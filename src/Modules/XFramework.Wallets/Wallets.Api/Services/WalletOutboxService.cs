@@ -30,6 +30,7 @@ public sealed class WalletOutboxService(
         const int batchSize = 50;
         var pending = (int)WalletOutboxStatus.Pending;
         var failed = (int)WalletOutboxStatus.Failed;
+        var processing = (int)WalletOutboxStatus.Processing;
 
         await using var leaseTransaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         var due = await dbContext.Set<WalletOutboxMessage>()
@@ -37,9 +38,18 @@ public sealed class WalletOutboxService(
                 SELECT *
                 FROM "Wallet"."WalletOutboxMessage"
                 WHERE "IsDeleted" = false
-                  AND "Status" IN ({pending}, {failed})
-                  AND ("NextAttemptAt" IS NULL OR "NextAttemptAt" <= {now})
-                  AND ("LockedUntil" IS NULL OR "LockedUntil" <= {now})
+                  AND (
+                    (
+                      "Status" IN ({pending}, {failed})
+                      AND ("NextAttemptAt" IS NULL OR "NextAttemptAt" <= {now})
+                      AND ("LockedUntil" IS NULL OR "LockedUntil" <= {now})
+                    )
+                    OR (
+                      "Status" = {processing}
+                      AND "LockedUntil" IS NOT NULL
+                      AND "LockedUntil" <= {now}
+                    )
+                  )
                 ORDER BY COALESCE("NextAttemptAt", "CreatedAt")
                 LIMIT {batchSize}
                 FOR UPDATE SKIP LOCKED
@@ -50,6 +60,11 @@ public sealed class WalletOutboxService(
 
         foreach (var message in due)
         {
+            if (message.Status == WalletOutboxStatus.Processing)
+            {
+                message.LastError = "Recovered expired outbox processing lease";
+            }
+
             message.Status = WalletOutboxStatus.Processing;
             message.LockedBy = _workerId;
             message.LockedUntil = now.AddMinutes(2);

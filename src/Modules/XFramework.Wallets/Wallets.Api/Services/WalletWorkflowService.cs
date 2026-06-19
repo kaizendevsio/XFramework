@@ -370,12 +370,27 @@ public sealed class WalletWorkflowService(
             .FirstAsync(x => x.Id == withdrawal.WalletId && x.TenantId == withdrawal.TenantId, ct);
 
         var amount = (withdrawal.Amount ?? 0) + (withdrawal.Fee ?? withdrawal.CalculatedFee ?? 0);
-        var actorCredentialId = ResolveActor(load.Data.Context, withdrawal.CredentialId);
+        var approvalActor = await ResolveApprovalDecisionActorAsync(
+            withdrawal.ApprovalId,
+            withdrawal.TenantId,
+            load.Data.Context,
+            withdrawal.RequestedByCredentialId ?? withdrawal.CredentialId,
+            ct);
+        if (!approvalActor.IsSuccess)
+        {
+            return Result<WalletWorkflowResponse>.Failure(approvalActor.Message!, approvalActor.StatusCode);
+        }
+
+        var actorCredentialId = approvalActor.Data;
         var approval = withdrawal.ApprovalId.HasValue
             ? await dbContext.Set<WalletApprovalRequest>()
                 .IgnoreQueryFilters()
                 .AsTracking()
-                .FirstOrDefaultAsync(x => x.Id == withdrawal.ApprovalId.Value && !x.IsDeleted, ct)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == withdrawal.ApprovalId.Value &&
+                    x.TenantId == withdrawal.TenantId &&
+                    !x.IsDeleted,
+                    ct)
             : null;
         ApplyApprovalDecision(approval, WalletApprovalStatus.Approved, actorCredentialId, request.Reason);
 
@@ -399,7 +414,7 @@ public sealed class WalletWorkflowService(
         {
             TenantId = withdrawal.TenantId,
             OperationType = WalletOperationType.Hold,
-            ActorCredentialId = actorCredentialId ?? withdrawal.RequestedByCredentialId ?? withdrawal.CredentialId,
+            ActorCredentialId = actorCredentialId,
             IdempotencyKey = $"withdrawal:hold:{withdrawal.Id}",
             ReferenceNumber = withdrawal.ReferenceNumber,
             ExternalReference = withdrawal.ExternalReference,
@@ -663,13 +678,32 @@ public sealed class WalletWorkflowService(
                 400);
         }
 
-        var actorCredentialId = ResolveActor(load.Data.Context, withdrawal.CredentialId);
-        var approval = workflowStatus is WalletWorkflowStatus.Rejected && withdrawal.ApprovalId.HasValue
-            ? await dbContext.Set<WalletApprovalRequest>()
-                .IgnoreQueryFilters()
-                .AsTracking()
-                .FirstOrDefaultAsync(x => x.Id == withdrawal.ApprovalId.Value && !x.IsDeleted, ct)
-            : null;
+        Guid? actorCredentialId = ResolveActor(load.Data.Context, withdrawal.CredentialId);
+        WalletApprovalRequest? approval = null;
+        if (workflowStatus is WalletWorkflowStatus.Rejected)
+        {
+            if (IsTrustedProviderTerminalDecision(load.Data.Context, request))
+            {
+                actorCredentialId = load.Data.Context.ActorCredentialId;
+            }
+            else
+            {
+                var approvalActor = await ResolveApprovalDecisionActorAsync(
+                    withdrawal.ApprovalId,
+                    withdrawal.TenantId,
+                    load.Data.Context,
+                    withdrawal.RequestedByCredentialId ?? withdrawal.CredentialId,
+                    ct);
+                if (!approvalActor.IsSuccess)
+                {
+                    return Result<WalletWorkflowResponse>.Failure(approvalActor.Message!, approvalActor.StatusCode);
+                }
+
+                actorCredentialId = approvalActor.Data;
+            }
+
+            approval = await LoadPendingApprovalAsync(withdrawal.ApprovalId, withdrawal.TenantId, ct);
+        }
 
         if (!withdrawal.HoldOperationId.HasValue)
         {
@@ -920,6 +954,12 @@ public sealed class WalletWorkflowService(
             return Result<WalletCaseResponse>.NotFound("Wallet not found");
         }
 
+        var authorization = AuthorizeWorkflowActor(contextResult.Data!, wallet.CredentialId);
+        if (!authorization.IsSuccess)
+        {
+            return Result<WalletCaseResponse>.Failure(authorization.Message!, authorization.StatusCode);
+        }
+
         var walletCase = new WalletCase
         {
             Id = Guid.NewGuid(),
@@ -958,15 +998,6 @@ public sealed class WalletWorkflowService(
             return Result<WalletCaseResponse>.NotFound("Wallet case not found");
         }
 
-        if (!request.Approve)
-        {
-            walletCase.Status = WalletCaseStatus.Rejected;
-            walletCase.DeciderCredentialId = contextResult.Data!.ActorCredentialId;
-            walletCase.ResolvedAt = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync(ct);
-            return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, "Wallet case rejected"));
-        }
-
         var wallet = await dbContext.Set<Wallet>()
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -974,6 +1005,21 @@ public sealed class WalletWorkflowService(
         if (wallet is null)
         {
             return Result<WalletCaseResponse>.NotFound("Wallet not found");
+        }
+
+        var authorization = AuthorizeWorkflowActor(contextResult.Data!, wallet.CredentialId);
+        if (!authorization.IsSuccess)
+        {
+            return Result<WalletCaseResponse>.Failure(authorization.Message!, authorization.StatusCode);
+        }
+
+        if (!request.Approve)
+        {
+            walletCase.Status = WalletCaseStatus.Rejected;
+            walletCase.DeciderCredentialId = contextResult.Data!.ActorCredentialId;
+            walletCase.ResolvedAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(ct);
+            return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, "Wallet case rejected"));
         }
 
         var credit = walletCase.CaseType is WalletCaseType.Refund;
@@ -1049,6 +1095,8 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<List<WalletStatementLineResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsReporting, ct);
         if (!feature.IsSuccess) return Failure<List<WalletStatementLineResponse>>(feature);
+        var scope = await ResolveReportWalletScopeAsync(contextResult.Data!, request.WalletId, ct);
+        if (!scope.IsSuccess) return Result<List<WalletStatementLineResponse>>.Failure(scope.Message!, scope.StatusCode);
 
         var query = dbContext.Set<WalletLedgerEntry>()
             .IgnoreQueryFilters()
@@ -1087,6 +1135,8 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<List<WalletStatementLineResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsReporting, ct);
         if (!feature.IsSuccess) return Failure<List<WalletStatementLineResponse>>(feature);
+        var scope = await ResolveReportWalletScopeAsync(contextResult.Data!, request.WalletId, ct);
+        if (!scope.IsSuccess) return Result<List<WalletStatementLineResponse>>.Failure(scope.Message!, scope.StatusCode);
 
         var query = dbContext.Set<WalletLedgerEntry>()
             .IgnoreQueryFilters()
@@ -1094,6 +1144,7 @@ public sealed class WalletWorkflowService(
             .Where(x => x.TenantId == contextResult.Data!.TenantId && !x.IsDeleted);
 
         if (request.WalletId.HasValue) query = query.Where(x => x.WalletId == request.WalletId.Value);
+        if (!scope.Data!.TenantWide) query = query.Where(x => x.WalletId.HasValue && scope.Data.WalletIds.Contains(x.WalletId.Value));
         if (request.From.HasValue) query = query.Where(x => x.CreatedAt >= request.From.Value);
         if (request.To.HasValue) query = query.Where(x => x.CreatedAt <= request.To.Value);
         if (!string.IsNullOrWhiteSpace(request.ReferenceNumber)) query = query.Where(x => x.ReferenceNumber == request.ReferenceNumber);
@@ -1130,6 +1181,8 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<WalletBalanceAsOfResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsReporting, ct);
         if (!feature.IsSuccess) return Failure<WalletBalanceAsOfResponse>(feature);
+        var scope = await ResolveReportWalletScopeAsync(contextResult.Data!, request.WalletId, ct);
+        if (!scope.IsSuccess) return Result<WalletBalanceAsOfResponse>.Failure(scope.Message!, scope.StatusCode);
 
         var entry = await dbContext.Set<WalletLedgerEntry>()
             .IgnoreQueryFilters()
@@ -1178,6 +1231,15 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<List<WalletOperationHistoryResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsReporting, ct);
         if (!feature.IsSuccess) return Failure<List<WalletOperationHistoryResponse>>(feature);
+        if (!contextResult.Data!.IsPrivilegedActor &&
+            request.ActorCredentialId.HasValue &&
+            request.ActorCredentialId != contextResult.Data.ActorCredentialId)
+        {
+            return Result<List<WalletOperationHistoryResponse>>.Forbidden("Actor cannot access another credential's wallet operation history");
+        }
+
+        var scope = await ResolveReportWalletScopeAsync(contextResult.Data, request.WalletId, ct);
+        if (!scope.IsSuccess) return Result<List<WalletOperationHistoryResponse>>.Failure(scope.Message!, scope.StatusCode);
 
         var query = dbContext.Set<WalletOperation>()
             .IgnoreQueryFilters()
@@ -1185,6 +1247,7 @@ public sealed class WalletWorkflowService(
             .Where(x => x.TenantId == contextResult.Data!.TenantId && !x.IsDeleted);
 
         if (request.WalletId.HasValue) query = query.Where(x => x.LedgerEntries.Any(entry => entry.WalletId == request.WalletId.Value));
+        if (!scope.Data!.TenantWide) query = query.Where(x => x.LedgerEntries.Any(entry => entry.WalletId.HasValue && scope.Data.WalletIds.Contains(entry.WalletId.Value)));
         if (request.ActorCredentialId.HasValue) query = query.Where(x => x.ActorCredentialId == request.ActorCredentialId.Value);
         if (request.OperationType.HasValue) query = query.Where(x => x.OperationType == request.OperationType.Value);
         if (request.Status.HasValue) query = query.Where(x => x.Status == request.Status.Value);
@@ -1240,6 +1303,8 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<List<WalletOperationHistoryResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsReporting, ct);
         if (!feature.IsSuccess) return Failure<List<WalletOperationHistoryResponse>>(feature);
+        var scope = await ResolveReportWalletScopeAsync(contextResult.Data!, historyRequest.WalletId, ct);
+        if (!scope.IsSuccess) return Result<List<WalletOperationHistoryResponse>>.Failure(scope.Message!, scope.StatusCode);
 
         var query = dbContext.Set<WalletOperation>()
             .IgnoreQueryFilters()
@@ -1250,6 +1315,7 @@ public sealed class WalletWorkflowService(
                 (x.Status == WalletOperationStatus.Failed || x.Status == WalletOperationStatus.Rejected));
 
         if (historyRequest.WalletId.HasValue) query = query.Where(x => x.LedgerEntries.Any(entry => entry.WalletId == historyRequest.WalletId.Value));
+        if (!scope.Data!.TenantWide) query = query.Where(x => x.LedgerEntries.Any(entry => entry.WalletId.HasValue && scope.Data.WalletIds.Contains(entry.WalletId.Value)));
         if (historyRequest.OperationType.HasValue) query = query.Where(x => x.OperationType == historyRequest.OperationType.Value);
         if (historyRequest.From.HasValue) query = query.Where(x => x.CreatedAt >= historyRequest.From.Value);
         if (historyRequest.To.HasValue) query = query.Where(x => x.CreatedAt <= historyRequest.To.Value);
@@ -1291,6 +1357,8 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<List<WalletReconciliationItemResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsReporting, ct);
         if (!feature.IsSuccess) return Failure<List<WalletReconciliationItemResponse>>(feature);
+        var scope = await ResolveReportWalletScopeAsync(contextResult.Data!, request.WalletId, ct);
+        if (!scope.IsSuccess) return Result<List<WalletReconciliationItemResponse>>.Failure(scope.Message!, scope.StatusCode);
 
         var query = dbContext.Set<WalletReconciliationItem>()
             .IgnoreQueryFilters()
@@ -1302,6 +1370,7 @@ public sealed class WalletWorkflowService(
                 x.Status != WalletReconciliationStatus.MarkedReconciled);
 
         if (request.WalletId.HasValue) query = query.Where(x => x.WalletId == request.WalletId.Value);
+        if (!scope.Data!.TenantWide) query = query.Where(x => x.WalletId.HasValue && scope.Data.WalletIds.Contains(x.WalletId.Value));
 
         var page = NormalizePage(request.Page);
         var pageSize = NormalizePageSize(request.PageSize);
@@ -1331,6 +1400,10 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<List<WalletOutboxFailureResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsReporting, ct);
         if (!feature.IsSuccess) return Failure<List<WalletOutboxFailureResponse>>(feature);
+        if (!contextResult.Data!.IsPrivilegedActor)
+        {
+            return Result<List<WalletOutboxFailureResponse>>.Forbidden("Outbox failure reporting requires privileged wallet access");
+        }
 
         var query = dbContext.Set<WalletOutboxMessage>()
             .IgnoreQueryFilters()
@@ -1373,6 +1446,10 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<List<WalletSettlementReportResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsReporting, ct);
         if (!feature.IsSuccess) return Failure<List<WalletSettlementReportResponse>>(feature);
+        var scope = await ResolveReportWalletScopeAsync(contextResult.Data!, requestedWalletId: null, ct);
+        if (!scope.IsSuccess) return Result<List<WalletSettlementReportResponse>>.Failure(scope.Message!, scope.StatusCode);
+        var context = contextResult.Data!;
+        var reportScope = scope.Data!;
 
         var rows = new List<WalletSettlementReportResponse>();
         var page = NormalizePage(request.Page);
@@ -1384,8 +1461,12 @@ public sealed class WalletWorkflowService(
             var deposits = dbContext.Set<DepositRequest>()
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .Where(x => x.TenantId == contextResult.Data!.TenantId && !x.IsDeleted);
+                .Where(x => x.TenantId == context.TenantId && !x.IsDeleted);
 
+            if (!reportScope.TenantWide && context.ActorCredentialId.HasValue)
+            {
+                deposits = deposits.Where(x => x.CredentialId == context.ActorCredentialId.Value);
+            }
             if (request.Status.HasValue) deposits = deposits.Where(x => x.WorkflowStatus == request.Status.Value);
             if (request.From.HasValue) deposits = deposits.Where(x => x.CreatedAt >= request.From.Value);
             if (request.To.HasValue) deposits = deposits.Where(x => x.CreatedAt <= request.To.Value);
@@ -1418,8 +1499,12 @@ public sealed class WalletWorkflowService(
             var withdrawals = dbContext.Set<WithdrawalRequest>()
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .Where(x => x.TenantId == contextResult.Data!.TenantId && !x.IsDeleted);
+                .Where(x => x.TenantId == context.TenantId && !x.IsDeleted);
 
+            if (!reportScope.TenantWide && context.ActorCredentialId.HasValue)
+            {
+                withdrawals = withdrawals.Where(x => x.CredentialId == context.ActorCredentialId.Value);
+            }
             if (request.Status.HasValue) withdrawals = withdrawals.Where(x => x.WorkflowStatus == request.Status.Value);
             if (request.From.HasValue) withdrawals = withdrawals.Where(x => x.CreatedAt >= request.From.Value);
             if (request.To.HasValue) withdrawals = withdrawals.Where(x => x.CreatedAt <= request.To.Value);
@@ -1659,16 +1744,44 @@ public sealed class WalletWorkflowService(
         deposit.Remarks = request.Reason ?? deposit.Remarks;
         if (approve)
         {
-            deposit.ApprovedByCredentialId = ResolveActor(load.Data.Context, deposit.CredentialId);
+            var approvalActor = await ResolveApprovalDecisionActorAsync(
+                deposit.ApprovalId,
+                deposit.TenantId,
+                load.Data.Context,
+                deposit.RequestedByCredentialId ?? deposit.CredentialId,
+                ct);
+            if (!approvalActor.IsSuccess)
+            {
+                return Result<WalletWorkflowResponse>.Failure(approvalActor.Message!, approvalActor.StatusCode);
+            }
+
+            deposit.ApprovedByCredentialId = approvalActor.Data;
             deposit.ApprovedAt = DateTime.UtcNow;
             deposit.DepositStatus = (short)DepositStatus.PendingPayment;
             await UpdateApprovalAsync(deposit.ApprovalId, deposit.TenantId, WalletApprovalStatus.Approved, deposit.ApprovedByCredentialId, request.Reason, ct);
         }
         if (reject)
         {
+            Guid? decisionActorId = load.Data.Context.ActorCredentialId;
+            if (!IsTrustedProviderTerminalDecision(load.Data.Context, request))
+            {
+                var approvalActor = await ResolveApprovalDecisionActorAsync(
+                    deposit.ApprovalId,
+                    deposit.TenantId,
+                    load.Data.Context,
+                    deposit.RequestedByCredentialId ?? deposit.CredentialId,
+                    ct);
+                if (!approvalActor.IsSuccess)
+                {
+                    return Result<WalletWorkflowResponse>.Failure(approvalActor.Message!, approvalActor.StatusCode);
+                }
+
+                decisionActorId = approvalActor.Data;
+            }
+
             deposit.DepositStatus = (short)DepositStatus.Revoked;
             deposit.FailureReason = request.Reason;
-            await UpdateApprovalAsync(deposit.ApprovalId, deposit.TenantId, WalletApprovalStatus.Rejected, ResolveActor(load.Data.Context, deposit.CredentialId), request.Reason, ct);
+            await UpdateApprovalAsync(deposit.ApprovalId, deposit.TenantId, WalletApprovalStatus.Rejected, decisionActorId, request.Reason, ct);
         }
         if (fail)
         {
@@ -1709,16 +1822,44 @@ public sealed class WalletWorkflowService(
         withdrawal.Remarks = request.Reason ?? withdrawal.Remarks;
         if (approve)
         {
-            withdrawal.ApprovedByCredentialId = ResolveActor(load.Data.Context, withdrawal.CredentialId);
+            var approvalActor = await ResolveApprovalDecisionActorAsync(
+                withdrawal.ApprovalId,
+                withdrawal.TenantId,
+                load.Data.Context,
+                withdrawal.RequestedByCredentialId ?? withdrawal.CredentialId,
+                ct);
+            if (!approvalActor.IsSuccess)
+            {
+                return Result<WalletWorkflowResponse>.Failure(approvalActor.Message!, approvalActor.StatusCode);
+            }
+
+            withdrawal.ApprovedByCredentialId = approvalActor.Data;
             withdrawal.ApprovedAt = DateTime.UtcNow;
             withdrawal.WithdrawalStatus = TransactionStatus.Accepted;
             await UpdateApprovalAsync(withdrawal.ApprovalId, withdrawal.TenantId, WalletApprovalStatus.Approved, withdrawal.ApprovedByCredentialId, request.Reason, ct);
         }
         if (reject)
         {
+            Guid? decisionActorId = load.Data.Context.ActorCredentialId;
+            if (!IsTrustedProviderTerminalDecision(load.Data.Context, request))
+            {
+                var approvalActor = await ResolveApprovalDecisionActorAsync(
+                    withdrawal.ApprovalId,
+                    withdrawal.TenantId,
+                    load.Data.Context,
+                    withdrawal.RequestedByCredentialId ?? withdrawal.CredentialId,
+                    ct);
+                if (!approvalActor.IsSuccess)
+                {
+                    return Result<WalletWorkflowResponse>.Failure(approvalActor.Message!, approvalActor.StatusCode);
+                }
+
+                decisionActorId = approvalActor.Data;
+            }
+
             withdrawal.WithdrawalStatus = TransactionStatus.Rejected;
             withdrawal.FailureReason = request.Reason;
-            await UpdateApprovalAsync(withdrawal.ApprovalId, withdrawal.TenantId, WalletApprovalStatus.Rejected, ResolveActor(load.Data.Context, withdrawal.CredentialId), request.Reason, ct);
+            await UpdateApprovalAsync(withdrawal.ApprovalId, withdrawal.TenantId, WalletApprovalStatus.Rejected, decisionActorId, request.Reason, ct);
         }
         if (fail)
         {
@@ -1737,6 +1878,8 @@ public sealed class WalletWorkflowService(
     }
 
     private sealed record WorkflowLoad<T>(T Entity, WalletRequestContext Context);
+
+    private sealed record WalletReportScope(bool TenantWide, IReadOnlyList<Guid> WalletIds);
 
     private async Task<Result<WorkflowLoad<DepositRequest>>> LoadDepositAsync(WalletWorkflowActionRequest request, bool tracking, CancellationToken ct)
     {
@@ -1884,6 +2027,96 @@ public sealed class WalletWorkflowService(
         });
     }
 
+    private async Task<Result<Guid>> ResolveApprovalDecisionActorAsync(
+        Guid? approvalId,
+        Guid tenantId,
+        WalletRequestContext context,
+        Guid requesterCredentialId,
+        CancellationToken ct)
+    {
+        if (context.ActorCredentialId is not { } actorCredentialId || actorCredentialId == Guid.Empty)
+        {
+            return Result<Guid>.Failure("Approver credential is required", 400);
+        }
+
+        if (actorCredentialId == requesterCredentialId)
+        {
+            return Result<Guid>.Forbidden("Requester cannot approve their own maker-checker request");
+        }
+
+        if (!approvalId.HasValue)
+        {
+            return Result<Guid>.Success(actorCredentialId);
+        }
+
+        var approval = await dbContext.Set<WalletApprovalRequest>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == approvalId.Value && x.TenantId == tenantId && !x.IsDeleted, ct);
+        if (approval is not null && approval.RequesterCredentialId == actorCredentialId)
+        {
+            return Result<Guid>.Forbidden("Requester cannot approve their own maker-checker request");
+        }
+
+        return Result<Guid>.Success(actorCredentialId);
+    }
+
+    private async Task<WalletApprovalRequest?> LoadPendingApprovalAsync(Guid? approvalId, Guid tenantId, CancellationToken ct)
+    {
+        if (!approvalId.HasValue)
+        {
+            return null;
+        }
+
+        return await dbContext.Set<WalletApprovalRequest>()
+            .IgnoreQueryFilters()
+            .AsTracking()
+            .FirstOrDefaultAsync(x =>
+                x.Id == approvalId.Value &&
+                x.TenantId == tenantId &&
+                !x.IsDeleted,
+                ct);
+    }
+
+    private async Task<Result<WalletReportScope>> ResolveReportWalletScopeAsync(
+        WalletRequestContext context,
+        Guid? requestedWalletId,
+        CancellationToken ct)
+    {
+        if (context.IsPrivilegedActor)
+        {
+            return Result<WalletReportScope>.Success(new WalletReportScope(
+                TenantWide: !requestedWalletId.HasValue,
+                WalletIds: requestedWalletId.HasValue ? [requestedWalletId.Value] : []));
+        }
+
+        if (context.ActorCredentialId is not { } actorCredentialId || actorCredentialId == Guid.Empty)
+        {
+            return Result<WalletReportScope>.Forbidden("Actor credential is required for wallet reports");
+        }
+
+        var walletQuery = dbContext.Set<Wallet>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == context.TenantId &&
+                !x.IsDeleted &&
+                x.CredentialId == actorCredentialId);
+
+        if (requestedWalletId.HasValue)
+        {
+            walletQuery = walletQuery.Where(x => x.Id == requestedWalletId.Value);
+        }
+
+        var walletIds = await walletQuery.Select(x => x.Id).ToListAsync(ct);
+        if (requestedWalletId.HasValue && walletIds.Count == 0)
+        {
+            return Result<WalletReportScope>.Forbidden("Actor cannot access the requested wallet report");
+        }
+
+        return Result<WalletReportScope>.Success(new WalletReportScope(false, walletIds));
+    }
+
     private async Task UpdateApprovalAsync(
         Guid? approvalId,
         Guid tenantId,
@@ -2011,6 +2244,11 @@ public sealed class WalletWorkflowService(
             ? Result.Success()
             : Result.Forbidden("Actor cannot operate on the requested wallet workflow");
     }
+
+    private static bool IsTrustedProviderTerminalDecision(WalletRequestContext context, WalletWorkflowActionRequest request) =>
+        context.IsSystemActor &&
+        request.WebhookEventId.HasValue &&
+        !string.IsNullOrWhiteSpace(request.ProviderStatus);
 
     private static Guid? ResolveActor(WalletRequestContext context, Guid fallbackCredentialId) =>
         context.ActorCredentialId ?? fallbackCredentialId;

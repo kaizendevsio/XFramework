@@ -26,6 +26,7 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     public async Task Http_DepositAndWithdrawalRequestLifecycle_CreatesAndUpdatesWorkflowRecords()
     {
         var credential = await SeedCredential();
+        var checker = await SeedCredential();
         var wallet = await SeedWallet(credential.Id, 500m);
         var gatewayId = await SeedPaymentGateway();
         var depositReference = $"dep-{Guid.NewGuid():N}";
@@ -51,12 +52,12 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         deposit.TenantId.Should().Be(WalletsTestFixture.TestTenantId);
         deposit.WorkflowStatus.Should().Be(WalletWorkflowStatus.PendingApproval);
 
-        var approveDepositResponse = await HttpClient.PostAsJsonAsync("/api/wallets/deposits/approve", new ApproveDepositWorkflowRequest
+        var approveDepositResponse = await PostAsJsonAsActorAsync("/api/wallets/deposits/approve", new ApproveDepositWorkflowRequest
         {
             RequestId = deposit.Id,
             Reason = "checker approved deposit",
             Metadata = CreateMetadata()
-        });
+        }, checker.Id);
         var approveDepositBody = await approveDepositResponse.Content.ReadAsStringAsync();
         approveDepositResponse.IsSuccessStatusCode.Should().BeTrue(approveDepositBody);
         db.ChangeTracker.Clear();
@@ -92,12 +93,12 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         withdrawal.TenantId.Should().Be(WalletsTestFixture.TestTenantId);
         withdrawal.WorkflowStatus.Should().Be(WalletWorkflowStatus.PendingApproval);
 
-        var approveWithdrawalResponse = await HttpClient.PostAsJsonAsync("/api/wallets/withdrawals/approve", new ApproveWithdrawalWorkflowRequest
+        var approveWithdrawalResponse = await PostAsJsonAsActorAsync("/api/wallets/withdrawals/approve", new ApproveWithdrawalWorkflowRequest
         {
             RequestId = withdrawal.Id,
             Reason = "checker accepted withdrawal",
             Metadata = CreateMetadata()
-        });
+        }, checker.Id);
         var approveWithdrawalBody = await approveWithdrawalResponse.Content.ReadAsStringAsync();
         approveWithdrawalResponse.IsSuccessStatusCode.Should().BeTrue(approveWithdrawalBody);
         db.ChangeTracker.Clear();
@@ -133,6 +134,7 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     public async Task Http_RegisteredPaymentGateway_InitiatesDepositAndSettlesWithdrawalThroughProvider()
     {
         var credential = await SeedCredential();
+        var checker = await SeedCredential();
         var wallet = await SeedWallet(credential.Id, 500m);
         var gatewayId = await SeedPaymentGateway(SamplePaymentGatewayId, "Sample Payment Provider");
         var depositReference = $"provider-dep-{Guid.NewGuid():N}";
@@ -171,12 +173,12 @@ public class WalletAdvancedSystemTests : WalletsTestBase
 
         db.ChangeTracker.Clear();
         var withdrawal = await db.Set<WithdrawalRequest>().SingleAsync(x => x.ExternalReference == withdrawalReference);
-        var approveWithdrawalResponse = await HttpClient.PostAsJsonAsync("/api/wallets/withdrawals/approve", new ApproveWithdrawalWorkflowRequest
+        var approveWithdrawalResponse = await PostAsJsonAsActorAsync("/api/wallets/withdrawals/approve", new ApproveWithdrawalWorkflowRequest
         {
             RequestId = withdrawal.Id,
             Reason = "provider payout approved",
             Metadata = CreateMetadata()
-        });
+        }, checker.Id);
         approveWithdrawalResponse.IsSuccessStatusCode.Should().BeTrue(await approveWithdrawalResponse.Content.ReadAsStringAsync());
 
         db.ChangeTracker.Clear();
@@ -469,6 +471,7 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     public async Task Webhook_SignedUnauthenticatedRequest_SettlesDepositOnceAndIgnoresDuplicate()
     {
         var credential = await SeedCredential();
+        var checker = await SeedCredential();
         var gatewayId = await SeedPaymentGateway();
         var externalReference = $"signed-webhook-{Guid.NewGuid():N}";
 
@@ -485,11 +488,11 @@ public class WalletAdvancedSystemTests : WalletsTestBase
 
         await using var db = CreateDbContext();
         var deposit = await db.Set<DepositRequest>().SingleAsync(x => x.ExternalReference == externalReference);
-        var approveResponse = await HttpClient.PostAsJsonAsync("/api/wallets/deposits/approve", new ApproveDepositWorkflowRequest
+        var approveResponse = await PostAsJsonAsActorAsync("/api/wallets/deposits/approve", new ApproveDepositWorkflowRequest
         {
             RequestId = deposit.Id,
             Metadata = CreateMetadata()
-        });
+        }, checker.Id);
         approveResponse.IsSuccessStatusCode.Should().BeTrue(await approveResponse.Content.ReadAsStringAsync());
 
         var payload = $$"""{"tenantId":"{{WalletsTestFixture.TestTenantId}}","event":"deposit.completed","reference":"{{externalReference}}","amount":90}""";
@@ -532,6 +535,58 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         webhookRows.Should().ContainSingle();
         webhookRows[0].ProcessingStatus.Should().Be(WalletWebhookProcessingStatus.Processed);
         operationCount.Should().Be(1);
+    }
+
+    [Test]
+    public async Task Webhook_RejectedProviderStatus_MovesDepositToRejectedWithoutHumanApprover()
+    {
+        var credential = await SeedCredential();
+        var gatewayId = await SeedPaymentGateway();
+        var externalReference = $"signed-webhook-rejected-{Guid.NewGuid():N}";
+
+        var depositResponse = await HttpClient.PostAsJsonAsync("/api/wallets/deposits", new CreateDepositWorkflowRequest
+        {
+            CredentialId = credential.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+            GatewayId = gatewayId,
+            Amount = 45m,
+            ExternalReference = externalReference,
+            Metadata = CreateMetadata()
+        });
+        depositResponse.IsSuccessStatusCode.Should().BeTrue(await depositResponse.Content.ReadAsStringAsync());
+
+        await using var db = CreateDbContext();
+        var deposit = await db.Set<DepositRequest>().SingleAsync(x => x.ExternalReference == externalReference);
+        var payload = $$"""{"tenantId":"{{WalletsTestFixture.TestTenantId}}","event":"deposit.rejected","reference":"{{externalReference}}","amount":45}""";
+        var request = new IngestWalletPaymentWebhookRequest
+        {
+            ProviderKey = "test-provider",
+            ExternalEventId = $"evt-{Guid.NewGuid():N}",
+            ExternalReference = externalReference,
+            ProviderTransactionId = $"ptx-{Guid.NewGuid():N}",
+            ProviderStatus = "rejected",
+            Amount = 45m,
+            RawPayloadJson = payload,
+            Signature = SignWebhookPayload(payload),
+            Metadata = CreateMetadata()
+        };
+
+        await using var scope = WalletsTestFixture.Services.CreateAsyncScope();
+        var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+        accessor.HttpContext = new DefaultHttpContext();
+        var webhookService = scope.ServiceProvider.GetRequiredService<IWalletPaymentWebhookService>();
+
+        var result = await webhookService.IngestAsync(request);
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        db.ChangeTracker.Clear();
+        var rejectedDeposit = await db.Set<DepositRequest>().SingleAsync(x => x.Id == deposit.Id);
+        var approval = await db.Set<WalletApprovalRequest>().SingleAsync(x => x.Id == deposit.ApprovalId);
+        var webhook = await db.Set<WalletPaymentWebhookEvent>().SingleAsync(x => x.ExternalEventId == request.ExternalEventId);
+        rejectedDeposit.WorkflowStatus.Should().Be(WalletWorkflowStatus.Rejected);
+        approval.Status.Should().Be(WalletApprovalStatus.Rejected);
+        approval.ApproverCredentialId.Should().BeNull();
+        webhook.ProcessingStatus.Should().Be(WalletWebhookProcessingStatus.Processed);
     }
 
     [Test]
@@ -616,6 +671,7 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     public async Task WorkflowAction_CrossTenantApprovalReference_DoesNotMutateForeignApproval()
     {
         var credential = await SeedCredential();
+        var checker = await SeedCredential();
         var gatewayId = await SeedPaymentGateway();
         var foreignTenantId = Guid.NewGuid();
         await using var db = CreateDbContext();
@@ -652,12 +708,12 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         db.Set<DepositRequest>().Add(deposit);
         await db.SaveChangesAsync();
 
-        var response = await HttpClient.PostAsJsonAsync("/api/wallets/deposits/approve", new ApproveDepositWorkflowRequest
+        var response = await PostAsJsonAsActorAsync("/api/wallets/deposits/approve", new ApproveDepositWorkflowRequest
         {
             RequestId = deposit.Id,
             Reason = "approve only local deposit",
             Metadata = CreateMetadata()
-        });
+        }, checker.Id);
 
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
         db.ChangeTracker.Clear();
@@ -671,6 +727,227 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         unchangedForeignApproval.Status.Should().Be(WalletApprovalStatus.Pending);
         unchangedForeignApproval.ApproverCredentialId.Should().BeNull();
         unchangedForeignApproval.DecidedAt.Should().BeNull();
+    }
+
+    [Test]
+    public async Task WorkflowApproval_SameRequesterAndApprover_IsForbidden()
+    {
+        var credential = await SeedCredential();
+        var gatewayId = await SeedPaymentGateway();
+        var externalReference = $"self-approval-{Guid.NewGuid():N}";
+
+        var createResponse = await PostAsJsonAsActorAsync("/api/wallets/deposits", new CreateDepositWorkflowRequest
+        {
+            CredentialId = credential.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+            GatewayId = gatewayId,
+            Amount = 40m,
+            ExternalReference = externalReference,
+            Metadata = CreateMetadata()
+        }, credential.Id, privileged: false);
+        createResponse.IsSuccessStatusCode.Should().BeTrue(await createResponse.Content.ReadAsStringAsync());
+
+        await using var db = CreateDbContext();
+        var deposit = await db.Set<DepositRequest>().SingleAsync(x => x.ExternalReference == externalReference);
+
+        var approveResponse = await PostAsJsonAsActorAsync("/api/wallets/deposits/approve", new ApproveDepositWorkflowRequest
+        {
+            RequestId = deposit.Id,
+            Reason = "same actor tries to approve",
+            Metadata = CreateMetadata()
+        }, credential.Id, privileged: false);
+
+        approveResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        db.ChangeTracker.Clear();
+        var unchangedDeposit = await db.Set<DepositRequest>().SingleAsync(x => x.Id == deposit.Id);
+        var approval = await db.Set<WalletApprovalRequest>().SingleAsync(x => x.Id == deposit.ApprovalId);
+        unchangedDeposit.WorkflowStatus.Should().Be(WalletWorkflowStatus.PendingApproval);
+        approval.Status.Should().Be(WalletApprovalStatus.Pending);
+        approval.ApproverCredentialId.Should().BeNull();
+    }
+
+    [Test]
+    public async Task WithdrawalApproval_SameRequesterAndApprover_IsForbiddenAndDoesNotHoldFunds()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 100m);
+        var externalReference = $"self-withdrawal-{Guid.NewGuid():N}";
+
+        var createResponse = await PostAsJsonAsActorAsync("/api/wallets/withdrawals", new CreateWithdrawalWorkflowRequest
+        {
+            CredentialId = credential.Id,
+            WalletId = wallet.Id,
+            Amount = 25m,
+            RequestedFee = 0m,
+            ExternalReference = externalReference,
+            Metadata = CreateMetadata()
+        }, credential.Id, privileged: false);
+        createResponse.IsSuccessStatusCode.Should().BeTrue(await createResponse.Content.ReadAsStringAsync());
+
+        await using var db = CreateDbContext();
+        var withdrawal = await db.Set<WithdrawalRequest>().SingleAsync(x => x.ExternalReference == externalReference);
+
+        var approveResponse = await PostAsJsonAsActorAsync("/api/wallets/withdrawals/approve", new ApproveWithdrawalWorkflowRequest
+        {
+            RequestId = withdrawal.Id,
+            Reason = "same actor tries to approve withdrawal",
+            Metadata = CreateMetadata()
+        }, credential.Id, privileged: false);
+
+        approveResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        db.ChangeTracker.Clear();
+        var unchangedWithdrawal = await db.Set<WithdrawalRequest>().SingleAsync(x => x.Id == withdrawal.Id);
+        var unchangedWallet = await db.Set<Wallet>().SingleAsync(x => x.Id == wallet.Id);
+        var approval = await db.Set<WalletApprovalRequest>().SingleAsync(x => x.Id == withdrawal.ApprovalId);
+        var holdExists = await db.Set<WalletOperation>().AnyAsync(x => x.ReferenceNumber == withdrawal.ReferenceNumber);
+        unchangedWithdrawal.WorkflowStatus.Should().Be(WalletWorkflowStatus.PendingApproval);
+        unchangedWithdrawal.HoldOperationId.Should().BeNull();
+        unchangedWallet.Balance.Should().Be(100m);
+        unchangedWallet.DebitOnHoldBalance.Should().Be(0m);
+        unchangedWallet.TransferableBalance.Should().Be(100m);
+        approval.Status.Should().Be(WalletApprovalStatus.Pending);
+        holdExists.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task WalletCase_WrongActorCannotCreateOrResolveCase()
+    {
+        var owner = await SeedCredential();
+        var otherActor = await SeedCredential();
+        var wallet = await SeedWallet(owner.Id, 100m);
+
+        var wrongCreateResponse = await PostAsJsonAsActorAsync("/api/wallets/cases", new CreateWalletCaseRequest
+        {
+            WalletId = wallet.Id,
+            CaseType = WalletCaseType.Refund,
+            Amount = 10m,
+            ExternalReference = $"wrong-case-{Guid.NewGuid():N}",
+            Reason = "wrong actor",
+            Metadata = CreateMetadata()
+        }, otherActor.Id, privileged: false);
+
+        wrongCreateResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var caseReference = $"case-{Guid.NewGuid():N}";
+        var createResponse = await PostAsJsonAsActorAsync("/api/wallets/cases", new CreateWalletCaseRequest
+        {
+            WalletId = wallet.Id,
+            CaseType = WalletCaseType.Refund,
+            Amount = 10m,
+            ExternalReference = caseReference,
+            Reason = "owner opened case",
+            Metadata = CreateMetadata()
+        }, owner.Id, privileged: false);
+        createResponse.IsSuccessStatusCode.Should().BeTrue(await createResponse.Content.ReadAsStringAsync());
+
+        await using var db = CreateDbContext();
+        var walletCase = await db.Set<WalletCase>().SingleAsync(x => x.ExternalReference == caseReference);
+        var wrongResolveResponse = await PostAsJsonAsActorAsync("/api/wallets/cases/resolve", new ResolveWalletCaseRequest
+        {
+            CaseId = walletCase.Id,
+            Approve = true,
+            Reason = "wrong actor tries to resolve",
+            Metadata = CreateMetadata()
+        }, otherActor.Id, privileged: false);
+
+        wrongResolveResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        db.ChangeTracker.Clear();
+        var unchangedCase = await db.Set<WalletCase>().SingleAsync(x => x.Id == walletCase.Id);
+        var operationExists = await db.Set<WalletOperation>().AnyAsync(x => x.ReferenceNumber == caseReference);
+        unchangedCase.Status.Should().Be(WalletCaseStatus.Open);
+        operationExists.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task OutboxDispatcher_ExpiredProcessingLease_IsReprocessed()
+    {
+        var outboxId = Guid.NewGuid();
+        await using (var db = CreateDbContext())
+        {
+            db.Set<WalletOutboxMessage>().Add(new WalletOutboxMessage
+            {
+                Id = outboxId,
+                TenantId = WalletsTestFixture.TestTenantId,
+                EventType = "WalletTest.ExpiredLease",
+                AggregateType = "wallet",
+                AggregateId = Guid.NewGuid(),
+                PayloadJson = $$"""{"walletId":"{{Guid.NewGuid()}}","actorCredentialId":"{{Guid.NewGuid()}}"}""",
+                Status = WalletOutboxStatus.Processing,
+                LockedBy = "dead-worker",
+                LockedUntil = DateTime.UtcNow.AddMinutes(-5),
+                LastAttemptAt = DateTime.UtcNow.AddMinutes(-10),
+                MaxAttempts = 5
+            });
+            await db.SaveChangesAsync();
+        }
+
+        await using (var scope = WalletsTestFixture.Services.CreateAsyncScope())
+        {
+            var outbox = scope.ServiceProvider.GetRequiredService<IWalletOutboxService>();
+            await outbox.DispatchDueAsync();
+        }
+
+        await using var verifyDb = CreateDbContext();
+        var message = await verifyDb.Set<WalletOutboxMessage>().SingleAsync(x => x.Id == outboxId);
+        message.Status.Should().Be(WalletOutboxStatus.Published);
+        message.PublishedAt.Should().NotBeNull();
+        message.LockedBy.Should().BeNull();
+        message.LockedUntil.Should().BeNull();
+        message.LastError.Should().BeNull();
+    }
+
+    [Test]
+    public async Task Reports_NonPrivilegedActorIsScopedToOwnWallets()
+    {
+        var owner = await SeedCredential();
+        var otherActor = await SeedCredential();
+        var ownerWallet = await SeedWallet(owner.Id, 100m);
+        var otherWallet = await SeedWallet(otherActor.Id, 100m);
+        var ownerReference = $"owner-report-{Guid.NewGuid():N}";
+        var otherReference = $"other-report-{Guid.NewGuid():N}";
+
+        await using (var scope = WalletsTestFixture.Services.CreateAsyncScope())
+        {
+            var ledger = scope.ServiceProvider.GetRequiredService<IWalletLedgerService>();
+            (await ledger.ExecuteAsync(CreateReportCreditRequest(ownerWallet, owner.Id, ownerReference, 11m))).IsSuccess.Should().BeTrue();
+            (await ledger.ExecuteAsync(CreateReportCreditRequest(otherWallet, otherActor.Id, otherReference, 13m))).IsSuccess.Should().BeTrue();
+        }
+
+        await using var reportScope = WalletsTestFixture.Services.CreateAsyncScope();
+        var accessor = reportScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+        accessor.HttpContext = CreateActorHttpContext(owner.Id, privileged: false);
+        var reporting = reportScope.ServiceProvider.GetRequiredService<IWalletReportingService>();
+
+        var ledgerEntries = await reporting.GetLedgerEntriesAsync(new WalletLedgerEntriesRequest
+        {
+            PageSize = 50,
+            Metadata = CreateMetadata()
+        });
+        ledgerEntries.IsSuccess.Should().BeTrue(ledgerEntries.Message);
+        ledgerEntries.Data!.Select(x => x.ReferenceNumber).Should().Contain(ownerReference);
+        ledgerEntries.Data!.Select(x => x.ReferenceNumber).Should().NotContain(otherReference);
+
+        var history = await reporting.GetOperationHistoryAsync(new WalletOperationHistoryRequest
+        {
+            PageSize = 50,
+            Metadata = CreateMetadata()
+        });
+        history.IsSuccess.Should().BeTrue(history.Message);
+        history.Data!.Should().Contain(x => x.ReferenceNumber == ownerReference);
+        history.Data!.Should().NotContain(x => x.ReferenceNumber == otherReference);
+
+        var forbidden = await reporting.GetLedgerEntriesAsync(new WalletLedgerEntriesRequest
+        {
+            WalletId = otherWallet.Id,
+            Metadata = CreateMetadata()
+        });
+        forbidden.StatusCode.Should().Be(403);
+
+        var outboxFailures = await reporting.GetOutboxFailuresAsync(new WalletOutboxFailuresRequest
+        {
+            Metadata = CreateMetadata()
+        });
+        outboxFailures.StatusCode.Should().Be(403);
     }
 
     [Test]
@@ -923,6 +1200,7 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     public async Task Http_FailApprovedWithdrawal_ReleasesLedgerHoldAndKeepsBalance()
     {
         var credential = await SeedCredential();
+        var checker = await SeedCredential();
         var wallet = await SeedWallet(credential.Id, 500m);
         var withdrawalReference = $"wd-fail-{Guid.NewGuid():N}";
 
@@ -940,12 +1218,12 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         await using var db = CreateDbContext();
         var withdrawal = await db.Set<WithdrawalRequest>().SingleAsync(x => x.ExternalReference == withdrawalReference);
 
-        var approveResponse = await HttpClient.PostAsJsonAsync("/api/wallets/withdrawals/approve", new ApproveWithdrawalWorkflowRequest
+        var approveResponse = await PostAsJsonAsActorAsync("/api/wallets/withdrawals/approve", new ApproveWithdrawalWorkflowRequest
         {
             RequestId = withdrawal.Id,
             Reason = "hold funds",
             Metadata = CreateMetadata()
-        });
+        }, checker.Id);
         approveResponse.IsSuccessStatusCode.Should().BeTrue(await approveResponse.Content.ReadAsStringAsync());
 
         db.ChangeTracker.Clear();
@@ -1099,6 +1377,79 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         debitTotal.Should().BeLessThanOrEqualTo(500m);
         updatedSender.Balance.Should().Be(500m - debitTotal);
     }
+
+    private async Task<HttpResponseMessage> PostAsJsonAsActorAsync<TRequest>(
+        string requestUri,
+        TRequest request,
+        Guid credentialId,
+        bool privileged = true)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, requestUri)
+        {
+            Content = JsonContent.Create(request)
+        };
+        message.Headers.TryAddWithoutValidation("X-Wallets-Test-CredentialId", credentialId.ToString());
+        if (!privileged)
+        {
+            message.Headers.TryAddWithoutValidation("X-Wallets-Test-No-Role", "true");
+        }
+
+        return await HttpClient.SendAsync(message);
+    }
+
+    private static DefaultHttpContext CreateActorHttpContext(Guid credentialId, bool privileged)
+    {
+        var claims = new List<Claim>
+        {
+            new("tenantId", WalletsTestFixture.TestTenantId.ToString()),
+            new("credentialId", credentialId.ToString())
+        };
+        if (privileged)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        }
+
+        return new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(claims, "WalletsTest"))
+        };
+    }
+
+    private static WalletLedgerExecutionRequest CreateReportCreditRequest(
+        Wallet wallet,
+        Guid actorCredentialId,
+        string referenceNumber,
+        decimal amount) =>
+        new()
+        {
+            TenantId = WalletsTestFixture.TestTenantId,
+            OperationType = WalletOperationType.DepositApproval,
+            ActorCredentialId = actorCredentialId,
+            IdempotencyKey = referenceNumber,
+            ReferenceNumber = referenceNumber,
+            Postings =
+            [
+                new WalletLedgerPostingRequest
+                {
+                    Direction = WalletLedgerDirection.Debit,
+                    BalanceBucket = WalletBalanceBucket.External,
+                    EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                    Amount = amount,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber
+                },
+                new WalletLedgerPostingRequest
+                {
+                    WalletId = wallet.Id,
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.Available,
+                    EntryKind = WalletLedgerEntryKind.Principal,
+                    Amount = amount,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber
+                }
+            ]
+        };
 
     private async Task<Guid> SeedPaymentGateway(Guid? gatewayId = null, string? gatewayName = null)
     {

@@ -11,7 +11,8 @@ public sealed record WalletRequestContext(
     string? CorrelationId,
     string? IpAddress,
     string? UserAgent,
-    bool IsPrivilegedActor);
+    bool IsPrivilegedActor,
+    bool IsSystemActor = false);
 
 public interface IWalletRequestContextResolver
 {
@@ -43,9 +44,8 @@ public sealed class WalletRequestContextResolver(
             return Result<WalletRequestContext>.Forbidden("Request tenant does not match trusted tenant context");
         }
 
-        var isPrivilegedActor = isSignedInternalRequest ||
-                                IsAdmin(httpContext?.User) ||
-                                TryGetItemBool(httpContext, "WalletsPrivilegedActor");
+        var isSystemActor = isSignedInternalRequest || TryGetItemBool(httpContext, "WalletsPrivilegedActor");
+        var isPrivilegedActor = isSystemActor || IsAdmin(httpContext?.User);
         var actorCredentialId = TryGetClaimGuid(httpContext?.User, "credential_id", "credentialId", "CredentialId", ClaimTypes.NameIdentifier)
             ?? TryGetItemGuid(httpContext, "CredentialId")
             ?? (isSignedInternalRequest ? request.Metadata.CredentialId : null)
@@ -74,7 +74,8 @@ public sealed class WalletRequestContextResolver(
             request.Metadata.RequestId?.ToString(),
             request.Metadata.IpAddress ?? httpContext?.Connection.RemoteIpAddress?.ToString(),
             request.Metadata.DeviceAgent ?? httpContext?.Request.Headers.UserAgent.ToString(),
-            isPrivilegedActor));
+            isPrivilegedActor,
+            isSystemActor));
     }
 
     private bool IsTrustedServerMetadata(RequestMetadata? metadata)
