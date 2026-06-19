@@ -1,0 +1,53 @@
+@inherits LayoutComponentBase
+
+<div class="ops-shell">
+    <aside class="ops-sidebar">
+        <div class="ops-brand">
+            <div class="ops-brand-mark">X</div>
+            <div>
+                <div class="ops-brand-title">Operations</div>
+                <div class="ops-brand-subtitle">XFramework</div>
+            </div>
+        </div>
+
+        <nav class="ops-nav" aria-label="Operations navigation">
+            <a class="ops-nav-link active" href="/">
+                <LucideIcon Name="activity" class="ops-nav-icon" />
+                Services
+            </a>
+            <a class="ops-nav-link" href="http://localhost:5341" target="_blank" rel="noreferrer">
+                <LucideIcon Name="scroll-text" class="ops-nav-icon" />
+                Seq
+            </a>
+            <a class="ops-nav-link" href="http://localhost:16686" target="_blank" rel="noreferrer">
+                <LucideIcon Name="waypoints" class="ops-nav-icon" />
+                Jaeger
+            </a>
+        </nav>
+
+        <div class="ops-sidebar-footer">
+            <span>Internal dev</span>
+        </div>
+    </aside>
+
+    <div class="ops-main-shell">
+        <header class="ops-topbar">
+            <div>
+                <h1>XFramework Operations</h1>
+                <p>Service discovery, logs, and trace activity</p>
+            </div>
+            <div class="ops-topbar-actions">
+                <BbDarkModeToggle Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" />
+                <BbThemeSwitcher />
+            </div>
+        </header>
+
+        <main class="ops-main">
+            @Body
+        </main>
+    </div>
+</div>
+
+<BbToastProvider Position="ToastPosition.BottomRight" />
+<BbDialogProvider />
+<BbPortalHost />

@@ -1,0 +1,549 @@
+@page "/"
+@implements IAsyncDisposable
+@using Microsoft.Extensions.Options
+
+<PageTitle>Operations - XFramework</PageTitle>
+
+<div class="dashboard-grid">
+    <section class="summary-grid" aria-label="Service summary">
+        <div class="metric-card">
+            <div class="metric-card-header">
+                <span class="metric-card-label">Services</span>
+                <LucideIcon Name="server" class="metric-card-icon" />
+            </div>
+            <div class="metric-card-value">@_snapshot.Summary.TotalServices</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-card-header">
+                <span class="metric-card-label">Online</span>
+                <LucideIcon Name="circle-check" class="metric-card-icon" />
+            </div>
+            <div class="metric-card-value">@_snapshot.Summary.OnlineServices</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-card-header">
+                <span class="metric-card-label">Degraded</span>
+                <LucideIcon Name="triangle-alert" class="metric-card-icon" />
+            </div>
+            <div class="metric-card-value">@_snapshot.Summary.DegradedServices</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-card-header">
+                <span class="metric-card-label">Offline</span>
+                <LucideIcon Name="circle-off" class="metric-card-icon" />
+            </div>
+            <div class="metric-card-value">@_snapshot.Summary.OfflineServices</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-card-header">
+                <span class="metric-card-label">Instances</span>
+                <LucideIcon Name="box" class="metric-card-icon" />
+            </div>
+            <div class="metric-card-value">@_snapshot.Summary.ActiveInstances</div>
+        </div>
+    </section>
+
+    @if (_snapshot.Warnings.Count > 0)
+    {
+        <BbAlert Variant="AlertVariant.Warning">
+            <BbAlertTitle>Registry</BbAlertTitle>
+            <BbAlertDescription>@string.Join(" ", _snapshot.Warnings)</BbAlertDescription>
+        </BbAlert>
+    }
+
+    <section class="dashboard-content-grid">
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">
+                        <LucideIcon Name="radio-tower" />
+                        Service Registry
+                    </div>
+                    <div class="panel-subtitle">Last updated @FormatRelative(_snapshot.CapturedAt)</div>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="RefreshAsync">
+                    <LucideIcon Name="refresh-cw" class="ops-nav-icon" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            @if (_loading && _snapshot.Services.Count == 0)
+            {
+                <div class="empty-state">
+                    <LucideIcon Name="loader-circle" class="empty-state-icon" />
+                    <h2>Loading services</h2>
+                </div>
+            }
+            else if (_snapshot.Services.Count == 0)
+            {
+                <div class="empty-state">
+                    <LucideIcon Name="unplug" class="empty-state-icon" />
+                    <h2>No services registered</h2>
+                    <p>Bolt Hub has not reported any service manifests yet.</p>
+                </div>
+            }
+            else
+            {
+                <div class="service-table-wrap">
+                    <table class="service-table">
+                        <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Status</th>
+                            <th>Instances</th>
+                            <th>Modules</th>
+                            <th>Last Seen</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var service in _snapshot.Services)
+                        {
+                            <tr class="@SelectedRowClass(service)" @key="service.ClientId">
+                                <td>
+                                    <button type="button" class="service-row-button" @onclick="() => SelectServiceAsync(service)">
+                                        <span class="service-name">@service.DisplayName</span>
+                                        <span class="service-meta">@service.ClientName</span>
+                                    </button>
+                                </td>
+                                <td>
+                                    <span class="@StatusPillClass(service.Status)">
+                                        <span class="status-dot"></span>
+                                        @service.Status
+                                    </span>
+                                </td>
+                                <td>@service.ConnectionCount</td>
+                                <td>@service.Modules.Count</td>
+                                <td>@FormatRelative(service.LastSeenAt)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <aside class="service-detail">
+            @if (_selectedService is null)
+            {
+                <div class="empty-state">
+                    <LucideIcon Name="mouse-pointer-click" class="empty-state-icon" />
+                    <h2>Select a service</h2>
+                </div>
+            }
+            else
+            {
+                <div class="detail-heading">
+                    <div>
+                        <h2>@_selectedService.DisplayName</h2>
+                        <p>@_selectedService.ServiceName</p>
+                    </div>
+                    <span class="@StatusPillClass(_selectedService.Status)">
+                        <span class="status-dot"></span>
+                        @_selectedService.Status
+                    </span>
+                </div>
+
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Client</div>
+                        <div class="detail-value">@_selectedService.ClientName</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Version</div>
+                        <div class="detail-value">@(_selectedService.Version ?? "unknown")</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Connections</div>
+                        <div class="detail-value">@_selectedService.ConnectionCount</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Last Connected</div>
+                        <div class="detail-value">@FormatOptionalTime(_selectedService.LastConnectedAt)</div>
+                    </div>
+                </div>
+
+                @if (_selectedService.Dependencies.Count > 0)
+                {
+                    <section>
+                        <div class="panel-title">
+                            <LucideIcon Name="git-branch" />
+                            Dependencies
+                        </div>
+                        <div class="dependency-list">
+                            @foreach (var dependency in _selectedService.Dependencies)
+                            {
+                                <div class="dependency-item" @key="dependency.Key">
+                                    <div class="item-title-row">
+                                        <div class="item-title">@dependency.DisplayName</div>
+                                        <BbBadge Variant="BadgeVariant.Outline">
+                                            @(dependency.IsSatisfied ? "Satisfied" : dependency.Required ? "Required missing" : "Optional missing")
+                                        </BbBadge>
+                                    </div>
+                                    <div class="item-description">@dependency.Kind / @dependency.Key</div>
+                                </div>
+                            }
+                        </div>
+                    </section>
+                }
+
+                <section>
+                    <div class="panel-title">
+                        <LucideIcon Name="blocks" />
+                        Modules
+                    </div>
+                    @if (_selectedService.Modules.Count == 0)
+                    {
+                        <div class="muted">No modules advertised.</div>
+                    }
+                    else
+                    {
+                        <div class="module-list">
+                            @foreach (var module in _selectedService.Modules)
+                            {
+                                <div class="module-item" @key="module.ModuleKey">
+                                    <div class="item-title-row">
+                                        <div class="item-title">@module.DisplayName</div>
+                                        <span class="@StatusPillClass(module.Status)">
+                                            <span class="status-dot"></span>
+                                            @module.Status
+                                        </span>
+                                    </div>
+                                    <div class="item-description">@module.ModuleKey - @module.FeatureCount feature(s)</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </section>
+            }
+        </aside>
+    </section>
+
+    <section class="dashboard-content-grid">
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">
+                        <LucideIcon Name="scroll-text" />
+                        Logs
+                    </div>
+                    <div class="panel-subtitle">@SelectedServiceLabel</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                @if (_selectedService is null)
+                {
+                    <div class="empty-state">
+                        <LucideIcon Name="list" class="empty-state-icon" />
+                        <h2>No service selected</h2>
+                    </div>
+                }
+                else if (!_logs.IsAvailable)
+                {
+                    <div class="degraded-state">
+                        <LucideIcon Name="circle-alert" class="empty-state-icon" />
+                        <h2>Logs unavailable</h2>
+                        <p>@_logs.Message</p>
+                    </div>
+                }
+                else if (_logs.Data.Count == 0)
+                {
+                    <div class="empty-state">
+                        <LucideIcon Name="file-search" class="empty-state-icon" />
+                        <h2>No recent logs</h2>
+                    </div>
+                }
+                else
+                {
+                    <div class="log-list">
+                        @foreach (var log in _logs.Data)
+                        {
+                            <article class="log-item" @key="log.Timestamp.ToUnixTimeMilliseconds() + log.Message">
+                                <div class="item-title-row">
+                                    <div class="item-title">@log.Level</div>
+                                    <div class="muted">@FormatTime(log.Timestamp)</div>
+                                </div>
+                                <div class="log-message">@log.Message</div>
+                                <div class="item-description">@log.SourceContext</div>
+                                @if (log.Properties.Count > 0)
+                                {
+                                    <details class="item-description">
+                                        <summary>Properties</summary>
+                                        @foreach (var property in log.Properties)
+                                        {
+                                            <div><strong>@property.Key:</strong> @property.Value</div>
+                                        }
+                                    </details>
+                                }
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">
+                        <LucideIcon Name="waypoints" />
+                        Trace Timeline
+                    </div>
+                    <div class="panel-subtitle">@SelectedServiceLabel</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                @if (_selectedService is null)
+                {
+                    <div class="empty-state">
+                        <LucideIcon Name="workflow" class="empty-state-icon" />
+                        <h2>No service selected</h2>
+                    </div>
+                }
+                else if (!_traces.IsAvailable)
+                {
+                    <div class="degraded-state">
+                        <LucideIcon Name="circle-alert" class="empty-state-icon" />
+                        <h2>Traces unavailable</h2>
+                        <p>@_traces.Message</p>
+                    </div>
+                }
+                else if (_traces.Data.Count == 0)
+                {
+                    <div class="empty-state">
+                        <LucideIcon Name="git-compare-arrows" class="empty-state-icon" />
+                        <h2>No recent traces</h2>
+                    </div>
+                }
+                else
+                {
+                    <div class="trace-list">
+                        @foreach (var trace in _traces.Data)
+                        {
+                            <article class="trace-item" @key="trace.TraceId">
+                                <div class="item-title-row">
+                                    <div class="item-title">@trace.RootOperation</div>
+                                    <BbBadge Variant="@(trace.HasErrors ? BadgeVariant.Destructive : BadgeVariant.Outline)">
+                                        @FormatDuration(trace.Duration)
+                                    </BbBadge>
+                                </div>
+                                <div class="item-description">@trace.ServiceName - @trace.SpanCount span(s) - @FormatTime(trace.StartedAt)</div>
+                                <div class="timeline" aria-label="Trace span timeline">
+                                    @foreach (var span in trace.Spans)
+                                    {
+                                        <span class="@(span.HasError ? "timeline-span error" : "timeline-span")"
+                                              title="@($"{span.ServiceName}: {span.OperationName} ({FormatDuration(span.Duration)})")"
+                                              style="@TraceSpanStyle(trace, span)">
+                                        </span>
+                                    }
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Inject] private OperationsRegistryClient RegistryClient { get; set; } = default!;
+    [Inject] private SeqLogClient SeqLogClient { get; set; } = default!;
+    [Inject] private JaegerTraceClient JaegerTraceClient { get; set; } = default!;
+    [Inject] private IOptions<OperationsDashboardOptions> Options { get; set; } = default!;
+    [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
+
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private CancellationTokenSource? _refreshCts;
+    private Task? _refreshLoop;
+    private DashboardRegistrySnapshot _snapshot = DashboardRegistrySnapshot.EmptyDisconnected("Not loaded.");
+    private ExternalDataResult<IReadOnlyList<DashboardLogEvent>> _logs = ExternalDataResult<IReadOnlyList<DashboardLogEvent>>.Available([]);
+    private ExternalDataResult<IReadOnlyList<DashboardTraceSummary>> _traces = ExternalDataResult<IReadOnlyList<DashboardTraceSummary>>.Available([]);
+    private ServiceInstanceSummary? _selectedService;
+    private string? _selectedClientId;
+    private bool _loading = true;
+
+    private string SelectedServiceLabel => _selectedService?.DisplayName ?? "Select a service";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _refreshCts = new CancellationTokenSource();
+        await RefreshAsync();
+        _refreshLoop = RunRefreshLoopAsync(_refreshCts.Token);
+    }
+
+    private async Task RunRefreshLoopAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(Options.Value.RefreshInterval);
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                await InvokeAsync(RefreshAsync);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (!await _refreshGate.WaitAsync(0))
+        {
+            return;
+        }
+
+        try
+        {
+            _loading = true;
+            var ct = _refreshCts?.Token ?? CancellationToken.None;
+            _snapshot = await RegistryClient.GetSnapshotAsync(ct);
+
+            if (_selectedClientId is null && _snapshot.Services.Count > 0)
+            {
+                _selectedClientId = _snapshot.Services[0].ClientId;
+            }
+
+            _selectedService = _snapshot.Services.FirstOrDefault(x => x.ClientId == _selectedClientId);
+
+            if (_selectedService is not null)
+            {
+                await LoadServiceDetailsAsync(_selectedService, ct);
+            }
+            else
+            {
+                _logs = ExternalDataResult<IReadOnlyList<DashboardLogEvent>>.Available([]);
+                _traces = ExternalDataResult<IReadOnlyList<DashboardTraceSummary>>.Available([]);
+            }
+        }
+        catch (OperationCanceledException) when (_refreshCts?.IsCancellationRequested == true)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Operations dashboard refresh failed");
+        }
+        finally
+        {
+            _loading = false;
+            _refreshGate.Release();
+        }
+    }
+
+    private async Task SelectServiceAsync(ServiceInstanceSummary service)
+    {
+        _selectedClientId = service.ClientId;
+        _selectedService = service;
+        await LoadServiceDetailsAsync(service, _refreshCts?.Token ?? CancellationToken.None);
+    }
+
+    private async Task LoadServiceDetailsAsync(ServiceInstanceSummary service, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var lookback = Options.Value.DefaultLookback;
+
+        _logs = await SeqLogClient.GetLogsAsync(
+            new DashboardLogQuery(
+                service.LogApplicationName,
+                service.MachineName,
+                now.Subtract(lookback),
+                now,
+                Options.Value.DefaultLogCount),
+            ct);
+
+        _traces = await JaegerTraceClient.GetTracesAsync(
+            new DashboardTraceQuery(
+                service.LogApplicationName,
+                lookback,
+                Options.Value.DefaultTraceLimit),
+            ct);
+    }
+
+    private string SelectedRowClass(ServiceInstanceSummary service) =>
+        string.Equals(service.ClientId, _selectedClientId, StringComparison.OrdinalIgnoreCase)
+            ? "selected"
+            : "";
+
+    private static string StatusPillClass(string status) =>
+        $"status-pill {OperationsRegistryMapper.StatusCssClass(status)}";
+
+    private static string FormatRelative(DateTimeOffset value)
+    {
+        if (value == DateTimeOffset.MinValue)
+        {
+            return "never";
+        }
+
+        var elapsed = DateTimeOffset.UtcNow - value.ToUniversalTime();
+        if (elapsed.TotalSeconds < 60)
+        {
+            return "just now";
+        }
+
+        if (elapsed.TotalMinutes < 60)
+        {
+            return $"{(int)elapsed.TotalMinutes}m ago";
+        }
+
+        if (elapsed.TotalHours < 24)
+        {
+            return $"{(int)elapsed.TotalHours}h ago";
+        }
+
+        return value.ToLocalTime().ToString("MMM d, HH:mm", CultureInfo.CurrentCulture);
+    }
+
+    private static string FormatOptionalTime(DateTimeOffset? value) =>
+        value is null ? "never" : FormatTime(value.Value);
+
+    private static string FormatTime(DateTimeOffset value) =>
+        value == DateTimeOffset.MinValue
+            ? "unknown"
+            : value.ToLocalTime().ToString("MMM d, HH:mm:ss", CultureInfo.CurrentCulture);
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalMilliseconds < 1000)
+        {
+            return $"{Math.Max(0, duration.TotalMilliseconds):0} ms";
+        }
+
+        if (duration.TotalSeconds < 60)
+        {
+            return $"{duration.TotalSeconds:0.0} s";
+        }
+
+        return $"{duration.TotalMinutes:0.0} m";
+    }
+
+    private static string TraceSpanStyle(DashboardTraceSummary trace, DashboardTraceSpan span)
+    {
+        var total = Math.Max(1, trace.Duration.TotalMilliseconds);
+        var left = Math.Clamp(span.Offset.TotalMilliseconds / total * 100, 0, 99);
+        var width = Math.Clamp(span.Duration.TotalMilliseconds / total * 100, 1, 100 - left);
+        return FormattableString.Invariant($"left:{left:0.##}%;width:{width:0.##}%;");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_refreshCts is not null)
+        {
+            await _refreshCts.CancelAsync();
+        }
+
+        if (_refreshLoop is not null)
+        {
+            try
+            {
+                await _refreshLoop;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _refreshCts?.Dispose();
+        _refreshGate.Dispose();
+    }
+}

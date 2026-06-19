@@ -12,6 +12,9 @@ x-common-env: &common-env
   ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Docker}
   DefaultDatabaseConnection: Host=${DB_HOST:-postgres};Port=${DB_PORT:-5432};Database=${DB_NAME:-XFramework};Username=${DB_USER:-dbAdmin};Password=${DB_PASSWORD:?Set DB_PASSWORD in .env}
   JwtOptions__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
+  OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
+  OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-true}
+  OpenTelemetry__Exporters__OTLP__Endpoint: ${OTEL_OTLP_ENDPOINT:-http://jaeger:4317}
 
 services:
 
@@ -228,6 +231,40 @@ services:
       start_period: 15s
 
   # ── Seq (structured log aggregator) ──────────────────────────
+  # Operations Dashboard
+  operations-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Presentation/XFramework.Operations.Dashboard/XFramework.Operations.Dashboard.csproj
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${OPERATIONS_DASHBOARD_ASPNETCORE_ENVIRONMENT:-Docker}
+      BoltConfiguration__ClientName: OperationsDashboard
+      BoltConfiguration__ServerUrls__0: ws://bolt-hub:8080/bolt/ws
+      BoltConfiguration__RpcTimeoutSeconds: 30
+      Seq__Url: http://seq:80
+      Jaeger__QueryUrl: http://jaeger:16686
+      OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
+      OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-true}
+      OpenTelemetry__Exporters__OTLP__Endpoint: ${OTEL_OTLP_ENDPOINT:-http://jaeger:4317}
+    ports:
+      - "${OPERATIONS_DASHBOARD_EXPOSE_PORT:-5050}:8080"
+    depends_on:
+      bolt-hub:
+        condition: service_healthy
+      seq:
+        condition: service_started
+      jaeger:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
   seq:
     image: datalust/seq:2025
     environment:
@@ -236,6 +273,16 @@ services:
       - "${SEQ_EXPOSE_PORT:-5341}:80"
     volumes:
       - seqdata:/data
+
+  # Jaeger (OpenTelemetry trace backend for dev)
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "${JAEGER_EXPOSE_PORT:-16686}:16686"
+      - "${JAEGER_OTLP_GRPC_EXPOSE_PORT:-4317}:4317"
+      - "${JAEGER_OTLP_HTTP_EXPOSE_PORT:-4318}:4318"
 
 volumes:
   pgdata:
