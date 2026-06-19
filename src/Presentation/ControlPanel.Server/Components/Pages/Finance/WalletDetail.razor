@@ -178,7 +178,7 @@ else
                                               Label="Remarks"
                                               Placeholder="Admin credit" />
                         </div>
-                        <BbButton OnClick="@AddFunds" Disabled="@_isProcessing">
+                        <BbButton OnClick="@AddFunds" Disabled="@MoneyOperationsDisabled">
                             @if (_isProcessing)
                             {
                                 <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
@@ -204,7 +204,7 @@ else
                                               Label="Remarks"
                                               Placeholder="Admin debit" />
                         </div>
-                        <BbButton Variant="ButtonVariant.Destructive" OnClick="@WithdrawFunds" Disabled="@_isProcessing">
+                        <BbButton Variant="ButtonVariant.Destructive" OnClick="@WithdrawFunds" Disabled="@MoneyOperationsDisabled">
                             @if (_isProcessing)
                             {
                                 <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
@@ -232,7 +232,7 @@ else
                                               Label="Remarks"
                                               Placeholder="Admin balance adjustment" />
                         </div>
-                        <BbButton Variant="ButtonVariant.Outline" OnClick="@AdjustBalance" Disabled="@_isProcessing">
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@AdjustBalance" Disabled="@MoneyOperationsDisabled">
                             @if (_isProcessing)
                             {
                                 <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
@@ -467,6 +467,7 @@ else
     private bool _isProcessing;
     private bool _showCloseDialog;
     private bool _outsideTenantContext;
+    private bool MoneyOperationsDisabled => _isProcessing || _wallet?.Status == WalletStatus.Closed;
 
     // Add Funds form
     private string _addFundsAmount = "";
@@ -717,7 +718,7 @@ else
                 return;
             }
 
-            if (!TryGetWalletTypeId(fresh, out var walletTypeId))
+            if (!HasWalletType(fresh))
             {
                 return;
             }
@@ -727,7 +728,6 @@ else
                 WalletId = Id,
                 CredentialId = fresh.CredentialId,
                 Amount = amount,
-                WalletTypeId = walletTypeId,
                 ReferenceNumber = string.IsNullOrWhiteSpace(_addFundsRef) ? null : _addFundsRef.Trim(),
                 Remarks = string.IsNullOrWhiteSpace(_addFundsRemarks) ? "Admin credit" : _addFundsRemarks.Trim(),
                 IdempotencyKey = $"controlpanel-add-{Guid.NewGuid():N}",
@@ -781,7 +781,7 @@ else
                 return;
             }
 
-            if (!TryGetWalletTypeId(fresh, out var walletTypeId))
+            if (!HasWalletType(fresh))
             {
                 return;
             }
@@ -797,7 +797,6 @@ else
                 WalletId = Id,
                 CredentialId = fresh.CredentialId,
                 Amount = amount,
-                WalletTypeId = walletTypeId,
                 ReferenceNumber = string.IsNullOrWhiteSpace(_withdrawRef) ? null : _withdrawRef.Trim(),
                 Remarks = string.IsNullOrWhiteSpace(_withdrawRemarks) ? "Admin debit" : _withdrawRemarks.Trim(),
                 IdempotencyKey = $"controlpanel-withdraw-{Guid.NewGuid():N}",
@@ -852,7 +851,7 @@ else
                 return;
             }
 
-            if (!TryGetWalletTypeId(fresh, out var walletTypeId))
+            if (!HasWalletType(fresh))
             {
                 return;
             }
@@ -874,7 +873,6 @@ else
                 {
                     WalletId = Id,
                     CredentialId = fresh.CredentialId,
-                    WalletTypeId = walletTypeId,
                     Amount = difference,
                     ReferenceNumber = referenceNumber,
                     Remarks = remarks,
@@ -885,7 +883,6 @@ else
                 {
                     WalletId = Id,
                     CredentialId = fresh.CredentialId,
-                    WalletTypeId = walletTypeId,
                     Amount = Math.Abs(difference),
                     ReferenceNumber = referenceNumber,
                     Remarks = remarks,
@@ -916,15 +913,13 @@ else
         }
     }
 
-    private bool TryGetWalletTypeId(Wallet wallet, out Guid walletTypeId)
+    private bool HasWalletType(Wallet wallet)
     {
         if (wallet.WalletTypeId is Guid value && value != Guid.Empty)
         {
-            walletTypeId = value;
             return true;
         }
 
-        walletTypeId = Guid.Empty;
         ToastService.Show("This wallet has no wallet type. Assign a wallet type before submitting money operations.");
         return false;
     }

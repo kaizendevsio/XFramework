@@ -262,21 +262,17 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure("Total fee cannot exceed increment amount", 400);
             }
 
-            // Fetch wallet
-            var wallet = request.WalletTypeId != Guid.Empty
-                ? await _dataContext.Query<Wallet>()
-                    .IgnoreQueryFilters()
-                    .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.WalletTypeId == request.WalletTypeId && w.CredentialId == request.CredentialId)
-                    .FirstOrDefaultAsync(cancellationToken)
-                : await _dataContext.Query<Wallet>()
-                    .IgnoreQueryFilters()
-                    .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.Id == request.WalletId)
-                    .FirstOrDefaultAsync(cancellationToken);
+            var wallet = await FindWalletForTransactionAsync(
+                tenant.Id,
+                request.WalletId,
+                request.CredentialId,
+                request.WalletTypeId,
+                cancellationToken);
 
             if (wallet is null)
             {
                 // Auto-create wallet if WalletTypeId provided
-                if (request.WalletTypeId != Guid.Empty)
+                if (request.WalletId == Guid.Empty && request.WalletTypeId != Guid.Empty)
                 {
                     var createResult = await CreateWalletAsync(
                         request.CredentialId,
@@ -304,6 +300,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
                     return Result.NotFound("Wallet not found");
                 }
             }
+
+            var targetCheck = CheckWalletRequestTarget(wallet, request.CredentialId, request.WalletTypeId);
+            if (targetCheck is not null) return targetCheck;
 
             var statusCheck = CheckWalletStatus(wallet, "IncrementWallet");
             if (statusCheck is not null) return statusCheck;
@@ -482,22 +481,21 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure("Invalid decrement amount", 400);
             }
 
-            // Fetch wallet
-            var wallet = request.WalletTypeId != Guid.Empty
-                ? await _dataContext.Query<Wallet>()
-                    .IgnoreQueryFilters()
-                    .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.WalletTypeId == request.WalletTypeId && w.CredentialId == request.CredentialId)
-                    .FirstOrDefaultAsync(cancellationToken)
-                : await _dataContext.Query<Wallet>()
-                    .IgnoreQueryFilters()
-                    .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.Id == request.WalletId)
-                    .FirstOrDefaultAsync(cancellationToken);
+            var wallet = await FindWalletForTransactionAsync(
+                tenant.Id,
+                request.WalletId,
+                request.CredentialId,
+                request.WalletTypeId,
+                cancellationToken);
 
             if (wallet == null)
             {
                 _logger.EntityNotFound("Wallet", request.WalletId);
                 return Result.NotFound("Wallet not found");
             }
+
+            var targetCheck = CheckWalletRequestTarget(wallet, request.CredentialId, request.WalletTypeId);
+            if (targetCheck is not null) return targetCheck;
 
             var statusCheck = CheckWalletStatus(wallet, "DecrementWallet");
             if (statusCheck is not null) return statusCheck;
@@ -1546,6 +1544,49 @@ public sealed class WalletOperationsService : IWalletOperationsService
             WalletStatus.Closed => Result.Failure("Wallet is closed. No operations allowed.", 403),
             _ => null
         };
+    }
+
+    private async Task<Wallet?> FindWalletForTransactionAsync(
+        Guid tenantId,
+        Guid walletId,
+        Guid credentialId,
+        Guid walletTypeId,
+        CancellationToken cancellationToken)
+    {
+        var query = _dataContext.Query<Wallet>()
+            .IgnoreQueryFilters()
+            .Where(w => w.TenantId == tenantId && !w.IsDeleted);
+
+        if (walletId != Guid.Empty)
+        {
+            return await query
+                .Where(w => w.Id == walletId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        if (credentialId == Guid.Empty || walletTypeId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await query
+            .Where(w => w.CredentialId == credentialId && w.WalletTypeId == walletTypeId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static Result? CheckWalletRequestTarget(Wallet wallet, Guid credentialId, Guid walletTypeId)
+    {
+        if (credentialId != Guid.Empty && wallet.CredentialId != credentialId)
+        {
+            return Result.Failure("Wallet does not belong to the requested credential", 400);
+        }
+
+        if (walletTypeId != Guid.Empty && wallet.WalletTypeId != walletTypeId)
+        {
+            return Result.Failure("Wallet does not match requested wallet type", 400);
+        }
+
+        return null;
     }
 
     private async Task<bool> HasProcessedIdempotencyKey(

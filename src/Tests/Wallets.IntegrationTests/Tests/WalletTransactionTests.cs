@@ -204,6 +204,37 @@ public class WalletTransactionTests : WalletsTestBase
         operationCount.Should().Be(1);
     }
 
+    [Test]
+    public async Task Http_AddFunds_WithWalletIdAndDuplicateCredentialType_TargetsExplicitWallet()
+    {
+        var credential = await SeedCredential();
+        var otherWallet = await SeedWallet(credential.Id, 100m, WalletStatus.Frozen);
+        var targetWallet = await SeedWallet(credential.Id, 0m);
+
+        var request = new IncrementWalletRequest
+        {
+            CredentialId = credential.Id,
+            WalletId = targetWallet.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+            Amount = 25m,
+            ReferenceNumber = $"walletid-add-{Guid.NewGuid():N}",
+            Metadata = CreateMetadata()
+        };
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/add-funds", request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Response: {body}");
+
+        await using var db = CreateDbContext();
+        var unchangedOther = await db.Set<Wallet>().SingleAsync(w => w.Id == otherWallet.Id);
+        var updatedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
+
+        unchangedOther.Balance.Should().Be(100m);
+        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        updatedTarget.Balance.Should().Be(25m);
+    }
+
     #endregion
 
     #region HTTP — WithdrawFunds (Decrement)
@@ -230,6 +261,37 @@ public class WalletTransactionTests : WalletsTestBase
         await using var db = CreateDbContext();
         var updated = await db.Set<Wallet>().FirstAsync(w => w.Id == wallet.Id);
         updated.Balance.Should().Be(700m);
+    }
+
+    [Test]
+    public async Task Http_WithdrawFunds_WithWalletIdAndDuplicateCredentialType_TargetsExplicitWallet()
+    {
+        var credential = await SeedCredential();
+        var otherWallet = await SeedWallet(credential.Id, 1000m, WalletStatus.Frozen);
+        var targetWallet = await SeedWallet(credential.Id, 100m);
+
+        var request = new DecrementWalletRequest
+        {
+            CredentialId = credential.Id,
+            WalletId = targetWallet.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+            Amount = 25m,
+            ReferenceNumber = $"walletid-withdraw-{Guid.NewGuid():N}",
+            Metadata = CreateMetadata()
+        };
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/withdraw-funds", request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Response: {body}");
+
+        await using var db = CreateDbContext();
+        var unchangedOther = await db.Set<Wallet>().SingleAsync(w => w.Id == otherWallet.Id);
+        var updatedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
+
+        unchangedOther.Balance.Should().Be(1000m);
+        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        updatedTarget.Balance.Should().Be(75m);
     }
 
     [Test]
@@ -785,6 +847,66 @@ public class WalletTransactionTests : WalletsTestBase
         updated.Balance.Should().Be(1500m);
     }
 
+    [Test]
+    public async Task Bolt_AddFunds_WithWalletIdAndDuplicateCredentialType_TargetsExplicitWallet()
+    {
+        var credential = await SeedCredential();
+        var otherWallet = await SeedWallet(credential.Id, 100m, WalletStatus.Frozen);
+        var targetWallet = await SeedWallet(credential.Id, 0m);
+
+        var result = await WalletsTestFixture.ServiceWrapper.IncrementWallet(
+            new IncrementWalletRequest
+            {
+                CredentialId = credential.Id,
+                WalletId = targetWallet.Id,
+                WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+                Amount = 25m,
+                ReferenceNumber = $"bolt-walletid-add-{Guid.NewGuid():N}",
+                Metadata = CreateMetadata()
+            });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var unchangedOther = await db.Set<Wallet>().SingleAsync(w => w.Id == otherWallet.Id);
+        var updatedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
+
+        unchangedOther.Balance.Should().Be(100m);
+        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        updatedTarget.Balance.Should().Be(25m);
+    }
+
+    [Test]
+    public async Task Bolt_AddFunds_WithClosedWalletAndDuplicateCredentialType_ReturnsClosedWalletFailure()
+    {
+        var credential = await SeedCredential();
+        var otherWallet = await SeedWallet(credential.Id, 100m, WalletStatus.Frozen);
+        var targetWallet = await SeedWallet(credential.Id, 0m, WalletStatus.Closed);
+
+        var result = await WalletsTestFixture.ServiceWrapper.IncrementWallet(
+            new IncrementWalletRequest
+            {
+                CredentialId = credential.Id,
+                WalletId = targetWallet.Id,
+                WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+                Amount = 25m,
+                ReferenceNumber = $"bolt-walletid-closed-{Guid.NewGuid():N}",
+                Metadata = CreateMetadata()
+            });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+        result.Message.Should().Be("Wallet is closed. No operations allowed.");
+
+        await using var db = CreateDbContext();
+        var unchangedOther = await db.Set<Wallet>().SingleAsync(w => w.Id == otherWallet.Id);
+        var unchangedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
+
+        unchangedOther.Balance.Should().Be(100m);
+        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        unchangedTarget.Balance.Should().Be(0m);
+        unchangedTarget.Status.Should().Be(WalletStatus.Closed);
+    }
+
     #endregion
 
     #region Bolt — WithdrawFunds
@@ -809,6 +931,35 @@ public class WalletTransactionTests : WalletsTestBase
         await using var db = CreateDbContext();
         var updated = await db.Set<Wallet>().FirstAsync(w => w.Id == wallet.Id);
         updated.Balance.Should().Be(700m);
+    }
+
+    [Test]
+    public async Task Bolt_WithdrawFunds_WithWalletIdAndDuplicateCredentialType_TargetsExplicitWallet()
+    {
+        var credential = await SeedCredential();
+        var otherWallet = await SeedWallet(credential.Id, 1000m, WalletStatus.Frozen);
+        var targetWallet = await SeedWallet(credential.Id, 100m);
+
+        var result = await WalletsTestFixture.ServiceWrapper.DecrementWallet(
+            new DecrementWalletRequest
+            {
+                CredentialId = credential.Id,
+                WalletId = targetWallet.Id,
+                WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+                Amount = 25m,
+                ReferenceNumber = $"bolt-walletid-withdraw-{Guid.NewGuid():N}",
+                Metadata = CreateMetadata()
+            });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var unchangedOther = await db.Set<Wallet>().SingleAsync(w => w.Id == otherWallet.Id);
+        var updatedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
+
+        unchangedOther.Balance.Should().Be(1000m);
+        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        updatedTarget.Balance.Should().Be(75m);
     }
 
     [Test]
