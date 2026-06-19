@@ -384,17 +384,13 @@ input {
 }
 
 .dependency-list,
-.module-list,
-.log-list,
-.trace-list {
+.module-list {
     display: grid;
     gap: 0.65rem;
 }
 
 .dependency-item,
-.module-item,
-.log-item,
-.trace-item {
+.module-item {
     border: 1px solid var(--border);
     border-radius: calc(var(--radius) - 2px);
     padding: 0.75rem;
@@ -414,8 +410,7 @@ input {
     overflow-wrap: anywhere;
 }
 
-.item-description,
-.log-message {
+.item-description {
     margin-top: 0.3rem;
     color: var(--muted-foreground);
     font-size: 0.78rem;
@@ -428,28 +423,6 @@ input {
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
-}
-
-.timeline {
-    position: relative;
-    height: 2.2rem;
-    border: 1px solid var(--border);
-    border-radius: calc(var(--radius) - 2px);
-    background: color-mix(in oklab, var(--muted) 45%, transparent);
-    overflow: hidden;
-}
-
-.timeline-span {
-    position: absolute;
-    top: 0.35rem;
-    height: 1.45rem;
-    min-width: 0.35rem;
-    border-radius: 999px;
-    background: var(--primary);
-}
-
-.timeline-span.error {
-    background: var(--destructive);
 }
 
 .empty-state,
