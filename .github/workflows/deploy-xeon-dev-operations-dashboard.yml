@@ -1,0 +1,22 @@
+name: Deploy Xeon Dev - Operations Dashboard
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - src/Presentation/XFramework.Operations.Dashboard/**
+      - src/Infrastructure/XFramework.Integration/**
+      - src/Kernel/XFramework.Core/**
+      - src/Modules/XFramework.Bolt/Bolt.Domain.Shared/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-xeon-dev-service.yml
+    with:
+      service: operations-dashboard
+      health_url: http://localhost:5050/health/ready
+      diagnostics_services: bolt-hub seq jaeger operations-dashboard

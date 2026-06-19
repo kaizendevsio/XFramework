@@ -86,6 +86,7 @@ jobs:
             "wallets=http://localhost:9696/health/ready"
             "inventario=http://localhost:8105/health/ready"
             "controlpanel=http://localhost:5000/health/ready"
+            "operations-dashboard=http://localhost:5050/health/ready"
           )
 
           for check in "${checks[@]}"; do
@@ -118,4 +119,4 @@ jobs:
         shell: bash
         run: |
           docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps || true
-          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 migrate bolt-hub identityserver messaging notifications smsgateway wallets inventario controlpanel || true
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 migrate bolt-hub identityserver messaging notifications smsgateway wallets inventario controlpanel operations-dashboard seq jaeger || true

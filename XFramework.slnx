@@ -66,6 +66,7 @@
     <Project Path="src\Presentation\ControlPanel.Server\ControlPanel.Server.csproj" />
     <Project Path="src\Presentation\Fluid\Fluid.csproj" />
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
+    <Project Path="src\Presentation\XFramework.Operations.Dashboard\XFramework.Operations.Dashboard.csproj" />
   </Folder>
   <Folder Name="/Libraries/Bolt/">
     <Project Path="src\Libraries\Bolt\Bolt.Protocol\Bolt.Protocol.csproj" />
@@ -78,6 +79,7 @@
   <Folder Name="/Tests/">
     <Project Path="src\Tests\ControlPanel.E2ETests\ControlPanel.E2ETests.csproj" />
     <Project Path="src\Tests\Inventario.Api.Tests\Inventario.Api.Tests.csproj" />
+    <Project Path="src\Tests\OperationsDashboard.Tests\OperationsDashboard.Tests.csproj" />
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
     <Project Path="src\Tests\XFramework.SourceGenerators.Tests\XFramework.SourceGenerators.Tests.csproj" />
     <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
