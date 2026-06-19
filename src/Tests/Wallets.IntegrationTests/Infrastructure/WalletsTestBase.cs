@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Contexts;
 using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Enums;
 
 namespace Wallets.IntegrationTests;
 
@@ -61,7 +62,10 @@ public abstract class WalletsTestBase
         return credential;
     }
 
-    protected async Task<Wallet> SeedWallet(Guid credentialId, decimal balance = 1000m)
+    protected async Task<Wallet> SeedWallet(
+        Guid credentialId,
+        decimal balance = 1000m,
+        WalletStatus status = WalletStatus.Active)
     {
         await using var db = CreateDbContext();
 
@@ -72,6 +76,7 @@ public abstract class WalletsTestBase
             WalletTypeId = WalletsTestFixture.TestWalletTypeId,
             Balance = balance,
             TransferableBalance = balance,
+            Status = status,
             TenantId = WalletsTestFixture.TestTenantId
         };
         db.Set<Wallet>().Add(wallet);
