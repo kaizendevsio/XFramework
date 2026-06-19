@@ -116,6 +116,18 @@ ControlPanel forms should use framework controls that match the data type:
 
 For `BbCombobox`, prefer typed `SelectOption<TValue>` options when the selection is simple. Use compositional `BbComboboxItem` only when the option rows need rich custom markup.
 
+## Operational Page Layout
+
+For module admin surfaces such as Inventario, keep list and detail workflows distinct:
+
+- List pages are for scanning, filtering, creating small records, and navigating to detail pages.
+- Viewing and editing existing records should happen on the detail page with a clear edit mode, not in list-page edit modals.
+- Detail pages should show the operational context users need for that entity. For example, product detail should include catalog fields, replenishment rules, stock balances by warehouse/location/lot, and traceability records when those features are enabled.
+- Header actions belong on the far right of the page header. Use the shared `xf-page-header` and `xf-page-actions` classes instead of hand-assembling inconsistent flex utility combinations.
+- Card headers that combine a title with search/filter controls should use `xf-page-header` plus `xf-filter-actions`; do not assume arbitrary responsive width utilities such as `md:w-[28rem]` are available in the compiled app CSS.
+- Summary metrics should use the shared `xf-summary-grid` classes. Do not rely on new responsive Tailwind utility class names until the compiled `wwwroot/css/app.css` is verified to include them on xeon-dev.
+- Avoid card-in-card summary layouts unless the surrounding component is a true detail surface. Dense operational pages should use stable grids and tables that do not collapse to one full-width row on desktop.
+
 ## Visual Verification Workflow
 
 Use the Codex built-in browser for BlazorBlueprint work that touches interactive UI:

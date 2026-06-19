@@ -22,12 +22,12 @@ else
 {
     <FadeInContent>
         <div class="space-y-6">
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Lots and Batches</BbTypographyH3>
                     <BbTypographyMuted>Track inventory by product, source, received date, and expiry.</BbTypographyMuted>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div class="xf-page-actions">
                     <BbButton OnClick="@OpenCreateDialog" Disabled="@(_products.Count == 0)">
                         <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                         Create Lot
