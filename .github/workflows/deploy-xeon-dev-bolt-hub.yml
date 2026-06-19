@@ -18,3 +18,4 @@ jobs:
       service: bolt-hub
       health_url: http://localhost:7000/health/ready
       diagnostics_services: migrate bolt-hub
+    secrets: inherit

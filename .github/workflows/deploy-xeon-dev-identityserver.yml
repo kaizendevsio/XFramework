@@ -20,3 +20,4 @@ jobs:
       service: identityserver
       health_url: http://localhost:8261/health/ready
       diagnostics_services: bolt-hub identityserver
+    secrets: inherit

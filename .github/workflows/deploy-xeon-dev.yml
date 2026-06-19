@@ -19,6 +19,7 @@ on:
       - src/SourceGenerators/**
       - src/Libraries/**
       - src/Tools/XFramework.MigrationRunner/**
+      - src/Modules/**/Migrations/**
       - src/Modules/XFramework.Bolt/Bolt.Domain.Shared/**
   workflow_dispatch:
 
@@ -33,10 +34,21 @@ jobs:
   deploy:
     name: Deploy all services to xeon-dev
     runs-on: [self-hosted, Linux, xeon-dev-deploy]
-    timeout-minutes: 60
+    timeout-minutes: 75
     env:
       COMPOSE_FILE_PATH: docker-compose.yml
+      COMPOSE_PROJECT_NAME: xframework
+      REGISTRY_HOST: xsystems-registry-dev.tailed40e.ts.net
+      REGISTRY_NAMESPACE: xframework
+      IMAGE_TAG: ${{ github.sha }}
+      CHANNEL_TAG: develop
+      DEPLOY_HOST: github-runner@xeon-dev
+      DEPLOY_SSH_KEY: /home/xeon/.ssh/xframework_xeon_dev_ed25519
+      REMOTE_DEPLOY_DIR: /home/github-runner/xframework-deploy
+      REMOTE_COMPOSE_FILE: /home/github-runner/xframework-deploy/docker-compose.yml
       XFRAMEWORK_ENV_FILE: /opt/xframework/xeon-dev.env
+      DB_PASSWORD: compose-validation-placeholder
+      JWT_SECRET: compose-validation-placeholder
 
     steps:
       - name: Checkout
@@ -44,7 +56,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Verify runner and Docker
+      - name: Verify build runner, Docker, registry, and deploy host
         shell: bash
         run: |
           set -euo pipefail
@@ -54,23 +66,122 @@ jobs:
           docker --version
           docker compose version
           curl --version
-
-          test -r "$XFRAMEWORK_ENV_FILE"
           test -S /var/run/docker.sock
           docker info --format 'Docker daemon: {{.Name}} {{.ServerVersion}}'
+
+          test -r "$DEPLOY_SSH_KEY"
+          mkdir -p ~/.ssh
+          ssh-keyscan -H xeon-dev >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          registry_headers="$(mktemp)"
+          registry_status="$(curl -sS -o "$registry_headers" -w "%{http_code}" -I "https://${REGISTRY_HOST}/v2/" || true)"
+          cat "$registry_headers"
+          test "$registry_status" = "401"
+          grep -qi '^Docker-Distribution-Api-Version: registry/2.0' "$registry_headers"
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "test -r '$XFRAMEWORK_ENV_FILE' && docker --version && docker compose version && curl -sSI 'https://${REGISTRY_HOST}/v2/' | sed -n '1,8p'"
 
       - name: Validate compose
         shell: bash
         run: |
           set -euo pipefail
-          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" config
+          docker compose -f "$COMPOSE_FILE_PATH" config >/tmp/xframework-compose.yml
 
-      - name: Deploy stack
+      - name: Login to dev registry
+        shell: bash
+        env:
+          XSYSTEMS_DEV_REGISTRY_USERNAME: ${{ secrets.XSYSTEMS_DEV_REGISTRY_USERNAME }}
+          XSYSTEMS_DEV_REGISTRY_PASSWORD: ${{ secrets.XSYSTEMS_DEV_REGISTRY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$XSYSTEMS_DEV_REGISTRY_USERNAME"
+          test -n "$XSYSTEMS_DEV_REGISTRY_PASSWORD"
+
+          printf '%s' "$XSYSTEMS_DEV_REGISTRY_PASSWORD" \
+            | docker login "$REGISTRY_HOST" --username "$XSYSTEMS_DEV_REGISTRY_USERNAME" --password-stdin
+
+          printf '%s' "$XSYSTEMS_DEV_REGISTRY_PASSWORD" \
+            | ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+                "docker login '$REGISTRY_HOST' --username '$XSYSTEMS_DEV_REGISTRY_USERNAME' --password-stdin"
+
+      - name: Build images on buildserver
         shell: bash
         run: |
           set -euo pipefail
-          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" up --build -d
-          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps
+          services=(
+            migrate
+            bolt-hub
+            identityserver
+            messaging
+            notifications
+            smsgateway
+            wallets
+            inventario
+            controlpanel
+            operations-dashboard
+          )
+
+          docker compose -f "$COMPOSE_FILE_PATH" build "${services[@]}"
+
+      - name: Push images to dev registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          services=(
+            migrate
+            bolt-hub
+            identityserver
+            messaging
+            notifications
+            smsgateway
+            wallets
+            inventario
+            controlpanel
+            operations-dashboard
+          )
+
+          for service in "${services[@]}"; do
+            image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${service}:${IMAGE_TAG}"
+            channel_image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${service}:${CHANNEL_TAG}"
+            docker tag "$image" "$channel_image"
+            docker push "$image"
+            docker push "$channel_image"
+          done
+
+      - name: Deploy stack on xeon-dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          pull_services=(
+            postgres
+            seq
+            jaeger
+            migrate
+            bolt-hub
+            identityserver
+            messaging
+            notifications
+            smsgateway
+            wallets
+            inventario
+            controlpanel
+            operations-dashboard
+          )
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "mkdir -p '$REMOTE_DEPLOY_DIR'"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$COMPOSE_FILE_PATH" "$DEPLOY_HOST:$REMOTE_COMPOSE_FILE"
+
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' pull ${pull_services[*]}"
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' up -d --no-build"
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps"
 
       - name: Wait for readiness
         shell: bash
@@ -97,7 +208,10 @@ jobs:
 
             ready=0
             for attempt in {1..60}; do
-              status="$(curl -fsS -o "$body" -w "%{http_code}" "$url" || true)"
+              status="$(
+                ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+                  "curl -sS -o '$body' -w '%{http_code}' '$url' || true"
+              )"
               if [ "$status" = "200" ]; then
                 ready=1
                 break
@@ -109,7 +223,7 @@ jobs:
 
             if [ "$ready" -ne 1 ]; then
               echo "::error::${name} failed readiness check at ${url}"
-              cat "$body" || true
+              ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "cat '$body' || true"
               exit 1
             fi
           done
@@ -118,5 +232,8 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps || true
-          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 migrate bolt-hub identityserver messaging notifications smsgateway wallets inventario controlpanel operations-dashboard seq jaeger || true
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps" || true
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' logs --tail=200 migrate bolt-hub identityserver messaging notifications smsgateway wallets inventario controlpanel operations-dashboard seq jaeger" || true

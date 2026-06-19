@@ -18,3 +18,4 @@ jobs:
       service: wallets
       health_url: http://localhost:9696/health/ready
       diagnostics_services: bolt-hub wallets
+    secrets: inherit
