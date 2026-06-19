@@ -53,6 +53,96 @@ public sealed class ReservationServiceTests
     }
 
     [Test]
+    public async Task ReserveAsync_MultipleLots_AllocatesEarliestExpiryFirst()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var firstLotId = Guid.NewGuid();
+        var secondLotId = Guid.NewGuid();
+        var dataContext = SeedReservationData(tenantId, ids, onHand: 0, reserved: 0, includeDefaultBalance: false);
+        AddLotBalance(dataContext, tenantId, ids, firstLotId, "LOT-EXP-2", DateTime.UtcNow.AddDays(20), 5);
+        AddLotBalance(dataContext, tenantId, ids, secondLotId, "LOT-EXP-1", DateTime.UtcNow.AddDays(5), 4);
+        var service = CreateService(dataContext, tenantId);
+
+        var result = await service.ReserveAsync(new ReserveInventoryRequest
+        {
+            ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId,
+            LocationId = ids.LocationId,
+            Quantity = 7
+        });
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.Allocations.Should().HaveCount(2);
+        result.Data.Allocations[0].LotId.Should().Be(secondLotId);
+        result.Data.Allocations[0].Quantity.Should().Be(4);
+        result.Data.Allocations[1].LotId.Should().Be(firstLotId);
+        result.Data.Allocations[1].Quantity.Should().Be(3);
+
+        dataContext.Set<StockBalance>().Single(x => x.LotId == secondLotId).ReservedQuantity.Should().Be(4);
+        dataContext.Set<StockBalance>().Single(x => x.LotId == firstLotId).ReservedQuantity.Should().Be(3);
+        dataContext.Added.OfType<InventoryMovement>()
+            .Where(x => x.MovementType == InventoryMovementType.Reservation)
+            .Should().HaveCount(2);
+        dataContext.SaveCount.Should().Be(1);
+    }
+
+    [Test]
+    public async Task ReserveAsync_ExpiredLots_AreExcludedByDefault()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var expiredLotId = Guid.NewGuid();
+        var dataContext = SeedReservationData(tenantId, ids, onHand: 0, reserved: 0, includeDefaultBalance: false);
+        AddLotBalance(dataContext, tenantId, ids, expiredLotId, "LOT-OLD", DateTime.UtcNow.AddDays(-1), 5);
+        var service = CreateService(dataContext, tenantId);
+
+        var result = await service.ReserveAsync(new ReserveInventoryRequest
+        {
+            ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId,
+            LocationId = ids.LocationId,
+            Quantity = 1
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(409);
+        dataContext.Set<StockBalance>().Single().ReservedQuantity.Should().Be(0);
+        dataContext.Added.OfType<ReservationAllocation>().Should().BeEmpty();
+        dataContext.SaveCount.Should().Be(0);
+    }
+
+    [Test]
+    public async Task ReserveAsync_ExpiredLotOverride_WithAdminClaim_AllowsAllocation()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var expiredLotId = Guid.NewGuid();
+        var dataContext = SeedReservationData(tenantId, ids, onHand: 0, reserved: 0, includeDefaultBalance: false);
+        AddLotBalance(dataContext, tenantId, ids, expiredLotId, "LOT-OLD", DateTime.UtcNow.AddDays(-1), 5);
+        var service = CreateService(dataContext, tenantId, includeAdminClaim: true);
+
+        var result = await service.ReserveAsync(new ReserveInventoryRequest
+        {
+            ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId,
+            LocationId = ids.LocationId,
+            LotId = expiredLotId,
+            Quantity = 2,
+            AllowExpiredLotOverride = true,
+            ExpiredLotOverrideReason = "QA hold released by supervisor"
+        });
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.Allocations.Should().ContainSingle(x =>
+            x.LotId == expiredLotId &&
+            x.Quantity == 2 &&
+            x.ExpiredLotOverrideReason == "QA hold released by supervisor");
+        dataContext.Set<StockBalance>().Single().ReservedQuantity.Should().Be(2);
+        dataContext.SaveCount.Should().Be(1);
+    }
+
+    [Test]
     public async Task ReserveAsync_BeyondAvailableStock_ReturnsConflictWithoutSaving()
     {
         var tenantId = Guid.NewGuid();
@@ -104,6 +194,7 @@ public sealed class ReservationServiceTests
         dataContext.Added.OfType<InventoryMovement>().Should().ContainSingle(x =>
             x.MovementType == InventoryMovementType.Shipment &&
             x.QuantityDelta == -4);
+        dataContext.Set<ReservationAllocation>().Single().Status.Should().Be(ReservationAllocationStatus.Fulfilled);
         dataContext.Set<Product>().Single().StockQuantity.Should().Be(6);
         dataContext.SaveCount.Should().Be(1);
     }
@@ -151,7 +242,8 @@ public sealed class ReservationServiceTests
         decimal onHand,
         decimal reserved,
         Guid? reservationId = null,
-        DateTime? expiresAt = null)
+        DateTime? expiresAt = null,
+        bool includeDefaultBalance = true)
     {
         var dataContext = new FakeDataContext();
         dataContext.Set<Product>().Add(new Product
@@ -180,18 +272,21 @@ public sealed class ReservationServiceTests
             Name = "Bin 01",
             IsEnabled = true
         });
-        dataContext.Set<StockBalance>().Add(new StockBalance
+        if (includeDefaultBalance)
         {
-            Id = ids.BalanceId,
-            TenantId = tenantId,
-            ProductId = ids.ProductId,
-            WarehouseId = ids.WarehouseId,
-            LocationId = ids.LocationId,
-            OnHandQuantity = onHand,
-            ReservedQuantity = reserved,
-            AvailableQuantity = onHand - reserved,
-            IsEnabled = true
-        });
+            dataContext.Set<StockBalance>().Add(new StockBalance
+            {
+                Id = ids.BalanceId,
+                TenantId = tenantId,
+                ProductId = ids.ProductId,
+                WarehouseId = ids.WarehouseId,
+                LocationId = ids.LocationId,
+                OnHandQuantity = onHand,
+                ReservedQuantity = reserved,
+                AvailableQuantity = onHand - reserved,
+                IsEnabled = true
+            });
+        }
 
         if (reservationId is { } id)
         {
@@ -214,20 +309,63 @@ public sealed class ReservationServiceTests
         return dataContext;
     }
 
-    private static ReservationService CreateService(FakeDataContext dataContext, Guid tenantId)
+    private static void AddLotBalance(
+        FakeDataContext dataContext,
+        Guid tenantId,
+        TestIds ids,
+        Guid lotId,
+        string lotNumber,
+        DateTime expiresAt,
+        decimal onHand)
     {
+        dataContext.Set<InventoryLot>().Add(new InventoryLot
+        {
+            Id = lotId,
+            TenantId = tenantId,
+            ProductId = ids.ProductId,
+            LotNumber = lotNumber,
+            ReceivedAt = DateTime.UtcNow.AddDays(-10),
+            ExpiresAt = expiresAt,
+            Status = expiresAt <= DateTime.UtcNow ? InventoryLotStatus.Expired : InventoryLotStatus.Available,
+            IsEnabled = true
+        });
+        dataContext.Set<StockBalance>().Add(new StockBalance
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId,
+            LocationId = ids.LocationId,
+            LotId = lotId,
+            OnHandQuantity = onHand,
+            ReservedQuantity = 0,
+            AvailableQuantity = onHand,
+            IsEnabled = true
+        });
+    }
+
+    private static ReservationService CreateService(
+        FakeDataContext dataContext,
+        Guid tenantId,
+        bool includeAdminClaim = false)
+    {
+        var claims = new List<Claim> { new("tenantId", tenantId.ToString()) };
+        if (includeAdminClaim)
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+
         var httpContextAccessor = new HttpContextAccessor
         {
             HttpContext = new DefaultHttpContext
             {
                 User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("tenantId", tenantId.ToString())],
+                    claims,
                     authenticationType: "Test"))
             }
         };
 
         var stockPostingService = new StockPostingService(dataContext, httpContextAccessor);
-        return new ReservationService(dataContext, httpContextAccessor, stockPostingService);
+        var allocationService = new InventoryAllocationService(dataContext, httpContextAccessor, stockPostingService);
+        return new ReservationService(dataContext, httpContextAccessor, allocationService);
     }
 
     private sealed record TestIds(Guid ProductId, Guid WarehouseId, Guid LocationId, Guid BalanceId)

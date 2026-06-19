@@ -15,10 +15,13 @@ public partial record ReserveInventoryRequest : RequestBase,
     public Guid ProductId { get; init; }
     public Guid WarehouseId { get; init; }
     public Guid LocationId { get; init; }
+    public Guid? LotId { get; init; }
     public decimal Quantity { get; init; }
     public DateTime? ExpiresAt { get; init; }
     public string? UnitOfMeasure { get; init; }
     public string? ReferenceType { get; init; }
     public Guid? ReferenceId { get; init; }
     public string? Reason { get; init; }
+    public bool AllowExpiredLotOverride { get; init; }
+    public string? ExpiredLotOverrideReason { get; init; }
 }
