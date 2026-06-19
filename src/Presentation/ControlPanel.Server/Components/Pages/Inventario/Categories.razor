@@ -37,7 +37,9 @@ else
                     <BbCardDescription>@_categories.Count category(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_categories" ShowPagination="true" InitialPageSize="20">
+                    <BbDataGrid Items="@_categories" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((ProductCategory item) => Navigation.NavigateTo($"/inventario/categories/{item.Id}"))"
+                                Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
@@ -47,7 +49,11 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
-                                    <div class="flex items-center gap-1">
+                                    <div class="flex items-center gap-1" @onclick:stopPropagation="true">
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/categories/{item.Id}"))">
+                                            <LucideIcon Name="eye" class="h-4 w-4" />
+                                        </BbButton>
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                   OnClick="@(() => OpenEditDialog(item))">
                                             <LucideIcon Name="pencil" class="h-4 w-4" />
@@ -91,6 +97,7 @@ else
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
