@@ -7,8 +7,11 @@ using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Bolt.Hub.Extensions;
+using Payments.Core;
 using Testcontainers.PostgreSql;
 using Wallets.Api.Events;
+using Wallets.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Enums;
 using Wallets.Integration.Drivers;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
@@ -127,15 +130,28 @@ public class WalletsTestFixture
         builder.Services.AddServerDataContext<AppDbContext>();
 
         builder.Services.InstallStandardServices<Wallets.Api.Services.WalletOperationsService>(builder.Configuration);
+        builder.Services.AddHttpClient();
+        builder.Services.AddPaymentServices();
         builder.Services.AddTenantResolver();
         builder.Services.AddAuthentication("WalletsTest")
             .AddScheme<AuthenticationSchemeOptions, WalletsTestAuthHandler>("WalletsTest", _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton<IWalletEventPublisher, WalletEventPublisher>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletRequestContextResolver, Wallets.Api.Services.WalletRequestContextResolver>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletFeeCalculator, Wallets.Api.Services.WalletFeeCalculator>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletPolicyEvaluator, Wallets.Api.Services.WalletPolicyEvaluator>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletLedgerService, Wallets.Api.Services.WalletLedgerService>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletOperationsService, Wallets.Api.Services.WalletOperationsService>();
         builder.Services.AddScoped<Wallets.Api.Services.IBatchWalletService, Wallets.Api.Services.BatchWalletService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletWorkflowService, Wallets.Api.Services.WalletWorkflowService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletApprovalWorkflowService, Wallets.Api.Services.WalletWorkflowService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletCaseWorkflowService, Wallets.Api.Services.WalletWorkflowService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletReportingService, Wallets.Api.Services.WalletWorkflowService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletPolicyAdminService, Wallets.Api.Services.WalletPolicyAdminService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletPaymentWebhookService, Wallets.Api.Services.WalletPaymentWebhookService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletOutboxService, Wallets.Api.Services.WalletOutboxService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletOutboxPublisher, Wallets.Api.Services.WalletOutboxPublisher>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletReconciliationService, Wallets.Api.Services.WalletReconciliationService>();
         builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletOperationsService>();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
         builder.Services.AddDataContextHandler(typeof(Wallets.Api.Services.WalletOperationsService).Assembly);
@@ -250,6 +266,7 @@ public class WalletsTestFixture
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
+            ["Wallets:Webhooks:SharedSecret"] = "wallets-webhook-test-secret",
             ["Logging:LogLevel:Default"] = "Warning"
         });
     }
@@ -274,6 +291,45 @@ public class WalletsTestFixture
         await using var db = new AppDbContext(options);
         await db.Database.MigrateAsync();
         await XFramework.TestInfrastructure.TestSeedData.SeedAll(db);
+        await SeedWalletFeeSchedules(db);
+    }
+
+    private static async Task SeedWalletFeeSchedules(AppDbContext db)
+    {
+        var operations = new[]
+        {
+            WalletOperationType.Credit,
+            WalletOperationType.Debit,
+            WalletOperationType.Transfer,
+            WalletOperationType.Conversion,
+            WalletOperationType.Release,
+            WalletOperationType.Reversal,
+            WalletOperationType.Hold,
+            WalletOperationType.DepositApproval,
+            WalletOperationType.WithdrawalApproval,
+            WalletOperationType.Refund,
+            WalletOperationType.DisputeResolution,
+            WalletOperationType.Chargeback
+        };
+
+        foreach (var operation in operations)
+        {
+            db.Set<WalletFeeSchedule>().Add(new WalletFeeSchedule
+            {
+                Id = Guid.NewGuid(),
+                TenantId = TestTenantId,
+                Name = $"Integration fee override {operation}",
+                OperationType = operation,
+                WalletTypeId = TestWalletTypeId,
+                FixedFee = 0,
+                PercentageFee = 0,
+                AllowRequestedFeeOverride = true,
+                EffectiveAt = DateTime.UtcNow.AddDays(-1),
+                IsEnabled = true
+            });
+        }
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task WaitForHealth(string url, Task? appTask = null, int timeoutSeconds = 30)

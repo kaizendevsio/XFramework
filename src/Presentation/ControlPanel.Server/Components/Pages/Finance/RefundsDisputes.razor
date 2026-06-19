@@ -1,0 +1,354 @@
+@page "/finance/refunds-disputes"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Refunds & Disputes - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <BbTypographyH3>Refunds & Disputes</BbTypographyH3>
+            <BbTypographyMuted>Create refund, dispute, and chargeback cases through Wallets workflow APIs.</BbTypographyMuted>
+        </div>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+            Refresh
+        </BbButton>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else if (!_hasTenant)
+    {
+        <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
+    }
+    else if (!_moduleEnabled)
+    {
+        <ModuleUnavailable ModuleName="Wallets" />
+    }
+    else
+    {
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Open Refund / Dispute Case</BbCardTitle>
+                <BbCardDescription>Select a transaction or enter wallet details, then submit a case for workflow settlement.</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="grid gap-3 md:grid-cols-5">
+                    <BbFormFieldSelect TValue="string" @bind-Value="_caseType" Label="Case Type">
+                        @foreach (var caseType in Enum.GetValues<WalletCaseType>())
+                        {
+                            <BbSelectItem Value="@caseType.ToString()">@caseType</BbSelectItem>
+                        }
+                    </BbFormFieldSelect>
+                    <BbFormFieldInput TValue="string" @bind-Value="_walletId" Label="Wallet ID" Placeholder="Required" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_transactionId" Label="Original Transaction ID" Placeholder="Optional" />
+                    <BbFormFieldInput TValue="decimal" @bind-Value="_amount" Label="Amount" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_reason" Label="Reason" Placeholder="Customer refund or dispute reason" />
+                </div>
+                <div class="mt-4">
+                    <BbButton Variant="ButtonVariant.Destructive" OnClick="@SubmitCase" Disabled="@_acting">
+                        <LucideIcon Name="file-warning" class="mr-2 h-4 w-4" />
+                        Create Case
+                    </BbButton>
+                </div>
+            </BbCardContent>
+        </BbCard>
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Reversal Operations</BbTypographyMuted>
+                        <BbTypographyH3>@_refundOperations.Count</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Recent Credits</BbTypographyMuted>
+                        <BbTypographyH3>@_creditCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Recent Debits</BbTypographyMuted>
+                        <BbTypographyH3>@_debitCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+        </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Open Cases</BbCardTitle>
+                <BbCardDescription>@_cases.Count case(s) loaded</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_cases" ShowPagination="true" InitialPageSize="10">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.CaseType)" Title="Type" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReasonCode)" Title="Reason Code" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                        <BbDataGridTemplateColumn Title="Actions">
+                            <ChildContent Context="item">
+                                @if (item.Status is WalletCaseStatus.Open or WalletCaseStatus.OnHold)
+                                {
+                                    <div class="flex gap-2">
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ResolveCase(item, true))" Disabled="@_acting">
+                                            Approve
+                                        </BbButton>
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost" OnClick="@(() => ResolveCase(item, false))" Disabled="@_acting">
+                                            Reject
+                                        </BbButton>
+                                    </div>
+                                }
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Recent Refund/Reversal Operations</BbCardTitle>
+                <BbCardDescription>@_refundOperations.Count operation(s) loaded</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_refundOperations" ShowPagination="true" InitialPageSize="10">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Type" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
+                        <BbDataGridPropertyColumn Property="@(x => x.FailureMessage)" Title="Failure" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Recent Transactions</BbCardTitle>
+                <BbCardDescription>@_transactions.Count transaction(s) available for reversal</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.Id)" Title="Transaction" />
+                        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                        <BbDataGridTemplateColumn Title="Actions">
+                            <ChildContent Context="item">
+                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => SelectTransaction(item))">
+                                    Use
+                                </BbButton>
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+    }
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private List<WalletTransaction> _transactions = [];
+    private List<WalletOperation> _refundOperations = [];
+    private List<WalletCase> _cases = [];
+    private bool _loading = true;
+    private bool _acting;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private int _creditCount;
+    private int _debitCount;
+    private string _caseType = WalletCaseType.Refund.ToString();
+    private string _walletId = "";
+    private string _transactionId = "";
+    private decimal _amount;
+    private string _reason = "";
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private void OnTenantChanged() => _ = InvokeAsync(LoadData);
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsTransfers);
+            _transactions = [];
+            _refundOperations = [];
+            _cases = [];
+            _creditCount = 0;
+            _debitCount = 0;
+
+            if (!_hasTenant || !_moduleEnabled)
+            {
+                return;
+            }
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _transactions = await DataContext.Query<WalletTransaction>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(200)
+                .ToListAsync();
+
+            _refundOperations = await DataContext.Query<WalletOperation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId
+                    && !x.IsDeleted
+                    && (x.OperationType == WalletOperationType.Refund
+                        || x.OperationType == WalletOperationType.Reversal
+                        || x.OperationType == WalletOperationType.DisputeHold
+                        || x.OperationType == WalletOperationType.DisputeResolution
+                        || x.OperationType == WalletOperationType.Chargeback
+                        || x.Status == WalletOperationStatus.Reversed))
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            _cases = await DataContext.Query<WalletCase>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            _creditCount = _transactions.Count(x => x.TransactionType == TransactionType.Credit);
+            _debitCount = _transactions.Count(x => x.TransactionType == TransactionType.Debit);
+        }
+        catch (Exception ex)
+        {
+            _transactions = [];
+            _refundOperations = [];
+            _cases = [];
+            ToastService.Show($"Failed to load refunds and disputes: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ResolveCase(WalletCase walletCase, bool approve)
+    {
+        _acting = true;
+        try
+        {
+            var result = await WalletsAdminContracts.ResolveWalletCaseAsync(
+                walletCase.Id,
+                approve,
+                approve ? "ControlPanel case approval" : "ControlPanel case rejection");
+
+            ToastService.Show(result.IsSuccess ? "Wallet case updated." : result.Message ?? "Wallet case action failed.");
+            if (result.IsSuccess)
+            {
+                await LoadData();
+            }
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private void SelectTransaction(WalletTransaction transaction)
+    {
+        _walletId = transaction.WalletId.ToString();
+        _transactionId = transaction.Id.ToString();
+        _amount = Math.Abs(transaction.Amount);
+        _reason = string.IsNullOrWhiteSpace(_reason) ? "ControlPanel case" : _reason;
+    }
+
+    private async Task SubmitCase()
+    {
+        if (!Guid.TryParse(_walletId, out var walletId))
+        {
+            ToastService.Show("Enter a valid wallet ID.");
+            return;
+        }
+
+        if (_amount <= 0)
+        {
+            ToastService.Show("Enter an amount greater than zero.");
+            return;
+        }
+
+        if (!Enum.TryParse<WalletCaseType>(_caseType, out var caseType))
+        {
+            ToastService.Show("Select a valid case type.");
+            return;
+        }
+
+        var transactionId = Guid.TryParse(_transactionId, out var parsedTransactionId)
+            ? parsedTransactionId
+            : (Guid?)null;
+
+        _acting = true;
+        try
+        {
+            var result = await WalletsAdminContracts.CreateWalletCaseAsync(
+                walletId,
+                caseType,
+                _amount,
+                transactionId,
+                string.IsNullOrWhiteSpace(_reason) ? "ControlPanel case" : _reason.Trim());
+
+            ToastService.Show(result.IsSuccess ? "Wallet case created." : $"Failed to create wallet case: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _walletId = "";
+                _transactionId = "";
+                _amount = 0;
+                _reason = "";
+                await LoadData();
+            }
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

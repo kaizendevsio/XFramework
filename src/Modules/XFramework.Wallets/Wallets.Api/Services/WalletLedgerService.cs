@@ -91,6 +91,8 @@ public sealed class WalletLedgerService(
                 return Result<WalletLedgerExecutionResult>.Failure("New wallets must belong to the operation tenant", 400);
             }
 
+            await LockWalletRowsAsync(request.TenantId, walletIds, newWalletIds, ct);
+
             var existingWallets = await dbContext.Set<Wallet>()
                 .IgnoreQueryFilters()
                 .AsTracking()
@@ -138,6 +140,26 @@ public sealed class WalletLedgerService(
                     403);
             }
 
+            if (policyResult.Data?.RequiresApproval == true && !request.ApprovalId.HasValue)
+            {
+                await transaction.RollbackAsync(ct);
+                return Result<WalletLedgerExecutionResult>.Failure(
+                    policyResult.Data.Message ?? "Wallet policy requires maker-checker approval before settlement",
+                    409);
+            }
+
+            if (request.ApprovalId.HasValue)
+            {
+                var approvalValidation = await ValidateApprovalAsync(request, walletIds, ct);
+                if (!approvalValidation.IsSuccess)
+                {
+                    await transaction.RollbackAsync(ct);
+                    return Result<WalletLedgerExecutionResult>.Failure(
+                        approvalValidation.Message ?? "Wallet approval is invalid",
+                        approvalValidation.StatusCode);
+                }
+            }
+
             var operation = new WalletOperation
             {
                 Id = Guid.NewGuid(),
@@ -153,6 +175,14 @@ public sealed class WalletLedgerService(
                 Reason = request.Reason,
                 RiskDecision = policyResult.Data?.Decision,
                 PolicyDecision = policyResult.Data?.Decision,
+                PolicyDecisionJson = policyResult.Data?.DecisionJson,
+                RequiresApproval = policyResult.Data?.RequiresApproval == true,
+                RiskTier = policyResult.Data?.RiskTier,
+                RiskScore = policyResult.Data?.RiskScore,
+                RequestedFee = request.RequestedFee,
+                CalculatedFee = request.CalculatedFee,
+                ApprovalId = request.ApprovalId,
+                OriginalOperationId = request.OriginalOperationId,
                 CompletedAt = DateTime.UtcNow
             };
 
@@ -195,6 +225,11 @@ public sealed class WalletLedgerService(
             ApplyTransactionUpdates(request.TransactionUpdates, touchedWallets);
             AddCompatibilityReadModels(request);
             dbContext.Set<WalletOutboxMessage>().Add(CreateOutboxMessage(operation, request));
+
+            if (request.BeforeCommitAsync is not null)
+            {
+                await request.BeforeCommitAsync(operation, ct);
+            }
 
             await dbContext.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
@@ -242,6 +277,34 @@ public sealed class WalletLedgerService(
 
             dbContext.Update(update.Transaction);
         }
+    }
+
+    private async Task LockWalletRowsAsync(
+        Guid tenantId,
+        IReadOnlyList<Guid> walletIds,
+        IReadOnlyCollection<Guid> newWalletIds,
+        CancellationToken ct)
+    {
+        var existingIds = walletIds
+            .Except(newWalletIds)
+            .Distinct()
+            .OrderBy(static id => id)
+            .ToArray();
+
+        if (existingIds.Length == 0)
+        {
+            return;
+        }
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT "ID"
+            FROM "Wallet"."Wallet"
+            WHERE "TenantId" = {tenantId}
+              AND "IsDeleted" = false
+              AND "ID" = ANY({existingIds})
+            ORDER BY "ID"
+            FOR UPDATE
+            """, ct);
     }
 
     private async Task<Result<WalletLedgerExecutionResult>?> FindCompletedReplayAsync(
@@ -540,6 +603,8 @@ public sealed class WalletLedgerService(
             operation.Status,
             operation.ReferenceNumber,
             request.CorrelationId,
+            walletId = request.Postings.FirstOrDefault(static p => p.WalletId.HasValue)?.WalletId,
+            actorCredentialId = operation.ActorCredentialId,
             postingCount = request.Postings.Count
         }, HashJsonOptions);
 
@@ -596,4 +661,71 @@ public sealed class WalletLedgerService(
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
         return Convert.ToHexString(bytes);
     }
+
+    private async Task<Result> ValidateApprovalAsync(
+        WalletLedgerExecutionRequest request,
+        IReadOnlyCollection<Guid> walletIds,
+        CancellationToken ct)
+    {
+        var approvalSet = dbContext.Set<WalletApprovalRequest>();
+        var approval = approvalSet.Local.FirstOrDefault(x =>
+                x.Id == request.ApprovalId!.Value &&
+                x.TenantId == request.TenantId &&
+                !x.IsDeleted)
+            ?? await approvalSet
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.Id == request.ApprovalId!.Value &&
+                x.TenantId == request.TenantId &&
+                !x.IsDeleted,
+                ct);
+        if (approval is null)
+        {
+            return Result.NotFound("Wallet approval was not found");
+        }
+
+        if (approval.Status != WalletApprovalStatus.Approved)
+        {
+            return Result.Failure("Wallet approval must be approved before settlement", 409);
+        }
+
+        if (!IsApprovalCompatible(approval.OperationType, request.OperationType))
+        {
+            return Result.Failure("Wallet approval does not match the operation type", 400);
+        }
+
+        if (approval.WalletId.HasValue && !walletIds.Contains(approval.WalletId.Value))
+        {
+            return Result.Failure("Wallet approval does not match the target wallet", 400);
+        }
+
+        if (RequiresApproverSeparation(request.OperationType) &&
+            approval.ApproverCredentialId.HasValue &&
+            approval.ApproverCredentialId == approval.RequesterCredentialId)
+        {
+            return Result.Failure("Wallet approval requires a different approver", 409);
+        }
+
+        return Result.Success();
+    }
+
+    private static bool IsApprovalCompatible(
+        WalletOperationType approvalOperationType,
+        WalletOperationType operationType) =>
+        approvalOperationType == operationType ||
+        (approvalOperationType == WalletOperationType.WithdrawalApproval &&
+         operationType is
+             WalletOperationType.Hold or
+             WalletOperationType.Release or
+             WalletOperationType.WithdrawalApproval);
+
+    private static bool RequiresApproverSeparation(WalletOperationType operationType) =>
+        operationType is
+            WalletOperationType.Transfer or
+            WalletOperationType.Reversal or
+            WalletOperationType.ManualAdjustment or
+            WalletOperationType.Freeze or
+            WalletOperationType.Unfreeze or
+            WalletOperationType.Close;
 }

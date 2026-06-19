@@ -216,6 +216,7 @@ else
     [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private IWalletsServiceWrapper WalletsService { get; set; } = default!;
+    [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
 
     private List<Wallet> _items = [];
@@ -485,26 +486,20 @@ else
             }
 
             var isFreezing = fresh.Status == WalletStatus.Active;
-            var result = isFreezing
-                ? await WalletsService.FreezeWallet(new FreezeWalletRequest
-                {
-                    WalletId = fresh.Id,
-                    Metadata = BuildCommandMetadata(fresh.TenantId)
-                })
-                : await WalletsService.UnfreezeWallet(new UnfreezeWalletRequest
-                {
-                    WalletId = fresh.Id,
-                    Metadata = BuildCommandMetadata(fresh.TenantId)
-                });
+            var operationType = isFreezing ? WalletOperationType.Freeze : WalletOperationType.Unfreeze;
+            var result = await WalletsAdminContracts.CreateWalletApprovalAsync(
+                operationType,
+                fresh.Id,
+                null,
+                $"{operationType} requested from ControlPanel wallet list");
 
             if (result.IsSuccess)
             {
-                ToastService.Show($"Wallet {(isFreezing ? "frozen" : "unfrozen")} successfully.");
-                await LoadData();
+                ToastService.Show($"Wallet {(isFreezing ? "freeze" : "unfreeze")} approval requested.");
             }
             else
             {
-                ToastService.Show($"Failed to update wallet: {result.Message}");
+                ToastService.Show($"Failed to request wallet status change: {result.Message}");
             }
         }
         catch (Exception ex)

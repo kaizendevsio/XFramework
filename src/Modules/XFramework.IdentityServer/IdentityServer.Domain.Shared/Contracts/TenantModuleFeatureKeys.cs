@@ -3,6 +3,14 @@ namespace IdentityServer.Domain.Shared.Contracts;
 public static class TenantModuleFeatureKeys
 {
     public const string Wallets = "wallets";
+    public const string WalletsTransfers = "wallets.transfers";
+    public const string WalletsDeposits = "wallets.deposits";
+    public const string WalletsWithdrawals = "wallets.withdrawals";
+    public const string WalletsBatch = "wallets.batch";
+    public const string WalletsReconciliation = "wallets.reconciliation";
+    public const string WalletsPolicy = "wallets.policy";
+    public const string WalletsWebhooks = "wallets.webhooks";
+    public const string WalletsReporting = "wallets.reporting";
     public const string Inventario = "inventario";
     public const string InventarioCatalog = "inventario.catalog";
     public const string InventarioVariations = "inventario.variations";
@@ -26,6 +34,14 @@ public static class TenantModuleFeatureKeys
     public const string Notifications = "notifications";
 
     public const string CatalogSubFeature = "catalog";
+    public const string TransfersSubFeature = "transfers";
+    public const string DepositsSubFeature = "deposits";
+    public const string WithdrawalsSubFeature = "withdrawals";
+    public const string BatchSubFeature = "batch";
+    public const string ReconciliationSubFeature = "reconciliation";
+    public const string PolicySubFeature = "policy";
+    public const string WebhooksSubFeature = "webhooks";
+    public const string ReportingSubFeature = "reporting";
     public const string VariationsSubFeature = "variations";
     public const string TransactionsSubFeature = "transactions";
     public const string LowStockAlertsSubFeature = "low_stock_alerts";
@@ -37,7 +53,7 @@ public static class TenantModuleFeatureKeys
     public const string PurchasingSubFeature = "purchasing";
     public const string TraceabilitySubFeature = "traceability";
     public const string PlanningSubFeature = "planning";
-    public const string ReportingSubFeature = "reporting";
+    public const string InventarioReportingSubFeature = "reporting";
     public const string NegativeStockSubFeature = "negative_stock";
     public const string ChatSubFeature = "chat";
     public const string AudioVideoSubFeature = "audio_video";
@@ -45,6 +61,14 @@ public static class TenantModuleFeatureKeys
     public static IReadOnlyList<TenantModuleFeatureDefinition> All { get; } =
     [
         new(Wallets, string.Empty, "Wallets", "Wallet accounts, balances, transfers, deposits, and withdrawals.", "wallet"),
+        new(Wallets, TransfersSubFeature, "Wallet Transfers", "Wallet transfer and conversion operations.", "arrow-left-right"),
+        new(Wallets, DepositsSubFeature, "Wallet Deposits", "Deposit requests, approvals, provider callbacks, and settlement.", "circle-plus"),
+        new(Wallets, WithdrawalsSubFeature, "Wallet Withdrawals", "Withdrawal requests, holds, approvals, payout settlement, and failures.", "circle-minus"),
+        new(Wallets, BatchSubFeature, "Wallet Batch", "Batch wallet balance and transfer operations.", "rows-3"),
+        new(Wallets, ReconciliationSubFeature, "Wallet Reconciliation", "Ledger, balance, transaction, and provider reconciliation.", "scale"),
+        new(Wallets, PolicySubFeature, "Wallet Policy", "Wallet policy, risk, fee, and approval rules.", "shield-check"),
+        new(Wallets, WebhooksSubFeature, "Wallet Webhooks", "Payment provider webhook ingestion and outbox delivery.", "webhook"),
+        new(Wallets, ReportingSubFeature, "Wallet Reporting", "Statements, operation history, settlement, and failure reports.", "bar-chart-3"),
         new(Inventario, string.Empty, "Inventario", "Product catalog and inventory operations.", "boxes"),
         new(Inventario, CatalogSubFeature, "Catalog", "Products, categories, SKUs, and catalog attributes.", "package"),
         new(Inventario, VariationsSubFeature, "Variations", "Product options, variants, and variation-specific stock.", "git-branch"),
@@ -58,7 +82,7 @@ public static class TenantModuleFeatureKeys
         new(Inventario, PurchasingSubFeature, "Purchasing", "Purchase orders, receiving, and supplier replenishment workflows.", "shopping-cart", false),
         new(Inventario, TraceabilitySubFeature, "Traceability", "Lot, serial, batch, and inventory lineage tracking.", "scan-line", false),
         new(Inventario, PlanningSubFeature, "Planning", "Demand planning, reorder planning, and replenishment forecasting.", "calendar-clock", false),
-        new(Inventario, ReportingSubFeature, "Reporting", "Inventory analytics, valuation, audit, and operational reports.", "bar-chart-3", false),
+        new(Inventario, InventarioReportingSubFeature, "Reporting", "Inventory analytics, valuation, audit, and operational reports.", "bar-chart-3", false),
         new(Inventario, NegativeStockSubFeature, "Negative Stock", "Controls for allowing or blocking negative stock positions.", "minus-circle", false),
         new(Messaging, ChatSubFeature, "Messaging Chat", "Threads, direct messages, reactions, and attachments.", "message-circle"),
         new(Messaging, AudioVideoSubFeature, "Messaging Audio/Video", "Audio and video communication features.", "video"),

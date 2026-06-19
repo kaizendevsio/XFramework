@@ -12,4 +12,5 @@ public partial record TransferWalletRequest : TransactionRequestBase,
     public TransactionPurpose TransactionPurpose { get; set; } = TransactionPurpose.Transfer;
     public required Guid RecipientCredentialId { get; set; }
     public required Guid WalletTypeId { get; set; }
+    public Guid? ApprovalId { get; set; }
 }

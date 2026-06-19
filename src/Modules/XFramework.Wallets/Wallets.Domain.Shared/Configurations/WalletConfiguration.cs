@@ -16,6 +16,13 @@ public class WalletConfiguration : IEntityTypeConfiguration<Wallet>
             .HasColumnName("ID")
             .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
         entity.Property(e => e.Balance).HasPrecision(24, 8);
+        entity.Property(e => e.DebitOnHoldBalance).HasPrecision(24, 8);
+        entity.Property(e => e.CreditOnHoldBalance).HasPrecision(24, 8);
+        entity.Property(e => e.TransferableBalance).HasPrecision(24, 8);
+        entity.Property(e => e.MinTransferRule).HasPrecision(24, 8);
+        entity.Property(e => e.MaxTransferRule).HasPrecision(24, 8);
+        entity.Property(e => e.BondBalanceRule).HasPrecision(24, 8);
+        entity.Property(e => e.MaintainingBalanceRule).HasPrecision(24, 8);
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
         entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
@@ -30,5 +37,13 @@ public class WalletConfiguration : IEntityTypeConfiguration<Wallet>
         entity.HasOne(d => d.WalletType).WithMany()
             .HasForeignKey(d => d.WalletTypeId)
             .HasConstraintName("tbl_Wallets_WalletTypeId_fkey");
+
+        entity.HasIndex(e => new { e.TenantId, e.AccountNumber })
+            .IsUnique()
+            .HasFilter("\"AccountNumber\" IS NOT NULL AND \"IsDeleted\" = false");
+        entity.HasIndex(e => new { e.TenantId, e.CredentialId, e.WalletTypeId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false AND \"Status\" <> 3");
+        entity.HasIndex(e => new { e.TenantId, e.Status });
     }
 }

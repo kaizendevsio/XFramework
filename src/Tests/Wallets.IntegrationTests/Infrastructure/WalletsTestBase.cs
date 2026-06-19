@@ -85,6 +85,33 @@ public abstract class WalletsTestBase
         return wallet;
     }
 
+    protected async Task<Guid> SeedApprovedWalletApproval(
+        Guid walletId,
+        WalletOperationType operationType,
+        Guid? requesterCredentialId = null,
+        Guid? approverCredentialId = null)
+    {
+        await using var db = CreateDbContext();
+
+        var approval = new WalletApprovalRequest
+        {
+            Id = Guid.NewGuid(),
+            TenantId = WalletsTestFixture.TestTenantId,
+            OperationType = operationType,
+            WalletId = walletId,
+            Status = WalletApprovalStatus.Approved,
+            RequesterCredentialId = requesterCredentialId ?? Guid.NewGuid(),
+            ApproverCredentialId = approverCredentialId ?? Guid.NewGuid(),
+            RequestedAt = DateTime.UtcNow.AddMinutes(-5),
+            DecidedAt = DateTime.UtcNow.AddMinutes(-1),
+            DecisionReason = "approved by integration test"
+        };
+
+        db.Set<WalletApprovalRequest>().Add(approval);
+        await db.SaveChangesAsync();
+        return approval.Id;
+    }
+
     protected static XFramework.Domain.Shared.BusinessObjects.RequestMetadata CreateMetadata() => new()
     {
         TenantId = WalletsTestFixture.TestTenantId,

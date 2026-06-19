@@ -11,6 +11,7 @@ namespace Wallets.Api.Services;
 public sealed class BatchWalletService(
     DbContext dbContext,
     IWalletLedgerService ledgerService,
+    IWalletFeeCalculator feeCalculator,
     ILogger<BatchWalletService> logger) : IBatchWalletService
 {
     private const int MaxBatchSize = 1000;
@@ -83,38 +84,10 @@ public sealed class BatchWalletService(
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var validation = ValidateBatch(transactions);
-        if (validation is not null)
-        {
-            return validation;
-        }
-
-        try
-        {
-            await dbContext.Set<WalletTransaction>().AddRangeAsync(transactions, cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            var result = new BatchOperationResult
-            {
-                TotalProcessed = transactions.Count,
-                SuccessCount = transactions.Count,
-                Duration = stopwatch.Elapsed
-            };
-
-            logger.OperationCompleted("ProcessTransactions", stopwatch.ElapsedMilliseconds);
-            return Result<BatchOperationResult>.Success(result);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            logger.ConcurrencyConflict("ProcessTransactions", Guid.Empty);
-            return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
-        }
-        catch (Exception ex)
-        {
-            logger.OperationFailed("ProcessTransactions", "WalletTransaction", Guid.Empty, ex.Message, ex);
-            return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
-        }
+        await Task.CompletedTask;
+        return Result<BatchOperationResult>.Failure(
+            "Direct WalletTransaction batch writes are disabled. Use ledger-backed batch increment, decrement, or transfer operations.",
+            409);
     }
 
     private async Task<Result<BatchOperationResult>> ExecuteIncrementLedgerAsync(
@@ -185,8 +158,27 @@ public sealed class BatchWalletService(
                     $"Amount {request.Amount} exceeds maximum transfer rule {wallet.MaxTransferRule.Value}");
             }
 
+            var feeResult = await CalculateBatchFeeAsync(
+                tenantId,
+                WalletOperationType.Credit,
+                wallet.WalletTypeId,
+                request.Amount,
+                request.Fee,
+                ct);
+            if (!feeResult.IsSuccess)
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber, feeResult.Message!);
+            }
+
+            var fee = feeResult.Data;
+            if (fee > request.Amount)
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber,
+                    $"Calculated increment fee {fee} exceeds amount {request.Amount}");
+            }
+
             var draft = drafts[wallet.Id];
-            var netCredit = request.Amount - request.Fee;
+            var netCredit = request.Amount - fee;
             if (request.OnHold)
             {
                 draft.CreditOnHoldBalance += netCredit;
@@ -205,7 +197,7 @@ public sealed class BatchWalletService(
                 CredentialId = request.CredentialId,
                 WalletId = wallet.Id,
                 Amount = request.Amount,
-                TransactionFee = request.Fee,
+                TransactionFee = fee,
                 Remarks = request.Remarks,
                 TransactionType = TransactionType.Credit,
                 Held = request.OnHold,
@@ -246,9 +238,9 @@ public sealed class BatchWalletService(
                 ApplyDraftBalances(walletTransaction, draft);
             }
 
-            if (request.Fee > 0)
+            if (fee > 0)
             {
-                postings.Add(CreateFeePosting(request.Fee, wallet.WalletTypeId, referenceNumber, "Batch increment fee"));
+                postings.Add(CreateFeePosting(fee, wallet.WalletTypeId, referenceNumber, "Batch increment fee"));
             }
 
             readModels.Add(walletTransaction);
@@ -295,7 +287,20 @@ public sealed class BatchWalletService(
             }
 
             var draft = drafts[wallet.Id];
-            var totalDebit = request.Amount + request.Fee;
+            var feeResult = await CalculateBatchFeeAsync(
+                tenantId,
+                WalletOperationType.Debit,
+                wallet.WalletTypeId,
+                request.Amount,
+                request.Fee,
+                ct);
+            if (!feeResult.IsSuccess)
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber, feeResult.Message!);
+            }
+
+            var fee = feeResult.Data;
+            var totalDebit = request.Amount + fee;
             var debitValidation = ValidateDraftDebit(draft, wallet, totalDebit, request.OnHold, "decrement");
             if (debitValidation is not null)
             {
@@ -321,7 +326,7 @@ public sealed class BatchWalletService(
                 CredentialId = request.CredentialId,
                 WalletId = wallet.Id,
                 Amount = request.Amount,
-                TransactionFee = request.Fee,
+                TransactionFee = fee,
                 Remarks = request.Remarks,
                 TransactionType = TransactionType.Debit,
                 Held = request.OnHold,
@@ -355,9 +360,9 @@ public sealed class BatchWalletService(
                 Description = "Batch decrement destination"
             });
 
-            if (request.Fee > 0)
+            if (fee > 0)
             {
-                postings.Add(CreateFeePosting(request.Fee, wallet.WalletTypeId, referenceNumber, "Batch decrement fee"));
+                postings.Add(CreateFeePosting(fee, wallet.WalletTypeId, referenceNumber, "Batch decrement fee"));
             }
 
             readModels.Add(walletTransaction);
@@ -413,7 +418,20 @@ public sealed class BatchWalletService(
             }
 
             var fromDraft = drafts[fromWallet.Id];
-            var totalDebit = request.Amount + request.Fee;
+            var feeResult = await CalculateBatchFeeAsync(
+                tenantId,
+                WalletOperationType.Transfer,
+                fromWallet.WalletTypeId,
+                request.Amount,
+                request.Fee,
+                ct);
+            if (!feeResult.IsSuccess)
+            {
+                return BatchFailure(requests.Count, i, request.FromWalletId, request.ReferenceNumber, feeResult.Message!);
+            }
+
+            var fee = feeResult.Data;
+            var totalDebit = request.Amount + fee;
             var debitValidation = ValidateDraftDebit(fromDraft, fromWallet, totalDebit, onHold: false, "transfer");
             if (debitValidation is not null)
             {
@@ -435,7 +453,7 @@ public sealed class BatchWalletService(
                 CredentialId = request.FromCredentialId,
                 WalletId = fromWallet.Id,
                 Amount = request.Amount,
-                TransactionFee = request.Fee,
+                TransactionFee = fee,
                 Remarks = $"Transfer to wallet {toWallet.Id}: {request.Remarks}",
                 TransactionType = TransactionType.Debit,
                 Held = false,
@@ -467,7 +485,7 @@ public sealed class BatchWalletService(
                 SenderTransaction = debitTransaction,
                 RecipientTransaction = creditTransaction,
                 TransactionPurpose = TransactionPurpose.Transfer,
-                TransactionFee = request.Fee
+                TransactionFee = fee
             };
 
             postings.Add(new WalletLedgerPostingRequest
@@ -496,9 +514,9 @@ public sealed class BatchWalletService(
                 Description = "Batch transfer credit"
             });
 
-            if (request.Fee > 0)
+            if (fee > 0)
             {
-                postings.Add(CreateFeePosting(request.Fee, fromWallet.WalletTypeId, referenceNumber, "Batch transfer fee"));
+                postings.Add(CreateFeePosting(fee, fromWallet.WalletTypeId, referenceNumber, "Batch transfer fee"));
             }
 
             readModels.Add(debitTransaction);
@@ -598,6 +616,28 @@ public sealed class BatchWalletService(
         logger.BatchWalletOperationCompleted(batchOperationName, result.Data.SuccessCount, result.Data.TotalProcessed);
         logger.OperationCompleted(operationName, stopwatch.ElapsedMilliseconds);
         return result;
+    }
+
+    private async Task<Result<decimal>> CalculateBatchFeeAsync(
+        Guid tenantId,
+        WalletOperationType operationType,
+        Guid? walletTypeId,
+        decimal amount,
+        decimal requestedFee,
+        CancellationToken ct)
+    {
+        var feeResult = await feeCalculator.CalculateAsync(
+            tenantId,
+            operationType,
+            walletTypeId,
+            currencyId: null,
+            amount,
+            requestedFee,
+            ct);
+
+        return feeResult.IsSuccess
+            ? Result<decimal>.Success(feeResult.Data!.AppliedFee)
+            : Result<decimal>.Failure(feeResult.Message!, feeResult.StatusCode);
     }
 
     private static Result<BatchOperationResult>? ValidateBatch<T>(List<T>? requests)

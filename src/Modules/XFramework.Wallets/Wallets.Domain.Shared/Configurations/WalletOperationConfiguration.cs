@@ -25,8 +25,18 @@ public class WalletOperationConfiguration : IEntityTypeConfiguration<WalletOpera
         entity.Property(e => e.ExternalReference).HasMaxLength(200);
         entity.Property(e => e.RiskDecision).HasMaxLength(200);
         entity.Property(e => e.PolicyDecision).HasMaxLength(2000);
+        entity.Property(e => e.PolicyDecisionJson).HasColumnType("jsonb");
+        entity.Property(e => e.RiskTier).HasMaxLength(100);
+        entity.Property(e => e.RiskScore).HasPrecision(18, 8);
+        entity.Property(e => e.RequestedFee).HasPrecision(24, 8);
+        entity.Property(e => e.CalculatedFee).HasPrecision(24, 8);
         entity.Property(e => e.Reason).HasMaxLength(2000);
         entity.Property(e => e.FailureMessage).HasMaxLength(4000);
+
+        entity.HasOne(e => e.OriginalOperation)
+            .WithMany()
+            .HasForeignKey(e => e.OriginalOperationId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         entity.HasIndex(e => new { e.TenantId, e.IdempotencyKey })
             .IsUnique()
@@ -34,5 +44,7 @@ public class WalletOperationConfiguration : IEntityTypeConfiguration<WalletOpera
         entity.HasIndex(e => new { e.TenantId, e.ReferenceNumber });
         entity.HasIndex(e => new { e.TenantId, e.OperationType, e.Status });
         entity.HasIndex(e => new { e.TenantId, e.ActorCredentialId });
+        entity.HasIndex(e => new { e.TenantId, e.Status, e.CreatedAt });
+        entity.HasIndex(e => new { e.TenantId, e.ExternalReference });
     }
 }

@@ -1,12 +1,16 @@
 @page "/finance/policy-decisions"
+@using global::Wallets.Domain.Shared.Contracts.Requests
 @using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
 <PageTitle>Wallet Policy Decisions - Control Panel</PageTitle>
 
 <div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <BbTypographyH3>Policy Decisions</BbTypographyH3>
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <BbTypographyH3>Policy & Fees</BbTypographyH3>
+            <BbTypographyMuted>Inspect policy decisions, risk outcomes, and wallet fee postings.</BbTypographyMuted>
+        </div>
         <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
             <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
             Refresh
@@ -27,16 +31,178 @@
     }
     else
     {
-        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-            <Columns>
-                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.RiskDecision)" Title="Risk" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.PolicyDecision)" Title="Policy" />
-                <BbDataGridPropertyColumn Property="@(x => x.ActorCredentialId)" Title="Actor" />
-                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-            </Columns>
-        </BbDataGrid>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Policy Decisions</BbTypographyMuted>
+                        <BbTypographyH3>@_items.Count</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Rejected</BbTypographyMuted>
+                        <BbTypographyH3>@_rejectedCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Fee Postings</BbTypographyMuted>
+                        <BbTypographyH3>@_fees.Count</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Total Fees</BbTypographyMuted>
+                        <BbTypographyH3>@_totalFees.ToString("N2")</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Policy Rule</BbCardTitle>
+                    <BbCardDescription>Create tenant-scoped limits, velocity checks, and approval thresholds.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <BbFormFieldInput TValue="string" @bind-Value="_policyName" Label="Name" Placeholder="Large transfer approval" />
+                        <BbFormFieldSelect TValue="string" @bind-Value="_policyOperationType" Label="Operation">
+                            @foreach (var operationType in Enum.GetValues<WalletOperationType>())
+                            {
+                                <BbSelectItem Value="@operationType.ToString()">@operationType</BbSelectItem>
+                            }
+                        </BbFormFieldSelect>
+                        <BbFormFieldInput TValue="decimal" @bind-Value="_policyMaxSingle" Label="Max Single" />
+                        <BbFormFieldInput TValue="decimal" @bind-Value="_policyDailyVelocity" Label="Daily Velocity" />
+                        <BbFormFieldInput TValue="decimal" @bind-Value="_policyMonthlyVelocity" Label="Monthly Velocity" />
+                        <BbFormFieldInput TValue="decimal" @bind-Value="_policyApprovalThreshold" Label="Approval Threshold" />
+                    </div>
+                    <div class="mt-4">
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@SavePolicyRule" Disabled="@_acting">
+                            <LucideIcon Name="shield-check" class="mr-2 h-4 w-4" />
+                            Save Policy
+                        </BbButton>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Fee Schedule</BbCardTitle>
+                    <BbCardDescription>Create server-calculated fixed and percentage fees.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <BbFormFieldInput TValue="string" @bind-Value="_feeName" Label="Name" Placeholder="Standard transfer fee" />
+                        <BbFormFieldSelect TValue="string" @bind-Value="_feeOperationType" Label="Operation">
+                            @foreach (var operationType in Enum.GetValues<WalletOperationType>())
+                            {
+                                <BbSelectItem Value="@operationType.ToString()">@operationType</BbSelectItem>
+                            }
+                        </BbFormFieldSelect>
+                        <BbFormFieldInput TValue="decimal" @bind-Value="_fixedFee" Label="Fixed Fee" />
+                        <BbFormFieldInput TValue="decimal" @bind-Value="_percentageFee" Label="Percentage Fee" />
+                        <BbFormFieldInput TValue="decimal" @bind-Value="_minimumFee" Label="Minimum Fee" />
+                        <BbFormFieldInput TValue="decimal" @bind-Value="_maximumFee" Label="Maximum Fee" />
+                    </div>
+                    <div class="mt-4">
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@SaveFeeSchedule" Disabled="@_acting">
+                            <LucideIcon Name="receipt" class="mr-2 h-4 w-4" />
+                            Save Fee
+                        </BbButton>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Policy Rules</BbCardTitle>
+                    <BbCardDescription>@_rules.Count active rule(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_rules" ShowPagination="true" InitialPageSize="10">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MaxSingleTransactionAmount)" Title="Max Single" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.DailyVelocityLimit)" Title="Daily" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ApprovalThreshold)" Title="Approval" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.IsEnabled)" Title="Enabled" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Fee Schedules</BbCardTitle>
+                    <BbCardDescription>@_feeSchedules.Count active schedule(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_feeSchedules" ShowPagination="true" InitialPageSize="10">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.FixedFee)" Title="Fixed" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.PercentageFee)" Title="Percent" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MinimumFee)" Title="Min" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MaximumFee)" Title="Max" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.IsEnabled)" Title="Enabled" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Policy Decisions</BbCardTitle>
+                <BbCardDescription>@_items.Count operation(s) with risk or policy output</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.RiskDecision)" Title="Risk" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.PolicyDecision)" Title="Policy" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ActorCredentialId)" Title="Actor" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Fee Ledger</BbCardTitle>
+                <BbCardDescription>@_fees.Count fee posting(s) loaded</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_fees" ShowPagination="true" InitialPageSize="20">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Direction)" Title="Direction" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.BalanceBucket)" Title="Bucket" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
     }
 </div>
 
@@ -44,12 +210,31 @@
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<WalletOperation> _items = [];
+    private List<WalletLedgerEntry> _fees = [];
+    private List<WalletPolicyRule> _rules = [];
+    private List<WalletFeeSchedule> _feeSchedules = [];
     private bool _loading = true;
+    private bool _acting;
     private bool _hasTenant;
     private bool _moduleEnabled;
+    private int _rejectedCount;
+    private decimal _totalFees;
+    private string _policyName = "";
+    private string _policyOperationType = WalletOperationType.Transfer.ToString();
+    private decimal _policyMaxSingle;
+    private decimal _policyDailyVelocity;
+    private decimal _policyMonthlyVelocity;
+    private decimal _policyApprovalThreshold;
+    private string _feeName = "";
+    private string _feeOperationType = WalletOperationType.Transfer.ToString();
+    private decimal _fixedFee;
+    private decimal _percentageFee;
+    private decimal _minimumFee;
+    private decimal _maximumFee;
 
     protected override void OnInitialized()
     {
@@ -71,8 +256,13 @@
         {
             await ModuleNavigation.EnsureLoadedAsync();
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
-            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Wallets);
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsPolicy);
             _items = [];
+            _fees = [];
+            _rules = [];
+            _feeSchedules = [];
+            _rejectedCount = 0;
+            _totalFees = 0;
 
             if (!_hasTenant || !_moduleEnabled)
             {
@@ -102,10 +292,44 @@
                 .OrderByDescending(x => x.CreatedAt)
                 .Take(200)
                 .ToList();
+
+            _fees = await DataContext.Query<WalletLedgerEntry>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId
+                    && !x.IsDeleted
+                    && (x.EntryKind == WalletLedgerEntryKind.Fee || x.BalanceBucket == WalletBalanceBucket.Fee))
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(200)
+                .ToListAsync();
+
+            _rules = await DataContext.Query<WalletPolicyRule>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            _feeSchedules = await DataContext.Query<WalletFeeSchedule>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            _rejectedCount = _items.Count(x => x.Status == WalletOperationStatus.Rejected || (x.PolicyDecision != null && x.PolicyDecision.Contains("reject")));
+            _totalFees = _fees.Sum(x => x.Amount);
         }
         catch (Exception ex)
         {
             _items = [];
+            _fees = [];
+            _rules = [];
+            _feeSchedules = [];
+            _rejectedCount = 0;
+            _totalFees = 0;
             ToastService.Show($"Failed to load wallet policy decisions: {ex.Message}");
         }
         finally
@@ -114,6 +338,87 @@
             StateHasChanged();
         }
     }
+
+    private async Task SavePolicyRule()
+    {
+        if (!Enum.TryParse<WalletOperationType>(_policyOperationType, out var operationType))
+        {
+            ToastService.Show("Select a valid operation type.");
+            return;
+        }
+
+        _acting = true;
+        try
+        {
+            var result = await WalletsAdminContracts.SaveWalletPolicyAsync(new UpsertWalletPolicyRuleRequest
+            {
+                Name = string.IsNullOrWhiteSpace(_policyName) ? $"Policy {operationType}" : _policyName.Trim(),
+                OperationType = operationType,
+                MaxSingleTransactionAmount = PositiveOrNull(_policyMaxSingle),
+                DailyVelocityLimit = PositiveOrNull(_policyDailyVelocity),
+                MonthlyVelocityLimit = PositiveOrNull(_policyMonthlyVelocity),
+                ApprovalThreshold = PositiveOrNull(_policyApprovalThreshold),
+                DecisionCode = $"control-panel-{operationType}".ToLowerInvariant(),
+                IsEnabled = true
+            });
+
+            ToastService.Show(result.IsSuccess ? "Policy rule saved." : result.Message ?? "Policy rule save failed.");
+            if (result.IsSuccess)
+            {
+                _policyName = "";
+                _policyMaxSingle = 0;
+                _policyDailyVelocity = 0;
+                _policyMonthlyVelocity = 0;
+                _policyApprovalThreshold = 0;
+                await LoadData();
+            }
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private async Task SaveFeeSchedule()
+    {
+        if (!Enum.TryParse<WalletOperationType>(_feeOperationType, out var operationType))
+        {
+            ToastService.Show("Select a valid operation type.");
+            return;
+        }
+
+        _acting = true;
+        try
+        {
+            var result = await WalletsAdminContracts.SaveWalletFeeScheduleAsync(new UpsertWalletFeeScheduleRequest
+            {
+                Name = string.IsNullOrWhiteSpace(_feeName) ? $"Fee {operationType}" : _feeName.Trim(),
+                OperationType = operationType,
+                FixedFee = _fixedFee,
+                PercentageFee = _percentageFee,
+                MinimumFee = PositiveOrNull(_minimumFee),
+                MaximumFee = PositiveOrNull(_maximumFee),
+                IsEnabled = true
+            });
+
+            ToastService.Show(result.IsSuccess ? "Fee schedule saved." : result.Message ?? "Fee schedule save failed.");
+            if (result.IsSuccess)
+            {
+                _feeName = "";
+                _fixedFee = 0;
+                _percentageFee = 0;
+                _minimumFee = 0;
+                _maximumFee = 0;
+                await LoadData();
+            }
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private static decimal? PositiveOrNull(decimal value) => value > 0 ? value : null;
 
     public void Dispose()
     {

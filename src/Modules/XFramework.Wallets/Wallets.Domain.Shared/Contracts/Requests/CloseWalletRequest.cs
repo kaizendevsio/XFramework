@@ -10,4 +10,5 @@ public partial record CloseWalletRequest : RequestBase,
 {
     public Guid WalletId { get; set; }
     public string? Reason { get; set; }
+    public Guid? ApprovalId { get; set; }
 }

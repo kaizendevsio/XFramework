@@ -5,6 +5,7 @@ using XFramework.Core.Loggers;
 using XFramework.Core.Observability;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
+using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
 
@@ -22,6 +23,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
     private readonly ILogger<WalletOperationsService> _logger;
     private readonly IWalletEventPublisher _eventPublisher;
     private readonly IWalletLedgerService _ledgerService;
+    private readonly IWalletRequestContextResolver _contextResolver;
+    private readonly IWalletFeeCalculator _feeCalculator;
 
     public WalletOperationsService(
         IDataContext dataContext,
@@ -29,7 +32,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
         IHelperService helperService,
         ILogger<WalletOperationsService> logger,
         IWalletEventPublisher eventPublisher,
-        IWalletLedgerService ledgerService)
+        IWalletLedgerService ledgerService,
+        IWalletRequestContextResolver contextResolver,
+        IWalletFeeCalculator feeCalculator)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _tenantService = tenantService ?? throw new ArgumentNullException(nameof(tenantService));
@@ -37,6 +42,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
         _ledgerService = ledgerService ?? throw new ArgumentNullException(nameof(ledgerService));
+        _contextResolver = contextResolver ?? throw new ArgumentNullException(nameof(contextResolver));
+        _feeCalculator = feeCalculator ?? throw new ArgumentNullException(nameof(feeCalculator));
     }
 
     /// <inheritdoc />
@@ -247,7 +254,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request, request.CredentialId);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
             activity?.SetTag("tenant.id", tenant.Id);
 
             if (request.TotalAmount <= 0 || request.TotalFee < 0)
@@ -321,7 +330,26 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure($"Amount must not exceed {wallet.MaxTransferRule.Value}", 400);
             }
 
-            var netCredit = request.TotalAmount - request.TotalFee;
+            var feeResult = await CalculateFeeAsync(
+                tenant.Id,
+                WalletOperationType.Credit,
+                wallet.WalletTypeId,
+                request.CurrencyId,
+                request.TotalAmount,
+                request.TotalFee,
+                cancellationToken);
+            if (!feeResult.IsSuccess)
+            {
+                return Result.Failure(feeResult.Message!, feeResult.StatusCode);
+            }
+
+            var fee = feeResult.Data!.RequestedFee;
+            if (fee > request.TotalAmount)
+            {
+                return Result.Failure("Total fee cannot exceed increment amount", 400);
+            }
+
+            var netCredit = request.TotalAmount - fee;
             var referenceNumber = CreateReferenceNumber(request);
             var transaction = new WalletTransaction
             {
@@ -330,7 +358,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 CredentialId = request.CredentialId,
                 WalletId = wallet.Id,
                 Amount = request.TotalAmount,
-                TransactionFee = request.TotalFee,
+                TransactionFee = fee,
                 Remarks = request.Remarks,
                 TransactionType = TransactionType.Credit,
                 Held = request.OnHold,
@@ -372,14 +400,14 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 });
             }
 
-            if (request.TotalFee > 0)
+            if (fee > 0)
             {
                 postings.Add(new WalletLedgerPostingRequest
                 {
                     Direction = WalletLedgerDirection.Credit,
                     BalanceBucket = WalletBalanceBucket.Fee,
                     EntryKind = WalletLedgerEntryKind.Fee,
-                    Amount = request.TotalFee,
+                    Amount = fee,
                     CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
                     WalletTypeId = wallet.WalletTypeId,
                     ReferenceNumber = referenceNumber,
@@ -398,6 +426,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
                     IdempotencyKey = request.IdempotencyKey,
                     ReferenceNumber = referenceNumber,
                     Reason = request.Remarks,
+                    RequestedFee = request.TotalFee,
+                    CalculatedFee = feeResult.Data.CalculatedFee,
                     Postings = postings,
                     ReadModels = [transaction]
                 },
@@ -473,7 +503,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request, request.CredentialId);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             if (request.TotalAmount <= 0 || request.TotalFee < 0)
             {
@@ -500,7 +532,21 @@ public sealed class WalletOperationsService : IWalletOperationsService
             var statusCheck = CheckWalletStatus(wallet, "DecrementWallet");
             if (statusCheck is not null) return statusCheck;
 
-            var totalDebit = request.TotalAmount + request.TotalFee;
+            var feeResult = await CalculateFeeAsync(
+                tenant.Id,
+                WalletOperationType.Debit,
+                wallet.WalletTypeId,
+                request.CurrencyId,
+                request.TotalAmount,
+                request.TotalFee,
+                cancellationToken);
+            if (!feeResult.IsSuccess)
+            {
+                return Result.Failure(feeResult.Message!, feeResult.StatusCode);
+            }
+
+            var fee = feeResult.Data!.RequestedFee;
+            var totalDebit = request.TotalAmount + fee;
 
             // Check sufficient balance
             if (wallet.AvailableBalance < totalDebit)
@@ -517,7 +563,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 CredentialId = request.CredentialId,
                 WalletId = wallet.Id,
                 Amount = request.TotalAmount,
-                TransactionFee = request.TotalFee,
+                TransactionFee = fee,
                 Remarks = request.Remarks,
                 TransactionType = TransactionType.Debit,
                 Held = request.OnHold,
@@ -555,14 +601,14 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 }
             };
 
-            if (request.TotalFee > 0)
+            if (fee > 0)
             {
                 postings.Add(new WalletLedgerPostingRequest
                 {
                     Direction = WalletLedgerDirection.Credit,
                     BalanceBucket = WalletBalanceBucket.Fee,
                     EntryKind = WalletLedgerEntryKind.Fee,
-                    Amount = request.TotalFee,
+                    Amount = fee,
                     CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
                     WalletTypeId = wallet.WalletTypeId,
                     ReferenceNumber = referenceNumber,
@@ -581,6 +627,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
                     IdempotencyKey = request.IdempotencyKey,
                     ReferenceNumber = referenceNumber,
                     Reason = request.Remarks,
+                    RequestedFee = request.TotalFee,
+                    CalculatedFee = feeResult.Data.CalculatedFee,
                     Postings = postings,
                     ReadModels = [transaction]
                 },
@@ -631,7 +679,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request, request.CredentialId);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             // Validate amount and fee
             if (request.TotalAmount <= 0 || request.Fee < 0)
@@ -761,16 +811,31 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 transferDeductionType = request.TransferDeductionType;
             }
 
+            var feeResult = await CalculateFeeAsync(
+                tenant.Id,
+                WalletOperationType.Transfer,
+                senderWallet.WalletTypeId,
+                request.CurrencyId,
+                request.TotalAmount,
+                request.TotalFee,
+                cancellationToken);
+            if (!feeResult.IsSuccess)
+            {
+                return Result.Failure(feeResult.Message!, feeResult.StatusCode);
+            }
+
+            var fee = feeResult.Data!.RequestedFee;
+
             // Calculate amounts based on deduction type
             switch (transferDeductionType)
             {
                 case TransferDeductionType.DeductFromSender:
-                    totalDecrement = request.TotalAmount + request.TotalFee;
+                    totalDecrement = request.TotalAmount + fee;
                     totalIncrement = request.TotalAmount;
                     break;
                 case TransferDeductionType.DeductFromRecipient:
                     totalDecrement = request.TotalAmount;
-                    totalIncrement = request.TotalAmount - request.TotalFee;
+                    totalIncrement = request.TotalAmount - fee;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -846,7 +911,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 CredentialId = request.CredentialId,
                 WalletId = senderWallet.Id,
                 Amount = request.TotalAmount,
-                TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
+                TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? fee : 0,
                 Remarks = request.Remarks,
                 Description = $"Transferred to {MaskFullName(recipientCredential.IdentityInfo?.FullName)}",
                 TransactionType = TransactionType.Debit,
@@ -862,7 +927,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 CredentialId = request.RecipientCredentialId,
                 WalletId = recipientWallet.Id,
                 Amount = request.TotalAmount,
-                TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
+                TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? fee : 0,
                 Remarks = request.Remarks,
                 Description = $"Received from {MaskFullName(senderCredential.IdentityInfo?.FullName)}",
                 TransactionType = TransactionType.Credit,
@@ -888,7 +953,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 RecipientTransaction = recipientTransaction,
                 LineItems = request.LineItems,
                 TransactionPurpose = request.TransactionPurpose,
-                TransactionFee = request.TotalFee
+                TransactionFee = fee
             };
 
             var postings = new List<WalletLedgerPostingRequest>
@@ -925,14 +990,14 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 });
             }
 
-            if (request.TotalFee > 0)
+            if (fee > 0)
             {
                 postings.Add(new WalletLedgerPostingRequest
                 {
                     Direction = WalletLedgerDirection.Credit,
                     BalanceBucket = WalletBalanceBucket.Fee,
                     EntryKind = WalletLedgerEntryKind.Fee,
-                    Amount = request.TotalFee,
+                    Amount = fee,
                     CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
                     WalletTypeId = senderWallet.WalletTypeId,
                     ReferenceNumber = referenceNumber,
@@ -951,6 +1016,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
                     IdempotencyKey = request.IdempotencyKey,
                     ReferenceNumber = referenceNumber,
                     Reason = request.Remarks,
+                    RequestedFee = request.TotalFee,
+                    CalculatedFee = feeResult.Data.CalculatedFee,
+                    ApprovalId = request.ApprovalId,
                     Postings = postings,
                     ReadModels = [senderTransaction, recipientTransaction, walletTransfer]
                 },
@@ -1016,7 +1084,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request, request.CredentialId);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             // Validate amount and fees
             if (request.TotalAmount <= 0 || request.Fee < 0)
@@ -1119,16 +1189,31 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 transferDeductionType = request.TransferDeductionType;
             }
 
+            var feeResult = await CalculateFeeAsync(
+                tenant.Id,
+                WalletOperationType.Conversion,
+                sourceWallet.WalletTypeId,
+                request.CurrencyId,
+                request.TotalAmount,
+                request.TotalFee,
+                cancellationToken);
+            if (!feeResult.IsSuccess)
+            {
+                return Result.Failure(feeResult.Message!, feeResult.StatusCode);
+            }
+
+            var fee = feeResult.Data!.RequestedFee;
+
             // Calculate amounts based on deduction type
             switch (transferDeductionType)
             {
                 case TransferDeductionType.DeductFromSender:
-                    totalDecrement = request.TotalAmount + request.TotalFee;
+                    totalDecrement = request.TotalAmount + fee;
                     totalIncrement = request.TotalAmount;
                     break;
                 case TransferDeductionType.DeductFromRecipient:
                     totalDecrement = request.TotalAmount;
-                    totalIncrement = request.TotalAmount - request.TotalFee;
+                    totalIncrement = request.TotalAmount - fee;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -1169,7 +1254,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 CredentialId = request.CredentialId,
                 WalletId = sourceWallet.Id,
                 Amount = request.TotalAmount,
-                TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
+                TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? fee : 0,
                 Remarks = request.Remarks,
                 Description = $"Converted to {targetWallet.WalletType?.Name}",
                 TransactionType = TransactionType.Debit,
@@ -1185,7 +1270,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 CredentialId = request.CredentialId,
                 WalletId = targetWallet.Id,
                 Amount = request.TotalAmount,
-                TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
+                TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? fee : 0,
                 Remarks = request.Remarks,
                 Description = $"Converted from {sourceWallet.WalletType?.Name}",
                 TransactionType = TransactionType.Credit,
@@ -1240,14 +1325,14 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 targetTransaction.RunningCreditOnHoldBalance = targetWallet.CreditOnHoldBalance;
             }
 
-            if (request.TotalFee > 0)
+            if (fee > 0)
             {
                 postings.Add(new WalletLedgerPostingRequest
                 {
                     Direction = WalletLedgerDirection.Credit,
                     BalanceBucket = WalletBalanceBucket.Fee,
                     EntryKind = WalletLedgerEntryKind.Fee,
-                    Amount = request.TotalFee,
+                    Amount = fee,
                     CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
                     WalletTypeId = sourceWallet.WalletTypeId,
                     ReferenceNumber = referenceNumber,
@@ -1266,6 +1351,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
                     IdempotencyKey = request.IdempotencyKey,
                     ReferenceNumber = referenceNumber,
                     Reason = request.Remarks,
+                    RequestedFee = request.TotalFee,
+                    CalculatedFee = feeResult.Data.CalculatedFee,
                     Postings = postings,
                     ReadModels = [sourceTransaction, targetTransaction]
                 },
@@ -1331,7 +1418,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             // Fetch the transaction
             var transaction = await _dataContext.Query<WalletTransaction>()
@@ -1698,7 +1787,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             if (request.WalletTransferId != Guid.Empty)
             {
@@ -1861,6 +1952,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 ReferenceNumber = transaction.ReferenceNumber,
                 Reason = request.Reason,
                 ExternalReference = transaction.Id.ToString(),
+                ApprovalId = request.ApprovalId,
                 Postings = postings,
                 ReadModels = [reversalTransaction]
             },
@@ -2028,6 +2120,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 ReferenceNumber = senderTx.ReferenceNumber,
                 Reason = request.Reason,
                 ExternalReference = transfer.Id.ToString(),
+                ApprovalId = request.ApprovalId,
                 Postings = postings,
                 ReadModels = [senderReversalTx, recipientReversalTx, reversalTransfer]
             },
@@ -2124,7 +2217,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             var wallet = await _dataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
@@ -2142,6 +2237,14 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             if (wallet.Status == WalletStatus.Closed)
                 return Result.Failure("Cannot freeze a closed wallet", 400);
+
+            var approvalCheck = await ValidateApprovedWalletActionAsync(
+                tenant.Id,
+                wallet.Id,
+                WalletOperationType.Freeze,
+                request.ApprovalId,
+                cancellationToken);
+            if (!approvalCheck.IsSuccess) return approvalCheck;
 
             wallet.Status = WalletStatus.Frozen;
             wallet.ModifiedAt = DateTime.UtcNow;
@@ -2175,7 +2278,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             var wallet = await _dataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
@@ -2190,6 +2295,14 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             if (wallet.Status != WalletStatus.Frozen)
                 return Result.Failure("Wallet is not frozen", 400);
+
+            var approvalCheck = await ValidateApprovedWalletActionAsync(
+                tenant.Id,
+                wallet.Id,
+                WalletOperationType.Unfreeze,
+                request.ApprovalId,
+                cancellationToken);
+            if (!approvalCheck.IsSuccess) return approvalCheck;
 
             wallet.Status = WalletStatus.Active;
             wallet.ModifiedAt = DateTime.UtcNow;
@@ -2222,7 +2335,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenantResult = ResolveTrustedTenantId(request);
+            if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             var wallet = await _dataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
@@ -2243,6 +2358,14 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             if (wallet.DebitOnHoldBalance != 0 || wallet.CreditOnHoldBalance != 0)
                 return Result.Failure("Cannot close wallet with held funds", 400);
+
+            var approvalCheck = await ValidateApprovedWalletActionAsync(
+                tenant.Id,
+                wallet.Id,
+                WalletOperationType.Close,
+                request.ApprovalId,
+                cancellationToken);
+            if (!approvalCheck.IsSuccess) return approvalCheck;
 
             wallet.Status = WalletStatus.Closed;
             wallet.ModifiedAt = DateTime.UtcNow;
@@ -2268,4 +2391,77 @@ public sealed class WalletOperationsService : IWalletOperationsService
             return Result.Failure("An error occurred while closing the wallet", 500);
         }
     }
+
+    private Result<Guid> ResolveTrustedTenantId(RequestBase request, Guid? requestCredentialId = null)
+    {
+        var contextResult = _contextResolver.Resolve(request, requestCredentialId);
+        return contextResult.IsSuccess
+            ? Result<Guid>.Success(contextResult.Data!.TenantId)
+            : Result<Guid>.Failure(contextResult.Message!, contextResult.StatusCode);
+    }
+
+    private async Task<Result> ValidateApprovedWalletActionAsync(
+        Guid tenantId,
+        Guid walletId,
+        WalletOperationType operationType,
+        Guid? approvalId,
+        CancellationToken ct)
+    {
+        if (!approvalId.HasValue)
+        {
+            return Result.Failure("Wallet action requires maker-checker approval", 409);
+        }
+
+        var approval = await _dataContext.Query<WalletApprovalRequest>()
+            .IgnoreQueryFilters()
+            .Where(x =>
+                x.Id == approvalId.Value &&
+                x.TenantId == tenantId &&
+                !x.IsDeleted)
+            .FirstOrDefaultAsync(ct);
+        if (approval is null)
+        {
+            return Result.NotFound("Wallet approval was not found");
+        }
+
+        if (approval.Status != WalletApprovalStatus.Approved)
+        {
+            return Result.Failure("Wallet approval must be approved before the action can be completed", 409);
+        }
+
+        if (approval.OperationType != operationType)
+        {
+            return Result.Failure("Wallet approval does not match the requested action", 400);
+        }
+
+        if (approval.WalletId.HasValue && approval.WalletId != walletId)
+        {
+            return Result.Failure("Wallet approval does not match the target wallet", 400);
+        }
+
+        if (approval.ApproverCredentialId.HasValue &&
+            approval.ApproverCredentialId == approval.RequesterCredentialId)
+        {
+            return Result.Failure("Wallet approval requires a different approver", 409);
+        }
+
+        return Result.Success();
+    }
+
+    private Task<Result<WalletFeeCalculation>> CalculateFeeAsync(
+        Guid tenantId,
+        WalletOperationType operationType,
+        Guid? walletTypeId,
+        Guid? currencyId,
+        decimal amount,
+        decimal requestedFee,
+        CancellationToken ct) =>
+        _feeCalculator.CalculateAsync(
+            tenantId,
+            operationType,
+            walletTypeId,
+            currencyId == Guid.Empty ? null : currencyId,
+            amount,
+            requestedFee,
+            ct);
 }

@@ -13,5 +13,12 @@ public enum WalletOperationType
     Refund = 8,
     DepositApproval = 9,
     WithdrawalApproval = 10,
-    Batch = 11
+    Batch = 11,
+    DisputeHold = 12,
+    DisputeResolution = 13,
+    Chargeback = 14,
+    ManualAdjustment = 15,
+    Freeze = 16,
+    Unfreeze = 17,
+    Close = 18
 }

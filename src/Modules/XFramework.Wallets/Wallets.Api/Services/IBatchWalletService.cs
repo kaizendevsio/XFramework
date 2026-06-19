@@ -66,16 +66,15 @@ public interface IBatchWalletService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Processes a batch of pre-created wallet transactions.
-    /// Useful for complex scenarios where transactions are prepared in advance.
+    /// Rejects direct processing of pre-created wallet transactions.
+    /// Financial mutations must use ledger-backed batch increment, decrement, or transfer operations.
     /// </summary>
     /// <param name="transactions">List of wallet transactions to process</param>
     /// <param name="tenantId">The tenant ID for multi-tenancy support</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result containing batch operation statistics and any errors</returns>
     /// <remarks>
-    /// Assumes transactions are already validated and properly configured.
-    /// Uses AddRangeAsync for optimal bulk insert performance.
+    /// Arbitrary transaction rows cannot prove balanced ledger postings and are intentionally blocked.
     /// </remarks>
     Task<Result<BatchOperationResult>> ProcessTransactionsAsync(
         List<WalletTransaction> transactions,

@@ -13,10 +13,15 @@ public sealed record WalletLedgerExecutionRequest
     public string? CorrelationId { get; init; }
     public string? ExternalReference { get; init; }
     public string? Reason { get; init; }
+    public decimal? RequestedFee { get; init; }
+    public decimal? CalculatedFee { get; init; }
+    public Guid? ApprovalId { get; init; }
+    public Guid? OriginalOperationId { get; init; }
     public IReadOnlyList<WalletLedgerPostingRequest> Postings { get; init; } = [];
     public IReadOnlyList<Wallet> NewWallets { get; init; } = [];
     public IReadOnlyList<object> ReadModels { get; init; } = [];
     public IReadOnlyList<WalletTransactionStateUpdateRequest> TransactionUpdates { get; init; } = [];
+    public Func<WalletOperation, CancellationToken, Task>? BeforeCommitAsync { get; init; }
 }
 
 public sealed record WalletLedgerPostingRequest

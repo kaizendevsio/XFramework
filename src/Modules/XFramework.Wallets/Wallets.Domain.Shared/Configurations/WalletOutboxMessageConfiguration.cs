@@ -22,6 +22,7 @@ public class WalletOutboxMessageConfiguration : IEntityTypeConfiguration<WalletO
         entity.Property(e => e.PayloadJson).HasColumnType("jsonb");
         entity.Property(e => e.HeadersJson).HasColumnType("jsonb");
         entity.Property(e => e.LastError).HasMaxLength(4000);
+        entity.Property(e => e.LockedBy).HasMaxLength(200);
         entity.Property(e => e.Status).HasDefaultValue(WalletOutboxStatus.Pending);
 
         entity.HasOne(e => e.Operation)
@@ -31,7 +32,11 @@ public class WalletOutboxMessageConfiguration : IEntityTypeConfiguration<WalletO
             .HasConstraintName("tbl_WalletOutboxMessages_OperationId_fkey");
 
         entity.HasIndex(e => new { e.TenantId, e.Status, e.NextAttemptAt });
+        entity.HasIndex(e => new { e.TenantId, e.Status, e.LockedUntil, e.NextAttemptAt });
         entity.HasIndex(e => new { e.TenantId, e.OperationId });
         entity.HasIndex(e => new { e.TenantId, e.AggregateType, e.AggregateId });
+        entity.HasIndex(e => new { e.TenantId, e.OperationId, e.EventType })
+            .IsUnique()
+            .HasFilter("\"OperationId\" IS NOT NULL");
     }
 }

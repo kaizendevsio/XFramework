@@ -5,7 +5,11 @@ namespace Wallets.Api.Services;
 public sealed record WalletPolicyEvaluationResult(
     bool IsApproved,
     string Decision,
-    string? Message = null)
+    string? Message = null,
+    bool RequiresApproval = false,
+    string? RiskTier = null,
+    decimal? RiskScore = null,
+    string? DecisionJson = null)
 {
     public static WalletPolicyEvaluationResult Approved(string decision = "approved") => new(true, decision);
     public static WalletPolicyEvaluationResult Rejected(string decision, string message) => new(false, decision, message);
