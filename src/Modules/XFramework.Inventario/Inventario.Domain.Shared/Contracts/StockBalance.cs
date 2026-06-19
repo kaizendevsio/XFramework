@@ -27,11 +27,15 @@ public partial class StockBalance : BaseModel
     [MemoryPackIgnore]
     public InventoryLocation? Location { get; set; }
     [MemoryPackOrder(3)]
-    public decimal OnHandQuantity { get; set; }
+    public Guid? LotId { get; set; }
+    [MemoryPackIgnore]
+    public InventoryLot? Lot { get; set; }
     [MemoryPackOrder(4)]
-    public decimal ReservedQuantity { get; set; }
+    public decimal OnHandQuantity { get; set; }
     [MemoryPackOrder(5)]
-    public decimal AvailableQuantity { get; set; }
+    public decimal ReservedQuantity { get; set; }
     [MemoryPackOrder(6)]
+    public decimal AvailableQuantity { get; set; }
+    [MemoryPackOrder(7)]
     public DateTime? LastMovementAt { get; set; }
 }

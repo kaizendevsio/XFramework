@@ -13,6 +13,7 @@ public sealed class DesignTimeAppDbContextFactory : IDesignTimeDbContextFactory<
         "Bolt.Domain.Shared",
         "Community.Domain.Shared",
         "IdentityServer.Domain.Shared",
+        "Inventario.Domain.Shared",
         "Messaging.Domain.Shared",
         "Wallets.Domain.Shared"
     ];

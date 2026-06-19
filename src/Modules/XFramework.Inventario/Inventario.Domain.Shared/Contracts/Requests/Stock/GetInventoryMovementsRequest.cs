@@ -14,4 +14,8 @@ public partial record GetInventoryMovementsRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid? ProductId { get; init; }
+    public Guid? WarehouseId { get; init; }
+    public Guid? LocationId { get; init; }
+    public Guid? LotId { get; init; }
+    public string? IdempotencyKey { get; init; }
 }

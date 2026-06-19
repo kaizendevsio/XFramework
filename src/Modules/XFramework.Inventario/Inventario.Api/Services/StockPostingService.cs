@@ -1,4 +1,7 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -14,6 +17,8 @@ public sealed class StockPostingService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor)
 {
+    private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
+
     public async Task<Result<StockPostingResponse>> PostAsync(
         PostStockMovementRequest request,
         CancellationToken ct = default) =>
@@ -40,14 +45,29 @@ public sealed class StockPostingService(
         if (request.MovementType != InventoryMovementType.Adjustment && request.Quantity < 0)
             return Result<StockPostingResponse>.Failure("Quantity must be positive for this movement type.", 400);
 
+        var requestHash = ComputeRequestHash(tenantId, request);
+        var replay = await FindIdempotentReplayAsync(tenantId, request, requestHash, ct);
+        if (replay is not null)
+            return replay;
+
         if (request.MovementType == InventoryMovementType.Transfer)
-            return await PostTransferAsync(tenantId, request, saveChanges, ct);
+            return await PostTransferAsync(tenantId, request, requestHash, saveChanges, ct);
 
         var product = await GetProduct(tenantId, request.ProductId, ct);
         if (product is null)
             return Result<StockPostingResponse>.NotFound("Product not found.");
 
-        var balanceResult = await GetOrCreateBalance(tenantId, request.ProductId, request.WarehouseId, request.LocationId, ct);
+        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.LotId, ct);
+        if (!lotResult.IsSuccess)
+            return Result<StockPostingResponse>.Failure(lotResult.Message!, lotResult.StatusCode);
+
+        var balanceResult = await GetOrCreateBalance(
+            tenantId,
+            request.ProductId,
+            request.WarehouseId,
+            request.LocationId,
+            request.LotId,
+            ct);
         if (!balanceResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(balanceResult.Message!, balanceResult.StatusCode);
 
@@ -66,7 +86,15 @@ public sealed class StockPostingService(
             dataContext.Update(balance);
 
         ApplyBalance(balance, afterOnHand, afterReserved);
-        AddMovement(tenantId, request, balance.Id, delta == 0 ? reservedDelta : delta, before, afterOnHand);
+        AddMovement(
+            tenantId,
+            request,
+            balance.Id,
+            delta == 0 ? reservedDelta : delta,
+            before,
+            afterOnHand,
+            requestHash,
+            includeIdempotency: true);
         await UpdateProductSnapshot(tenantId, product, request.ProductId, delta, ct);
 
         if (saveChanges)
@@ -76,14 +104,17 @@ public sealed class StockPostingService(
                 return Result<StockPostingResponse>.Failure(saveResult.Message ?? "Stock posting failed.", saveResult.StatusCode);
         }
 
-        return Result<StockPostingResponse>.Success(new StockPostingResponse(
+        return Result<StockPostingResponse>.Success(CreateResponse(
             balance.Id,
             request.ProductId,
             balance.WarehouseId,
             balance.LocationId,
             balance.OnHandQuantity,
             balance.ReservedQuantity,
-            balance.AvailableQuantity));
+            balance.AvailableQuantity,
+            request.LotId,
+            NormalizeIdempotencyKey(request.IdempotencyKey),
+            isReplay: false));
     }
 
     public async Task<Result<List<StockBalance>>> GetBalancesAsync(
@@ -101,6 +132,15 @@ public sealed class StockPostingService(
 
         if (request.ProductId is { } id)
             query = query.Where(x => x.ProductId == id);
+
+        if (request.WarehouseId is { } warehouseId)
+            query = query.Where(x => x.WarehouseId == warehouseId);
+
+        if (request.LocationId is { } locationId)
+            query = query.Where(x => x.LocationId == locationId);
+
+        if (request.LotId is { } lotId)
+            query = query.Where(x => x.LotId == lotId);
 
         var balances = await query
             .OrderBy(x => x.ProductId)
@@ -126,6 +166,19 @@ public sealed class StockPostingService(
         if (request.ProductId is { } id)
             query = query.Where(x => x.ProductId == id);
 
+        if (request.WarehouseId is { } warehouseId)
+            query = query.Where(x => x.WarehouseId == warehouseId);
+
+        if (request.LocationId is { } locationId)
+            query = query.Where(x => x.LocationId == locationId);
+
+        if (request.LotId is { } lotId)
+            query = query.Where(x => x.LotId == lotId);
+
+        var idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
+        if (idempotencyKey is not null)
+            query = query.Where(x => x.IdempotencyKey == idempotencyKey);
+
         var movements = await query
             .OrderByDescending(x => x.MovementDate)
             .Take(500)
@@ -137,6 +190,7 @@ public sealed class StockPostingService(
     private async Task<Result<StockPostingResponse>> PostTransferAsync(
         Guid tenantId,
         PostStockMovementRequest request,
+        string requestHash,
         bool saveChanges,
         CancellationToken ct)
     {
@@ -150,11 +204,27 @@ public sealed class StockPostingService(
         if (product is null)
             return Result<StockPostingResponse>.NotFound("Product not found.");
 
-        var sourceResult = await GetOrCreateBalance(tenantId, request.ProductId, request.WarehouseId, request.LocationId, ct);
+        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.LotId, ct);
+        if (!lotResult.IsSuccess)
+            return Result<StockPostingResponse>.Failure(lotResult.Message!, lotResult.StatusCode);
+
+        var sourceResult = await GetOrCreateBalance(
+            tenantId,
+            request.ProductId,
+            request.WarehouseId,
+            request.LocationId,
+            request.LotId,
+            ct);
         if (!sourceResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(sourceResult.Message!, sourceResult.StatusCode);
 
-        var destinationResult = await GetOrCreateBalance(tenantId, request.ProductId, destinationWarehouseId, destinationLocationId, ct);
+        var destinationResult = await GetOrCreateBalance(
+            tenantId,
+            request.ProductId,
+            destinationWarehouseId,
+            destinationLocationId,
+            request.LotId,
+            ct);
         if (!destinationResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(destinationResult.Message!, destinationResult.StatusCode);
 
@@ -177,12 +247,20 @@ public sealed class StockPostingService(
         ApplyBalance(source, sourceAfter, source.ReservedQuantity, now);
         ApplyBalance(destination, destination.OnHandQuantity + request.Quantity, destination.ReservedQuantity, now);
 
-        AddMovement(tenantId, request, source.Id, -request.Quantity, sourceBefore, source.OnHandQuantity);
+        AddMovement(
+            tenantId,
+            request,
+            source.Id,
+            -request.Quantity,
+            sourceBefore,
+            source.OnHandQuantity,
+            requestHash,
+            includeIdempotency: true);
         AddMovement(tenantId, request with
         {
             WarehouseId = destinationWarehouseId,
             LocationId = destinationLocationId
-        }, destination.Id, request.Quantity, destinationBefore, destination.OnHandQuantity);
+        }, destination.Id, request.Quantity, destinationBefore, destination.OnHandQuantity, requestHash, includeIdempotency: false);
 
         await UpdateProductSnapshot(tenantId, product, request.ProductId, 0, ct);
 
@@ -193,14 +271,17 @@ public sealed class StockPostingService(
                 return Result<StockPostingResponse>.Failure(saveResult.Message ?? "Stock transfer failed.", saveResult.StatusCode);
         }
 
-        return Result<StockPostingResponse>.Success(new StockPostingResponse(
+        return Result<StockPostingResponse>.Success(CreateResponse(
             destination.Id,
             request.ProductId,
             destination.WarehouseId,
             destination.LocationId,
             destination.OnHandQuantity,
             destination.ReservedQuantity,
-            destination.AvailableQuantity));
+            destination.AvailableQuantity,
+            request.LotId,
+            NormalizeIdempotencyKey(request.IdempotencyKey),
+            isReplay: false));
     }
 
     private async Task<Product?> GetProduct(Guid tenantId, Guid productId, CancellationToken ct) =>
@@ -209,11 +290,38 @@ public sealed class StockPostingService(
             .Where(x => x.TenantId == tenantId && x.Id == productId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
+    private async Task<Result<InventoryLot?>> ValidateLotAsync(
+        Guid tenantId,
+        Guid productId,
+        Guid? lotId,
+        CancellationToken ct)
+    {
+        if (lotId is null)
+            return Result<InventoryLot?>.Success(null);
+
+        var lot = await dataContext.Query<InventoryLot>()
+            .IgnoreQueryFilters()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.Id == lotId.Value &&
+                !x.IsDeleted)
+            .FirstOrDefaultAsync(ct);
+
+        if (lot is null)
+            return Result<InventoryLot?>.NotFound("Lot not found.");
+
+        if (lot.ProductId != productId)
+            return Result<InventoryLot?>.Failure("Lot does not belong to the requested product.", 400);
+
+        return Result<InventoryLot?>.Success(lot);
+    }
+
     private async Task<Result<StockBalanceLookup>> GetOrCreateBalance(
         Guid tenantId,
         Guid productId,
         Guid warehouseId,
         Guid locationId,
+        Guid? lotId,
         CancellationToken ct)
     {
         var warehouseExists = await dataContext.Query<Warehouse>()
@@ -235,6 +343,7 @@ public sealed class StockPostingService(
                 x.ProductId == productId &&
                 x.WarehouseId == warehouseId &&
                 x.LocationId == locationId &&
+                x.LotId == lotId &&
                 !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
@@ -248,6 +357,7 @@ public sealed class StockPostingService(
             ProductId = productId,
             WarehouseId = warehouseId,
             LocationId = locationId,
+            LotId = lotId,
             IsEnabled = true,
             CreatedAt = DateTime.UtcNow,
             ConcurrencyStamp = Guid.NewGuid()
@@ -293,8 +403,14 @@ public sealed class StockPostingService(
         Guid stockBalanceId,
         decimal quantityDelta,
         decimal quantityBefore,
-        decimal quantityAfter)
+        decimal quantityAfter,
+        string requestHash,
+        bool includeIdempotency)
     {
+        var idempotencyKey = includeIdempotency
+            ? NormalizeIdempotencyKey(request.IdempotencyKey)
+            : null;
+
         dataContext.Add(new InventoryMovement
         {
             Id = Guid.NewGuid(),
@@ -303,6 +419,7 @@ public sealed class StockPostingService(
             WarehouseId = request.WarehouseId,
             LocationId = request.LocationId,
             StockBalanceId = stockBalanceId,
+            LotId = request.LotId,
             MovementType = request.MovementType,
             QuantityDelta = quantityDelta,
             QuantityBefore = quantityBefore,
@@ -312,6 +429,8 @@ public sealed class StockPostingService(
             ReferenceType = request.ReferenceType,
             ReferenceId = request.ReferenceId,
             Reason = request.Reason,
+            IdempotencyKey = idempotencyKey,
+            RequestHash = idempotencyKey is null ? null : requestHash,
             IsEnabled = true,
             CreatedAt = DateTime.UtcNow
         });
@@ -348,6 +467,111 @@ public sealed class StockPostingService(
 
         return Result<Guid>.Forbidden("Authenticated user does not have a valid tenant context.");
     }
+
+    private async Task<Result<StockPostingResponse>?> FindIdempotentReplayAsync(
+        Guid tenantId,
+        PostStockMovementRequest request,
+        string requestHash,
+        CancellationToken ct)
+    {
+        var idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
+        if (idempotencyKey is null)
+            return null;
+
+        var existing = await dataContext.Query<InventoryMovement>()
+            .IgnoreQueryFilters()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                !x.IsDeleted &&
+                x.IdempotencyKey == idempotencyKey)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (existing is null)
+            return null;
+
+        if (!string.Equals(existing.RequestHash, requestHash, StringComparison.Ordinal))
+        {
+            return Result<StockPostingResponse>.Conflict(
+                "Idempotency key was already used with a different request");
+        }
+
+        if (existing.StockBalanceId is not { } stockBalanceId)
+            return Result<StockPostingResponse>.Conflict("Processed stock movement is missing a stock balance.");
+
+        var balance = await dataContext.Query<StockBalance>()
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && x.Id == stockBalanceId && !x.IsDeleted)
+            .FirstOrDefaultAsync(ct);
+
+        if (balance is null)
+            return Result<StockPostingResponse>.Conflict("Processed stock movement balance was not found.");
+
+        return Result<StockPostingResponse>.Success(CreateResponse(
+            balance.Id,
+            balance.ProductId,
+            balance.WarehouseId,
+            balance.LocationId,
+            balance.OnHandQuantity,
+            balance.ReservedQuantity,
+            balance.AvailableQuantity,
+            balance.LotId,
+            idempotencyKey,
+            isReplay: true), "Stock movement already processed.");
+    }
+
+    private static string? NormalizeIdempotencyKey(string? idempotencyKey) =>
+        string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim();
+
+    private static string ComputeRequestHash(Guid tenantId, PostStockMovementRequest request)
+    {
+        var hashPayload = new
+        {
+            tenantId,
+            request.ProductId,
+            request.WarehouseId,
+            request.LocationId,
+            request.LotId,
+            request.DestinationWarehouseId,
+            request.DestinationLocationId,
+            request.MovementType,
+            request.Quantity,
+            request.UnitOfMeasure,
+            request.ReferenceType,
+            request.ReferenceId,
+            request.Reason,
+            request.AllowNegativeStock
+        };
+
+        var json = JsonSerializer.Serialize(hashPayload, HashJsonOptions);
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+        return Convert.ToHexString(bytes);
+    }
+
+    private static StockPostingResponse CreateResponse(
+        Guid stockBalanceId,
+        Guid productId,
+        Guid warehouseId,
+        Guid locationId,
+        decimal onHandQuantity,
+        decimal reservedQuantity,
+        decimal availableQuantity,
+        Guid? lotId,
+        string? idempotencyKey,
+        bool isReplay) =>
+        new(
+            stockBalanceId,
+            productId,
+            warehouseId,
+            locationId,
+            onHandQuantity,
+            reservedQuantity,
+            availableQuantity)
+        {
+            LotId = lotId,
+            IdempotencyKey = idempotencyKey,
+            IsIdempotentReplay = isReplay
+        };
 
     private sealed record StockBalanceLookup(StockBalance Balance, bool IsNew);
 }

@@ -18,9 +18,15 @@ public class InventoryMovementConfiguration : IEntityTypeConfiguration<Inventory
         entity.Property(e => e.UnitOfMeasure).HasMaxLength(25);
         entity.Property(e => e.ReferenceType).HasMaxLength(100);
         entity.Property(e => e.Reason).HasMaxLength(1000);
+        entity.Property(e => e.IdempotencyKey).HasMaxLength(200);
+        entity.Property(e => e.RequestHash).HasMaxLength(128);
 
         entity.HasIndex(e => new { e.TenantId, e.ProductId, e.MovementDate });
+        entity.HasIndex(e => new { e.TenantId, e.LotId, e.MovementDate });
         entity.HasIndex(e => new { e.TenantId, e.ReferenceType, e.ReferenceId });
+        entity.HasIndex(e => new { e.TenantId, e.IdempotencyKey })
+            .IsUnique()
+            .HasFilter("\"IdempotencyKey\" IS NOT NULL");
 
         entity.HasOne(e => e.Product)
             .WithMany()
@@ -45,5 +51,11 @@ public class InventoryMovementConfiguration : IEntityTypeConfiguration<Inventory
             .HasForeignKey(e => e.StockBalanceId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_InventoryMovement_StockBalance");
+
+        entity.HasOne(e => e.Lot)
+            .WithMany()
+            .HasForeignKey(e => e.LotId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_InventoryMovement_Lot");
     }
 }

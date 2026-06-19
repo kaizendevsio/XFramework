@@ -89,6 +89,150 @@ public sealed class StockPostingServiceTests
         dataContext.SaveCount.Should().Be(0);
     }
 
+    [Test]
+    public async Task PostAsync_SameProductLocationWithDifferentLots_CreatesSeparateBalances()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var firstLotId = Guid.NewGuid();
+        var secondLotId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        dataContext.Set<InventoryLot>().AddRange([
+            CreateLot(tenantId, productId, firstLotId, "LOT-A"),
+            CreateLot(tenantId, productId, secondLotId, "LOT-B")
+        ]);
+        var service = CreateService(dataContext, tenantId);
+
+        var firstResult = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            LotId = firstLotId,
+            MovementType = InventoryMovementType.OpeningBalance,
+            Quantity = 10
+        });
+        var secondResult = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            LotId = secondLotId,
+            MovementType = InventoryMovementType.OpeningBalance,
+            Quantity = 5
+        });
+
+        firstResult.IsSuccess.Should().BeTrue(firstResult.Message);
+        secondResult.IsSuccess.Should().BeTrue(secondResult.Message);
+        dataContext.Set<StockBalance>().Should().HaveCount(2);
+        dataContext.Set<StockBalance>().Should().ContainSingle(x => x.LotId == firstLotId && x.OnHandQuantity == 10);
+        dataContext.Set<StockBalance>().Should().ContainSingle(x => x.LotId == secondLotId && x.OnHandQuantity == 5);
+        dataContext.Added.OfType<InventoryMovement>().Should().ContainSingle(x => x.LotId == firstLotId && x.QuantityDelta == 10);
+        dataContext.Added.OfType<InventoryMovement>().Should().ContainSingle(x => x.LotId == secondLotId && x.QuantityDelta == 5);
+        dataContext.Set<Product>().Single().StockQuantity.Should().Be(15);
+    }
+
+    [Test]
+    public async Task PostAsync_LotForDifferentProduct_ReturnsBadRequestWithoutSaving()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var lotId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        dataContext.Set<InventoryLot>().Add(CreateLot(tenantId, Guid.NewGuid(), lotId, "OTHER-PRODUCT"));
+        var service = CreateService(dataContext, tenantId);
+
+        var result = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            LotId = lotId,
+            MovementType = InventoryMovementType.OpeningBalance,
+            Quantity = 10
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(400);
+        dataContext.Set<StockBalance>().Should().BeEmpty();
+        dataContext.SaveCount.Should().Be(0);
+    }
+
+    [Test]
+    public async Task PostAsync_SameIdempotencyKeyAndPayload_ReplaysWithoutDoublePosting()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        var service = CreateService(dataContext, tenantId);
+        var request = new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            MovementType = InventoryMovementType.OpeningBalance,
+            Quantity = 25,
+            Reason = "Initial count",
+            IdempotencyKey = "stock-open-1"
+        };
+
+        var firstResult = await service.PostAsync(request);
+        var replayResult = await service.PostAsync(request);
+
+        firstResult.IsSuccess.Should().BeTrue(firstResult.Message);
+        replayResult.IsSuccess.Should().BeTrue(replayResult.Message);
+        replayResult.Data!.IsIdempotentReplay.Should().BeTrue();
+        replayResult.Data.IdempotencyKey.Should().Be("stock-open-1");
+        replayResult.Data.OnHandQuantity.Should().Be(25);
+        dataContext.Set<StockBalance>().Should().ContainSingle(x => x.OnHandQuantity == 25);
+        dataContext.Added.OfType<InventoryMovement>().Should().ContainSingle(x => x.IdempotencyKey == "stock-open-1");
+        dataContext.Set<Product>().Single().StockQuantity.Should().Be(25);
+        dataContext.SaveCount.Should().Be(1);
+    }
+
+    [Test]
+    public async Task PostAsync_SameIdempotencyKeyWithDifferentPayload_ReturnsConflict()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        var service = CreateService(dataContext, tenantId);
+
+        var firstResult = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            MovementType = InventoryMovementType.OpeningBalance,
+            Quantity = 25,
+            IdempotencyKey = "stock-open-1"
+        });
+        var conflictResult = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            MovementType = InventoryMovementType.OpeningBalance,
+            Quantity = 30,
+            IdempotencyKey = "stock-open-1"
+        });
+
+        firstResult.IsSuccess.Should().BeTrue(firstResult.Message);
+        conflictResult.IsSuccess.Should().BeFalse();
+        conflictResult.StatusCode.Should().Be(409);
+        dataContext.Set<StockBalance>().Should().ContainSingle(x => x.OnHandQuantity == 25);
+        dataContext.Added.OfType<InventoryMovement>().Should().ContainSingle(x => x.IdempotencyKey == "stock-open-1");
+        dataContext.SaveCount.Should().Be(1);
+    }
+
     private static FakeDataContext SeedStockData(Guid tenantId, Guid productId, Guid warehouseId, Guid locationId)
     {
         var dataContext = new FakeDataContext();
@@ -120,6 +264,18 @@ public sealed class StockPostingServiceTests
 
         return dataContext;
     }
+
+    private static InventoryLot CreateLot(Guid tenantId, Guid productId, Guid lotId, string lotNumber) =>
+        new()
+        {
+            Id = lotId,
+            TenantId = tenantId,
+            ProductId = productId,
+            LotNumber = lotNumber,
+            ReceivedAt = DateTime.UtcNow,
+            Status = InventoryLotStatus.Available,
+            IsEnabled = true
+        };
 
     private static StockPostingService CreateService(FakeDataContext dataContext, Guid tenantId)
     {

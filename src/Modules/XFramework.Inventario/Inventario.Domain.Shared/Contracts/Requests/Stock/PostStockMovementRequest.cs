@@ -16,6 +16,7 @@ public partial record PostStockMovementRequest : RequestBase,
     public Guid ProductId { get; init; }
     public Guid WarehouseId { get; init; }
     public Guid LocationId { get; init; }
+    public Guid? LotId { get; init; }
     public Guid? DestinationWarehouseId { get; init; }
     public Guid? DestinationLocationId { get; init; }
     public InventoryMovementType MovementType { get; init; }
@@ -25,4 +26,5 @@ public partial record PostStockMovementRequest : RequestBase,
     public Guid? ReferenceId { get; init; }
     public string? Reason { get; init; }
     public bool AllowNegativeStock { get; init; }
+    public string? IdempotencyKey { get; init; }
 }

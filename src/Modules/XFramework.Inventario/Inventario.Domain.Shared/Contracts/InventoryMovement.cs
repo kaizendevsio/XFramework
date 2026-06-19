@@ -32,21 +32,29 @@ public partial class InventoryMovement : BaseModel
     [MemoryPackIgnore]
     public StockBalance? StockBalance { get; set; }
     [MemoryPackOrder(4)]
-    public InventoryMovementType MovementType { get; set; }
+    public Guid? LotId { get; set; }
+    [MemoryPackIgnore]
+    public InventoryLot? Lot { get; set; }
     [MemoryPackOrder(5)]
-    public decimal QuantityDelta { get; set; }
+    public InventoryMovementType MovementType { get; set; }
     [MemoryPackOrder(6)]
-    public decimal QuantityBefore { get; set; }
+    public decimal QuantityDelta { get; set; }
     [MemoryPackOrder(7)]
-    public decimal QuantityAfter { get; set; }
+    public decimal QuantityBefore { get; set; }
     [MemoryPackOrder(8)]
-    public DateTime MovementDate { get; set; }
+    public decimal QuantityAfter { get; set; }
     [MemoryPackOrder(9)]
-    public string? UnitOfMeasure { get; set; }
+    public DateTime MovementDate { get; set; }
     [MemoryPackOrder(10)]
-    public string? ReferenceType { get; set; }
+    public string? UnitOfMeasure { get; set; }
     [MemoryPackOrder(11)]
-    public Guid? ReferenceId { get; set; }
+    public string? ReferenceType { get; set; }
     [MemoryPackOrder(12)]
+    public Guid? ReferenceId { get; set; }
+    [MemoryPackOrder(13)]
     public string? Reason { get; set; }
+    [MemoryPackOrder(14)]
+    public string? IdempotencyKey { get; set; }
+    [MemoryPackOrder(15)]
+    public string? RequestHash { get; set; }
 }

@@ -45,6 +45,12 @@
                     <LucideIcon Name="warehouse" class="h-4 w-4" /> Warehouses
                 </NavLink>
             }
+            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability"))
+            {
+                <NavLink href="/inventario/lots" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="scan-barcode" class="h-4 w-4" /> Lots
+                </NavLink>
+            }
             @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances")
                  || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements"))
             {
