@@ -87,6 +87,42 @@ public class WalletTransactionTests : WalletsTestBase
     }
 
     [Test]
+    public async Task Http_AddFunds_WithReferenceAndIdempotencyKey_UsesReferenceAndDeduplicatesByIdempotency()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 1000m);
+        var idempotencyKey = $"add-{Guid.NewGuid():N}";
+        var referenceNumber = $"ref-{Guid.NewGuid():N}";
+
+        var request = new IncrementWalletRequest
+        {
+            CredentialId = credential.Id,
+            WalletId = wallet.Id,
+            Amount = 500m,
+            ReferenceNumber = referenceNumber,
+            IdempotencyKey = idempotencyKey,
+            Metadata = CreateMetadata()
+        };
+
+        var firstResponse = await HttpClient.PostAsJsonAsync("/api/wallets/add-funds", request);
+        var secondResponse = await HttpClient.PostAsJsonAsync("/api/wallets/add-funds", request);
+
+        firstResponse.IsSuccessStatusCode.Should().BeTrue();
+        secondResponse.IsSuccessStatusCode.Should().BeTrue();
+
+        await using var db = CreateDbContext();
+        var updated = await db.Set<Wallet>().FirstAsync(w => w.Id == wallet.Id);
+        var transaction = await db.Set<WalletTransaction>()
+            .SingleAsync(t => t.WalletId == wallet.Id && t.ReferenceNumber == referenceNumber);
+        var operation = await db.Set<WalletOperation>()
+            .SingleAsync(o => o.IdempotencyKey == idempotencyKey);
+
+        updated.Balance.Should().Be(1500m);
+        transaction.ReferenceNumber.Should().Be(referenceNumber);
+        operation.ReferenceNumber.Should().Be(referenceNumber);
+    }
+
+    [Test]
     public async Task Http_AddFunds_WithFee_CreatesBalancedLedgerSnapshotAndOutbox()
     {
         var credential = await SeedCredential();
