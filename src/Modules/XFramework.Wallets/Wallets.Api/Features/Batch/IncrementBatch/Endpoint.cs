@@ -75,6 +75,7 @@ public static class Endpoint
             .WithSummary("Batch increment wallet balances")
             .WithDescription("Processes multiple wallet increments in a single optimized transaction. " +
                 "Performance: 20-50x faster than individual operations. Can process 1000 increments in ~200-500ms.")
+            .RequireAuthorization()
             .Produces<BatchOperationResult>(StatusCodes.Status200OK)
             .Produces<BatchOperationResult>(StatusCodes.Status207MultiStatus)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)

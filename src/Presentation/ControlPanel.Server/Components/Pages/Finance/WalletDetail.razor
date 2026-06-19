@@ -1,6 +1,8 @@
 @page "/finance/wallets/{Id:guid}"
 @using System.Globalization
 @using global::Wallets.Domain.Shared.Enums
+@using global::Wallets.Integration.Drivers
+@using XFramework.Domain.Shared.BusinessObjects
 @using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
@@ -456,6 +458,8 @@ else
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private NavigationHistoryService NavigationHistory { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsService { get; set; } = default!;
+    [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
 
     private Wallet? _wallet;
     private List<WalletTransaction> _transactions = [];
@@ -627,36 +631,9 @@ else
         _savingRules = true;
         try
         {
-            var fresh = await DataContext.Query<Wallet>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
-
-            if (fresh is null)
-            {
-                ToastService.Show("Wallet not found.");
-                return;
-            }
-
-            fresh.MinTransferRule = minTransfer;
-            fresh.MaxTransferRule = maxTransfer;
-            fresh.BondBalanceRule = bondBalance;
-            fresh.MaintainingBalanceRule = maintainingBalance;
-            fresh.ModifiedAt = DateTime.UtcNow;
-
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
-            if (result.IsSuccess)
-            {
-                ToastService.Show("Wallet rules updated.");
-                _editingRules = false;
-                await LoadWallet();
-            }
-            else
-            {
-                ToastService.Show($"Failed to update wallet rules: {result.Message}");
-            }
+            ToastService.Show("Wallet rule changes require the backend policy workflow and were not saved.");
+            _editingRules = false;
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {
@@ -670,6 +647,18 @@ else
 
     private static string FormatRuleInput(decimal? value) =>
         value?.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
+
+    private RequestMetadata BuildCommandMetadata(Guid tenantId) => new()
+    {
+        TenantId = tenantId,
+        CredentialId = RequestMetadata.CredentialId,
+        SessionId = RequestMetadata.SessionId,
+        RequestId = Guid.NewGuid(),
+        Name = RequestMetadata.Name ?? "ControlPanel",
+        DeviceName = RequestMetadata.DeviceName,
+        DeviceAgent = RequestMetadata.DeviceAgent,
+        IpAddress = RequestMetadata.IpAddress
+    };
 
     private static bool TryParseRule(string value, string label, out decimal? parsed, out string error)
     {
@@ -709,7 +698,6 @@ else
         _isProcessing = true;
         try
         {
-            // Fetch fresh wallet state
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -722,39 +710,26 @@ else
                 return;
             }
 
-            var oldBalance = fresh.Balance;
-            var newBalance = oldBalance + amount;
-
-            // Create transaction record
-            var transaction = new WalletTransaction
+            if (!TryGetWalletTypeId(fresh, out var walletTypeId))
             {
-                Id = Guid.NewGuid(),
-                TenantId = _wallet!.TenantId,
+                return;
+            }
+
+            var response = await WalletsService.IncrementWallet(new IncrementWalletRequest
+            {
                 WalletId = Id,
                 CredentialId = fresh.CredentialId,
                 Amount = amount,
-                TransactionType = TransactionType.Credit,
-                TransactionFee = 0,
+                WalletTypeId = walletTypeId,
                 ReferenceNumber = string.IsNullOrWhiteSpace(_addFundsRef) ? null : _addFundsRef.Trim(),
                 Remarks = string.IsNullOrWhiteSpace(_addFundsRemarks) ? "Admin credit" : _addFundsRemarks.Trim(),
-                Held = false,
-                Released = true,
-                RunningBalance = newBalance,
-                PreviousBalance = oldBalance,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
+                IdempotencyKey = $"controlpanel-add-{Guid.NewGuid():N}",
+                Metadata = BuildCommandMetadata(fresh.TenantId)
+            });
 
-            // Update wallet balance
-            DataContext.Add(transaction);
-            fresh.Balance = newBalance;
-            fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
-
-            if (result.IsSuccess)
+            if (response.IsSuccess)
             {
-                ToastService.Show($"Added {amount:N2} to wallet. New balance: {newBalance:N2}");
+                ToastService.Show($"Added {amount:N2} to wallet.");
                 _addFundsAmount = "";
                 _addFundsRef = "";
                 _addFundsRemarks = "";
@@ -763,7 +738,7 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to update wallet balance: {result.Message}");
+                ToastService.Show($"Failed to add funds: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -787,7 +762,6 @@ else
         _isProcessing = true;
         try
         {
-            // Fetch fresh wallet state
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -800,45 +774,32 @@ else
                 return;
             }
 
-            if (fresh.Balance < amount)
+            if (!TryGetWalletTypeId(fresh, out var walletTypeId))
             {
-                ToastService.Show($"Insufficient balance. Current balance: {fresh.Balance:N2}, requested: {amount:N2}");
                 return;
             }
 
-            var oldBalance = fresh.Balance;
-            var newBalance = oldBalance - amount;
-
-            // Create transaction record
-            var transaction = new WalletTransaction
+            if (fresh.AvailableBalance < amount)
             {
-                Id = Guid.NewGuid(),
-                TenantId = _wallet!.TenantId,
+                ToastService.Show($"Insufficient balance. Available: {fresh.AvailableBalance:N2}, requested: {amount:N2}");
+                return;
+            }
+
+            var response = await WalletsService.DecrementWallet(new DecrementWalletRequest
+            {
                 WalletId = Id,
                 CredentialId = fresh.CredentialId,
                 Amount = amount,
-                TransactionType = TransactionType.Debit,
-                TransactionFee = 0,
+                WalletTypeId = walletTypeId,
                 ReferenceNumber = string.IsNullOrWhiteSpace(_withdrawRef) ? null : _withdrawRef.Trim(),
                 Remarks = string.IsNullOrWhiteSpace(_withdrawRemarks) ? "Admin debit" : _withdrawRemarks.Trim(),
-                Held = false,
-                Released = true,
-                RunningBalance = newBalance,
-                PreviousBalance = oldBalance,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
+                IdempotencyKey = $"controlpanel-withdraw-{Guid.NewGuid():N}",
+                Metadata = BuildCommandMetadata(fresh.TenantId)
+            });
 
-            // Update wallet balance
-            DataContext.Add(transaction);
-            fresh.Balance = newBalance;
-            fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
-
-            if (result.IsSuccess)
+            if (response.IsSuccess)
             {
-                ToastService.Show($"Withdrew {amount:N2} from wallet. New balance: {newBalance:N2}");
+                ToastService.Show($"Withdrew {amount:N2} from wallet.");
                 _withdrawAmount = "";
                 _withdrawRef = "";
                 _withdrawRemarks = "";
@@ -847,7 +808,7 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to update wallet balance: {result.Message}");
+                ToastService.Show($"Failed to withdraw funds: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -884,41 +845,50 @@ else
                 return;
             }
 
-            var oldBalance = fresh.Balance;
-            var difference = newBalance - oldBalance;
-
-            // Create an adjustment transaction record
-            var transaction = new WalletTransaction
+            if (!TryGetWalletTypeId(fresh, out var walletTypeId))
             {
-                Id = Guid.NewGuid(),
-                TenantId = _wallet!.TenantId,
-                WalletId = Id,
-                CredentialId = fresh.CredentialId,
-                Amount = Math.Abs(difference),
-                TransactionType = difference >= 0 ? TransactionType.Credit : TransactionType.Debit,
-                TransactionFee = 0,
-                ReferenceNumber = $"ADJ-{DateTime.UtcNow:yyyyMMddHHmmss}",
-                Remarks = string.IsNullOrWhiteSpace(_adjustRemarks)
-                    ? $"Admin balance adjustment: {oldBalance:N2} -> {newBalance:N2}"
-                    : _adjustRemarks.Trim(),
-                Held = false,
-                Released = true,
-                RunningBalance = newBalance,
-                PreviousBalance = oldBalance,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
+                return;
+            }
 
-            // Update wallet balance directly
-            DataContext.Add(transaction);
-            fresh.Balance = newBalance;
-            fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
-
-            if (result.IsSuccess)
+            var difference = newBalance - fresh.Balance;
+            if (difference == 0)
             {
-                ToastService.Show($"Balance adjusted from {oldBalance:N2} to {newBalance:N2}.");
+                ToastService.Show("Balance is already at the requested amount.");
+                return;
+            }
+
+            var referenceNumber = $"ADJ-{DateTime.UtcNow:yyyyMMddHHmmss}";
+            var remarks = string.IsNullOrWhiteSpace(_adjustRemarks)
+                ? $"Admin balance adjustment: {fresh.Balance:N2} -> {newBalance:N2}"
+                : _adjustRemarks.Trim();
+
+            var response = difference > 0
+                ? await WalletsService.IncrementWallet(new IncrementWalletRequest
+                {
+                    WalletId = Id,
+                    CredentialId = fresh.CredentialId,
+                    WalletTypeId = walletTypeId,
+                    Amount = difference,
+                    ReferenceNumber = referenceNumber,
+                    Remarks = remarks,
+                    IdempotencyKey = $"controlpanel-adjust-{Guid.NewGuid():N}",
+                    Metadata = BuildCommandMetadata(fresh.TenantId)
+                })
+                : await WalletsService.DecrementWallet(new DecrementWalletRequest
+                {
+                    WalletId = Id,
+                    CredentialId = fresh.CredentialId,
+                    WalletTypeId = walletTypeId,
+                    Amount = Math.Abs(difference),
+                    ReferenceNumber = referenceNumber,
+                    Remarks = remarks,
+                    IdempotencyKey = $"controlpanel-adjust-{Guid.NewGuid():N}",
+                    Metadata = BuildCommandMetadata(fresh.TenantId)
+                });
+
+            if (response.IsSuccess)
+            {
+                ToastService.Show($"Balance adjustment submitted for {newBalance:N2}.");
                 _adjustBalance = "";
                 _adjustRemarks = "";
                 await LoadWallet();
@@ -926,7 +896,7 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to adjust balance: {result.Message}");
+                ToastService.Show($"Failed to adjust balance: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -937,6 +907,19 @@ else
         {
             _isProcessing = false;
         }
+    }
+
+    private bool TryGetWalletTypeId(Wallet wallet, out Guid walletTypeId)
+    {
+        if (wallet.WalletTypeId is Guid value && value != Guid.Empty)
+        {
+            walletTypeId = value;
+            return true;
+        }
+
+        walletTypeId = Guid.Empty;
+        ToastService.Show("This wallet has no wallet type. Assign a wallet type before submitting money operations.");
+        return false;
     }
 
     private async Task FreezeWallet()
@@ -961,19 +944,20 @@ else
                 return;
             }
 
-            fresh.Status = WalletStatus.Frozen;
-            fresh.ModifiedAt = DateTime.UtcNow;
+            var response = await WalletsService.FreezeWallet(new FreezeWalletRequest
+            {
+                WalletId = Id,
+                Metadata = BuildCommandMetadata(fresh.TenantId)
+            });
 
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
-            if (result.IsSuccess)
+            if (response.IsSuccess)
             {
                 ToastService.Show("Wallet frozen successfully.");
                 await LoadWallet();
             }
             else
             {
-                ToastService.Show($"Failed to freeze wallet: {result.Message}");
+                ToastService.Show($"Failed to freeze wallet: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -1004,19 +988,20 @@ else
                 return;
             }
 
-            fresh.Status = WalletStatus.Active;
-            fresh.ModifiedAt = DateTime.UtcNow;
+            var response = await WalletsService.UnfreezeWallet(new UnfreezeWalletRequest
+            {
+                WalletId = Id,
+                Metadata = BuildCommandMetadata(fresh.TenantId)
+            });
 
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
-            if (result.IsSuccess)
+            if (response.IsSuccess)
             {
                 ToastService.Show("Wallet unfrozen successfully.");
                 await LoadWallet();
             }
             else
             {
-                ToastService.Show($"Failed to unfreeze wallet: {result.Message}");
+                ToastService.Show($"Failed to unfreeze wallet: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -1048,21 +1033,9 @@ else
                 return;
             }
 
-            fresh.Status = WalletStatus.Closed;
-            fresh.ModifiedAt = DateTime.UtcNow;
-
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
-            if (result.IsSuccess)
-            {
-                ToastService.Show("Wallet closed successfully.");
-                _showCloseDialog = false;
-                await LoadWallet();
-            }
-            else
-            {
-                ToastService.Show($"Failed to close wallet: {result.Message}");
-            }
+            ToastService.Show("Closing wallets requires the backend close-wallet workflow and was not applied.");
+            _showCloseDialog = false;
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {

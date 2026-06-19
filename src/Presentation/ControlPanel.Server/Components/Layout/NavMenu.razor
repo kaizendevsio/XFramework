@@ -115,15 +115,33 @@
     </div>
 }
 
-@* Finance *@
-<div class="mt-4">
-    <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Finance</p>
-    <div class="space-y-0.5">
-        <NavLink href="/finance/wallets" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-            <LucideIcon Name="wallet" class="h-4 w-4" /> Wallets
-        </NavLink>
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Wallets))
+{
+    @* Finance *@
+    <div class="mt-4">
+        <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Finance</p>
+        <div class="space-y-0.5">
+            <NavLink href="/finance/wallets" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="wallet" class="h-4 w-4" /> Wallets
+            </NavLink>
+            <NavLink href="/finance/wallet-operations" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="receipt-text" class="h-4 w-4" /> Operations
+            </NavLink>
+            <NavLink href="/finance/reconciliation" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="scale" class="h-4 w-4" /> Reconciliation
+            </NavLink>
+            <NavLink href="/finance/outbox-webhooks" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="send" class="h-4 w-4" /> Outbox
+            </NavLink>
+            <NavLink href="/finance/policy-decisions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="shield-check" class="h-4 w-4" /> Policy
+            </NavLink>
+            <NavLink href="/finance/wallet-audit" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="list-checks" class="h-4 w-4" /> Audit
+            </NavLink>
+        </div>
     </div>
-</div>
+}
 
 @code {
     protected override async Task OnInitializedAsync()

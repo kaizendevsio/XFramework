@@ -76,6 +76,7 @@ public static class Endpoint
             .WithDescription("Processes multiple wallet transfers in a single optimized transaction. " +
                 "Each transfer creates debit and credit transactions. Validates balances and wallet existence. " +
                 "Performance: 20-50x faster than individual operations.")
+            .RequireAuthorization()
             .Produces<BatchOperationResult>(StatusCodes.Status200OK)
             .Produces<BatchOperationResult>(StatusCodes.Status207MultiStatus)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)

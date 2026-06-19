@@ -21,19 +21,22 @@ public sealed class WalletOperationsService : IWalletOperationsService
     private readonly IHelperService _helperService;
     private readonly ILogger<WalletOperationsService> _logger;
     private readonly IWalletEventPublisher _eventPublisher;
+    private readonly IWalletLedgerService _ledgerService;
 
     public WalletOperationsService(
         IDataContext dataContext,
         ITenantResolver tenantService,
         IHelperService helperService,
         ILogger<WalletOperationsService> logger,
-        IWalletEventPublisher eventPublisher)
+        IWalletEventPublisher eventPublisher,
+        IWalletLedgerService ledgerService)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _tenantService = tenantService ?? throw new ArgumentNullException(nameof(tenantService));
         _helperService = helperService ?? throw new ArgumentNullException(nameof(helperService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
+        _ledgerService = ledgerService ?? throw new ArgumentNullException(nameof(ledgerService));
     }
 
     /// <inheritdoc />
@@ -47,6 +50,11 @@ public sealed class WalletOperationsService : IWalletOperationsService
         try
         {
             var tenant = await _tenantService.GetTenant(tenantId);
+
+            if (initialBalance < 0)
+            {
+                return Result<Wallet>.Failure("Initial balance cannot be negative", 400);
+            }
 
             var walletType = await _dataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>()
                 .Where(x => x.Id == walletTypeId)
@@ -70,10 +78,11 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             var wallet = new Wallet
             {
+                Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 CredentialId = credentialId,
                 WalletTypeId = walletType.Id,
-                Balance = initialBalance,
+                Balance = 0,
                 BondBalanceRule = walletType.BondBalanceRule,
                 MaintainingBalanceRule = walletType.MaintainingBalanceRule,
                 MinTransferRule = walletType.MinTransferRule,
@@ -81,11 +90,81 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 AccountNumber = accountNumber,
                 DebitOnHoldBalance = 0,
                 CreditOnHoldBalance = 0,
-                TransferableBalance = initialBalance
+                TransferableBalance = 0,
+                IsEnabled = true
             };
 
-            _dataContext.Add(wallet);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            if (initialBalance > 0)
+            {
+                var referenceNumber = $"wallet-create:{wallet.Id}";
+                var transaction = new WalletTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    CredentialId = credentialId,
+                    WalletId = wallet.Id,
+                    Amount = initialBalance,
+                    TransactionFee = 0,
+                    Remarks = "Initial wallet balance",
+                    Description = "Initial wallet balance",
+                    TransactionType = TransactionType.Credit,
+                    Held = false,
+                    Released = true,
+                    ReferenceNumber = referenceNumber
+                };
+
+                var ledgerResult = await _ledgerService.ExecuteAsync(
+                    new WalletLedgerExecutionRequest
+                    {
+                        TenantId = tenant.Id,
+                        OperationType = WalletOperationType.Credit,
+                        ActorCredentialId = credentialId,
+                        ReferenceNumber = referenceNumber,
+                        Reason = "Initial wallet balance",
+                        NewWallets = [wallet],
+                        Postings =
+                        [
+                            new WalletLedgerPostingRequest
+                            {
+                                Direction = WalletLedgerDirection.Debit,
+                                BalanceBucket = WalletBalanceBucket.External,
+                                EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                                Amount = initialBalance,
+                                WalletTypeId = wallet.WalletTypeId,
+                                ReferenceNumber = referenceNumber,
+                                CounterpartyType = "initial-balance-source",
+                                CounterpartyReference = "wallet-create",
+                                Description = "Initial balance source"
+                            },
+                            new WalletLedgerPostingRequest
+                            {
+                                WalletId = wallet.Id,
+                                WalletTransaction = transaction,
+                                Direction = WalletLedgerDirection.Credit,
+                                BalanceBucket = WalletBalanceBucket.Available,
+                                EntryKind = WalletLedgerEntryKind.Principal,
+                                Amount = initialBalance,
+                                WalletTypeId = wallet.WalletTypeId,
+                                ReferenceNumber = referenceNumber,
+                                Description = "Initial wallet balance"
+                            }
+                        ],
+                        ReadModels = [transaction]
+                    },
+                    cancellationToken);
+
+                if (!ledgerResult.IsSuccess)
+                {
+                    return Result<Wallet>.Failure(
+                        ledgerResult.Message ?? "Wallet ledger operation failed",
+                        ledgerResult.StatusCode);
+                }
+            }
+            else
+            {
+                _dataContext.Add(wallet);
+                await _dataContext.SaveChangesAsync(cancellationToken);
+            }
 
             _logger.EntityCreated("Wallet", wallet.Id);
 
@@ -179,11 +258,6 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure("Total fee cannot exceed increment amount", 400);
             }
 
-            if (await HasProcessedIdempotencyKey(tenant.Id, request, cancellationToken))
-            {
-                return Result.Success("Transaction already processed");
-            }
-
             // Fetch wallet
             var wallet = request.WalletTypeId != Guid.Empty
                 ? await _dataContext.Query<Wallet>()
@@ -242,49 +316,16 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure($"Amount must not exceed {wallet.MaxTransferRule.Value}", 400);
             }
 
-            // Store previous balances
-            var previousBalance = wallet.Balance;
-            var previousTotalBalance = wallet.TotalBalance ?? 0;
-            var previousCreditOnHoldBalance = wallet.CreditOnHoldBalance;
-            var previousDebitOnHoldBalance = wallet.DebitOnHoldBalance;
             var netCredit = request.TotalAmount - request.TotalFee;
-
-            // Update wallet balance
-            if (request.OnHold)
-            {
-                wallet.CreditOnHoldBalance += netCredit;
-            }
-            else
-            {
-                wallet.Balance += netCredit;
-                wallet.TransferableBalance += netCredit;
-            }
-
-            // Validate maintaining balance rule
-            if (wallet.MaintainingBalanceRule.HasValue && wallet.Balance < wallet.MaintainingBalanceRule.Value)
-            {
-                _logger.BusinessRuleViolation("IncrementWallet", $"Balance {wallet.Balance} below maintaining rule {wallet.MaintainingBalanceRule.Value}");
-                return Result.Failure($"Balance after increment must not drop below {wallet.MaintainingBalanceRule.Value}", 400);
-            }
-
-            // Create transaction record
             var referenceNumber = CreateReferenceNumber(request);
             var transaction = new WalletTransaction
             {
+                Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 CredentialId = request.CredentialId,
                 WalletId = wallet.Id,
                 Amount = request.TotalAmount,
                 TransactionFee = request.TotalFee,
-                PreviousBalance = previousBalance,
-                PreviousTotalBalance = previousTotalBalance,
-                PreviousDebitOnHoldBalance = previousDebitOnHoldBalance,
-                PreviousCreditOnHoldBalance = previousCreditOnHoldBalance,
-                RunningBalance = wallet.Balance,
-                RunningTotalBalance = wallet.TotalBalance,
-                RunningAvailableBalance = wallet.AvailableBalance,
-                RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance,
-                RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance,
                 Remarks = request.Remarks,
                 TransactionType = TransactionType.Credit,
                 Held = request.OnHold,
@@ -292,12 +333,85 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 ReferenceNumber = referenceNumber
             };
 
-            _dataContext.Update(wallet);
-            _dataContext.Add(transaction);
+            var postings = new List<WalletLedgerPostingRequest>
+            {
+                new()
+                {
+                    Direction = WalletLedgerDirection.Debit,
+                    BalanceBucket = WalletBalanceBucket.External,
+                    EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                    Amount = request.TotalAmount,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    CounterpartyType = "external-funding-source",
+                    CounterpartyReference = request.ReferenceNumber,
+                    Description = "External funding source"
+                }
+            };
 
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            if (netCredit > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    WalletId = wallet.Id,
+                    WalletTransaction = transaction,
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = request.OnHold ? WalletBalanceBucket.CreditHold : WalletBalanceBucket.Available,
+                    EntryKind = request.OnHold ? WalletLedgerEntryKind.Hold : WalletLedgerEntryKind.Principal,
+                    Amount = netCredit,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    Description = request.OnHold ? "Credit held funds" : "Credit available funds"
+                });
+            }
+
+            if (request.TotalFee > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.Fee,
+                    EntryKind = WalletLedgerEntryKind.Fee,
+                    Amount = request.TotalFee,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    CounterpartyType = "platform-fee",
+                    CounterpartyReference = "wallets",
+                    Description = "Platform fee"
+                });
+            }
+
+            var ledgerResult = await _ledgerService.ExecuteAsync(
+                new WalletLedgerExecutionRequest
+                {
+                    TenantId = tenant.Id,
+                    OperationType = WalletOperationType.Credit,
+                    ActorCredentialId = request.CredentialId,
+                    IdempotencyKey = request.IdempotencyKey,
+                    ReferenceNumber = referenceNumber,
+                    Reason = request.Remarks,
+                    Postings = postings,
+                    ReadModels = [transaction]
+                },
+                cancellationToken);
+
+            if (!ledgerResult.IsSuccess)
+            {
+                return Result.Failure(ledgerResult.Message ?? "Wallet ledger operation failed", ledgerResult.StatusCode);
+            }
+
+            if (ledgerResult.Data?.AlreadyProcessed == true)
+            {
+                return Result.Success("Transaction already processed");
+            }
 
             stopwatch.Stop();
+            var runningBalance = ledgerResult.Data?.Wallets.TryGetValue(wallet.Id, out var balanceResult) == true
+                ? balanceResult.Balance
+                : wallet.Balance;
 
             // Record metrics
             XFrameworkMetrics.WalletIncrements.Add(1,
@@ -311,9 +425,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             activity?.SetStatus(ActivityStatusCode.Ok);
             activity?.SetTag("operation.duration_ms", stopwatch.ElapsedMilliseconds);
-            activity?.SetTag("wallet.new_balance", wallet.Balance);
+            activity?.SetTag("wallet.new_balance", runningBalance);
 
-            _logger.WalletIncremented(wallet.Id, request.TotalAmount, "Primary", wallet.Balance);
+            _logger.WalletIncremented(wallet.Id, request.TotalAmount, "Primary", runningBalance);
             _logger.TransactionCreated(transaction.Id, wallet.Id, "Credit", request.TotalAmount);
 
             await _eventPublisher.PublishAsync(new TransactionCompletedEvent
@@ -325,7 +439,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 Amount = request.TotalAmount,
                 TransactionType = "Credit",
                 ReferenceNumber = transaction.ReferenceNumber,
-                RunningBalance = wallet.Balance
+                RunningBalance = runningBalance
             });
 
             return Result.Success();
@@ -362,11 +476,6 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure("Invalid decrement amount", 400);
             }
 
-            if (await HasProcessedIdempotencyKey(tenant.Id, request, cancellationToken))
-            {
-                return Result.Success("Transaction already processed");
-            }
-
             // Fetch wallet
             var wallet = request.WalletTypeId != Guid.Empty
                 ? await _dataContext.Query<Wallet>()
@@ -394,48 +503,15 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure("Insufficient funds", 400);
             }
 
-            // Store previous balances
-            var previousBalance = wallet.Balance;
-            var previousTotalBalance = wallet.TotalBalance ?? 0;
-            var previousDebitOnHoldBalance = wallet.DebitOnHoldBalance;
-            var previousCreditOnHoldBalance = wallet.CreditOnHoldBalance;
-
-            // Update wallet balance
-            if (request.OnHold)
-            {
-                wallet.DebitOnHoldBalance += totalDebit;
-            }
-            else
-            {
-                wallet.Balance -= totalDebit;
-                wallet.TransferableBalance -= totalDebit;
-            }
-
-            // Validate maintaining balance rule
-            if (wallet.MaintainingBalanceRule.HasValue && wallet.Balance < wallet.MaintainingBalanceRule.Value)
-            {
-                _logger.BusinessRuleViolation("DecrementWallet", $"Balance {wallet.Balance} below maintaining rule {wallet.MaintainingBalanceRule.Value}");
-                return Result.Failure($"Balance after decrement must not drop below {wallet.MaintainingBalanceRule.Value}", 400);
-            }
-
-            // Create transaction record
             var referenceNumber = CreateReferenceNumber(request);
             var transaction = new WalletTransaction
             {
+                Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 CredentialId = request.CredentialId,
                 WalletId = wallet.Id,
-                Amount = -request.TotalAmount, // Negative for debit
+                Amount = request.TotalAmount,
                 TransactionFee = request.TotalFee,
-                PreviousBalance = previousBalance,
-                PreviousTotalBalance = previousTotalBalance,
-                PreviousDebitOnHoldBalance = previousDebitOnHoldBalance,
-                PreviousCreditOnHoldBalance = previousCreditOnHoldBalance,
-                RunningBalance = wallet.Balance,
-                RunningTotalBalance = wallet.TotalBalance,
-                RunningAvailableBalance = wallet.AvailableBalance,
-                RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance,
-                RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance,
                 Remarks = request.Remarks,
                 TransactionType = TransactionType.Debit,
                 Held = request.OnHold,
@@ -443,12 +519,82 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 ReferenceNumber = referenceNumber
             };
 
-            _dataContext.Update(wallet);
-            _dataContext.Add(transaction);
+            var postings = new List<WalletLedgerPostingRequest>
+            {
+                new()
+                {
+                    WalletId = wallet.Id,
+                    WalletTransaction = transaction,
+                    Direction = WalletLedgerDirection.Debit,
+                    BalanceBucket = request.OnHold ? WalletBalanceBucket.DebitHold : WalletBalanceBucket.Available,
+                    EntryKind = request.OnHold ? WalletLedgerEntryKind.Hold : WalletLedgerEntryKind.Principal,
+                    Amount = totalDebit,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    Description = request.OnHold ? "Debit held funds" : "Debit available funds"
+                },
+                new()
+                {
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.External,
+                    EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                    Amount = request.TotalAmount,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    CounterpartyType = "external-payout-destination",
+                    CounterpartyReference = request.ReferenceNumber,
+                    Description = "External payout destination"
+                }
+            };
 
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            if (request.TotalFee > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.Fee,
+                    EntryKind = WalletLedgerEntryKind.Fee,
+                    Amount = request.TotalFee,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    CounterpartyType = "platform-fee",
+                    CounterpartyReference = "wallets",
+                    Description = "Platform fee"
+                });
+            }
 
-            _logger.WalletDecremented(wallet.Id, request.TotalAmount, "Primary", wallet.Balance);
+            var ledgerResult = await _ledgerService.ExecuteAsync(
+                new WalletLedgerExecutionRequest
+                {
+                    TenantId = tenant.Id,
+                    OperationType = WalletOperationType.Debit,
+                    ActorCredentialId = request.CredentialId,
+                    IdempotencyKey = request.IdempotencyKey,
+                    ReferenceNumber = referenceNumber,
+                    Reason = request.Remarks,
+                    Postings = postings,
+                    ReadModels = [transaction]
+                },
+                cancellationToken);
+
+            if (!ledgerResult.IsSuccess)
+            {
+                return Result.Failure(ledgerResult.Message ?? "Wallet ledger operation failed", ledgerResult.StatusCode);
+            }
+
+            if (ledgerResult.Data?.AlreadyProcessed == true)
+            {
+                return Result.Success("Transaction already processed");
+            }
+
+            var runningBalance = ledgerResult.Data?.Wallets.TryGetValue(wallet.Id, out var balanceResult) == true
+                ? balanceResult.Balance
+                : wallet.Balance;
+
+            _logger.WalletDecremented(wallet.Id, request.TotalAmount, "Primary", runningBalance);
             _logger.TransactionCreated(transaction.Id, wallet.Id, "Debit", request.TotalAmount);
 
             await _eventPublisher.PublishAsync(new TransactionCompletedEvent
@@ -460,7 +606,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 Amount = request.TotalAmount,
                 TransactionType = "Debit",
                 ReferenceNumber = transaction.ReferenceNumber,
-                RunningBalance = wallet.Balance
+                RunningBalance = runningBalance
             });
 
             return Result.Success();
@@ -493,11 +639,6 @@ public sealed class WalletOperationsService : IWalletOperationsService
             {
                 _logger.ValidationFailed("TransferWallet", "Wallet type ID is required");
                 return Result.Failure("Wallet type ID is required", 400);
-            }
-
-            if (await HasProcessedIdempotencyKey(tenant.Id, request, cancellationToken))
-            {
-                return Result.Success("Transaction already processed");
             }
 
             // Fetch sender and recipient wallets
@@ -685,52 +826,15 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure($"Amount must not exceed {recipientWallet.MaxTransferRule}", 400);
             }
 
-            // Store previous balances
-            var previousSenderBalance = senderWallet.Balance;
-            var previousSenderTotalBalance = senderWallet.TotalBalance ?? 0;
-            var previousSenderDebitOnHoldBalance = senderWallet.DebitOnHoldBalance;
-            var previousSenderCreditOnHoldBalance = senderWallet.CreditOnHoldBalance;
-
-            var previousRecipientBalance = recipientWallet.Balance;
-            var previousRecipientTotalBalance = recipientWallet.TotalBalance ?? 0;
-            var previousRecipientDebitOnHoldBalance = recipientWallet.DebitOnHoldBalance;
-            var previousRecipientCreditOnHoldBalance = recipientWallet.CreditOnHoldBalance;
-
-            // Update wallet balances
-            if (request.OnHold)
-            {
-                senderWallet.DebitOnHoldBalance += totalDecrement;
-                senderWallet.TransferableBalance -= totalDecrement;
-
-                recipientWallet.CreditOnHoldBalance += totalIncrement;
-            }
-            else
-            {
-                senderWallet.Balance -= totalDecrement;
-                senderWallet.TransferableBalance -= totalDecrement;
-
-                recipientWallet.Balance += totalIncrement;
-                recipientWallet.TransferableBalance += totalIncrement;
-            }
-
-            // Create transaction records
             var referenceNumber = CreateReferenceNumber(request);
             var senderTransaction = new WalletTransaction
             {
+                Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 CredentialId = request.CredentialId,
                 WalletId = senderWallet.Id,
                 Amount = request.TotalAmount,
                 TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
-                PreviousBalance = previousSenderBalance,
-                PreviousTotalBalance = previousSenderTotalBalance,
-                PreviousDebitOnHoldBalance = previousSenderDebitOnHoldBalance,
-                PreviousCreditOnHoldBalance = previousSenderCreditOnHoldBalance,
-                RunningBalance = senderWallet.Balance,
-                RunningDebitOnHoldBalance = senderWallet.DebitOnHoldBalance,
-                RunningCreditOnHoldBalance = senderWallet.CreditOnHoldBalance,
-                RunningTotalBalance = senderWallet.TotalBalance,
-                RunningAvailableBalance = senderWallet.AvailableBalance,
                 Remarks = request.Remarks,
                 Description = $"Transferred to {MaskFullName(recipientCredential.IdentityInfo?.FullName)}",
                 TransactionType = TransactionType.Debit,
@@ -741,20 +845,12 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             var recipientTransaction = new WalletTransaction
             {
+                Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 CredentialId = request.RecipientCredentialId,
                 WalletId = recipientWallet.Id,
                 Amount = request.TotalAmount,
                 TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
-                PreviousBalance = previousRecipientBalance,
-                PreviousTotalBalance = previousRecipientTotalBalance,
-                PreviousDebitOnHoldBalance = previousRecipientDebitOnHoldBalance,
-                PreviousCreditOnHoldBalance = previousRecipientCreditOnHoldBalance,
-                RunningBalance = recipientWallet.Balance,
-                RunningTotalBalance = recipientWallet.TotalBalance,
-                RunningAvailableBalance = recipientWallet.AvailableBalance,
-                RunningCreditOnHoldBalance = recipientWallet.CreditOnHoldBalance,
-                RunningDebitOnHoldBalance = recipientWallet.DebitOnHoldBalance,
                 Remarks = request.Remarks,
                 Description = $"Received from {MaskFullName(senderCredential.IdentityInfo?.FullName)}",
                 TransactionType = TransactionType.Credit,
@@ -772,6 +868,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
             // Create WalletTransfer entity
             var walletTransfer = new WalletTransfer
             {
+                Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 SenderTransactionId = senderTransaction.Id,
                 RecipientTransactionId = recipientTransaction.Id,
@@ -782,11 +879,87 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 TransactionFee = request.TotalFee
             };
 
-            _dataContext.Update(senderWallet);
-            _dataContext.Update(recipientWallet);
-            _dataContext.Add(walletTransfer);
+            var postings = new List<WalletLedgerPostingRequest>
+            {
+                new()
+                {
+                    WalletId = senderWallet.Id,
+                    WalletTransaction = senderTransaction,
+                    Direction = WalletLedgerDirection.Debit,
+                    BalanceBucket = request.OnHold ? WalletBalanceBucket.DebitHold : WalletBalanceBucket.Available,
+                    EntryKind = request.OnHold ? WalletLedgerEntryKind.Hold : WalletLedgerEntryKind.Principal,
+                    Amount = totalDecrement,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = senderWallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    Description = "Transfer debit"
+                }
+            };
 
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            if (totalIncrement > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    WalletId = recipientWallet.Id,
+                    WalletTransaction = recipientTransaction,
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = request.OnHold ? WalletBalanceBucket.CreditHold : WalletBalanceBucket.Available,
+                    EntryKind = request.OnHold ? WalletLedgerEntryKind.Hold : WalletLedgerEntryKind.Principal,
+                    Amount = totalIncrement,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = recipientWallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    Description = "Transfer credit"
+                });
+            }
+
+            if (request.TotalFee > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.Fee,
+                    EntryKind = WalletLedgerEntryKind.Fee,
+                    Amount = request.TotalFee,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = senderWallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    CounterpartyType = "platform-fee",
+                    CounterpartyReference = "wallets",
+                    Description = "Transfer platform fee"
+                });
+            }
+
+            var ledgerResult = await _ledgerService.ExecuteAsync(
+                new WalletLedgerExecutionRequest
+                {
+                    TenantId = tenant.Id,
+                    OperationType = WalletOperationType.Transfer,
+                    ActorCredentialId = request.CredentialId,
+                    IdempotencyKey = request.IdempotencyKey,
+                    ReferenceNumber = referenceNumber,
+                    Reason = request.Remarks,
+                    Postings = postings,
+                    ReadModels = [senderTransaction, recipientTransaction, walletTransfer]
+                },
+                cancellationToken);
+
+            if (!ledgerResult.IsSuccess)
+            {
+                return Result.Failure(ledgerResult.Message ?? "Wallet ledger operation failed", ledgerResult.StatusCode);
+            }
+
+            if (ledgerResult.Data?.AlreadyProcessed == true)
+            {
+                return Result.Success("Transaction already processed");
+            }
+
+            var senderRunningBalance = ledgerResult.Data?.Wallets.TryGetValue(senderWallet.Id, out var senderBalanceResult) == true
+                ? senderBalanceResult.Balance
+                : senderWallet.Balance;
+            var recipientRunningBalance = ledgerResult.Data?.Wallets.TryGetValue(recipientWallet.Id, out var recipientBalanceResult) == true
+                ? recipientBalanceResult.Balance
+                : recipientWallet.Balance;
 
             _logger.WalletTransfer(senderWallet.Id, recipientWallet.Id, request.TotalAmount, "Primary");
 
@@ -799,7 +972,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 Amount = request.TotalAmount,
                 TransactionType = "Debit",
                 ReferenceNumber = senderTransaction.ReferenceNumber,
-                RunningBalance = senderWallet.Balance
+                RunningBalance = senderRunningBalance
             });
 
             await _eventPublisher.PublishAsync(new TransactionCompletedEvent
@@ -811,7 +984,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 Amount = request.TotalAmount,
                 TransactionType = "Credit",
                 ReferenceNumber = recipientTransaction.ReferenceNumber,
-                RunningBalance = recipientWallet.Balance
+                RunningBalance = recipientRunningBalance
             });
 
             return Result.Success();
@@ -845,11 +1018,6 @@ public sealed class WalletOperationsService : IWalletOperationsService
             {
                 _logger.ValidationFailed("ConvertWallet", "Source and target wallet type IDs are required");
                 return Result.Failure("Source and target wallet type IDs are required", 400);
-            }
-
-            if (await HasProcessedIdempotencyKey(tenant.Id, request, cancellationToken))
-            {
-                return Result.Success("Transaction already processed");
             }
 
             // Fetch source wallet
@@ -899,6 +1067,9 @@ public sealed class WalletOperationsService : IWalletOperationsService
                     return Result.Failure("Target wallet could not be created", 500);
                 }
             }
+
+            var targetStatusCheck = CheckWalletStatus(targetWallet, "ConvertWallet");
+            if (targetStatusCheck is not null) return targetStatusCheck;
 
             // Calculate deduction amounts
             decimal totalDecrement;
@@ -973,42 +1144,16 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure($"Balance after conversion must not drop below {sourceWallet.MaintainingBalanceRule}", 400);
             }
 
-            // Store previous balances
-            var previousSourceBalance = sourceWallet.Balance;
-            var previousSourceTotalBalance = sourceWallet.TotalBalance ?? 0;
-            var previousSourceCreditOnHoldBalance = sourceWallet.CreditOnHoldBalance;
-            var previousSourceDebitOnHoldBalance = sourceWallet.DebitOnHoldBalance;
-
-            var previousTargetBalance = targetWallet.Balance;
-            var previousTargetTotalBalance = targetWallet.TotalBalance ?? 0;
-            var previousTargetCreditOnHoldBalance = targetWallet.CreditOnHoldBalance;
-            var previousTargetDebitOnHoldBalance = targetWallet.DebitOnHoldBalance;
-
-            // Update wallet balances
-            sourceWallet.Balance -= totalDecrement;
-            sourceWallet.TransferableBalance -= totalDecrement;
-
-            targetWallet.Balance += totalIncrement;
-            targetWallet.TransferableBalance += totalIncrement;
-
             // Create transaction records
             var referenceNumber = CreateReferenceNumber(request);
             var sourceTransaction = new WalletTransaction
             {
+                Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 CredentialId = request.CredentialId,
                 WalletId = sourceWallet.Id,
-                Amount = totalDecrement,
+                Amount = request.TotalAmount,
                 TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
-                PreviousBalance = previousSourceBalance,
-                PreviousTotalBalance = previousSourceTotalBalance,
-                PreviousDebitOnHoldBalance = previousSourceDebitOnHoldBalance,
-                PreviousCreditOnHoldBalance = previousSourceCreditOnHoldBalance,
-                RunningBalance = sourceWallet.Balance,
-                RunningDebitOnHoldBalance = sourceWallet.DebitOnHoldBalance,
-                RunningCreditOnHoldBalance = sourceWallet.CreditOnHoldBalance,
-                RunningTotalBalance = sourceWallet.TotalBalance,
-                RunningAvailableBalance = sourceWallet.AvailableBalance,
                 Remarks = request.Remarks,
                 Description = $"Converted to {targetWallet.WalletType?.Name}",
                 TransactionType = TransactionType.Debit,
@@ -1019,20 +1164,12 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             var targetTransaction = new WalletTransaction
             {
+                Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 CredentialId = request.CredentialId,
                 WalletId = targetWallet.Id,
                 Amount = request.TotalAmount,
                 TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
-                PreviousBalance = previousTargetBalance,
-                PreviousTotalBalance = previousTargetTotalBalance,
-                PreviousDebitOnHoldBalance = previousTargetDebitOnHoldBalance,
-                PreviousCreditOnHoldBalance = previousTargetCreditOnHoldBalance,
-                RunningBalance = targetWallet.Balance,
-                RunningDebitOnHoldBalance = targetWallet.DebitOnHoldBalance,
-                RunningCreditOnHoldBalance = targetWallet.CreditOnHoldBalance,
-                RunningTotalBalance = targetWallet.TotalBalance,
-                RunningAvailableBalance = targetWallet.AvailableBalance,
                 Remarks = request.Remarks,
                 Description = $"Converted from {sourceWallet.WalletType?.Name}",
                 TransactionType = TransactionType.Credit,
@@ -1041,15 +1178,102 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 ReferenceNumber = referenceNumber
             };
 
-            _dataContext.Update(sourceWallet);
-            _dataContext.Update(targetWallet);
-            _dataContext.Add(sourceTransaction);
-            _dataContext.Add(targetTransaction);
+            var postings = new List<WalletLedgerPostingRequest>
+            {
+                new()
+                {
+                    WalletId = sourceWallet.Id,
+                    WalletTransaction = sourceTransaction,
+                    Direction = WalletLedgerDirection.Debit,
+                    BalanceBucket = WalletBalanceBucket.Available,
+                    EntryKind = WalletLedgerEntryKind.Principal,
+                    Amount = totalDecrement,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = sourceWallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    Description = "Conversion source debit"
+                }
+            };
 
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            if (totalIncrement > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    WalletId = targetWallet.Id,
+                    WalletTransaction = targetTransaction,
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.Available,
+                    EntryKind = WalletLedgerEntryKind.Principal,
+                    Amount = totalIncrement,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = targetWallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    Description = "Conversion target credit"
+                });
+            }
+            else
+            {
+                targetTransaction.PreviousBalance = targetWallet.Balance;
+                targetTransaction.PreviousTotalBalance = targetWallet.TotalBalance ?? targetWallet.Balance;
+                targetTransaction.PreviousDebitOnHoldBalance = targetWallet.DebitOnHoldBalance;
+                targetTransaction.PreviousCreditOnHoldBalance = targetWallet.CreditOnHoldBalance;
+                targetTransaction.RunningBalance = targetWallet.Balance;
+                targetTransaction.RunningTotalBalance = targetWallet.TotalBalance;
+                targetTransaction.RunningAvailableBalance = targetWallet.AvailableBalance;
+                targetTransaction.RunningDebitOnHoldBalance = targetWallet.DebitOnHoldBalance;
+                targetTransaction.RunningCreditOnHoldBalance = targetWallet.CreditOnHoldBalance;
+            }
+
+            if (request.TotalFee > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.Fee,
+                    EntryKind = WalletLedgerEntryKind.Fee,
+                    Amount = request.TotalFee,
+                    CurrencyId = request.CurrencyId == Guid.Empty ? null : request.CurrencyId,
+                    WalletTypeId = sourceWallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    CounterpartyType = "platform-fee",
+                    CounterpartyReference = "wallets",
+                    Description = "Conversion platform fee"
+                });
+            }
+
+            var ledgerResult = await _ledgerService.ExecuteAsync(
+                new WalletLedgerExecutionRequest
+                {
+                    TenantId = tenant.Id,
+                    OperationType = WalletOperationType.Conversion,
+                    ActorCredentialId = request.CredentialId,
+                    IdempotencyKey = request.IdempotencyKey,
+                    ReferenceNumber = referenceNumber,
+                    Reason = request.Remarks,
+                    Postings = postings,
+                    ReadModels = [sourceTransaction, targetTransaction]
+                },
+                cancellationToken);
+
+            if (!ledgerResult.IsSuccess)
+            {
+                return Result.Failure(ledgerResult.Message ?? "Wallet ledger operation failed", ledgerResult.StatusCode);
+            }
+
+            if (ledgerResult.Data?.AlreadyProcessed == true)
+            {
+                return Result.Success("Transaction already processed");
+            }
 
             stopwatch.Stop();
             _logger.OperationCompleted("ConvertWallet", stopwatch.ElapsedMilliseconds);
+
+            var sourceRunningBalance = ledgerResult.Data?.Wallets.TryGetValue(sourceWallet.Id, out var sourceBalanceResult) == true
+                ? sourceBalanceResult.Balance
+                : sourceWallet.Balance;
+            var targetRunningBalance = ledgerResult.Data?.Wallets.TryGetValue(targetWallet.Id, out var targetBalanceResult) == true
+                ? targetBalanceResult.Balance
+                : targetWallet.Balance;
 
             await _eventPublisher.PublishAsync(new TransactionCompletedEvent
             {
@@ -1060,7 +1284,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 Amount = totalDecrement,
                 TransactionType = "Debit",
                 ReferenceNumber = sourceTransaction.ReferenceNumber,
-                RunningBalance = sourceWallet.Balance
+                RunningBalance = sourceRunningBalance
             });
 
             await _eventPublisher.PublishAsync(new TransactionCompletedEvent
@@ -1072,7 +1296,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 Amount = totalIncrement,
                 TransactionType = "Credit",
                 ReferenceNumber = targetTransaction.ReferenceNumber,
-                RunningBalance = targetWallet.Balance
+                RunningBalance = targetRunningBalance
             });
 
             return Result.Success();
@@ -1110,82 +1334,133 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 return Result.Failure("Transaction is not on hold", 400);
             }
 
-            // Update the transaction
-            transaction.Held = false;
-            transaction.Released = true;
-
-            // Fetch and update the wallet balance
             var wallet = await _dataContext.Query<Wallet>()
                 .Where(i => i.Id == transaction.WalletId)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            if (wallet != null)
+            if (wallet is null)
             {
-                var statusCheck = CheckWalletStatus(wallet, "ReleaseTransaction");
-                if (statusCheck is not null) return statusCheck;
-
-                var heldAmount = GetHeldReleaseAmount(transaction);
-                if (heldAmount <= 0)
-                {
-                    return Result.Failure("Held transaction amount is invalid", 400);
-                }
-
-                var isHeldTransferDebit = transaction.TransactionType is TransactionType.Debit &&
-                    await _dataContext.Query<WalletTransfer>()
-                        .AnyAsync(t =>
-                            t.TenantId == tenant.Id &&
-                            t.SenderTransactionId == transaction.Id,
-                            cancellationToken);
-
-                // Update balances based on transaction type
-                if (transaction.TransactionType is TransactionType.Credit)
-                {
-                    if (wallet.CreditOnHoldBalance < heldAmount)
-                    {
-                        return Result.Failure("Held credit balance is insufficient for release", 400);
-                    }
-
-                    wallet.Balance += heldAmount;
-                    wallet.TransferableBalance += heldAmount;
-                    wallet.CreditOnHoldBalance -= heldAmount;
-                }
-                else if (transaction.TransactionType is TransactionType.Debit)
-                {
-                    if (wallet.DebitOnHoldBalance < heldAmount)
-                    {
-                        return Result.Failure("Held debit balance is insufficient for release", 400);
-                    }
-
-                    if (wallet.Balance < heldAmount)
-                    {
-                        return Result.Failure("Insufficient balance to release held debit", 400);
-                    }
-
-                    if (wallet.MaintainingBalanceRule.HasValue &&
-                        wallet.Balance - heldAmount < wallet.MaintainingBalanceRule)
-                    {
-                        return Result.Failure($"Balance after release must not drop below {wallet.MaintainingBalanceRule}", 400);
-                    }
-
-                    wallet.Balance -= heldAmount;
-                    if (!isHeldTransferDebit)
-                    {
-                        wallet.TransferableBalance -= heldAmount;
-                    }
-                    wallet.DebitOnHoldBalance -= heldAmount;
-                }
-
-                transaction.RunningBalance = wallet.Balance;
-                transaction.RunningTotalBalance = wallet.TotalBalance;
-                transaction.RunningAvailableBalance = wallet.AvailableBalance;
-                transaction.RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance;
-                transaction.RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance;
-
-                _dataContext.Update(transaction);
-                _dataContext.Update(wallet);
+                _logger.EntityNotFound("Wallet", transaction.WalletId);
+                return Result.NotFound("Wallet not found");
             }
 
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var statusCheck = CheckWalletStatus(wallet, "ReleaseTransaction");
+            if (statusCheck is not null) return statusCheck;
+
+            var heldAmount = GetHeldReleaseAmount(transaction);
+            if (heldAmount <= 0)
+            {
+                return Result.Failure("Held transaction amount is invalid", 400);
+            }
+
+            var postings = new List<WalletLedgerPostingRequest>();
+            if (transaction.TransactionType is TransactionType.Credit)
+            {
+                if (wallet.CreditOnHoldBalance < heldAmount)
+                {
+                    return Result.Failure("Held credit balance is insufficient for release", 400);
+                }
+
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    WalletId = wallet.Id,
+                    WalletTransactionId = transaction.Id,
+                    Direction = WalletLedgerDirection.Debit,
+                    BalanceBucket = WalletBalanceBucket.CreditHold,
+                    EntryKind = WalletLedgerEntryKind.Hold,
+                    Amount = heldAmount,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = transaction.ReferenceNumber,
+                    Description = "Release held credit"
+                });
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    WalletId = wallet.Id,
+                    WalletTransactionId = transaction.Id,
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.Available,
+                    EntryKind = WalletLedgerEntryKind.Principal,
+                    Amount = heldAmount,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = transaction.ReferenceNumber,
+                    Description = "Apply released credit"
+                });
+            }
+            else if (transaction.TransactionType is TransactionType.Debit)
+            {
+                if (wallet.DebitOnHoldBalance < heldAmount)
+                {
+                    return Result.Failure("Held debit balance is insufficient for release", 400);
+                }
+
+                if (wallet.Balance < heldAmount)
+                {
+                    return Result.Failure("Insufficient balance to release held debit", 400);
+                }
+
+                if (wallet.MaintainingBalanceRule.HasValue &&
+                    wallet.Balance - heldAmount < wallet.MaintainingBalanceRule)
+                {
+                    return Result.Failure($"Balance after release must not drop below {wallet.MaintainingBalanceRule}", 400);
+                }
+
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    WalletId = wallet.Id,
+                    WalletTransactionId = transaction.Id,
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = WalletBalanceBucket.DebitHold,
+                    EntryKind = WalletLedgerEntryKind.Hold,
+                    Amount = heldAmount,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = transaction.ReferenceNumber,
+                    Description = "Release held debit"
+                });
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    WalletId = wallet.Id,
+                    WalletTransactionId = transaction.Id,
+                    Direction = WalletLedgerDirection.Debit,
+                    BalanceBucket = WalletBalanceBucket.Available,
+                    EntryKind = WalletLedgerEntryKind.Principal,
+                    Amount = heldAmount,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = transaction.ReferenceNumber,
+                    Description = "Capture held debit"
+                });
+            }
+            else
+            {
+                return Result.Failure("Unsupported held transaction type", 400);
+            }
+
+            var ledgerResult = await _ledgerService.ExecuteAsync(
+                new WalletLedgerExecutionRequest
+                {
+                    TenantId = tenant.Id,
+                    OperationType = WalletOperationType.Release,
+                    ActorCredentialId = transaction.CredentialId,
+                    IdempotencyKey = $"release:{transaction.Id}",
+                    ReferenceNumber = transaction.ReferenceNumber,
+                    Reason = request.Id.ToString(),
+                    Postings = postings,
+                    TransactionUpdates =
+                    [
+                        new WalletTransactionStateUpdateRequest
+                        {
+                            Transaction = transaction,
+                            WalletId = wallet.Id,
+                            Held = false,
+                            Released = true
+                        }
+                    ]
+                },
+                cancellationToken);
+
+            if (!ledgerResult.IsSuccess)
+            {
+                return Result.Failure(ledgerResult.Message ?? "Wallet ledger operation failed", ledgerResult.StatusCode);
+            }
 
             _logger.OperationCompleted("ReleaseTransaction", 0);
             return Result.Success();
@@ -1256,19 +1531,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
     private async Task<bool> HasProcessedIdempotencyKey(
         Guid tenantId,
         TransactionRequestBase request,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(request.IdempotencyKey))
-        {
-            return false;
-        }
-
-        return await _dataContext.Query<WalletTransaction>()
-            .AnyAsync(t =>
-                t.TenantId == tenantId &&
-                t.ReferenceNumber == request.IdempotencyKey,
-                cancellationToken);
-    }
+        CancellationToken cancellationToken) =>
+        await _ledgerService.HasProcessedAsync(tenantId, request.IdempotencyKey, cancellationToken);
 
     private static string CreateReferenceNumber(TransactionRequestBase request)
     {
@@ -1445,15 +1709,6 @@ public sealed class WalletOperationsService : IWalletOperationsService
             "reversal");
         if (debitCheck is not null) return debitCheck;
 
-        // Snapshot previous balances
-        var previousBalance = wallet.Balance;
-        var previousTotalBalance = wallet.TotalBalance!.Value;
-        var previousDebitOnHold = wallet.DebitOnHoldBalance;
-        var previousCreditOnHold = wallet.CreditOnHoldBalance;
-
-        wallet.Balance += reversalDelta;
-        wallet.TransferableBalance += reversalDelta;
-
         var reversalAmount = Math.Abs(reversalDelta);
         var reversalType = reversalDelta >= 0
             ? TransactionType.Credit
@@ -1461,6 +1716,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
         var reversalTransaction = new WalletTransaction
         {
+            Id = Guid.NewGuid(),
             TenantId = tenantId,
             CredentialId = transaction.CredentialId,
             WalletId = transaction.WalletId,
@@ -1469,21 +1725,84 @@ public sealed class WalletOperationsService : IWalletOperationsService
             TransactionFee = 0,
             ReferenceNumber = transaction.ReferenceNumber,
             Description = $"Reversal of {transaction.Id}: {request.Reason}",
-            Remarks = request.Reason,
-            PreviousBalance = previousBalance,
-            PreviousTotalBalance = previousTotalBalance,
-            PreviousDebitOnHoldBalance = previousDebitOnHold,
-            PreviousCreditOnHoldBalance = previousCreditOnHold,
-            RunningBalance = wallet.Balance,
-            RunningTotalBalance = wallet.TotalBalance,
-            RunningAvailableBalance = wallet.AvailableBalance,
-            RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance,
-            RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance
+            Remarks = request.Reason
         };
 
-        _dataContext.Add(reversalTransaction);
-        _dataContext.Update(wallet);
-        await _dataContext.SaveChangesAsync(ct);
+        var postings = new List<WalletLedgerPostingRequest>();
+        if (reversalType is TransactionType.Credit)
+        {
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                Direction = WalletLedgerDirection.Debit,
+                BalanceBucket = WalletBalanceBucket.External,
+                EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                Amount = reversalAmount,
+                WalletTypeId = wallet.WalletTypeId,
+                ReferenceNumber = transaction.ReferenceNumber,
+                CounterpartyType = "reversal-counterparty",
+                CounterpartyReference = transaction.Id.ToString(),
+                Description = "Reversal counterparty debit"
+            });
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                WalletId = wallet.Id,
+                WalletTransaction = reversalTransaction,
+                Direction = WalletLedgerDirection.Credit,
+                BalanceBucket = WalletBalanceBucket.Available,
+                EntryKind = WalletLedgerEntryKind.Reversal,
+                Amount = reversalAmount,
+                WalletTypeId = wallet.WalletTypeId,
+                ReferenceNumber = transaction.ReferenceNumber,
+                Description = "Reversal credit"
+            });
+        }
+        else
+        {
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                WalletId = wallet.Id,
+                WalletTransaction = reversalTransaction,
+                Direction = WalletLedgerDirection.Debit,
+                BalanceBucket = WalletBalanceBucket.Available,
+                EntryKind = WalletLedgerEntryKind.Reversal,
+                Amount = reversalAmount,
+                WalletTypeId = wallet.WalletTypeId,
+                ReferenceNumber = transaction.ReferenceNumber,
+                Description = "Reversal debit"
+            });
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                Direction = WalletLedgerDirection.Credit,
+                BalanceBucket = WalletBalanceBucket.External,
+                EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                Amount = reversalAmount,
+                WalletTypeId = wallet.WalletTypeId,
+                ReferenceNumber = transaction.ReferenceNumber,
+                CounterpartyType = "reversal-counterparty",
+                CounterpartyReference = transaction.Id.ToString(),
+                Description = "Reversal counterparty credit"
+            });
+        }
+
+        var ledgerResult = await _ledgerService.ExecuteAsync(
+            new WalletLedgerExecutionRequest
+            {
+                TenantId = tenantId,
+                OperationType = WalletOperationType.Reversal,
+                ActorCredentialId = transaction.CredentialId,
+                IdempotencyKey = $"reversal:{transaction.Id}",
+                ReferenceNumber = transaction.ReferenceNumber,
+                Reason = request.Reason,
+                ExternalReference = transaction.Id.ToString(),
+                Postings = postings,
+                ReadModels = [reversalTransaction]
+            },
+            ct);
+
+        if (!ledgerResult.IsSuccess)
+        {
+            return Result.Failure(ledgerResult.Message ?? "Wallet ledger operation failed", ledgerResult.StatusCode);
+        }
 
         _logger.EntityCreated("ReversalTransaction", reversalTransaction.Id);
 
@@ -1577,18 +1896,11 @@ public sealed class WalletOperationsService : IWalletOperationsService
         if (recipientDebitCheck is not null) return recipientDebitCheck;
 
         // Reverse sender: was Debit → now Credit (money back)
-        var senderPrevBalance = senderWallet.Balance;
-        var senderPrevTotal = senderWallet.TotalBalance!.Value;
-        var senderPrevDebitOnHold = senderWallet.DebitOnHoldBalance;
-        var senderPrevCreditOnHold = senderWallet.CreditOnHoldBalance;
-
-        senderWallet.Balance += senderReversalDelta;
-        senderWallet.TransferableBalance += senderReversalDelta;
-
         var senderReversalAmount = Math.Abs(senderReversalDelta);
 
         var senderReversalTx = new WalletTransaction
         {
+            Id = Guid.NewGuid(),
             TenantId = tenantId,
             CredentialId = senderTx.CredentialId,
             WalletId = senderTx.WalletId,
@@ -1597,31 +1909,15 @@ public sealed class WalletOperationsService : IWalletOperationsService
             TransactionFee = 0,
             ReferenceNumber = senderTx.ReferenceNumber,
             Description = $"Reversal of transfer {transfer.Id}: {request.Reason}",
-            Remarks = request.Reason,
-            PreviousBalance = senderPrevBalance,
-            PreviousTotalBalance = senderPrevTotal,
-            PreviousDebitOnHoldBalance = senderPrevDebitOnHold,
-            PreviousCreditOnHoldBalance = senderPrevCreditOnHold,
-            RunningBalance = senderWallet.Balance,
-            RunningTotalBalance = senderWallet.TotalBalance,
-            RunningAvailableBalance = senderWallet.AvailableBalance,
-            RunningDebitOnHoldBalance = senderWallet.DebitOnHoldBalance,
-            RunningCreditOnHoldBalance = senderWallet.CreditOnHoldBalance
+            Remarks = request.Reason
         };
 
         // Reverse recipient: was Credit → now Debit (money taken back)
-        var recipientPrevBalance = recipientWallet.Balance;
-        var recipientPrevTotal = recipientWallet.TotalBalance!.Value;
-        var recipientPrevDebitOnHold = recipientWallet.DebitOnHoldBalance;
-        var recipientPrevCreditOnHold = recipientWallet.CreditOnHoldBalance;
-
-        recipientWallet.Balance += recipientReversalDelta;
-        recipientWallet.TransferableBalance += recipientReversalDelta;
-
         var recipientReversalAmount = Math.Abs(recipientReversalDelta);
 
         var recipientReversalTx = new WalletTransaction
         {
+            Id = Guid.NewGuid(),
             TenantId = tenantId,
             CredentialId = recipientTx.CredentialId,
             WalletId = recipientTx.WalletId,
@@ -1630,35 +1926,45 @@ public sealed class WalletOperationsService : IWalletOperationsService
             TransactionFee = 0,
             ReferenceNumber = recipientTx.ReferenceNumber,
             Description = $"Reversal of transfer {transfer.Id}: {request.Reason}",
-            Remarks = request.Reason,
-            PreviousBalance = recipientPrevBalance,
-            PreviousTotalBalance = recipientPrevTotal,
-            PreviousDebitOnHoldBalance = recipientPrevDebitOnHold,
-            PreviousCreditOnHoldBalance = recipientPrevCreditOnHold,
-            RunningBalance = recipientWallet.Balance,
-            RunningTotalBalance = recipientWallet.TotalBalance,
-            RunningAvailableBalance = recipientWallet.AvailableBalance,
-            RunningDebitOnHoldBalance = recipientWallet.DebitOnHoldBalance,
-            RunningCreditOnHoldBalance = recipientWallet.CreditOnHoldBalance
+            Remarks = request.Reason
         };
 
-        _dataContext.Add(senderReversalTx);
-        _dataContext.Add(recipientReversalTx);
-
-        // Create reversal WalletTransfer linking the reversal transactions
         var reversalTransfer = new WalletTransfer
         {
+            Id = Guid.NewGuid(),
             TenantId = tenantId,
             TransactionPurpose = TransactionPurpose.Reversal,
             SenderTransactionId = senderReversalTx.Id,
             RecipientTransactionId = recipientReversalTx.Id,
+            SenderTransaction = senderReversalTx,
+            RecipientTransaction = recipientReversalTx,
             TransactionFee = 0
         };
 
-        _dataContext.Add(reversalTransfer);
-        _dataContext.Update(senderWallet);
-        _dataContext.Update(recipientWallet);
-        await _dataContext.SaveChangesAsync(ct);
+        var postings = new List<WalletLedgerPostingRequest>();
+        AddReversalPosting(postings, senderWallet, senderReversalTx, senderReversalDelta, senderTx.ReferenceNumber);
+        AddReversalPosting(postings, recipientWallet, recipientReversalTx, recipientReversalDelta, recipientTx.ReferenceNumber);
+        BalanceNonWalletReversalPostings(postings, transfer.Id, senderTx.ReferenceNumber);
+
+        var ledgerResult = await _ledgerService.ExecuteAsync(
+            new WalletLedgerExecutionRequest
+            {
+                TenantId = tenantId,
+                OperationType = WalletOperationType.Reversal,
+                ActorCredentialId = senderTx.CredentialId,
+                IdempotencyKey = $"reversal:transfer:{transfer.Id}",
+                ReferenceNumber = senderTx.ReferenceNumber,
+                Reason = request.Reason,
+                ExternalReference = transfer.Id.ToString(),
+                Postings = postings,
+                ReadModels = [senderReversalTx, recipientReversalTx, reversalTransfer]
+            },
+            ct);
+
+        if (!ledgerResult.IsSuccess)
+        {
+            return Result.Failure(ledgerResult.Message ?? "Wallet ledger operation failed", ledgerResult.StatusCode);
+        }
 
         _logger.EntityCreated("ReversalTransfer", reversalTransfer.Id);
 
@@ -1685,6 +1991,58 @@ public sealed class WalletOperationsService : IWalletOperationsService
         });
 
         return Result.Success("Transfer reversed successfully");
+    }
+
+    private static void AddReversalPosting(
+        List<WalletLedgerPostingRequest> postings,
+        Wallet wallet,
+        WalletTransaction transaction,
+        decimal balanceDelta,
+        string? referenceNumber)
+    {
+        var amount = Math.Abs(balanceDelta);
+        postings.Add(new WalletLedgerPostingRequest
+        {
+            WalletId = wallet.Id,
+            WalletTransaction = transaction,
+            Direction = balanceDelta >= 0 ? WalletLedgerDirection.Credit : WalletLedgerDirection.Debit,
+            BalanceBucket = WalletBalanceBucket.Available,
+            EntryKind = WalletLedgerEntryKind.Reversal,
+            Amount = amount,
+            WalletTypeId = wallet.WalletTypeId,
+            ReferenceNumber = referenceNumber,
+            Description = balanceDelta >= 0 ? "Transfer reversal credit" : "Transfer reversal debit"
+        });
+    }
+
+    private static void BalanceNonWalletReversalPostings(
+        List<WalletLedgerPostingRequest> postings,
+        Guid transferId,
+        string? referenceNumber)
+    {
+        var debitTotal = postings
+            .Where(static p => p.Direction == WalletLedgerDirection.Debit)
+            .Sum(static p => p.Amount);
+        var creditTotal = postings
+            .Where(static p => p.Direction == WalletLedgerDirection.Credit)
+            .Sum(static p => p.Amount);
+
+        if (debitTotal == creditTotal)
+        {
+            return;
+        }
+
+        postings.Add(new WalletLedgerPostingRequest
+        {
+            Direction = debitTotal < creditTotal ? WalletLedgerDirection.Debit : WalletLedgerDirection.Credit,
+            BalanceBucket = WalletBalanceBucket.External,
+            EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+            Amount = Math.Abs(creditTotal - debitTotal),
+            ReferenceNumber = referenceNumber,
+            CounterpartyType = "transfer-reversal-counterparty",
+            CounterpartyReference = transferId.ToString(),
+            Description = "Transfer reversal balancing entry"
+        });
     }
 
     /// <inheritdoc />

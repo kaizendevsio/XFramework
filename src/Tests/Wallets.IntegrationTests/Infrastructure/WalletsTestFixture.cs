@@ -1,7 +1,11 @@
 using Bolt.Client;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using Bolt.Hub.Extensions;
 using Testcontainers.PostgreSql;
 using Wallets.Api.Events;
@@ -124,7 +128,12 @@ public class WalletsTestFixture
 
         builder.Services.InstallStandardServices<Wallets.Api.Services.WalletOperationsService>(builder.Configuration);
         builder.Services.AddTenantResolver();
+        builder.Services.AddAuthentication("WalletsTest")
+            .AddScheme<AuthenticationSchemeOptions, WalletsTestAuthHandler>("WalletsTest", _ => { });
+        builder.Services.AddAuthorization();
         builder.Services.AddSingleton<IWalletEventPublisher, WalletEventPublisher>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletPolicyEvaluator, Wallets.Api.Services.WalletPolicyEvaluator>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletLedgerService, Wallets.Api.Services.WalletLedgerService>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletOperationsService, Wallets.Api.Services.WalletOperationsService>();
         builder.Services.AddScoped<Wallets.Api.Services.IBatchWalletService, Wallets.Api.Services.BatchWalletService>();
         builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletOperationsService>();
@@ -134,6 +143,8 @@ public class WalletsTestFixture
         var app = (WebApplication)builder.Build();
         RegisterWalletsBoltHandlers(app);
         app.UseCorrelationId();
+        app.UseAuthentication();
+        app.UseAuthorization();
 
         // Map source-generated endpoints
         Wallets.Api.Generated.GeneratedEndpointRoutes.MapGeneratedEndpoints(app);
@@ -301,5 +312,29 @@ public class WalletsTestFixture
             throw new InvalidOperationException("Application stopped before the health endpoint became available.");
 
         throw new TimeoutException($"Service at {url} did not become healthy within {timeoutSeconds}s");
+    }
+
+    private sealed class WalletsTestAuthHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder)
+        : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    {
+        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, "wallets-test"),
+                new Claim("tenantId", TestTenantId.ToString()),
+                new Claim("TenantId", TestTenantId.ToString()),
+                new Claim("tid", TestTenantId.ToString())
+            };
+
+            var identity = new ClaimsIdentity(claims, Scheme.Name);
+            var principal = new ClaimsPrincipal(identity);
+            var ticket = new AuthenticationTicket(principal, Scheme.Name);
+
+            return Task.FromResult(AuthenticateResult.Success(ticket));
+        }
     }
 }

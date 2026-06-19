@@ -13,6 +13,7 @@ public static class AddFundsEndpoint
     [MapPost("/api/wallets/add-funds", Tags = ["Wallets"],
         Summary = "Add funds to a wallet",
         Description = "Increments (adds to) a wallet's balance. Supports both immediate and on-hold increments. Automatically creates wallet if WalletTypeId is provided and wallet doesn't exist.",
+        RequireAuthorization = true,
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         IncrementWalletRequest request,

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
-using Wallets.Api.Features.Wallets.Shared;
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts.Responses;
 
 namespace Wallets.Api.Features.Wallets.Get;
 
@@ -14,6 +14,7 @@ public static class GetWalletEndpoint
         app.MapGet("/api/wallets/{walletId:guid}", Handle)
             .WithName("GetWallet")
             .WithTags("Wallets")
+            .RequireAuthorization()
             .ExcludeFromDescription();
     }
 

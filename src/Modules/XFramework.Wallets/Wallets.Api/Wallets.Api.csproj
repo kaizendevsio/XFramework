@@ -22,6 +22,13 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Keep EF design-time packages aligned with net10 transitive health-check dependencies. -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" PrivateAssets="all" />
+
         <!-- OpenTelemetry Core -->
         <PackageReference Include="OpenTelemetry" />
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />

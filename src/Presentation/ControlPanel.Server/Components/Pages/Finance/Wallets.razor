@@ -1,12 +1,24 @@
 @page "/finance/wallets"
+@using System.Globalization
 @using global::Wallets.Domain.Shared.Enums
+@using global::Wallets.Integration.Drivers
+@using XFramework.Domain.Shared.BusinessObjects
 @using XFramework.Domain.Shared.DataContext
+@implements IDisposable
 
 <PageTitle>Wallet Management - Control Panel</PageTitle>
 
 @if (_loading)
 {
     <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="Wallets" />
 }
 else
 {
@@ -202,6 +214,9 @@ else
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsService { get; set; } = default!;
+    [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
 
     private List<Wallet> _items = [];
     private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
@@ -209,6 +224,8 @@ else
     private Dictionary<Guid, string> _credentialLabels = [];
     private Dictionary<Guid, Guid> _credentialTenantIds = [];
     private bool _loading = true;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
     private bool _showCreateDialog;
     private bool _isSaving;
 
@@ -223,17 +240,44 @@ else
     private string _newWalletTypeId = "";
     private string _newInitialBalance = "0";
 
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
     protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+    }
+
+    private void OnTenantChanged()
+    {
+        _ = InvokeAsync(Reload);
+    }
+
+    private async Task Reload()
     {
         _loading = true;
         try
         {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Wallets);
+            ResetData();
+
+            if (!_hasTenant || !_moduleEnabled)
+            {
+                return;
+            }
+
             await LoadData();
             await LoadCredentialOptions();
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
             _walletTypes = (await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
                     .IgnoreQueryFilters()
                     .NoCache()
-                    .Where(x => !x.IsDeleted)
+                    .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                     .OrderBy(x => x.Name)
                     .Take(100)
                     .ToListAsync())
@@ -246,20 +290,36 @@ else
         finally
         {
             _loading = false;
+            StateHasChanged();
         }
+    }
+
+    private void ResetData()
+    {
+        _items = [];
+        _walletTypes = [];
+        _credentialOptions = [];
+        _credentialLabels = [];
+        _credentialTenantIds = [];
+        _totalWallets = 0;
+        _totalBalance = 0;
+        _activeWallets = 0;
+        _frozenWallets = 0;
     }
 
     private async Task LoadData()
     {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId)
+        {
+            _items = [];
+            return;
+        }
+
         var query = DataContext.Query<Wallet>()
             .IgnoreQueryFilters()
             .NoCache()
-            .Include(x => x.WalletType);
-
-        if (TenantFilter.SelectedTenantId is Guid tenantId)
-        {
-            query = query.Where(x => x.TenantId == tenantId);
-        }
+            .Include(x => x.WalletType)
+            .Where(x => x.TenantId == tenantId);
 
         _items = await query.Take(100).ToListAsync();
 
@@ -271,16 +331,19 @@ else
 
     private async Task LoadCredentialOptions()
     {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId)
+        {
+            _credentialOptions = [];
+            _credentialLabels = [];
+            _credentialTenantIds = [];
+            return;
+        }
+
         var query = DataContext.Query<IdentityCredential>()
             .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.IdentityInfo)
-            .Where(x => !x.IsDeleted);
-
-        if (TenantFilter.SelectedTenantId is Guid tenantId)
-        {
-            query = query.Where(x => x.TenantId == tenantId);
-        }
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         var credentials = (await query.Take(250).ToListAsync())
             .OrderBy(GetCredentialSortText)
@@ -324,9 +387,20 @@ else
             return;
         }
 
-        if (!decimal.TryParse(_newInitialBalance, out var initialBalance))
+        var initialBalanceText = string.IsNullOrWhiteSpace(_newInitialBalance)
+            ? "0"
+            : _newInitialBalance.Trim();
+        if (!decimal.TryParse(initialBalanceText, NumberStyles.Number, CultureInfo.CurrentCulture, out var initialBalance)
+            && !decimal.TryParse(initialBalanceText, NumberStyles.Number, CultureInfo.InvariantCulture, out initialBalance))
         {
-            initialBalance = 0;
+            ToastService.Show("Initial balance must be a valid number.");
+            return;
+        }
+
+        if (initialBalance < 0)
+        {
+            ToastService.Show("Initial balance cannot be negative.");
+            return;
         }
 
         if (!Guid.TryParse(_newWalletTypeId, out var walletTypeId))
@@ -345,39 +419,23 @@ else
         _isSaving = true;
         try
         {
-            var wallet = new Wallet
+            var response = await WalletsService.CreateWallet(new CreateWalletRequest
             {
-                Id = Guid.NewGuid(),
-                TenantId = walletTenantId,
                 CredentialId = credentialId,
                 WalletTypeId = walletType.Id,
-                AccountNumber = await GenerateUniqueAccountNumber(),
-                Balance = initialBalance,
-                TransferableBalance = initialBalance,
-                DebitOnHoldBalance = 0,
-                CreditOnHoldBalance = 0,
-                BondBalanceRule = walletType.BondBalanceRule,
-                MaintainingBalanceRule = walletType.MaintainingBalanceRule,
-                MinTransferRule = walletType.MinTransferRule,
-                MaxTransferRule = walletType.MaxTransferRule,
-                Status = WalletStatus.Active,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
+                InitialBalance = initialBalance,
+                Metadata = BuildCommandMetadata(walletTenantId)
+            });
 
-            DataContext.Add(wallet);
-            var result = await DataContext.SaveChangesAsync();
-
-            if (result.IsSuccess)
+            if (response.IsSuccess)
             {
                 ToastService.Show("Wallet created successfully.");
                 _showCreateDialog = false;
-                await LoadData();
-                await LoadCredentialOptions();
+                await Reload();
             }
             else
             {
-                ToastService.Show($"Failed to create wallet: {result.Message}");
+                ToastService.Show($"Failed to create wallet: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -390,37 +448,17 @@ else
         }
     }
 
-    private async Task<string> GenerateUniqueAccountNumber()
+    private RequestMetadata BuildCommandMetadata(Guid tenantId) => new()
     {
-        for (var attempt = 0; attempt < 10; attempt++)
-        {
-            var accountNumber = GenerateAccountNumber();
-            var exists = await DataContext.Query<Wallet>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .AnyAsync(x => x.AccountNumber == accountNumber);
-
-            if (!exists)
-            {
-                return accountNumber;
-            }
-        }
-
-        throw new InvalidOperationException("Unable to generate a unique account number. Try again.");
-    }
-
-    private static string GenerateAccountNumber()
-    {
-        Span<char> digits = stackalloc char[12];
-        digits[0] = (char)('1' + System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 9));
-
-        for (var i = 1; i < digits.Length; i++)
-        {
-            digits[i] = (char)('0' + System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 10));
-        }
-
-        return new string(digits);
-    }
+        TenantId = tenantId,
+        CredentialId = RequestMetadata.CredentialId,
+        SessionId = RequestMetadata.SessionId,
+        RequestId = Guid.NewGuid(),
+        Name = RequestMetadata.Name ?? "ControlPanel",
+        DeviceName = RequestMetadata.DeviceName,
+        DeviceAgent = RequestMetadata.DeviceAgent,
+        IpAddress = RequestMetadata.IpAddress
+    };
 
     private async Task ToggleFreeze(Wallet wallet)
     {
@@ -446,16 +484,22 @@ else
                 return;
             }
 
-            var newStatus = fresh.Status == WalletStatus.Active ? WalletStatus.Frozen : WalletStatus.Active;
-            fresh.Status = newStatus;
-            fresh.ModifiedAt = DateTime.UtcNow;
-
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            var isFreezing = fresh.Status == WalletStatus.Active;
+            var result = isFreezing
+                ? await WalletsService.FreezeWallet(new FreezeWalletRequest
+                {
+                    WalletId = fresh.Id,
+                    Metadata = BuildCommandMetadata(fresh.TenantId)
+                })
+                : await WalletsService.UnfreezeWallet(new UnfreezeWalletRequest
+                {
+                    WalletId = fresh.Id,
+                    Metadata = BuildCommandMetadata(fresh.TenantId)
+                });
 
             if (result.IsSuccess)
             {
-                ToastService.Show($"Wallet {(newStatus == WalletStatus.Frozen ? "frozen" : "unfrozen")} successfully.");
+                ToastService.Show($"Wallet {(isFreezing ? "frozen" : "unfrozen")} successfully.");
                 await LoadData();
             }
             else
@@ -500,5 +544,11 @@ else
             : $"{credentialName} - {credential.Id.ToString()[..8]}";
 
         return $"{displayName} ({suffix})";
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
     }
 }
