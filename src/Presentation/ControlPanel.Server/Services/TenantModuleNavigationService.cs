@@ -70,7 +70,8 @@ public sealed class TenantModuleNavigationService(
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IsEnabled)
-                .Take(50)
+                .OrderBy(x => x.ModuleKey)
+                .ThenBy(x => x.SubFeatureKey)
                 .ToListAsync(ct);
 
             foreach (var row in rows)
