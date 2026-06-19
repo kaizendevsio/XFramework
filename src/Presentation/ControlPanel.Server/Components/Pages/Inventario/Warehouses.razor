@@ -28,85 +28,20 @@ else
                     <BbTypographyH3>Warehouses</BbTypographyH3>
                     <BbTypographyMuted>Set up stock storage warehouses and internal locations.</BbTypographyMuted>
                 </div>
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
-                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                    Refresh
-                </BbButton>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Create Warehouse</BbCardTitle>
-                        <BbCardDescription>Warehouse codes are unique inside a tenant.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <div class="grid gap-3">
-                            <div class="grid gap-3 md:grid-cols-2">
-                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Code" Label="Code" Required="true" />
-                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Name" Label="Name" Required="true" />
-                            </div>
-                            <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Description" Label="Description" />
-                            <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.AddressLine" Label="Address" />
-                            <div class="grid gap-3 md:grid-cols-3">
-                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.City" Label="City" />
-                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Region" Label="Region" />
-                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.CountryCode" Label="Country Code" />
-                            </div>
-                            <BbFormFieldSwitch Checked="@_warehouseForm.IsDefault"
-                                               CheckedChanged="@((bool value) => _warehouseForm.IsDefault = value)"
-                                               Label="Default warehouse" />
-                            <div>
-                                <BbButton OnClick="@CreateWarehouse" Disabled="@_savingWarehouse">
-                                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
-                                    Create Warehouse
-                                </BbButton>
-                            </div>
-                        </div>
-                    </BbCardContent>
-                </BbCard>
-
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Create Location</BbCardTitle>
-                        <BbCardDescription>Locations belong to a warehouse and can represent bins, shelves, or zones.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <div class="grid gap-3">
-                            <div class="xf-form-field">
-                                <BbLabel>Warehouse</BbLabel>
-                                <BbCombobox TValue="string"
-                                             @bind-Value="_locationForm.WarehouseId"
-                                             Options="@WarehouseOptions"
-                                             Placeholder="Select warehouse"
-                                             SearchPlaceholder="Search warehouses..."
-                                             EmptyMessage="No warehouses found."
-                                             Class="xf-entity-combobox"
-                                             MatchTriggerWidth="true" />
-                            </div>
-                            <div class="grid gap-3 md:grid-cols-2">
-                                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
-                                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
-                            </div>
-                            <BbFormFieldSelect TValue="string" @bind-Value="_locationForm.LocationType" Label="Location Type">
-                                @foreach (var type in Enum.GetValues<InventoryLocationType>())
-                                {
-                                    <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
-                            <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Description" Label="Description" />
-                            <BbFormFieldSwitch Checked="@_locationForm.IsPickable"
-                                               CheckedChanged="@((bool value) => _locationForm.IsPickable = value)"
-                                               Label="Pickable location" />
-                            <div>
-                                <BbButton OnClick="@CreateLocation" Disabled="@IsCreateLocationDisabled">
-                                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
-                                    Create Location
-                                </BbButton>
-                            </div>
-                        </div>
-                    </BbCardContent>
-                </BbCard>
+                <div class="flex flex-wrap gap-2">
+                    <BbButton OnClick="@OpenWarehouseDialog">
+                        <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                        Create Warehouse
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@OpenLocationDialog" Disabled="@(_warehouses.Count == 0)">
+                        <LucideIcon Name="map-pin" class="mr-2 h-4 w-4" />
+                        Create Location
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
             </div>
 
             <BbCard>
@@ -115,7 +50,9 @@ else
                     <BbCardDescription>@_warehouses.Count warehouse(s), @_locations.Count location(s)</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_warehouses" ShowPagination="true" InitialPageSize="20">
+                    <BbDataGrid Items="@_warehouses" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((Warehouse item) => Navigation.NavigateTo($"/inventario/warehouses/{item.Id}"))"
+                                Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
@@ -128,6 +65,14 @@ else
                             <BbDataGridTemplateColumn Title="Locations">
                                 <ChildContent Context="item">@_locations.Count(x => x.WarehouseId == item.Id)</ChildContent>
                             </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/warehouses/{item.Id}"))">
+                                        <LucideIcon Name="eye" class="h-4 w-4" />
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -139,7 +84,9 @@ else
                     <BbCardDescription>Internal stock positions by warehouse.</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_locations" ShowPagination="true" InitialPageSize="20">
+                    <BbDataGrid Items="@_locations" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((InventoryLocation item) => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))"
+                                Class="cursor-pointer">
                         <Columns>
                             <BbDataGridTemplateColumn Title="Warehouse">
                                 <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
@@ -152,6 +99,14 @@ else
                                     <StatusBadge Text="@(item.IsPickable ? "Pickable" : "Storage")" Status="@(item.IsPickable ? "active" : "inactive")" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))">
+                                        <LucideIcon Name="eye" class="h-4 w-4" />
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -160,9 +115,83 @@ else
     </FadeInContent>
 }
 
+<BbDialog Open="@_warehouseDialogOpen" OpenChanged="@(v => _warehouseDialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Create Warehouse</BbDialogTitle>
+            <BbDialogDescription>Warehouse codes are unique inside the selected tenant.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Code" Label="Code" Required="true" />
+                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Name" Label="Name" Required="true" />
+            </div>
+            <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Description" Label="Description" />
+            <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.AddressLine" Label="Address" />
+            <div class="grid gap-3 md:grid-cols-3">
+                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.City" Label="City" />
+                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Region" Label="Region" />
+                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.CountryCode" Label="Country Code" />
+            </div>
+            <BbFormFieldSwitch Checked="@_warehouseForm.IsDefault"
+                               CheckedChanged="@((bool value) => _warehouseForm.IsDefault = value)"
+                               Label="Default warehouse" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _warehouseDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@CreateWarehouse" Disabled="@_savingWarehouse">
+                Create
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog Open="@_locationDialogOpen" OpenChanged="@(v => _locationDialogOpen = v)">
+    <BbDialogContent TrapFocus="false">
+        <BbDialogHeader>
+            <BbDialogTitle>Create Location</BbDialogTitle>
+            <BbDialogDescription>Locations belong to a warehouse and represent bins, shelves, or zones.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="xf-form-field">
+                <BbLabel>Warehouse</BbLabel>
+                <BbCombobox TValue="string"
+                             @bind-Value="_locationForm.WarehouseId"
+                             Options="@WarehouseOptions"
+                             Placeholder="Select warehouse"
+                             SearchPlaceholder="Search warehouses..."
+                             EmptyMessage="No warehouses found."
+                             Class="xf-entity-combobox"
+                             MatchTriggerWidth="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
+                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
+            </div>
+            <BbFormFieldSelect TValue="string" @bind-Value="_locationForm.LocationType" Label="Location Type">
+                @foreach (var type in Enum.GetValues<InventoryLocationType>())
+                {
+                    <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Description" Label="Description" />
+            <BbFormFieldSwitch Checked="@_locationForm.IsPickable"
+                               CheckedChanged="@((bool value) => _locationForm.IsPickable = value)"
+                               Label="Pickable location" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _locationDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@CreateLocation" Disabled="@IsCreateLocationDisabled">
+                Create
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
@@ -176,6 +205,8 @@ else
     private bool _warehousingEnabled;
     private bool _savingWarehouse;
     private bool _savingLocation;
+    private bool _warehouseDialogOpen;
+    private bool _locationDialogOpen;
     private bool IsCreateLocationDisabled => _savingLocation || _warehouses.Count == 0;
     private List<SelectOption<string>> WarehouseOptions =>
         _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
@@ -232,6 +263,19 @@ else
         }
     }
 
+    private void OpenWarehouseDialog()
+    {
+        _warehouseForm.Reset();
+        _warehouseDialogOpen = true;
+    }
+
+    private void OpenLocationDialog()
+    {
+        _locationForm.Reset();
+        _locationForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
+        _locationDialogOpen = true;
+    }
+
     private async Task CreateWarehouse()
     {
         if (TenantFilter.SelectedTenantId is not Guid)
@@ -265,6 +309,7 @@ else
             if (result.IsSuccess)
             {
                 _warehouseForm.Reset();
+                _warehouseDialogOpen = false;
                 await Reload();
             }
         }
@@ -306,6 +351,7 @@ else
             {
                 _locationForm.Reset();
                 _locationForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
+                _locationDialogOpen = false;
                 await Reload();
             }
         }

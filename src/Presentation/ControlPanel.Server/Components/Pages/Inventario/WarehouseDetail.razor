@@ -1,0 +1,317 @@
+@page "/inventario/warehouses/{Id:guid}"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Inventario Warehouse - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_warehousingEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Warehousing" />
+}
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/inventario/warehouses"))">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Warehouses
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Warehouse Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to this warehouse's tenant to view its details.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else if (_warehouse is null)
+{
+    <BbTypographyMuted>Warehouse not found.</BbTypographyMuted>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex items-center gap-4">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                          OnClick="@(() => Navigation.NavigateTo("/inventario/warehouses"))">
+                    <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                </BbButton>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <BbTypographyH3>@_warehouse.Name</BbTypographyH3>
+                        <StatusBadge Text="@(_warehouse.IsDefault ? "Default" : "Standard")"
+                                     Status="@(_warehouse.IsDefault ? "active" : "inactive")" />
+                    </div>
+                    <BbTypographyMuted>@_warehouse.Code - ID: @_warehouse.Id</BbTypographyMuted>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Warehouse Summary</BbCardTitle>
+                    <BbCardDescription>Storage facility details for the selected tenant.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <BbTypographyMuted>Code</BbTypographyMuted>
+                            <div class="font-mono">@_warehouse.Code</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Name</BbTypographyMuted>
+                            <div>@_warehouse.Name</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Address</BbTypographyMuted>
+                            <div>@FormatAddress(_warehouse)</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Created</BbTypographyMuted>
+                            <div>@_warehouse.CreatedAt.ToLocalTime().ToString("g")</div>
+                        </div>
+                        <div class="md:col-span-2">
+                            <BbTypographyMuted>Description</BbTypographyMuted>
+                            <div>@(_warehouse.Description ?? "No description")</div>
+                        </div>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Locations</BbTypographyMuted>
+                            <BbTypographyH3>@_locations.Count</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Stock Balances</BbTypographyMuted>
+                            <BbTypographyH3>@_balances.Count</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Recent Movements</BbTypographyMuted>
+                            <BbTypographyH3>@_movements.Count</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Locations</BbCardTitle>
+                    <BbCardDescription>Internal positions inside this warehouse.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_locations" ShowPagination="true" InitialPageSize="10"
+                                OnRowClick="@((InventoryLocation item) => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LocationType)" Title="Type" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Pickable">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsPickable ? "Pickable" : "Storage")" Status="@(item.IsPickable ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Stock Balances</BbCardTitle>
+                    <BbCardDescription>Current balances held in this warehouse.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="10"
+                                OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Product">
+                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Location">
+                                <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Recent Movements</BbCardTitle>
+                    <BbCardDescription>Latest movement ledger entries for this warehouse.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="10"
+                                OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Product">
+                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+
+    private Warehouse? _warehouse;
+    private List<InventoryLocation> _locations = [];
+    private List<StockBalance> _balances = [];
+    private List<InventoryMovement> _movements = [];
+    private Dictionary<Guid, string> _productNames = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _warehousingEnabled;
+    private bool _outsideTenantContext;
+    private Guid? _loadedId;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id) return;
+        _loadedId = Id;
+        await Reload();
+    }
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _warehousingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing");
+            _outsideTenantContext = false;
+            _warehouse = null;
+            _locations = [];
+            _balances = [];
+            _movements = [];
+            _productNames = [];
+
+            if (!_hasTenant || !_warehousingEnabled) return;
+
+            _warehouse = await DataContext.Query<Warehouse>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id && !x.IsDeleted)
+                .FirstOrDefaultAsync();
+
+            _outsideTenantContext = _warehouse is not null && _warehouse.TenantId != TenantFilter.SelectedTenantId;
+            if (_warehouse is null || _outsideTenantContext) return;
+
+            var tenantId = _warehouse.TenantId;
+            _locations = await DataContext.Query<InventoryLocation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.WarehouseId == Id && !x.IsDeleted)
+                .OrderBy(x => x.Code)
+                .Take(200)
+                .ToListAsync();
+
+            _balances = await DataContext.Query<StockBalance>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.WarehouseId == Id && !x.IsDeleted)
+                .OrderBy(x => x.ProductId)
+                .Take(200)
+                .ToListAsync();
+
+            _movements = await DataContext.Query<InventoryMovement>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.WarehouseId == Id && !x.IsDeleted)
+                .OrderByDescending(x => x.MovementDate)
+                .Take(100)
+                .ToListAsync();
+
+            var productIds = _balances.Select(x => x.ProductId).Concat(_movements.Select(x => x.ProductId)).Distinct().ToList();
+            if (productIds.Count > 0)
+            {
+                var products = await DataContext.Query<Product>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id) && !x.IsDeleted)
+                    .Take(500)
+                    .ToListAsync();
+                _productNames = products.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]);
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load warehouse: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetProductName(Guid productId) =>
+        _productNames.TryGetValue(productId, out var name) ? name : productId.ToString()[..8];
+
+    private string GetLocationName(Guid locationId) =>
+        _locations.FirstOrDefault(x => x.Id == locationId)?.Name ?? locationId.ToString()[..8];
+
+    private static string FormatAddress(Warehouse warehouse)
+    {
+        var parts = new[] { warehouse.AddressLine, warehouse.City, warehouse.Region, warehouse.PostalCode, warehouse.CountryCode }
+            .Where(x => !string.IsNullOrWhiteSpace(x));
+        var address = string.Join(", ", parts);
+        return string.IsNullOrWhiteSpace(address) ? "N/A" : address;
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

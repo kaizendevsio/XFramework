@@ -31,6 +31,10 @@ else
                     <BbTypographyMuted>Reserve, release, fulfill, and expire allocated inventory.</BbTypographyMuted>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <BbButton OnClick="@OpenReservationDialog">
+                        <LucideIcon Name="clipboard-plus" class="mr-2 h-4 w-4" />
+                        Reserve Inventory
+                    </BbButton>
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@ExpireDueReservations" Disabled="@_expiring">
                         <LucideIcon Name="timer" class="mr-2 h-4 w-4" />
                         Expire Due
@@ -44,79 +48,13 @@ else
 
             <BbCard>
                 <BbCardHeader>
-                    <BbCardTitle>Reserve Inventory</BbCardTitle>
-                    <BbCardDescription>Reservations reduce available quantity without changing on-hand stock.</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    <div class="grid gap-3">
-                        <div class="grid gap-3 xl:grid-cols-3">
-                            <div class="xf-form-field">
-                                <BbLabel>Product</BbLabel>
-                                <BbCombobox TValue="string"
-                                             @bind-Value="_form.ProductId"
-                                             Options="@ProductOptions"
-                                             Placeholder="Select product"
-                                             SearchPlaceholder="Search products..."
-                                             EmptyMessage="No products found."
-                                             Class="xf-entity-combobox"
-                                             MatchTriggerWidth="true" />
-                            </div>
-                            <div class="xf-form-field">
-                                <BbLabel>Warehouse</BbLabel>
-                                <BbCombobox TValue="string"
-                                             Value="@_form.WarehouseId"
-                                             ValueChanged="@OnReservationWarehouseChanged"
-                                             Options="@WarehouseOptions"
-                                             Placeholder="Select warehouse"
-                                             SearchPlaceholder="Search warehouses..."
-                                             EmptyMessage="No warehouses found."
-                                             Class="xf-entity-combobox"
-                                             MatchTriggerWidth="true" />
-                            </div>
-                            <div class="xf-form-field">
-                                <BbLabel>Location</BbLabel>
-                                <BbCombobox TValue="string"
-                                             @bind-Value="_form.LocationId"
-                                             Options="@ReservationLocationOptions"
-                                             Placeholder="Select location"
-                                             SearchPlaceholder="Search locations..."
-                                             EmptyMessage="No locations found."
-                                             Class="xf-entity-combobox"
-                                             MatchTriggerWidth="true" />
-                            </div>
-                        </div>
-                        <div class="grid gap-3 md:grid-cols-3">
-                            <BbFormFieldInput TValue="string" @bind-Value="_form.Quantity" Label="Quantity" />
-                            <div class="xf-form-field">
-                                <BbLabel>Expires At</BbLabel>
-                                <input type="datetime-local"
-                                       class="xf-datetime-input"
-                                       value="@_form.ExpiresAt"
-                                       @oninput="@((ChangeEventArgs e) => _form.ExpiresAt = e.Value?.ToString() ?? string.Empty)" />
-                            </div>
-                            <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceType" Label="Reference Type" />
-                        </div>
-                        <div class="grid gap-3 md:grid-cols-2">
-                            <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceId" Label="Reference ID" />
-                            <BbFormFieldInput TValue="string" @bind-Value="_form.Reason" Label="Reason" />
-                        </div>
-                        <div>
-                            <BbButton OnClick="@ReserveInventory" Disabled="@IsReserveDisabled">
-                                <LucideIcon Name="clipboard-plus" class="mr-2 h-4 w-4" />
-                                Reserve
-                            </BbButton>
-                        </div>
-                    </div>
-                </BbCardContent>
-            </BbCard>
-
-            <BbCard>
-                <BbCardHeader>
                     <BbCardTitle>Reservation List</BbCardTitle>
                     <BbCardDescription>@_reservations.Count reservation(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_reservations" ShowPagination="true" InitialPageSize="20">
+                    <BbDataGrid Items="@_reservations" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((Reservation item) => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))"
+                                Class="cursor-pointer">
                         <Columns>
                             <BbDataGridTemplateColumn Title="Product">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
@@ -137,10 +75,19 @@ else
                                 <ChildContent Context="item">
                                     @if (item.Status == ReservationStatus.Active)
                                     {
-                                        <div class="flex flex-wrap gap-1">
+                                        <div class="flex flex-wrap gap-1" @onclick:stopPropagation="true">
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReleaseReservation(item.Id))">Release</BbButton>
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => FulfillReservation(item.Id))">Fulfill</BbButton>
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelReservation(item.Id))">Cancel</BbButton>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div @onclick:stopPropagation="true">
+                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                      OnClick="@(() => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))">
+                                                <LucideIcon Name="eye" class="h-4 w-4" />
+                                            </BbButton>
                                         </div>
                                     }
                                 </ChildContent>
@@ -153,9 +100,78 @@ else
     </FadeInContent>
 }
 
+<BbDialog Open="@_reservationDialogOpen" OpenChanged="@(v => _reservationDialogOpen = v)">
+    <BbDialogContent TrapFocus="false">
+        <BbDialogHeader>
+            <BbDialogTitle>Reserve Inventory</BbDialogTitle>
+            <BbDialogDescription>Reservations reduce available quantity without changing on-hand stock.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 xl:grid-cols-3">
+                <div class="xf-form-field">
+                    <BbLabel>Product</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_form.ProductId"
+                                 Options="@ProductOptions"
+                                 Placeholder="Select product"
+                                 SearchPlaceholder="Search products..."
+                                 EmptyMessage="No products found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Warehouse</BbLabel>
+                    <BbCombobox TValue="string"
+                                 Value="@_form.WarehouseId"
+                                 ValueChanged="@OnReservationWarehouseChanged"
+                                 Options="@WarehouseOptions"
+                                 Placeholder="Select warehouse"
+                                 SearchPlaceholder="Search warehouses..."
+                                 EmptyMessage="No warehouses found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Location</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_form.LocationId"
+                                 Options="@ReservationLocationOptions"
+                                 Placeholder="Select location"
+                                 SearchPlaceholder="Search locations..."
+                                 EmptyMessage="No locations found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+            </div>
+            <div class="grid gap-3 md:grid-cols-3">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Quantity" Label="Quantity" />
+                <div class="xf-form-field">
+                    <BbLabel>Expires At</BbLabel>
+                    <input type="datetime-local"
+                           class="xf-datetime-input"
+                           value="@_form.ExpiresAt"
+                           @oninput="@((ChangeEventArgs e) => _form.ExpiresAt = e.Value?.ToString() ?? string.Empty)" />
+                </div>
+                <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceType" Label="Reference Type" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceId" Label="Reference ID" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Reason" Label="Reason" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _reservationDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@ReserveInventory" Disabled="@IsReserveDisabled">
+                Reserve
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
@@ -170,6 +186,7 @@ else
     private bool _reservationsEnabled;
     private bool _reserving;
     private bool _expiring;
+    private bool _reservationDialogOpen;
     private bool IsReserveDisabled => _reserving || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
     private List<SelectOption<string>> ProductOptions =>
         _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
@@ -293,6 +310,7 @@ else
                 _form.Quantity = "0";
                 _form.ExpiresAt = "";
                 _form.Reason = "";
+                _reservationDialogOpen = false;
                 await Reload();
             }
         }
@@ -300,6 +318,12 @@ else
         {
             _reserving = false;
         }
+    }
+
+    private void OpenReservationDialog()
+    {
+        ApplyDefaultSelections();
+        _reservationDialogOpen = true;
     }
 
     private async Task ReleaseReservation(Guid reservationId) =>
