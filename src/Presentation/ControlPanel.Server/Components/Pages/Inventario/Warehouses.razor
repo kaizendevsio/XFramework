@@ -73,12 +73,17 @@ else
                     </BbCardHeader>
                     <BbCardContent>
                         <div class="grid gap-3">
-                            <BbFormFieldSelect TValue="string" @bind-Value="_locationForm.WarehouseId" Label="Warehouse" Placeholder="Select warehouse">
-                                @foreach (var warehouse in _warehouses)
-                                {
-                                    <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Code - @warehouse.Name</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
+                            <div class="xf-form-field">
+                                <BbLabel>Warehouse</BbLabel>
+                                <BbCombobox TValue="string"
+                                             @bind-Value="_locationForm.WarehouseId"
+                                             Options="@WarehouseOptions"
+                                             Placeholder="Select warehouse"
+                                             SearchPlaceholder="Search warehouses..."
+                                             EmptyMessage="No warehouses found."
+                                             Class="xf-entity-combobox"
+                                             MatchTriggerWidth="true" />
+                            </div>
                             <div class="grid gap-3 md:grid-cols-2">
                                 <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
                                 <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
@@ -137,7 +142,7 @@ else
                     <BbDataGrid Items="@_locations" ShowPagination="true" InitialPageSize="20">
                         <Columns>
                             <BbDataGridTemplateColumn Title="Warehouse">
-                                <ChildContent Context="item">@GetWarehouseLabel(item.WarehouseId)</ChildContent>
+                                <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
@@ -172,6 +177,8 @@ else
     private bool _savingWarehouse;
     private bool _savingLocation;
     private bool IsCreateLocationDisabled => _savingLocation || _warehouses.Count == 0;
+    private List<SelectOption<string>> WarehouseOptions =>
+        _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
 
     protected override void OnInitialized()
     {
@@ -315,10 +322,12 @@ else
         Name = "ControlPanel"
     };
 
-    private string GetWarehouseLabel(Guid warehouseId) =>
+    private string GetWarehouseName(Guid warehouseId) =>
         _warehouses.FirstOrDefault(x => x.Id == warehouseId) is { } warehouse
-            ? $"{warehouse.Code} - {warehouse.Name}"
+            ? GetWarehouseLabel(warehouse)
             : warehouseId.ToString()[..8];
+
+    private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

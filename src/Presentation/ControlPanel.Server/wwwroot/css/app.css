@@ -113,6 +113,28 @@
     white-space: nowrap;
 }
 
+.xf-entity-combobox,
+.xf-entity-combobox * {
+    min-width: 0;
+}
+
+.xf-entity-combobox[role="combobox"],
+.xf-entity-combobox [role="combobox"] {
+    width: 100%;
+    min-height: 2.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.xf-entity-combobox[role="combobox"] span,
+.xf-entity-combobox [role="combobox"] span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .xf-form-field {
     display: flex;
     flex-direction: column;

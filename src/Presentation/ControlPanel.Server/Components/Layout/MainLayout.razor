@@ -140,10 +140,12 @@
     [Inject] private NavigationManager Nav { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private NavigationHistoryService NavigationHistory { get; set; } = default!;
+    [Inject] private IJSRuntime Js { get; set; } = default!;
     [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
     private const string AllTenantsValue = "__all_tenants__";
+    private const string ActiveTenantStorageKey = "xframework.controlpanel.activeTenantId";
     private string _selectedTenantId = AllTenantsValue;
     private int _contentRenderKey;
     private string _displayName = "Administrator";
@@ -221,21 +223,85 @@
                 .Take(100)
                 .ToListAsync();
 
-            if (TenantFilter.SelectedTenantId is Guid selectedTenantId)
-            {
-                _selectedTenantId = selectedTenantId.ToString();
-            }
-            else
-            {
-                _selectedTenantId = AllTenantsValue;
-            }
+            await RestoreTenantSelection();
 
             StateHasChanged();
         }
         catch { /* Tenant loading is non-critical */ }
     }
 
-    private void OnTenantSelectionChanged(string? value)
+    private async Task RestoreTenantSelection()
+    {
+        var selectedTenantId = TenantFilter.SelectedTenantId;
+        var storedTenantId = await ReadStoredTenantId();
+
+        if (selectedTenantId is null && Guid.TryParse(storedTenantId, out var persistedTenantId))
+        {
+            selectedTenantId = persistedTenantId;
+        }
+
+        if (selectedTenantId is Guid tenantId
+            && _tenants.FirstOrDefault(t => t.Id == tenantId) is { } tenant)
+        {
+            _selectedTenantId = tenantId.ToString();
+
+            if (TenantFilter.SelectedTenantId != tenantId || TenantFilter.SelectedTenantName != tenant.Name)
+            {
+                TenantFilter.SetTenant(tenantId, tenant.Name);
+            }
+
+            return;
+        }
+
+        _selectedTenantId = AllTenantsValue;
+        if (TenantFilter.SelectedTenantId is not null)
+        {
+            TenantFilter.Clear();
+        }
+
+        if (!string.IsNullOrWhiteSpace(storedTenantId))
+        {
+            await ClearStoredTenantId();
+        }
+    }
+
+    private async Task<string?> ReadStoredTenantId()
+    {
+        try
+        {
+            return await Js.InvokeAsync<string?>("localStorage.getItem", ActiveTenantStorageKey);
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private async Task StoreTenantId(string tenantId)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("localStorage.setItem", ActiveTenantStorageKey, tenantId);
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    private async Task ClearStoredTenantId()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("localStorage.removeItem", ActiveTenantStorageKey);
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    private async Task OnTenantSelectionChanged(string? value)
     {
         _selectedTenantId = string.IsNullOrWhiteSpace(value) ? AllTenantsValue : value;
 
@@ -243,10 +309,12 @@
         {
             var name = _tenants.FirstOrDefault(t => t.Id == tenantId)?.Name ?? "";
             TenantFilter.SetTenant(tenantId, name);
+            await StoreTenantId(_selectedTenantId);
         }
         else
         {
             TenantFilter.Clear();
+            await ClearStoredTenantId();
         }
 
         _profileMenuOpen = false;
