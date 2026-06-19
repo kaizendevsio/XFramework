@@ -319,7 +319,7 @@ else
             .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.WalletType)
-            .Where(x => x.TenantId == tenantId);
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         _items = await query.Take(100).ToListAsync();
 
@@ -469,7 +469,7 @@ else
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.Id == wallet.Id)
+                .Where(x => x.Id == wallet.Id && x.TenantId == wallet.TenantId && !x.IsDeleted)
                 .FirstOrDefaultAsync();
 
             if (fresh is null)

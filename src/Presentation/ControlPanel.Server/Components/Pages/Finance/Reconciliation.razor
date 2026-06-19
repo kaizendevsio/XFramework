@@ -90,8 +90,9 @@
             var query = DataContext.Query<WalletBalanceSnapshot>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .OrderByDescending(x => x.ModifiedAt ?? x.CreatedAt);
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.ModifiedAt)
+                .ThenByDescending(x => x.CreatedAt);
 
             _items = await query.Take(200).ToListAsync();
         }

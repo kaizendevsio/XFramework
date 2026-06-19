@@ -88,7 +88,7 @@
             var query = DataContext.Query<WalletLedgerEntry>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.TenantId == tenantId)
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt);
 
             _items = await query.Take(200).ToListAsync();

@@ -218,7 +218,7 @@ else
                         <BbAlert Variant="AlertVariant.Warning" class="mb-4">
                             <BbAlertTitle>Warning</BbAlertTitle>
                             <BbAlertDescription>
-                                Balance adjustment directly overwrites the wallet balance without creating a standard transaction. Use with caution.
+                                Balance adjustment posts the difference through the wallet operation workflow and records a transaction.
                             </BbAlertDescription>
                         </BbAlert>
                         <div class="grid gap-4 py-4 md:grid-cols-2">
@@ -543,7 +543,7 @@ else
             .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.WalletType)
-            .Where(x => x.Id == Id)
+            .Where(x => x.Id == Id && !x.IsDeleted)
             .FirstOrDefaultAsync();
         _outsideTenantContext = _wallet is not null
             && TenantFilter.SelectedTenantId is Guid tenantId
@@ -552,10 +552,17 @@ else
 
     private async Task LoadTransactions()
     {
+        if (_wallet is null)
+        {
+            _transactions = [];
+            return;
+        }
+
+        var walletTenantId = _wallet.TenantId;
         _transactions = await DataContext.Query<WalletTransaction>()
             .IgnoreQueryFilters()
             .NoCache()
-            .Where(x => x.WalletId == Id)
+            .Where(x => x.WalletId == Id && x.TenantId == walletTenantId && !x.IsDeleted)
             .OrderByDescending(x => x.CreatedAt)
             .Take(100)
             .ToListAsync();
@@ -701,7 +708,7 @@ else
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.Id == Id)
+                .Where(x => x.Id == Id && !x.IsDeleted)
                 .FirstOrDefaultAsync();
 
             if (fresh is null)
@@ -765,7 +772,7 @@ else
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.Id == Id)
+                .Where(x => x.Id == Id && !x.IsDeleted)
                 .FirstOrDefaultAsync();
 
             if (fresh is null)
@@ -836,7 +843,7 @@ else
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.Id == Id)
+                .Where(x => x.Id == Id && !x.IsDeleted)
                 .FirstOrDefaultAsync();
 
             if (fresh is null)
@@ -929,7 +936,7 @@ else
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.Id == Id)
+                .Where(x => x.Id == Id && !x.IsDeleted)
                 .FirstOrDefaultAsync();
 
             if (fresh is null)
@@ -973,7 +980,7 @@ else
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.Id == Id)
+                .Where(x => x.Id == Id && !x.IsDeleted)
                 .FirstOrDefaultAsync();
 
             if (fresh is null)
@@ -1017,7 +1024,7 @@ else
             var fresh = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.Id == Id)
+                .Where(x => x.Id == Id && !x.IsDeleted)
                 .FirstOrDefaultAsync();
 
             if (fresh is null)
