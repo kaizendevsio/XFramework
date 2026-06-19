@@ -128,12 +128,15 @@ else
         <div class="grid gap-4 py-4">
             <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
             <BbFormFieldInput TValue="string" @bind-Value="_form.Sku" Label="SKU" />
-            <BbFormFieldSelect TValue="string" @bind-Value="_form.CategoryId" Label="Category" Placeholder="Select category">
-                @foreach (var category in _categories)
-                {
-                    <BbSelectItem Value="@category.Id.ToString()">@(category.Name ?? category.Id.ToString()[..8])</BbSelectItem>
-                }
-            </BbFormFieldSelect>
+            <BbFormFieldCombobox TValue="string"
+                                  @bind-Value="_form.CategoryId"
+                                  Options="@CategoryOptions"
+                                  Label="Category"
+                                  Placeholder="Select category"
+                                  SearchPlaceholder="Search categories..."
+                                  EmptyMessage="No categories found."
+                                  MatchTriggerWidth="true"
+                                  Required="true" />
             <div class="grid gap-4 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Price" Label="Price" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Brand" Label="Brand" />
@@ -272,6 +275,11 @@ else
 
     private string GetCategoryName(Guid categoryId) =>
         _categories.FirstOrDefault(x => x.Id == categoryId)?.Name ?? "Uncategorized";
+
+    private List<SelectOption<string>> CategoryOptions =>
+        _categories
+            .Select(category => new SelectOption<string>(category.Id.ToString(), category.Name ?? category.Id.ToString()[..8]))
+            .ToList();
 
     private void OpenCreateDialog()
     {
