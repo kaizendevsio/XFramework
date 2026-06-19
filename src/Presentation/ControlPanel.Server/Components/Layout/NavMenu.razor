@@ -64,6 +64,18 @@
                     <LucideIcon Name="clipboard-check" class="h-4 w-4" /> Reservations
                 </NavLink>
             }
+            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning"))
+            {
+                <NavLink href="/inventario/planning" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="chart-no-axes-combined" class="h-4 w-4" /> Planning
+                </NavLink>
+            }
+            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting"))
+            {
+                <NavLink href="/inventario/reports" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="file-chart-column" class="h-4 w-4" /> Reports
+                </NavLink>
+            }
             @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "transactions"))
             {
                 <NavLink href="/inventario/transactions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">

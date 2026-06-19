@@ -1,0 +1,331 @@
+@page "/inventario/reports"
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Inventario Reports - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_reportingEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Reporting" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Inventory Reports</BbTypographyH3>
+                    <BbTypographyMuted>Focused inventory views for stock, expiry, movement, and allocation status.</BbTypographyMuted>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <ReportMetric Title="Low Stock" Value="@_lowStock.Count.ToString()" />
+                <ReportMetric Title="Near Expiry" Value="@_nearExpiry.Count.ToString()" />
+                <ReportMetric Title="Expired Lots" Value="@_expired.Count.ToString()" />
+                <ReportMetric Title="Stock Positions" Value="@_balances.Count.ToString()" />
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Low Stock</BbCardTitle>
+                    <BbCardDescription>@_lowStock.Count scoped rule(s) at or below reorder point</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_lowStock" ShowPagination="true" InitialPageSize="10">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Scope" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Near Expiry</BbCardTitle>
+                    <BbCardDescription>Lots expiring in the next 30 days with on-hand stock</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_nearExpiry" ShowPagination="true" InitialPageSize="10">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Expired Stock</BbCardTitle>
+                    <BbCardDescription>Expired or expired-status lots that still have on-hand stock</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_expired" ShowPagination="true" InitialPageSize="10">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expired" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Stock By Product / Location / Lot</BbCardTitle>
+                    <BbCardDescription>@_stockPositions.Count balance row(s)</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_stockPositions" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Recent Movement Ledger</BbCardTitle>
+                    <BbCardDescription>@_movements.Count latest movement(s)</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Reference)" Title="Reference" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Date" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Reservation Allocation Status</BbCardTitle>
+                    <BbCardDescription>@_allocations.Count allocation row(s)</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_allocations" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private List<Product> _products = [];
+    private List<Warehouse> _warehouses = [];
+    private List<InventoryLocation> _locations = [];
+    private List<InventoryLot> _lots = [];
+    private List<StockBalance> _balances = [];
+    private List<InventoryReorderRule> _rules = [];
+    private List<InventoryMovement> _rawMovements = [];
+    private List<ReservationAllocation> _rawAllocations = [];
+    private List<LowStockRow> _lowStock = [];
+    private List<ExpiryRow> _nearExpiry = [];
+    private List<ExpiryRow> _expired = [];
+    private List<StockRow> _stockPositions = [];
+    private List<MovementRow> _movements = [];
+    private List<AllocationRow> _allocations = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _reportingEnabled;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _reportingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting");
+            ClearRows();
+            if (!_hasTenant || !_reportingEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _lots = await DataContext.Query<InventoryLot>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _balances = await DataContext.Query<StockBalance>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(2000).ToListAsync();
+            _rules = await DataContext.Query<InventoryReorderRule>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted).Take(1000).ToListAsync();
+            _rawMovements = await DataContext.Query<InventoryMovement>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.MovementDate).Take(500).ToListAsync();
+            _rawAllocations = await DataContext.Query<ReservationAllocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.ReservedAt).Take(500).ToListAsync();
+
+            BuildRows();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load inventory reports: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearRows()
+    {
+        _products = [];
+        _warehouses = [];
+        _locations = [];
+        _lots = [];
+        _balances = [];
+        _rules = [];
+        _rawMovements = [];
+        _rawAllocations = [];
+        _lowStock = [];
+        _nearExpiry = [];
+        _expired = [];
+        _stockPositions = [];
+        _movements = [];
+        _allocations = [];
+    }
+
+    private void BuildRows()
+    {
+        _lowStock = _rules.Select(rule =>
+            {
+                var available = _balances.Where(x =>
+                        x.ProductId == rule.ProductId &&
+                        (rule.WarehouseId is null || x.WarehouseId == rule.WarehouseId) &&
+                        (rule.LocationId is null || x.LocationId == rule.LocationId))
+                    .Sum(x => x.AvailableQuantity);
+                var reorderPoint = rule.ReorderPoint > 0 ? rule.ReorderPoint : rule.MinimumQuantity;
+                return new LowStockRow(GetProductName(rule.ProductId), GetScope(rule.WarehouseId, rule.LocationId), available, reorderPoint);
+            })
+            .Where(x => x.AvailableQuantity <= x.ReorderPoint)
+            .ToList();
+
+        var now = DateTime.UtcNow;
+        _nearExpiry = BuildExpiryRows(lot => lot.ExpiresAt is not null && lot.ExpiresAt > now && lot.ExpiresAt <= now.AddDays(30));
+        _expired = BuildExpiryRows(lot => lot.Status == InventoryLotStatus.Expired || lot.ExpiresAt is not null && lot.ExpiresAt <= now);
+        _stockPositions = _balances.Select(balance => new StockRow(
+                GetProductName(balance.ProductId),
+                GetScope(balance.WarehouseId, balance.LocationId),
+                GetLotNumber(balance.LotId),
+                balance.OnHandQuantity,
+                balance.ReservedQuantity,
+                balance.AvailableQuantity))
+            .ToList();
+        _movements = _rawMovements.Select(movement => new MovementRow(
+                GetProductName(movement.ProductId),
+                movement.MovementType,
+                movement.QuantityDelta,
+                FormatReference(movement.ReferenceType, movement.ReferenceId),
+                movement.MovementDate))
+            .ToList();
+        _allocations = _rawAllocations.Select(allocation => new AllocationRow(
+                GetProductName(allocation.ProductId),
+                GetLotNumber(allocation.LotId),
+                allocation.Quantity,
+                allocation.Status,
+                allocation.ReservedAt))
+            .ToList();
+    }
+
+    private List<ExpiryRow> BuildExpiryRows(Func<InventoryLot, bool> lotFilter)
+    {
+        var lots = _lots.Where(lotFilter).ToDictionary(x => x.Id);
+        if (lots.Count == 0) return [];
+
+        return _balances
+            .Where(x => x.LotId is { } lotId && lots.ContainsKey(lotId) && x.OnHandQuantity > 0)
+            .Select(balance =>
+            {
+                var lot = lots[balance.LotId!.Value];
+                return new ExpiryRow(
+                    GetProductName(lot.ProductId),
+                    lot.LotNumber ?? lot.Id.ToString()[..8],
+                    GetScope(balance.WarehouseId, balance.LocationId),
+                    balance.AvailableQuantity,
+                    lot.ExpiresAt);
+            })
+            .OrderBy(x => x.ExpiresAt)
+            .ToList();
+    }
+
+    private string GetProductName(Guid productId) =>
+        _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
+
+    private string GetScope(Guid? warehouseId, Guid? locationId) =>
+        $"{GetWarehouseName(warehouseId)} / {GetLocationName(locationId)}";
+
+    private string GetWarehouseName(Guid? id) =>
+        id is { } value ? _warehouses.FirstOrDefault(x => x.Id == value) is { } warehouse ? $"{warehouse.Code} - {warehouse.Name}" : value.ToString()[..8] : "Any warehouse";
+
+    private string GetLocationName(Guid? id) =>
+        id is { } value ? _locations.FirstOrDefault(x => x.Id == value) is { } location ? $"{location.Code} - {location.Name}" : value.ToString()[..8] : "Any location";
+
+    private string GetLotNumber(Guid? id) =>
+        id is { } value ? _lots.FirstOrDefault(x => x.Id == value)?.LotNumber ?? value.ToString()[..8] : "Untracked";
+
+    private static string FormatReference(string? type, Guid? id) =>
+        string.IsNullOrWhiteSpace(type) ? "N/A" : id is { } value ? $"{type} / {value.ToString()[..8]}" : type;
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed record LowStockRow(string ProductName, string Scope, decimal AvailableQuantity, decimal ReorderPoint);
+    private sealed record ExpiryRow(string ProductName, string LotNumber, string Scope, decimal AvailableQuantity, DateTime? ExpiresAt);
+    private sealed record StockRow(string ProductName, string Scope, string LotNumber, decimal OnHandQuantity, decimal ReservedQuantity, decimal AvailableQuantity);
+    private sealed record MovementRow(string ProductName, InventoryMovementType MovementType, decimal QuantityDelta, string Reference, DateTime MovementDate);
+    private sealed record AllocationRow(string ProductName, string LotNumber, decimal Quantity, ReservationAllocationStatus Status, DateTime ReservedAt);
+}

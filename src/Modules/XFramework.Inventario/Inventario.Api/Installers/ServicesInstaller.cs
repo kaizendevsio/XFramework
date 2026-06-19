@@ -20,6 +20,8 @@ public class ServicesInstaller : IInstaller
         services.AddScoped<WarehouseService>();
         services.AddScoped<ReservationService>();
         services.AddScoped<InventoryAllocationService>();
+        services.AddScoped<InventoryPlanningService>();
+        services.AddScoped<InventoryReportingService>();
 
         // Register FluentValidation validators
         services.AddValidatorsFromAssemblyContaining<Program>();
