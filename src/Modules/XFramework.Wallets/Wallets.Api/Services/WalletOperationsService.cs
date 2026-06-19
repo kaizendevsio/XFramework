@@ -57,7 +57,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
             }
 
             var walletType = await _dataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>()
-                .Where(x => x.Id == walletTypeId)
+                .IgnoreQueryFilters()
+                .Where(x => x.Id == walletTypeId && x.TenantId == tenant.Id && !x.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (walletType is null)
@@ -73,7 +74,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
             {
                 accountNumber = $"{_helperService.GenerateRandomNumber(1000_0000_0000, 9999_9999_9999)}";
                 accountNumberExists = await _dataContext.Query<Wallet>()
-                    .AnyAsync(x => x.AccountNumber == accountNumber, cancellationToken);
+                    .IgnoreQueryFilters()
+                    .AnyAsync(x => x.TenantId == tenant.Id && !x.IsDeleted && x.AccountNumber == accountNumber, cancellationToken);
             } while (accountNumberExists);
 
             var wallet = new Wallet
@@ -188,7 +190,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
             var tenant = await _tenantService.GetTenant(tenantId);
 
             var wallet = await _dataContext.Query<Wallet>()
-                .Where(w => w.TenantId == tenant.Id && w.Id == walletId)
+                .IgnoreQueryFilters()
+                .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.Id == walletId)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (wallet is null)
@@ -216,7 +219,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
             var tenant = await _tenantService.GetTenant(tenantId);
 
             var wallets = await _dataContext.Query<Wallet>()
-                .Where(w => w.TenantId == tenant.Id && w.CredentialId == credentialId)
+                .IgnoreQueryFilters()
+                .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.CredentialId == credentialId)
                 .ToListAsync(cancellationToken);
 
             return Result<List<Wallet>>.Success(wallets);
@@ -261,10 +265,12 @@ public sealed class WalletOperationsService : IWalletOperationsService
             // Fetch wallet
             var wallet = request.WalletTypeId != Guid.Empty
                 ? await _dataContext.Query<Wallet>()
-                    .Where(w => w.TenantId == tenant.Id && w.WalletTypeId == request.WalletTypeId && w.CredentialId == request.CredentialId)
+                    .IgnoreQueryFilters()
+                    .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.WalletTypeId == request.WalletTypeId && w.CredentialId == request.CredentialId)
                     .FirstOrDefaultAsync(cancellationToken)
                 : await _dataContext.Query<Wallet>()
-                    .Where(w => w.TenantId == tenant.Id && w.Id == request.WalletId)
+                    .IgnoreQueryFilters()
+                    .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.Id == request.WalletId)
                     .FirstOrDefaultAsync(cancellationToken);
 
             if (wallet is null)
@@ -479,10 +485,12 @@ public sealed class WalletOperationsService : IWalletOperationsService
             // Fetch wallet
             var wallet = request.WalletTypeId != Guid.Empty
                 ? await _dataContext.Query<Wallet>()
-                    .Where(w => w.TenantId == tenant.Id && w.WalletTypeId == request.WalletTypeId && w.CredentialId == request.CredentialId)
+                    .IgnoreQueryFilters()
+                    .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.WalletTypeId == request.WalletTypeId && w.CredentialId == request.CredentialId)
                     .FirstOrDefaultAsync(cancellationToken)
                 : await _dataContext.Query<Wallet>()
-                    .Where(w => w.TenantId == tenant.Id && w.Id == request.WalletId)
+                    .IgnoreQueryFilters()
+                    .Where(w => w.TenantId == tenant.Id && !w.IsDeleted && w.Id == request.WalletId)
                     .FirstOrDefaultAsync(cancellationToken);
 
             if (wallet == null)
@@ -643,26 +651,32 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             // Fetch sender and recipient wallets
             var senderWallet = await _dataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
                 .Where(x => x.TenantId == tenant.Id)
+                .Where(x => !x.IsDeleted)
                 .Where(x => x.CredentialId == request.CredentialId)
                 .Where(x => x.WalletTypeId == request.WalletTypeId)
                 .FirstOrDefaultAsync(cancellationToken);
 
             var recipientWallet = await _dataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
                 .Where(x => x.TenantId == tenant.Id)
+                .Where(x => !x.IsDeleted)
                 .Where(x => x.CredentialId == request.RecipientCredentialId)
                 .Where(x => x.WalletTypeId == request.WalletTypeId)
                 .FirstOrDefaultAsync(cancellationToken);
 
             // Fetch user information for masking (direct DB query — shared database in VSA)
             var senderCredential = await _dataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
                 .Include(c => c.IdentityInfo)
-                .Where(c => c.Id == request.CredentialId && c.TenantId == tenant.Id)
+                .Where(c => c.Id == request.CredentialId && c.TenantId == tenant.Id && !c.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             var recipientCredential = await _dataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
                 .Include(c => c.IdentityInfo)
-                .Where(c => c.Id == request.RecipientCredentialId && c.TenantId == tenant.Id)
+                .Where(c => c.Id == request.RecipientCredentialId && c.TenantId == tenant.Id && !c.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (senderCredential is null)
@@ -1022,8 +1036,10 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             // Fetch source wallet
             var sourceWallet = await _dataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
                 .Include(x => x.WalletType)
                 .Where(x => x.TenantId == tenant.Id)
+                .Where(x => !x.IsDeleted)
                 .Where(x => x.CredentialId == request.CredentialId)
                 .Where(x => x.WalletTypeId == request.SourceWalletTypeId)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -1039,8 +1055,10 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             // Fetch or create target wallet
             var targetWallet = await _dataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
                 .Include(x => x.WalletType)
                 .Where(x => x.TenantId == tenant.Id)
+                .Where(x => !x.IsDeleted)
                 .Where(x => x.CredentialId == request.CredentialId)
                 .Where(x => x.WalletTypeId == request.TargetWalletTypeId)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -1319,7 +1337,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             // Fetch the transaction
             var transaction = await _dataContext.Query<WalletTransaction>()
-                .Where(t => t.Id == request.Id && t.TenantId == tenant.Id)
+                .IgnoreQueryFilters()
+                .Where(t => t.Id == request.Id && t.TenantId == tenant.Id && !t.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (transaction == null)
@@ -1335,7 +1354,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
             }
 
             var wallet = await _dataContext.Query<Wallet>()
-                .Where(i => i.Id == transaction.WalletId)
+                .IgnoreQueryFilters()
+                .Where(i => i.Id == transaction.WalletId && i.TenantId == tenant.Id && !i.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (wallet is null)
@@ -1604,8 +1624,10 @@ public sealed class WalletOperationsService : IWalletOperationsService
         var prefix = $"Reversal of {transactionId}:";
 
         return await _dataContext.Query<WalletTransaction>()
+            .IgnoreQueryFilters()
             .AnyAsync(t =>
                 t.TenantId == tenantId &&
+                !t.IsDeleted &&
                 t.Description != null &&
                 t.Description.StartsWith(prefix),
                 cancellationToken);
@@ -1619,8 +1641,10 @@ public sealed class WalletOperationsService : IWalletOperationsService
         var prefix = $"Reversal of transfer {transferId}:";
 
         return await _dataContext.Query<WalletTransaction>()
+            .IgnoreQueryFilters()
             .AnyAsync(t =>
                 t.TenantId == tenantId &&
+                !t.IsDeleted &&
                 t.Description != null &&
                 t.Description.StartsWith(prefix),
                 cancellationToken);
@@ -1659,7 +1683,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         Guid tenantId, ReverseTransactionRequest request, CancellationToken ct)
     {
         var transaction = await _dataContext.Query<WalletTransaction>()
-            .Where(t => t.Id == request.TransactionId && t.TenantId == tenantId)
+            .IgnoreQueryFilters()
+            .Where(t => t.Id == request.TransactionId && t.TenantId == tenantId && !t.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         if (transaction is null)
@@ -1684,7 +1709,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         }
 
         var wallet = await _dataContext.Query<Wallet>()
-            .Where(w => w.Id == transaction.WalletId)
+            .IgnoreQueryFilters()
+            .Where(w => w.Id == transaction.WalletId && w.TenantId == tenantId && !w.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         if (wallet is null)
@@ -1824,7 +1850,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         Guid tenantId, ReverseTransactionRequest request, CancellationToken ct)
     {
         var transfer = await _dataContext.Query<WalletTransfer>()
-            .Where(t => t.Id == request.WalletTransferId && t.TenantId == tenantId)
+            .IgnoreQueryFilters()
+            .Where(t => t.Id == request.WalletTransferId && t.TenantId == tenantId && !t.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         if (transfer is null)
@@ -1844,11 +1871,13 @@ public sealed class WalletOperationsService : IWalletOperationsService
         }
 
         var senderTx = await _dataContext.Query<WalletTransaction>()
-            .Where(t => t.Id == transfer.SenderTransactionId)
+            .IgnoreQueryFilters()
+            .Where(t => t.Id == transfer.SenderTransactionId && t.TenantId == tenantId && !t.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         var recipientTx = await _dataContext.Query<WalletTransaction>()
-            .Where(t => t.Id == transfer.RecipientTransactionId)
+            .IgnoreQueryFilters()
+            .Where(t => t.Id == transfer.RecipientTransactionId && t.TenantId == tenantId && !t.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         if (senderTx is null || recipientTx is null)
@@ -1857,11 +1886,13 @@ public sealed class WalletOperationsService : IWalletOperationsService
         }
 
         var senderWallet = await _dataContext.Query<Wallet>()
-            .Where(w => w.Id == senderTx.WalletId)
+            .IgnoreQueryFilters()
+            .Where(w => w.Id == senderTx.WalletId && w.TenantId == tenantId && !w.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         var recipientWallet = await _dataContext.Query<Wallet>()
-            .Where(w => w.Id == recipientTx.WalletId)
+            .IgnoreQueryFilters()
+            .Where(w => w.Id == recipientTx.WalletId && w.TenantId == tenantId && !w.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         if (senderWallet is null || recipientWallet is null)
@@ -2055,7 +2086,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
             var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
 
             var wallet = await _dataContext.Query<Wallet>()
-                .Where(w => w.Id == request.WalletId && w.TenantId == tenant.Id)
+                .IgnoreQueryFilters()
+                .Where(w => w.Id == request.WalletId && w.TenantId == tenant.Id && !w.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (wallet is null)
@@ -2105,7 +2137,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
             var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
 
             var wallet = await _dataContext.Query<Wallet>()
-                .Where(w => w.Id == request.WalletId && w.TenantId == tenant.Id)
+                .IgnoreQueryFilters()
+                .Where(w => w.Id == request.WalletId && w.TenantId == tenant.Id && !w.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (wallet is null)

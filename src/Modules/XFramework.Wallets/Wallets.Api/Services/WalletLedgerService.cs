@@ -24,9 +24,11 @@ public sealed class WalletLedgerService(
         }
 
         return await dbContext.Set<WalletOperation>()
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
+                !x.IsDeleted &&
                 x.IdempotencyKey == idempotencyKey &&
                 x.Status == WalletOperationStatus.Completed,
                 ct);
@@ -90,9 +92,11 @@ public sealed class WalletLedgerService(
             }
 
             var existingWallets = await dbContext.Set<Wallet>()
+                .IgnoreQueryFilters()
                 .AsTracking()
                 .Where(w =>
                     w.TenantId == request.TenantId &&
+                    !w.IsDeleted &&
                     walletIds.Contains(w.Id) &&
                     !newWalletIds.Contains(w.Id))
                 .OrderBy(w => w.Id)
@@ -156,8 +160,9 @@ public sealed class WalletLedgerService(
             dbContext.Set<Wallet>().AddRange(newWallets.Values);
 
             var snapshots = await dbContext.Set<WalletBalanceSnapshot>()
+                .IgnoreQueryFilters()
                 .AsTracking()
-                .Where(s => s.TenantId == request.TenantId && walletIds.Contains(s.WalletId))
+                .Where(s => s.TenantId == request.TenantId && !s.IsDeleted && walletIds.Contains(s.WalletId))
                 .ToDictionaryAsync(s => s.WalletId, ct);
 
             var sequence = 0;
@@ -251,8 +256,9 @@ public sealed class WalletLedgerService(
         }
 
         var existing = await dbContext.Set<WalletOperation>()
+            .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.IdempotencyKey == idempotencyKey)
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IdempotencyKey == idempotencyKey)
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync(ct);
 
