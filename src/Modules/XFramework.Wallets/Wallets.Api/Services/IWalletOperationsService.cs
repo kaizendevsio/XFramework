@@ -171,4 +171,11 @@ public interface IWalletOperationsService
     Task<Result> UnfreezeWalletAsync(
         UnfreezeWalletRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Closes an empty wallet, preventing future financial operations.
+    /// </summary>
+    Task<Result> CloseWalletAsync(
+        CloseWalletRequest request,
+        CancellationToken cancellationToken = default);
 }

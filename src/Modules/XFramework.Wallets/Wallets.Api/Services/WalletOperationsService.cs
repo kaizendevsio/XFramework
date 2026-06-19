@@ -2173,4 +2173,58 @@ public sealed class WalletOperationsService : IWalletOperationsService
             return Result.Failure("An error occurred while unfreezing the wallet", 500);
         }
     }
+
+    /// <inheritdoc />
+    public async Task<Result> CloseWalletAsync(
+        CloseWalletRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+
+            var wallet = await _dataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .Where(w => w.Id == request.WalletId && w.TenantId == tenant.Id && !w.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (wallet is null)
+            {
+                _logger.EntityNotFound("Wallet", request.WalletId);
+                return Result.NotFound("Wallet not found");
+            }
+
+            if (wallet.Status == WalletStatus.Closed)
+                return Result.Failure("Wallet is already closed", 400);
+
+            if (wallet.Balance != 0)
+                return Result.Failure("Cannot close wallet with a remaining balance", 400);
+
+            if (wallet.DebitOnHoldBalance != 0 || wallet.CreditOnHoldBalance != 0)
+                return Result.Failure("Cannot close wallet with held funds", 400);
+
+            wallet.Status = WalletStatus.Closed;
+            wallet.ModifiedAt = DateTime.UtcNow;
+            _dataContext.Update(wallet);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            _logger.EntityUpdated("Wallet", wallet.Id);
+
+            await _eventPublisher.PublishAsync(new WalletClosedEvent
+            {
+                EventType = nameof(WalletClosedEvent),
+                WalletId = wallet.Id,
+                CredentialId = wallet.CredentialId,
+                TenantId = tenant.Id,
+                Reason = request.Reason
+            });
+
+            return Result.Success("Wallet closed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("CloseWallet", "Wallet", request.WalletId, ex.Message, ex);
+            return Result.Failure("An error occurred while closing the wallet", 500);
+        }
+    }
 }

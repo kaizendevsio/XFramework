@@ -626,6 +626,91 @@ public class WalletTransactionTests : WalletsTestBase
 
     #endregion
 
+    #region HTTP - Close
+
+    [Test]
+    public async Task Http_CloseWallet_WhenEmpty_SetsClosedStatusAndBlocksOperations()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 0m);
+
+        var closeResponse = await HttpClient.PostAsJsonAsync("/api/wallets/close",
+            new CloseWalletRequest
+            {
+                WalletId = wallet.Id,
+                Reason = "test close empty wallet",
+                Metadata = CreateMetadata()
+            });
+        var closeBody = await closeResponse.Content.ReadAsStringAsync();
+
+        closeResponse.IsSuccessStatusCode.Should().BeTrue($"Response: {closeBody}");
+
+        await using (var db = CreateDbContext())
+        {
+            var updated = await db.Set<Wallet>().SingleAsync(w => w.Id == wallet.Id);
+            updated.Status.Should().Be(WalletStatus.Closed);
+        }
+
+        var addResponse = await HttpClient.PostAsJsonAsync("/api/wallets/add-funds",
+            new IncrementWalletRequest
+            {
+                CredentialId = credential.Id,
+                WalletId = wallet.Id,
+                Amount = 10m,
+                Metadata = CreateMetadata()
+            });
+
+        addResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task Http_CloseWallet_WithRemainingBalance_Returns400()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 10m);
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/close",
+            new CloseWalletRequest
+            {
+                WalletId = wallet.Id,
+                Reason = "test close non-empty wallet",
+                Metadata = CreateMetadata()
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var db = CreateDbContext();
+        var updated = await db.Set<Wallet>().SingleAsync(w => w.Id == wallet.Id);
+        updated.Status.Should().Be(WalletStatus.Active);
+    }
+
+    [Test]
+    public async Task Http_CloseWallet_WithHeldFunds_Returns400()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 0m);
+
+        await using (var db = CreateDbContext())
+        {
+            var heldWallet = await db.Set<Wallet>().SingleAsync(w => w.Id == wallet.Id);
+            heldWallet.DebitOnHoldBalance = 5m;
+            db.Update(heldWallet);
+            await db.SaveChangesAsync();
+        }
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/close",
+            new CloseWalletRequest
+            {
+                WalletId = wallet.Id,
+                Reason = "test close held wallet",
+                Metadata = CreateMetadata()
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    #endregion
+
     #region HTTP - Batch
 
     [Test]
@@ -819,6 +904,31 @@ public class WalletTransactionTests : WalletsTestBase
 
         // Convert may succeed or fail depending on exchange rate config — just verify it doesn't crash
         result.Should().NotBeNull();
+    }
+
+    #endregion
+
+    #region Bolt - Close
+
+    [Test]
+    public async Task Bolt_CloseWallet_WhenEmpty_SetsClosedStatus()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 0m);
+
+        var result = await WalletsTestFixture.ServiceWrapper.CloseWallet(
+            new CloseWalletRequest
+            {
+                WalletId = wallet.Id,
+                Reason = "test bolt close empty wallet",
+                Metadata = CreateMetadata()
+            });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var updated = await db.Set<Wallet>().SingleAsync(w => w.Id == wallet.Id);
+        updated.Status.Should().Be(WalletStatus.Closed);
     }
 
     #endregion

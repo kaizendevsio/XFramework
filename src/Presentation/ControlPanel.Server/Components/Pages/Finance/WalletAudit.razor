@@ -30,6 +30,7 @@
         <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
             <Columns>
                 <BbDataGridPropertyColumn Property="@(x => x.OperationId)" Title="Operation" />
+                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
                 <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
                 <BbDataGridTemplateColumn Title="Direction">
                     <ChildContent Context="item">
