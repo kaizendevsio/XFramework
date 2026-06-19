@@ -1,0 +1,223 @@
+@page "/inventario/purchase-orders/{Id:guid}"
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Purchase Order - Inventario</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_purchasingEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Purchasing" />
+}
+else if (_order is null)
+{
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>Purchase order not found</BbCardTitle>
+            <BbCardDescription>This purchase order is not available in the selected tenant.</BbCardDescription>
+        </BbCardHeader>
+    </BbCard>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div class="flex items-center gap-3">
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Icon" OnClick="@GoBack">
+                        <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                    </BbButton>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <BbTypographyH3>@_order.OrderNumber</BbTypographyH3>
+                            <StatusBadge Text="@_order.Status.ToString()" Status="@GetStatusBadge(_order.Status)" />
+                        </div>
+                        <BbTypographyMuted>Supplier: @GetSupplierName(_order.SupplierId) — ID: @_order.Id</BbTypographyMuted>
+                    </div>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Order Summary</BbCardTitle>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid gap-4 md:grid-cols-3">
+                        <div>
+                            <BbTypographyMuted>Order Date</BbTypographyMuted>
+                            <p>@_order.OrderDate.ToString("g")</p>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Expected Date</BbTypographyMuted>
+                            <p>@(_order.ExpectedDate?.ToString("g") ?? "N/A")</p>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Notes</BbTypographyMuted>
+                            <p>@(_order.Notes ?? "N/A")</p>
+                        </div>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Lines</BbCardTitle>
+                    <BbCardDescription>@_lines.Count line(s) on this purchase order</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_lines" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Product">
+                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.OrderedQuantity)" Title="Ordered" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedQuantity)" Title="Received" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Remaining">
+                                <ChildContent Context="item">@Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity).ToString("N2")</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" />
+                            <BbDataGridPropertyColumn Property="@(x => x.UnitOfMeasure)" Title="Unit" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Receiving Documents</BbCardTitle>
+                    <BbCardDescription>@_receipts.Count receipt(s) posted against this order</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_receipts" ShowPagination="true" InitialPageSize="10"
+                                OnRowClick="@((ReceivingDocument item) => Navigation.NavigateTo($"/inventario/receiving/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private PurchaseOrder? _order;
+    private List<PurchaseOrderLine> _lines = [];
+    private List<ReceivingDocument> _receipts = [];
+    private List<Product> _products = [];
+    private List<Supplier> _suppliers = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _purchasingEnabled;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _purchasingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing");
+            _order = null;
+            _lines = [];
+            _receipts = [];
+            _products = [];
+            _suppliers = [];
+
+            if (!_hasTenant || !_purchasingEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _order = await DataContext.Query<PurchaseOrder>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.Id == Id && !x.IsDeleted)
+                .FirstOrDefaultAsync();
+            if (_order is null) return;
+
+            _lines = await DataContext.Query<PurchaseOrderLine>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.PurchaseOrderId == Id && !x.IsDeleted)
+                .OrderBy(x => x.CreatedAt)
+                .ToListAsync();
+            _receipts = await DataContext.Query<ReceivingDocument>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.PurchaseOrderId == Id && !x.IsDeleted)
+                .OrderByDescending(x => x.ReceivedAt)
+                .ToListAsync();
+            _products = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Take(500)
+                .ToListAsync();
+            _suppliers = await DataContext.Query<Supplier>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Take(500)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load purchase order: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/inventario/purchase-orders");
+    private string GetProductName(Guid productId) => _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
+    private string GetSupplierName(Guid? supplierId) => supplierId is { } id ? _suppliers.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString()[..8] : "No supplier";
+    private static string GetStatusBadge(PurchaseOrderStatus status) =>
+        status switch
+        {
+            PurchaseOrderStatus.Received => "active",
+            PurchaseOrderStatus.Cancelled => "danger",
+            PurchaseOrderStatus.PartiallyReceived => "warning",
+            _ => "info"
+        };
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}
