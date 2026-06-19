@@ -270,25 +270,16 @@
             }
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
-            var baseQuery = DataContext.Query<WalletOperation>()
+            var operations = await DataContext.Query<WalletOperation>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted);
-
-            var riskDecisions = await baseQuery
-                .Where(x => x.RiskDecision != null)
                 .OrderByDescending(x => x.CreatedAt)
-                .Take(200)
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Take(400)
                 .ToListAsync();
 
-            var policyDecisions = baseQuery
-                .Where(x => x.PolicyDecision != null)
-                .OrderByDescending(x => x.CreatedAt);
-
-            _items = riskDecisions
-                .Concat(await policyDecisions.Take(200).ToListAsync())
-                .GroupBy(x => x.Id)
-                .Select(x => x.First())
+            _items = operations
+                .Where(x => x.RiskDecision is not null || x.PolicyDecision is not null)
                 .OrderByDescending(x => x.CreatedAt)
                 .Take(200)
                 .ToList();
@@ -296,12 +287,14 @@
             _fees = await DataContext.Query<WalletLedgerEntry>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.TenantId == tenantId
-                    && !x.IsDeleted
-                    && (x.EntryKind == WalletLedgerEntryKind.Fee || x.BalanceBucket == WalletBalanceBucket.Fee))
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
-                .Take(200)
+                .Take(500)
                 .ToListAsync();
+            _fees = _fees
+                .Where(x => x.EntryKind == WalletLedgerEntryKind.Fee || x.BalanceBucket == WalletBalanceBucket.Fee)
+                .Take(200)
+                .ToList();
 
             _rules = await DataContext.Query<WalletPolicyRule>()
                 .IgnoreQueryFilters()

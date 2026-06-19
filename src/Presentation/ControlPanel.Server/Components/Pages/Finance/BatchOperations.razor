@@ -185,10 +185,13 @@
             _wallets = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.Status != WalletStatus.Closed)
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
                 .Take(250)
                 .ToListAsync();
+            _wallets = _wallets
+                .Where(x => x.Status != WalletStatus.Closed)
+                .ToList();
 
             _batchOperations = await DataContext.Query<WalletOperation>()
                 .IgnoreQueryFilters()

@@ -293,10 +293,13 @@
             .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.WalletType)
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.Status != WalletStatus.Closed)
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
             .OrderBy(x => x.AccountNumber)
             .Take(250)
             .ToListAsync();
+        _wallets = _wallets
+            .Where(x => x.Status != WalletStatus.Closed)
+            .ToList();
 
         _walletTypes = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
             .IgnoreQueryFilters()
@@ -309,18 +312,24 @@
         _currencies = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>()
             .IgnoreQueryFilters()
             .NoCache()
-            .Where(x => !x.IsDeleted && (x.TenantId == tenantId || x.TenantId == Guid.Empty))
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.CurrencyIsoCode3)
             .Take(100)
             .ToListAsync();
+        _currencies = _currencies
+            .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
+            .ToList();
 
         _gateways = await DataContext.Query<PaymentGateway>()
             .IgnoreQueryFilters()
             .NoCache()
-            .Where(x => !x.IsDeleted && (x.TenantId == tenantId || x.TenantId == Guid.Empty))
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Name)
             .Take(100)
             .ToListAsync();
+        _gateways = _gateways
+            .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
+            .ToList();
     }
 
     private async Task CreateDeposit()

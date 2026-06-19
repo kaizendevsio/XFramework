@@ -229,17 +229,19 @@
             _refundOperations = await DataContext.Query<WalletOperation>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.TenantId == tenantId
-                    && !x.IsDeleted
-                    && (x.OperationType == WalletOperationType.Refund
-                        || x.OperationType == WalletOperationType.Reversal
-                        || x.OperationType == WalletOperationType.DisputeHold
-                        || x.OperationType == WalletOperationType.DisputeResolution
-                        || x.OperationType == WalletOperationType.Chargeback
-                        || x.Status == WalletOperationStatus.Reversed))
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
-                .Take(100)
+                .Take(300)
                 .ToListAsync();
+            _refundOperations = _refundOperations
+                .Where(x => x.OperationType == WalletOperationType.Refund
+                    || x.OperationType == WalletOperationType.Reversal
+                    || x.OperationType == WalletOperationType.DisputeHold
+                    || x.OperationType == WalletOperationType.DisputeResolution
+                    || x.OperationType == WalletOperationType.Chargeback
+                    || x.Status == WalletOperationStatus.Reversed)
+                .Take(100)
+                .ToList();
 
             _cases = await DataContext.Query<WalletCase>()
                 .IgnoreQueryFilters()
