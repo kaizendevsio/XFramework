@@ -757,18 +757,36 @@ else
         _currencies = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>()
             .IgnoreQueryFilters()
             .NoCache()
-            .Where(x => !x.IsDeleted && (x.TenantId == tenantId || x.TenantId == Guid.Empty))
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.CurrencyIsoCode3)
             .Take(100)
             .ToListAsync();
+        _currencies = _currencies
+            .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
+            .ToList();
 
-        _gateways = await DataContext.Query<PaymentGateway>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => !x.IsDeleted && (x.TenantId == tenantId || x.TenantId == Guid.Empty))
-            .OrderBy(x => x.Name)
-            .Take(100)
-            .ToListAsync();
+        await LoadPaymentGateways(tenantId);
+    }
+
+    private async Task LoadPaymentGateways(Guid tenantId)
+    {
+        try
+        {
+            _gateways = await DataContext.Query<PaymentGateway>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(100)
+                .ToListAsync();
+            _gateways = _gateways
+                .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
+                .ToList();
+        }
+        catch (InvalidOperationException ex) when (IsMissingPaymentGatewayWrapper(ex))
+        {
+            _gateways = [];
+        }
     }
 
     private void ResetWorkflowOptions()
@@ -1014,6 +1032,10 @@ else
         string.IsNullOrWhiteSpace(gateway.Name)
             ? gateway.Id.ToString()[..8]
             : $"{gateway.Name} - {gateway.ServiceCharge.ToString("N2", CultureInfo.CurrentCulture)}";
+
+    private static bool IsMissingPaymentGatewayWrapper(Exception ex) =>
+        ex.Message.Contains("PaymentGateway", StringComparison.OrdinalIgnoreCase)
+        && ex.Message.Contains("service wrapper", StringComparison.OrdinalIgnoreCase);
 
     private async Task ReleaseTransaction(WalletTransaction transaction)
     {

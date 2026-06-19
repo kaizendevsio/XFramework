@@ -196,10 +196,14 @@
             _batchOperations = await DataContext.Query<WalletOperation>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.OperationType == WalletOperationType.Batch)
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
-                .Take(100)
+                .Take(300)
                 .ToListAsync();
+            _batchOperations = _batchOperations
+                .Where(x => x.OperationType == WalletOperationType.Batch)
+                .Take(100)
+                .ToList();
 
             _latest = _batchOperations.Count == 0 ? null : _batchOperations.Max(x => x.CreatedAt);
         }
