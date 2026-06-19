@@ -67,26 +67,22 @@
             <div class="flex items-center gap-2">
                 <BbDarkModeToggle Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" />
                 <BbThemeSwitcher />
-                <div class="profile-menu">
-                    <button type="button"
-                            class="profile-trigger"
-                            aria-label="Open profile menu"
-                            aria-expanded="@(_profileMenuOpen ? "true" : "false")"
-                            @onclick="ToggleProfileMenu">
-                        <span class="profile-avatar">@_userInitials</span>
-                        <span class="profile-trigger-text">
-                            <span class="profile-name">@_displayName</span>
-                            <span class="profile-tenant">@ActiveTenantLabel</span>
-                        </span>
-                        <LucideIcon Name="chevron-down" class="h-4 w-4 text-muted-foreground" />
-                    </button>
-                    @if (_profileMenuOpen)
-                    {
-                        <button type="button"
-                                class="profile-menu-backdrop"
-                                aria-label="Close profile menu"
-                                @onclick="CloseProfileMenu"></button>
-                        <div class="profile-menu-panel" @onclick:stopPropagation="true">
+                <BbPopover Open="@_profileMenuOpen" OpenChanged="@OnProfileMenuOpenChanged" RestoreFocusOnClose="true">
+                    <BbPopoverTrigger>
+                        <BbButton Variant="ButtonVariant.Ghost" Class="profile-trigger">
+                            <span class="profile-avatar">@_userInitials</span>
+                            <span class="profile-trigger-text">
+                                <span class="profile-name">@_displayName</span>
+                                <span class="profile-tenant">@ActiveTenantLabel</span>
+                            </span>
+                            <LucideIcon Name="chevron-down" class="h-4 w-4 text-muted-foreground" />
+                        </BbButton>
+                    </BbPopoverTrigger>
+                    <BbPopoverContent Class="profile-menu-panel"
+                                      Offset="8"
+                                      CloseOnClickOutside="true"
+                                      CloseOnEscape="true"
+                                      ZIndex="10000">
                             <div class="profile-menu-user">
                                 <span class="profile-avatar profile-avatar-large">@_userInitials</span>
                                 <div class="min-w-0">
@@ -118,9 +114,8 @@
                                     Sign Out
                                 </BbButton>
                             </div>
-                        </div>
-                    }
-                </div>
+                    </BbPopoverContent>
+                </BbPopover>
             </div>
         </header>
         <main class="app-main flex-1 min-w-0 p-6 overflow-y-auto">
@@ -163,9 +158,9 @@
         .. _tenants.Select(t => new SelectOption<string>(t.Id.ToString(), t.Name ?? t.Id.ToString()[..8]))
     ];
 
-    private void ToggleProfileMenu() => _profileMenuOpen = !_profileMenuOpen;
-
     private void CloseProfileMenu() => _profileMenuOpen = false;
+
+    private void OnProfileMenuOpenChanged(bool open) => _profileMenuOpen = open;
 
     private List<string> GetBreadcrumbs()
     {
