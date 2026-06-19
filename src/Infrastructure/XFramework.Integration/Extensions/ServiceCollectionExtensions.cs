@@ -2,6 +2,7 @@ using System.Reflection;
 using Bolt.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -11,6 +12,7 @@ using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.DataContext;
 using XFramework.Integration.Drivers;
+using XFramework.Integration.ServiceDiscovery;
 
 namespace XFramework.Integration.Extensions;
 
@@ -30,6 +32,8 @@ public static class ServiceCollectionExtensions
         bool autoConnect = true)
     {
         services.Configure<BoltConfiguration>(configuration.GetSection("BoltConfiguration"));
+        services.Configure<BoltServiceDiscoveryOptions>(
+            configuration.GetSection(BoltServiceDiscoveryOptions.SectionName));
 
         var boltConfig = configuration.GetSection("BoltConfiguration").Get<BoltConfiguration>()
             ?? throw new InvalidOperationException("BoltConfiguration section is missing or empty in configuration.");
@@ -60,8 +64,17 @@ public static class ServiceCollectionExtensions
                 builder.DisableAutoConnect();
         });
 
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IBoltServiceManifestProvider, ConfigurationBoltServiceManifestProvider>());
+        services.AddHostedService<BoltServiceManifestAdvertisementHostedService>();
         services.AddSingleton<IMessageBusWrapper, BoltDriver>();
 
+        return services;
+    }
+
+    public static IServiceCollection AddBoltServiceManifestProvider<TProvider>(this IServiceCollection services)
+        where TProvider : class, IBoltServiceManifestProvider
+    {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IBoltServiceManifestProvider, TProvider>());
         return services;
     }
 

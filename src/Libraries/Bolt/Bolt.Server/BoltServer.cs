@@ -37,6 +37,7 @@ public sealed class BoltServer : IDisposable
 
     // Direct handlers — when registered, server handles requests locally instead of routing
     private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _localHandlers = new();
+    private readonly ConcurrentDictionary<int, Func<BoltRequestContext, ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _contextLocalHandlers = new();
 
     // Media processor tap: registered processors receive copies of media frames on a background thread
     private readonly List<IMediaProcessor> _mediaProcessors = new();
@@ -113,6 +114,22 @@ public sealed class BoltServer : IDisposable
         _localHandlers[hash] = handler;
     }
 
+    /// <summary>
+    /// Register a local handler that receives sender connection context.
+    /// This is for hub-local infrastructure commands such as service discovery.
+    /// </summary>
+    public void RegisterHandler(
+        string commandName,
+        Func<BoltRequestContext, ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
+    {
+        var hash = BoltCodec.Fnv1aHash(commandName);
+        _contextLocalHandlers[hash] = handler;
+    }
+
+    public event Func<BoltClientConnectionEvent, CancellationToken, Task>? ClientRegistered;
+
+    public event Func<BoltClientConnectionEvent, CancellationToken, Task>? ClientDisconnected;
+
     public async Task HandleConnectionAsync(IBoltConnection transport, CancellationToken ct)
     {
         var connection = new BoltHubConnection(transport);
@@ -179,7 +196,7 @@ public sealed class BoltServer : IDisposable
             connection.CompleteSendChannel();
             ArrayPool<byte>.Shared.Return(receiveBuffer);
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
-            RemoveConnection(connection);
+            await RemoveConnectionAsync(connection);
 
             try { await transport.CloseAsync(); }
             catch { }
@@ -276,6 +293,8 @@ public sealed class BoltServer : IDisposable
         var writer = new ArrayBufferWriter<byte>(2);
         BoltCodec.WriteRegisterAck(writer, true);
         await connection.SendAsync(writer.WrittenMemory, ct);
+
+        await NotifyClientRegisteredAsync(connection, ct);
     }
 
     private async Task HandleRequestAsync(BoltHubConnection caller, byte[] buffer, int length, CancellationToken ct)
@@ -283,8 +302,31 @@ public sealed class BoltServer : IDisposable
         var span = buffer.AsSpan(0, length);
 
         // Check for local handler first (direct mode — server handles request itself)
-        if (_localHandlers.Count > 0 && BoltCodec.TryReadRequest(span, out var frame, out var consumed))
+        if ((_contextLocalHandlers.Count > 0 || _localHandlers.Count > 0)
+            && BoltCodec.TryReadRequest(span, out var frame, out var consumed))
         {
+            if (_contextLocalHandlers.TryGetValue(frame.CommandHash, out var contextHandler))
+            {
+                try
+                {
+                    var payload = frame.GetPayload(buffer.AsMemory(0, length));
+                    var context = BoltRequestContext.FromConnection(caller);
+                    var (statusCode, responsePayload) = await contextHandler(context, payload, frame.RequestId);
+
+                    var writer = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteResponse(writer, frame.RequestId, statusCode, responsePayload.Span);
+                    await caller.SendAsync(writer.WrittenMemory, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Context local handler error for command hash {Hash}", frame.CommandHash);
+                    var errWriter = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.InternalServerError, ReadOnlySpan<byte>.Empty);
+                    await caller.SendAsync(errWriter.WrittenMemory, ct);
+                }
+                return;
+            }
+
             if (_localHandlers.TryGetValue(frame.CommandHash, out var handler))
             {
                 try
@@ -1179,7 +1221,7 @@ public sealed class BoltServer : IDisposable
         return firstAlive;
     }
 
-    private void RemoveConnection(BoltHubConnection connection)
+    private async Task RemoveConnectionAsync(BoltHubConnection connection)
     {
         if (connection.ClientId is not null)
         {
@@ -1195,6 +1237,7 @@ public sealed class BoltServer : IDisposable
             }
 
             _logger.LogInformation("Client disconnected: {ClientId} ({ClientName})", connection.ClientId, connection.ClientName);
+            await NotifyClientDisconnectedAsync(connection, CancellationToken.None);
         }
 
         foreach (var (requestId, pending) in _pendingInvocations)
@@ -1260,6 +1303,46 @@ public sealed class BoltServer : IDisposable
         var keysToRemove = _liveDurableConnections.Where(kvp => kvp.Value == connection).Select(kvp => kvp.Key).ToList();
         foreach (var key in keysToRemove)
             _liveDurableConnections.TryRemove(key, out _);
+    }
+
+    private async Task NotifyClientRegisteredAsync(BoltHubConnection connection, CancellationToken ct)
+    {
+        var handler = ClientRegistered;
+        if (handler is null || connection.ClientId is null)
+            return;
+
+        var connectionEvent = BoltClientConnectionEvent.FromConnection(connection);
+        foreach (Func<BoltClientConnectionEvent, CancellationToken, Task> subscriber in handler.GetInvocationList())
+        {
+            try
+            {
+                await subscriber(connectionEvent, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Client registered subscriber failed for {ClientId}", connection.ClientId);
+            }
+        }
+    }
+
+    private async Task NotifyClientDisconnectedAsync(BoltHubConnection connection, CancellationToken ct)
+    {
+        var handler = ClientDisconnected;
+        if (handler is null || connection.ClientId is null)
+            return;
+
+        var connectionEvent = BoltClientConnectionEvent.FromConnection(connection);
+        foreach (Func<BoltClientConnectionEvent, CancellationToken, Task> subscriber in handler.GetInvocationList())
+        {
+            try
+            {
+                await subscriber(connectionEvent, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Client disconnected subscriber failed for {ClientId}", connection.ClientId);
+            }
+        }
     }
 
     private void CleanupStaleInvocations(object? state)
@@ -1331,6 +1414,40 @@ public sealed class BoltServer : IDisposable
         _cleanupTimer.Dispose();
         _mediaTapCts.Dispose();
     }
+}
+
+public sealed record BoltRequestContext(
+    string ConnectionId,
+    string? ClientId,
+    string? ClientName,
+    int ServiceHash,
+    BoltTransport TransportType)
+{
+    internal static BoltRequestContext FromConnection(BoltHubConnection connection) =>
+        new(
+            connection.StreamId,
+            connection.ClientId,
+            connection.ClientName,
+            connection.ServiceHash,
+            connection.TransportType);
+}
+
+public sealed record BoltClientConnectionEvent(
+    string ConnectionId,
+    string ClientId,
+    string? ClientName,
+    int ServiceHash,
+    BoltTransport TransportType,
+    DateTime OccurredAt)
+{
+    internal static BoltClientConnectionEvent FromConnection(BoltHubConnection connection) =>
+        new(
+            connection.StreamId,
+            connection.ClientId ?? string.Empty,
+            connection.ClientName,
+            connection.ServiceHash,
+            connection.TransportType,
+            DateTime.UtcNow);
 }
 
 /// <summary>
