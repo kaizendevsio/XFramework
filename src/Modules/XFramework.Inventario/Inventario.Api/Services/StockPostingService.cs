@@ -62,10 +62,10 @@ public sealed class StockPostingService(
         if (!request.AllowNegativeStock && (afterOnHand < 0 || afterReserved < 0 || afterOnHand - afterReserved < 0))
             return Result<StockPostingResponse>.Failure("Stock movement would create a negative stock position.", 409);
 
-        ApplyBalance(balance, afterOnHand, afterReserved);
         if (!balanceState.IsNew)
             dataContext.Update(balance);
 
+        ApplyBalance(balance, afterOnHand, afterReserved);
         AddMovement(tenantId, request, balance.Id, delta == 0 ? reservedDelta : delta, before, afterOnHand);
         await UpdateProductSnapshot(tenantId, product, request.ProductId, delta, ct);
 
@@ -169,12 +169,13 @@ public sealed class StockPostingService(
         var now = DateTime.UtcNow;
         var sourceBefore = source.OnHandQuantity;
         var destinationBefore = destination.OnHandQuantity;
-        ApplyBalance(source, sourceAfter, source.ReservedQuantity, now);
-        ApplyBalance(destination, destination.OnHandQuantity + request.Quantity, destination.ReservedQuantity, now);
         if (!sourceState.IsNew)
             dataContext.Update(source);
         if (!destinationState.IsNew)
             dataContext.Update(destination);
+
+        ApplyBalance(source, sourceAfter, source.ReservedQuantity, now);
+        ApplyBalance(destination, destination.OnHandQuantity + request.Quantity, destination.ReservedQuantity, now);
 
         AddMovement(tenantId, request, source.Id, -request.Quantity, sourceBefore, source.OnHandQuantity);
         AddMovement(tenantId, request with
