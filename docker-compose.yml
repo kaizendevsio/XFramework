@@ -281,6 +281,7 @@ services:
     image: datalust/seq:2025
     environment:
       ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
     ports:
       - "${SEQ_EXPOSE_PORT:-5341}:80"
     volumes:
