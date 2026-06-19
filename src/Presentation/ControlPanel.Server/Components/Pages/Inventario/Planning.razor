@@ -1,0 +1,448 @@
+@page "/inventario/planning"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Inventario Planning - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_planningEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Planning" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Replenishment Planning</BbTypographyH3>
+                    <BbTypographyMuted>Maintain reorder rules and review suggested replenishment quantities.</BbTypographyMuted>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <BbButton OnClick="@OpenRuleDialog">
+                        <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                        Add Rule
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Active Rules</BbTypographyMuted>
+                            <BbTypographyH3>@_rules.Count(x => x.IsActive)</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Low Stock</BbTypographyMuted>
+                            <BbTypographyH3>@_lowStock.Count</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Suggested Quantity</BbTypographyMuted>
+                            <BbTypographyH3>@_suggestions.Sum(x => x.SuggestedQuantity).ToString("N2")</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Reorder Suggestions</BbCardTitle>
+                    <BbCardDescription>@_suggestions.Count suggestion(s) generated from active rules</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_suggestions" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.SuggestedQuantity)" Title="Suggested Qty" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Reorder Rules</BbCardTitle>
+                    <BbCardDescription>@_rules.Count rule(s) configured</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_rules" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Product">
+                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Scope">
+                                <ChildContent Context="item">@GetScopeLabel(item)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Point" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Qty" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Supplier" />
+                            <BbDataGridTemplateColumn Title="Status">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+<BbDialog Open="@_ruleDialogOpen" OpenChanged="@(v => _ruleDialogOpen = v)">
+    <BbDialogContent TrapFocus="false">
+        <BbDialogHeader>
+            <BbDialogTitle>Add Reorder Rule</BbDialogTitle>
+            <BbDialogDescription>Rules can apply tenant-wide for a product or be scoped to a warehouse/location.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-2">
+                <div class="xf-form-field">
+                    <BbLabel>Product</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_form.ProductId"
+                                 Options="@ProductOptions"
+                                 Placeholder="Select product"
+                                 SearchPlaceholder="Search products..."
+                                 EmptyMessage="No products found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Warehouse</BbLabel>
+                    <BbCombobox TValue="string"
+                                 Value="@_form.WarehouseId"
+                                 ValueChanged="@OnWarehouseChanged"
+                                 Options="@WarehouseOptions"
+                                 Placeholder="Any warehouse"
+                                 SearchPlaceholder="Search warehouses..."
+                                 EmptyMessage="No warehouses found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Location</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_form.LocationId"
+                                 Options="@LocationOptions"
+                                 Placeholder="Any location"
+                                 SearchPlaceholder="Search locations..."
+                                 EmptyMessage="No locations found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <BbFormFieldInput TValue="string" @bind-Value="_form.PreferredSupplier" Label="Preferred Supplier" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-4">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.MinimumQuantity" Label="Minimum" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.MaximumQuantity" Label="Maximum" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.ReorderPoint" Label="Reorder Point" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.ReorderQuantity" Label="Reorder Qty" />
+            </div>
+            <BbFormFieldSwitch Checked="@_form.IsActive"
+                               CheckedChanged="@((bool value) => _form.IsActive = value)"
+                               Label="Rule active" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _ruleDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@CreateRule" Disabled="@_savingRule">Create Rule</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private readonly RuleForm _form = new();
+    private List<Product> _products = [];
+    private List<Warehouse> _warehouses = [];
+    private List<InventoryLocation> _locations = [];
+    private List<StockBalance> _balances = [];
+    private List<InventoryReorderRule> _rules = [];
+    private List<PlanningRow> _lowStock = [];
+    private List<PlanningRow> _suggestions = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _planningEnabled;
+    private bool _ruleDialogOpen;
+    private bool _savingRule;
+
+    private List<SelectOption<string>> ProductOptions =>
+        _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
+    private List<SelectOption<string>> WarehouseOptions
+    {
+        get
+        {
+            var options = new List<SelectOption<string>> { new("", "Any warehouse") };
+            options.AddRange(_warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))));
+            return options;
+        }
+    }
+    private List<SelectOption<string>> LocationOptions
+    {
+        get
+        {
+            var options = new List<SelectOption<string>> { new("", "Any location") };
+            options.AddRange(LocationsForSelectedWarehouse().Select(location => new SelectOption<string>(location.Id.ToString(), GetLocationLabel(location))));
+            return options;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _planningEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning");
+            _products = [];
+            _warehouses = [];
+            _locations = [];
+            _balances = [];
+            _rules = [];
+            _lowStock = [];
+            _suggestions = [];
+
+            if (!_hasTenant || !_planningEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Name).Take(500).ToListAsync();
+            _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(500).ToListAsync();
+            _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(500).ToListAsync();
+            _balances = await DataContext.Query<StockBalance>().IgnoreQueryFilters().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _rules = await DataContext.Query<InventoryReorderRule>().IgnoreQueryFilters().NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.CreatedAt).Take(500).ToListAsync();
+
+            BuildSuggestions();
+            ApplyDefaults();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load planning: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void BuildSuggestions()
+    {
+        _lowStock = [];
+        _suggestions = [];
+        foreach (var rule in _rules.Where(x => x.IsActive))
+        {
+            var available = _balances
+                .Where(x =>
+                    x.ProductId == rule.ProductId &&
+                    (rule.WarehouseId is null || x.WarehouseId == rule.WarehouseId) &&
+                    (rule.LocationId is null || x.LocationId == rule.LocationId))
+                .Sum(x => x.AvailableQuantity);
+            var reorderPoint = rule.ReorderPoint > 0 ? rule.ReorderPoint : rule.MinimumQuantity;
+            if (available > reorderPoint) continue;
+
+            var row = new PlanningRow(
+                GetProductName(rule.ProductId),
+                GetWarehouseName(rule.WarehouseId),
+                GetLocationName(rule.LocationId),
+                available,
+                reorderPoint,
+                Math.Max(rule.ReorderQuantity, Math.Max(0, (rule.MaximumQuantity ?? reorderPoint + rule.ReorderQuantity) - available)),
+                rule.PreferredSupplier);
+            _lowStock.Add(row);
+            _suggestions.Add(row);
+        }
+    }
+
+    private async Task CreateRule()
+    {
+        if (!_hasTenant || !Guid.TryParse(_form.ProductId, out var productId))
+        {
+            ToastService.Show("Select a product.");
+            return;
+        }
+
+        if (!decimal.TryParse(_form.MinimumQuantity, out var min) ||
+            !decimal.TryParse(_form.ReorderPoint, out var point) ||
+            !decimal.TryParse(_form.ReorderQuantity, out var qty) ||
+            min < 0 || point < 0 || qty <= 0)
+        {
+            ToastService.Show("Quantities must be valid.");
+            return;
+        }
+
+        decimal? max = null;
+        if (!string.IsNullOrWhiteSpace(_form.MaximumQuantity))
+        {
+            if (!decimal.TryParse(_form.MaximumQuantity, out var parsedMax) || parsedMax < min)
+            {
+                ToastService.Show("Maximum must be greater than or equal to minimum.");
+                return;
+            }
+            max = parsedMax;
+        }
+
+        _savingRule = true;
+        try
+        {
+            var now = DateTime.UtcNow;
+            DataContext.Add(new InventoryReorderRule
+            {
+                Id = Guid.NewGuid(),
+                TenantId = TenantFilter.SelectedTenantId!.Value,
+                ProductId = productId,
+                WarehouseId = Guid.TryParse(_form.WarehouseId, out var warehouseId) ? warehouseId : null,
+                LocationId = Guid.TryParse(_form.LocationId, out var locationId) ? locationId : null,
+                MinimumQuantity = min,
+                MaximumQuantity = max,
+                ReorderPoint = point,
+                ReorderQuantity = qty,
+                PreferredSupplier = NullIfEmpty(_form.PreferredSupplier),
+                IsActive = _form.IsActive,
+                IsEnabled = true,
+                CreatedAt = now,
+                ConcurrencyStamp = Guid.NewGuid()
+            });
+            var save = await DataContext.SaveChangesAsync();
+            ToastService.Show(save.IsSuccess ? "Reorder rule created." : $"Failed: {save.Message}");
+            if (save.IsSuccess)
+            {
+                _ruleDialogOpen = false;
+                ResetForm();
+                await Reload();
+            }
+        }
+        finally
+        {
+            _savingRule = false;
+        }
+    }
+
+    private void OpenRuleDialog()
+    {
+        ApplyDefaults();
+        _ruleDialogOpen = true;
+    }
+
+    private void OnWarehouseChanged(string? value)
+    {
+        _form.WarehouseId = value ?? "";
+        _form.LocationId = "";
+    }
+
+    private IEnumerable<InventoryLocation> LocationsForSelectedWarehouse()
+    {
+        if (!Guid.TryParse(_form.WarehouseId, out var warehouseId))
+            return _locations;
+        return _locations.Where(x => x.WarehouseId == warehouseId);
+    }
+
+    private void ApplyDefaults() =>
+        _form.ProductId = _form.ProductId.Length > 0 ? _form.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
+
+    private void ResetForm()
+    {
+        _form.ProductId = "";
+        _form.WarehouseId = "";
+        _form.LocationId = "";
+        _form.MinimumQuantity = "0";
+        _form.MaximumQuantity = "";
+        _form.ReorderPoint = "0";
+        _form.ReorderQuantity = "1";
+        _form.PreferredSupplier = "";
+        _form.IsActive = true;
+    }
+
+    private string GetProductName(Guid productId) =>
+        _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
+
+    private string GetProductLabel(Product product) =>
+        string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
+
+    private string GetWarehouseName(Guid? warehouseId) =>
+        warehouseId is { } id ? _warehouses.FirstOrDefault(x => x.Id == id) is { } warehouse ? GetWarehouseLabel(warehouse) : id.ToString()[..8] : "Any warehouse";
+
+    private string GetLocationName(Guid? locationId) =>
+        locationId is { } id ? _locations.FirstOrDefault(x => x.Id == id) is { } location ? GetLocationLabel(location) : id.ToString()[..8] : "Any location";
+
+    private string GetScopeLabel(InventoryReorderRule rule) =>
+        $"{GetWarehouseName(rule.WarehouseId)} / {GetLocationName(rule.LocationId)}";
+
+    private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+    private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed record PlanningRow(
+        string ProductName,
+        string WarehouseName,
+        string LocationName,
+        decimal AvailableQuantity,
+        decimal ReorderPoint,
+        decimal SuggestedQuantity,
+        string? PreferredSupplier);
+
+    private sealed class RuleForm
+    {
+        public string ProductId { get; set; } = "";
+        public string WarehouseId { get; set; } = "";
+        public string LocationId { get; set; } = "";
+        public string MinimumQuantity { get; set; } = "0";
+        public string MaximumQuantity { get; set; } = "";
+        public string ReorderPoint { get; set; } = "0";
+        public string ReorderQuantity { get; set; } = "1";
+        public string PreferredSupplier { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+    }
+}

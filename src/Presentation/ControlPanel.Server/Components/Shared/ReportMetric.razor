@@ -1,0 +1,13 @@
+<BbCard>
+    <BbCardContent>
+        <div class="space-y-1 pt-4">
+            <BbTypographyMuted>@Title</BbTypographyMuted>
+            <BbTypographyH3>@Value</BbTypographyH3>
+        </div>
+    </BbCardContent>
+</BbCard>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+}
