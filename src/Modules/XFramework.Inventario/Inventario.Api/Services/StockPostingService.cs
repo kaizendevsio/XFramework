@@ -51,7 +51,8 @@ public sealed class StockPostingService(
         if (!balanceResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(balanceResult.Message!, balanceResult.StatusCode);
 
-        var balance = balanceResult.Data!;
+        var balanceState = balanceResult.Data!;
+        var balance = balanceState.Balance;
         var before = balance.OnHandQuantity;
         var delta = GetOnHandDelta(request.MovementType, request.Quantity);
         var reservedDelta = GetReservedDelta(request.MovementType, request.Quantity);
@@ -62,6 +63,9 @@ public sealed class StockPostingService(
             return Result<StockPostingResponse>.Failure("Stock movement would create a negative stock position.", 409);
 
         ApplyBalance(balance, afterOnHand, afterReserved);
+        if (!balanceState.IsNew)
+            dataContext.Update(balance);
+
         AddMovement(tenantId, request, balance.Id, delta == 0 ? reservedDelta : delta, before, afterOnHand);
         await UpdateProductSnapshot(tenantId, product, request.ProductId, delta, ct);
 
@@ -154,8 +158,10 @@ public sealed class StockPostingService(
         if (!destinationResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(destinationResult.Message!, destinationResult.StatusCode);
 
-        var source = sourceResult.Data!;
-        var destination = destinationResult.Data!;
+        var sourceState = sourceResult.Data!;
+        var destinationState = destinationResult.Data!;
+        var source = sourceState.Balance;
+        var destination = destinationState.Balance;
         var sourceAfter = source.OnHandQuantity - request.Quantity;
         if (!request.AllowNegativeStock && sourceAfter < source.ReservedQuantity)
             return Result<StockPostingResponse>.Failure("Transfer would create a negative source stock position.", 409);
@@ -165,6 +171,10 @@ public sealed class StockPostingService(
         var destinationBefore = destination.OnHandQuantity;
         ApplyBalance(source, sourceAfter, source.ReservedQuantity, now);
         ApplyBalance(destination, destination.OnHandQuantity + request.Quantity, destination.ReservedQuantity, now);
+        if (!sourceState.IsNew)
+            dataContext.Update(source);
+        if (!destinationState.IsNew)
+            dataContext.Update(destination);
 
         AddMovement(tenantId, request, source.Id, -request.Quantity, sourceBefore, source.OnHandQuantity);
         AddMovement(tenantId, request with
@@ -198,7 +208,7 @@ public sealed class StockPostingService(
             .Where(x => x.TenantId == tenantId && x.Id == productId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
-    private async Task<Result<StockBalance>> GetOrCreateBalance(
+    private async Task<Result<StockBalanceLookup>> GetOrCreateBalance(
         Guid tenantId,
         Guid productId,
         Guid warehouseId,
@@ -209,13 +219,13 @@ public sealed class StockPostingService(
             .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == warehouseId && !x.IsDeleted, ct);
         if (!warehouseExists)
-            return Result<StockBalance>.NotFound("Warehouse not found.");
+            return Result<StockBalanceLookup>.NotFound("Warehouse not found.");
 
         var locationExists = await dataContext.Query<InventoryLocation>()
             .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == locationId && x.WarehouseId == warehouseId && !x.IsDeleted, ct);
         if (!locationExists)
-            return Result<StockBalance>.NotFound("Location not found.");
+            return Result<StockBalanceLookup>.NotFound("Location not found.");
 
         var balance = await dataContext.Query<StockBalance>()
             .IgnoreQueryFilters()
@@ -228,7 +238,7 @@ public sealed class StockPostingService(
             .FirstOrDefaultAsync(ct);
 
         if (balance is not null)
-            return Result<StockBalance>.Success(balance);
+            return Result<StockBalanceLookup>.Success(new StockBalanceLookup(balance, IsNew: false));
 
         balance = new StockBalance
         {
@@ -242,7 +252,7 @@ public sealed class StockPostingService(
             ConcurrencyStamp = Guid.NewGuid()
         };
         dataContext.Add(balance);
-        return Result<StockBalance>.Success(balance);
+        return Result<StockBalanceLookup>.Success(new StockBalanceLookup(balance, IsNew: true));
     }
 
     private static decimal GetOnHandDelta(InventoryMovementType movementType, decimal quantity) =>
@@ -337,4 +347,6 @@ public sealed class StockPostingService(
 
         return Result<Guid>.Forbidden("Authenticated user does not have a valid tenant context.");
     }
+
+    private sealed record StockBalanceLookup(StockBalance Balance, bool IsNew);
 }
