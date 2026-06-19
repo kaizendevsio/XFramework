@@ -80,14 +80,28 @@
             }
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
-            var query = DataContext.Query<WalletOperation>()
+            var baseQuery = DataContext.Query<WalletOperation>()
                 .IgnoreQueryFilters()
                 .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => x.RiskDecision != null || x.PolicyDecision != null)
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted);
+
+            var riskDecisions = await baseQuery
+                .Where(x => x.RiskDecision != null)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(200)
+                .ToListAsync();
+
+            var policyDecisions = baseQuery
+                .Where(x => x.PolicyDecision != null)
                 .OrderByDescending(x => x.CreatedAt);
 
-            _items = await query.Take(200).ToListAsync();
+            _items = riskDecisions
+                .Concat(await policyDecisions.Take(200).ToListAsync())
+                .GroupBy(x => x.Id)
+                .Select(x => x.First())
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(200)
+                .ToList();
         }
         catch (Exception ex)
         {
