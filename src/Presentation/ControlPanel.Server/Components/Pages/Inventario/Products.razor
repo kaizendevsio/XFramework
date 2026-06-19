@@ -20,18 +20,20 @@ else
 {
     <FadeInContent>
         <div class="space-y-6">
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Products</BbTypographyH3>
                     <BbTypographyMuted>Manage the selected tenant's product catalog.</BbTypographyMuted>
                 </div>
-                <BbButton OnClick="@OpenCreateDialog">
-                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
-                    Create Product
-                </BbButton>
+                <div class="xf-page-actions">
+                    <BbButton OnClick="@OpenCreateDialog">
+                        <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                        Create Product
+                    </BbButton>
+                </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div class="xf-summary-grid xf-summary-grid-4">
                 <BbCard>
                     <BbCardHeader><BbCardTitle>Total Products</BbCardTitle></BbCardHeader>
                     <BbCardContent><BbTypographyH2>@_products.Count</BbTypographyH2></BbCardContent>
@@ -52,12 +54,12 @@ else
 
             <BbCard>
                 <BbCardHeader>
-                    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div class="xf-page-header">
                         <div>
                             <BbCardTitle>Product Catalog</BbCardTitle>
                             <BbCardDescription>@_filteredProducts.Count product(s) shown</BbCardDescription>
                         </div>
-                        <div class="flex flex-col gap-2 md:w-[28rem] md:flex-row">
+                        <div class="xf-filter-actions">
                             <BbInput @bind-Value="_search" Placeholder="Search products..." @oninput="OnSearchChanged" />
                             <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
                                 <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
@@ -104,10 +106,6 @@ else
                                                   OnClick="@(() => Navigation.NavigateTo($"/inventario/products/{item.Id}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Edit product"
-                                                  OnClick="@(() => OpenEditDialog(item))">
-                                            <LucideIcon Name="pencil" class="h-4 w-4" />
-                                        </BbButton>
                                     </div>
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
@@ -122,7 +120,7 @@ else
 <BbDialog Open="@_productDialogOpen" OpenChanged="@(v => _productDialogOpen = v)">
     <BbDialogContent>
         <BbDialogHeader>
-            <BbDialogTitle>@(_editingProduct is null ? "Create Product" : "Edit Product")</BbDialogTitle>
+            <BbDialogTitle>Create Product</BbDialogTitle>
             <BbDialogDescription>Catalog data belongs to the selected tenant.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
@@ -149,7 +147,7 @@ else
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _productDialogOpen = false)">Cancel</BbButton>
             <BbButton OnClick="@SaveProduct" Disabled="@_saving">
-                @(_editingProduct is null ? "Create" : "Save")
+                Create
             </BbButton>
         </BbDialogFooter>
     </BbDialogContent>
@@ -171,7 +169,6 @@ else
     private bool _hasTenant;
     private bool _moduleEnabled;
     private bool _productDialogOpen;
-    private Product? _editingProduct;
     private string _search = "";
     private int _lowStockThreshold = 5;
 
@@ -283,23 +280,9 @@ else
 
     private void OpenCreateDialog()
     {
-        _editingProduct = null;
         _form.Reset();
         _form.IsAvailable = true;
         _form.CategoryId = _categories.FirstOrDefault()?.Id.ToString() ?? "";
-        _productDialogOpen = true;
-    }
-
-    private void OpenEditDialog(Product product)
-    {
-        _editingProduct = product;
-        _form.Name = product.Name ?? "";
-        _form.Sku = product.SKU ?? "";
-        _form.CategoryId = product.CategoryId.ToString();
-        _form.Price = product.Price.ToString("0.##");
-        _form.Brand = product.Brand ?? "";
-        _form.Description = product.Description ?? "";
-        _form.IsAvailable = product.IsAvailable;
         _productDialogOpen = true;
     }
 
@@ -332,52 +315,26 @@ else
         _saving = true;
         try
         {
-            if (_editingProduct is null)
+            DataContext.Add(new Product
             {
-                DataContext.Add(new Product
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = tenantId,
-                    Name = _form.Name.Trim(),
-                    SKU = NullIfEmpty(_form.Sku),
-                    CategoryId = categoryId,
-                    Price = price,
-                    StockQuantity = 0,
-                    Brand = NullIfEmpty(_form.Brand),
-                    Description = NullIfEmpty(_form.Description),
-                    IsAvailable = _form.IsAvailable,
-                    CreatedAt = DateTime.UtcNow,
-                    IsEnabled = true
-                });
-            }
-            else
-            {
-                var fresh = await DataContext.Query<Product>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.Id == _editingProduct.Id && x.TenantId == tenantId)
-                    .FirstOrDefaultAsync();
-                if (fresh is null)
-                {
-                    ToastService.Show("Product not found.");
-                    return;
-                }
-
-                fresh.Name = _form.Name.Trim();
-                fresh.SKU = NullIfEmpty(_form.Sku);
-                fresh.CategoryId = categoryId;
-                fresh.Price = price;
-                fresh.Brand = NullIfEmpty(_form.Brand);
-                fresh.Description = NullIfEmpty(_form.Description);
-                fresh.IsAvailable = _form.IsAvailable;
-                fresh.ModifiedAt = DateTime.UtcNow;
-                DataContext.Update(fresh);
-            }
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = _form.Name.Trim(),
+                SKU = NullIfEmpty(_form.Sku),
+                CategoryId = categoryId,
+                Price = price,
+                StockQuantity = 0,
+                Brand = NullIfEmpty(_form.Brand),
+                Description = NullIfEmpty(_form.Description),
+                IsAvailable = _form.IsAvailable,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            });
 
             var result = await DataContext.SaveChangesAsync();
             if (result.IsSuccess)
             {
-                ToastService.Show(_editingProduct is null ? "Product created." : "Product updated.");
+                ToastService.Show("Product created.");
                 _productDialogOpen = false;
                 await Reload();
             }

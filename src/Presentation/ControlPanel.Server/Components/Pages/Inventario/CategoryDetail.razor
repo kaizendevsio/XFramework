@@ -37,23 +37,40 @@ else
 {
     <FadeInContent>
         <div class="space-y-6">
-            <div class="flex items-center gap-4">
+            <div class="xf-detail-header">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to categories"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/categories"))">
                     <LucideIcon Name="arrow-left" class="h-4 w-4" />
                 </BbButton>
-                <div class="flex-1">
-                    <div class="flex items-center gap-2">
+                <div class="xf-detail-header-main">
+                    <div class="xf-detail-header-title">
                         <BbTypographyH3>@(_category.Name ?? "Unnamed Category")</BbTypographyH3>
                         <StatusBadge Text="@(_category.IsEnabled ? "Enabled" : "Disabled")"
                                      Status="@(_category.IsEnabled ? "active" : "inactive")" />
                     </div>
                     <BbTypographyMuted>ID: @_category.Id</BbTypographyMuted>
                 </div>
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
-                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                    Refresh
-                </BbButton>
+                <div class="xf-page-actions">
+                    @if (_editMode)
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@CancelEdit" Disabled="@_saving">Discard</BbButton>
+                        <BbButton OnClick="@SaveCategory" Disabled="@_saving">
+                            <LucideIcon Name="save" class="mr-2 h-4 w-4" />
+                            Save
+                        </BbButton>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                            Refresh
+                        </BbButton>
+                        <BbButton OnClick="@StartEdit">
+                            <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
+                            Edit
+                        </BbButton>
+                    }
+                </div>
             </div>
 
             <BbCard>
@@ -62,28 +79,41 @@ else
                     <BbCardDescription>Catalog category details for the selected tenant.</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <BbTypographyMuted>Name</BbTypographyMuted>
-                            <div>@(_category.Name ?? "Unnamed Category")</div>
+                    @if (_editMode)
+                    {
+                        <div class="grid gap-4">
+                            <BbFormFieldInput TValue="string" @bind-Value="_name" Label="Name" Required="true" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_description" Label="Description" />
+                            <BbFormFieldSwitch Checked="@_isEnabled"
+                                               CheckedChanged="@((bool value) => _isEnabled = value)"
+                                               Label="Enabled" />
                         </div>
-                        <div>
-                            <BbTypographyMuted>Products</BbTypographyMuted>
-                            <div>@_products.Count</div>
+                    }
+                    else
+                    {
+                        <div class="xf-detail-field-grid">
+                            <div>
+                                <BbTypographyMuted>Name</BbTypographyMuted>
+                                <div>@(_category.Name ?? "Unnamed Category")</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Products</BbTypographyMuted>
+                                <div>@_products.Count</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Created</BbTypographyMuted>
+                                <div>@_category.CreatedAt.ToLocalTime().ToString("g")</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Last Modified</BbTypographyMuted>
+                                <div>@(_category.ModifiedAt?.ToLocalTime().ToString("g") ?? "Never")</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Description</BbTypographyMuted>
+                                <div>@(_category.Description ?? "No description")</div>
+                            </div>
                         </div>
-                        <div>
-                            <BbTypographyMuted>Created</BbTypographyMuted>
-                            <div>@_category.CreatedAt.ToLocalTime().ToString("g")</div>
-                        </div>
-                        <div>
-                            <BbTypographyMuted>Last Modified</BbTypographyMuted>
-                            <div>@(_category.ModifiedAt?.ToLocalTime().ToString("g") ?? "Never")</div>
-                        </div>
-                        <div class="md:col-span-2">
-                            <BbTypographyMuted>Description</BbTypographyMuted>
-                            <div>@(_category.Description ?? "No description")</div>
-                        </div>
-                    </div>
+                    }
                 </BbCardContent>
             </BbCard>
 
@@ -139,6 +169,11 @@ else
     private bool _hasTenant;
     private bool _moduleEnabled;
     private bool _outsideTenantContext;
+    private bool _editMode;
+    private bool _saving;
+    private bool _isEnabled = true;
+    private string _name = "";
+    private string _description = "";
     private Guid? _loadedId;
 
     protected override void OnInitialized()
@@ -186,6 +221,9 @@ else
                 .OrderBy(x => x.Name)
                 .Take(250)
                 .ToListAsync();
+
+            if (!_editMode)
+                LoadForm();
         }
         catch (Exception ex)
         {
@@ -195,6 +233,77 @@ else
         {
             _loading = false;
             StateHasChanged();
+        }
+    }
+
+    private void StartEdit()
+    {
+        LoadForm();
+        _editMode = true;
+    }
+
+    private void CancelEdit()
+    {
+        LoadForm();
+        _editMode = false;
+    }
+
+    private void LoadForm()
+    {
+        if (_category is null) return;
+        _name = _category.Name ?? "";
+        _description = _category.Description ?? "";
+        _isEnabled = _category.IsEnabled;
+    }
+
+    private async Task SaveCategory()
+    {
+        if (_category is null || TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            ToastService.Show("Category name is required.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var fresh = await DataContext.Query<ProductCategory>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == _category.Id && x.TenantId == tenantId && !x.IsDeleted)
+                .FirstOrDefaultAsync();
+            if (fresh is null)
+            {
+                ToastService.Show("Category not found.");
+                return;
+            }
+
+            fresh.Name = _name.Trim();
+            fresh.Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim();
+            fresh.IsEnabled = _isEnabled;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Category updated.");
+                _editMode = false;
+                await Reload();
+            }
+            else
+            {
+                ToastService.Show($"Failed to save category: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error saving category: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
         }
     }
 
