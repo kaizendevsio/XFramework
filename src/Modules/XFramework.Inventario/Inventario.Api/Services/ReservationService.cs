@@ -25,6 +25,7 @@ public sealed class ReservationService(
 
         var tenantId = tenantResult.Data;
         var query = dataContext.Query<Reservation>()
+            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (request.ProductId is { } productId)
@@ -197,6 +198,7 @@ public sealed class ReservationService(
         var cutoff = request.ExpiresBefore ?? DateTime.UtcNow;
         var maxCount = Math.Clamp(request.MaxCount, 1, 500);
         var reservations = await dataContext.Query<Reservation>()
+            .IgnoreQueryFilters()
             .Where(x =>
                 x.TenantId == tenantResult.Data &&
                 x.Status == ReservationStatus.Active &&
@@ -236,6 +238,7 @@ public sealed class ReservationService(
             return Result<Reservation>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
         var reservation = await dataContext.Query<Reservation>()
+            .IgnoreQueryFilters()
             .Where(x =>
                 x.TenantId == tenantResult.Data &&
                 x.Id == reservationId &&
