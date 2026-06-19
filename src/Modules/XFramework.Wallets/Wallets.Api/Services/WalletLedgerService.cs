@@ -244,7 +244,7 @@ public sealed class WalletLedgerService(
         catch (Exception ex)
         {
             await transaction.RollbackAsync(ct);
-            logger.LogError(ex, "Wallet ledger operation failed for tenant {TenantId}", request.TenantId);
+            logger.LogError(ex, "Wallet ledger operation failed");
             return Result<WalletLedgerExecutionResult>.Failure("Wallet ledger operation failed", 409);
         }
     }
