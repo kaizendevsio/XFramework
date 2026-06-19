@@ -52,7 +52,7 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View transaction"
                                               OnClick="@(() => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))">
                                         <LucideIcon Name="eye" class="h-4 w-4" />
                                     </BbButton>

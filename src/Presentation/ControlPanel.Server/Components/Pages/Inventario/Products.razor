@@ -100,11 +100,11 @@ else
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <div class="flex items-center gap-1">
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View product"
                                                   OnClick="@(() => Navigation.NavigateTo($"/inventario/products/{item.Id}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Edit product"
                                                   OnClick="@(() => OpenEditDialog(item))">
                                             <LucideIcon Name="pencil" class="h-4 w-4" />
                                         </BbButton>

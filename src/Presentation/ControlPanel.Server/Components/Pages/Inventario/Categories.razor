@@ -50,15 +50,15 @@ else
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <div class="flex items-center gap-1" @onclick:stopPropagation="true">
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View category"
                                                   OnClick="@(() => Navigation.NavigateTo($"/inventario/categories/{item.Id}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Edit category"
                                                   OnClick="@(() => OpenEditDialog(item))">
                                             <LucideIcon Name="pencil" class="h-4 w-4" />
                                         </BbButton>
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Delete category"
                                                   OnClick="@(() => OpenDeleteDialog(item))">
                                             <LucideIcon Name="trash-2" class="h-4 w-4" />
                                         </BbButton>
