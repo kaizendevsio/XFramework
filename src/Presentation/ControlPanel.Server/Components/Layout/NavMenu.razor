@@ -70,6 +70,18 @@
                     <LucideIcon Name="chart-no-axes-combined" class="h-4 w-4" /> Planning
                 </NavLink>
             }
+            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing"))
+            {
+                <NavLink href="/inventario/suppliers" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="truck" class="h-4 w-4" /> Suppliers
+                </NavLink>
+                <NavLink href="/inventario/purchase-orders" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="clipboard-list" class="h-4 w-4" /> Purchase Orders
+                </NavLink>
+                <NavLink href="/inventario/receiving" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="package-check" class="h-4 w-4" /> Receiving
+                </NavLink>
+            }
             @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting"))
             {
                 <NavLink href="/inventario/reports" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">

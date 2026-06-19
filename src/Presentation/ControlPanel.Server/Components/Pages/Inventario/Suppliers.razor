@@ -1,0 +1,214 @@
+@page "/inventario/suppliers"
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Purchasing
+@implements IDisposable
+
+<PageTitle>Inventario Suppliers - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_purchasingEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Purchasing" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Suppliers</BbTypographyH3>
+                    <BbTypographyMuted>Maintain suppliers for purchase orders and receiving.</BbTypographyMuted>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <BbButton OnClick="@OpenCreateDialog">
+                        <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                        Create Supplier
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Supplier List</BbCardTitle>
+                    <BbCardDescription>@_suppliers.Count supplier(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_suppliers" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ContactName)" Title="Contact" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Email)" Title="Email" />
+                            <BbDataGridTemplateColumn Title="Status">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+<BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Create Supplier</BbDialogTitle>
+            <BbDialogDescription>Supplier codes are unique inside the selected tenant.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Code" Label="Code" Required="true" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.ContactName" Label="Contact Name" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Email" Label="Email" />
+            </div>
+            <BbFormFieldInput TValue="string" @bind-Value="_form.Phone" Label="Phone" />
+            <BbFormFieldSwitch Checked="@_form.IsActive"
+                               CheckedChanged="@((bool value) => _form.IsActive = value)"
+                               Label="Active supplier" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _createDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@CreateSupplier" Disabled="@IsCreateDisabled">Create</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private readonly SupplierForm _form = new();
+    private List<Supplier> _suppliers = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _purchasingEnabled;
+    private bool _saving;
+    private bool _createDialogOpen;
+    private bool IsCreateDisabled => _saving || string.IsNullOrWhiteSpace(_form.Code) || string.IsNullOrWhiteSpace(_form.Name);
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _purchasingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing");
+            _suppliers = [];
+
+            if (!_hasTenant || !_purchasingEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _suppliers = await DataContext.Query<Supplier>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(500)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load suppliers: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        _form.Reset();
+        _createDialogOpen = true;
+    }
+
+    private async Task CreateSupplier()
+    {
+        _saving = true;
+        try
+        {
+            var result = await Inventario.CreateSupplier(new CreateSupplierRequest
+            {
+                Metadata = BuildMetadata(),
+                Code = NullIfEmpty(_form.Code),
+                Name = NullIfEmpty(_form.Name),
+                ContactName = NullIfEmpty(_form.ContactName),
+                Email = NullIfEmpty(_form.Email),
+                Phone = NullIfEmpty(_form.Phone),
+                IsActive = _form.IsActive
+            });
+
+            ToastService.Show(result.IsSuccess ? "Supplier created." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _createDialogOpen = false;
+                await Reload();
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private RequestMetadata BuildMetadata() => new() { TenantId = TenantFilter.SelectedTenantId };
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class SupplierForm
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string ContactName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Phone { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            Code = "";
+            Name = "";
+            ContactName = "";
+            Email = "";
+            Phone = "";
+            IsActive = true;
+        }
+    }
+}

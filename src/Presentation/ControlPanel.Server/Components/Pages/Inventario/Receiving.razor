@@ -1,0 +1,421 @@
+@page "/inventario/receiving"
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Purchasing
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Inventario Receiving - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_purchasingEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Purchasing" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Receiving</BbTypographyH3>
+                    <BbTypographyMuted>Post received stock into warehouses and locations with optional lot tracking.</BbTypographyMuted>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <BbButton OnClick="@OpenReceiveDialog" Disabled="@(_products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0)">
+                        <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                        Receive Stock
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Receiving Documents</BbCardTitle>
+                    <BbCardDescription>@_documents.Count receipt(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_documents" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((ReceivingDocument item) => Navigation.NavigateTo($"/inventario/receiving/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Purchase Order">
+                                <ChildContent Context="item">@GetPurchaseOrderNumber(item.PurchaseOrderId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Supplier">
+                                <ChildContent Context="item">@GetSupplierName(item.SupplierId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Warehouse">
+                                <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
+                            <BbDataGridTemplateColumn Title="Lines">
+                                <ChildContent Context="item">@_lines.Count(x => x.ReceivingDocumentId == item.Id)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/receiving/{item.Id}"))">
+                                        <LucideIcon Name="eye" class="h-4 w-4" />
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+<BbDialog Open="@_receiveDialogOpen" OpenChanged="@(v => _receiveDialogOpen = v)">
+    <BbDialogContent TrapFocus="false" class="max-w-5xl">
+        <BbDialogHeader>
+            <BbDialogTitle>Receive Stock</BbDialogTitle>
+            <BbDialogDescription>Receiving posts receipt movements and updates balances in one save.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-3">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.ReceiptNumber" Label="Receipt Number" />
+                <div class="xf-form-field">
+                    <BbLabel>Purchase Order</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_form.PurchaseOrderId"
+                                 Options="@PurchaseOrderOptions"
+                                 Placeholder="No purchase order"
+                                 SearchPlaceholder="Search purchase orders..."
+                                 EmptyMessage="No purchase orders found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Supplier</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_form.SupplierId"
+                                 Options="@SupplierOptions"
+                                 Placeholder="No supplier"
+                                 SearchPlaceholder="Search suppliers..."
+                                 EmptyMessage="No suppliers found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+            </div>
+            <div class="grid gap-3 md:grid-cols-3">
+                <div class="xf-form-field">
+                    <BbLabel>Warehouse</BbLabel>
+                    <BbCombobox TValue="string"
+                                 Value="@_form.WarehouseId"
+                                 ValueChanged="@OnWarehouseChanged"
+                                 Options="@WarehouseOptions"
+                                 Placeholder="Select warehouse"
+                                 SearchPlaceholder="Search warehouses..."
+                                 EmptyMessage="No warehouses found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Location</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_form.LocationId"
+                                 Options="@LocationOptions"
+                                 Placeholder="Select location"
+                                 SearchPlaceholder="Search locations..."
+                                 EmptyMessage="No locations found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceNumber" Label="Reference" />
+            </div>
+
+            <div class="rounded-md border p-3">
+                <div class="mb-3 flex items-center justify-between">
+                    <BbTypographyH4>Lines</BbTypographyH4>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@AddLine">
+                        <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                        Add Line
+                    </BbButton>
+                </div>
+                <div class="grid gap-3">
+                    @for (var i = 0; i < _form.Lines.Count; i++)
+                    {
+                        var index = i;
+                        var line = _form.Lines[index];
+                        <div class="grid gap-3 rounded-md border p-3">
+                            <div class="grid gap-3 md:grid-cols-[1.2fr_1.4fr_0.8fr_0.8fr_auto]">
+                                <div class="xf-form-field">
+                                    <BbLabel>PO Line</BbLabel>
+                                    <BbCombobox TValue="string"
+                                                 @bind-Value="line.PurchaseOrderLineId"
+                                                 Options="@PurchaseOrderLineOptions"
+                                                 Placeholder="No PO line"
+                                                 SearchPlaceholder="Search PO lines..."
+                                                 EmptyMessage="No open PO lines."
+                                                 Class="xf-entity-combobox"
+                                                 MatchTriggerWidth="true" />
+                                </div>
+                                <div class="xf-form-field">
+                                    <BbLabel>Product</BbLabel>
+                                    <BbCombobox TValue="string"
+                                                 @bind-Value="line.ProductId"
+                                                 Options="@ProductOptions"
+                                                 Placeholder="Select product"
+                                                 SearchPlaceholder="Search products..."
+                                                 EmptyMessage="No products found."
+                                                 Class="xf-entity-combobox"
+                                                 MatchTriggerWidth="true" />
+                                </div>
+                                <BbFormFieldInput TValue="string" @bind-Value="line.Quantity" Label="Quantity" />
+                                <BbFormFieldInput TValue="string" @bind-Value="line.UnitCost" Label="Unit Cost" />
+                                <div class="flex items-end">
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              Disabled="@(_form.Lines.Count == 1)"
+                                              OnClick="@(() => RemoveLine(index))">
+                                        <LucideIcon Name="trash-2" class="h-4 w-4" />
+                                    </BbButton>
+                                </div>
+                            </div>
+                            <div class="grid gap-3 md:grid-cols-4">
+                                <div class="xf-form-field">
+                                    <BbLabel>Existing Lot</BbLabel>
+                                    <BbCombobox TValue="string"
+                                                 @bind-Value="line.LotId"
+                                                 Options="@LotOptions"
+                                                 Placeholder="Create/no lot"
+                                                 SearchPlaceholder="Search lots..."
+                                                 EmptyMessage="No lots found."
+                                                 Class="xf-entity-combobox"
+                                                 MatchTriggerWidth="true" />
+                                </div>
+                                <BbFormFieldInput TValue="string" @bind-Value="line.LotNumber" Label="New Lot Number" />
+                                <BbFormFieldInput TValue="string" @bind-Value="line.ManufacturedAt" Label="Manufacture Date" />
+                                <BbFormFieldInput TValue="string" @bind-Value="line.ExpiresAt" Label="Expiration Date" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _receiveDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@ReceiveStock" Disabled="@IsReceiveDisabled">Post Receiving</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private readonly ReceivingForm _form = new();
+    private List<ReceivingDocument> _documents = [];
+    private List<ReceivingLine> _lines = [];
+    private List<PurchaseOrder> _orders = [];
+    private List<PurchaseOrderLine> _orderLines = [];
+    private List<Supplier> _suppliers = [];
+    private List<Product> _products = [];
+    private List<Warehouse> _warehouses = [];
+    private List<InventoryLocation> _locations = [];
+    private List<InventoryLot> _lots = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _purchasingEnabled;
+    private bool _saving;
+    private bool _receiveDialogOpen;
+    private bool IsReceiveDisabled =>
+        _saving ||
+        string.IsNullOrWhiteSpace(_form.WarehouseId) ||
+        string.IsNullOrWhiteSpace(_form.LocationId) ||
+        _form.Lines.Any(x => string.IsNullOrWhiteSpace(x.ProductId) || !decimal.TryParse(x.Quantity, out var quantity) || quantity <= 0);
+
+    private List<SelectOption<string>> PurchaseOrderOptions => [new("", "No purchase order"), .. _orders.Where(x => x.Status is PurchaseOrderStatus.Open or PurchaseOrderStatus.PartiallyReceived).Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.OrderNumber} ({x.Status})"))];
+    private List<SelectOption<string>> PurchaseOrderLineOptions => [new("", "No PO line"), .. _orderLines.Where(x => x.ReceivedQuantity < x.OrderedQuantity).Select(x => new SelectOption<string>(x.Id.ToString(), $"{GetPurchaseOrderNumber(x.PurchaseOrderId)} - {GetProductName(x.ProductId)} ({x.OrderedQuantity - x.ReceivedQuantity:N2} remaining)"))];
+    private List<SelectOption<string>> SupplierOptions => [new("", "No supplier"), .. _suppliers.Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Code} - {x.Name}"))];
+    private List<SelectOption<string>> ProductOptions => _products.Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Name} ({x.SKU ?? x.Id.ToString()[..8]})")).ToList();
+    private List<SelectOption<string>> WarehouseOptions => _warehouses.Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Code} - {x.Name}")).ToList();
+    private List<SelectOption<string>> LocationOptions => _locations.Where(x => x.WarehouseId.ToString() == _form.WarehouseId).Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Code} - {x.Name}")).ToList();
+    private List<SelectOption<string>> LotOptions => [new("", "Create/no lot"), .. _lots.Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.LotNumber} - {GetProductName(x.ProductId)}"))];
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _purchasingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing");
+            _documents = [];
+            _lines = [];
+            _orders = [];
+            _orderLines = [];
+            _suppliers = [];
+            _products = [];
+            _warehouses = [];
+            _locations = [];
+            _lots = [];
+
+            if (!_hasTenant || !_purchasingEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _documents = await DataContext.Query<ReceivingDocument>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.ReceivedAt).Take(500).ToListAsync();
+            _lines = await DataContext.Query<ReceivingLine>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _orders = await DataContext.Query<PurchaseOrder>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(500).ToListAsync();
+            _orderLines = await DataContext.Query<PurchaseOrderLine>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _suppliers = await DataContext.Query<Supplier>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Name).Take(500).ToListAsync();
+            _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Name).Take(500).ToListAsync();
+            _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(200).ToListAsync();
+            _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Code).Take(500).ToListAsync();
+            _lots = await DataContext.Query<InventoryLot>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.LotNumber).Take(500).ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load receiving: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenReceiveDialog()
+    {
+        _form.Reset(_warehouses.FirstOrDefault()?.Id.ToString() ?? "", _locations.FirstOrDefault()?.Id.ToString() ?? "", _products.FirstOrDefault()?.Id.ToString() ?? "");
+        _receiveDialogOpen = true;
+    }
+
+    private void OnWarehouseChanged(string? warehouseId)
+    {
+        _form.WarehouseId = warehouseId ?? "";
+        _form.LocationId = _locations.FirstOrDefault(x => x.WarehouseId.ToString() == _form.WarehouseId)?.Id.ToString() ?? "";
+    }
+
+    private void AddLine() => _form.Lines.Add(new ReceivingLineForm { ProductId = _products.FirstOrDefault()?.Id.ToString() ?? "", Quantity = "1" });
+
+    private void RemoveLine(int index)
+    {
+        if (_form.Lines.Count > 1 && index >= 0 && index < _form.Lines.Count)
+            _form.Lines.RemoveAt(index);
+    }
+
+    private async Task ReceiveStock()
+    {
+        _saving = true;
+        try
+        {
+            var result = await Inventario.ReceiveInventory(new ReceiveInventoryRequest
+            {
+                Metadata = BuildMetadata(),
+                ReceiptNumber = NullIfEmpty(_form.ReceiptNumber),
+                PurchaseOrderId = Guid.TryParse(_form.PurchaseOrderId, out var poId) ? poId : null,
+                WarehouseId = Guid.Parse(_form.WarehouseId),
+                LocationId = Guid.Parse(_form.LocationId),
+                SupplierId = Guid.TryParse(_form.SupplierId, out var supplierId) ? supplierId : null,
+                ReferenceNumber = NullIfEmpty(_form.ReferenceNumber),
+                IdempotencyKey = NullIfEmpty(_form.IdempotencyKey),
+                Lines = _form.Lines
+                    .Where(x => Guid.TryParse(x.ProductId, out _) && decimal.TryParse(x.Quantity, out var quantity) && quantity > 0)
+                    .Select(x => new ReceivingLineRequest
+                    {
+                        PurchaseOrderLineId = Guid.TryParse(x.PurchaseOrderLineId, out var poLineId) ? poLineId : null,
+                        ProductId = Guid.Parse(x.ProductId),
+                        Quantity = decimal.Parse(x.Quantity),
+                        UnitCost = decimal.TryParse(x.UnitCost, out var unitCost) ? unitCost : null,
+                        LotId = Guid.TryParse(x.LotId, out var lotId) ? lotId : null,
+                        LotNumber = NullIfEmpty(x.LotNumber),
+                        ManufacturedAt = ParseDate(x.ManufacturedAt),
+                        ExpiresAt = ParseDate(x.ExpiresAt)
+                    })
+                    .ToList()
+            });
+
+            ToastService.Show(result.IsSuccess ? "Receiving posted." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _receiveDialogOpen = false;
+                await Reload();
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private string GetPurchaseOrderNumber(Guid? orderId) => orderId is { } id ? _orders.FirstOrDefault(x => x.Id == id)?.OrderNumber ?? id.ToString()[..8] : "No PO";
+    private string GetProductName(Guid productId) => _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
+    private string GetSupplierName(Guid? supplierId) => supplierId is { } id ? _suppliers.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString()[..8] : "No supplier";
+    private string GetWarehouseName(Guid warehouseId) => _warehouses.FirstOrDefault(x => x.Id == warehouseId)?.Name ?? warehouseId.ToString()[..8];
+
+    private RequestMetadata BuildMetadata() => new() { TenantId = TenantFilter.SelectedTenantId };
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static DateTime? ParseDate(string? value) => DateTime.TryParse(value, out var date) ? date : null;
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class ReceivingForm
+    {
+        public string ReceiptNumber { get; set; } = "";
+        public string PurchaseOrderId { get; set; } = "";
+        public string SupplierId { get; set; } = "";
+        public string WarehouseId { get; set; } = "";
+        public string LocationId { get; set; } = "";
+        public string ReferenceNumber { get; set; } = "";
+        public string IdempotencyKey { get; set; } = "";
+        public List<ReceivingLineForm> Lines { get; } = [];
+
+        public void Reset(string warehouseId, string locationId, string productId)
+        {
+            ReceiptNumber = "";
+            PurchaseOrderId = "";
+            SupplierId = "";
+            WarehouseId = warehouseId;
+            LocationId = locationId;
+            ReferenceNumber = "";
+            IdempotencyKey = "";
+            Lines.Clear();
+            Lines.Add(new ReceivingLineForm { ProductId = productId, Quantity = "1" });
+        }
+    }
+
+    private sealed class ReceivingLineForm
+    {
+        public string PurchaseOrderLineId { get; set; } = "";
+        public string ProductId { get; set; } = "";
+        public string Quantity { get; set; } = "1";
+        public string UnitCost { get; set; } = "";
+        public string LotId { get; set; } = "";
+        public string LotNumber { get; set; } = "";
+        public string ManufacturedAt { get; set; } = "";
+        public string ExpiresAt { get; set; } = "";
+    }
+}
