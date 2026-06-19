@@ -45,24 +45,40 @@ else
                     <BbCardContent>
                         <div class="grid gap-3">
                             <div class="grid gap-3 xl:grid-cols-4">
-                                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.ProductId" Label="Product" Placeholder="Select product">
-                                    @foreach (var product in _products)
-                                    {
-                                        <BbSelectItem Value="@product.Id.ToString()">@GetProductLabel(product)</BbSelectItem>
-                                    }
-                                </BbFormFieldSelect>
-                                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.WarehouseId" Label="Warehouse" Placeholder="Select warehouse">
-                                    @foreach (var warehouse in _warehouses)
-                                    {
-                                        <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Code - @warehouse.Name</BbSelectItem>
-                                    }
-                                </BbFormFieldSelect>
-                                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.LocationId" Label="Location" Placeholder="Select location">
-                                    @foreach (var location in LocationsForSelectedWarehouse())
-                                    {
-                                        <BbSelectItem Value="@location.Id.ToString()">@location.Code - @location.Name</BbSelectItem>
-                                    }
-                                </BbFormFieldSelect>
+                                <div class="xf-form-field">
+                                    <BbLabel>Product</BbLabel>
+                                    <BbCombobox TValue="string"
+                                                 @bind-Value="_movementForm.ProductId"
+                                                 Options="@ProductOptions"
+                                                 Placeholder="Select product"
+                                                 SearchPlaceholder="Search products..."
+                                                 EmptyMessage="No products found."
+                                                 Class="xf-entity-combobox"
+                                                 MatchTriggerWidth="true" />
+                                </div>
+                                <div class="xf-form-field">
+                                    <BbLabel>Warehouse</BbLabel>
+                                    <BbCombobox TValue="string"
+                                                 Value="@_movementForm.WarehouseId"
+                                                 ValueChanged="@OnMovementWarehouseChanged"
+                                                 Options="@WarehouseOptions"
+                                                 Placeholder="Select warehouse"
+                                                 SearchPlaceholder="Search warehouses..."
+                                                 EmptyMessage="No warehouses found."
+                                                 Class="xf-entity-combobox"
+                                                 MatchTriggerWidth="true" />
+                                </div>
+                                <div class="xf-form-field">
+                                    <BbLabel>Location</BbLabel>
+                                    <BbCombobox TValue="string"
+                                                 @bind-Value="_movementForm.LocationId"
+                                                 Options="@MovementLocationOptions"
+                                                 Placeholder="Select location"
+                                                 SearchPlaceholder="Search locations..."
+                                                 EmptyMessage="No locations found."
+                                                 Class="xf-entity-combobox"
+                                                 MatchTriggerWidth="true" />
+                                </div>
                                 <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
                                     @foreach (var type in Enum.GetValues<InventoryMovementType>())
                                     {
@@ -166,6 +182,12 @@ else
     private bool _movementsEnabled;
     private bool _postingMovement;
     private bool IsPostMovementDisabled => _postingMovement || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
+    private List<SelectOption<string>> ProductOptions =>
+        _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
+    private List<SelectOption<string>> WarehouseOptions =>
+        _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
+    private List<SelectOption<string>> MovementLocationOptions =>
+        LocationsForSelectedWarehouse().Select(location => new SelectOption<string>(location.Id.ToString(), GetLocationLabel(location))).ToList();
 
     protected override void OnInitialized()
     {
@@ -305,6 +327,13 @@ else
         return _locations.Where(x => x.WarehouseId == warehouseId);
     }
 
+    private void OnMovementWarehouseChanged(string? value)
+    {
+        _movementForm.WarehouseId = value ?? "";
+        var location = LocationsForSelectedWarehouse().FirstOrDefault();
+        _movementForm.LocationId = location?.Id.ToString() ?? "";
+    }
+
     private void ApplyDefaultMovementSelections()
     {
         _movementForm.ProductId = _movementForm.ProductId.Length > 0 ? _movementForm.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
@@ -326,11 +355,15 @@ else
     private string GetProductName(Guid productId) =>
         _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
 
+    private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+
     private string GetWarehouseName(Guid warehouseId) =>
         _warehouses.FirstOrDefault(x => x.Id == warehouseId)?.Name ?? warehouseId.ToString()[..8];
 
     private string GetLocationName(Guid locationId) =>
         _locations.FirstOrDefault(x => x.Id == locationId)?.Name ?? locationId.ToString()[..8];
+
+    private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

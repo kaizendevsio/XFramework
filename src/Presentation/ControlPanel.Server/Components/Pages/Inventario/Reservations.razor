@@ -50,28 +50,50 @@ else
                 <BbCardContent>
                     <div class="grid gap-3">
                         <div class="grid gap-3 xl:grid-cols-3">
-                            <BbFormFieldSelect TValue="string" @bind-Value="_form.ProductId" Label="Product" Placeholder="Select product">
-                                @foreach (var product in _products)
-                                {
-                                    <BbSelectItem Value="@product.Id.ToString()">@GetProductLabel(product)</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
-                            <BbFormFieldSelect TValue="string" @bind-Value="_form.WarehouseId" Label="Warehouse" Placeholder="Select warehouse">
-                                @foreach (var warehouse in _warehouses)
-                                {
-                                    <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Code - @warehouse.Name</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
-                            <BbFormFieldSelect TValue="string" @bind-Value="_form.LocationId" Label="Location" Placeholder="Select location">
-                                @foreach (var location in LocationsForSelectedWarehouse())
-                                {
-                                    <BbSelectItem Value="@location.Id.ToString()">@location.Code - @location.Name</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
+                            <div class="xf-form-field">
+                                <BbLabel>Product</BbLabel>
+                                <BbCombobox TValue="string"
+                                             @bind-Value="_form.ProductId"
+                                             Options="@ProductOptions"
+                                             Placeholder="Select product"
+                                             SearchPlaceholder="Search products..."
+                                             EmptyMessage="No products found."
+                                             Class="xf-entity-combobox"
+                                             MatchTriggerWidth="true" />
+                            </div>
+                            <div class="xf-form-field">
+                                <BbLabel>Warehouse</BbLabel>
+                                <BbCombobox TValue="string"
+                                             Value="@_form.WarehouseId"
+                                             ValueChanged="@OnReservationWarehouseChanged"
+                                             Options="@WarehouseOptions"
+                                             Placeholder="Select warehouse"
+                                             SearchPlaceholder="Search warehouses..."
+                                             EmptyMessage="No warehouses found."
+                                             Class="xf-entity-combobox"
+                                             MatchTriggerWidth="true" />
+                            </div>
+                            <div class="xf-form-field">
+                                <BbLabel>Location</BbLabel>
+                                <BbCombobox TValue="string"
+                                             @bind-Value="_form.LocationId"
+                                             Options="@ReservationLocationOptions"
+                                             Placeholder="Select location"
+                                             SearchPlaceholder="Search locations..."
+                                             EmptyMessage="No locations found."
+                                             Class="xf-entity-combobox"
+                                             MatchTriggerWidth="true" />
+                            </div>
                         </div>
                         <div class="grid gap-3 md:grid-cols-3">
                             <BbFormFieldInput TValue="string" @bind-Value="_form.Quantity" Label="Quantity" />
-                            <BbFormFieldInput TValue="string" @bind-Value="_form.ExpiresAt" Label="Expires At" Placeholder="YYYY-MM-DD HH:mm" />
+                            <div class="xf-form-field">
+                                <BbLabel>Expires At</BbLabel>
+                                <input type="datetime-local"
+                                       class="xf-datetime-input"
+                                       value="@_form.ExpiresAt"
+                                       @oninput="@((ChangeEventArgs e) => _form.ExpiresAt = e.Value?.ToString() ?? string.Empty)" />
+                            </div>
                             <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceType" Label="Reference Type" />
                         </div>
                         <div class="grid gap-3 md:grid-cols-2">
@@ -149,6 +171,12 @@ else
     private bool _reserving;
     private bool _expiring;
     private bool IsReserveDisabled => _reserving || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
+    private List<SelectOption<string>> ProductOptions =>
+        _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
+    private List<SelectOption<string>> WarehouseOptions =>
+        _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
+    private List<SelectOption<string>> ReservationLocationOptions =>
+        LocationsForSelectedWarehouse().Select(location => new SelectOption<string>(location.Id.ToString(), GetLocationLabel(location))).ToList();
 
     protected override void OnInitialized()
     {
@@ -263,6 +291,7 @@ else
             if (result.IsSuccess)
             {
                 _form.Quantity = "0";
+                _form.ExpiresAt = "";
                 _form.Reason = "";
                 await Reload();
             }
@@ -335,6 +364,13 @@ else
         return _locations.Where(x => x.WarehouseId == warehouseId);
     }
 
+    private void OnReservationWarehouseChanged(string? value)
+    {
+        _form.WarehouseId = value ?? "";
+        var location = LocationsForSelectedWarehouse().FirstOrDefault();
+        _form.LocationId = location?.Id.ToString() ?? "";
+    }
+
     private void ApplyDefaultSelections()
     {
         _form.ProductId = _form.ProductId.Length > 0 ? _form.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
@@ -363,6 +399,10 @@ else
 
         return _locations.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString()[..8];
     }
+
+    private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+
+    private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
 
     private static string GetStatusBadge(ReservationStatus status) =>
         status == ReservationStatus.Active ? "active" : "inactive";
