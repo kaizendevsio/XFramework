@@ -92,6 +92,7 @@ public sealed class StockPostingService(
 
         var tenantId = tenantResult.Data;
         var query = dataContext.Query<StockBalance>()
+            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (request.ProductId is { } id)
@@ -115,6 +116,7 @@ public sealed class StockPostingService(
 
         var tenantId = tenantResult.Data;
         var query = dataContext.Query<InventoryMovement>()
+            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (request.ProductId is { } id)
@@ -192,6 +194,7 @@ public sealed class StockPostingService(
 
     private async Task<Product?> GetProduct(Guid tenantId, Guid productId, CancellationToken ct) =>
         await dataContext.Query<Product>()
+            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.Id == productId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
@@ -203,16 +206,19 @@ public sealed class StockPostingService(
         CancellationToken ct)
     {
         var warehouseExists = await dataContext.Query<Warehouse>()
+            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == warehouseId && !x.IsDeleted, ct);
         if (!warehouseExists)
             return Result<StockBalance>.NotFound("Warehouse not found.");
 
         var locationExists = await dataContext.Query<InventoryLocation>()
+            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == locationId && x.WarehouseId == warehouseId && !x.IsDeleted, ct);
         if (!locationExists)
             return Result<StockBalance>.NotFound("Location not found.");
 
         var balance = await dataContext.Query<StockBalance>()
+            .IgnoreQueryFilters()
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == productId &&
