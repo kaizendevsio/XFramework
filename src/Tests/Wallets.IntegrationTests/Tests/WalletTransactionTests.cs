@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Enums;
 using XFramework.Domain.Shared.Enums;
 
 namespace Wallets.IntegrationTests.Tests;
@@ -83,6 +84,88 @@ public class WalletTransactionTests : WalletsTestBase
 
         updated.Balance.Should().Be(1500m);
         transactionCount.Should().Be(1);
+    }
+
+    [Test]
+    public async Task Http_AddFunds_WithFee_CreatesBalancedLedgerSnapshotAndOutbox()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 1000m);
+        var idempotencyKey = $"ledger-{Guid.NewGuid():N}";
+
+        var request = new IncrementWalletRequest
+        {
+            CredentialId = credential.Id,
+            WalletId = wallet.Id,
+            Amount = 500m,
+            Fee = 25m,
+            IdempotencyKey = idempotencyKey,
+            Metadata = CreateMetadata()
+        };
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/add-funds", request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Response: {body}");
+
+        await using var db = CreateDbContext();
+        var operation = await db.Set<WalletOperation>()
+            .SingleAsync(o => o.IdempotencyKey == idempotencyKey);
+        var entries = await db.Set<WalletLedgerEntry>()
+            .Where(e => e.OperationId == operation.Id)
+            .ToListAsync();
+        var snapshot = await db.Set<WalletBalanceSnapshot>()
+            .SingleAsync(s => s.WalletId == wallet.Id);
+        var outbox = await db.Set<WalletOutboxMessage>()
+            .SingleAsync(o => o.OperationId == operation.Id);
+
+        operation.Status.Should().Be(WalletOperationStatus.Completed);
+        entries.Where(e => e.Direction == WalletLedgerDirection.Debit).Sum(e => e.Amount)
+            .Should().Be(entries.Where(e => e.Direction == WalletLedgerDirection.Credit).Sum(e => e.Amount));
+        entries.Should().Contain(e =>
+            e.WalletId == wallet.Id &&
+            e.Direction == WalletLedgerDirection.Credit &&
+            e.Amount == 475m);
+        entries.Should().Contain(e =>
+            e.EntryKind == WalletLedgerEntryKind.Fee &&
+            e.Direction == WalletLedgerDirection.Credit &&
+            e.Amount == 25m);
+        snapshot.Balance.Should().Be(1475m);
+        snapshot.AvailableBalance.Should().Be(1475m);
+        snapshot.IsReconciled.Should().BeTrue();
+        outbox.Status.Should().Be(WalletOutboxStatus.Pending);
+    }
+
+    [Test]
+    public async Task Http_AddFunds_SameIdempotencyKeyWithDifferentPayload_ReturnsConflict()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 1000m);
+        var idempotencyKey = $"conflict-{Guid.NewGuid():N}";
+
+        var firstRequest = new IncrementWalletRequest
+        {
+            CredentialId = credential.Id,
+            WalletId = wallet.Id,
+            Amount = 500m,
+            IdempotencyKey = idempotencyKey,
+            Metadata = CreateMetadata()
+        };
+        var secondRequest = firstRequest with { Amount = 250m };
+
+        var firstResponse = await HttpClient.PostAsJsonAsync("/api/wallets/add-funds", firstRequest);
+        var secondResponse = await HttpClient.PostAsJsonAsync("/api/wallets/add-funds", secondRequest);
+
+        firstResponse.IsSuccessStatusCode.Should().BeTrue();
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        await using var db = CreateDbContext();
+        var updated = await db.Set<Wallet>().FirstAsync(w => w.Id == wallet.Id);
+        var operationCount = await db.Set<WalletOperation>()
+            .CountAsync(o => o.IdempotencyKey == idempotencyKey);
+
+        updated.Balance.Should().Be(1500m);
+        operationCount.Should().Be(1);
     }
 
     #endregion
@@ -187,6 +270,11 @@ public class WalletTransactionTests : WalletsTestBase
             releasedWallet.AvailableBalance.Should().Be(700m);
             transaction.Held.Should().BeFalse();
             transaction.Released.Should().BeTrue();
+
+            var operation = await db.Set<WalletOperation>()
+                .SingleAsync(o => o.IdempotencyKey == $"release:{transactionId}");
+            operation.OperationType.Should().Be(WalletOperationType.Release);
+            await AssertLedgerBalanced(db, operation.Id);
         }
     }
 
@@ -353,6 +441,47 @@ public class WalletTransactionTests : WalletsTestBase
 
     #endregion
 
+    #region HTTP - Convert
+
+    [Test]
+    public async Task Http_Convert_WithFee_CreatesBalancedLedgerOperation()
+    {
+        var secondTypeId = await SeedSecondWalletType();
+        var credential = await SeedCredential();
+        var sourceWallet = await SeedWallet(credential.Id, 1000m);
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/convert",
+            new ConvertWalletRequest
+            {
+                CredentialId = credential.Id,
+                SourceWalletTypeId = WalletsTestFixture.TestWalletTypeId,
+                TargetWalletTypeId = secondTypeId,
+                TransferDeductionType = TransferDeductionType.DeductFromSender,
+                Amount = 200m,
+                Fee = 10m,
+                ReferenceNumber = $"convert-{Guid.NewGuid():N}",
+                Metadata = CreateMetadata()
+            });
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Response: {body}");
+
+        await using var db = CreateDbContext();
+        var updatedSource = await db.Set<Wallet>().SingleAsync(w => w.Id == sourceWallet.Id);
+        var targetWallet = await db.Set<Wallet>()
+            .SingleAsync(w => w.CredentialId == credential.Id && w.WalletTypeId == secondTypeId);
+        var operation = await db.Set<WalletOperation>()
+            .Where(o => o.OperationType == WalletOperationType.Conversion)
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstAsync();
+
+        updatedSource.Balance.Should().Be(790m);
+        targetWallet.Balance.Should().Be(200m);
+        await AssertLedgerBalanced(db, operation.Id);
+    }
+
+    #endregion
+
     #region HTTP - Reverse
 
     [Test]
@@ -407,6 +536,106 @@ public class WalletTransactionTests : WalletsTestBase
             var updated = await db.Set<Wallet>().FirstAsync(w => w.Id == wallet.Id);
             updated.Balance.Should().Be(50m);
         }
+    }
+
+    [Test]
+    public async Task Http_ReverseDebit_CreatesBalancedLedgerOperation()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 500m);
+        var referenceNumber = $"debit-{Guid.NewGuid():N}";
+
+        var withdrawResponse = await HttpClient.PostAsJsonAsync("/api/wallets/withdraw-funds",
+            new DecrementWalletRequest
+            {
+                CredentialId = credential.Id,
+                WalletId = wallet.Id,
+                Amount = 125m,
+                ReferenceNumber = referenceNumber,
+                Metadata = CreateMetadata()
+            });
+        withdrawResponse.IsSuccessStatusCode.Should().BeTrue();
+
+        Guid debitTransactionId;
+        await using (var db = CreateDbContext())
+        {
+            debitTransactionId = await db.Set<WalletTransaction>()
+                .Where(t => t.ReferenceNumber == referenceNumber && t.TransactionType == TransactionType.Debit)
+                .Select(t => t.Id)
+                .SingleAsync();
+        }
+
+        var reverseResponse = await HttpClient.PostAsJsonAsync("/api/wallets/reverse-transaction",
+            new ReverseTransactionRequest
+            {
+                TransactionId = debitTransactionId,
+                Reason = "test reversal",
+                Metadata = CreateMetadata()
+            });
+        var body = await reverseResponse.Content.ReadAsStringAsync();
+
+        reverseResponse.IsSuccessStatusCode.Should().BeTrue($"Response: {body}");
+
+        await using (var db = CreateDbContext())
+        {
+            var updated = await db.Set<Wallet>().FirstAsync(w => w.Id == wallet.Id);
+            var operation = await db.Set<WalletOperation>()
+                .SingleAsync(o => o.IdempotencyKey == $"reversal:{debitTransactionId}");
+
+            updated.Balance.Should().Be(500m);
+            operation.OperationType.Should().Be(WalletOperationType.Reversal);
+            await AssertLedgerBalanced(db, operation.Id);
+        }
+    }
+
+    #endregion
+
+    #region HTTP - Batch
+
+    [Test]
+    public async Task Http_BatchIncrement_CreatesSingleBalancedBatchLedgerOperation()
+    {
+        var firstCredential = await SeedCredential();
+        var firstWallet = await SeedWallet(firstCredential.Id, 0m);
+        var secondCredential = await SeedCredential();
+        var secondWallet = await SeedWallet(secondCredential.Id, 0m);
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/batch/increment", new
+        {
+            TenantId = WalletsTestFixture.TestTenantId,
+            AllowPartialSuccess = false,
+            Requests = new[]
+            {
+                new BatchIncrementRequest
+                {
+                    CredentialId = firstCredential.Id,
+                    WalletId = firstWallet.Id,
+                    Amount = 100m,
+                    Fee = 5m,
+                    ReferenceNumber = $"batch-inc-{Guid.NewGuid():N}"
+                },
+                new BatchIncrementRequest
+                {
+                    CredentialId = secondCredential.Id,
+                    WalletId = secondWallet.Id,
+                    Amount = 200m,
+                    ReferenceNumber = $"batch-inc-{Guid.NewGuid():N}"
+                }
+            }
+        });
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Response: {body}");
+
+        await using var db = CreateDbContext();
+        var updatedFirst = await db.Set<Wallet>().SingleAsync(w => w.Id == firstWallet.Id);
+        var updatedSecond = await db.Set<Wallet>().SingleAsync(w => w.Id == secondWallet.Id);
+        var operation = await db.Set<WalletOperation>()
+            .SingleAsync(o => o.OperationType == WalletOperationType.Batch);
+
+        updatedFirst.Balance.Should().Be(95m);
+        updatedSecond.Balance.Should().Be(200m);
+        await AssertLedgerBalanced(db, operation.Id);
     }
 
     #endregion
@@ -557,4 +786,32 @@ public class WalletTransactionTests : WalletsTestBase
     }
 
     #endregion
+
+    private async Task<Guid> SeedSecondWalletType()
+    {
+        var secondTypeId = Guid.NewGuid();
+        await using var db = CreateDbContext();
+        db.Set<Wallets.Domain.Shared.Contracts.WalletType>().Add(new Wallets.Domain.Shared.Contracts.WalletType
+        {
+            Id = secondTypeId,
+            Code = $"TST{Guid.NewGuid():N}"[..8],
+            Name = "TestCoin2",
+            TenantId = WalletsTestFixture.TestTenantId,
+            MinTransferRule = 0,
+            MaxTransferRule = 1_000_000
+        });
+        await db.SaveChangesAsync();
+        return secondTypeId;
+    }
+
+    private static async Task AssertLedgerBalanced(DbContext db, Guid operationId)
+    {
+        var entries = await db.Set<WalletLedgerEntry>()
+            .Where(e => e.OperationId == operationId)
+            .ToListAsync();
+
+        entries.Should().NotBeEmpty();
+        entries.Where(e => e.Direction == WalletLedgerDirection.Debit).Sum(e => e.Amount)
+            .Should().Be(entries.Where(e => e.Direction == WalletLedgerDirection.Credit).Sum(e => e.Amount));
+    }
 }

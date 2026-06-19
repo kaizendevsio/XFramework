@@ -13,6 +13,7 @@ public static class ConvertEndpoint
     [MapPost("/api/wallets/convert", Tags = ["Wallets"],
         Summary = "Convert funds between wallet types",
         Description = "Converts funds from one wallet type to another for the same credential. Handles fee deduction based on TransferDeductionType. Automatically creates target wallet if it doesn't exist.",
+        RequireAuthorization = true,
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ConvertWalletRequest request,

@@ -11,6 +11,7 @@ public static class UnfreezeWalletEndpoint
     [MapPost("/api/wallets/unfreeze", Tags = ["Wallets"],
         Summary = "Unfreeze a wallet",
         Description = "Unfreezes a wallet, restoring it to Active status and allowing financial operations.",
+        RequireAuthorization = true,
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         UnfreezeWalletRequest request,

@@ -16,6 +16,8 @@ public class ServicesInstaller : IInstaller
         services.AddSingleton<IWalletEventPublisher, WalletEventPublisher>();
 
         // Register wallet services
+        services.AddScoped<IWalletPolicyEvaluator, WalletPolicyEvaluator>();
+        services.AddScoped<IWalletLedgerService, WalletLedgerService>();
         services.AddScoped<IWalletOperationsService, WalletOperationsService>();
         services.AddScoped<IBatchWalletService, BatchWalletService>();
     }

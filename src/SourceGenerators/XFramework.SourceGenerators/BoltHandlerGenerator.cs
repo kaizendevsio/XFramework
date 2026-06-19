@@ -133,6 +133,9 @@ public class BoltHandlerGenerator : ISourceGenerator
         string? summary = null;
         string? description = null;
         bool excludeFromOpenApi = false;
+        bool requireAuthorization = false;
+        string? authorizationPolicy = null;
+        string[]? roles = null;
 
         if (httpAttr != null)
         {
@@ -164,10 +167,38 @@ public class BoltHandlerGenerator : ISourceGenerator
                     case "ExcludeFromOpenApi":
                         excludeFromOpenApi = value == "true";
                         break;
+                    case "RequireAuthorization":
+                        requireAuthorization = value == "true";
+                        break;
+                    case "AuthorizationPolicy":
+                        authorizationPolicy = value.Trim('"');
+                        break;
                     case "Tags":
                         tags = ParseStringArray(value);
                         break;
+                    case "Roles":
+                        roles = ParseStringArray(value);
+                        break;
                 }
+            }
+
+            var httpAttributeData = httpMethod == null
+                ? null
+                : methodSymbol.GetAttributes()
+                    .FirstOrDefault(attributeData => AttributeMatchesHttpMethod(attributeData, httpMethod));
+
+            if (httpAttributeData != null)
+            {
+                requireAuthorization = GetBoolNamedArgument(
+                    httpAttributeData,
+                    "RequireAuthorization",
+                    requireAuthorization);
+                authorizationPolicy = GetStringNamedArgument(
+                    httpAttributeData,
+                    "AuthorizationPolicy") ?? authorizationPolicy;
+                roles = GetStringArrayNamedArgument(
+                    httpAttributeData,
+                    "Roles") ?? roles;
             }
         }
 
@@ -237,6 +268,9 @@ public class BoltHandlerGenerator : ISourceGenerator
             Summary = summary,
             Description = description,
             ExcludeFromOpenApi = excludeFromOpenApi,
+            RequireAuthorization = requireAuthorization,
+            AuthorizationPolicy = authorizationPolicy,
+            Roles = roles,
             ValidatorTypeFullName = hasValidator ? validatorInterface : null
         };
     }
@@ -364,6 +398,54 @@ public class BoltHandlerGenerator : ISourceGenerator
             .Select(s => s.Trim().Trim('"'))
             .Where(s => !string.IsNullOrEmpty(s))
             .ToArray();
+    }
+
+    private static bool AttributeMatchesHttpMethod(AttributeData attributeData, string httpMethod)
+    {
+        var attributeName = attributeData.AttributeClass?.Name;
+        return attributeName == httpMethod || attributeName == $"{httpMethod}Attribute";
+    }
+
+    private static bool GetBoolNamedArgument(
+        AttributeData attributeData,
+        string propertyName,
+        bool defaultValue)
+    {
+        foreach (var namedArg in attributeData.NamedArguments)
+        {
+            if (namedArg.Key == propertyName && namedArg.Value.Value is bool value)
+                return value;
+        }
+
+        return defaultValue;
+    }
+
+    private static string? GetStringNamedArgument(AttributeData attributeData, string propertyName)
+    {
+        foreach (var namedArg in attributeData.NamedArguments)
+        {
+            if (namedArg.Key == propertyName && namedArg.Value.Value is string value)
+                return value;
+        }
+
+        return null;
+    }
+
+    private static string[]? GetStringArrayNamedArgument(AttributeData attributeData, string propertyName)
+    {
+        foreach (var namedArg in attributeData.NamedArguments)
+        {
+            if (namedArg.Key != propertyName || namedArg.Value.IsNull)
+                continue;
+
+            return namedArg.Value.Values
+                .Select(static value => value.Value as string)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value!)
+                .ToArray();
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -597,6 +679,7 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
             chain.AppendLine($"            .WithSummary({ToCSharpStringLiteral(h.Summary)})");
         if (h.Description != null)
             chain.AppendLine($"            .WithDescription({ToCSharpStringLiteral(h.Description)})");
+        chain.Append(GenerateAuthorizationConfiguration(h));
         if (h.ExcludeFromOpenApi)
             chain.AppendLine("            .ExcludeFromDescription()");
 
@@ -812,6 +895,34 @@ public static class GeneratedEndpointRoutes
 
     #endregion
 
+    private static string GenerateAuthorizationConfiguration(HandlerInfo h)
+    {
+        var policy = string.IsNullOrWhiteSpace(h.AuthorizationPolicy) ? null : h.AuthorizationPolicy;
+        var roles = h.Roles?
+            .Where(static role => !string.IsNullOrWhiteSpace(role))
+            .ToArray();
+        var hasRoles = roles is { Length: > 0 };
+
+        if (!h.RequireAuthorization && policy == null && !hasRoles)
+            return string.Empty;
+
+        var builder = new StringBuilder();
+
+        if (policy != null)
+            builder.AppendLine($"            .RequireAuthorization({ToCSharpStringLiteral(policy)})");
+
+        if (hasRoles)
+        {
+            var roleArguments = string.Join(", ", roles!.Select(ToCSharpStringLiteral));
+            builder.AppendLine($"            .RequireAuthorization(policy => policy.RequireRole({roleArguments}))");
+        }
+
+        if (policy == null && !hasRoles)
+            builder.AppendLine("            .RequireAuthorization()");
+
+        return builder.ToString();
+    }
+
     private static string ToCSharpStringLiteral(string value)
     {
         var builder = new StringBuilder(value.Length + 2);
@@ -867,6 +978,9 @@ public static class GeneratedEndpointRoutes
         public string? Summary { get; set; }
         public string? Description { get; set; }
         public bool ExcludeFromOpenApi { get; set; }
+        public bool RequireAuthorization { get; set; }
+        public string? AuthorizationPolicy { get; set; }
+        public string[]? Roles { get; set; }
 
         // Validation
         public string? ValidatorTypeFullName { get; set; }

@@ -26,6 +26,24 @@ public abstract class MapEndpointAttribute : Attribute
     /// </summary>
     public bool ExcludeFromOpenApi { get; set; }
 
+    /// <summary>
+    /// Whether the generated endpoint should require authorization.
+    /// Defaults to <c>false</c> to preserve existing method-level endpoint behavior.
+    /// </summary>
+    public bool RequireAuthorization { get; set; }
+
+    /// <summary>
+    /// Named authorization policy required by the generated endpoint.
+    /// When set, the generator emits RequireAuthorization for this policy.
+    /// </summary>
+    public string? AuthorizationPolicy { get; set; }
+
+    /// <summary>
+    /// Roles required by the generated endpoint.
+    /// When set, the generator emits RequireAuthorization with a role requirement.
+    /// </summary>
+    public string[]? Roles { get; set; }
+
     protected MapEndpointAttribute(string route) => Route = route;
 }
 

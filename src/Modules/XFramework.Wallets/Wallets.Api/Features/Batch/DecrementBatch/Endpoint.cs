@@ -75,6 +75,7 @@ public static class Endpoint
             .WithSummary("Batch decrement wallet balances")
             .WithDescription("Processes multiple wallet decrements in a single optimized transaction. " +
                 "Validates sufficient balances before processing. Performance: 20-50x faster than individual operations.")
+            .RequireAuthorization()
             .Produces<BatchOperationResult>(StatusCodes.Status200OK)
             .Produces<BatchOperationResult>(StatusCodes.Status207MultiStatus)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)

@@ -11,6 +11,7 @@ public static class ReverseTransactionEndpoint
     [MapPost("/api/wallets/reverse-transaction", Tags = ["Wallets"],
         Summary = "Reverse a transaction",
         Description = "Reverses a single transaction or a full transfer (paired). Creates inverse transactions and updates balances.",
+        RequireAuthorization = true,
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ReverseTransactionRequest request,

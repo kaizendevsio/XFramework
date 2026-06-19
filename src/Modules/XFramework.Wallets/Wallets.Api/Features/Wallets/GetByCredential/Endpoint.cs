@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
-using Wallets.Api.Features.Wallets.Shared;
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts.Responses;
 
 namespace Wallets.Api.Features.Wallets.GetByCredential;
 
@@ -14,6 +14,7 @@ public static class GetWalletsByCredentialEndpoint
         app.MapGet("/api/wallets/credential/{credentialId:guid}", Handle)
             .WithName("GetWalletsByCredential")
             .WithTags("Wallets")
+            .RequireAuthorization()
             .ExcludeFromDescription();
     }
 

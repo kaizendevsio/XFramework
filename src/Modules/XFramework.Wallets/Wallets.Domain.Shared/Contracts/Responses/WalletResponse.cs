@@ -1,9 +1,7 @@
-namespace Wallets.Api.Features.Wallets.Shared;
+namespace Wallets.Domain.Shared.Contracts.Responses;
 
-/// <summary>
-/// Response DTO for Wallet operations
-/// </summary>
-public class WalletResponse
+[MemoryPackable]
+public partial record WalletResponse
 {
     public Guid Id { get; set; }
     public Guid CredentialId { get; set; }
@@ -24,12 +22,8 @@ public class WalletResponse
     public DateTime CreatedAt { get; set; }
     public DateTime? ModifiedAt { get; set; }
 
-    /// <summary>
-    /// Maps a Wallet entity to WalletResponse
-    /// </summary>
-    public static WalletResponse FromWallet(Wallet wallet)
-    {
-        return new WalletResponse
+    public static WalletResponse FromWallet(Wallet wallet) =>
+        new()
         {
             Id = wallet.Id,
             CredentialId = wallet.CredentialId,
@@ -50,15 +44,12 @@ public class WalletResponse
             CreatedAt = wallet.CreatedAt,
             ModifiedAt = wallet.ModifiedAt
         };
-    }
 }
 
-/// <summary>
-/// Paginated response for wallets
-/// </summary>
-public class PaginatedWalletResponse
+[MemoryPackable]
+public partial record PaginatedWalletResponse
 {
-    public List<WalletResponse> Items { get; set; } = new();
+    public List<WalletResponse> Items { get; set; } = [];
     public int Page { get; set; }
     public int PageSize { get; set; }
     public int TotalCount { get; set; }

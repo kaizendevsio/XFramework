@@ -6,695 +6,739 @@ using XFramework.Domain.Shared.Enums;
 namespace Wallets.Api.Services;
 
 /// <summary>
-/// High-performance batch wallet operations service.
-/// Provides 20-50x performance improvement over individual operations through bulk processing.
+/// Batch wallet operations backed by the append-only wallet ledger.
 /// </summary>
-public sealed class BatchWalletService : IBatchWalletService
+public sealed class BatchWalletService(
+    DbContext dbContext,
+    IWalletLedgerService ledgerService,
+    ILogger<BatchWalletService> logger) : IBatchWalletService
 {
     private const int MaxBatchSize = 1000;
-    private const int ChunkSize = 1000;
-    
-    private readonly DbContext _dbContext;
-    private readonly ILogger<BatchWalletService> _logger;
 
-    public BatchWalletService(
-        DbContext dbContext,
-        ILogger<BatchWalletService> logger)
-    {
-        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    /// <inheritdoc />
     public async Task<Result<BatchOperationResult>> BatchIncrementAsync(
         List<BatchIncrementRequest> requests,
         Guid tenantId,
         bool allowPartialSuccess = false,
         CancellationToken cancellationToken = default)
     {
+        var validation = ValidateBatch(requests);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        logger.BatchWalletOperationStarted("Increment", requests.Count);
         var stopwatch = Stopwatch.StartNew();
-        var result = new BatchOperationResult();
+        var result = allowPartialSuccess
+            ? await ExecutePartialAsync(requests, tenantId, ExecuteIncrementLedgerAsync, cancellationToken)
+            : await ExecuteIncrementLedgerAsync(requests, tenantId, cancellationToken);
 
-        try
-        {
-            // Validate input
-            if (requests == null || requests.Count == 0)
-            {
-                return Result<BatchOperationResult>.Failure("Batch requests cannot be null or empty", 400);
-            }
-
-            if (requests.Count > MaxBatchSize)
-            {
-                return Result<BatchOperationResult>.Failure(
-                    $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.", 400);
-            }
-
-            _logger.BatchWalletOperationStarted("Increment", requests.Count);
-
-            // Start transaction
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-            try
-            {
-                // Fetch all required wallets in a single query
-                var walletIds = requests.Select(r => r.WalletId).Distinct().ToList();
-                var wallets = await _dbContext.Set<Wallet>()
-                    .Where(w => w.TenantId == tenantId && walletIds.Contains(w.Id))
-                    .ToDictionaryAsync(w => w.Id, cancellationToken);
-
-                var transactions = new List<WalletTransaction>();
-                
-                // Process each request
-                for (int i = 0; i < requests.Count; i++)
-                {
-                    var request = requests[i];
-                    
-                    try
-                    {
-                        // Validate amount
-                        if (request.Amount <= 0)
-                        {
-                            AddError(result, i, request.WalletId, request.ReferenceNumber,
-                                $"Invalid increment amount: {request.Amount}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Invalid increment amount");
-                            continue;
-                        }
-
-                        // Get or create wallet
-                        if (!wallets.TryGetValue(request.WalletId, out var wallet))
-                        {
-                            // Wallet doesn't exist - check if we can create it
-                            if (request.WalletTypeId == Guid.Empty)
-                            {
-                                AddError(result, i, request.WalletId, request.ReferenceNumber,
-                                    "Wallet not found and WalletTypeId not provided for auto-creation");
-                                if (!allowPartialSuccess) throw new InvalidOperationException("Wallet not found");
-                                continue;
-                            }
-
-                            // Create new wallet
-                            wallet = new Wallet
-                            {
-                                Id = request.WalletId == Guid.Empty ? Guid.NewGuid() : request.WalletId,
-                                TenantId = tenantId,
-                                CredentialId = request.CredentialId,
-                                WalletTypeId = request.WalletTypeId,
-                                Balance = 0,
-                                DebitOnHoldBalance = 0,
-                                CreditOnHoldBalance = 0,
-                                TransferableBalance = 0
-                            };
-                            
-                            _dbContext.Set<Wallet>().Add(wallet);
-                            wallets[wallet.Id] = wallet;
-                        }
-
-                        // Validate transfer rules
-                        if (wallet.MinTransferRule.HasValue && request.Amount < wallet.MinTransferRule.Value)
-                        {
-                            AddError(result, i, request.WalletId, request.ReferenceNumber,
-                                $"Amount {request.Amount} is below minimum transfer rule {wallet.MinTransferRule.Value}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Amount below minimum");
-                            continue;
-                        }
-
-                        if (wallet.MaxTransferRule.HasValue && request.Amount > wallet.MaxTransferRule.Value)
-                        {
-                            AddError(result, i, request.WalletId, request.ReferenceNumber,
-                                $"Amount {request.Amount} exceeds maximum transfer rule {wallet.MaxTransferRule.Value}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Amount exceeds maximum");
-                            continue;
-                        }
-
-                        // Store previous balances
-                        var previousBalance = wallet.Balance;
-                        var previousTotalBalance = wallet.TotalBalance ?? 0;
-                        var previousCreditOnHoldBalance = wallet.CreditOnHoldBalance;
-                        var previousDebitOnHoldBalance = wallet.DebitOnHoldBalance;
-
-                        // Update wallet balance
-                        if (request.OnHold)
-                        {
-                            wallet.CreditOnHoldBalance += request.Amount;
-                        }
-                        else
-                        {
-                            wallet.Balance += request.Amount;
-                            wallet.TransferableBalance += request.Amount;
-                        }
-
-                        // Validate maintaining balance rule
-                        if (wallet.MaintainingBalanceRule.HasValue && wallet.Balance < wallet.MaintainingBalanceRule.Value)
-                        {
-                            AddError(result, i, request.WalletId, request.ReferenceNumber,
-                                $"Operation would violate maintaining balance rule {wallet.MaintainingBalanceRule.Value}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Maintaining balance violation");
-                            continue;
-                        }
-
-                        // Create transaction record
-                        var walletTxn = new WalletTransaction
-                        {
-                            Id = Guid.NewGuid(),
-                            TenantId = tenantId,
-                            CredentialId = request.CredentialId,
-                            WalletId = wallet.Id,
-                            Amount = request.Amount,
-                            TransactionFee = request.Fee,
-                            PreviousBalance = previousBalance,
-                            PreviousTotalBalance = previousTotalBalance,
-                            PreviousDebitOnHoldBalance = previousDebitOnHoldBalance,
-                            PreviousCreditOnHoldBalance = previousCreditOnHoldBalance,
-                            RunningBalance = wallet.Balance,
-                            RunningTotalBalance = wallet.TotalBalance,
-                            RunningAvailableBalance = wallet.AvailableBalance,
-                            RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance,
-                            RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance,
-                            Remarks = request.Remarks,
-                            TransactionType = TransactionType.Credit,
-                            Held = request.OnHold,
-                            Released = !request.OnHold,
-                            ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber)
-                                ? Guid.NewGuid().ToString()
-                                : request.ReferenceNumber
-                        };
-
-                        transactions.Add(walletTxn);
-                        result.SuccessCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error processing batch increment item {Index}", i);
-                        AddError(result, i, request.WalletId, request.ReferenceNumber, ex.Message);
-                        
-                        if (!allowPartialSuccess)
-                        {
-                            throw;
-                        }
-                    }
-                }
-
-                // Bulk insert all transactions
-                if (transactions.Count > 0)
-                {
-                    await _dbContext.Set<WalletTransaction>().AddRangeAsync(transactions, cancellationToken);
-                }
-
-                // Save changes
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-
-                result.TotalProcessed = requests.Count;
-                result.FailureCount = result.Errors.Count;
-                result.Duration = stopwatch.Elapsed;
-
-                _logger.BatchWalletOperationCompleted("Increment", result.SuccessCount, result.TotalProcessed);
-                _logger.OperationCompleted("BatchIncrement", stopwatch.ElapsedMilliseconds);
-
-                return Result<BatchOperationResult>.Success(result);
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.ConcurrencyConflict("BatchWalletIncrement", Guid.Empty);
-                return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.OperationFailed("BatchIncrement", "Wallet", Guid.Empty, ex.Message, ex);
-                return Result<BatchOperationResult>.Failure($"Batch operation failed: {ex.Message}", 500);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.OperationFailed("BatchIncrement", "Wallet", Guid.Empty, ex.Message, ex);
-            return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
-        }
+        return Complete("BatchIncrement", "Increment", result, stopwatch);
     }
 
-    /// <inheritdoc />
     public async Task<Result<BatchOperationResult>> BatchDecrementAsync(
         List<BatchDecrementRequest> requests,
         Guid tenantId,
         bool allowPartialSuccess = false,
         CancellationToken cancellationToken = default)
     {
+        var validation = ValidateBatch(requests);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        logger.BatchWalletOperationStarted("Decrement", requests.Count);
         var stopwatch = Stopwatch.StartNew();
-        var result = new BatchOperationResult();
+        var result = allowPartialSuccess
+            ? await ExecutePartialAsync(requests, tenantId, ExecuteDecrementLedgerAsync, cancellationToken)
+            : await ExecuteDecrementLedgerAsync(requests, tenantId, cancellationToken);
 
-        try
-        {
-            // Validate input
-            if (requests == null || requests.Count == 0)
-            {
-                return Result<BatchOperationResult>.Failure("Batch requests cannot be null or empty", 400);
-            }
-
-            if (requests.Count > MaxBatchSize)
-            {
-                return Result<BatchOperationResult>.Failure(
-                    $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.", 400);
-            }
-
-            _logger.BatchWalletOperationStarted("Decrement", requests.Count);
-
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-            try
-            {
-                // Fetch all required wallets
-                var walletIds = requests.Select(r => r.WalletId).Distinct().ToList();
-                var wallets = await _dbContext.Set<Wallet>()
-                    .Where(w => w.TenantId == tenantId && walletIds.Contains(w.Id))
-                    .ToDictionaryAsync(w => w.Id, cancellationToken);
-
-                var transactions = new List<WalletTransaction>();
-
-                for (int i = 0; i < requests.Count; i++)
-                {
-                    var request = requests[i];
-
-                    try
-                    {
-                        // Validate amount
-                        if (request.Amount <= 0)
-                        {
-                            AddError(result, i, request.WalletId, request.ReferenceNumber,
-                                $"Invalid decrement amount: {request.Amount}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Invalid decrement amount");
-                            continue;
-                        }
-
-                        // Check wallet exists
-                        if (!wallets.TryGetValue(request.WalletId, out var wallet))
-                        {
-                            AddError(result, i, request.WalletId, request.ReferenceNumber, "Wallet not found");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Wallet not found");
-                            continue;
-                        }
-
-                        // Check sufficient balance
-                        var availableBalance = request.OnHold ? wallet.Balance : wallet.AvailableBalance;
-                        if (availableBalance < request.Amount)
-                        {
-                            AddError(result, i, request.WalletId, request.ReferenceNumber,
-                                $"Insufficient balance. Available: {availableBalance}, Required: {request.Amount}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Insufficient balance");
-                            continue;
-                        }
-
-                        // Store previous balances
-                        var previousBalance = wallet.Balance;
-                        var previousTotalBalance = wallet.TotalBalance ?? 0;
-                        var previousCreditOnHoldBalance = wallet.CreditOnHoldBalance;
-                        var previousDebitOnHoldBalance = wallet.DebitOnHoldBalance;
-
-                        // Update wallet balance
-                        if (request.OnHold)
-                        {
-                            wallet.DebitOnHoldBalance += request.Amount;
-                        }
-                        else
-                        {
-                            wallet.Balance -= request.Amount;
-                            wallet.TransferableBalance -= request.Amount;
-                        }
-
-                        // Validate maintaining balance rule
-                        if (wallet.MaintainingBalanceRule.HasValue && wallet.Balance < wallet.MaintainingBalanceRule.Value)
-                        {
-                            AddError(result, i, request.WalletId, request.ReferenceNumber,
-                                $"Operation would violate maintaining balance rule {wallet.MaintainingBalanceRule.Value}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Maintaining balance violation");
-                            continue;
-                        }
-
-                        // Create transaction record
-                        var txn = new WalletTransaction
-                        {
-                            Id = Guid.NewGuid(),
-                            TenantId = tenantId,
-                            CredentialId = request.CredentialId,
-                            WalletId = wallet.Id,
-                            Amount = request.Amount,
-                            TransactionFee = request.Fee,
-                            PreviousBalance = previousBalance,
-                            PreviousTotalBalance = previousTotalBalance,
-                            PreviousDebitOnHoldBalance = previousDebitOnHoldBalance,
-                            PreviousCreditOnHoldBalance = previousCreditOnHoldBalance,
-                            RunningBalance = wallet.Balance,
-                            RunningTotalBalance = wallet.TotalBalance,
-                            RunningAvailableBalance = wallet.AvailableBalance,
-                            RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance,
-                            RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance,
-                            Remarks = request.Remarks,
-                            TransactionType = TransactionType.Debit,
-                            Held = request.OnHold,
-                            Released = !request.OnHold,
-                            ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber)
-                                ? Guid.NewGuid().ToString()
-                                : request.ReferenceNumber
-                        };
-
-                        transactions.Add(txn);
-                        result.SuccessCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error processing batch decrement item {Index}", i);
-                        AddError(result, i, request.WalletId, request.ReferenceNumber, ex.Message);
-                        
-                        if (!allowPartialSuccess)
-                        {
-                            throw;
-                        }
-                    }
-                }
-
-                // Bulk insert transactions
-                if (transactions.Count > 0)
-                {
-                    await _dbContext.Set<WalletTransaction>().AddRangeAsync(transactions, cancellationToken);
-                }
-
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-
-                result.TotalProcessed = requests.Count;
-                result.FailureCount = result.Errors.Count;
-                result.Duration = stopwatch.Elapsed;
-
-                _logger.BatchWalletOperationCompleted("Decrement", result.SuccessCount, result.TotalProcessed);
-                _logger.OperationCompleted("BatchDecrement", stopwatch.ElapsedMilliseconds);
-
-                return Result<BatchOperationResult>.Success(result);
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.ConcurrencyConflict("BatchWalletDecrement", Guid.Empty);
-                return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.OperationFailed("BatchDecrement", "Wallet", Guid.Empty, ex.Message, ex);
-                return Result<BatchOperationResult>.Failure($"Batch operation failed: {ex.Message}", 500);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.OperationFailed("BatchDecrement", "Wallet", Guid.Empty, ex.Message, ex);
-            return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
-        }
+        return Complete("BatchDecrement", "Decrement", result, stopwatch);
     }
 
-    /// <inheritdoc />
     public async Task<Result<BatchOperationResult>> BatchTransferAsync(
         List<BatchTransferRequest> requests,
         Guid tenantId,
         bool allowPartialSuccess = false,
         CancellationToken cancellationToken = default)
     {
+        var validation = ValidateBatch(requests);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        logger.BatchWalletOperationStarted("Transfer", requests.Count);
         var stopwatch = Stopwatch.StartNew();
-        var result = new BatchOperationResult();
+        var result = allowPartialSuccess
+            ? await ExecutePartialAsync(requests, tenantId, ExecuteTransferLedgerAsync, cancellationToken)
+            : await ExecuteTransferLedgerAsync(requests, tenantId, cancellationToken);
 
-        try
-        {
-            // Validate input
-            if (requests == null || requests.Count == 0)
-            {
-                return Result<BatchOperationResult>.Failure("Batch requests cannot be null or empty", 400);
-            }
-
-            if (requests.Count > MaxBatchSize)
-            {
-                return Result<BatchOperationResult>.Failure(
-                    $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.", 400);
-            }
-
-            _logger.BatchWalletOperationStarted("Transfer", requests.Count);
-
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-            try
-            {
-                // Fetch all required wallets (both source and destination)
-                var allWalletIds = requests
-                    .SelectMany(r => new[] { r.FromWalletId, r.ToWalletId })
-                    .Distinct()
-                    .ToList();
-
-                var wallets = await _dbContext.Set<Wallet>()
-                    .Where(w => w.TenantId == tenantId && allWalletIds.Contains(w.Id))
-                    .ToDictionaryAsync(w => w.Id, cancellationToken);
-
-                var transactions = new List<WalletTransaction>();
-
-                for (int i = 0; i < requests.Count; i++)
-                {
-                    var request = requests[i];
-
-                    try
-                    {
-                        // Validate amount
-                        if (request.Amount <= 0)
-                        {
-                            AddError(result, i, request.FromWalletId, request.ReferenceNumber,
-                                $"Invalid transfer amount: {request.Amount}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Invalid transfer amount");
-                            continue;
-                        }
-
-                        // Validate source wallet
-                        if (!wallets.TryGetValue(request.FromWalletId, out var fromWallet))
-                        {
-                            AddError(result, i, request.FromWalletId, request.ReferenceNumber, "Source wallet not found");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Source wallet not found");
-                            continue;
-                        }
-
-                        // Validate destination wallet
-                        if (!wallets.TryGetValue(request.ToWalletId, out var toWallet))
-                        {
-                            AddError(result, i, request.ToWalletId, request.ReferenceNumber, "Destination wallet not found");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Destination wallet not found");
-                            continue;
-                        }
-
-                        // Check sufficient balance in source wallet
-                        if (fromWallet.AvailableBalance < request.Amount)
-                        {
-                            AddError(result, i, request.FromWalletId, request.ReferenceNumber,
-                                $"Insufficient balance in source wallet. Available: {fromWallet.AvailableBalance}, Required: {request.Amount}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Insufficient balance");
-                            continue;
-                        }
-
-                        // Store previous balances for source wallet
-                        var fromPrevBalance = fromWallet.Balance;
-                        var fromPrevTotalBalance = fromWallet.TotalBalance ?? 0;
-                        var fromPrevCreditOnHold = fromWallet.CreditOnHoldBalance;
-                        var fromPrevDebitOnHold = fromWallet.DebitOnHoldBalance;
-
-                        // Store previous balances for destination wallet
-                        var toPrevBalance = toWallet.Balance;
-                        var toPrevTotalBalance = toWallet.TotalBalance ?? 0;
-                        var toPrevCreditOnHold = toWallet.CreditOnHoldBalance;
-                        var toPrevDebitOnHold = toWallet.DebitOnHoldBalance;
-
-                        // Update source wallet (debit)
-                        fromWallet.Balance -= request.Amount;
-                        fromWallet.TransferableBalance -= request.Amount;
-
-                        // Update destination wallet (credit)
-                        toWallet.Balance += request.Amount;
-                        toWallet.TransferableBalance += request.Amount;
-
-                        // Validate maintaining balance for source wallet
-                        if (fromWallet.MaintainingBalanceRule.HasValue && fromWallet.Balance < fromWallet.MaintainingBalanceRule.Value)
-                        {
-                            AddError(result, i, request.FromWalletId, request.ReferenceNumber,
-                                $"Transfer would violate source wallet maintaining balance rule {fromWallet.MaintainingBalanceRule.Value}");
-                            if (!allowPartialSuccess) throw new InvalidOperationException("Maintaining balance violation");
-                            continue;
-                        }
-
-                        var refNumber = string.IsNullOrEmpty(request.ReferenceNumber)
-                            ? Guid.NewGuid().ToString()
-                            : request.ReferenceNumber;
-
-                        // Create debit transaction for source wallet
-                        var debitTxn = new WalletTransaction
-                        {
-                            Id = Guid.NewGuid(),
-                            TenantId = tenantId,
-                            CredentialId = request.FromCredentialId,
-                            WalletId = fromWallet.Id,
-                            Amount = request.Amount,
-                            TransactionFee = request.Fee,
-                            PreviousBalance = fromPrevBalance,
-                            PreviousTotalBalance = fromPrevTotalBalance,
-                            PreviousDebitOnHoldBalance = fromPrevDebitOnHold,
-                            PreviousCreditOnHoldBalance = fromPrevCreditOnHold,
-                            RunningBalance = fromWallet.Balance,
-                            RunningTotalBalance = fromWallet.TotalBalance,
-                            RunningAvailableBalance = fromWallet.AvailableBalance,
-                            RunningCreditOnHoldBalance = fromWallet.CreditOnHoldBalance,
-                            RunningDebitOnHoldBalance = fromWallet.DebitOnHoldBalance,
-                            Remarks = $"Transfer to wallet {toWallet.Id}: {request.Remarks}",
-                            TransactionType = TransactionType.Debit,
-                            Held = false,
-                            Released = true,
-                            ReferenceNumber = refNumber
-                        };
-
-                        // Create credit transaction for destination wallet
-                        var creditTxn = new WalletTransaction
-                        {
-                            Id = Guid.NewGuid(),
-                            TenantId = tenantId,
-                            CredentialId = request.ToCredentialId,
-                            WalletId = toWallet.Id,
-                            Amount = request.Amount,
-                            TransactionFee = 0, // Fee charged to sender only
-                            PreviousBalance = toPrevBalance,
-                            PreviousTotalBalance = toPrevTotalBalance,
-                            PreviousDebitOnHoldBalance = toPrevDebitOnHold,
-                            PreviousCreditOnHoldBalance = toPrevCreditOnHold,
-                            RunningBalance = toWallet.Balance,
-                            RunningTotalBalance = toWallet.TotalBalance,
-                            RunningAvailableBalance = toWallet.AvailableBalance,
-                            RunningCreditOnHoldBalance = toWallet.CreditOnHoldBalance,
-                            RunningDebitOnHoldBalance = toWallet.DebitOnHoldBalance,
-                            Remarks = $"Transfer from wallet {fromWallet.Id}: {request.Remarks}",
-                            TransactionType = TransactionType.Credit,
-                            Held = false,
-                            Released = true,
-                            ReferenceNumber = refNumber
-                        };
-
-                        transactions.Add(debitTxn);
-                        transactions.Add(creditTxn);
-                        result.SuccessCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error processing batch transfer item {Index}", i);
-                        AddError(result, i, request.FromWalletId, request.ReferenceNumber, ex.Message);
-                        
-                        if (!allowPartialSuccess)
-                        {
-                            throw;
-                        }
-                    }
-                }
-
-                // Bulk insert transactions
-                if (transactions.Count > 0)
-                {
-                    await _dbContext.Set<WalletTransaction>().AddRangeAsync(transactions, cancellationToken);
-                }
-
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-
-                result.TotalProcessed = requests.Count;
-                result.FailureCount = result.Errors.Count;
-                result.Duration = stopwatch.Elapsed;
-
-                _logger.BatchWalletOperationCompleted("Transfer", result.SuccessCount, result.TotalProcessed);
-                _logger.OperationCompleted("BatchTransfer", stopwatch.ElapsedMilliseconds);
-
-                return Result<BatchOperationResult>.Success(result);
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.ConcurrencyConflict("BatchWalletTransfer", Guid.Empty);
-                return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.OperationFailed("BatchTransfer", "Wallet", Guid.Empty, ex.Message, ex);
-                return Result<BatchOperationResult>.Failure($"Batch operation failed: {ex.Message}", 500);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.OperationFailed("BatchTransfer", "Wallet", Guid.Empty, ex.Message, ex);
-            return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
-        }
+        return Complete("BatchTransfer", "Transfer", result, stopwatch);
     }
 
-    /// <inheritdoc />
     public async Task<Result<BatchOperationResult>> ProcessTransactionsAsync(
         List<WalletTransaction> transactions,
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        var result = new BatchOperationResult();
+        var validation = ValidateBatch(transactions);
+        if (validation is not null)
+        {
+            return validation;
+        }
 
         try
         {
-            if (transactions == null || transactions.Count == 0)
+            await dbContext.Set<WalletTransaction>().AddRangeAsync(transactions, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            var result = new BatchOperationResult
             {
-                return Result<BatchOperationResult>.Failure("Transaction list cannot be null or empty", 400);
-            }
+                TotalProcessed = transactions.Count,
+                SuccessCount = transactions.Count,
+                Duration = stopwatch.Elapsed
+            };
 
-            if (transactions.Count > MaxBatchSize)
-            {
-                return Result<BatchOperationResult>.Failure(
-                    $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.", 400);
-            }
-
-            _logger.BatchWalletOperationStarted("ProcessTransactions", transactions.Count);
-
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-            try
-            {
-                // Bulk insert all transactions
-                await _dbContext.Set<WalletTransaction>().AddRangeAsync(transactions, cancellationToken);
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-
-                result.TotalProcessed = transactions.Count;
-                result.SuccessCount = transactions.Count;
-                result.FailureCount = 0;
-                result.Duration = stopwatch.Elapsed;
-
-                _logger.OperationCompleted("ProcessTransactions", stopwatch.ElapsedMilliseconds);
-
-                return Result<BatchOperationResult>.Success(result);
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.ConcurrencyConflict("ProcessTransactions", Guid.Empty);
-                return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.OperationFailed("ProcessTransactions", "WalletTransaction", Guid.Empty, ex.Message, ex);
-                return Result<BatchOperationResult>.Failure($"Batch operation failed: {ex.Message}", 500);
-            }
+            logger.OperationCompleted("ProcessTransactions", stopwatch.ElapsedMilliseconds);
+            return Result<BatchOperationResult>.Success(result);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            logger.ConcurrencyConflict("ProcessTransactions", Guid.Empty);
+            return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
         }
         catch (Exception ex)
         {
-            _logger.OperationFailed("ProcessTransactions", "WalletTransaction", Guid.Empty, ex.Message, ex);
+            logger.OperationFailed("ProcessTransactions", "WalletTransaction", Guid.Empty, ex.Message, ex);
             return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
         }
     }
 
+    private async Task<Result<BatchOperationResult>> ExecuteIncrementLedgerAsync(
+        List<BatchIncrementRequest> requests,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        var walletIds = requests
+            .Where(static r => r.WalletId != Guid.Empty)
+            .Select(static r => r.WalletId)
+            .Distinct()
+            .ToList();
+
+        var wallets = await dbContext.Set<Wallet>()
+            .AsNoTracking()
+            .Where(w => w.TenantId == tenantId && walletIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, ct);
+
+        var newWallets = new Dictionary<Guid, Wallet>();
+        var drafts = wallets.ToDictionary(static pair => pair.Key, static pair => WalletDraft.From(pair.Value));
+        var postings = new List<WalletLedgerPostingRequest>();
+        var readModels = new List<object>();
+
+        for (var i = 0; i < requests.Count; i++)
+        {
+            var request = requests[i];
+            var validation = ValidateIncrement(request);
+            if (validation is not null)
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber, validation);
+            }
+
+            if (!wallets.TryGetValue(request.WalletId, out var wallet))
+            {
+                if (request.WalletTypeId == Guid.Empty)
+                {
+                    return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber,
+                        "Wallet not found and WalletTypeId not provided for auto-creation");
+                }
+
+                var walletId = request.WalletId == Guid.Empty ? Guid.NewGuid() : request.WalletId;
+                wallet = new Wallet
+                {
+                    Id = walletId,
+                    TenantId = tenantId,
+                    CredentialId = request.CredentialId,
+                    WalletTypeId = request.WalletTypeId,
+                    Balance = 0,
+                    TransferableBalance = 0,
+                    DebitOnHoldBalance = 0,
+                    CreditOnHoldBalance = 0,
+                    IsEnabled = true
+                };
+                wallets[wallet.Id] = wallet;
+                newWallets[wallet.Id] = wallet;
+                drafts[wallet.Id] = WalletDraft.From(wallet);
+            }
+
+            if (wallet.MinTransferRule.HasValue && request.Amount < wallet.MinTransferRule.Value)
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber,
+                    $"Amount {request.Amount} is below minimum transfer rule {wallet.MinTransferRule.Value}");
+            }
+
+            if (wallet.MaxTransferRule.HasValue && request.Amount > wallet.MaxTransferRule.Value)
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber,
+                    $"Amount {request.Amount} exceeds maximum transfer rule {wallet.MaxTransferRule.Value}");
+            }
+
+            var draft = drafts[wallet.Id];
+            var netCredit = request.Amount - request.Fee;
+            if (request.OnHold)
+            {
+                draft.CreditOnHoldBalance += netCredit;
+            }
+            else
+            {
+                draft.Balance += netCredit;
+                draft.TransferableBalance += netCredit;
+            }
+
+            var referenceNumber = CreateReferenceNumber(request.ReferenceNumber);
+            var walletTransaction = new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                CredentialId = request.CredentialId,
+                WalletId = wallet.Id,
+                Amount = request.Amount,
+                TransactionFee = request.Fee,
+                Remarks = request.Remarks,
+                TransactionType = TransactionType.Credit,
+                Held = request.OnHold,
+                Released = !request.OnHold,
+                ReferenceNumber = referenceNumber
+            };
+
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                Direction = WalletLedgerDirection.Debit,
+                BalanceBucket = WalletBalanceBucket.External,
+                EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                Amount = request.Amount,
+                WalletTypeId = wallet.WalletTypeId,
+                ReferenceNumber = referenceNumber,
+                CounterpartyType = "batch-increment-source",
+                CounterpartyReference = "wallets",
+                Description = "Batch increment source"
+            });
+
+            if (netCredit > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    WalletId = wallet.Id,
+                    WalletTransaction = walletTransaction,
+                    Direction = WalletLedgerDirection.Credit,
+                    BalanceBucket = request.OnHold ? WalletBalanceBucket.CreditHold : WalletBalanceBucket.Available,
+                    EntryKind = request.OnHold ? WalletLedgerEntryKind.Hold : WalletLedgerEntryKind.Principal,
+                    Amount = netCredit,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = referenceNumber,
+                    Description = request.OnHold ? "Batch held credit" : "Batch available credit"
+                });
+            }
+            else
+            {
+                ApplyDraftBalances(walletTransaction, draft);
+            }
+
+            if (request.Fee > 0)
+            {
+                postings.Add(CreateFeePosting(request.Fee, wallet.WalletTypeId, referenceNumber, "Batch increment fee"));
+            }
+
+            readModels.Add(walletTransaction);
+        }
+
+        return await ExecuteLedgerAsync(
+            tenantId,
+            WalletOperationType.Batch,
+            postings,
+            readModels,
+            newWallets.Values.ToList(),
+            requests.Count,
+            "batch-increment",
+            ct);
+    }
+
+    private async Task<Result<BatchOperationResult>> ExecuteDecrementLedgerAsync(
+        List<BatchDecrementRequest> requests,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        var walletIds = requests.Select(static r => r.WalletId).Distinct().ToList();
+        var wallets = await dbContext.Set<Wallet>()
+            .AsNoTracking()
+            .Where(w => w.TenantId == tenantId && walletIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, ct);
+
+        var drafts = wallets.ToDictionary(static pair => pair.Key, static pair => WalletDraft.From(pair.Value));
+        var postings = new List<WalletLedgerPostingRequest>();
+        var readModels = new List<object>();
+
+        for (var i = 0; i < requests.Count; i++)
+        {
+            var request = requests[i];
+            var validation = ValidateDecrement(request);
+            if (validation is not null)
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber, validation);
+            }
+
+            if (!wallets.TryGetValue(request.WalletId, out var wallet))
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber, "Wallet not found");
+            }
+
+            var draft = drafts[wallet.Id];
+            var totalDebit = request.Amount + request.Fee;
+            var debitValidation = ValidateDraftDebit(draft, wallet, totalDebit, request.OnHold, "decrement");
+            if (debitValidation is not null)
+            {
+                return BatchFailure(requests.Count, i, request.WalletId, request.ReferenceNumber, debitValidation);
+            }
+
+            if (request.OnHold)
+            {
+                draft.DebitOnHoldBalance += totalDebit;
+                draft.TransferableBalance -= totalDebit;
+            }
+            else
+            {
+                draft.Balance -= totalDebit;
+                draft.TransferableBalance -= totalDebit;
+            }
+
+            var referenceNumber = CreateReferenceNumber(request.ReferenceNumber);
+            var walletTransaction = new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                CredentialId = request.CredentialId,
+                WalletId = wallet.Id,
+                Amount = request.Amount,
+                TransactionFee = request.Fee,
+                Remarks = request.Remarks,
+                TransactionType = TransactionType.Debit,
+                Held = request.OnHold,
+                Released = !request.OnHold,
+                ReferenceNumber = referenceNumber
+            };
+
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                WalletId = wallet.Id,
+                WalletTransaction = walletTransaction,
+                Direction = WalletLedgerDirection.Debit,
+                BalanceBucket = request.OnHold ? WalletBalanceBucket.DebitHold : WalletBalanceBucket.Available,
+                EntryKind = request.OnHold ? WalletLedgerEntryKind.Hold : WalletLedgerEntryKind.Principal,
+                Amount = totalDebit,
+                WalletTypeId = wallet.WalletTypeId,
+                ReferenceNumber = referenceNumber,
+                Description = request.OnHold ? "Batch held debit" : "Batch available debit"
+            });
+
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                Direction = WalletLedgerDirection.Credit,
+                BalanceBucket = WalletBalanceBucket.External,
+                EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                Amount = request.Amount,
+                WalletTypeId = wallet.WalletTypeId,
+                ReferenceNumber = referenceNumber,
+                CounterpartyType = "batch-decrement-destination",
+                CounterpartyReference = "wallets",
+                Description = "Batch decrement destination"
+            });
+
+            if (request.Fee > 0)
+            {
+                postings.Add(CreateFeePosting(request.Fee, wallet.WalletTypeId, referenceNumber, "Batch decrement fee"));
+            }
+
+            readModels.Add(walletTransaction);
+        }
+
+        return await ExecuteLedgerAsync(
+            tenantId,
+            WalletOperationType.Batch,
+            postings,
+            readModels,
+            [],
+            requests.Count,
+            "batch-decrement",
+            ct);
+    }
+
+    private async Task<Result<BatchOperationResult>> ExecuteTransferLedgerAsync(
+        List<BatchTransferRequest> requests,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        var walletIds = requests
+            .SelectMany(static r => new[] { r.FromWalletId, r.ToWalletId })
+            .Distinct()
+            .ToList();
+
+        var wallets = await dbContext.Set<Wallet>()
+            .AsNoTracking()
+            .Where(w => w.TenantId == tenantId && walletIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, ct);
+
+        var drafts = wallets.ToDictionary(static pair => pair.Key, static pair => WalletDraft.From(pair.Value));
+        var postings = new List<WalletLedgerPostingRequest>();
+        var readModels = new List<object>();
+
+        for (var i = 0; i < requests.Count; i++)
+        {
+            var request = requests[i];
+            var validation = ValidateTransfer(request);
+            if (validation is not null)
+            {
+                return BatchFailure(requests.Count, i, request.FromWalletId, request.ReferenceNumber, validation);
+            }
+
+            if (!wallets.TryGetValue(request.FromWalletId, out var fromWallet))
+            {
+                return BatchFailure(requests.Count, i, request.FromWalletId, request.ReferenceNumber, "Source wallet not found");
+            }
+
+            if (!wallets.TryGetValue(request.ToWalletId, out var toWallet))
+            {
+                return BatchFailure(requests.Count, i, request.ToWalletId, request.ReferenceNumber, "Destination wallet not found");
+            }
+
+            var fromDraft = drafts[fromWallet.Id];
+            var totalDebit = request.Amount + request.Fee;
+            var debitValidation = ValidateDraftDebit(fromDraft, fromWallet, totalDebit, onHold: false, "transfer");
+            if (debitValidation is not null)
+            {
+                return BatchFailure(requests.Count, i, request.FromWalletId, request.ReferenceNumber, debitValidation);
+            }
+
+            fromDraft.Balance -= totalDebit;
+            fromDraft.TransferableBalance -= totalDebit;
+
+            var toDraft = drafts[toWallet.Id];
+            toDraft.Balance += request.Amount;
+            toDraft.TransferableBalance += request.Amount;
+
+            var referenceNumber = CreateReferenceNumber(request.ReferenceNumber);
+            var debitTransaction = new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                CredentialId = request.FromCredentialId,
+                WalletId = fromWallet.Id,
+                Amount = request.Amount,
+                TransactionFee = request.Fee,
+                Remarks = $"Transfer to wallet {toWallet.Id}: {request.Remarks}",
+                TransactionType = TransactionType.Debit,
+                Held = false,
+                Released = true,
+                ReferenceNumber = referenceNumber
+            };
+
+            var creditTransaction = new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                CredentialId = request.ToCredentialId,
+                WalletId = toWallet.Id,
+                Amount = request.Amount,
+                TransactionFee = 0,
+                Remarks = $"Transfer from wallet {fromWallet.Id}: {request.Remarks}",
+                TransactionType = TransactionType.Credit,
+                Held = false,
+                Released = true,
+                ReferenceNumber = referenceNumber
+            };
+
+            var walletTransfer = new WalletTransfer
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                SenderTransactionId = debitTransaction.Id,
+                RecipientTransactionId = creditTransaction.Id,
+                SenderTransaction = debitTransaction,
+                RecipientTransaction = creditTransaction,
+                TransactionPurpose = TransactionPurpose.Transfer,
+                TransactionFee = request.Fee
+            };
+
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                WalletId = fromWallet.Id,
+                WalletTransaction = debitTransaction,
+                Direction = WalletLedgerDirection.Debit,
+                BalanceBucket = WalletBalanceBucket.Available,
+                EntryKind = WalletLedgerEntryKind.Principal,
+                Amount = totalDebit,
+                WalletTypeId = fromWallet.WalletTypeId,
+                ReferenceNumber = referenceNumber,
+                Description = "Batch transfer debit"
+            });
+
+            postings.Add(new WalletLedgerPostingRequest
+            {
+                WalletId = toWallet.Id,
+                WalletTransaction = creditTransaction,
+                Direction = WalletLedgerDirection.Credit,
+                BalanceBucket = WalletBalanceBucket.Available,
+                EntryKind = WalletLedgerEntryKind.Principal,
+                Amount = request.Amount,
+                WalletTypeId = toWallet.WalletTypeId,
+                ReferenceNumber = referenceNumber,
+                Description = "Batch transfer credit"
+            });
+
+            if (request.Fee > 0)
+            {
+                postings.Add(CreateFeePosting(request.Fee, fromWallet.WalletTypeId, referenceNumber, "Batch transfer fee"));
+            }
+
+            readModels.Add(debitTransaction);
+            readModels.Add(creditTransaction);
+            readModels.Add(walletTransfer);
+        }
+
+        return await ExecuteLedgerAsync(
+            tenantId,
+            WalletOperationType.Batch,
+            postings,
+            readModels,
+            [],
+            requests.Count,
+            "batch-transfer",
+            ct);
+    }
+
+    private async Task<Result<BatchOperationResult>> ExecuteLedgerAsync(
+        Guid tenantId,
+        WalletOperationType operationType,
+        IReadOnlyList<WalletLedgerPostingRequest> postings,
+        IReadOnlyList<object> readModels,
+        IReadOnlyList<Wallet> newWallets,
+        int totalProcessed,
+        string referencePrefix,
+        CancellationToken ct)
+    {
+        var ledgerResult = await ledgerService.ExecuteAsync(
+            new WalletLedgerExecutionRequest
+            {
+                TenantId = tenantId,
+                OperationType = operationType,
+                ReferenceNumber = $"{referencePrefix}:{Guid.NewGuid():N}",
+                Postings = postings,
+                NewWallets = newWallets,
+                ReadModels = readModels
+            },
+            ct);
+
+        if (!ledgerResult.IsSuccess)
+        {
+            return Result<BatchOperationResult>.Failure(
+                ledgerResult.Message ?? "Batch ledger operation failed",
+                ledgerResult.StatusCode);
+        }
+
+        return Result<BatchOperationResult>.Success(new BatchOperationResult
+        {
+            TotalProcessed = totalProcessed,
+            SuccessCount = totalProcessed,
+            FailureCount = 0
+        });
+    }
+
+    private async Task<Result<BatchOperationResult>> ExecutePartialAsync<TRequest>(
+        List<TRequest> requests,
+        Guid tenantId,
+        Func<List<TRequest>, Guid, CancellationToken, Task<Result<BatchOperationResult>>> executeSingle,
+        CancellationToken ct)
+        where TRequest : class
+    {
+        var result = new BatchOperationResult { TotalProcessed = requests.Count };
+
+        for (var i = 0; i < requests.Count; i++)
+        {
+            var singleResult = await executeSingle([requests[i]], tenantId, ct);
+            if (singleResult.IsSuccess)
+            {
+                result.SuccessCount++;
+                continue;
+            }
+
+            result.FailureCount++;
+            var (walletId, referenceNumber) = GetBatchItemIdentity(requests[i]);
+            AddError(result, i, walletId, referenceNumber, singleResult.Message ?? "Batch item failed");
+        }
+
+        return Result<BatchOperationResult>.Success(result);
+    }
+
+    private Result<BatchOperationResult> Complete(
+        string operationName,
+        string batchOperationName,
+        Result<BatchOperationResult> result,
+        Stopwatch stopwatch)
+    {
+        stopwatch.Stop();
+
+        if (!result.IsSuccess)
+        {
+            logger.OperationFailed(operationName, "Wallet", Guid.Empty, result.Message ?? "Batch operation failed");
+            return result;
+        }
+
+        result.Data!.Duration = stopwatch.Elapsed;
+        logger.BatchWalletOperationCompleted(batchOperationName, result.Data.SuccessCount, result.Data.TotalProcessed);
+        logger.OperationCompleted(operationName, stopwatch.ElapsedMilliseconds);
+        return result;
+    }
+
+    private static Result<BatchOperationResult>? ValidateBatch<T>(List<T>? requests)
+    {
+        if (requests is null || requests.Count == 0)
+        {
+            return Result<BatchOperationResult>.Failure("Batch requests cannot be null or empty", 400);
+        }
+
+        return requests.Count > MaxBatchSize
+            ? Result<BatchOperationResult>.Failure(
+                $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.",
+                400)
+            : null;
+    }
+
+    private static string? ValidateIncrement(BatchIncrementRequest request)
+    {
+        if (request.Amount <= 0)
+        {
+            return $"Invalid increment amount: {request.Amount}";
+        }
+
+        return request.Fee < 0 || request.Fee > request.Amount
+            ? $"Invalid increment fee: {request.Fee}"
+            : null;
+    }
+
+    private static string? ValidateDecrement(BatchDecrementRequest request)
+    {
+        if (request.Amount <= 0)
+        {
+            return $"Invalid decrement amount: {request.Amount}";
+        }
+
+        return request.Fee < 0
+            ? $"Invalid decrement fee: {request.Fee}"
+            : null;
+    }
+
+    private static string? ValidateTransfer(BatchTransferRequest request)
+    {
+        if (request.Amount <= 0)
+        {
+            return $"Invalid transfer amount: {request.Amount}";
+        }
+
+        return request.Fee < 0
+            ? $"Invalid transfer fee: {request.Fee}"
+            : null;
+    }
+
+    private static string? ValidateDraftDebit(
+        WalletDraft draft,
+        Wallet wallet,
+        decimal amount,
+        bool onHold,
+        string operation)
+    {
+        if (draft.AvailableBalance < amount)
+        {
+            return $"Insufficient balance. Available: {draft.AvailableBalance}, Required: {amount}";
+        }
+
+        if (draft.TransferableBalance < amount)
+        {
+            return $"Insufficient transferable balance. Available: {draft.TransferableBalance}, Required: {amount}";
+        }
+
+        if (!onHold &&
+            wallet.MaintainingBalanceRule.HasValue &&
+            draft.Balance - amount < wallet.MaintainingBalanceRule.Value)
+        {
+            return $"Balance after {operation} must not drop below {wallet.MaintainingBalanceRule.Value}";
+        }
+
+        return null;
+    }
+
+    private static Result<BatchOperationResult> BatchFailure(
+        int totalProcessed,
+        int index,
+        Guid? walletId,
+        string? referenceNumber,
+        string message)
+    {
+        var result = new BatchOperationResult
+        {
+            TotalProcessed = totalProcessed,
+            SuccessCount = 0,
+            FailureCount = 1
+        };
+        AddError(result, index, walletId, referenceNumber, message);
+        return Result<BatchOperationResult>.Failure(message, 400);
+    }
+
+    private static WalletLedgerPostingRequest CreateFeePosting(
+        decimal fee,
+        Guid? walletTypeId,
+        string referenceNumber,
+        string description) =>
+        new()
+        {
+            Direction = WalletLedgerDirection.Credit,
+            BalanceBucket = WalletBalanceBucket.Fee,
+            EntryKind = WalletLedgerEntryKind.Fee,
+            Amount = fee,
+            WalletTypeId = walletTypeId,
+            ReferenceNumber = referenceNumber,
+            CounterpartyType = "platform-fee",
+            CounterpartyReference = "wallets",
+            Description = description
+        };
+
+    private static void ApplyDraftBalances(WalletTransaction transaction, WalletDraft draft)
+    {
+        transaction.RunningBalance = draft.Balance;
+        transaction.RunningTotalBalance = draft.TotalBalance;
+        transaction.RunningAvailableBalance = draft.AvailableBalance;
+        transaction.RunningDebitOnHoldBalance = draft.DebitOnHoldBalance;
+        transaction.RunningCreditOnHoldBalance = draft.CreditOnHoldBalance;
+    }
+
+    private static string CreateReferenceNumber(string? referenceNumber) =>
+        string.IsNullOrWhiteSpace(referenceNumber)
+            ? Guid.NewGuid().ToString()
+            : referenceNumber;
+
+    private static (Guid? WalletId, string? ReferenceNumber) GetBatchItemIdentity<TRequest>(TRequest request) =>
+        request switch
+        {
+            BatchIncrementRequest increment => (increment.WalletId, increment.ReferenceNumber),
+            BatchDecrementRequest decrement => (decrement.WalletId, decrement.ReferenceNumber),
+            BatchTransferRequest transfer => (transfer.FromWalletId, transfer.ReferenceNumber),
+            _ => (null, null)
+        };
+
     private static void AddError(
         BatchOperationResult result,
         int index,
-        Guid walletId,
+        Guid? walletId,
         string? referenceNumber,
         string message)
     {
@@ -705,5 +749,24 @@ public sealed class BatchWalletService : IBatchWalletService
             ReferenceNumber = referenceNumber,
             ErrorMessage = message
         });
+    }
+
+    private sealed class WalletDraft
+    {
+        public decimal Balance { get; set; }
+        public decimal TransferableBalance { get; set; }
+        public decimal DebitOnHoldBalance { get; set; }
+        public decimal CreditOnHoldBalance { get; set; }
+        public decimal AvailableBalance => Balance - DebitOnHoldBalance;
+        public decimal TotalBalance => Balance + CreditOnHoldBalance - DebitOnHoldBalance;
+
+        public static WalletDraft From(Wallet wallet) =>
+            new()
+            {
+                Balance = wallet.Balance,
+                TransferableBalance = wallet.TransferableBalance,
+                DebitOnHoldBalance = wallet.DebitOnHoldBalance,
+                CreditOnHoldBalance = wallet.CreditOnHoldBalance
+            };
     }
 }

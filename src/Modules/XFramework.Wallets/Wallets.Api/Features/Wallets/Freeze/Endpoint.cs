@@ -11,6 +11,7 @@ public static class FreezeWalletEndpoint
     [MapPost("/api/wallets/freeze", Tags = ["Wallets"],
         Summary = "Freeze a wallet",
         Description = "Freezes a wallet, preventing all financial operations (transfer, increment, decrement, convert).",
+        RequireAuthorization = true,
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         FreezeWalletRequest request,

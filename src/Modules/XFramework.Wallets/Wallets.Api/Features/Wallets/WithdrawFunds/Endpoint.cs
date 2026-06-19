@@ -13,6 +13,7 @@ public static class WithdrawFundsEndpoint
     [MapPost("/api/wallets/withdraw-funds", Tags = ["Wallets"],
         Summary = "Withdraw funds from a wallet",
         Description = "Decrements (subtracts from) a wallet's balance. Supports both immediate and on-hold decrements. Validates sufficient available balance.",
+        RequireAuthorization = true,
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         DecrementWalletRequest request,
