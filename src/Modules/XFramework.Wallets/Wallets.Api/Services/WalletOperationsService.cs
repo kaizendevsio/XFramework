@@ -1556,14 +1556,14 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
     private static string CreateReferenceNumber(TransactionRequestBase request)
     {
-        if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+        if (!string.IsNullOrWhiteSpace(request.ReferenceNumber))
         {
-            return request.IdempotencyKey;
+            return request.ReferenceNumber;
         }
 
-        return string.IsNullOrWhiteSpace(request.ReferenceNumber)
+        return string.IsNullOrWhiteSpace(request.IdempotencyKey)
             ? Guid.NewGuid().ToString()
-            : request.ReferenceNumber;
+            : request.IdempotencyKey;
     }
 
     private static decimal GetHeldReleaseAmount(WalletTransaction transaction)
