@@ -6,7 +6,7 @@ namespace Wallets.Domain.Shared.Contracts;
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Both,
-    Actions = EndpointActions.All,
+    Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/exchange-rates",
     RequireAuthorization = true,
     CacheDurationSeconds = 1800,

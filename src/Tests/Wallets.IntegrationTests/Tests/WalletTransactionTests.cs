@@ -208,7 +208,7 @@ public class WalletTransactionTests : WalletsTestBase
     public async Task Http_AddFunds_WithWalletIdAndDuplicateCredentialType_TargetsExplicitWallet()
     {
         var credential = await SeedCredential();
-        var otherWallet = await SeedWallet(credential.Id, 100m, WalletStatus.Frozen);
+        var otherWallet = await SeedWallet(credential.Id, 100m, WalletStatus.Closed);
         var targetWallet = await SeedWallet(credential.Id, 0m);
 
         var request = new IncrementWalletRequest
@@ -231,7 +231,7 @@ public class WalletTransactionTests : WalletsTestBase
         var updatedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
 
         unchangedOther.Balance.Should().Be(100m);
-        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        unchangedOther.Status.Should().Be(WalletStatus.Closed);
         updatedTarget.Balance.Should().Be(25m);
     }
 
@@ -267,7 +267,7 @@ public class WalletTransactionTests : WalletsTestBase
     public async Task Http_WithdrawFunds_WithWalletIdAndDuplicateCredentialType_TargetsExplicitWallet()
     {
         var credential = await SeedCredential();
-        var otherWallet = await SeedWallet(credential.Id, 1000m, WalletStatus.Frozen);
+        var otherWallet = await SeedWallet(credential.Id, 1000m, WalletStatus.Closed);
         var targetWallet = await SeedWallet(credential.Id, 100m);
 
         var request = new DecrementWalletRequest
@@ -290,7 +290,7 @@ public class WalletTransactionTests : WalletsTestBase
         var updatedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
 
         unchangedOther.Balance.Should().Be(1000m);
-        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        unchangedOther.Status.Should().Be(WalletStatus.Closed);
         updatedTarget.Balance.Should().Be(75m);
     }
 
@@ -695,11 +695,13 @@ public class WalletTransactionTests : WalletsTestBase
     {
         var credential = await SeedCredential();
         var wallet = await SeedWallet(credential.Id, 0m);
+        var approvalId = await SeedApprovedWalletApproval(wallet.Id, WalletOperationType.Close, credential.Id);
 
         var closeResponse = await HttpClient.PostAsJsonAsync("/api/wallets/close",
             new CloseWalletRequest
             {
                 WalletId = wallet.Id,
+                ApprovalId = approvalId,
                 Reason = "test close empty wallet",
                 Metadata = CreateMetadata()
             });
@@ -851,7 +853,7 @@ public class WalletTransactionTests : WalletsTestBase
     public async Task Bolt_AddFunds_WithWalletIdAndDuplicateCredentialType_TargetsExplicitWallet()
     {
         var credential = await SeedCredential();
-        var otherWallet = await SeedWallet(credential.Id, 100m, WalletStatus.Frozen);
+        var otherWallet = await SeedWallet(credential.Id, 100m, WalletStatus.Closed);
         var targetWallet = await SeedWallet(credential.Id, 0m);
 
         var result = await WalletsTestFixture.ServiceWrapper.IncrementWallet(
@@ -872,7 +874,7 @@ public class WalletTransactionTests : WalletsTestBase
         var updatedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
 
         unchangedOther.Balance.Should().Be(100m);
-        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        unchangedOther.Status.Should().Be(WalletStatus.Closed);
         updatedTarget.Balance.Should().Be(25m);
     }
 
@@ -937,7 +939,7 @@ public class WalletTransactionTests : WalletsTestBase
     public async Task Bolt_WithdrawFunds_WithWalletIdAndDuplicateCredentialType_TargetsExplicitWallet()
     {
         var credential = await SeedCredential();
-        var otherWallet = await SeedWallet(credential.Id, 1000m, WalletStatus.Frozen);
+        var otherWallet = await SeedWallet(credential.Id, 1000m, WalletStatus.Closed);
         var targetWallet = await SeedWallet(credential.Id, 100m);
 
         var result = await WalletsTestFixture.ServiceWrapper.DecrementWallet(
@@ -958,7 +960,7 @@ public class WalletTransactionTests : WalletsTestBase
         var updatedTarget = await db.Set<Wallet>().SingleAsync(w => w.Id == targetWallet.Id);
 
         unchangedOther.Balance.Should().Be(1000m);
-        unchangedOther.Status.Should().Be(WalletStatus.Frozen);
+        unchangedOther.Status.Should().Be(WalletStatus.Closed);
         updatedTarget.Balance.Should().Be(75m);
     }
 
@@ -1066,11 +1068,13 @@ public class WalletTransactionTests : WalletsTestBase
     {
         var credential = await SeedCredential();
         var wallet = await SeedWallet(credential.Id, 0m);
+        var approvalId = await SeedApprovedWalletApproval(wallet.Id, WalletOperationType.Close, credential.Id);
 
         var result = await WalletsTestFixture.ServiceWrapper.CloseWallet(
             new CloseWalletRequest
             {
                 WalletId = wallet.Id,
+                ApprovalId = approvalId,
                 Reason = "test bolt close empty wallet",
                 Metadata = CreateMetadata()
             });

@@ -9,7 +9,11 @@ public class WalletLedgerEntryConfiguration : IEntityTypeConfiguration<WalletLed
     public void Configure(EntityTypeBuilder<WalletLedgerEntry> entity)
     {
         entity.HasKey(e => e.Id).HasName("tbl_WalletLedgerEntries_pkey");
-        entity.ToTable("WalletLedgerEntry", "Wallet");
+        entity.ToTable("WalletLedgerEntry", "Wallet", table =>
+        {
+            table.HasCheckConstraint("CK_WalletLedgerEntry_PositiveAmount", "\"Amount\" > 0");
+            table.HasCheckConstraint("CK_WalletLedgerEntry_NonNegativeSequence", "\"Sequence\" >= 0");
+        });
 
         entity.Property(e => e.Id)
             .HasColumnName("ID")

@@ -3571,6 +3571,22 @@ namespace XFramework.Domain.Migrations
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
+                    b.Property<Guid?>("ApprovalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("CalculatedFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
 
@@ -3605,6 +3621,17 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("FailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<Guid>("GatewayId")
                         .HasColumnType("uuid");
 
@@ -3619,6 +3646,18 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("ProviderEventId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ProviderStatus")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("RawRequestData")
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)");
@@ -3628,12 +3667,28 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("character varying(5000)");
 
                     b.Property<string>("ReferenceNo")
-                        .HasMaxLength(35)
-                        .HasColumnType("character varying(35)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Remarks")
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)");
+
+                    b.Property<Guid?>("RequestedByCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("RequestedFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<DateTime?>("SettledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SettlementOperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SettlementTransactionId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("SourceCurrencyId")
                         .HasColumnType("uuid");
@@ -3645,14 +3700,22 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("WalletId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("WalletTypeId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("WalletTypeId1")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("WorkflowStatus")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id")
                         .HasName("tbl_DepositRequests_pkey");
+
+                    b.HasIndex("ApprovalId");
 
                     b.HasIndex("CredentialId");
 
@@ -3660,13 +3723,36 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("GatewayId");
 
+                    b.HasIndex("SettlementOperationId");
+
+                    b.HasIndex("SettlementTransactionId");
+
                     b.HasIndex("SourceCurrencyId");
+
+                    b.HasIndex("WalletId");
 
                     b.HasIndex("WalletTypeId");
 
                     b.HasIndex("WalletTypeId1");
 
-                    b.ToTable("DepositRequest", "Wallet");
+                    b.HasIndex("TenantId", "ExternalReference")
+                        .IsUnique()
+                        .HasFilter("\"ExternalReference\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ProviderEventId")
+                        .IsUnique()
+                        .HasFilter("\"ProviderEventId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ReferenceNo");
+
+                    b.HasIndex("TenantId", "WorkflowStatus", "CreatedAt");
+
+                    b.ToTable("DepositRequest", "Wallet", t =>
+                        {
+                            t.HasCheckConstraint("CK_DepositRequest_NonNegativeFees", "(\"ConvenienceFee\" IS NULL OR \"ConvenienceFee\" >= 0) AND (\"SystemFee\" IS NULL OR \"SystemFee\" >= 0) AND (\"Discount\" IS NULL OR \"Discount\" >= 0) AND (\"RequestedFee\" IS NULL OR \"RequestedFee\" >= 0) AND (\"CalculatedFee\" IS NULL OR \"CalculatedFee\" >= 0)");
+
+                            t.HasCheckConstraint("CK_DepositRequest_PositiveAmount", "\"Amount\" IS NULL OR \"Amount\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.ExchangeRate", b =>
@@ -3750,7 +3836,8 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("numeric(24,8)");
 
                     b.Property<decimal?>("BondBalanceRule")
-                        .HasColumnType("numeric");
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
 
                     b.Property<int>("CardNumber")
                         .HasColumnType("integer");
@@ -3767,10 +3854,12 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("CreditOnHoldBalance")
-                        .HasColumnType("numeric");
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
 
                     b.Property<decimal>("DebitOnHoldBalance")
-                        .HasColumnType("numeric");
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3784,13 +3873,16 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<decimal?>("MaintainingBalanceRule")
-                        .HasColumnType("numeric");
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
 
                     b.Property<decimal?>("MaxTransferRule")
-                        .HasColumnType("numeric");
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
 
                     b.Property<decimal?>("MinTransferRule")
-                        .HasColumnType("numeric");
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
@@ -3806,7 +3898,8 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("TransferableBalance")
-                        .HasColumnType("numeric");
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
 
                     b.Property<Guid?>("WalletTypeId")
                         .HasColumnType("uuid");
@@ -3823,7 +3916,22 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("WalletTypeId1");
 
-                    b.ToTable("Wallet", "Wallet");
+                    b.HasIndex("TenantId", "AccountNumber")
+                        .IsUnique()
+                        .HasFilter("\"AccountNumber\" IS NOT NULL AND \"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.HasIndex("TenantId", "CredentialId", "WalletTypeId")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false AND \"Status\" <> 3");
+
+                    b.ToTable("Wallet", "Wallet", t =>
+                        {
+                            t.HasCheckConstraint("CK_Wallet_NonNegativeBalances", "\"Balance\" >= 0 AND \"TransferableBalance\" >= 0 AND \"DebitOnHoldBalance\" >= 0 AND \"CreditOnHoldBalance\" >= 0");
+
+                            t.HasCheckConstraint("CK_Wallet_TransferRules", "(\"MinTransferRule\" IS NULL OR \"MinTransferRule\" >= 0) AND (\"MaxTransferRule\" IS NULL OR \"MaxTransferRule\" >= 0) AND (\"MinTransferRule\" IS NULL OR \"MaxTransferRule\" IS NULL OR \"MaxTransferRule\" >= \"MinTransferRule\")");
+                        });
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletAddress", b =>
@@ -3880,6 +3988,99 @@ namespace XFramework.Domain.Migrations
                     b.HasIndex("WalletId");
 
                     b.ToTable("WalletAddress", "Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletApprovalRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<Guid?>("ApproverCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AuditMetadataJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DecisionReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("OperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("OperationType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("RequesterCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WalletId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("tbl_WalletApprovalRequests_pkey");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("WalletId");
+
+                    b.HasIndex("TenantId", "ApproverCredentialId");
+
+                    b.HasIndex("TenantId", "RequesterCredentialId");
+
+                    b.HasIndex("TenantId", "Status", "OperationType", "RequestedAt");
+
+                    b.ToTable("WalletApprovalRequest", "Wallet");
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletBalanceSnapshot", b =>
@@ -3981,6 +4182,201 @@ namespace XFramework.Domain.Migrations
                         .IsUnique();
 
                     b.ToTable("WalletBalanceSnapshot", "Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<int>("CaseType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("DeciderCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("OriginalOperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OriginalTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("RequesterCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SettlementOperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WalletId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("tbl_WalletCases_pkey");
+
+                    b.HasIndex("OriginalOperationId");
+
+                    b.HasIndex("OriginalTransactionId");
+
+                    b.HasIndex("SettlementOperationId");
+
+                    b.HasIndex("WalletId");
+
+                    b.HasIndex("TenantId", "ExternalReference")
+                        .IsUnique()
+                        .HasFilter("\"ExternalReference\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "WalletId", "Status");
+
+                    b.HasIndex("TenantId", "CaseType", "Status", "CreatedAt");
+
+                    b.ToTable("WalletCase", "Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletFeeSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<bool>("AllowRequestedFeeOverride")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("CurrencyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EffectiveAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("FixedFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("MaximumFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<decimal?>("MinimumFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("OperationType")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PercentageFee")
+                        .HasPrecision(18, 10)
+                        .HasColumnType("numeric(18,10)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WalletTypeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("tbl_WalletFeeSchedules_pkey");
+
+                    b.HasIndex("CurrencyId");
+
+                    b.HasIndex("WalletTypeId");
+
+                    b.HasIndex("TenantId", "EffectiveAt", "ExpiresAt");
+
+                    b.HasIndex("TenantId", "IsEnabled", "OperationType", "WalletTypeId", "CurrencyId");
+
+                    b.ToTable("WalletFeeSchedule", "Wallet", t =>
+                        {
+                            t.HasCheckConstraint("CK_WalletFeeSchedule_MinMaxFee", "\"MinimumFee\" IS NULL OR \"MaximumFee\" IS NULL OR \"MaximumFee\" >= \"MinimumFee\"");
+
+                            t.HasCheckConstraint("CK_WalletFeeSchedule_NonNegativeFees", "\"FixedFee\" >= 0 AND \"PercentageFee\" >= 0 AND (\"MinimumFee\" IS NULL OR \"MinimumFee\" >= 0) AND (\"MaximumFee\" IS NULL OR \"MaximumFee\" >= 0)");
+                        });
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletLedgerEntry", b =>
@@ -4115,7 +4511,12 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "WalletId", "CreatedAt");
 
-                    b.ToTable("WalletLedgerEntry", "Wallet");
+                    b.ToTable("WalletLedgerEntry", "Wallet", t =>
+                        {
+                            t.HasCheckConstraint("CK_WalletLedgerEntry_NonNegativeSequence", "\"Sequence\" >= 0");
+
+                            t.HasCheckConstraint("CK_WalletLedgerEntry_PositiveAmount", "\"Amount\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletOperation", b =>
@@ -4128,6 +4529,13 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<Guid?>("ActorCredentialId")
                         .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ApprovalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("CalculatedFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4175,9 +4583,15 @@ namespace XFramework.Domain.Migrations
                     b.Property<int>("OperationType")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("OriginalOperationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("PolicyDecision")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("PolicyDecisionJson")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("Reason")
                         .HasMaxLength(2000)
@@ -4191,9 +4605,24 @@ namespace XFramework.Domain.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<decimal?>("RequestedFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<bool>("RequiresApproval")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("RiskDecision")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<decimal?>("RiskScore")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<string>("RiskTier")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<int>("Status")
                         .ValueGeneratedOnAdd()
@@ -4206,7 +4635,11 @@ namespace XFramework.Domain.Migrations
                     b.HasKey("Id")
                         .HasName("tbl_WalletOperations_pkey");
 
+                    b.HasIndex("OriginalOperationId");
+
                     b.HasIndex("TenantId", "ActorCredentialId");
+
+                    b.HasIndex("TenantId", "ExternalReference");
 
                     b.HasIndex("TenantId", "IdempotencyKey")
                         .IsUnique()
@@ -4216,7 +4649,14 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "OperationType", "Status");
 
-                    b.ToTable("WalletOperation", "Wallet");
+                    b.HasIndex("TenantId", "Status", "CreatedAt");
+
+                    b.ToTable("WalletOperation", "Wallet", t =>
+                        {
+                            t.HasCheckConstraint("CK_WalletOperation_NonNegativeFees", "(\"RequestedFee\" IS NULL OR \"RequestedFee\" >= 0) AND (\"CalculatedFee\" IS NULL OR \"CalculatedFee\" >= 0)");
+
+                            t.HasCheckConstraint("CK_WalletOperation_RiskScoreRange", "\"RiskScore\" IS NULL OR (\"RiskScore\" >= 0 AND \"RiskScore\" <= 100)");
+                        });
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletOutboxMessage", b =>
@@ -4246,6 +4686,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeadLetteredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -4265,9 +4708,22 @@ namespace XFramework.Domain.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("LastError")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("LockedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
@@ -4304,9 +4760,391 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "AggregateType", "AggregateId");
 
+                    b.HasIndex("TenantId", "OperationId", "EventType")
+                        .IsUnique()
+                        .HasFilter("\"OperationId\" IS NOT NULL");
+
                     b.HasIndex("TenantId", "Status", "NextAttemptAt");
 
+                    b.HasIndex("TenantId", "Status", "LockedUntil", "NextAttemptAt");
+
                     b.ToTable("WalletOutboxMessage", "Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletPaymentWebhookEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DepositRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExternalEventId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("HeadersHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MappedWorkflowStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("OperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProcessingError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("ProcessingStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProviderKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProviderStatus")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RawPayloadJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("SignatureScheme")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("SignatureValid")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WithdrawalRequestId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("tbl_WalletPaymentWebhookEvents_pkey");
+
+                    b.HasIndex("DepositRequestId");
+
+                    b.HasIndex("OperationId");
+
+                    b.HasIndex("WithdrawalRequestId");
+
+                    b.HasIndex("TenantId", "ExternalReference");
+
+                    b.HasIndex("TenantId", "ProcessingStatus", "ReceivedAt");
+
+                    b.HasIndex("TenantId", "ProviderKey", "ExternalEventId")
+                        .IsUnique()
+                        .HasFilter("\"ExternalEventId\" <> ''");
+
+                    b.ToTable("WalletPaymentWebhookEvent", "Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletPolicyRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<decimal?>("ApprovalThreshold")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("CurrencyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("DailyVelocityLimit")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<string>("DecisionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("DenyWhenMatched")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("EffectiveAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("MaxSingleTransactionAmount")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<decimal?>("MonthlyVelocityLimit")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("OperationType")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RequiredWalletStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RiskTier")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WalletTypeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("tbl_WalletPolicyRules_pkey");
+
+                    b.HasIndex("CurrencyId");
+
+                    b.HasIndex("WalletTypeId");
+
+                    b.HasIndex("TenantId", "EffectiveAt", "ExpiresAt");
+
+                    b.HasIndex("TenantId", "IsEnabled", "OperationType", "WalletTypeId");
+
+                    b.ToTable("WalletPolicyRule", "Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletReconciliationItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<decimal>("ActualAmount")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<string>("CheckType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DetailsJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal>("DriftAmount")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<decimal>("ExpectedAmount")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("MarkedReconciledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("MarkedReconciledByCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RepairSuggestion")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WalletId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("tbl_WalletReconciliationItems_pkey");
+
+                    b.HasIndex("WalletId");
+
+                    b.HasIndex("RunId", "Status");
+
+                    b.HasIndex("TenantId", "Status", "CheckType");
+
+                    b.HasIndex("TenantId", "WalletId", "Status");
+
+                    b.ToTable("WalletReconciliationItem", "Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletReconciliationRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("CheckedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DriftCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("StartedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("tbl_WalletReconciliationRuns_pkey");
+
+                    b.HasIndex("TenantId", "Status", "StartedAt");
+
+                    b.ToTable("WalletReconciliationRun", "Wallet");
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletTransaction", b =>
@@ -4620,6 +5458,22 @@ namespace XFramework.Domain.Migrations
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
+                    b.Property<Guid?>("ApprovalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("CalculatedFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
 
@@ -4634,8 +5488,26 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("FailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<decimal?>("Fee")
-                        .HasColumnType("numeric");
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<Guid?>("GatewayId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("HoldOperationId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -4648,11 +5520,45 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("ProviderEventId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ProviderStatus")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RawRequestData")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("RawResponseData")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("ReferenceNumber")
                         .HasColumnType("text");
 
                     b.Property<string>("Remarks")
                         .HasColumnType("character varying");
+
+                    b.Property<Guid?>("RequestedByCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("RequestedFee")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("numeric(24,8)");
+
+                    b.Property<DateTime?>("SettledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SettlementOperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SettlementTransactionId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -4669,10 +5575,23 @@ namespace XFramework.Domain.Migrations
                     b.Property<int>("WithdrawalStatus")
                         .HasColumnType("integer");
 
+                    b.Property<int>("WorkflowStatus")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id")
                         .HasName("tbl_WithdrawalRequest_pkey");
 
+                    b.HasIndex("ApprovalId");
+
                     b.HasIndex("CredentialId");
+
+                    b.HasIndex("GatewayId");
+
+                    b.HasIndex("HoldOperationId");
+
+                    b.HasIndex("SettlementOperationId");
+
+                    b.HasIndex("SettlementTransactionId");
 
                     b.HasIndex("WalletId");
 
@@ -4680,7 +5599,24 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("WalletTypeId");
 
-                    b.ToTable("WithdrawalRequest", "Wallet");
+                    b.HasIndex("TenantId", "ExternalReference")
+                        .IsUnique()
+                        .HasFilter("\"ExternalReference\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ProviderEventId")
+                        .IsUnique()
+                        .HasFilter("\"ProviderEventId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ReferenceNumber");
+
+                    b.HasIndex("TenantId", "WorkflowStatus", "CreatedAt");
+
+                    b.ToTable("WithdrawalRequest", "Wallet", t =>
+                        {
+                            t.HasCheckConstraint("CK_WithdrawalRequest_NonNegativeFees", "(\"Fee\" IS NULL OR \"Fee\" >= 0) AND (\"RequestedFee\" IS NULL OR \"RequestedFee\" >= 0) AND (\"CalculatedFee\" IS NULL OR \"CalculatedFee\" >= 0)");
+
+                            t.HasCheckConstraint("CK_WithdrawalRequest_PositiveAmount", "\"Amount\" IS NULL OR \"Amount\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.MetaData", b =>
@@ -7841,6 +8777,11 @@ namespace XFramework.Domain.Migrations
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.DepositRequest", b =>
                 {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletApprovalRequest", "Approval")
+                        .WithMany()
+                        .HasForeignKey("ApprovalId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("IdentityServer.Domain.Shared.Contracts.IdentityCredential", "Credential")
                         .WithMany()
                         .HasForeignKey("CredentialId")
@@ -7859,10 +8800,25 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("DepositRequest_Gateway_ID_fk");
 
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "SettlementOperation")
+                        .WithMany()
+                        .HasForeignKey("SettlementOperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletTransaction", "SettlementTransaction")
+                        .WithMany()
+                        .HasForeignKey("SettlementTransactionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Wallets.Domain.Shared.Contracts.CurrencyType", "SourceCurrency")
                         .WithMany()
                         .HasForeignKey("SourceCurrencyId")
                         .HasConstraintName("SourceCurrencyId");
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.Wallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Wallets.Domain.Shared.Contracts.WalletType", "WalletType")
                         .WithMany()
@@ -7873,11 +8829,19 @@ namespace XFramework.Domain.Migrations
                         .WithMany("DepositRequests")
                         .HasForeignKey("WalletTypeId1");
 
+                    b.Navigation("Approval");
+
                     b.Navigation("Credential");
 
                     b.Navigation("PaymentGateway");
 
+                    b.Navigation("SettlementOperation");
+
+                    b.Navigation("SettlementTransaction");
+
                     b.Navigation("SourceCurrency");
+
+                    b.Navigation("Wallet");
 
                     b.Navigation("WalletType");
                 });
@@ -7934,6 +8898,23 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Wallet");
                 });
 
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletApprovalRequest", b =>
+                {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "Operation")
+                        .WithOne("Approval")
+                        .HasForeignKey("Wallets.Domain.Shared.Contracts.WalletApprovalRequest", "OperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.Wallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Operation");
+
+                    b.Navigation("Wallet");
+                });
+
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletBalanceSnapshot", b =>
                 {
                     b.HasOne("Wallets.Domain.Shared.Contracts.WalletLedgerEntry", "LastLedgerEntry")
@@ -7960,6 +8941,54 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("LastOperation");
 
                     b.Navigation("Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletCase", b =>
+                {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "OriginalOperation")
+                        .WithMany()
+                        .HasForeignKey("OriginalOperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletTransaction", "OriginalTransaction")
+                        .WithMany()
+                        .HasForeignKey("OriginalTransactionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "SettlementOperation")
+                        .WithMany()
+                        .HasForeignKey("SettlementOperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.Wallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .IsRequired();
+
+                    b.Navigation("OriginalOperation");
+
+                    b.Navigation("OriginalTransaction");
+
+                    b.Navigation("SettlementOperation");
+
+                    b.Navigation("Wallet");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletFeeSchedule", b =>
+                {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.CurrencyType", "Currency")
+                        .WithMany()
+                        .HasForeignKey("CurrencyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletType", "WalletType")
+                        .WithMany()
+                        .HasForeignKey("WalletTypeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Currency");
+
+                    b.Navigation("WalletType");
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletLedgerEntry", b =>
@@ -7990,6 +9019,16 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("WalletTransaction");
                 });
 
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletOperation", b =>
+                {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "OriginalOperation")
+                        .WithMany()
+                        .HasForeignKey("OriginalOperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("OriginalOperation");
+                });
+
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletOutboxMessage", b =>
                 {
                     b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "Operation")
@@ -7999,6 +9038,65 @@ namespace XFramework.Domain.Migrations
                         .HasConstraintName("tbl_WalletOutboxMessages_OperationId_fkey");
 
                     b.Navigation("Operation");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletPaymentWebhookEvent", b =>
+                {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.DepositRequest", "DepositRequest")
+                        .WithMany()
+                        .HasForeignKey("DepositRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "Operation")
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WithdrawalRequest", "WithdrawalRequest")
+                        .WithMany()
+                        .HasForeignKey("WithdrawalRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("DepositRequest");
+
+                    b.Navigation("Operation");
+
+                    b.Navigation("WithdrawalRequest");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletPolicyRule", b =>
+                {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.CurrencyType", "Currency")
+                        .WithMany()
+                        .HasForeignKey("CurrencyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletType", "WalletType")
+                        .WithMany()
+                        .HasForeignKey("WalletTypeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Currency");
+
+                    b.Navigation("WalletType");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletReconciliationItem", b =>
+                {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletReconciliationRun", "Run")
+                        .WithMany("Items")
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.Wallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Run");
+
+                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletTransaction", b =>
@@ -8083,11 +9181,36 @@ namespace XFramework.Domain.Migrations
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WithdrawalRequest", b =>
                 {
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletApprovalRequest", "Approval")
+                        .WithMany()
+                        .HasForeignKey("ApprovalId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("IdentityServer.Domain.Shared.Contracts.IdentityCredential", "Credential")
                         .WithMany()
                         .HasForeignKey("CredentialId")
                         .IsRequired()
                         .HasConstraintName("WithdrawalRequest_CredentialId");
+
+                    b.HasOne("XFramework.Domain.Shared.Contracts.PaymentGateway", "PaymentGateway")
+                        .WithMany()
+                        .HasForeignKey("GatewayId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "HoldOperation")
+                        .WithMany()
+                        .HasForeignKey("HoldOperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletOperation", "SettlementOperation")
+                        .WithMany()
+                        .HasForeignKey("SettlementOperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Wallets.Domain.Shared.Contracts.WalletTransaction", "SettlementTransaction")
+                        .WithMany()
+                        .HasForeignKey("SettlementTransactionId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Wallets.Domain.Shared.Contracts.Wallet", "Wallet")
                         .WithMany()
@@ -8104,7 +9227,17 @@ namespace XFramework.Domain.Migrations
                         .WithMany("WithdrawalRequests")
                         .HasForeignKey("WalletTypeId");
 
+                    b.Navigation("Approval");
+
                     b.Navigation("Credential");
+
+                    b.Navigation("HoldOperation");
+
+                    b.Navigation("PaymentGateway");
+
+                    b.Navigation("SettlementOperation");
+
+                    b.Navigation("SettlementTransaction");
 
                     b.Navigation("Wallet");
                 });
@@ -8872,9 +10005,16 @@ namespace XFramework.Domain.Migrations
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletOperation", b =>
                 {
+                    b.Navigation("Approval");
+
                     b.Navigation("LedgerEntries");
 
                     b.Navigation("OutboxMessages");
+                });
+
+            modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletReconciliationRun", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.WalletTransaction", b =>

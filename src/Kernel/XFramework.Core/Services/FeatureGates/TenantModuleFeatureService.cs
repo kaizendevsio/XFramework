@@ -32,8 +32,7 @@ public sealed class TenantModuleFeatureService(
         if (cache.TryGetValue(cacheKey, out bool enabled))
         {
             logger.LogDebug(
-                "Tenant module feature cache hit for tenant {TenantId}, feature {FeatureKey}",
-                tenantId,
+                "Tenant module feature cache hit for feature {FeatureKey}",
                 TenantModuleFeatureKeys.Combine(normalizedModuleKey, normalizedSubFeatureKey));
 
             return Result<bool>.Success(enabled);
@@ -54,8 +53,7 @@ public sealed class TenantModuleFeatureService(
         cache.Set(cacheKey, enabled, CacheDuration);
 
         logger.LogDebug(
-            "Tenant module feature resolved for tenant {TenantId}, feature {FeatureKey}: {Enabled}",
-            tenantId,
+            "Tenant module feature resolved for feature {FeatureKey}: {Enabled}",
             TenantModuleFeatureKeys.Combine(normalizedModuleKey, normalizedSubFeatureKey),
             enabled);
 

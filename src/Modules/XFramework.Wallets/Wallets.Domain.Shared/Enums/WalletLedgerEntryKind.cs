@@ -8,5 +8,8 @@ public enum WalletLedgerEntryKind
     Release = 4,
     Reversal = 5,
     SystemCounterparty = 6,
-    Adjustment = 7
+    Adjustment = 7,
+    Refund = 8,
+    Dispute = 9,
+    Chargeback = 10
 }

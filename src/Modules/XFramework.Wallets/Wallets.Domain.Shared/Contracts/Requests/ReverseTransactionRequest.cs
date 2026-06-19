@@ -11,4 +11,5 @@ public partial record ReverseTransactionRequest : RequestBase,
     public Guid TransactionId { get; set; }
     public Guid WalletTransferId { get; set; }
     public string? Reason { get; set; }
+    public Guid? ApprovalId { get; set; }
 }

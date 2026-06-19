@@ -14,6 +14,8 @@
         <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
         <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
         <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\XFramework.Payments\Payments.Core\Payments.Core.csproj" />
+        <ProjectReference Include="..\..\XFramework.Payments\Payments.Domain.Shared\Payments.Domain.Shared.csproj" />
         <ProjectReference Include="..\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
     </ItemGroup>
 

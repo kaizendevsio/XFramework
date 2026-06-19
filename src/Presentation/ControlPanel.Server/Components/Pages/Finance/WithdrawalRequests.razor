@@ -1,70 +1,448 @@
 @page "/finance/withdrawal-requests"
+@using System.Globalization
+@using XFramework.Domain.Shared.Contracts
 @using XFramework.Domain.Shared.DataContext
+@implements IDisposable
 
 <PageTitle>Withdrawal Requests - Control Panel</PageTitle>
 
 <div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <BbTypographyH3>Withdrawal Requests</BbTypographyH3>
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <BbTypographyH3>Withdrawal Requests</BbTypographyH3>
+            <BbTypographyMuted>Review cash-out requests, fees, and approval workflow readiness.</BbTypographyMuted>
+        </div>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+            Refresh
+        </BbButton>
     </div>
 
     @if (_loading)
     {
         <CenteredSpinner />
     }
+    else if (!_hasTenant)
+    {
+        <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
+    }
+    else if (!_moduleEnabled)
+    {
+        <ModuleUnavailable ModuleName="Wallets" />
+    }
     else
     {
-    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <Columns>
-            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet ID" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.Fee)" Title="Fee" Sortable="true" />
-            <BbDataGridTemplateColumn Title="Status">
-                <ChildContent Context="item">
-                    <StatusBadge Text="@item.WithdrawalStatus.ToString()" Status="@GetWithdrawalStatusCategory(item.WithdrawalStatus)" />
-                </ChildContent>
-            </BbDataGridTemplateColumn>
-            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
-            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-        </Columns>
-    </BbDataGrid>
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Create Withdrawal Request</BbCardTitle>
+                <BbCardDescription>Submit cash-out requests through the Wallets withdrawal workflow.</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <BbFormFieldSelect TValue="string" @bind-Value="_createWalletId" Label="Wallet">
+                        <BbSelectItem Value="@NoSelectionValue">Select wallet</BbSelectItem>
+                        @foreach (var wallet in _wallets)
+                        {
+                            <BbSelectItem Value="@wallet.Id.ToString()">@BuildWalletLabel(wallet)</BbSelectItem>
+                        }
+                    </BbFormFieldSelect>
+                    <BbFormFieldSelect TValue="string" @bind-Value="_createGatewayId" Label="Gateway">
+                        <BbSelectItem Value="@NoSelectionValue">No payout provider yet</BbSelectItem>
+                        @foreach (var gateway in _gateways)
+                        {
+                            <BbSelectItem Value="@gateway.Id.ToString()">@BuildGatewayLabel(gateway)</BbSelectItem>
+                        }
+                    </BbFormFieldSelect>
+                    <BbFormFieldSelect TValue="string" @bind-Value="_createCurrencyId" Label="Currency">
+                        <BbSelectItem Value="@NoSelectionValue">Default wallet currency</BbSelectItem>
+                        @foreach (var currency in _currencies)
+                        {
+                            <BbSelectItem Value="@currency.Id.ToString()">@BuildCurrencyLabel(currency)</BbSelectItem>
+                        }
+                    </BbFormFieldSelect>
+                    <BbFormFieldInput TValue="decimal" @bind-Value="_createAmount" Label="Amount" />
+                    <BbFormFieldInput TValue="decimal" @bind-Value="_createRequestedFee" Label="Requested Fee" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_createExternalReference" Label="External Reference" Placeholder="Optional provider/reference id" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_createAddress" Label="Payout Address" Placeholder="Account, wallet, or payout destination" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_createRemarks" Label="Remarks" Placeholder="Cash-out note" />
+                </div>
+                <div class="mt-4">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@CreateWithdrawal" Disabled="@_acting">
+                        @if (_acting)
+                        {
+                            <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                        }
+                        <LucideIcon Name="circle-minus" class="mr-2 h-4 w-4" />
+                        Create Withdrawal
+                    </BbButton>
+                </div>
+            </BbCardContent>
+        </BbCard>
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Pending</BbTypographyMuted>
+                        <BbTypographyH3>@_pendingCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Completed</BbTypographyMuted>
+                        <BbTypographyH3>@_completedCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Rejected/Failed</BbTypographyMuted>
+                        <BbTypographyH3>@_failedCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Total Fees</BbTypographyMuted>
+                        <BbTypographyH3>@_totalFees.ToString("N2")</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+        </div>
+
+        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+            <Columns>
+                <BbDataGridTemplateColumn Title="Credential">
+                    <ChildContent Context="item">
+                        <span class="font-mono text-xs">@ShortId(item.CredentialId)</span>
+                    </ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridTemplateColumn Title="Wallet">
+                    <ChildContent Context="item">
+                        <span class="font-mono text-xs">@ShortId(item.WalletId)</span>
+                    </ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Fee)" Title="Fee" Sortable="true" />
+                <BbDataGridTemplateColumn Title="Workflow">
+                    <ChildContent Context="item">
+                        <StatusBadge Text="@item.WorkflowStatus.ToString()" Status="@GetWorkflowStatusCategory(item.WorkflowStatus)" />
+                    </ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridTemplateColumn Title="Status">
+                    <ChildContent Context="item">
+                        <StatusBadge Text="@item.WithdrawalStatus.ToString()" Status="@GetWithdrawalStatusCategory(item.WithdrawalStatus)" />
+                    </ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Address)" Title="Address" />
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                <BbDataGridTemplateColumn Title="Actions">
+                    <ChildContent Context="item">
+                        <div class="flex flex-wrap gap-1">
+                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ApproveWithdrawal(item))" Disabled="@_acting">
+                                Approve
+                            </BbButton>
+                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => RejectWithdrawal(item))" Disabled="@_acting">
+                                Reject
+                            </BbButton>
+                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => SettleWithdrawal(item))" Disabled="@_acting">
+                                Settle
+                            </BbButton>
+                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => FailWithdrawal(item))" Disabled="@_acting">
+                                Fail
+                            </BbButton>
+                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => CancelWithdrawal(item))" Disabled="@_acting">
+                                Cancel
+                            </BbButton>
+                        </div>
+                    </ChildContent>
+                </BbDataGridTemplateColumn>
+            </Columns>
+        </BbDataGrid>
     }
 </div>
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
-    [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private const string NoSelectionValue = "__none";
 
     private List<WithdrawalRequest> _items = [];
+    private List<Wallet> _wallets = [];
+    private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _currencies = [];
+    private List<PaymentGateway> _gateways = [];
+    private Dictionary<Guid, string> _credentialLabels = [];
     private bool _loading = true;
+    private bool _acting;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private int _pendingCount;
+    private int _completedCount;
+    private int _failedCount;
+    private decimal _totalFees;
+    private string _createWalletId = NoSelectionValue;
+    private string _createGatewayId = NoSelectionValue;
+    private string _createCurrencyId = NoSelectionValue;
+    private string _createExternalReference = "";
+    private string _createAddress = "";
+    private string _createRemarks = "";
+    private decimal _createAmount;
+    private decimal _createRequestedFee;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await LoadData();
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
     }
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private void OnTenantChanged() => _ = InvokeAsync(LoadData);
 
     private async Task LoadData()
     {
         _loading = true;
         try
         {
-            var query = DataContext.Query<WithdrawalRequest>();
-            if (TenantFilter.SelectedTenantId is Guid tenantId)
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsWithdrawals);
+            _items = [];
+            ResetCreateOptions();
+            ResetSummary();
+
+            if (!_hasTenant || !_moduleEnabled)
             {
-                query = query.Where(x => x.TenantId == tenantId);
+                return;
             }
 
-            _items = await query.Take(100).ToListAsync();
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _items = await DataContext.Query<WithdrawalRequest>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(200)
+                .ToListAsync();
+
+            await LoadCreateOptions(tenantId);
+
+            _pendingCount = _items.Count(x => IsPending(x.WithdrawalStatus));
+            _completedCount = _items.Count(x => x.WithdrawalStatus is TransactionStatus.Completed or TransactionStatus.Ok);
+            _failedCount = _items.Count(x => x.WithdrawalStatus is TransactionStatus.Failed or TransactionStatus.Cancelled or TransactionStatus.Rejected);
+            _totalFees = _items.Sum(x => x.Fee ?? 0);
+        }
+        catch (Exception ex)
+        {
+            _items = [];
+            ResetCreateOptions();
+            ResetSummary();
+            ToastService.Show($"Failed to load withdrawal requests: {ex.Message}");
         }
         finally
         {
             _loading = false;
+            StateHasChanged();
         }
     }
 
-    private string GetWithdrawalStatusCategory(TransactionStatus status) => status switch
+    private async Task LoadCreateOptions(Guid tenantId)
+    {
+        var credentials = (await DataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.IdentityInfo)
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Take(250)
+                .ToListAsync())
+            .OrderBy(GetCredentialSortText)
+            .ToList();
+        _credentialLabels = credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
+
+        _wallets = await DataContext.Query<Wallet>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Include(x => x.WalletType)
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .OrderBy(x => x.AccountNumber)
+            .Take(250)
+            .ToListAsync();
+        _wallets = _wallets
+            .Where(x => x.Status == WalletStatus.Active)
+            .ToList();
+
+        _currencies = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.CurrencyIsoCode3)
+            .Take(100)
+            .ToListAsync();
+        _currencies = _currencies
+            .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
+            .ToList();
+
+        await LoadPaymentGateways(tenantId);
+    }
+
+    private async Task LoadPaymentGateways(Guid tenantId)
+    {
+        try
+        {
+            _gateways = await DataContext.Query<PaymentGateway>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(100)
+                .ToListAsync();
+            _gateways = _gateways
+                .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
+                .ToList();
+        }
+        catch (InvalidOperationException ex) when (IsMissingPaymentGatewayWrapper(ex))
+        {
+            _gateways = [];
+        }
+    }
+
+    private async Task CreateWithdrawal()
+    {
+        if (_createAmount <= 0)
+        {
+            ToastService.Show("Enter a withdrawal amount greater than zero.");
+            return;
+        }
+
+        if (_createRequestedFee < 0)
+        {
+            ToastService.Show("Requested fee cannot be negative.");
+            return;
+        }
+
+        if (!Guid.TryParse(_createWalletId, out var walletId))
+        {
+            ToastService.Show("Select a wallet.");
+            return;
+        }
+
+        var wallet = _wallets.FirstOrDefault(x => x.Id == walletId);
+        if (wallet is null)
+        {
+            ToastService.Show("Selected wallet was not found. Refresh and try again.");
+            return;
+        }
+
+        var gatewayId = Guid.TryParse(_createGatewayId, out var parsedGatewayId)
+            ? parsedGatewayId
+            : (Guid?)null;
+        var currencyId = Guid.TryParse(_createCurrencyId, out var parsedCurrencyId)
+            ? parsedCurrencyId
+            : (Guid?)null;
+
+        _acting = true;
+        try
+        {
+            var result = await WalletsAdminContracts.CreateWithdrawalAsync(new CreateWithdrawalWorkflowRequest
+            {
+                CredentialId = wallet.CredentialId,
+                WalletId = wallet.Id,
+                GatewayId = gatewayId,
+                CurrencyId = currencyId,
+                Amount = _createAmount,
+                RequestedFee = PositiveOrNull(_createRequestedFee),
+                Address = string.IsNullOrWhiteSpace(_createAddress) ? null : _createAddress.Trim(),
+                Remarks = string.IsNullOrWhiteSpace(_createRemarks) ? null : _createRemarks.Trim(),
+                ExternalReference = string.IsNullOrWhiteSpace(_createExternalReference) ? null : _createExternalReference.Trim(),
+                IdempotencyKey = $"control-panel-withdrawal:{Guid.NewGuid():N}"
+            });
+
+            ToastService.Show(result.IsSuccess ? "Withdrawal request created." : result.Message ?? "Withdrawal request creation failed.");
+            if (result.IsSuccess)
+            {
+                ResetCreateForm();
+                await LoadData();
+            }
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private async Task ApproveWithdrawal(WithdrawalRequest item) =>
+        await RunUnsupportedAction(() => WalletsAdminContracts.ApproveWithdrawalAsync(item.Id), "Withdrawal approval");
+
+    private async Task RejectWithdrawal(WithdrawalRequest item) =>
+        await RunUnsupportedAction(() => WalletsAdminContracts.RejectWithdrawalAsync(item.Id), "Withdrawal rejection");
+
+    private async Task SettleWithdrawal(WithdrawalRequest item) =>
+        await RunUnsupportedAction(() => WalletsAdminContracts.SettleWithdrawalAsync(item.Id), "Withdrawal settlement");
+
+    private async Task FailWithdrawal(WithdrawalRequest item) =>
+        await RunUnsupportedAction(() => WalletsAdminContracts.FailWithdrawalAsync(item.Id), "Withdrawal failure");
+
+    private async Task CancelWithdrawal(WithdrawalRequest item) =>
+        await RunUnsupportedAction(() => WalletsAdminContracts.CancelWithdrawalAsync(item.Id), "Withdrawal cancellation");
+
+    private async Task RunUnsupportedAction(Func<Task<CmdResponse>> action, string label)
+    {
+        _acting = true;
+        try
+        {
+            var result = await action();
+            ToastService.Show(result.IsSuccess ? $"{label} submitted." : result.Message ?? $"{label} is not available.");
+            await LoadData();
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private void ResetSummary()
+    {
+        _pendingCount = 0;
+        _completedCount = 0;
+        _failedCount = 0;
+        _totalFees = 0;
+    }
+
+    private void ResetCreateOptions()
+    {
+        _wallets = [];
+        _currencies = [];
+        _gateways = [];
+        _credentialLabels = [];
+    }
+
+    private void ResetCreateForm()
+    {
+        _createWalletId = NoSelectionValue;
+        _createGatewayId = NoSelectionValue;
+        _createCurrencyId = NoSelectionValue;
+        _createExternalReference = "";
+        _createAddress = "";
+        _createRemarks = "";
+        _createAmount = 0;
+        _createRequestedFee = 0;
+    }
+
+    private static decimal? PositiveOrNull(decimal value) => value > 0 ? value : null;
+
+    private static bool IsPending(TransactionStatus status) =>
+        status is TransactionStatus.Pending or TransactionStatus.OnHold or TransactionStatus.Scheduled;
+
+    private static string GetWithdrawalStatusCategory(TransactionStatus status) => status switch
     {
         TransactionStatus.Pending or TransactionStatus.OnHold or TransactionStatus.Scheduled => "pending",
         TransactionStatus.Ok or TransactionStatus.Completed => "active",
@@ -73,4 +451,78 @@
         TransactionStatus.Expired or TransactionStatus.Reversed or TransactionStatus.Refunded => "error",
         _ => "inactive"
     };
+
+    private static string GetWorkflowStatusCategory(WalletWorkflowStatus status) => status switch
+    {
+        WalletWorkflowStatus.PendingValidation or WalletWorkflowStatus.PendingApproval or WalletWorkflowStatus.Settling => "pending",
+        WalletWorkflowStatus.Approved => "approved",
+        WalletWorkflowStatus.Completed => "active",
+        WalletWorkflowStatus.Rejected or WalletWorkflowStatus.Failed or WalletWorkflowStatus.Cancelled => "failed",
+        WalletWorkflowStatus.Expired => "expired",
+        _ => "inactive"
+    };
+
+    private string BuildWalletLabel(Wallet wallet)
+    {
+        var account = string.IsNullOrWhiteSpace(wallet.AccountNumber)
+            ? wallet.Id.ToString()[..8]
+            : wallet.AccountNumber;
+        var credential = _credentialLabels.TryGetValue(wallet.CredentialId, out var label)
+            ? label
+            : wallet.CredentialId.ToString()[..8];
+        var type = wallet.WalletType?.Code
+            ?? (wallet.WalletTypeId.HasValue ? wallet.WalletTypeId.Value.ToString()[..8] : "No type");
+
+        return $"{account} - {credential} - {type} - {wallet.AvailableBalance.ToString("N2", CultureInfo.CurrentCulture)}";
+    }
+
+    private static string BuildCurrencyLabel(global::Wallets.Domain.Shared.Contracts.CurrencyType currency) =>
+        string.IsNullOrWhiteSpace(currency.CurrencyIsoCode3)
+            ? currency.Name ?? currency.Id.ToString()[..8]
+            : $"{currency.CurrencyIsoCode3} - {currency.Name}";
+
+    private static string BuildGatewayLabel(PaymentGateway gateway) =>
+        string.IsNullOrWhiteSpace(gateway.Name)
+            ? gateway.Id.ToString()[..8]
+            : $"{gateway.Name} - {gateway.ServiceCharge.ToString("N2", CultureInfo.CurrentCulture)}";
+
+    private static bool IsMissingPaymentGatewayWrapper(Exception ex) =>
+        ex.Message.Contains("PaymentGateway", StringComparison.OrdinalIgnoreCase)
+        && ex.Message.Contains("service wrapper", StringComparison.OrdinalIgnoreCase);
+
+    private static string GetCredentialSortText(IdentityCredential credential) =>
+        credential.IdentityInfo?.FullName
+        ?? credential.IdentityInfo?.IdentityName
+        ?? credential.UserName
+        ?? credential.UserAlias
+        ?? credential.Id.ToString();
+
+    private static string BuildCredentialLabel(IdentityCredential credential)
+    {
+        var displayName = credential.IdentityInfo?.FullName;
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = credential.IdentityInfo?.IdentityName;
+        }
+
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = credential.UserName ?? credential.UserAlias ?? "Unnamed user";
+        }
+
+        var credentialName = credential.UserName ?? credential.UserAlias;
+        var suffix = string.IsNullOrWhiteSpace(credentialName)
+            ? credential.Id.ToString()[..8]
+            : $"{credentialName} - {credential.Id.ToString()[..8]}";
+
+        return $"{displayName} ({suffix})";
+    }
+
+    private static string ShortId(Guid id) => id.ToString()[..8];
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
 }

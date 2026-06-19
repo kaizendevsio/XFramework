@@ -53,10 +53,40 @@ public partial class WalletOperation : BaseModel
     public DateTime? CompletedAt { get; set; }
 
     [MemoryPackOrder(13)]
-    public virtual ICollection<WalletLedgerEntry> LedgerEntries { get; set; } = [];
+    public decimal? RequestedFee { get; set; }
 
     [MemoryPackOrder(14)]
+    public decimal? CalculatedFee { get; set; }
+
+    [MemoryPackOrder(15)]
+    public bool RequiresApproval { get; set; }
+
+    [MemoryPackOrder(16)]
+    public Guid? ApprovalId { get; set; }
+
+    [MemoryPackOrder(17)]
+    public Guid? OriginalOperationId { get; set; }
+
+    [MemoryPackOrder(18)]
+    public string? PolicyDecisionJson { get; set; }
+
+    [MemoryPackOrder(19)]
+    public string? RiskTier { get; set; }
+
+    [MemoryPackOrder(20)]
+    public decimal? RiskScore { get; set; }
+
+    [MemoryPackOrder(21)]
+    public virtual ICollection<WalletLedgerEntry> LedgerEntries { get; set; } = [];
+
+    [MemoryPackOrder(22)]
     public virtual ICollection<WalletOutboxMessage> OutboxMessages { get; set; } = [];
+
+    [MemoryPackOrder(23)]
+    public virtual WalletApprovalRequest? Approval { get; set; }
+
+    [MemoryPackOrder(24)]
+    public virtual WalletOperation? OriginalOperation { get; set; }
 }
 
 public class GetWalletOperationListRequest

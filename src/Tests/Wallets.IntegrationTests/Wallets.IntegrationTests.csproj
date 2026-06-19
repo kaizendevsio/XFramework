@@ -22,6 +22,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Api\Wallets.Api.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Payments\Payments.Core\Payments.Core.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Bolt\Bolt.Hub\Bolt.Hub.csproj" />
         <ProjectReference Include="..\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     </ItemGroup>

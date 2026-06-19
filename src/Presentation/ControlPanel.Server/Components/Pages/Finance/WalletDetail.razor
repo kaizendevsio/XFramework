@@ -3,6 +3,7 @@
 @using global::Wallets.Domain.Shared.Enums
 @using global::Wallets.Integration.Drivers
 @using XFramework.Domain.Shared.BusinessObjects
+@using XFramework.Domain.Shared.Contracts
 @using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
@@ -52,21 +53,21 @@ else
                 {
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@FreezeWallet">
                         <LucideIcon Name="lock" class="mr-2 h-4 w-4" />
-                        Freeze Wallet
+                        Request Freeze
                     </BbButton>
                 }
                 else if (_wallet.Status == WalletStatus.Frozen)
                 {
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@UnfreezeWallet">
                         <LucideIcon Name="lock-open" class="mr-2 h-4 w-4" />
-                        Unfreeze Wallet
+                        Request Unfreeze
                     </BbButton>
                 }
                 @if (_wallet.Status != WalletStatus.Closed)
                 {
                     <BbButton Variant="ButtonVariant.Destructive" OnClick="@(() => _showCloseDialog = true)">
                         <LucideIcon Name="x" class="mr-2 h-4 w-4" />
-                        Close Wallet
+                        Request Close
                     </BbButton>
                 }
             </div>
@@ -152,26 +153,40 @@ else
         <BbCard>
             <BbCardHeader>
                 <BbCardTitle>Admin Operations</BbCardTitle>
-                <BbCardDescription>Directly manage wallet funds. All operations are logged as transactions.</BbCardDescription>
+                <BbCardDescription>Create wallet workflow requests. Settlement and sensitive changes require approval.</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
                 <BbTabs DefaultValue="add-funds">
                     <BbTabsList>
-                        <BbTabsTrigger Value="add-funds">Add Funds</BbTabsTrigger>
-                        <BbTabsTrigger Value="withdraw-funds">Withdraw Funds</BbTabsTrigger>
-                        <BbTabsTrigger Value="adjust-balance">Adjust Balance</BbTabsTrigger>
+                        <BbTabsTrigger Value="add-funds">Deposit Request</BbTabsTrigger>
+                        <BbTabsTrigger Value="withdraw-funds">Withdrawal Request</BbTabsTrigger>
+                        <BbTabsTrigger Value="adjust-balance">Adjustment Approval</BbTabsTrigger>
                     </BbTabsList>
 
                     <BbTabsContent Value="add-funds" Class="xf-fade-in">
-                        <div class="grid gap-4 py-4 md:grid-cols-3">
+                        <div class="grid gap-4 py-4 md:grid-cols-2 xl:grid-cols-5">
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_addFundsAmount"
                                               Label="Amount"
                                               Placeholder="0.00"
                                               Required="true" />
+                            <BbFormFieldSelect TValue="string" @bind-Value="_addFundsGatewayId" Label="Gateway">
+                                <BbSelectItem Value="@NoSelectionValue">Select gateway</BbSelectItem>
+                                @foreach (var gateway in _gateways)
+                                {
+                                    <BbSelectItem Value="@gateway.Id.ToString()">@BuildGatewayLabel(gateway)</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
+                            <BbFormFieldSelect TValue="string" @bind-Value="_addFundsCurrencyId" Label="Currency">
+                                <BbSelectItem Value="@NoSelectionValue">Default wallet currency</BbSelectItem>
+                                @foreach (var currency in _currencies)
+                                {
+                                    <BbSelectItem Value="@currency.Id.ToString()">@BuildCurrencyLabel(currency)</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_addFundsRef"
-                                              Label="Reference Number"
+                                              Label="External Reference"
                                               Placeholder="REF-001" />
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_addFundsRemarks"
@@ -184,20 +199,34 @@ else
                                 <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                             }
                             <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
-                            Add Funds
+                            Create Deposit
                         </BbButton>
                     </BbTabsContent>
 
                     <BbTabsContent Value="withdraw-funds" Class="xf-fade-in">
-                        <div class="grid gap-4 py-4 md:grid-cols-3">
+                        <div class="grid gap-4 py-4 md:grid-cols-2 xl:grid-cols-5">
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_withdrawAmount"
                                               Label="Amount"
                                               Placeholder="0.00"
                                               Required="true" />
+                            <BbFormFieldSelect TValue="string" @bind-Value="_withdrawGatewayId" Label="Gateway">
+                                <BbSelectItem Value="@NoSelectionValue">No provider</BbSelectItem>
+                                @foreach (var gateway in _gateways)
+                                {
+                                    <BbSelectItem Value="@gateway.Id.ToString()">@BuildGatewayLabel(gateway)</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
+                            <BbFormFieldSelect TValue="string" @bind-Value="_withdrawCurrencyId" Label="Currency">
+                                <BbSelectItem Value="@NoSelectionValue">Default wallet currency</BbSelectItem>
+                                @foreach (var currency in _currencies)
+                                {
+                                    <BbSelectItem Value="@currency.Id.ToString()">@BuildCurrencyLabel(currency)</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_withdrawRef"
-                                              Label="Reference Number"
+                                              Label="External Reference"
                                               Placeholder="REF-001" />
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_withdrawRemarks"
@@ -210,15 +239,15 @@ else
                                 <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                             }
                             <LucideIcon Name="minus" class="mr-2 h-4 w-4" />
-                            Withdraw Funds
+                            Create Withdrawal
                         </BbButton>
                     </BbTabsContent>
 
                     <BbTabsContent Value="adjust-balance" Class="xf-fade-in">
                         <BbAlert Variant="AlertVariant.Warning" class="mb-4">
-                            <BbAlertTitle>Warning</BbAlertTitle>
+                            <BbAlertTitle>Approval Required</BbAlertTitle>
                             <BbAlertDescription>
-                                Balance adjustment posts the difference through the wallet operation workflow and records a transaction.
+                                Balance adjustment creates a maker-checker approval request. Funds are not changed from this screen.
                             </BbAlertDescription>
                         </BbAlert>
                         <div class="grid gap-4 py-4 md:grid-cols-2">
@@ -238,7 +267,7 @@ else
                                 <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                             }
                             <LucideIcon Name="settings" class="mr-2 h-4 w-4" />
-                            Apply Adjustment
+                            Request Adjustment
                         </BbButton>
                     </BbTabsContent>
                 </BbTabs>
@@ -328,6 +357,21 @@ else
                             </ChildContent>
                         </BbDataGridTemplateColumn>
                         <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                        <BbDataGridTemplateColumn Title="Actions">
+                            <ChildContent Context="item">
+                                <div class="flex flex-wrap gap-1">
+                                    @if (item.Held && !item.Released)
+                                    {
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReleaseTransaction(item))" Disabled="@_isProcessing">
+                                            Release
+                                        </BbButton>
+                                    }
+                                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReverseTransaction(item))" Disabled="@_isProcessing">
+                                        Reverse
+                                    </BbButton>
+                                </div>
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
@@ -432,7 +476,7 @@ else
         <BbDialogHeader>
             <BbDialogTitle>Close Wallet</BbDialogTitle>
             <BbDialogDescription>
-                Are you sure you want to close this wallet? Closed wallets cannot be used for future financial operations.
+                This creates a maker-checker approval request. Approved closure can then be executed through the wallet workflow.
                 @if (_wallet?.Balance != 0 || _wallet?.DebitOnHoldBalance != 0 || _wallet?.CreditOnHoldBalance != 0)
                 {
                     <span class="mt-2 block font-semibold text-red-500">
@@ -444,7 +488,7 @@ else
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showCloseDialog = false)">Cancel</BbButton>
             <BbButton Variant="ButtonVariant.Destructive" OnClick="@CloseWallet" Disabled="@_isProcessing">
-                Confirm Close
+                Request Close
             </BbButton>
         </BbDialogFooter>
     </BbDialogContent>
@@ -459,10 +503,14 @@ else
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private NavigationHistoryService NavigationHistory { get; set; } = default!;
     [Inject] private IWalletsServiceWrapper WalletsService { get; set; } = default!;
+    [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
 
+    private const string NoSelectionValue = "__none";
     private Wallet? _wallet;
     private List<WalletTransaction> _transactions = [];
+    private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _currencies = [];
+    private List<PaymentGateway> _gateways = [];
     private bool _loading = true;
     private bool _isProcessing;
     private bool _showCloseDialog;
@@ -473,11 +521,15 @@ else
     private string _addFundsAmount = "";
     private string _addFundsRef = "";
     private string _addFundsRemarks = "";
+    private string _addFundsGatewayId = NoSelectionValue;
+    private string _addFundsCurrencyId = NoSelectionValue;
 
     // Withdraw Funds form
     private string _withdrawAmount = "";
     private string _withdrawRef = "";
     private string _withdrawRemarks = "";
+    private string _withdrawGatewayId = NoSelectionValue;
+    private string _withdrawCurrencyId = NoSelectionValue;
 
     // Adjust Balance form
     private string _adjustBalance = "";
@@ -524,7 +576,12 @@ else
             await LoadWallet();
             if (_wallet is not null && !_outsideTenantContext)
             {
+                await LoadWorkflowOptions(_wallet.TenantId);
                 await LoadTransactions();
+            }
+            else
+            {
+                ResetWorkflowOptions();
             }
         }
         catch (Exception ex)
@@ -695,11 +752,64 @@ else
         return true;
     }
 
+    private async Task LoadWorkflowOptions(Guid tenantId)
+    {
+        _currencies = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.CurrencyIsoCode3)
+            .Take(100)
+            .ToListAsync();
+        _currencies = _currencies
+            .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
+            .ToList();
+
+        await LoadPaymentGateways(tenantId);
+    }
+
+    private async Task LoadPaymentGateways(Guid tenantId)
+    {
+        try
+        {
+            _gateways = await DataContext.Query<PaymentGateway>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(100)
+                .ToListAsync();
+            _gateways = _gateways
+                .Where(x => x.TenantId == tenantId || x.TenantId == Guid.Empty)
+                .ToList();
+        }
+        catch (InvalidOperationException ex) when (IsMissingPaymentGatewayWrapper(ex))
+        {
+            _gateways = [];
+        }
+    }
+
+    private void ResetWorkflowOptions()
+    {
+        _currencies = [];
+        _gateways = [];
+        _addFundsGatewayId = NoSelectionValue;
+        _addFundsCurrencyId = NoSelectionValue;
+        _withdrawGatewayId = NoSelectionValue;
+        _withdrawCurrencyId = NoSelectionValue;
+    }
+
     private async Task AddFunds()
     {
         if (!decimal.TryParse(_addFundsAmount, out var amount) || amount <= 0)
         {
             ToastService.Show("Please enter a valid positive amount.");
+            return;
+        }
+
+        if (!Guid.TryParse(_addFundsGatewayId, out var gatewayId))
+        {
+            ToastService.Show("Select a payment gateway for the deposit request.");
             return;
         }
 
@@ -723,34 +833,36 @@ else
                 return;
             }
 
-            var response = await WalletsService.IncrementWallet(new IncrementWalletRequest
+            var response = await WalletsAdminContracts.CreateDepositAsync(new CreateDepositWorkflowRequest
             {
-                WalletId = Id,
                 CredentialId = fresh.CredentialId,
+                WalletId = fresh.Id,
+                CurrencyId = ParseOptionalGuid(_addFundsCurrencyId),
+                GatewayId = gatewayId,
                 Amount = amount,
-                ReferenceNumber = string.IsNullOrWhiteSpace(_addFundsRef) ? null : _addFundsRef.Trim(),
+                ExternalReference = string.IsNullOrWhiteSpace(_addFundsRef) ? null : _addFundsRef.Trim(),
                 Remarks = string.IsNullOrWhiteSpace(_addFundsRemarks) ? "Admin credit" : _addFundsRemarks.Trim(),
-                IdempotencyKey = $"controlpanel-add-{Guid.NewGuid():N}",
-                Metadata = BuildCommandMetadata(fresh.TenantId)
+                IdempotencyKey = $"controlpanel-deposit-{Guid.NewGuid():N}"
             });
 
             if (response.IsSuccess)
             {
-                ToastService.Show($"Added {amount:N2} to wallet.");
+                ToastService.Show($"Deposit request created for {amount:N2}.");
                 _addFundsAmount = "";
                 _addFundsRef = "";
                 _addFundsRemarks = "";
-                await LoadWallet();
-                await LoadTransactions();
+                _addFundsGatewayId = NoSelectionValue;
+                _addFundsCurrencyId = NoSelectionValue;
+                await ReloadWalletDetail();
             }
             else
             {
-                ToastService.Show($"Failed to add funds: {response.Message}");
+                ToastService.Show($"Failed to create deposit request: {response.Message}");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error adding funds: {ex.Message}");
+            ToastService.Show($"Error creating deposit request: {ex.Message}");
         }
         finally
         {
@@ -792,34 +904,36 @@ else
                 return;
             }
 
-            var response = await WalletsService.DecrementWallet(new DecrementWalletRequest
+            var response = await WalletsAdminContracts.CreateWithdrawalAsync(new CreateWithdrawalWorkflowRequest
             {
-                WalletId = Id,
                 CredentialId = fresh.CredentialId,
+                WalletId = fresh.Id,
+                GatewayId = ParseOptionalGuid(_withdrawGatewayId),
+                CurrencyId = ParseOptionalGuid(_withdrawCurrencyId),
                 Amount = amount,
-                ReferenceNumber = string.IsNullOrWhiteSpace(_withdrawRef) ? null : _withdrawRef.Trim(),
+                ExternalReference = string.IsNullOrWhiteSpace(_withdrawRef) ? null : _withdrawRef.Trim(),
                 Remarks = string.IsNullOrWhiteSpace(_withdrawRemarks) ? "Admin debit" : _withdrawRemarks.Trim(),
-                IdempotencyKey = $"controlpanel-withdraw-{Guid.NewGuid():N}",
-                Metadata = BuildCommandMetadata(fresh.TenantId)
+                IdempotencyKey = $"controlpanel-withdrawal-{Guid.NewGuid():N}"
             });
 
             if (response.IsSuccess)
             {
-                ToastService.Show($"Withdrew {amount:N2} from wallet.");
+                ToastService.Show($"Withdrawal request created for {amount:N2}.");
                 _withdrawAmount = "";
                 _withdrawRef = "";
                 _withdrawRemarks = "";
-                await LoadWallet();
-                await LoadTransactions();
+                _withdrawGatewayId = NoSelectionValue;
+                _withdrawCurrencyId = NoSelectionValue;
+                await ReloadWalletDetail();
             }
             else
             {
-                ToastService.Show($"Failed to withdraw funds: {response.Message}");
+                ToastService.Show($"Failed to create withdrawal request: {response.Message}");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error withdrawing funds: {ex.Message}");
+            ToastService.Show($"Error creating withdrawal request: {ex.Message}");
         }
         finally
         {
@@ -868,39 +982,21 @@ else
                 ? $"Admin balance adjustment: {fresh.Balance:N2} -> {newBalance:N2}"
                 : _adjustRemarks.Trim();
 
-            var response = difference > 0
-                ? await WalletsService.IncrementWallet(new IncrementWalletRequest
-                {
-                    WalletId = Id,
-                    CredentialId = fresh.CredentialId,
-                    Amount = difference,
-                    ReferenceNumber = referenceNumber,
-                    Remarks = remarks,
-                    IdempotencyKey = $"controlpanel-adjust-{Guid.NewGuid():N}",
-                    Metadata = BuildCommandMetadata(fresh.TenantId)
-                })
-                : await WalletsService.DecrementWallet(new DecrementWalletRequest
-                {
-                    WalletId = Id,
-                    CredentialId = fresh.CredentialId,
-                    Amount = Math.Abs(difference),
-                    ReferenceNumber = referenceNumber,
-                    Remarks = remarks,
-                    IdempotencyKey = $"controlpanel-adjust-{Guid.NewGuid():N}",
-                    Metadata = BuildCommandMetadata(fresh.TenantId)
-                });
+            var response = await WalletsAdminContracts.CreateWalletApprovalAsync(
+                WalletOperationType.ManualAdjustment,
+                fresh.Id,
+                Math.Abs(difference),
+                $"{remarks}; reference={referenceNumber}");
 
             if (response.IsSuccess)
             {
-                ToastService.Show($"Balance adjustment submitted for {newBalance:N2}.");
+                ToastService.Show($"Balance adjustment approval requested for {newBalance:N2}.");
                 _adjustBalance = "";
                 _adjustRemarks = "";
-                await LoadWallet();
-                await LoadTransactions();
             }
             else
             {
-                ToastService.Show($"Failed to adjust balance: {response.Message}");
+                ToastService.Show($"Failed to request balance adjustment: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -922,6 +1018,89 @@ else
 
         ToastService.Show("This wallet has no wallet type. Assign a wallet type before submitting money operations.");
         return false;
+    }
+
+    private static Guid? ParseOptionalGuid(string value) =>
+        Guid.TryParse(value, out var parsed) ? parsed : null;
+
+    private static string BuildCurrencyLabel(global::Wallets.Domain.Shared.Contracts.CurrencyType currency) =>
+        string.IsNullOrWhiteSpace(currency.CurrencyIsoCode3)
+            ? currency.Name ?? currency.Id.ToString()[..8]
+            : $"{currency.CurrencyIsoCode3} - {currency.Name}";
+
+    private static string BuildGatewayLabel(PaymentGateway gateway) =>
+        string.IsNullOrWhiteSpace(gateway.Name)
+            ? gateway.Id.ToString()[..8]
+            : $"{gateway.Name} - {gateway.ServiceCharge.ToString("N2", CultureInfo.CurrentCulture)}";
+
+    private static bool IsMissingPaymentGatewayWrapper(Exception ex) =>
+        ex.Message.Contains("PaymentGateway", StringComparison.OrdinalIgnoreCase)
+        && ex.Message.Contains("service wrapper", StringComparison.OrdinalIgnoreCase);
+
+    private async Task ReleaseTransaction(WalletTransaction transaction)
+    {
+        if (_wallet is null)
+        {
+            ToastService.Show("Wallet not loaded.");
+            return;
+        }
+
+        _isProcessing = true;
+        try
+        {
+            var response = await WalletsService.ReleaseTransaction(new ReleaseTransactionRequest
+            {
+                Id = transaction.Id,
+                Metadata = BuildCommandMetadata(_wallet.TenantId)
+            });
+
+            if (response.IsSuccess)
+            {
+                ToastService.Show("Held transaction released.");
+                await LoadWallet();
+                await LoadTransactions();
+            }
+            else
+            {
+                ToastService.Show($"Failed to release transaction: {response.Message}");
+            }
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task ReverseTransaction(WalletTransaction transaction)
+    {
+        if (_wallet is null)
+        {
+            ToastService.Show("Wallet not loaded.");
+            return;
+        }
+
+        _isProcessing = true;
+        try
+        {
+            var response = await WalletsAdminContracts.CreateWalletApprovalAsync(
+                WalletOperationType.Reversal,
+                _wallet.Id,
+                transaction.Amount,
+                $"Reverse transaction {transaction.Id} from ControlPanel wallet detail");
+
+            if (response.IsSuccess)
+            {
+                ToastService.Show("Transaction reversal approval requested.");
+            }
+            else
+            {
+                ToastService.Show($"Failed to request reversal approval: {response.Message}");
+            }
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
     }
 
     private async Task FreezeWallet()
@@ -946,20 +1125,19 @@ else
                 return;
             }
 
-            var response = await WalletsService.FreezeWallet(new FreezeWalletRequest
-            {
-                WalletId = Id,
-                Metadata = BuildCommandMetadata(fresh.TenantId)
-            });
+            var response = await WalletsAdminContracts.CreateWalletApprovalAsync(
+                WalletOperationType.Freeze,
+                fresh.Id,
+                null,
+                "Freeze requested from ControlPanel wallet detail");
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Wallet frozen successfully.");
-                await LoadWallet();
+                ToastService.Show("Wallet freeze approval requested.");
             }
             else
             {
-                ToastService.Show($"Failed to freeze wallet: {response.Message}");
+                ToastService.Show($"Failed to request wallet freeze: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -990,20 +1168,19 @@ else
                 return;
             }
 
-            var response = await WalletsService.UnfreezeWallet(new UnfreezeWalletRequest
-            {
-                WalletId = Id,
-                Metadata = BuildCommandMetadata(fresh.TenantId)
-            });
+            var response = await WalletsAdminContracts.CreateWalletApprovalAsync(
+                WalletOperationType.Unfreeze,
+                fresh.Id,
+                null,
+                "Unfreeze requested from ControlPanel wallet detail");
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Wallet unfrozen successfully.");
-                await LoadWallet();
+                ToastService.Show("Wallet unfreeze approval requested.");
             }
             else
             {
-                ToastService.Show($"Failed to unfreeze wallet: {response.Message}");
+                ToastService.Show($"Failed to request wallet unfreeze: {response.Message}");
             }
         }
         catch (Exception ex)
@@ -1036,22 +1213,20 @@ else
             }
 
             _isProcessing = true;
-            var response = await WalletsService.CloseWallet(new CloseWalletRequest
-            {
-                WalletId = fresh.Id,
-                Reason = "Closed from ControlPanel",
-                Metadata = BuildCommandMetadata(fresh.TenantId)
-            });
+            var response = await WalletsAdminContracts.CreateWalletApprovalAsync(
+                WalletOperationType.Close,
+                fresh.Id,
+                null,
+                "Close requested from ControlPanel wallet detail");
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Wallet closed successfully.");
+                ToastService.Show("Wallet close approval requested.");
                 _showCloseDialog = false;
-                await LoadWallet();
             }
             else
             {
-                ToastService.Show($"Failed to close wallet: {response.Message}");
+                ToastService.Show($"Failed to request wallet close: {response.Message}");
             }
         }
         catch (Exception ex)

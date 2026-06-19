@@ -145,30 +145,78 @@
     </div>
 }
 
-@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Wallets))
+@if (AnyWalletFinanceFeatureEnabled())
 {
     @* Finance *@
     <div class="mt-4">
         <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Finance</p>
         <div class="space-y-0.5">
-            <NavLink href="/finance/wallets" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="wallet" class="h-4 w-4" /> Wallets
-            </NavLink>
-            <NavLink href="/finance/wallet-operations" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="receipt-text" class="h-4 w-4" /> Operations
-            </NavLink>
-            <NavLink href="/finance/reconciliation" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="scale" class="h-4 w-4" /> Reconciliation
-            </NavLink>
-            <NavLink href="/finance/outbox-webhooks" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="send" class="h-4 w-4" /> Outbox
-            </NavLink>
-            <NavLink href="/finance/policy-decisions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="shield-check" class="h-4 w-4" /> Policy
-            </NavLink>
-            <NavLink href="/finance/wallet-audit" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="list-checks" class="h-4 w-4" /> Audit
-            </NavLink>
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.Wallets))
+            {
+                <NavLink href="/finance/wallets" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="wallet" class="h-4 w-4" /> Wallets
+                </NavLink>
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsDeposits))
+            {
+                <NavLink href="/finance/deposit-requests" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="arrow-down-to-line" class="h-4 w-4" /> Deposits
+                </NavLink>
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWithdrawals))
+            {
+                <NavLink href="/finance/withdrawal-requests" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="arrow-up-from-line" class="h-4 w-4" /> Withdrawals
+                </NavLink>
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsTransfers))
+            {
+                <NavLink href="/finance/transfers" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="arrow-left-right" class="h-4 w-4" /> Transfers
+                </NavLink>
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsBatch))
+            {
+                <NavLink href="/finance/batch" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="layers" class="h-4 w-4" /> Batch
+                </NavLink>
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting))
+            {
+                <NavLink href="/finance/wallet-operations" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="receipt-text" class="h-4 w-4" /> Operations
+                </NavLink>
+                <NavLink href="/finance/statements" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="file-text" class="h-4 w-4" /> Statements
+                </NavLink>
+                <NavLink href="/finance/wallet-audit" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="list-checks" class="h-4 w-4" /> Audit
+                </NavLink>
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReconciliation))
+            {
+                <NavLink href="/finance/reconciliation" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="scale" class="h-4 w-4" /> Reconciliation
+                </NavLink>
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWebhooks))
+            {
+                <NavLink href="/finance/outbox-webhooks" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="send" class="h-4 w-4" /> Outbox
+                </NavLink>
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsPolicy))
+            {
+                <NavLink href="/finance/wallet-approvals" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="clipboard-check" class="h-4 w-4" /> Approvals
+                </NavLink>
+                <NavLink href="/finance/policy-decisions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="shield-check" class="h-4 w-4" /> Policy
+                </NavLink>
+                <NavLink href="/finance/refunds-disputes" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="rotate-ccw" class="h-4 w-4" /> Refunds
+                </NavLink>
+            }
         </div>
     </div>
 }
@@ -185,6 +233,20 @@
     {
         _ = InvokeAsync(StateHasChanged);
     }
+
+    private bool AnyWalletFinanceFeatureEnabled() =>
+        WalletFeatureEnabled(TenantModuleFeatureKeys.Wallets)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsDeposits)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWithdrawals)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsTransfers)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsBatch)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReconciliation)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsPolicy)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWebhooks)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting);
+
+    private bool WalletFeatureEnabled(string featureKey) =>
+        ModuleNavigation.IsFeatureEnabled(featureKey);
 
     public void Dispose()
     {

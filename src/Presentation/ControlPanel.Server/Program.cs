@@ -84,6 +84,7 @@ builder.Services.AddScoped(sp =>
     var metadata = new RequestMetadata
     {
         TenantId = tenantFilter.SelectedTenantId ?? loginTenantId,
+        CredentialId = TryGetGuidClaim(user, ControlPanelAuthClaims.CredentialId),
         SessionId = TryGetGuidClaim(user, ControlPanelAuthClaims.SessionId),
         RequestId = Guid.NewGuid(),
         Name = "ControlPanel",
@@ -109,6 +110,7 @@ builder.Services.AddScoped<TenantModuleFeatureDefinitionResolver>();
 builder.Services.AddScoped<MessagingControlPanelGuard>();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddScoped<CommunityControlPanelAccessService>();
+builder.Services.AddScoped<WalletsAdminBackendContractService>();
 builder.Services.AddScoped<ControlPanelAuthService>();
 builder.Services.AddScoped<ControlPanelBootstrapSeeder>();
 builder.Services.AddHostedService<ControlPanelBootstrapHostedService>();

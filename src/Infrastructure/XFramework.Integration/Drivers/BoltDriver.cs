@@ -155,6 +155,7 @@ public sealed class BoltDriver : IMessageBusWrapper
             request.Metadata.Name = _config.ClientName ?? string.Empty;
         if (request.Metadata.TenantId == null && _config.ClientGuid.HasValue)
             request.Metadata.TenantId = _config.ClientGuid.Value;
+        RequestMetadataTrust.Sign(request.Metadata, _config.Signature);
     }
 
     private static CmdResponse DeserializeCmdResponse(HttpStatusCode status, ReadOnlyMemory<byte> responsePayload)

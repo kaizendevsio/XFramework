@@ -12,4 +12,6 @@ public partial class RequestMetadata
     public string? DeviceAgent { get; set; }
     public string? IpAddress { get; set; }
     public Guid? RequestId { get; set; }
+    public DateTime? TrustedAtUtc { get; set; }
+    public string? TrustedSignature { get; set; }
 }

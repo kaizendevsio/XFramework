@@ -47,6 +47,21 @@ public partial class WalletOutboxMessage : BaseModel
     public string? LastError { get; set; }
 
     [MemoryPackOrder(11)]
+    public DateTime? LockedUntil { get; set; }
+
+    [MemoryPackOrder(12)]
+    public string? LockedBy { get; set; }
+
+    [MemoryPackOrder(13)]
+    public DateTime? LastAttemptAt { get; set; }
+
+    [MemoryPackOrder(14)]
+    public DateTime? DeadLetteredAt { get; set; }
+
+    [MemoryPackOrder(15)]
+    public int MaxAttempts { get; set; } = 5;
+
+    [MemoryPackOrder(16)]
     public virtual WalletOperation? Operation { get; set; }
 }
 

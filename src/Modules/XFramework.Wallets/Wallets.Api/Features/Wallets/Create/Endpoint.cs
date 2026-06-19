@@ -1,5 +1,6 @@
 using Wallets.Api.Services;
 using Wallets.Domain.Shared.Contracts.Responses;
+using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
 
@@ -19,35 +20,35 @@ public static class CreateWalletEndpoint
     public static async Task<Result<WalletResponse>> Handle(
         CreateWalletRequest request,
         IWalletOperationsService walletService,
+        IWalletRequestContextResolver contextResolver,
+        IWalletFeatureGateService featureGateService,
         CancellationToken ct)
     {
-        var tenantId = ResolveTenantId(request);
-        if (tenantId == Guid.Empty)
+        var contextResult = contextResolver.Resolve(request, request.CredentialId);
+        if (!contextResult.IsSuccess)
         {
-            return Result<WalletResponse>.Failure("Tenant ID is required", 400);
+            return Result<WalletResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+
+        var feature = await featureGateService.EnsureEnabledAsync(
+            contextResult.Data!.TenantId,
+            TenantModuleFeatureKeys.Wallets,
+            ct);
+        if (!feature.IsSuccess)
+        {
+            return Result<WalletResponse>.Failure(feature.Message!, feature.StatusCode);
         }
 
         var result = await walletService.CreateWalletAsync(
             request.CredentialId,
             request.WalletTypeId,
             request.InitialBalance,
-            tenantId,
+            contextResult.Data.TenantId,
             ct);
 
         if (!result.IsSuccess)
             return Result<WalletResponse>.Failure(result.Message ?? "Wallet creation failed", result.StatusCode);
 
         return Result<WalletResponse>.Success(WalletResponse.FromWallet(result.Data!));
-    }
-
-    private static Guid ResolveTenantId(CreateWalletRequest request)
-    {
-        var metadataTenantId = request.Metadata.TenantId.GetValueOrDefault();
-        if (metadataTenantId != Guid.Empty)
-        {
-            return metadataTenantId;
-        }
-
-        return request.TenantId.GetValueOrDefault();
     }
 }

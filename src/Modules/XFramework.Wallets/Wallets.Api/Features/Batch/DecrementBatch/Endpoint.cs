@@ -1,5 +1,5 @@
 using Wallets.Api.Services;
-using XFramework.Core.Services;
+using XFramework.Domain.Shared.Contracts.Requests;
 
 namespace Wallets.Api.Features.Batch.DecrementBatch;
 
@@ -13,13 +13,13 @@ public static class Endpoint
     /// </summary>
     /// <param name="request">The batch decrement request wrapper</param>
     /// <param name="batchService">Batch wallet service</param>
-    /// <param name="tenantService">Tenant service</param>
+    /// <param name="contextResolver">Wallet request context resolver</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Batch operation result</returns>
     public static async Task<IResult> HandleAsync(
         [FromBody] BatchDecrementRequestWrapper request,
         [FromServices] IBatchWalletService batchService,
-        [FromServices] ITenantResolver tenantService,
+        [FromServices] IWalletRequestContextResolver contextResolver,
         CancellationToken cancellationToken = default)
     {
         if (request?.Requests == null || request.Requests.Count == 0)
@@ -27,17 +27,18 @@ public static class Endpoint
             return Results.BadRequest(new { error = "Request list cannot be empty" });
         }
 
-        // Get tenant from metadata
-        var tenant = await tenantService.GetTenant(request.TenantId);
-        if (tenant == null)
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
         {
-            return Results.NotFound(new { error = "Tenant not found" });
+            return Results.Problem(
+                detail: contextResult.Message,
+                statusCode: contextResult.StatusCode);
         }
 
         // Process batch
         var result = await batchService.BatchDecrementAsync(
             request.Requests,
-            tenant.Id,
+            contextResult.Data!,
             request.AllowPartialSuccess,
             cancellationToken);
 
@@ -88,17 +89,12 @@ public static class Endpoint
 /// <summary>
 /// Wrapper for batch decrement requests
 /// </summary>
-public record BatchDecrementRequestWrapper
+public record BatchDecrementRequestWrapper : RequestBase
 {
     /// <summary>
     /// List of decrement requests to process
     /// </summary>
     public List<BatchDecrementRequest> Requests { get; set; } = new();
-
-    /// <summary>
-    /// The tenant ID for multi-tenancy support
-    /// </summary>
-    public Guid TenantId { get; set; }
 
     /// <summary>
     /// If true, continues processing after failures; if false, rolls back entire batch on any failure

@@ -1,63 +1,148 @@
 @page "/finance/transfers"
 @using XFramework.Domain.Shared.DataContext
+@implements IDisposable
 
 <PageTitle>Transfers - Control Panel</PageTitle>
 
 <div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <BbTypographyH3>Transfers</BbTypographyH3>
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <BbTypographyH3>Transfers</BbTypographyH3>
+            <BbTypographyMuted>Inspect paired wallet transfers, fees, and transaction links.</BbTypographyMuted>
+        </div>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+            Refresh
+        </BbButton>
     </div>
 
     @if (_loading)
     {
         <CenteredSpinner />
     }
+    else if (!_hasTenant)
+    {
+        <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
+    }
+    else if (!_moduleEnabled)
+    {
+        <ModuleUnavailable ModuleName="Wallets" />
+    }
     else
     {
-    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <Columns>
-            <BbDataGridPropertyColumn Property="@(x => x.SenderTransactionId)" Title="Sender Transaction ID" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.RecipientTransactionId)" Title="Recipient Transaction ID" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-            <BbDataGridTemplateColumn Title="Purpose">
-                <ChildContent Context="item">
-                    <BbBadge Variant="BadgeVariant.Outline">@item.TransactionPurpose</BbBadge>
-                </ChildContent>
-            </BbDataGridTemplateColumn>
-            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-        </Columns>
-    </BbDataGrid>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Transfers</BbTypographyMuted>
+                        <BbTypographyH3>@_items.Count</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Total Fees</BbTypographyMuted>
+                        <BbTypographyH3>@_totalFees.ToString("N2")</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Latest</BbTypographyMuted>
+                        <BbTypographyLarge>@(_latest?.ToString("g") ?? "N/A")</BbTypographyLarge>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+        </div>
+
+        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+            <Columns>
+                <BbDataGridPropertyColumn Property="@(x => x.Id)" Title="Transfer" />
+                <BbDataGridPropertyColumn Property="@(x => x.SenderTransactionId)" Title="Sender Transaction" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.RecipientTransactionId)" Title="Recipient Transaction" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+                <BbDataGridTemplateColumn Title="Purpose">
+                    <ChildContent Context="item">
+                        <BbBadge Variant="BadgeVariant.Outline">@item.TransactionPurpose</BbBadge>
+                    </ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            </Columns>
+        </BbDataGrid>
     }
 </div>
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
-    [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<WalletTransfer> _items = [];
     private bool _loading = true;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private decimal _totalFees;
+    private DateTime? _latest;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await LoadData();
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
     }
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private void OnTenantChanged() => _ = InvokeAsync(LoadData);
 
     private async Task LoadData()
     {
         _loading = true;
         try
         {
-            var query = DataContext.Query<WalletTransfer>();
-            if (TenantFilter.SelectedTenantId is Guid tenantId)
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsTransfers);
+            _items = [];
+            _totalFees = 0;
+            _latest = null;
+
+            if (!_hasTenant || !_moduleEnabled)
             {
-                query = query.Where(x => x.TenantId == tenantId);
+                return;
             }
 
-            _items = await query.Take(100).ToListAsync();
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _items = await DataContext.Query<WalletTransfer>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(200)
+                .ToListAsync();
+
+            _totalFees = _items.Sum(x => x.TransactionFee);
+            _latest = _items.Count == 0 ? null : _items.Max(x => x.CreatedAt);
+        }
+        catch (Exception ex)
+        {
+            _items = [];
+            _totalFees = 0;
+            _latest = null;
+            ToastService.Show($"Failed to load transfers: {ex.Message}");
         }
         finally
         {
             _loading = false;
+            StateHasChanged();
         }
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
     }
 }

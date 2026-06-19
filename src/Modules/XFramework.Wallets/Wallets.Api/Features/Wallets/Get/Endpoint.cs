@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wallets.Api.Services;
 using Wallets.Domain.Shared.Contracts.Responses;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.Contracts.Requests;
 
 namespace Wallets.Api.Features.Wallets.Get;
 
@@ -18,13 +20,26 @@ public static class GetWalletEndpoint
             .ExcludeFromDescription();
     }
 
-    public static async Task<Results<Ok<WalletResponse>, NotFound, ProblemHttpResult>> Handle(
+    public static async Task<IResult> Handle(
         [FromRoute] Guid walletId,
         [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
+        [FromServices] IWalletRequestContextResolver contextResolver,
         [FromServices] IWalletOperationsService walletService,
         CancellationToken ct)
     {
-        var result = await walletService.GetWalletAsync(walletId, tenantId, ct);
+        var contextResult = contextResolver.Resolve(new RequestBase
+        {
+            Metadata = new RequestMetadata { TenantId = tenantId }
+        });
+        if (!contextResult.IsSuccess)
+        {
+            return TypedResults.Problem(
+                title: "Invalid wallet tenant context",
+                detail: contextResult.Message,
+                statusCode: contextResult.StatusCode);
+        }
+
+        var result = await walletService.GetWalletAsync(walletId, contextResult.Data!.TenantId, ct);
 
         if (!result.IsSuccess)
         {

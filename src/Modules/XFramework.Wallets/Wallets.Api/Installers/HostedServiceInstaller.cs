@@ -1,11 +1,15 @@
-﻿using XFramework.Domain.Shared.Interfaces;
+using Wallets.Api.HostedService;
+using XFramework.Domain.Shared.Interfaces;
 
 namespace Wallets.Api.Installers;
 
 public class HostedServiceInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public virtual void InstallServices<TApp>(
+        IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment hostEnvironment)
     {
-        //services.AddHostedService<ProcessMonitorHostedService>();
+        services.AddHostedService<WalletOutboxDispatcherHostedService>();
     }
 }
