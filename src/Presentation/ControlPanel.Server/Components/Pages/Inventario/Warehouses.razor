@@ -67,7 +67,7 @@ else
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View warehouse"
                                               OnClick="@(() => Navigation.NavigateTo($"/inventario/warehouses/{item.Id}"))">
                                         <LucideIcon Name="eye" class="h-4 w-4" />
                                     </BbButton>
@@ -101,7 +101,7 @@ else
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View location"
                                               OnClick="@(() => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))">
                                         <LucideIcon Name="eye" class="h-4 w-4" />
                                     </BbButton>

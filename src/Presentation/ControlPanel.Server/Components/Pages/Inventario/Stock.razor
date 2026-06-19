@@ -78,7 +78,7 @@ else
                                 <BbDataGridPropertyColumn Property="@(x => x.LastMovementAt)" Title="Last Movement" Sortable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View stock balance"
                                                   OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>
@@ -119,7 +119,7 @@ else
                                 <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View movement"
                                                   OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>

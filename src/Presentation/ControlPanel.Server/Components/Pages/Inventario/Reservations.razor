@@ -84,7 +84,7 @@ else
                                     else
                                     {
                                         <div @onclick:stopPropagation="true">
-                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View reservation"
                                                       OnClick="@(() => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))">
                                                 <LucideIcon Name="eye" class="h-4 w-4" />
                                             </BbButton>

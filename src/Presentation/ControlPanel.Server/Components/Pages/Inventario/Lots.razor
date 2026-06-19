@@ -65,7 +65,7 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View lot"
                                               OnClick="@(() => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))">
                                         <LucideIcon Name="eye" class="h-4 w-4" />
                                     </BbButton>
