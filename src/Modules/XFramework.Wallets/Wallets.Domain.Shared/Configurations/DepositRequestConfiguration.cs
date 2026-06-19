@@ -10,7 +10,17 @@ public class DepositRequestConfiguration : IEntityTypeConfiguration<DepositReque
     {
         entity.HasKey(e => e.Id).HasName("tbl_DepositRequests_pkey");
 
-        entity.ToTable("DepositRequest", "Wallet");
+        entity.ToTable("DepositRequest", "Wallet", table =>
+        {
+            table.HasCheckConstraint("CK_DepositRequest_PositiveAmount", "\"Amount\" IS NULL OR \"Amount\" > 0");
+            table.HasCheckConstraint(
+                "CK_DepositRequest_NonNegativeFees",
+                "(\"ConvenienceFee\" IS NULL OR \"ConvenienceFee\" >= 0) AND " +
+                "(\"SystemFee\" IS NULL OR \"SystemFee\" >= 0) AND " +
+                "(\"Discount\" IS NULL OR \"Discount\" >= 0) AND " +
+                "(\"RequestedFee\" IS NULL OR \"RequestedFee\" >= 0) AND " +
+                "(\"CalculatedFee\" IS NULL OR \"CalculatedFee\" >= 0)");
+        });
 
 
         entity.Property(e => e.Id)

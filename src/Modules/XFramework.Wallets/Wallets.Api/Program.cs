@@ -66,6 +66,7 @@ app.UseTenantModuleFeatureGate(options =>
     options.RequireFeature(TenantModuleFeatureKeys.WalletsReconciliation, "/api/wallet-reconciliation-items");
     options.RequireFeature(TenantModuleFeatureKeys.WalletsReconciliation, "/api/wallet-reconciliation-runs");
     options.RequireFeature(TenantModuleFeatureKeys.WalletsPolicy, "/api/wallets/approvals");
+    options.RequireFeature(TenantModuleFeatureKeys.WalletsPolicy, "/api/wallets/cases");
     options.RequireFeature(TenantModuleFeatureKeys.WalletsPolicy, "/api/wallets/policy");
     options.RequireFeature(TenantModuleFeatureKeys.WalletsPolicy, "/api/wallet-approval-requests");
     options.RequireFeature(TenantModuleFeatureKeys.WalletsPolicy, "/api/wallet-cases");

@@ -1,3 +1,4 @@
+using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -17,7 +18,8 @@ public interface IWalletPolicyAdminService
 
 public sealed class WalletPolicyAdminService(
     DbContext dbContext,
-    IWalletRequestContextResolver contextResolver) : IWalletPolicyAdminService
+    IWalletRequestContextResolver contextResolver,
+    IWalletFeatureGateService featureGateService) : IWalletPolicyAdminService
 {
     public async Task<Result<WalletPolicyRuleResponse>> UpsertPolicyRuleAsync(
         UpsertWalletPolicyRuleRequest request,
@@ -27,6 +29,15 @@ public sealed class WalletPolicyAdminService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletPolicyRuleResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+
+        var feature = await featureGateService.EnsureEnabledAsync(
+            contextResult.Data!.TenantId,
+            TenantModuleFeatureKeys.WalletsPolicy,
+            ct);
+        if (!feature.IsSuccess)
+        {
+            return Result<WalletPolicyRuleResponse>.Failure(feature.Message!, feature.StatusCode);
         }
 
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -41,7 +52,7 @@ public sealed class WalletPolicyAdminService(
             return Result<WalletPolicyRuleResponse>.Failure("Policy rule expiry must be after effective date", 400);
         }
 
-        var tenantId = contextResult.Data!.TenantId;
+        var tenantId = contextResult.Data.TenantId;
         var rule = request.Id.HasValue
             ? await dbContext.Set<WalletPolicyRule>()
                 .IgnoreQueryFilters()
@@ -91,6 +102,15 @@ public sealed class WalletPolicyAdminService(
             return Result<WalletFeeScheduleResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         }
 
+        var feature = await featureGateService.EnsureEnabledAsync(
+            contextResult.Data!.TenantId,
+            TenantModuleFeatureKeys.WalletsPolicy,
+            ct);
+        if (!feature.IsSuccess)
+        {
+            return Result<WalletFeeScheduleResponse>.Failure(feature.Message!, feature.StatusCode);
+        }
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return Result<WalletFeeScheduleResponse>.Failure("Fee schedule name is required", 400);
@@ -115,7 +135,7 @@ public sealed class WalletPolicyAdminService(
             return Result<WalletFeeScheduleResponse>.Failure("Fee schedule expiry must be after effective date", 400);
         }
 
-        var tenantId = contextResult.Data!.TenantId;
+        var tenantId = contextResult.Data.TenantId;
         var schedule = request.Id.HasValue
             ? await dbContext.Set<WalletFeeSchedule>()
                 .IgnoreQueryFilters()

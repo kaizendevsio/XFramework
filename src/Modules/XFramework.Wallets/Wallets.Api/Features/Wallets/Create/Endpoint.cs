@@ -1,5 +1,6 @@
 using Wallets.Api.Services;
 using Wallets.Domain.Shared.Contracts.Responses;
+using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
 
@@ -20,6 +21,7 @@ public static class CreateWalletEndpoint
         CreateWalletRequest request,
         IWalletOperationsService walletService,
         IWalletRequestContextResolver contextResolver,
+        IWalletFeatureGateService featureGateService,
         CancellationToken ct)
     {
         var contextResult = contextResolver.Resolve(request, request.CredentialId);
@@ -28,11 +30,20 @@ public static class CreateWalletEndpoint
             return Result<WalletResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         }
 
+        var feature = await featureGateService.EnsureEnabledAsync(
+            contextResult.Data!.TenantId,
+            TenantModuleFeatureKeys.Wallets,
+            ct);
+        if (!feature.IsSuccess)
+        {
+            return Result<WalletResponse>.Failure(feature.Message!, feature.StatusCode);
+        }
+
         var result = await walletService.CreateWalletAsync(
             request.CredentialId,
             request.WalletTypeId,
             request.InitialBalance,
-            contextResult.Data!.TenantId,
+            contextResult.Data.TenantId,
             ct);
 
         if (!result.IsSuccess)

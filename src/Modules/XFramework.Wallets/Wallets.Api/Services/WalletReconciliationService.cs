@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -7,7 +8,8 @@ namespace Wallets.Api.Services;
 
 public sealed class WalletReconciliationService(
     DbContext dbContext,
-    IWalletRequestContextResolver contextResolver) : IWalletReconciliationService
+    IWalletRequestContextResolver contextResolver,
+    IWalletFeatureGateService featureGateService) : IWalletReconciliationService
 {
     public async Task<Result<WalletReconciliationRunResponse>> RunAsync(
         RunWalletReconciliationRequest request,
@@ -17,6 +19,15 @@ public sealed class WalletReconciliationService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletReconciliationRunResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+
+        var feature = await featureGateService.EnsureEnabledAsync(
+            contextResult.Data!.TenantId,
+            TenantModuleFeatureKeys.WalletsReconciliation,
+            ct);
+        if (!feature.IsSuccess)
+        {
+            return Result<WalletReconciliationRunResponse>.Failure(feature.Message!, feature.StatusCode);
         }
 
         var run = new WalletReconciliationRun
@@ -176,6 +187,15 @@ public sealed class WalletReconciliationService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletReconciliationItemResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+
+        var feature = await featureGateService.EnsureEnabledAsync(
+            contextResult.Data!.TenantId,
+            TenantModuleFeatureKeys.WalletsReconciliation,
+            ct);
+        if (!feature.IsSuccess)
+        {
+            return Result<WalletReconciliationItemResponse>.Failure(feature.Message!, feature.StatusCode);
         }
 
         var item = await dbContext.Set<WalletReconciliationItem>()

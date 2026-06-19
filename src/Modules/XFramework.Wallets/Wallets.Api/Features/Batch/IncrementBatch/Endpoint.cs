@@ -38,7 +38,7 @@ public static class Endpoint
         // Process batch
         var result = await batchService.BatchIncrementAsync(
             request.Requests,
-            contextResult.Data!.TenantId,
+            contextResult.Data!,
             request.AllowPartialSuccess,
             cancellationToken);
 

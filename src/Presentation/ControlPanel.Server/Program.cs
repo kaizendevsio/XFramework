@@ -84,6 +84,7 @@ builder.Services.AddScoped(sp =>
     var metadata = new RequestMetadata
     {
         TenantId = tenantFilter.SelectedTenantId ?? loginTenantId,
+        CredentialId = TryGetGuidClaim(user, ControlPanelAuthClaims.CredentialId),
         SessionId = TryGetGuidClaim(user, ControlPanelAuthClaims.SessionId),
         RequestId = Guid.NewGuid(),
         Name = "ControlPanel",

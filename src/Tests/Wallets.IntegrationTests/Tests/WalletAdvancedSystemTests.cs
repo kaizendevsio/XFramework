@@ -1,12 +1,16 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Wallets.Api.Services;
 using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Enums;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Enums;
 using SharedContracts = XFramework.Domain.Shared.Contracts;
@@ -488,7 +492,7 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         });
         approveResponse.IsSuccessStatusCode.Should().BeTrue(await approveResponse.Content.ReadAsStringAsync());
 
-        var payload = $$"""{"event":"deposit.completed","reference":"{{externalReference}}","amount":90}""";
+        var payload = $$"""{"tenantId":"{{WalletsTestFixture.TestTenantId}}","event":"deposit.completed","reference":"{{externalReference}}","amount":90}""";
         var request = new IngestWalletPaymentWebhookRequest
         {
             ProviderKey = "test-provider",
@@ -528,6 +532,197 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         webhookRows.Should().ContainSingle();
         webhookRows[0].ProcessingStatus.Should().Be(WalletWebhookProcessingStatus.Processed);
         operationCount.Should().Be(1);
+    }
+
+    [Test]
+    public async Task DirectWorkflowCall_UnsignedMetadataWithoutHttpContext_IsRejected()
+    {
+        var credential = await SeedCredential();
+
+        await using var scope = WalletsTestFixture.Services.CreateAsyncScope();
+        var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+        accessor.HttpContext = null;
+        var service = scope.ServiceProvider.GetRequiredService<IWalletWorkflowService>();
+
+        var result = await service.CreateDepositAsync(new CreateDepositWorkflowRequest
+        {
+            CredentialId = credential.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+            Amount = 25m,
+            Metadata = CreateMetadata()
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(400);
+        result.Message.Should().Contain("Tenant context");
+    }
+
+    [Test]
+    public async Task WorkflowAction_WrongActorWithoutAdminRole_IsForbidden()
+    {
+        var credential = await SeedCredential();
+        var gatewayId = await SeedPaymentGateway();
+        await using var db = CreateDbContext();
+        var approval = new WalletApprovalRequest
+        {
+            Id = Guid.NewGuid(),
+            TenantId = WalletsTestFixture.TestTenantId,
+            OperationType = WalletOperationType.DepositApproval,
+            Status = WalletApprovalStatus.Pending,
+            RequesterCredentialId = credential.Id,
+            Amount = 25m,
+            RequestedAt = DateTime.UtcNow
+        };
+        var deposit = new DepositRequest
+        {
+            Id = Guid.NewGuid(),
+            TenantId = WalletsTestFixture.TestTenantId,
+            CredentialId = credential.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+            Amount = 25m,
+            GatewayId = gatewayId,
+            RequestedFee = 0m,
+            CalculatedFee = 0m,
+            ConvenienceFee = 0m,
+            ReferenceNo = $"wrong-actor-{Guid.NewGuid():N}",
+            ExternalReference = $"wrong-actor-{Guid.NewGuid():N}",
+            DepositStatus = (short)DepositStatus.PendingPayment,
+            WorkflowStatus = WalletWorkflowStatus.PendingApproval,
+            RequestedByCredentialId = credential.Id,
+            ApprovalId = approval.Id,
+            RawRequestData = "{}"
+        };
+        db.Set<WalletApprovalRequest>().Add(approval);
+        db.Set<DepositRequest>().Add(deposit);
+        await db.SaveChangesAsync();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/wallets/deposits/approve")
+        {
+            Content = JsonContent.Create(new ApproveDepositWorkflowRequest
+            {
+                RequestId = deposit.Id,
+                Metadata = CreateMetadata()
+            })
+        };
+        request.Headers.TryAddWithoutValidation("X-Wallets-Test-CredentialId", Guid.NewGuid().ToString());
+        request.Headers.TryAddWithoutValidation("X-Wallets-Test-No-Role", "true");
+
+        var response = await HttpClient.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task WorkflowAction_CrossTenantApprovalReference_DoesNotMutateForeignApproval()
+    {
+        var credential = await SeedCredential();
+        var gatewayId = await SeedPaymentGateway();
+        var foreignTenantId = Guid.NewGuid();
+        await using var db = CreateDbContext();
+        var foreignApproval = new WalletApprovalRequest
+        {
+            Id = Guid.NewGuid(),
+            TenantId = foreignTenantId,
+            OperationType = WalletOperationType.DepositApproval,
+            Status = WalletApprovalStatus.Pending,
+            RequesterCredentialId = credential.Id,
+            Amount = 25m,
+            RequestedAt = DateTime.UtcNow
+        };
+        var deposit = new DepositRequest
+        {
+            Id = Guid.NewGuid(),
+            TenantId = WalletsTestFixture.TestTenantId,
+            CredentialId = credential.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+            Amount = 25m,
+            GatewayId = gatewayId,
+            RequestedFee = 0m,
+            CalculatedFee = 0m,
+            ConvenienceFee = 0m,
+            ReferenceNo = $"foreign-approval-{Guid.NewGuid():N}",
+            ExternalReference = $"foreign-approval-{Guid.NewGuid():N}",
+            DepositStatus = (short)DepositStatus.PendingPayment,
+            WorkflowStatus = WalletWorkflowStatus.PendingApproval,
+            RequestedByCredentialId = credential.Id,
+            ApprovalId = foreignApproval.Id,
+            RawRequestData = "{}"
+        };
+        db.Set<WalletApprovalRequest>().Add(foreignApproval);
+        db.Set<DepositRequest>().Add(deposit);
+        await db.SaveChangesAsync();
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/deposits/approve", new ApproveDepositWorkflowRequest
+        {
+            RequestId = deposit.Id,
+            Reason = "approve only local deposit",
+            Metadata = CreateMetadata()
+        });
+
+        response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
+        db.ChangeTracker.Clear();
+        var updatedDeposit = await db.Set<DepositRequest>().SingleAsync(x => x.Id == deposit.Id);
+        var unchangedForeignApproval = await db.Set<WalletApprovalRequest>()
+            .IgnoreQueryFilters()
+            .SingleAsync(x => x.Id == foreignApproval.Id);
+
+        updatedDeposit.WorkflowStatus.Should().Be(WalletWorkflowStatus.Approved);
+        unchangedForeignApproval.TenantId.Should().Be(foreignTenantId);
+        unchangedForeignApproval.Status.Should().Be(WalletApprovalStatus.Pending);
+        unchangedForeignApproval.ApproverCredentialId.Should().BeNull();
+        unchangedForeignApproval.DecidedAt.Should().BeNull();
+    }
+
+    [Test]
+    public async Task BoltMoneyOperation_DisabledWalletSubfeature_IsRejected()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 100m);
+
+        await SetTenantFeatureEnabled(TenantModuleFeatureKeys.WalletsDeposits, enabled: false);
+        try
+        {
+            var result = await WalletsTestFixture.ServiceWrapper.IncrementWallet(new IncrementWalletRequest
+            {
+                CredentialId = credential.Id,
+                WalletId = wallet.Id,
+                WalletTypeId = wallet.WalletTypeId ?? WalletsTestFixture.TestWalletTypeId,
+                Amount = 10m,
+                ReferenceNumber = $"feature-gate-{Guid.NewGuid():N}",
+                Metadata = CreateMetadata()
+            });
+
+            result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+            result.Message.Should().Contain("Feature disabled");
+        }
+        finally
+        {
+            await SetTenantFeatureEnabled(TenantModuleFeatureKeys.WalletsDeposits, enabled: true);
+        }
+    }
+
+    [Test]
+    public async Task DatabaseConstraints_RejectNegativeWalletBalance()
+    {
+        var credential = await SeedCredential();
+        await using var db = CreateDbContext();
+        db.Set<Wallet>().Add(new Wallet
+        {
+            Id = Guid.NewGuid(),
+            TenantId = WalletsTestFixture.TestTenantId,
+            CredentialId = credential.Id,
+            WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+            AccountNumber = $"neg-{Guid.NewGuid():N}"[..20],
+            Balance = -1m,
+            TransferableBalance = 0m,
+            DebitOnHoldBalance = 0m,
+            CreditOnHoldBalance = 0m,
+            IsEnabled = true
+        });
+
+        var act = () => db.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateException>();
     }
 
     [Test]
@@ -632,7 +827,9 @@ public class WalletAdvancedSystemTests : WalletsTestBase
             new Claim("credentialId", Guid.NewGuid().ToString())
         ], "WalletsTest"));
 
-        var resolver = new WalletRequestContextResolver(new HttpContextAccessor { HttpContext = httpContext });
+        var resolver = new WalletRequestContextResolver(
+            new HttpContextAccessor { HttpContext = httpContext },
+            new ConfigurationBuilder().Build());
         var spoofedTenantId = Guid.NewGuid();
 
         var result = resolver.Resolve(new RequestBase
@@ -680,6 +877,46 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         var directTransactionExists = await db.Set<WalletTransaction>()
             .AnyAsync(x => x.ReferenceNumber != null && x.ReferenceNumber.StartsWith("direct-"));
         directTransactionExists.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task BatchIncrement_WrongActorWithoutAdminRole_IsForbidden()
+    {
+        var owner = await SeedCredential();
+        var wallet = await SeedWallet(owner.Id, 100m);
+        var wrongActorId = Guid.NewGuid();
+        var referenceNumber = $"batch-wrong-actor-{Guid.NewGuid():N}";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/wallets/batch/increment")
+        {
+            Content = JsonContent.Create(new Wallets.Api.Features.Batch.IncrementBatch.BatchIncrementRequestWrapper
+            {
+                Metadata = CreateMetadata(),
+                Requests =
+                [
+                    new BatchIncrementRequest
+                    {
+                        WalletId = wallet.Id,
+                        WalletTypeId = WalletsTestFixture.TestWalletTypeId,
+                        CredentialId = owner.Id,
+                        Amount = 10m,
+                        ReferenceNumber = referenceNumber
+                    }
+                ]
+            })
+        };
+        request.Headers.TryAddWithoutValidation("X-Wallets-Test-CredentialId", wrongActorId.ToString());
+        request.Headers.TryAddWithoutValidation("X-Wallets-Test-No-Role", "true");
+
+        var response = await HttpClient.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await using var db = CreateDbContext();
+        var unchangedWallet = await db.Set<Wallet>().SingleAsync(x => x.Id == wallet.Id);
+        var transactionExists = await db.Set<WalletTransaction>().AnyAsync(x => x.ReferenceNumber == referenceNumber);
+
+        unchangedWallet.Balance.Should().Be(100m);
+        transactionExists.Should().BeFalse();
     }
 
     [Test]
@@ -903,5 +1140,26 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         using var hmac = new System.Security.Cryptography.HMACSHA256(
             System.Text.Encoding.UTF8.GetBytes("wallets-webhook-test-secret"));
         return Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+    }
+
+    private async Task SetTenantFeatureEnabled(string featureKey, bool enabled)
+    {
+        var (moduleKey, subFeatureKey) = TenantModuleFeatureKeys.Normalize(featureKey);
+        await using (var db = CreateDbContext())
+        {
+            var feature = await db.Set<TenantModuleFeature>()
+                .IgnoreQueryFilters()
+                .SingleAsync(x =>
+                    x.TenantId == WalletsTestFixture.TestTenantId &&
+                    x.ModuleKey == moduleKey &&
+                    x.SubFeatureKey == subFeatureKey);
+            feature.IsEnabled = enabled;
+            feature.ModifiedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        await using var scope = WalletsTestFixture.Services.CreateAsyncScope();
+        var featureService = scope.ServiceProvider.GetRequiredService<ITenantModuleFeatureService>();
+        featureService.Invalidate(WalletsTestFixture.TestTenantId, moduleKey, subFeatureKey);
     }
 }

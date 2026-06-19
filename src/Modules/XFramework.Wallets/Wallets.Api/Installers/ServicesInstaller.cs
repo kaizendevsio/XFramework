@@ -22,6 +22,7 @@ public class ServicesInstaller : IInstaller
 
         // Register wallet services
         services.AddHttpContextAccessor();
+        services.AddScoped<IWalletFeatureGateService, WalletFeatureGateService>();
         services.AddScoped<IWalletRequestContextResolver, WalletRequestContextResolver>();
         services.AddScoped<IWalletFeeCalculator, WalletFeeCalculator>();
         services.AddScoped<IWalletPolicyEvaluator, WalletPolicyEvaluator>();

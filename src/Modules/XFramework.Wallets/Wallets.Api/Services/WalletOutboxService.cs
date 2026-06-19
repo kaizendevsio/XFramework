@@ -1,4 +1,5 @@
 using System.Data;
+using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -8,6 +9,7 @@ namespace Wallets.Api.Services;
 public sealed class WalletOutboxService(
     DbContext dbContext,
     IWalletRequestContextResolver contextResolver,
+    IWalletFeatureGateService featureGateService,
     IWalletOutboxPublisher publisher,
     ILogger<WalletOutboxService> logger) : IWalletOutboxService
 {
@@ -108,6 +110,15 @@ public sealed class WalletOutboxService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletOutboxActionResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+
+        var feature = await featureGateService.EnsureEnabledAsync(
+            contextResult.Data!.TenantId,
+            TenantModuleFeatureKeys.WalletsWebhooks,
+            ct);
+        if (!feature.IsSuccess)
+        {
+            return Result<WalletOutboxActionResponse>.Failure(feature.Message!, feature.StatusCode);
         }
 
         var message = await dbContext.Set<WalletOutboxMessage>()

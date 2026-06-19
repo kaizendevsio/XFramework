@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
 
 namespace Wallets.Api.Services;
@@ -9,22 +10,26 @@ public sealed record WalletRequestContext(
     Guid? ActorCredentialId,
     string? CorrelationId,
     string? IpAddress,
-    string? UserAgent);
+    string? UserAgent,
+    bool IsPrivilegedActor);
 
 public interface IWalletRequestContextResolver
 {
     Result<WalletRequestContext> Resolve(RequestBase request, Guid? requestCredentialId = null);
 }
 
-public sealed class WalletRequestContextResolver(IHttpContextAccessor httpContextAccessor)
+public sealed class WalletRequestContextResolver(
+    IHttpContextAccessor httpContextAccessor,
+    IConfiguration configuration)
     : IWalletRequestContextResolver
 {
     public Result<WalletRequestContext> Resolve(RequestBase request, Guid? requestCredentialId = null)
     {
         var httpContext = httpContextAccessor.HttpContext;
+        var isSignedInternalRequest = httpContext is null && IsTrustedServerMetadata(request.Metadata);
         var trustedTenantId = TryGetClaimGuid(httpContext?.User, "tenant_id", "tenantId", "TenantId", "tenant")
             ?? TryGetItemGuid(httpContext, "TenantId")
-            ?? (httpContext is null ? request.Metadata.TenantId : null);
+            ?? (isSignedInternalRequest ? request.Metadata.TenantId : null);
 
         if (trustedTenantId is null || trustedTenantId.Value == Guid.Empty)
         {
@@ -38,16 +43,19 @@ public sealed class WalletRequestContextResolver(IHttpContextAccessor httpContex
             return Result<WalletRequestContext>.Forbidden("Request tenant does not match trusted tenant context");
         }
 
+        var isPrivilegedActor = isSignedInternalRequest ||
+                                IsAdmin(httpContext?.User) ||
+                                TryGetItemBool(httpContext, "WalletsPrivilegedActor");
         var actorCredentialId = TryGetClaimGuid(httpContext?.User, "credential_id", "credentialId", "CredentialId", ClaimTypes.NameIdentifier)
             ?? TryGetItemGuid(httpContext, "CredentialId")
-            ?? (httpContext is null ? request.Metadata.CredentialId : null)
+            ?? (isSignedInternalRequest ? request.Metadata.CredentialId : null)
             ?? requestCredentialId;
 
         if (request.Metadata.CredentialId is { } metadataCredentialId &&
             metadataCredentialId != Guid.Empty &&
             actorCredentialId.HasValue &&
             metadataCredentialId != actorCredentialId.Value &&
-            !IsAdmin(httpContext?.User))
+            !isPrivilegedActor)
         {
             return Result<WalletRequestContext>.Forbidden("Request credential does not match trusted actor context");
         }
@@ -55,7 +63,7 @@ public sealed class WalletRequestContextResolver(IHttpContextAccessor httpContex
         if (requestCredentialId is { } targetCredentialId &&
             actorCredentialId is { } actorId &&
             actorId != targetCredentialId &&
-            !IsAdmin(httpContext?.User))
+            !isPrivilegedActor)
         {
             return Result<WalletRequestContext>.Forbidden("Actor cannot operate on the requested credential");
         }
@@ -65,7 +73,17 @@ public sealed class WalletRequestContextResolver(IHttpContextAccessor httpContex
             actorCredentialId,
             request.Metadata.RequestId?.ToString(),
             request.Metadata.IpAddress ?? httpContext?.Connection.RemoteIpAddress?.ToString(),
-            request.Metadata.DeviceAgent ?? httpContext?.Request.Headers.UserAgent.ToString()));
+            request.Metadata.DeviceAgent ?? httpContext?.Request.Headers.UserAgent.ToString(),
+            isPrivilegedActor));
+    }
+
+    private bool IsTrustedServerMetadata(RequestMetadata? metadata)
+    {
+        var secret = configuration["Wallets:TrustedMetadata:SharedSecret"]
+            ?? configuration["BoltConfiguration:Signature"];
+        var maxAgeMinutes = configuration.GetValue("Wallets:TrustedMetadata:MaxAgeMinutes", 10);
+        var maxAge = TimeSpan.FromMinutes(Math.Clamp(maxAgeMinutes, 1, 60));
+        return RequestMetadataTrust.IsValid(metadata, secret, maxAge);
     }
 
     private static bool IsAdmin(ClaimsPrincipal? user) =>
@@ -103,6 +121,21 @@ public sealed class WalletRequestContextResolver(IHttpContextAccessor httpContex
             Guid id => id,
             string text when Guid.TryParse(text, out var id) => id,
             _ => null
+        };
+    }
+
+    private static bool TryGetItemBool(HttpContext? context, string key)
+    {
+        if (context?.Items.TryGetValue(key, out var value) != true)
+        {
+            return false;
+        }
+
+        return value switch
+        {
+            bool flag => flag,
+            string text when bool.TryParse(text, out var flag) => flag,
+            _ => false
         };
     }
 }

@@ -9,7 +9,16 @@ public class WalletOperationConfiguration : IEntityTypeConfiguration<WalletOpera
     public void Configure(EntityTypeBuilder<WalletOperation> entity)
     {
         entity.HasKey(e => e.Id).HasName("tbl_WalletOperations_pkey");
-        entity.ToTable("WalletOperation", "Wallet");
+        entity.ToTable("WalletOperation", "Wallet", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_WalletOperation_NonNegativeFees",
+                "(\"RequestedFee\" IS NULL OR \"RequestedFee\" >= 0) AND " +
+                "(\"CalculatedFee\" IS NULL OR \"CalculatedFee\" >= 0)");
+            table.HasCheckConstraint(
+                "CK_WalletOperation_RiskScoreRange",
+                "\"RiskScore\" IS NULL OR (\"RiskScore\" >= 0 AND \"RiskScore\" <= 100)");
+        });
 
         entity.Property(e => e.Id)
             .HasColumnName("ID")

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -12,6 +13,7 @@ public sealed class WalletPaymentWebhookService(
     DbContext dbContext,
     IConfiguration configuration,
     IHttpContextAccessor httpContextAccessor,
+    IWalletFeatureGateService featureGateService,
     IWalletWorkflowService workflowService) : IWalletPaymentWebhookService
 {
     public async Task<Result<WalletWebhookIngestResponse>> IngestAsync(
@@ -41,24 +43,34 @@ public sealed class WalletPaymentWebhookService(
             return Result<WalletWebhookIngestResponse>.Failure("Webhook signature validation failed", 401);
         }
 
-        var tenantId = configuredTenantId ?? request.Metadata.TenantId;
+        var signedPayloadTenantId = ResolveTenantIdFromSignedPayload(request.RawPayloadJson);
+        var tenantId = configuredTenantId ?? signedPayloadTenantId;
         if (tenantId is null || tenantId.Value == Guid.Empty)
         {
             return Result<WalletWebhookIngestResponse>.Failure("Webhook tenant context is required", 400);
         }
 
-        if (configuredTenantId.HasValue &&
-            request.Metadata.TenantId is { } metadataTenantId &&
+        if (request.Metadata.TenantId is { } metadataTenantId &&
             metadataTenantId != Guid.Empty &&
-            metadataTenantId != configuredTenantId.Value)
+            metadataTenantId != tenantId.Value)
         {
-            return Result<WalletWebhookIngestResponse>.Forbidden("Webhook tenant does not match provider configuration");
+            return Result<WalletWebhookIngestResponse>.Forbidden("Webhook tenant does not match trusted provider context");
+        }
+
+        var feature = await featureGateService.EnsureEnabledAsync(
+            tenantId.Value,
+            TenantModuleFeatureKeys.WalletsWebhooks,
+            ct);
+        if (!feature.IsSuccess)
+        {
+            return Result<WalletWebhookIngestResponse>.Failure(feature.Message!, feature.StatusCode);
         }
 
         request.Metadata.TenantId = tenantId.Value;
         if (httpContextAccessor.HttpContext is { } httpContext)
         {
             httpContext.Items["TenantId"] = tenantId.Value;
+            httpContext.Items["WalletsPrivilegedActor"] = true;
         }
 
         var duplicate = await dbContext.Set<WalletPaymentWebhookEvent>()
@@ -138,6 +150,15 @@ public sealed class WalletPaymentWebhookService(
                 return Result<WalletWebhookIngestResponse>.Failure(workflowResult.Message!, workflowResult.StatusCode);
             }
 
+            webhookEvent.OperationId = workflowResult.Data?.OperationId ?? webhookEvent.OperationId;
+            if (webhookEvent.ProcessingStatus == WalletWebhookProcessingStatus.Processing)
+            {
+                webhookEvent.ProcessingStatus = WalletWebhookProcessingStatus.Processed;
+                webhookEvent.ProcessingError = null;
+                webhookEvent.ProcessedAt = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync(ct);
+            }
+
             return Result<WalletWebhookIngestResponse>.Success(new WalletWebhookIngestResponse
             {
                 WebhookEventId = webhookEvent.Id,
@@ -166,6 +187,40 @@ public sealed class WalletPaymentWebhookService(
 
         return Guid.TryParse(configured, out var tenantId) && tenantId != Guid.Empty
             ? tenantId
+            : null;
+    }
+
+    private static Guid? ResolveTenantIdFromSignedPayload(string rawPayloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawPayloadJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawPayloadJson);
+            var root = document.RootElement;
+            return TryGetGuid(root, "tenantId")
+                ?? TryGetGuid(root, "TenantId")
+                ?? TryGetGuid(root, "tenant_id");
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static Guid? TryGetGuid(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        return Guid.TryParse(property.GetString(), out var id) && id != Guid.Empty
+            ? id
             : null;
     }
 

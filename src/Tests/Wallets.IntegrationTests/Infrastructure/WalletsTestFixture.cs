@@ -133,10 +133,12 @@ public class WalletsTestFixture
         builder.Services.AddHttpClient();
         builder.Services.AddPaymentServices();
         builder.Services.AddTenantResolver();
+        builder.Services.AddTenantModuleFeatures();
         builder.Services.AddAuthentication("WalletsTest")
             .AddScheme<AuthenticationSchemeOptions, WalletsTestAuthHandler>("WalletsTest", _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton<IWalletEventPublisher, WalletEventPublisher>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletFeatureGateService, Wallets.Api.Services.WalletFeatureGateService>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletRequestContextResolver, Wallets.Api.Services.WalletRequestContextResolver>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletFeeCalculator, Wallets.Api.Services.WalletFeeCalculator>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletPolicyEvaluator, Wallets.Api.Services.WalletPolicyEvaluator>();
@@ -198,6 +200,7 @@ public class WalletsTestFixture
             ["BoltConfiguration:ClientName"] = "WalletTestClient",
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
+            ["BoltConfiguration:Signature"] = "wallets-bolt-test-secret",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Logging:LogLevel:Default"] = "Warning",
         });
@@ -265,6 +268,7 @@ public class WalletsTestFixture
             ["ConnectionStrings:DefaultDatabaseConnection"] = ConnectionString,
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
+            ["BoltConfiguration:Signature"] = "wallets-bolt-test-secret",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Wallets:Webhooks:SharedSecret"] = "wallets-webhook-test-secret",
             ["Logging:LogLevel:Default"] = "Warning"
@@ -378,13 +382,41 @@ public class WalletsTestFixture
     {
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var claims = new[]
+            var tenantId = Request.Headers.TryGetValue("X-Wallets-Test-TenantId", out var tenantHeader) &&
+                           Guid.TryParse(tenantHeader.FirstOrDefault(), out var suppliedTenantId)
+                ? suppliedTenantId
+                : TestTenantId;
+            var credentialId = Request.Headers.TryGetValue("X-Wallets-Test-CredentialId", out var credentialHeader) &&
+                               Guid.TryParse(credentialHeader.FirstOrDefault(), out var suppliedCredentialId)
+                ? suppliedCredentialId
+                : (Guid?)null;
+            var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, "wallets-test"),
-                new Claim("tenantId", TestTenantId.ToString()),
-                new Claim("TenantId", TestTenantId.ToString()),
-                new Claim("tid", TestTenantId.ToString())
+                new Claim("tenantId", tenantId.ToString()),
+                new Claim("TenantId", tenantId.ToString()),
+                new Claim("tid", tenantId.ToString())
             };
+
+            if (credentialId.HasValue)
+            {
+                claims.Add(new Claim("credential_id", credentialId.Value.ToString()));
+            }
+
+            var suppressDefaultRole = Request.Headers.TryGetValue("X-Wallets-Test-No-Role", out var noRoleHeader) &&
+                                      bool.TryParse(noRoleHeader.FirstOrDefault(), out var noRole) &&
+                                      noRole;
+            if (Request.Headers.TryGetValue("X-Wallets-Test-Role", out var roleHeader))
+            {
+                foreach (var role in roleHeader.Where(static x => !string.IsNullOrWhiteSpace(x)))
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, role!));
+                }
+            }
+            else if (!suppressDefaultRole)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            }
 
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);

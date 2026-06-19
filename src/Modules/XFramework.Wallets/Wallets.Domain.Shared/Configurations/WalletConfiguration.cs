@@ -10,7 +10,17 @@ public class WalletConfiguration : IEntityTypeConfiguration<Wallet>
     {
         entity.HasKey(e => e.Id).HasName("tbl_Wallets_pkey");
 
-        entity.ToTable("Wallet", "Wallet");
+        entity.ToTable("Wallet", "Wallet", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_Wallet_NonNegativeBalances",
+                "\"Balance\" >= 0 AND \"TransferableBalance\" >= 0 AND \"DebitOnHoldBalance\" >= 0 AND \"CreditOnHoldBalance\" >= 0");
+            table.HasCheckConstraint(
+                "CK_Wallet_TransferRules",
+                "(\"MinTransferRule\" IS NULL OR \"MinTransferRule\" >= 0) AND " +
+                "(\"MaxTransferRule\" IS NULL OR \"MaxTransferRule\" >= 0) AND " +
+                "(\"MinTransferRule\" IS NULL OR \"MaxTransferRule\" IS NULL OR \"MaxTransferRule\" >= \"MinTransferRule\")");
+        });
 
         entity.Property(e => e.Id)
             .HasColumnName("ID")

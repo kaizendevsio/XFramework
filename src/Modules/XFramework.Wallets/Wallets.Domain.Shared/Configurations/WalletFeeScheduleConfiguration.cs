@@ -9,7 +9,17 @@ public class WalletFeeScheduleConfiguration : IEntityTypeConfiguration<WalletFee
     public void Configure(EntityTypeBuilder<WalletFeeSchedule> entity)
     {
         entity.HasKey(e => e.Id).HasName("tbl_WalletFeeSchedules_pkey");
-        entity.ToTable("WalletFeeSchedule", "Wallet");
+        entity.ToTable("WalletFeeSchedule", "Wallet", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_WalletFeeSchedule_NonNegativeFees",
+                "\"FixedFee\" >= 0 AND \"PercentageFee\" >= 0 AND " +
+                "(\"MinimumFee\" IS NULL OR \"MinimumFee\" >= 0) AND " +
+                "(\"MaximumFee\" IS NULL OR \"MaximumFee\" >= 0)");
+            table.HasCheckConstraint(
+                "CK_WalletFeeSchedule_MinMaxFee",
+                "\"MinimumFee\" IS NULL OR \"MaximumFee\" IS NULL OR \"MaximumFee\" >= \"MinimumFee\"");
+        });
 
         entity.Property(e => e.Id).HasColumnName("ID").HasDefaultValueSql("(uuid_generate_v4())");
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");

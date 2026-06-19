@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Api.Events;
 using XFramework.Core.Loggers;
 using XFramework.Core.Observability;
@@ -25,6 +26,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
     private readonly IWalletLedgerService _ledgerService;
     private readonly IWalletRequestContextResolver _contextResolver;
     private readonly IWalletFeeCalculator _feeCalculator;
+    private readonly IWalletFeatureGateService _featureGateService;
 
     public WalletOperationsService(
         IDataContext dataContext,
@@ -34,7 +36,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         IWalletEventPublisher eventPublisher,
         IWalletLedgerService ledgerService,
         IWalletRequestContextResolver contextResolver,
-        IWalletFeeCalculator feeCalculator)
+        IWalletFeeCalculator feeCalculator,
+        IWalletFeatureGateService featureGateService)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _tenantService = tenantService ?? throw new ArgumentNullException(nameof(tenantService));
@@ -44,6 +47,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
         _ledgerService = ledgerService ?? throw new ArgumentNullException(nameof(ledgerService));
         _contextResolver = contextResolver ?? throw new ArgumentNullException(nameof(contextResolver));
         _feeCalculator = feeCalculator ?? throw new ArgumentNullException(nameof(feeCalculator));
+        _featureGateService = featureGateService ?? throw new ArgumentNullException(nameof(featureGateService));
     }
 
     /// <inheritdoc />
@@ -256,6 +260,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request, request.CredentialId);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsDeposits, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
             activity?.SetTag("tenant.id", tenant.Id);
 
@@ -505,6 +511,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request, request.CredentialId);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsWithdrawals, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             if (request.TotalAmount <= 0 || request.TotalFee < 0)
@@ -681,6 +689,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request, request.CredentialId);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsTransfers, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             // Validate amount and fee
@@ -1086,6 +1096,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request, request.CredentialId);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsTransfers, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             // Validate amount and fees
@@ -1420,6 +1432,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsPolicy, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             // Fetch the transaction
@@ -1789,6 +1803,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsPolicy, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             if (request.WalletTransferId != Guid.Empty)
@@ -2219,6 +2235,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsPolicy, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             var wallet = await _dataContext.Query<Wallet>()
@@ -2280,6 +2298,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsPolicy, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             var wallet = await _dataContext.Query<Wallet>()
@@ -2337,6 +2357,8 @@ public sealed class WalletOperationsService : IWalletOperationsService
         {
             var tenantResult = ResolveTrustedTenantId(request);
             if (!tenantResult.IsSuccess) return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+            var feature = await _featureGateService.EnsureEnabledAsync(tenantResult.Data, TenantModuleFeatureKeys.WalletsPolicy, cancellationToken);
+            if (!feature.IsSuccess) return Result.Failure(feature.Message!, feature.StatusCode);
             var tenant = await _tenantService.GetTenant(tenantResult.Data);
 
             var wallet = await _dataContext.Query<Wallet>()

@@ -9,7 +9,8 @@ namespace ControlPanel.Server.Services;
 
 public sealed class WalletsAdminBackendContractService(
     IWalletsServiceWrapper wallets,
-    TenantFilterService tenantFilter)
+    TenantFilterService tenantFilter,
+    RequestMetadata requestMetadata)
 {
     public const string CreateDepositRoute = "POST /api/wallets/deposits";
     public const string ApproveDepositRoute = "POST /api/wallets/deposits/approve";
@@ -23,6 +24,9 @@ public sealed class WalletsAdminBackendContractService(
     public const string SettleWithdrawalRoute = "POST /api/wallets/withdrawals/settle";
     public const string FailWithdrawalRoute = "POST /api/wallets/withdrawals/fail";
     public const string CancelWithdrawalRoute = "POST /api/wallets/withdrawals/cancel";
+    public const string BatchIncrementRoute = "POST /api/wallets/batch/increment";
+    public const string BatchDecrementRoute = "POST /api/wallets/batch/decrement";
+    public const string BatchTransferRoute = "POST /api/wallets/batch/transfer";
     public const string RetryOutboxRoute = "POST /api/wallets/outbox/retry";
     public const string ReplayOutboxRoute = "POST /api/wallets/outbox/replay";
     public const string DeadLetterOutboxRoute = "POST /api/wallets/outbox/dead-letter";
@@ -169,6 +173,33 @@ public sealed class WalletsAdminBackendContractService(
             Metadata = Metadata()
         });
         return ToCommandResponse(response);
+    }
+
+    public async Task<CmdResponse> BatchIncrementAsync(BatchIncrementWalletRequest request, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return await wallets.BatchIncrementWallet(request with
+        {
+            Metadata = Metadata()
+        });
+    }
+
+    public async Task<CmdResponse> BatchDecrementAsync(BatchDecrementWalletRequest request, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return await wallets.BatchDecrementWallet(request with
+        {
+            Metadata = Metadata()
+        });
+    }
+
+    public async Task<CmdResponse> BatchTransferAsync(BatchTransferWalletRequest request, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return await wallets.BatchTransferWallet(request with
+        {
+            Metadata = Metadata()
+        });
     }
 
     public async Task<CmdResponse> RetryOutboxMessageAsync(Guid id, CancellationToken ct = default)
@@ -349,8 +380,14 @@ public sealed class WalletsAdminBackendContractService(
 
     private RequestMetadata Metadata() => new()
     {
-        TenantId = tenantFilter.SelectedTenantId,
-        RequestId = Guid.NewGuid()
+        TenantId = tenantFilter.SelectedTenantId ?? requestMetadata.TenantId,
+        CredentialId = requestMetadata.CredentialId,
+        SessionId = requestMetadata.SessionId,
+        RequestId = Guid.NewGuid(),
+        Name = requestMetadata.Name ?? "ControlPanel",
+        DeviceName = requestMetadata.DeviceName,
+        DeviceAgent = requestMetadata.DeviceAgent,
+        IpAddress = requestMetadata.IpAddress
     };
 
     private static CmdResponse ToCommandResponse(CmdResponse response) => response;

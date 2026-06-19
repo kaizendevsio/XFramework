@@ -13,7 +13,7 @@ public interface IBatchWalletService
     /// This is significantly faster than processing increments individually.
     /// </summary>
     /// <param name="requests">List of increment requests to process</param>
-    /// <param name="tenantId">The tenant ID for multi-tenancy support</param>
+    /// <param name="context">Trusted tenant and actor context for authorization</param>
     /// <param name="allowPartialSuccess">If true, continues processing after failures; if false, rolls back entire batch on any failure</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result containing batch operation statistics and any errors</returns>
@@ -23,7 +23,7 @@ public interface IBatchWalletService
     /// </remarks>
     Task<Result<BatchOperationResult>> BatchIncrementAsync(
         List<BatchIncrementRequest> requests,
-        Guid tenantId,
+        WalletRequestContext context,
         bool allowPartialSuccess = false,
         CancellationToken cancellationToken = default);
 
@@ -31,7 +31,7 @@ public interface IBatchWalletService
     /// Processes a batch of wallet decrements in a single transaction.
     /// </summary>
     /// <param name="requests">List of decrement requests to process</param>
-    /// <param name="tenantId">The tenant ID for multi-tenancy support</param>
+    /// <param name="context">Trusted tenant and actor context for authorization</param>
     /// <param name="allowPartialSuccess">If true, continues processing after failures; if false, rolls back entire batch on any failure</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result containing batch operation statistics and any errors</returns>
@@ -41,7 +41,7 @@ public interface IBatchWalletService
     /// </remarks>
     Task<Result<BatchOperationResult>> BatchDecrementAsync(
         List<BatchDecrementRequest> requests,
-        Guid tenantId,
+        WalletRequestContext context,
         bool allowPartialSuccess = false,
         CancellationToken cancellationToken = default);
 
@@ -50,7 +50,7 @@ public interface IBatchWalletService
     /// Each transfer debits one wallet and credits another.
     /// </summary>
     /// <param name="requests">List of transfer requests to process</param>
-    /// <param name="tenantId">The tenant ID for multi-tenancy support</param>
+    /// <param name="context">Trusted tenant and actor context for authorization</param>
     /// <param name="allowPartialSuccess">If true, continues processing after failures; if false, rolls back entire batch on any failure</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result containing batch operation statistics and any errors</returns>
@@ -61,7 +61,7 @@ public interface IBatchWalletService
     /// </remarks>
     Task<Result<BatchOperationResult>> BatchTransferAsync(
         List<BatchTransferRequest> requests,
-        Guid tenantId,
+        WalletRequestContext context,
         bool allowPartialSuccess = false,
         CancellationToken cancellationToken = default);
 

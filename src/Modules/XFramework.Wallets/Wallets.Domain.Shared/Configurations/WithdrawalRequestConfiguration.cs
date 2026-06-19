@@ -10,7 +10,15 @@ public class WithdrawalRequestConfiguration : IEntityTypeConfiguration<Withdrawa
     {
         entity.HasKey(e => e.Id).HasName("tbl_WithdrawalRequest_pkey");
 
-        entity.ToTable("WithdrawalRequest", "Wallet");
+        entity.ToTable("WithdrawalRequest", "Wallet", table =>
+        {
+            table.HasCheckConstraint("CK_WithdrawalRequest_PositiveAmount", "\"Amount\" IS NULL OR \"Amount\" > 0");
+            table.HasCheckConstraint(
+                "CK_WithdrawalRequest_NonNegativeFees",
+                "(\"Fee\" IS NULL OR \"Fee\" >= 0) AND " +
+                "(\"RequestedFee\" IS NULL OR \"RequestedFee\" >= 0) AND " +
+                "(\"CalculatedFee\" IS NULL OR \"CalculatedFee\" >= 0)");
+        });
 
         entity.Property(e => e.Id)
             .HasColumnName("ID")

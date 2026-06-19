@@ -174,8 +174,11 @@
                 <NavLink href="/finance/transfers" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
                     <LucideIcon Name="arrow-left-right" class="h-4 w-4" /> Transfers
                 </NavLink>
-                <NavLink href="/finance/refunds-disputes" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="rotate-ccw" class="h-4 w-4" /> Refunds
+            }
+            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsBatch))
+            {
+                <NavLink href="/finance/batch" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="layers" class="h-4 w-4" /> Batch
                 </NavLink>
             }
             @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting))
@@ -210,6 +213,9 @@
                 <NavLink href="/finance/policy-decisions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
                     <LucideIcon Name="shield-check" class="h-4 w-4" /> Policy
                 </NavLink>
+                <NavLink href="/finance/refunds-disputes" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="rotate-ccw" class="h-4 w-4" /> Refunds
+                </NavLink>
             }
         </div>
     </div>
@@ -233,6 +239,7 @@
         || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsDeposits)
         || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWithdrawals)
         || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsTransfers)
+        || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsBatch)
         || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReconciliation)
         || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsPolicy)
         || WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWebhooks)
