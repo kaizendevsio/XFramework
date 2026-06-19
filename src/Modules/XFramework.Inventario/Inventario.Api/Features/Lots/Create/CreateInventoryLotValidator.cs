@@ -1,5 +1,6 @@
 using FluentValidation;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Lots;
+using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace Inventario.Api.Features.Lots.Create;
 
@@ -9,6 +10,10 @@ public sealed class CreateInventoryLotValidator : AbstractValidator<CreateInvent
     {
         RuleFor(x => x.ProductId)
             .NotEmpty().WithMessage("Product is required.");
+
+        RuleFor(x => x.Status)
+            .Must(value => Enum.IsDefined(typeof(InventoryLotStatus), value))
+            .WithMessage("Lot status is invalid.");
 
         RuleFor(x => x.LotNumber)
             .NotEmpty().WithMessage("Lot number is required.")

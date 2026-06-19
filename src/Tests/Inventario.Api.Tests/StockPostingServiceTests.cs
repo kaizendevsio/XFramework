@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Linq.Expressions;
 using System.Security.Claims;
+using IdentityServer.Domain.Shared.Contracts;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using NUnit.Framework;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Api.Services;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -87,6 +89,83 @@ public sealed class StockPostingServiceTests
         result.StatusCode.Should().Be(409);
         dataContext.Added.OfType<InventoryMovement>().Should().BeEmpty();
         dataContext.SaveCount.Should().Be(0);
+    }
+
+    [Test]
+    public async Task PostAsync_NegativeStockFlagWithoutTenantFeature_ReturnsForbiddenWithoutSaving()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        dataContext.Set<StockBalance>().Add(new StockBalance
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            OnHandQuantity = 3,
+            ReservedQuantity = 0,
+            AvailableQuantity = 3
+        });
+        var service = CreateService(dataContext, tenantId);
+
+        var result = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            MovementType = InventoryMovementType.Shipment,
+            Quantity = 5,
+            AllowNegativeStock = true
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(403);
+        dataContext.Added.OfType<InventoryMovement>().Should().BeEmpty();
+        dataContext.SaveCount.Should().Be(0);
+    }
+
+    [Test]
+    public async Task PostAsync_NegativeStockFlagWithTenantFeature_AllowsNegativeBalance()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        dataContext.Set<StockBalance>().Add(new StockBalance
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            OnHandQuantity = 3,
+            ReservedQuantity = 0,
+            AvailableQuantity = 3
+        });
+        var service = CreateService(dataContext, tenantId, negativeStockEnabled: true);
+
+        var result = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            MovementType = InventoryMovementType.Shipment,
+            Quantity = 5,
+            AllowNegativeStock = true
+        });
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.OnHandQuantity.Should().Be(-2);
+        result.Data.AvailableQuantity.Should().Be(-2);
+        dataContext.Added.OfType<InventoryMovement>().Should().ContainSingle(x =>
+            x.MovementType == InventoryMovementType.Shipment &&
+            x.QuantityDelta == -5);
+        dataContext.SaveCount.Should().Be(1);
     }
 
     [Test]
@@ -277,7 +356,10 @@ public sealed class StockPostingServiceTests
             IsEnabled = true
         };
 
-    private static StockPostingService CreateService(FakeDataContext dataContext, Guid tenantId)
+    private static StockPostingService CreateService(
+        FakeDataContext dataContext,
+        Guid tenantId,
+        bool negativeStockEnabled = false)
     {
         var httpContextAccessor = new HttpContextAccessor
         {
@@ -289,7 +371,37 @@ public sealed class StockPostingServiceTests
             }
         };
 
-        return new StockPostingService(dataContext, httpContextAccessor);
+        return new StockPostingService(
+            dataContext,
+            httpContextAccessor,
+            new FakeTenantModuleFeatureService(negativeStockEnabled));
+    }
+
+    private sealed class FakeTenantModuleFeatureService(bool negativeStockEnabled) : ITenantModuleFeatureService
+    {
+        public Task<Result<bool>> IsEnabledAsync(
+            Guid tenantId,
+            string moduleKey,
+            string? subFeatureKey = null,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<bool>.Success(IsEnabled(moduleKey, subFeatureKey)));
+
+        public Task<Result> EnsureEnabledAsync(
+            Guid tenantId,
+            string moduleKey,
+            string? subFeatureKey = null,
+            CancellationToken ct = default) =>
+            Task.FromResult(IsEnabled(moduleKey, subFeatureKey)
+                ? Result.Success()
+                : Result.Forbidden($"Feature disabled: '{TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey)}' is not enabled for this tenant."));
+
+        public void Invalidate(Guid tenantId, string moduleKey, string? subFeatureKey = null)
+        {
+        }
+
+        private bool IsEnabled(string moduleKey, string? subFeatureKey) =>
+            negativeStockEnabled &&
+            string.Equals(TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey), TenantModuleFeatureKeys.InventarioNegativeStock, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class FakeDataContext : IDataContext

@@ -204,9 +204,12 @@ else
                 <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
             </div>
             <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Reason" Label="Reason" />
-            <BbFormFieldSwitch Checked="@_movementForm.AllowNegativeStock"
-                               CheckedChanged="@((bool value) => _movementForm.AllowNegativeStock = value)"
-                               Label="Allow negative stock for this posting" />
+            @if (_negativeStockEnabled)
+            {
+                <BbFormFieldSwitch Checked="@_movementForm.AllowNegativeStock"
+                                   CheckedChanged="@((bool value) => _movementForm.AllowNegativeStock = value)"
+                                   Label="Allow negative stock for this posting" />
+            }
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _movementDialogOpen = false)">Cancel</BbButton>
@@ -237,6 +240,7 @@ else
     private bool _stockEnabled;
     private bool _movementsEnabled;
     private bool _traceabilityEnabled;
+    private bool _negativeStockEnabled;
     private bool _postingMovement;
     private bool _movementDialogOpen;
     private bool IsPostMovementDisabled => _postingMovement || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
@@ -280,6 +284,9 @@ else
             _stockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances");
             _movementsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements");
             _traceabilityEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability");
+            _negativeStockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "negative_stock");
+            if (!_negativeStockEnabled)
+                _movementForm.AllowNegativeStock = false;
             _products = [];
             _warehouses = [];
             _locations = [];
@@ -385,7 +392,7 @@ else
                 UnitOfMeasure = NullIfEmpty(_movementForm.UnitOfMeasure),
                 ReferenceType = NullIfEmpty(_movementForm.ReferenceType),
                 Reason = NullIfEmpty(_movementForm.Reason),
-                AllowNegativeStock = _movementForm.AllowNegativeStock
+                AllowNegativeStock = _negativeStockEnabled && _movementForm.AllowNegativeStock
             });
 
             ToastService.Show(result.IsSuccess ? "Stock movement posted." : $"Failed: {result.Message}");

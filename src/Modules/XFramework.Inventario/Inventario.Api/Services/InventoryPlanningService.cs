@@ -1,5 +1,7 @@
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -11,7 +13,8 @@ namespace XFramework.Inventario.Api.Services;
 
 public sealed class InventoryPlanningService(
     IDataContext dataContext,
-    IHttpContextAccessor httpContextAccessor)
+    IHttpContextAccessor httpContextAccessor,
+    ITenantModuleFeatureService featureService)
 {
     public async Task<Result<List<InventoryReorderRule>>> GetRulesAsync(
         GetInventoryReorderRulesRequest request,
@@ -20,6 +23,10 @@ public sealed class InventoryPlanningService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<List<InventoryReorderRule>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsurePlanningEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<InventoryReorderRule>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
         var query = dataContext.Query<InventoryReorderRule>()
@@ -47,6 +54,10 @@ public sealed class InventoryPlanningService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<InventoryReorderRule>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsurePlanningEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<InventoryReorderRule>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         if (request.MinimumQuantity < 0 || request.ReorderPoint < 0 || request.ReorderQuantity <= 0)
             return Result<InventoryReorderRule>.Failure("Reorder quantities must be valid positive values.", 400);
@@ -129,7 +140,11 @@ public sealed class InventoryPlanningService(
         if (!tenantResult.IsSuccess)
             return Result<List<LowStockReportRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
-        var rows = await BuildLowStockRows(tenantResult.Data, request.ProductId, request.WarehouseId, request.LocationId, ct);
+        var featureResult = await EnsurePlanningEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<LowStockReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
+
+        var rows = await BuildLowStockRowsAsync(tenantResult.Data, request.ProductId, request.WarehouseId, request.LocationId, ct);
         return Result<List<LowStockReportRow>>.Success(rows);
     }
 
@@ -141,7 +156,11 @@ public sealed class InventoryPlanningService(
         if (!tenantResult.IsSuccess)
             return Result<List<ReorderSuggestionRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
-        var lowStock = await BuildLowStockRows(tenantResult.Data, request.ProductId, request.WarehouseId, request.LocationId, ct);
+        var featureResult = await EnsurePlanningEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<ReorderSuggestionRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
+
+        var lowStock = await BuildLowStockRowsAsync(tenantResult.Data, request.ProductId, request.WarehouseId, request.LocationId, ct);
         var rules = await LoadRules(tenantResult.Data, request.ProductId, request.WarehouseId, request.LocationId, ct);
 
         var suggestions = lowStock.Select(row =>
@@ -169,7 +188,7 @@ public sealed class InventoryPlanningService(
         return Result<List<ReorderSuggestionRow>>.Success(suggestions);
     }
 
-    private async Task<List<LowStockReportRow>> BuildLowStockRows(
+    internal async Task<List<LowStockReportRow>> BuildLowStockRowsAsync(
         Guid tenantId,
         Guid? productId,
         Guid? warehouseId,
@@ -276,4 +295,11 @@ public sealed class InventoryPlanningService(
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task<Result> EnsurePlanningEnabledAsync(Guid tenantId, CancellationToken ct) =>
+        await featureService.EnsureEnabledAsync(
+            tenantId,
+            TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.PlanningSubFeature,
+            ct);
 }

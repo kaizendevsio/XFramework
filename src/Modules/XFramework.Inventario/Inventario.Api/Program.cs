@@ -49,6 +49,8 @@ app.UseTenantModuleFeatureGate(options =>
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/lots", "traceability");
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reorder-rules", "planning");
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/planning", "planning");
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reports/near-expiry", "traceability");
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reports/expired-stock", "traceability");
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reports", "reporting");
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/suppliers", "purchasing");
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/purchase-orders", "purchasing");

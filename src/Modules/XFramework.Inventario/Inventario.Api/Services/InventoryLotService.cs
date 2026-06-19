@@ -1,5 +1,7 @@
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -9,7 +11,8 @@ namespace XFramework.Inventario.Api.Services;
 
 public sealed class InventoryLotService(
     IDataContext dataContext,
-    IHttpContextAccessor httpContextAccessor)
+    IHttpContextAccessor httpContextAccessor,
+    ITenantModuleFeatureService featureService)
 {
     public async Task<Result<List<InventoryLot>>> GetLotsAsync(
         GetInventoryLotsRequest request,
@@ -18,6 +21,10 @@ public sealed class InventoryLotService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<List<InventoryLot>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureTraceabilityEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<InventoryLot>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var query = dataContext.Query<InventoryLot>()
             .IgnoreQueryFilters()
@@ -50,6 +57,10 @@ public sealed class InventoryLotService(
         if (!tenantResult.IsSuccess)
             return Result<InventoryLot>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
+        var featureResult = await EnsureTraceabilityEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<InventoryLot>.Failure(featureResult.Message!, featureResult.StatusCode);
+
         var lot = await dataContext.Query<InventoryLot>()
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && x.Id == request.Id && !x.IsDeleted)
@@ -67,6 +78,10 @@ public sealed class InventoryLotService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<InventoryLot>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureTraceabilityEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<InventoryLot>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
         var lotNumber = NormalizeRequired(request.LotNumber);
@@ -141,4 +156,11 @@ public sealed class InventoryLotService(
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task<Result> EnsureTraceabilityEnabledAsync(Guid tenantId, CancellationToken ct) =>
+        await featureService.EnsureEnabledAsync(
+            tenantId,
+            TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.TraceabilitySubFeature,
+            ct);
 }

@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Linq.Expressions;
 using System.Security.Claims;
+using IdentityServer.Domain.Shared.Contracts;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using NUnit.Framework;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Api.Services;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -224,8 +226,38 @@ public sealed class PurchasingServiceTests
                     authenticationType: "Test"))
             }
         };
-        var stockPostingService = new StockPostingService(dataContext, httpContextAccessor);
-        return new PurchasingService(dataContext, httpContextAccessor, stockPostingService);
+        var featureService = new FakeTenantModuleFeatureService();
+        var stockPostingService = new StockPostingService(
+            dataContext,
+            httpContextAccessor,
+            featureService);
+        return new PurchasingService(dataContext, httpContextAccessor, stockPostingService, featureService);
+    }
+
+    private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService
+    {
+        public Task<Result<bool>> IsEnabledAsync(
+            Guid tenantId,
+            string moduleKey,
+            string? subFeatureKey = null,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<bool>.Success(IsEnabled(moduleKey, subFeatureKey)));
+
+        public Task<Result> EnsureEnabledAsync(
+            Guid tenantId,
+            string moduleKey,
+            string? subFeatureKey = null,
+            CancellationToken ct = default) =>
+            Task.FromResult(IsEnabled(moduleKey, subFeatureKey)
+                ? Result.Success()
+                : Result.Forbidden($"Feature disabled: '{TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey)}' is not enabled for this tenant."));
+
+        public void Invalidate(Guid tenantId, string moduleKey, string? subFeatureKey = null)
+        {
+        }
+
+        private static bool IsEnabled(string moduleKey, string? subFeatureKey) =>
+            string.Equals(TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey), TenantModuleFeatureKeys.InventarioPurchasing, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed record TestIds(

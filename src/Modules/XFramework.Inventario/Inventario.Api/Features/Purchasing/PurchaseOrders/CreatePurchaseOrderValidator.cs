@@ -11,6 +11,9 @@ public sealed class CreatePurchaseOrderValidator : AbstractValidator<CreatePurch
         RuleFor(x => x.OrderNumber).MaximumLength(100);
         RuleFor(x => x.Notes).MaximumLength(1000);
         RuleFor(x => x.Status)
+            .Must(value => Enum.IsDefined(typeof(PurchaseOrderStatus), value))
+            .WithMessage("Purchase order status is invalid.");
+        RuleFor(x => x.Status)
             .Must(x => x is PurchaseOrderStatus.Draft or PurchaseOrderStatus.Open)
             .WithMessage("New purchase orders can only start as draft or open.");
         RuleFor(x => x.Lines).NotEmpty();

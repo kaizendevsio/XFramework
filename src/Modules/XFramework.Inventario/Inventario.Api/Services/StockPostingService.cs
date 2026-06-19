@@ -2,8 +2,10 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -15,7 +17,8 @@ namespace XFramework.Inventario.Api.Services;
 
 public sealed class StockPostingService(
     IDataContext dataContext,
-    IHttpContextAccessor httpContextAccessor)
+    IHttpContextAccessor httpContextAccessor,
+    ITenantModuleFeatureService featureService)
 {
     private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -79,8 +82,12 @@ public sealed class StockPostingService(
         var afterOnHand = before + delta;
         var afterReserved = balance.ReservedQuantity + reservedDelta;
 
-        if (!request.AllowNegativeStock && (afterOnHand < 0 || afterReserved < 0 || afterOnHand - afterReserved < 0))
-            return Result<StockPostingResponse>.Failure("Stock movement would create a negative stock position.", 409);
+        if (CreatesNegativeStock(afterOnHand, afterReserved))
+        {
+            var negativeStockResult = await EnsureNegativeStockAllowedAsync(tenantId, request, ct);
+            if (!negativeStockResult.IsSuccess)
+                return Result<StockPostingResponse>.Failure(negativeStockResult.Message!, negativeStockResult.StatusCode);
+        }
 
         if (!balanceState.IsNew)
             dataContext.Update(balance);
@@ -233,8 +240,12 @@ public sealed class StockPostingService(
         var source = sourceState.Balance;
         var destination = destinationState.Balance;
         var sourceAfter = source.OnHandQuantity - request.Quantity;
-        if (!request.AllowNegativeStock && sourceAfter < source.ReservedQuantity)
-            return Result<StockPostingResponse>.Failure("Transfer would create a negative source stock position.", 409);
+        if (CreatesNegativeStock(sourceAfter, source.ReservedQuantity))
+        {
+            var negativeStockResult = await EnsureNegativeStockAllowedAsync(tenantId, request, ct);
+            if (!negativeStockResult.IsSuccess)
+                return Result<StockPostingResponse>.Failure(negativeStockResult.Message!, negativeStockResult.StatusCode);
+        }
 
         var now = DateTime.UtcNow;
         var sourceBefore = source.OnHandQuantity;
@@ -382,6 +393,29 @@ public sealed class StockPostingService(
             InventoryMovementType.Release => -quantity,
             _ => 0
         };
+
+    private async Task<Result> EnsureNegativeStockAllowedAsync(
+        Guid tenantId,
+        PostStockMovementRequest request,
+        CancellationToken ct)
+    {
+        if (!request.AllowNegativeStock)
+            return Result.Failure("Stock movement would create a negative stock position.", 409);
+
+        var featureResult = await featureService.EnsureEnabledAsync(
+            tenantId,
+            TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.NegativeStockSubFeature,
+            ct);
+
+        if (!featureResult.IsSuccess)
+            return featureResult;
+
+        return Result.Success();
+    }
+
+    private static bool CreatesNegativeStock(decimal onHandQuantity, decimal reservedQuantity) =>
+        onHandQuantity < 0 || reservedQuantity < 0 || onHandQuantity - reservedQuantity < 0;
 
     private static void ApplyBalance(
         StockBalance balance,
