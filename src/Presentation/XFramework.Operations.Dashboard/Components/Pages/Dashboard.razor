@@ -100,7 +100,7 @@
                         {
                             <tr class="@SelectedRowClass(service)" @key="service.ClientId">
                                 <td>
-                                    <button type="button" class="service-row-button" @onclick="() => SelectServiceAsync(service)">
+                                    <button type="button" class="service-row-button" @onclick="() => SelectService(service)">
                                         <span class="service-name">@service.DisplayName</span>
                                         <span class="service-meta">@service.ClientName</span>
                                     </button>
@@ -218,137 +218,10 @@
         </aside>
     </section>
 
-    <section class="dashboard-content-grid">
-        <div class="panel">
-            <div class="panel-header">
-                <div>
-                    <div class="panel-title">
-                        <LucideIcon Name="scroll-text" />
-                        Logs
-                    </div>
-                    <div class="panel-subtitle">@SelectedServiceLabel</div>
-                </div>
-            </div>
-            <div class="panel-body">
-                @if (_selectedService is null)
-                {
-                    <div class="empty-state">
-                        <LucideIcon Name="list" class="empty-state-icon" />
-                        <h2>No service selected</h2>
-                    </div>
-                }
-                else if (!_logs.IsAvailable)
-                {
-                    <div class="degraded-state">
-                        <LucideIcon Name="circle-alert" class="empty-state-icon" />
-                        <h2>Logs unavailable</h2>
-                        <p>@_logs.Message</p>
-                    </div>
-                }
-                else if (_logs.Data.Count == 0)
-                {
-                    <div class="empty-state">
-                        <LucideIcon Name="file-search" class="empty-state-icon" />
-                        <h2>No recent logs</h2>
-                    </div>
-                }
-                else
-                {
-                    <div class="log-list">
-                        @foreach (var log in _logs.Data)
-                        {
-                            <article class="log-item" @key="log.Timestamp.ToUnixTimeMilliseconds() + log.Message">
-                                <div class="item-title-row">
-                                    <div class="item-title">@log.Level</div>
-                                    <div class="muted">@FormatTime(log.Timestamp)</div>
-                                </div>
-                                <div class="log-message">@log.Message</div>
-                                <div class="item-description">@log.SourceContext</div>
-                                @if (log.Properties.Count > 0)
-                                {
-                                    <details class="item-description">
-                                        <summary>Properties</summary>
-                                        @foreach (var property in log.Properties)
-                                        {
-                                            <div><strong>@property.Key:</strong> @property.Value</div>
-                                        }
-                                    </details>
-                                }
-                            </article>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-header">
-                <div>
-                    <div class="panel-title">
-                        <LucideIcon Name="waypoints" />
-                        Trace Timeline
-                    </div>
-                    <div class="panel-subtitle">@SelectedServiceLabel</div>
-                </div>
-            </div>
-            <div class="panel-body">
-                @if (_selectedService is null)
-                {
-                    <div class="empty-state">
-                        <LucideIcon Name="workflow" class="empty-state-icon" />
-                        <h2>No service selected</h2>
-                    </div>
-                }
-                else if (!_traces.IsAvailable)
-                {
-                    <div class="degraded-state">
-                        <LucideIcon Name="circle-alert" class="empty-state-icon" />
-                        <h2>Traces unavailable</h2>
-                        <p>@_traces.Message</p>
-                    </div>
-                }
-                else if (_traces.Data.Count == 0)
-                {
-                    <div class="empty-state">
-                        <LucideIcon Name="git-compare-arrows" class="empty-state-icon" />
-                        <h2>No recent traces</h2>
-                    </div>
-                }
-                else
-                {
-                    <div class="trace-list">
-                        @foreach (var trace in _traces.Data)
-                        {
-                            <article class="trace-item" @key="trace.TraceId">
-                                <div class="item-title-row">
-                                    <div class="item-title">@trace.RootOperation</div>
-                                    <BbBadge Variant="@(trace.HasErrors ? BadgeVariant.Destructive : BadgeVariant.Outline)">
-                                        @FormatDuration(trace.Duration)
-                                    </BbBadge>
-                                </div>
-                                <div class="item-description">@trace.ServiceName - @trace.SpanCount span(s) - @FormatTime(trace.StartedAt)</div>
-                                <div class="timeline" aria-label="Trace span timeline">
-                                    @foreach (var span in trace.Spans)
-                                    {
-                                        <span class="@(span.HasError ? "timeline-span error" : "timeline-span")"
-                                              title="@($"{span.ServiceName}: {span.OperationName} ({FormatDuration(span.Duration)})")"
-                                              style="@TraceSpanStyle(trace, span)">
-                                        </span>
-                                    }
-                                </div>
-                            </article>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
-    </section>
 </div>
 
 @code {
     [Inject] private OperationsRegistryClient RegistryClient { get; set; } = default!;
-    [Inject] private SeqLogClient SeqLogClient { get; set; } = default!;
-    [Inject] private JaegerTraceClient JaegerTraceClient { get; set; } = default!;
     [Inject] private IOptions<OperationsDashboardOptions> Options { get; set; } = default!;
     [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
 
@@ -356,13 +229,9 @@
     private CancellationTokenSource? _refreshCts;
     private Task? _refreshLoop;
     private DashboardRegistrySnapshot _snapshot = DashboardRegistrySnapshot.EmptyDisconnected("Not loaded.");
-    private ExternalDataResult<IReadOnlyList<DashboardLogEvent>> _logs = ExternalDataResult<IReadOnlyList<DashboardLogEvent>>.Available([]);
-    private ExternalDataResult<IReadOnlyList<DashboardTraceSummary>> _traces = ExternalDataResult<IReadOnlyList<DashboardTraceSummary>>.Available([]);
     private ServiceInstanceSummary? _selectedService;
     private string? _selectedClientId;
     private bool _loading = true;
-
-    private string SelectedServiceLabel => _selectedService?.DisplayName ?? "Select a service";
 
     protected override async Task OnInitializedAsync()
     {
@@ -406,16 +275,6 @@
             }
 
             _selectedService = _snapshot.Services.FirstOrDefault(x => x.ClientId == _selectedClientId);
-
-            if (_selectedService is not null)
-            {
-                await LoadServiceDetailsAsync(_selectedService, ct);
-            }
-            else
-            {
-                _logs = ExternalDataResult<IReadOnlyList<DashboardLogEvent>>.Available([]);
-                _traces = ExternalDataResult<IReadOnlyList<DashboardTraceSummary>>.Available([]);
-            }
         }
         catch (OperationCanceledException) when (_refreshCts?.IsCancellationRequested == true)
         {
@@ -431,33 +290,10 @@
         }
     }
 
-    private async Task SelectServiceAsync(ServiceInstanceSummary service)
+    private void SelectService(ServiceInstanceSummary service)
     {
         _selectedClientId = service.ClientId;
         _selectedService = service;
-        await LoadServiceDetailsAsync(service, _refreshCts?.Token ?? CancellationToken.None);
-    }
-
-    private async Task LoadServiceDetailsAsync(ServiceInstanceSummary service, CancellationToken ct)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var lookback = Options.Value.DefaultLookback;
-
-        _logs = await SeqLogClient.GetLogsAsync(
-            new DashboardLogQuery(
-                service.LogApplicationName,
-                service.MachineName,
-                now.Subtract(lookback),
-                now,
-                Options.Value.DefaultLogCount),
-            ct);
-
-        _traces = await JaegerTraceClient.GetTracesAsync(
-            new DashboardTraceQuery(
-                service.TraceServiceName,
-                lookback,
-                Options.Value.DefaultTraceLimit),
-            ct);
     }
 
     private string SelectedRowClass(ServiceInstanceSummary service) =>
@@ -501,29 +337,6 @@
         value == DateTimeOffset.MinValue
             ? "unknown"
             : value.ToLocalTime().ToString("MMM d, HH:mm:ss", CultureInfo.CurrentCulture);
-
-    private static string FormatDuration(TimeSpan duration)
-    {
-        if (duration.TotalMilliseconds < 1000)
-        {
-            return $"{Math.Max(0, duration.TotalMilliseconds):0} ms";
-        }
-
-        if (duration.TotalSeconds < 60)
-        {
-            return $"{duration.TotalSeconds:0.0} s";
-        }
-
-        return $"{duration.TotalMinutes:0.0} m";
-    }
-
-    private static string TraceSpanStyle(DashboardTraceSummary trace, DashboardTraceSpan span)
-    {
-        var total = Math.Max(1, trace.Duration.TotalMilliseconds);
-        var left = Math.Clamp(span.Offset.TotalMilliseconds / total * 100, 0, 99);
-        var width = Math.Clamp(span.Duration.TotalMilliseconds / total * 100, 1, 100 - left);
-        return FormattableString.Invariant($"left:{left:0.##}%;width:{width:0.##}%;");
-    }
 
     public async ValueTask DisposeAsync()
     {
