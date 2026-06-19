@@ -49,6 +49,7 @@ public sealed class WalletPolicyEvaluator(DbContext dbContext) : IWalletPolicyEv
 
         var requiresApproval = false;
         var decisions = new List<object>();
+        var requestedDebitAmountsByWallet = new Dictionary<Guid, decimal>();
 
         foreach (var posting in walletPostings)
         {
@@ -115,10 +116,14 @@ public sealed class WalletPolicyEvaluator(DbContext dbContext) : IWalletPolicyEv
                 return Result<WalletPolicyEvaluationResult>.Failure("Insufficient funds for hold", 400);
             }
 
+            requestedDebitAmountsByWallet.TryGetValue(walletId, out var requestedDebitAmount);
+            requestedDebitAmount += posting.Amount;
+            requestedDebitAmountsByWallet[walletId] = requestedDebitAmount;
+
             var velocityResult = await CheckVelocityAsync(
                 context.Request.TenantId,
                 walletId,
-                posting.Amount,
+                requestedDebitAmount,
                 matchingRules,
                 now,
                 ct);

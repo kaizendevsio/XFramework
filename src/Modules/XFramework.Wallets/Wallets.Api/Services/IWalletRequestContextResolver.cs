@@ -48,8 +48,7 @@ public sealed class WalletRequestContextResolver(
         var isPrivilegedActor = isSystemActor || IsAdmin(httpContext?.User);
         var actorCredentialId = TryGetClaimGuid(httpContext?.User, "credential_id", "credentialId", "CredentialId", ClaimTypes.NameIdentifier)
             ?? TryGetItemGuid(httpContext, "CredentialId")
-            ?? (isSignedInternalRequest ? request.Metadata.CredentialId : null)
-            ?? requestCredentialId;
+            ?? (isSignedInternalRequest ? request.Metadata.CredentialId : null);
 
         if (request.Metadata.CredentialId is { } metadataCredentialId &&
             metadataCredentialId != Guid.Empty &&
@@ -60,6 +59,13 @@ public sealed class WalletRequestContextResolver(
             return Result<WalletRequestContext>.Forbidden("Request credential does not match trusted actor context");
         }
 
+        if (requestCredentialId.HasValue &&
+            actorCredentialId is null &&
+            !isPrivilegedActor)
+        {
+            return Result<WalletRequestContext>.Forbidden("Actor credential is required for target credential operations");
+        }
+
         if (requestCredentialId is { } targetCredentialId &&
             actorCredentialId is { } actorId &&
             actorId != targetCredentialId &&
@@ -68,12 +74,24 @@ public sealed class WalletRequestContextResolver(
             return Result<WalletRequestContext>.Forbidden("Actor cannot operate on the requested credential");
         }
 
+        var ipAddress = httpContext?.Connection.RemoteIpAddress?.ToString();
+        if (string.IsNullOrWhiteSpace(ipAddress) && isSignedInternalRequest)
+        {
+            ipAddress = request.Metadata.IpAddress;
+        }
+
+        var userAgent = httpContext?.Request.Headers.UserAgent.ToString();
+        if (string.IsNullOrWhiteSpace(userAgent) && isSignedInternalRequest)
+        {
+            userAgent = request.Metadata.DeviceAgent;
+        }
+
         return Result<WalletRequestContext>.Success(new WalletRequestContext(
             trustedTenantId.Value,
             actorCredentialId,
             request.Metadata.RequestId?.ToString(),
-            request.Metadata.IpAddress ?? httpContext?.Connection.RemoteIpAddress?.ToString(),
-            request.Metadata.DeviceAgent ?? httpContext?.Request.Headers.UserAgent.ToString(),
+            ipAddress,
+            userAgent,
             isPrivilegedActor,
             isSystemActor));
     }

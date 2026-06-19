@@ -28,23 +28,25 @@ public sealed class WalletPaymentWebhookService(
 
         var signatureValid = ValidateSignature(request);
         var configuredTenantId = ResolveConfiguredTenantId(request.ProviderKey);
+        var payloadTenantId = ResolveTenantIdFromSignedPayload(request.RawPayloadJson);
+        var mappedStatus = MapStatus(request.ProviderStatus);
         if (!signatureValid)
         {
-            if (configuredTenantId.HasValue)
+            var auditTenantId = configuredTenantId ?? payloadTenantId;
+            if (auditTenantId.HasValue)
             {
-                dbContext.Set<WalletPaymentWebhookEvent>().Add(CreateWebhookEvent(
+                await UpsertRejectedSignatureEventAsync(
                     request,
-                    configuredTenantId.Value,
-                    signatureValid: false,
-                    MapStatus(request.ProviderStatus)));
+                    auditTenantId.Value,
+                    mappedStatus,
+                    ct);
                 await dbContext.SaveChangesAsync(ct);
             }
 
             return Result<WalletWebhookIngestResponse>.Failure("Webhook signature validation failed", 401);
         }
 
-        var signedPayloadTenantId = ResolveTenantIdFromSignedPayload(request.RawPayloadJson);
-        var tenantId = configuredTenantId ?? signedPayloadTenantId;
+        var tenantId = configuredTenantId ?? payloadTenantId;
         if (tenantId is null || tenantId.Value == Guid.Empty)
         {
             return Result<WalletWebhookIngestResponse>.Failure("Webhook tenant context is required", 400);
@@ -73,32 +75,38 @@ public sealed class WalletPaymentWebhookService(
             httpContext.Items["WalletsPrivilegedActor"] = true;
         }
 
-        var duplicate = await dbContext.Set<WalletPaymentWebhookEvent>()
+        var webhookEvent = await dbContext.Set<WalletPaymentWebhookEvent>()
             .IgnoreQueryFilters()
-            .AsNoTracking()
+            .AsTracking()
             .FirstOrDefaultAsync(x =>
                 x.TenantId == tenantId.Value &&
                 !x.IsDeleted &&
                 x.ProviderKey == request.ProviderKey &&
                 x.ExternalEventId == request.ExternalEventId,
                 ct);
-        if (duplicate is not null)
+        if (webhookEvent is not null)
         {
-            return Result<WalletWebhookIngestResponse>.Success(new WalletWebhookIngestResponse
+            if (webhookEvent.ProcessingStatus is WalletWebhookProcessingStatus.Processed or WalletWebhookProcessingStatus.Processing)
             {
-                WebhookEventId = duplicate.Id,
-                Status = WalletWebhookProcessingStatus.Duplicate,
-                Duplicate = true,
-                DepositRequestId = duplicate.DepositRequestId,
-                WithdrawalRequestId = duplicate.WithdrawalRequestId,
-                OperationId = duplicate.OperationId,
-                Message = "Duplicate webhook ignored"
-            });
-        }
+                return Result<WalletWebhookIngestResponse>.Success(new WalletWebhookIngestResponse
+                {
+                    WebhookEventId = webhookEvent.Id,
+                    Status = WalletWebhookProcessingStatus.Duplicate,
+                    Duplicate = true,
+                    DepositRequestId = webhookEvent.DepositRequestId,
+                    WithdrawalRequestId = webhookEvent.WithdrawalRequestId,
+                    OperationId = webhookEvent.OperationId,
+                    Message = "Duplicate webhook ignored"
+                });
+            }
 
-        var mappedStatus = MapStatus(request.ProviderStatus);
-        var webhookEvent = CreateWebhookEvent(request, tenantId.Value, signatureValid: true, mappedStatus);
-        dbContext.Set<WalletPaymentWebhookEvent>().Add(webhookEvent);
+            ResetWebhookEventForRetry(webhookEvent, request, mappedStatus);
+        }
+        else
+        {
+            webhookEvent = CreateWebhookEvent(request, tenantId.Value, signatureValid: true, mappedStatus);
+            dbContext.Set<WalletPaymentWebhookEvent>().Add(webhookEvent);
+        }
 
         try
         {
@@ -244,9 +252,73 @@ public sealed class WalletPaymentWebhookService(
             HeadersHash = ComputeHash(JsonSerializer.Serialize(request.Headers)),
             RawPayloadJson = string.IsNullOrWhiteSpace(request.RawPayloadJson) ? "{}" : request.RawPayloadJson,
             ReceivedAt = DateTime.UtcNow,
+            ProcessedAt = signatureValid ? null : DateTime.UtcNow,
             ProcessingStatus = signatureValid ? WalletWebhookProcessingStatus.Processing : WalletWebhookProcessingStatus.Rejected,
             ProcessingError = signatureValid ? null : "Webhook signature validation failed"
         };
+
+    private async Task UpsertRejectedSignatureEventAsync(
+        IngestWalletPaymentWebhookRequest request,
+        Guid tenantId,
+        WalletWorkflowStatus mappedStatus,
+        CancellationToken ct)
+    {
+        var existing = await dbContext.Set<WalletPaymentWebhookEvent>()
+            .IgnoreQueryFilters()
+            .AsTracking()
+            .FirstOrDefaultAsync(x =>
+                x.TenantId == tenantId &&
+                !x.IsDeleted &&
+                x.ProviderKey == request.ProviderKey &&
+                x.ExternalEventId == request.ExternalEventId,
+                ct);
+        if (existing is null)
+        {
+            dbContext.Set<WalletPaymentWebhookEvent>().Add(CreateWebhookEvent(
+                request,
+                tenantId,
+                signatureValid: false,
+                mappedStatus));
+            return;
+        }
+
+        if (existing.ProcessingStatus is WalletWebhookProcessingStatus.Processed or WalletWebhookProcessingStatus.Processing)
+        {
+            return;
+        }
+
+        existing.ExternalReference = request.ExternalReference;
+        existing.ProviderTransactionId = request.ProviderTransactionId;
+        existing.ProviderStatus = request.ProviderStatus;
+        existing.MappedWorkflowStatus = mappedStatus;
+        existing.SignatureValid = false;
+        existing.SignatureScheme = "hmac-sha256";
+        existing.HeadersHash = ComputeHash(JsonSerializer.Serialize(request.Headers));
+        existing.RawPayloadJson = string.IsNullOrWhiteSpace(request.RawPayloadJson) ? "{}" : request.RawPayloadJson;
+        existing.ReceivedAt = DateTime.UtcNow;
+        existing.ProcessedAt = DateTime.UtcNow;
+        existing.ProcessingStatus = WalletWebhookProcessingStatus.Rejected;
+        existing.ProcessingError = "Webhook signature validation failed";
+    }
+
+    private static void ResetWebhookEventForRetry(
+        WalletPaymentWebhookEvent webhookEvent,
+        IngestWalletPaymentWebhookRequest request,
+        WalletWorkflowStatus mappedStatus)
+    {
+        webhookEvent.ExternalReference = request.ExternalReference;
+        webhookEvent.ProviderTransactionId = request.ProviderTransactionId;
+        webhookEvent.ProviderStatus = request.ProviderStatus;
+        webhookEvent.MappedWorkflowStatus = mappedStatus;
+        webhookEvent.SignatureValid = true;
+        webhookEvent.SignatureScheme = "hmac-sha256";
+        webhookEvent.HeadersHash = ComputeHash(JsonSerializer.Serialize(request.Headers));
+        webhookEvent.RawPayloadJson = string.IsNullOrWhiteSpace(request.RawPayloadJson) ? "{}" : request.RawPayloadJson;
+        webhookEvent.ReceivedAt = DateTime.UtcNow;
+        webhookEvent.ProcessedAt = null;
+        webhookEvent.ProcessingStatus = WalletWebhookProcessingStatus.Processing;
+        webhookEvent.ProcessingError = null;
+    }
 
     private bool ValidateSignature(IngestWalletPaymentWebhookRequest request)
     {

@@ -540,7 +540,9 @@ public sealed class WalletWorkflowService(
                 .FirstOrDefaultAsync(x => x.Id == withdrawal.SettlementTransactionId && x.TenantId == withdrawal.TenantId, ct)
             : null;
 
-        var amount = (withdrawal.Amount ?? 0) + (withdrawal.Fee ?? withdrawal.CalculatedFee ?? 0);
+        var principalAmount = withdrawal.Amount ?? 0;
+        var feeAmount = withdrawal.Fee ?? withdrawal.CalculatedFee ?? 0;
+        var totalDebit = principalAmount + feeAmount;
         var postings = new List<WalletLedgerPostingRequest>();
         if (heldTransaction is not null && withdrawal.HoldOperationId.HasValue)
         {
@@ -551,7 +553,7 @@ public sealed class WalletWorkflowService(
                 Direction = WalletLedgerDirection.Credit,
                 BalanceBucket = WalletBalanceBucket.DebitHold,
                 EntryKind = WalletLedgerEntryKind.Hold,
-                Amount = amount,
+                Amount = totalDebit,
                 WalletTypeId = wallet.WalletTypeId,
                 ReferenceNumber = withdrawal.ReferenceNumber,
                 Description = "Release withdrawal debit hold"
@@ -563,11 +565,26 @@ public sealed class WalletWorkflowService(
                 Direction = WalletLedgerDirection.Debit,
                 BalanceBucket = WalletBalanceBucket.Available,
                 EntryKind = WalletLedgerEntryKind.Principal,
-                Amount = amount,
+                Amount = totalDebit,
                 WalletTypeId = wallet.WalletTypeId,
                 ReferenceNumber = withdrawal.ReferenceNumber,
                 Description = "Capture withdrawal debit"
             });
+            if (feeAmount > 0)
+            {
+                postings.Add(new WalletLedgerPostingRequest
+                {
+                    Direction = WalletLedgerDirection.Debit,
+                    BalanceBucket = WalletBalanceBucket.External,
+                    EntryKind = WalletLedgerEntryKind.SystemCounterparty,
+                    Amount = feeAmount,
+                    WalletTypeId = wallet.WalletTypeId,
+                    ReferenceNumber = withdrawal.ReferenceNumber,
+                    CounterpartyType = "payment-provider",
+                    CounterpartyReference = request.ProviderTransactionId ?? withdrawal.ExternalReference,
+                    Description = "Withdrawal fee provider offset"
+                });
+            }
         }
         else
         {
@@ -577,7 +594,7 @@ public sealed class WalletWorkflowService(
                 Direction = WalletLedgerDirection.Debit,
                 BalanceBucket = WalletBalanceBucket.Available,
                 EntryKind = WalletLedgerEntryKind.Principal,
-                Amount = amount,
+                Amount = totalDebit,
                 WalletTypeId = wallet.WalletTypeId,
                 ReferenceNumber = withdrawal.ReferenceNumber,
                 Description = "Withdrawal debit"
@@ -587,7 +604,7 @@ public sealed class WalletWorkflowService(
                 Direction = WalletLedgerDirection.Credit,
                 BalanceBucket = WalletBalanceBucket.External,
                 EntryKind = WalletLedgerEntryKind.SystemCounterparty,
-                Amount = amount,
+                Amount = principalAmount,
                 WalletTypeId = wallet.WalletTypeId,
                 ReferenceNumber = withdrawal.ReferenceNumber,
                 CounterpartyType = "payment-provider",
@@ -596,14 +613,14 @@ public sealed class WalletWorkflowService(
             });
         }
 
-        if ((withdrawal.Fee ?? withdrawal.CalculatedFee ?? 0) > 0 && heldTransaction is null)
+        if (feeAmount > 0)
         {
             postings.Add(new WalletLedgerPostingRequest
             {
                 Direction = WalletLedgerDirection.Credit,
                 BalanceBucket = WalletBalanceBucket.Fee,
                 EntryKind = WalletLedgerEntryKind.Fee,
-                Amount = withdrawal.Fee ?? withdrawal.CalculatedFee ?? 0,
+                Amount = feeAmount,
                 WalletTypeId = wallet.WalletTypeId,
                 ReferenceNumber = withdrawal.ReferenceNumber,
                 CounterpartyType = "platform-fee",
