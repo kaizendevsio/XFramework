@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Linq.Expressions;
 using System.Security.Claims;
+using IdentityServer.Domain.Shared.Contracts;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using NUnit.Framework;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Api.Services;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -363,9 +365,33 @@ public sealed class ReservationServiceTests
             }
         };
 
-        var stockPostingService = new StockPostingService(dataContext, httpContextAccessor);
+        var stockPostingService = new StockPostingService(
+            dataContext,
+            httpContextAccessor,
+            new FakeTenantModuleFeatureService());
         var allocationService = new InventoryAllocationService(dataContext, httpContextAccessor, stockPostingService);
         return new ReservationService(dataContext, httpContextAccessor, allocationService);
+    }
+
+    private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService
+    {
+        public Task<Result<bool>> IsEnabledAsync(
+            Guid tenantId,
+            string moduleKey,
+            string? subFeatureKey = null,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<bool>.Success(false));
+
+        public Task<Result> EnsureEnabledAsync(
+            Guid tenantId,
+            string moduleKey,
+            string? subFeatureKey = null,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result.Forbidden($"Feature disabled: '{TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey)}' is not enabled for this tenant."));
+
+        public void Invalidate(Guid tenantId, string moduleKey, string? subFeatureKey = null)
+        {
+        }
     }
 
     private sealed record TestIds(Guid ProductId, Guid WarehouseId, Guid LocationId, Guid BalanceId)

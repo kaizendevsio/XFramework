@@ -1,5 +1,7 @@
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -12,12 +14,30 @@ namespace XFramework.Inventario.Api.Services;
 public sealed class InventoryReportingService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor,
-    InventoryPlanningService planningService)
+    InventoryPlanningService planningService,
+    ITenantModuleFeatureService featureService)
 {
     public async Task<Result<List<LowStockReportRow>>> GetLowStockAsync(
         GetLowStockReportRequest request,
-        CancellationToken ct = default) =>
-        await planningService.GetLowStockAsync(request, ct);
+        CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<List<LowStockReportRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureReportingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<LowStockReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
+
+        var rows = await planningService.BuildLowStockRowsAsync(
+            tenantResult.Data,
+            request.ProductId,
+            request.WarehouseId,
+            request.LocationId,
+            ct);
+
+        return Result<List<LowStockReportRow>>.Success(rows);
+    }
 
     public async Task<Result<List<NearExpiryStockReportRow>>> GetNearExpiryAsync(
         GetNearExpiryStockReportRequest request,
@@ -26,6 +46,14 @@ public sealed class InventoryReportingService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<List<NearExpiryStockReportRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureReportingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<NearExpiryStockReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
+
+        var traceabilityResult = await EnsureTraceabilityEnabledAsync(tenantResult.Data, ct);
+        if (!traceabilityResult.IsSuccess)
+            return Result<List<NearExpiryStockReportRow>>.Failure(traceabilityResult.Message!, traceabilityResult.StatusCode);
 
         var now = DateTime.UtcNow;
         var cutoff = now.AddDays(Math.Clamp(request.DaysAhead, 1, 365));
@@ -43,6 +71,14 @@ public sealed class InventoryReportingService(
         if (!tenantResult.IsSuccess)
             return Result<List<NearExpiryStockReportRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
+        var featureResult = await EnsureReportingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<NearExpiryStockReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
+
+        var traceabilityResult = await EnsureTraceabilityEnabledAsync(tenantResult.Data, ct);
+        if (!traceabilityResult.IsSuccess)
+            return Result<List<NearExpiryStockReportRow>>.Failure(traceabilityResult.Message!, traceabilityResult.StatusCode);
+
         var now = DateTime.UtcNow;
         var rows = await BuildExpiryRows(tenantResult.Data, request.ProductId, lot =>
             lot.Status == InventoryLotStatus.Expired || lot.ExpiresAt is not null && lot.ExpiresAt <= now, ct);
@@ -57,6 +93,10 @@ public sealed class InventoryReportingService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<List<StockPositionReportRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureReportingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<StockPositionReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
         var balances = await dataContext.Query<StockBalance>()
@@ -102,6 +142,10 @@ public sealed class InventoryReportingService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<List<MovementLedgerReportRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureReportingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<MovementLedgerReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
         var movements = await dataContext.Query<InventoryMovement>()
@@ -161,6 +205,10 @@ public sealed class InventoryReportingService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<List<ReservationAllocationStatusReportRow>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureReportingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<ReservationAllocationStatusReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
         var allocations = await dataContext.Query<ReservationAllocation>()
@@ -295,4 +343,18 @@ public sealed class InventoryReportingService(
         Dictionary<Guid, string> WarehouseNames,
         Dictionary<Guid, string> LocationNames,
         Dictionary<Guid, string> LotNumbers);
+
+    private async Task<Result> EnsureReportingEnabledAsync(Guid tenantId, CancellationToken ct) =>
+        await featureService.EnsureEnabledAsync(
+            tenantId,
+            TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.ReportingSubFeature,
+            ct);
+
+    private async Task<Result> EnsureTraceabilityEnabledAsync(Guid tenantId, CancellationToken ct) =>
+        await featureService.EnsureEnabledAsync(
+            tenantId,
+            TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.TraceabilitySubFeature,
+            ct);
 }

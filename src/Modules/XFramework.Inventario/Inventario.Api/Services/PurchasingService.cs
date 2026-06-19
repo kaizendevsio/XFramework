@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -15,7 +17,8 @@ namespace XFramework.Inventario.Api.Services;
 public sealed class PurchasingService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor,
-    StockPostingService stockPostingService)
+    StockPostingService stockPostingService,
+    ITenantModuleFeatureService featureService)
 {
     private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -26,6 +29,10 @@ public sealed class PurchasingService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<List<Supplier>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<Supplier>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var query = dataContext.Query<Supplier>()
             .IgnoreQueryFilters()
@@ -49,6 +56,10 @@ public sealed class PurchasingService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<Supplier>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<Supplier>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
         var code = NormalizeRequired(request.Code);
@@ -93,6 +104,10 @@ public sealed class PurchasingService(
         if (!tenantResult.IsSuccess)
             return Result<List<PurchaseOrder>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<PurchaseOrder>>.Failure(featureResult.Message!, featureResult.StatusCode);
+
         var query = dataContext.Query<PurchaseOrder>()
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
@@ -118,6 +133,10 @@ public sealed class PurchasingService(
         if (!tenantResult.IsSuccess)
             return Result<PurchaseOrder>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<PurchaseOrder>.Failure(featureResult.Message!, featureResult.StatusCode);
+
         var order = await LoadPurchaseOrder(tenantResult.Data, request.Id, ct);
         return order is null
             ? Result<PurchaseOrder>.NotFound("Purchase order not found.")
@@ -131,6 +150,10 @@ public sealed class PurchasingService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<PurchaseOrder>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<PurchaseOrder>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         if (request.Lines.Count == 0)
             return Result<PurchaseOrder>.Failure("At least one purchase order line is required.", 400);
@@ -220,6 +243,10 @@ public sealed class PurchasingService(
         if (!tenantResult.IsSuccess)
             return Result<PurchaseOrder>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<PurchaseOrder>.Failure(featureResult.Message!, featureResult.StatusCode);
+
         var order = await LoadPurchaseOrder(tenantResult.Data, request.PurchaseOrderId, ct);
         if (order is null)
             return Result<PurchaseOrder>.NotFound("Purchase order not found.");
@@ -249,6 +276,10 @@ public sealed class PurchasingService(
         if (!tenantResult.IsSuccess)
             return Result<List<ReceivingDocument>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<ReceivingDocument>>.Failure(featureResult.Message!, featureResult.StatusCode);
+
         var query = dataContext.Query<ReceivingDocument>()
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
@@ -273,6 +304,10 @@ public sealed class PurchasingService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<ReceivingDocument>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsurePurchasingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<ReceivingDocument>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         if (request.Lines.Count == 0)
             return Result<ReceivingDocument>.Failure("At least one receiving line is required.", 400);
@@ -611,6 +646,13 @@ public sealed class PurchasingService(
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task<Result> EnsurePurchasingEnabledAsync(Guid tenantId, CancellationToken ct) =>
+        await featureService.EnsureEnabledAsync(
+            tenantId,
+            TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.PurchasingSubFeature,
+            ct);
 
     private static string ComputeRequestHash(Guid tenantId, ReceiveInventoryRequest request)
     {
