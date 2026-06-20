@@ -13,10 +13,10 @@ public static class GetPurchaseOrderEndpoint
         Summary = "Get purchase order",
         Description = "Gets a purchase order with line items.")]
     public static async Task<Result<PurchaseOrder>> Handle(
-        Guid id,
+        GetPurchaseOrderRequest request,
         PurchasingService purchasingService,
         CancellationToken ct)
     {
-        return await purchasingService.GetPurchaseOrderAsync(new GetPurchaseOrderRequest { Id = id }, ct);
+        return await purchasingService.GetPurchaseOrderAsync(request, ct);
     }
 }

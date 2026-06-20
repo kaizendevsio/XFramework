@@ -84,6 +84,7 @@ Create an extended integration suite for broad module validation. It may be slow
 The extended suite should cover:
 
 - Every public wrapper request contract, at least one success path and one meaningful failure path.
+- A generated wrapper coverage matrix by enumerating every module `IBoltRequest` contract and matching each one to a direct service-wrapper integration test.
 - Every ControlPanel write path, including whether it uses the wrapper or remote `IDataContext`.
 - Every entity intentionally allowlisted for remote `IDataContext` mutation: create, update, remove or soft-delete where supported.
 - Remote `IDataContext` rejection for entities that must not be remotely mutated.
@@ -100,7 +101,7 @@ Module:Wallets
 Module:Inventario
 Area:Wrappers
 Area:DataContext
-Area:ControlPanel
+Area:ControlPanelContract
 Area:FeatureGates
 ```
 
@@ -121,7 +122,8 @@ When touching a ControlPanel module page:
 3. Prefer the matching service wrapper method when a request/endpoint exists.
 4. Check whether any direct `IDataContext` mutation entity has `[AllowRemoteDataContextMutation]`.
 5. Add or update tests for the exact path the page uses.
-6. Browser-smoke the page after the change when the page is user-facing.
+6. If claiming wrapper coverage is complete, enumerate all `IBoltRequest` contracts and prove each generated wrapper method appears in the module integration tests.
+7. Browser-smoke the page after the change when the page is user-facing.
 
 Useful searches:
 
