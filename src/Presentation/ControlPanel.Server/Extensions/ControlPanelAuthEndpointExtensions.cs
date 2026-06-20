@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using ControlPanel.Server.Services;
+using Microsoft.Extensions.Logging;
 
 namespace ControlPanel.Server.Extensions;
 
@@ -20,6 +21,7 @@ public static class ControlPanelAuthEndpointExtensions
     private static async Task<IResult> Login(
         HttpContext context,
         ControlPanelAuthService authService,
+        ILogger<ControlPanelAuthService> logger,
         CancellationToken ct)
     {
         var form = await context.Request.ReadFormAsync(ct);
@@ -28,7 +30,21 @@ public static class ControlPanelAuthEndpointExtensions
         var password = form["password"].ToString();
         var rememberMe = string.Equals(form["rememberMe"].ToString(), "true", StringComparison.OrdinalIgnoreCase);
 
-        var result = await authService.AuthenticateAsync(userName, password, rememberMe, context, ct);
+        ControlPanelLoginResult result;
+        try
+        {
+            result = await authService.AuthenticateAsync(userName, password, rememberMe, context, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ControlPanel login failed because the authentication dependencies are unavailable.");
+            return Results.Redirect(BuildLoginUrl("Sign-in service is temporarily unavailable. Try again shortly.", returnUrl));
+        }
+
         if (!result.IsSuccess || result.Principal is null)
         {
             return Results.Redirect(BuildLoginUrl(result.Error, returnUrl));
