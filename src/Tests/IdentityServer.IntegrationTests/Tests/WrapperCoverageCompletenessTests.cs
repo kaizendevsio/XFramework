@@ -1,0 +1,71 @@
+using XFramework.TestInfrastructure;
+
+namespace IdentityServer.IntegrationTests.Tests;
+
+[TestFixture]
+[Category(TestCategories.Integration)]
+[Category(TestCategories.ExtendedIntegration)]
+[Category(TestCategories.IdentityServer)]
+[Category(TestCategories.Wrappers)]
+public sealed class WrapperCoverageCompletenessTests
+{
+    [Test]
+    public void IdentityServerWrapperRequestContracts_AllHaveDirectIntegrationCoverage()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var requestsRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Domain.Shared",
+            "Contracts",
+            "Requests");
+        var testsRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Tests",
+            "IdentityServer.IntegrationTests",
+            "Tests");
+
+        var requestContracts = Directory
+            .EnumerateFiles(requestsRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => File.ReadAllText(path).Contains("IBoltRequest", StringComparison.Ordinal))
+            .Select(path => Path.GetFileNameWithoutExtension(path))
+            .Where(name => name.EndsWith("Request", StringComparison.Ordinal))
+            .Select(name => name[..^"Request".Length])
+            .OrderBy(name => name)
+            .ToArray();
+
+        var testSource = string.Join(
+            Environment.NewLine,
+            Directory
+                .EnumerateFiles(testsRoot, "*.cs", SearchOption.TopDirectoryOnly)
+                .Where(path => !string.Equals(
+                    Path.GetFileName(path),
+                    nameof(WrapperCoverageCompletenessTests) + ".cs",
+                    StringComparison.Ordinal))
+                .Select(File.ReadAllText));
+
+        var missing = requestContracts
+            .Where(methodName => !testSource.Contains($".{methodName}(", StringComparison.Ordinal))
+            .ToArray();
+
+        missing.Should().BeEmpty(
+            "every IdentityServer IBoltRequest contract must have at least one direct service-wrapper integration test");
+    }
+
+    private static DirectoryInfo FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "XFramework.slnx")))
+                return current;
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate XFramework repository root.");
+    }
+}
