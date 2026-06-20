@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 
 namespace XFramework.SourceGenerators;
@@ -14,16 +15,24 @@ namespace XFramework.SourceGenerators;
 [Generator]
 public class ServiceWrapperGenerator : IIncrementalGenerator
 {
+    private const string WrapperNameProperty = "build_property.XFrameworkServiceWrapperName";
+    private const string TargetClientNameProperty = "build_property.XFrameworkServiceWrapperTargetClientName";
+    private const string DiscoveryPrefixesProperty = "build_property.XFrameworkServiceWrapperDiscoveryPrefixes";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Pure auto-discovery: use CompilationProvider to scan referenced assemblies
         // for [GenerateEndpoints] entities and IBoltRequest types.
         // Triggers only in *.Integration projects (by assembly name convention).
-        context.RegisterSourceOutput(context.CompilationProvider,
-            static (spc, compilation) => Execute(compilation, spc));
+        var source = context.CompilationProvider.Combine(context.AnalyzerConfigOptionsProvider);
+        context.RegisterSourceOutput(source,
+            static (spc, source) => Execute(source.Left, source.Right, spc));
     }
 
-    private static void Execute(Compilation compilation, SourceProductionContext context)
+    private static void Execute(
+        Compilation compilation,
+        AnalyzerConfigOptionsProvider analyzerConfigOptions,
+        SourceProductionContext context)
     {
         var assemblyName = compilation.AssemblyName ?? "";
 
@@ -31,11 +40,13 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         if (!assemblyName.EndsWith(".Integration"))
             return;
 
-        var moduleName = assemblyName.Split('.').First();
-        var serviceId = moduleName.ToSha256();
+        var options = ResolveOptions(compilation, analyzerConfigOptions);
+        var serviceId = options.TargetClientName.ToSha256();
+        if (HasExistingServiceWrapperDeclaration(compilation, options.WrapperName))
+            return;
 
         // Discover entities from [GenerateEndpoints] in referenced assemblies
-        var (models, namespaces) = DiscoverGenerateEndpointEntities(compilation, moduleName);
+        var (models, namespaces) = DiscoverGenerateEndpointEntities(compilation, options.DiscoveryPrefixes);
 
         // Also check for [BoltWrapper] for backward compatibility (entities not yet migrated)
         var (legacyModels, legacyNamespace) = DiscoverBoltWrapperEntities(compilation);
@@ -47,16 +58,81 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         if (!string.IsNullOrEmpty(legacyNamespace))
             namespaces.Add(legacyNamespace);
 
-        if (models.Count == 0)
-            return; // No entities discovered — skip (manual wrappers handle custom-only cases)
-
         // Discover custom Bolt request types (IBoltRequest implementations)
-        var customRequests = DiscoverBoltRequests(compilation, moduleName);
+        var customRequests = DiscoverBoltRequests(compilation, options.DiscoveryPrefixes);
+
+        if (models.Count == 0 && customRequests.Count == 0)
+            return;
 
         // Generate the wrapper
-        var source = GenerateWrapper(moduleName, serviceId, models, namespaces, customRequests);
-        context.AddSource($"{moduleName}ServiceWrapperGenerator.g.cs",
+        var source = GenerateWrapper(options.WrapperName, serviceId, models, namespaces, customRequests);
+        context.AddSource($"{options.WrapperName}ServiceWrapperGenerator.g.cs",
             SourceText.From(source, Encoding.UTF8));
+    }
+
+    private static WrapperGenerationOptions ResolveOptions(
+        Compilation compilation,
+        AnalyzerConfigOptionsProvider analyzerConfigOptions)
+    {
+        var assemblyName = compilation.AssemblyName ?? "";
+        var conventionalName = assemblyName.Split('.').FirstOrDefault() ?? "";
+
+        var wrapperName = GetGlobalOption(analyzerConfigOptions, WrapperNameProperty);
+        if (string.IsNullOrWhiteSpace(wrapperName))
+            wrapperName = conventionalName;
+
+        var targetClientName = GetGlobalOption(analyzerConfigOptions, TargetClientNameProperty);
+        if (string.IsNullOrWhiteSpace(targetClientName))
+            targetClientName = wrapperName;
+
+        var discoveryPrefixes = ParseDiscoveryPrefixes(
+            GetGlobalOption(analyzerConfigOptions, DiscoveryPrefixesProperty));
+        if (discoveryPrefixes.Count == 0)
+            discoveryPrefixes.Add(wrapperName);
+
+        return new WrapperGenerationOptions(wrapperName, targetClientName, discoveryPrefixes);
+    }
+
+    private static string GetGlobalOption(
+        AnalyzerConfigOptionsProvider analyzerConfigOptions,
+        string key) =>
+        analyzerConfigOptions.GlobalOptions.TryGetValue(key, out var value)
+            ? value.Trim()
+            : string.Empty;
+
+    private static List<string> ParseDiscoveryPrefixes(string rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return [];
+
+        return rawValue
+            .Split([';', ','], StringSplitOptions.RemoveEmptyEntries)
+            .Select(static value => value.Trim())
+            .Where(static value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static bool HasExistingServiceWrapperDeclaration(Compilation compilation, string wrapperName)
+    {
+        var interfaceName = $"I{wrapperName}ServiceWrapper";
+        var recordName = $"{wrapperName}ServiceWrapper";
+        var extensionsName = $"{wrapperName}ServiceWrapperExtensions";
+
+        foreach (var syntaxTree in compilation.SyntaxTrees)
+        {
+            var root = syntaxTree.GetRoot();
+            foreach (var declaration in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+            {
+                var identifier = declaration.Identifier.Text;
+                if (identifier.Equals(interfaceName, StringComparison.Ordinal) ||
+                    identifier.Equals(recordName, StringComparison.Ordinal) ||
+                    identifier.Equals(extensionsName, StringComparison.Ordinal))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static string GenerateWrapper(string serviceName, string serviceId,
@@ -66,6 +142,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
         sb.AppendLine(
             $$"""
+            // <auto-generated/>
+            #nullable enable
             using XFramework.Domain.Shared.BusinessObjects;
             using XFramework.Domain.Shared.Contracts;
             using XFramework.Domain.Shared.Contracts.Requests;
@@ -118,11 +196,18 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
         // ── ServiceWrapper record ──
         sb.AppendLine($"public partial record {serviceName}ServiceWrapper(");
-        for (int i = 0; i < models.Count; i++)
+        var constructorParameters = models
+            .Select(static model => $"I{model}CrudService {model}")
+            .Concat([
+                "IMessageBusWrapper messageBusDriver",
+                "IConfiguration configuration",
+                "BoltClient boltClient"
+            ])
+            .ToList();
+        for (int i = 0; i < constructorParameters.Count; i++)
         {
-            sb.AppendLine($"I{models[i]}CrudService {models[i]}{(i < models.Count - 1 ? "," : "")}");
+            sb.AppendLine($"{constructorParameters[i]}{(i < constructorParameters.Count - 1 ? "," : "")}");
         }
-        sb.AppendLine($", IMessageBusWrapper messageBusDriver, IConfiguration configuration, BoltClient boltClient");
         sb.AppendLine($") : DriverBase(messageBusDriver, configuration), I{serviceName}ServiceWrapper");
         sb.AppendLine("{");
         sb.AppendLine($"    public override void Initialize() => TargetClient = \"{serviceId}\";");
@@ -131,7 +216,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                             public async System.Threading.Tasks.Task<byte[]> ExecuteQueryAsync(byte[] queryDescriptorBytes, System.Threading.CancellationToken ct = default)
                             {
                                 if (string.IsNullOrEmpty(TargetClient)) Initialize();
-                                var (status, data) = await boltClient.InvokeAsync(TargetClient, "__db_query__", queryDescriptorBytes, ct);
+                                var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
+                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", queryDescriptorBytes, ct);
                                 if ((int)status < 200 || (int)status >= 300)
                                     throw new System.InvalidOperationException($"DataContext query request failed with status {(int)status} ({status}).");
 
@@ -141,7 +227,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                             public async System.Threading.Tasks.Task<byte[]> ExecuteChangesAsync(byte[] saveChangesRequestBytes, System.Threading.CancellationToken ct = default)
                             {
                                 if (string.IsNullOrEmpty(TargetClient)) Initialize();
-                                var (status, data) = await boltClient.InvokeAsync(TargetClient, "__db_changes__", saveChangesRequestBytes, ct);
+                                var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
+                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", saveChangesRequestBytes, ct);
                                 if ((int)status < 200 || (int)status >= 300)
                                 {
                                     var failure = DataContextResult.Failure($"DataContext change request failed with status {(int)status} ({status}).", (int)status);
@@ -156,7 +243,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                                 [System.Runtime.CompilerServices.EnumeratorCancellation] System.Threading.CancellationToken ct = default)
                             {
                                 if (string.IsNullOrEmpty(TargetClient)) Initialize();
-                                var stream = await boltClient.OpenStreamAsync(TargetClient, "__db_query_stream__", ct);
+                                var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
+                                var stream = await boltClient.OpenStreamAsync(targetClient, "__db_query_stream__", ct);
                                 try
                                 {
                                     await stream.SendAsync((System.ReadOnlyMemory<byte>)queryDescriptorBytes, ct);
@@ -369,7 +457,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
     }
 
     private static (List<string> Models, HashSet<string> Namespaces) DiscoverGenerateEndpointEntities(
-        Compilation compilation, string moduleName)
+        Compilation compilation, IReadOnlyCollection<string> discoveryPrefixes)
     {
         var models = new List<string>();
         var namespaces = new HashSet<string>();
@@ -384,8 +472,9 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
             // Scan module's own assemblies
             // Also scan XFramework.Domain.Shared for IdentityServer (manages StorageFile etc.)
-            var isModuleAssembly = assembly.Name.StartsWith(moduleName, StringComparison.OrdinalIgnoreCase);
-            var isSharedForIdentity = moduleName == "IdentityServer" &&
+            var isModuleAssembly = MatchesAnyPrefix(assembly.Name, discoveryPrefixes);
+            var isSharedForIdentity = discoveryPrefixes.Any(static prefix =>
+                    prefix.Equals("IdentityServer", StringComparison.OrdinalIgnoreCase)) &&
                 assembly.Name.StartsWith("XFramework.Domain.Shared", StringComparison.OrdinalIgnoreCase);
             if (!isModuleAssembly && !isSharedForIdentity)
                 continue;
@@ -454,7 +543,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
     }
 
     private static List<CustomRequestInfo> DiscoverBoltRequests(
-        Compilation compilation, string serviceName)
+        Compilation compilation, IReadOnlyCollection<string> discoveryPrefixes)
     {
         var results = new List<CustomRequestInfo>();
         var boltInterface = compilation.GetTypeByMetadataName(
@@ -472,7 +561,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                 continue;
 
             var typeNamespace = type.ContainingNamespace?.ToDisplayString() ?? "";
-            if (!typeNamespace.Contains(serviceName, StringComparison.OrdinalIgnoreCase))
+            if (!MatchesAnyPrefix(typeNamespace, discoveryPrefixes))
                 continue;
 
             if (type.IsGenericType) continue;
@@ -554,9 +643,29 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             CollectTypes(childNs, types);
     }
 
+    private static bool MatchesAnyPrefix(string value, IReadOnlyCollection<string> prefixes) =>
+        prefixes.Any(prefix => value.Contains(prefix, StringComparison.OrdinalIgnoreCase));
+
     private class CustomRequestInfo
     {
         public string InterfaceMethodSignature { get; set; } = "";
         public string ImplementationMethod { get; set; } = "";
+    }
+
+    private sealed class WrapperGenerationOptions
+    {
+        public WrapperGenerationOptions(
+            string wrapperName,
+            string targetClientName,
+            List<string> discoveryPrefixes)
+        {
+            WrapperName = wrapperName;
+            TargetClientName = targetClientName;
+            DiscoveryPrefixes = discoveryPrefixes;
+        }
+
+        public string WrapperName { get; }
+        public string TargetClientName { get; }
+        public List<string> DiscoveryPrefixes { get; }
     }
 }

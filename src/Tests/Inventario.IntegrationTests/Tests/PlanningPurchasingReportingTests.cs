@@ -16,6 +16,46 @@ namespace Inventario.IntegrationTests.Tests;
 public sealed class PlanningPurchasingReportingTests : InventarioTestBase
 {
     [Test]
+    [Category(TestCategories.ExtendedIntegration)]
+    [Category(TestCategories.Planning)]
+    [Category(TestCategories.Wrappers)]
+    [Category(TestCategories.ControlPanelContract)]
+    public async Task CreateInventoryReorderRule_ValidRequest_PersistsThroughWrapper()
+    {
+        var seed = await SeedInventoryScope();
+
+        var result = await InventarioIntegrationTestFixture.ServiceWrapper.CreateInventoryReorderRule(
+            new CreateInventoryReorderRuleRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductId = seed.Product.Id,
+                WarehouseId = seed.Warehouse.Id,
+                LocationId = seed.Location.Id,
+                MinimumQuantity = 2,
+                MaximumQuantity = 20,
+                ReorderPoint = 5,
+                ReorderQuantity = 10,
+                PreferredSupplier = "control-panel-wrapper",
+                IsActive = true
+            });
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+
+        await using var db = CreateDbContext();
+        var persisted = await db.Set<InventoryReorderRule>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x =>
+                x.ProductId == seed.Product.Id &&
+                x.WarehouseId == seed.Warehouse.Id &&
+                x.LocationId == seed.Location.Id &&
+                x.PreferredSupplier == "control-panel-wrapper");
+
+        persisted.Should().NotBeNull();
+        persisted!.TenantId.Should().Be(InventarioIntegrationTestFixture.TestTenantId);
+        persisted.ReorderQuantity.Should().Be(10);
+    }
+
+    [Test]
     [Category(TestCategories.Planning)]
     [Category(TestCategories.Reporting)]
     public async Task GetReorderSuggestions_LowStockProduct_ReturnsSuggestedQuantity()

@@ -1,0 +1,316 @@
+using System.Collections.Immutable;
+using System.Reflection;
+using FluentAssertions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using NUnit.Framework;
+using XFramework.SourceGenerators;
+
+namespace XFramework.SourceGenerators.Tests;
+
+[TestFixture]
+public sealed class ServiceWrapperGeneratorTests
+{
+    [Test]
+    public void GenerateWrapper_CustomExternalServiceName_UsesConfiguredNameTargetAndDiscoveryPrefix()
+    {
+        var domainReference = CreateReference(
+            "Juan.Barangay.Domain.Shared",
+            """
+            namespace Juan.Barangay.Domain.Shared.Entities
+            {
+                using XFramework.Domain.Shared.Attributes;
+                using XFramework.Domain.Shared.Contracts.Base;
+
+                [GenerateEndpoints(Actions = EndpointActions.None, RequireAuthorization = true)]
+                public sealed class Resident : BaseModel;
+            }
+
+            namespace Juan.Barangay.Domain.Shared.Contracts.Residents
+            {
+                using Bolt.Domain.Shared.Contracts.Requests;
+                using XFramework.Domain.Shared.BusinessObjects;
+                using XFramework.Domain.Shared.Contracts.Requests;
+
+                public sealed record ResidentResponse;
+
+                public partial record ValidateBarangayIdRequest : RequestBase,
+                    IQuery<QueryResponse<ResidentResponse>>,
+                    IBoltRequest<ValidateBarangayIdRequest, QueryResponse<ResidentResponse>>;
+            }
+            """);
+
+        var generatedSource = RunGenerator(
+            "Juan.Barangay.Integration",
+            domainReference,
+            new Dictionary<string, string>
+            {
+                ["build_property.XFrameworkServiceWrapperName"] = "JuanBarangay",
+                ["build_property.XFrameworkServiceWrapperTargetClientName"] = "JuanBarangay",
+                ["build_property.XFrameworkServiceWrapperDiscoveryPrefixes"] = "Juan.Barangay"
+            });
+
+        generatedSource.Should().Contain("namespace JuanBarangay.Integration.Drivers");
+        generatedSource.Should().Contain("#nullable enable");
+        generatedSource.Should().Contain("public partial interface IJuanBarangayServiceWrapper");
+        generatedSource.Should().Contain("public partial record JuanBarangayServiceWrapper(");
+        generatedSource.Should().Contain($"TargetClient = \"{"JuanBarangay".ToSha256()}\"");
+        generatedSource.Should().Contain("public IResidentCrudService Resident { get; init; }");
+        generatedSource.Should().Contain("ValidateBarangayId(");
+        generatedSource.Should().NotContain("namespace Juan.Integration.Drivers");
+    }
+
+    [Test]
+    public void GenerateWrapper_ConventionModuleName_RemainsBackwardCompatible()
+    {
+        var domainReference = CreateReference(
+            "Inventario.Domain.Shared",
+            """
+            namespace XFramework.Inventario.Domain.Shared.Contracts
+            {
+                using XFramework.Domain.Shared.Attributes;
+                using XFramework.Domain.Shared.Contracts.Base;
+
+                [GenerateEndpoints(Actions = EndpointActions.None)]
+                public sealed class Product : BaseModel;
+            }
+
+            namespace XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations
+            {
+                using Bolt.Domain.Shared.Contracts.Requests;
+                using XFramework.Domain.Shared.BusinessObjects;
+                using XFramework.Domain.Shared.Contracts.Requests;
+
+                public partial record ReserveInventoryRequest : RequestBase,
+                    ICommand<CmdResponse>,
+                    IBoltRequest<ReserveInventoryRequest, CmdResponse>;
+            }
+            """);
+
+        var generatedSource = RunGenerator(
+            "Inventario.Integration",
+            domainReference,
+            new Dictionary<string, string>());
+
+        generatedSource.Should().Contain("namespace Inventario.Integration.Drivers");
+        generatedSource.Should().Contain("public partial interface IInventarioServiceWrapper");
+        generatedSource.Should().Contain($"TargetClient = \"{"Inventario".ToSha256()}\"");
+        generatedSource.Should().Contain("public IProductCrudService Product { get; init; }");
+        generatedSource.Should().Contain("ReserveInventory(");
+    }
+
+    [Test]
+    public void GenerateWrapper_ProjectWithManualWrapperDeclaration_SkipsGeneratedWrapper()
+    {
+        var domainReference = CreateReference(
+            "Messaging.Domain.Shared",
+            """
+            namespace Messaging.Domain.Shared.Contracts.Requests.Create
+            {
+                using Bolt.Domain.Shared.Contracts.Requests;
+                using XFramework.Domain.Shared.BusinessObjects;
+                using XFramework.Domain.Shared.Contracts.Requests;
+
+                public partial record CreateDirectMessageRequest : RequestBase,
+                    ICommand<CmdResponse>,
+                    IBoltRequest<CreateDirectMessageRequest, CmdResponse>;
+            }
+            """);
+
+        var generatedSources = RunGeneratorSources(
+            "Messaging.Integration",
+            domainReference,
+            new Dictionary<string, string>(),
+            """
+            namespace Messaging.Integration.Drivers
+            {
+                public interface IMessagingServiceWrapper { }
+                public sealed record MessagingServiceWrapper { }
+                public static class MessagingServiceWrapperExtensions { }
+            }
+            """);
+
+        generatedSources.Should().BeEmpty();
+    }
+
+    private static string RunGenerator(
+        string assemblyName,
+        MetadataReference domainReference,
+        IReadOnlyDictionary<string, string> globalOptions)
+    {
+        var generatedSources = RunGeneratorSources(
+            assemblyName,
+            domainReference,
+            globalOptions,
+            "");
+
+        var generatedSource = generatedSources.Single();
+        generatedSource.Should().NotBeNullOrWhiteSpace();
+        return generatedSource;
+    }
+
+    private static List<string> RunGeneratorSources(
+        string assemblyName,
+        MetadataReference domainReference,
+        IReadOnlyDictionary<string, string> globalOptions,
+        string projectSource)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [CSharpSyntaxTree.ParseText(projectSource, parseOptions)],
+            GetMetadataReferences().Append(domainReference),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var inputDiagnostics = compilation.GetDiagnostics()
+            .Where(static d => d.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        inputDiagnostics.Should().BeEmpty();
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new ServiceWrapperGenerator().AsSourceGenerator()],
+            parseOptions: parseOptions,
+            optionsProvider: new TestAnalyzerConfigOptionsProvider(globalOptions));
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out _,
+            out var generatorDiagnostics);
+
+        generatorDiagnostics
+            .Where(static d => d.Severity == DiagnosticSeverity.Error)
+            .Should()
+            .BeEmpty();
+
+        return driver.GetRunResult()
+            .GeneratedTrees
+            .Where(tree => tree.FilePath.EndsWith("ServiceWrapperGenerator.g.cs", StringComparison.Ordinal))
+            .Select(tree => tree.GetText().ToString())
+            .ToList();
+    }
+
+    private static MetadataReference CreateReference(string assemblyName, string source)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [
+                CSharpSyntaxTree.ParseText(CommonStubs, parseOptions),
+                CSharpSyntaxTree.ParseText(source, parseOptions)
+            ],
+            GetMetadataReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        using var stream = new MemoryStream();
+        var emitResult = compilation.Emit(stream);
+
+        emitResult.Diagnostics
+            .Where(static d => d.Severity == DiagnosticSeverity.Error)
+            .Should()
+            .BeEmpty();
+
+        emitResult.Success.Should().BeTrue();
+        return MetadataReference.CreateFromImage(stream.ToArray());
+    }
+
+    private static IEnumerable<MetadataReference> GetMetadataReferences()
+    {
+        return AppDomain.CurrentDomain.GetAssemblies()
+            .Where(static assembly => !assembly.IsDynamic && !string.IsNullOrWhiteSpace(assembly.Location))
+            .Select(static assembly => MetadataReference.CreateFromFile(assembly.Location))
+            .DistinctBy(static reference => reference.Display);
+    }
+
+    private sealed class TestAnalyzerConfigOptionsProvider(
+        IReadOnlyDictionary<string, string> globalOptions) : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _globalOptions = new DictionaryAnalyzerConfigOptions(globalOptions);
+        private readonly AnalyzerConfigOptions _emptyOptions = new DictionaryAnalyzerConfigOptions(
+            ImmutableDictionary<string, string>.Empty);
+
+        public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _emptyOptions;
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _emptyOptions;
+    }
+
+    private sealed class DictionaryAnalyzerConfigOptions(
+        IReadOnlyDictionary<string, string> options) : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+        {
+            if (options.TryGetValue(key, out var found))
+            {
+                value = found;
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
+        }
+    }
+
+    private const string CommonStubs = """
+    using System;
+
+    namespace XFramework.Domain.Shared.Attributes
+    {
+        public enum EndpointType
+        {
+            Rest = 1
+        }
+
+        [Flags]
+        public enum EndpointActions
+        {
+            None = 0,
+            Create = 1,
+            Get = 2,
+            GetList = 4,
+            Update = 8,
+            Delete = 16,
+            All = Create | Get | GetList | Update | Delete
+        }
+
+        [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+        public sealed class GenerateEndpointsAttribute : Attribute
+        {
+            public EndpointType Type { get; set; } = EndpointType.Rest;
+            public EndpointActions Actions { get; set; } = EndpointActions.All;
+            public bool RequireAuthorization { get; set; }
+        }
+    }
+
+    namespace XFramework.Domain.Shared.Contracts.Base
+    {
+        public abstract class BaseModel
+        {
+            public Guid Id { get; set; }
+            public Guid TenantId { get; set; }
+        }
+
+        public interface IHasRequestServer;
+    }
+
+    namespace XFramework.Domain.Shared.Contracts.Requests
+    {
+        using XFramework.Domain.Shared.Contracts.Base;
+
+        public abstract record RequestBase : IHasRequestServer;
+        public interface ICommand<TResponse> : IHasRequestServer;
+        public interface IQuery<TResponse> : IHasRequestServer;
+    }
+
+    namespace XFramework.Domain.Shared.BusinessObjects
+    {
+        public class CmdResponse;
+        public class CmdResponse<T> : CmdResponse;
+        public class QueryResponse<T>;
+    }
+
+    namespace Bolt.Domain.Shared.Contracts.Requests
+    {
+        public interface IBoltRequest<TRequest, TResponse>;
+    }
+    """;
+}

@@ -3,6 +3,7 @@ namespace XFramework.TestInfrastructure;
 public static class TestCategories
 {
     public const string Integration = "Kind:Integration";
+    public const string ExtendedIntegration = "Kind:ExtendedIntegration";
 
     public const string IdentityServer = "Module:IdentityServer";
     public const string Wallets = "Module:Wallets";
@@ -10,6 +11,8 @@ public static class TestCategories
 
     public const string Auth = "Area:Auth";
     public const string DataContext = "Area:DataContext";
+    public const string Wrappers = "Area:Wrappers";
+    public const string ControlPanelContract = "Area:ControlPanelContract";
     public const string FeatureGates = "Area:FeatureGates";
     public const string Catalog = "Area:Catalog";
     public const string Warehousing = "Area:Warehousing";

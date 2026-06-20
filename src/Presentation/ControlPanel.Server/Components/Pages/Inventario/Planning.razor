@@ -1,5 +1,6 @@
 @page "/inventario/planning"
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Planning
 @implements IDisposable
 
 <PageTitle>Inventario Planning - Control Panel</PageTitle>
@@ -179,6 +180,7 @@ else
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
@@ -331,11 +333,9 @@ else
         _savingRule = true;
         try
         {
-            var now = DateTime.UtcNow;
-            DataContext.Add(new InventoryReorderRule
+            var result = await Inventario.CreateInventoryReorderRule(new CreateInventoryReorderRuleRequest
             {
-                Id = Guid.NewGuid(),
-                TenantId = TenantFilter.SelectedTenantId!.Value,
+                Metadata = BuildMetadata(),
                 ProductId = productId,
                 WarehouseId = Guid.TryParse(_form.WarehouseId, out var warehouseId) ? warehouseId : null,
                 LocationId = Guid.TryParse(_form.LocationId, out var locationId) ? locationId : null,
@@ -344,14 +344,10 @@ else
                 ReorderPoint = point,
                 ReorderQuantity = qty,
                 PreferredSupplier = NullIfEmpty(_form.PreferredSupplier),
-                IsActive = _form.IsActive,
-                IsEnabled = true,
-                CreatedAt = now,
-                ConcurrencyStamp = Guid.NewGuid()
+                IsActive = _form.IsActive
             });
-            var save = await DataContext.SaveChangesAsync();
-            ToastService.Show(save.IsSuccess ? "Reorder rule created." : $"Failed: {save.Message}");
-            if (save.IsSuccess)
+            ToastService.Show(result.IsSuccess ? "Reorder rule created." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
             {
                 _ruleDialogOpen = false;
                 ResetForm();
@@ -413,6 +409,13 @@ else
 
     private string GetScopeLabel(InventoryReorderRule rule) =>
         $"{GetWarehouseName(rule.WarehouseId)} / {GetLocationName(rule.LocationId)}";
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel"
+    };
 
     private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
     private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";

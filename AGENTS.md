@@ -8,6 +8,7 @@ Primary route:
 - [docs/README.md](docs/README.md) - repository documentation map.
 - [docs/solutions/README.md](docs/solutions/README.md) - durable solution knowledgebase and category index.
 - [docs/solutions/conventions/xframework-best-practices.md](docs/solutions/conventions/xframework-best-practices.md) - canonical implementation standard.
+- [docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md](docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md) - ControlPanel wrapper vs `IDataContext` rules and integration-test coverage tiers.
 - [docs/solutions/tooling-decisions/blazor-blueprint-controlpanel-agent-guide.md](docs/solutions/tooling-decisions/blazor-blueprint-controlpanel-agent-guide.md) - BlazorBlueprint ControlPanel usage, docs lookup, and visual verification rules.
 
 Task-specific OpenCode skills live under `.opencode/skills/`; use them as workflow helpers, not as the primary documentation authority.

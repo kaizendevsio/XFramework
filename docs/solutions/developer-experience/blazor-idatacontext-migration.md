@@ -27,7 +27,7 @@ walletsServiceWrapper.Wallet.GetList(...)
 walletsServiceWrapper.WithdrawalRequest.Patch(entity)
 ```
 
-Service wrappers should now be used only for business RPC operations, such as:
+Service wrappers should now be used for business RPC operations and custom endpoint actions, such as:
 
 ```csharp
 identityServerServiceWrapper.AuthenticateIdentity(request)
@@ -35,13 +35,14 @@ identityServerServiceWrapper.ChangePassword(request)
 walletsServiceWrapper.TransferWallet(request)
 ```
 
-Generic entity CRUD/query work should use `IDataContext`.
+Generic entity query work should use `IDataContext`. Generic entity mutation should use `IDataContext.Add/Update/Remove` only when the entity is intentionally allowlisted for remote mutation and no richer business endpoint exists for that user action. If a request contract or wrapper method exists, prefer the wrapper because it owns validators, feature gates, idempotency, tenant derivation, ledger/allocation logic, and status transitions.
 
 See also:
 
 - `docs/solutions/conventions/ef-core-data-access-patterns.md` for local EF and remote `IDataContext` behavior.
 - `docs/solutions/architecture-patterns/decentralized-remote-data-context.md` for generated remote service-wrapper routing.
 - `docs/solutions/best-practices/xframework-caching-strategy.md` for remote data-context client cache behavior.
+- `docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md` for the ControlPanel wrapper-vs-`IDataContext` decision rule and required integration-test coverage.
 
 ## Migration Target
 
@@ -119,6 +120,7 @@ walletsServiceWrapper.<Entity>.(Get|GetList|Create|Patch|Replace|Delete)
 - Use `.Skip(...)` and `.Take(...)` for paging.
 - Use `.Where(...)` expressions instead of manually building `QueryFilter` lists where practical.
 - Keep custom business wrapper calls unchanged.
+- Do not replace business wrapper calls with direct `IDataContext` saves.
 
 ## Build Verification
 
