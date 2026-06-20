@@ -260,22 +260,73 @@
 }
 
 .login-shell {
+    position: relative;
+    isolation: isolate;
     display: grid;
     min-height: 100vh;
     place-items: center;
-    background: var(--background);
+    overflow-x: hidden;
+    background:
+        linear-gradient(135deg, color-mix(in oklab, var(--primary) 9%, transparent), transparent 32rem),
+        linear-gradient(180deg, color-mix(in oklab, var(--muted) 55%, transparent), transparent 18rem),
+        var(--background);
     color: var(--foreground);
-    padding: 1.5rem;
+    padding: 5rem 1.5rem 2rem;
+}
+
+.login-shell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image:
+        linear-gradient(color-mix(in oklab, var(--border) 55%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in oklab, var(--border) 55%, transparent) 1px, transparent 1px);
+    background-position: center;
+    background-size: 3rem 3rem;
+    mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.58), transparent 72%);
+}
+
+.login-theme-controls {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+    border-radius: var(--radius);
+    background: color-mix(in oklab, var(--card) 88%, transparent);
+    box-shadow: 0 12px 34px rgb(15 23 42 / 0.12);
+    padding: 0.25rem;
+}
+
+.login-theme-button {
+    min-width: 2.5rem;
+}
+
+.login-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+    width: min(100%, 68rem);
+    min-height: 38rem;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--border) 86%, transparent);
+    border-radius: var(--radius);
+    background: color-mix(in oklab, var(--card) 92%, transparent);
+    box-shadow: 0 28px 80px rgb(15 23 42 / 0.18);
 }
 
 .login-card {
-    width: min(100%, 24rem);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
     background: var(--card);
     color: var(--card-foreground);
-    box-shadow: 0 18px 45px rgb(15 23 42 / 0.10);
-    padding: 1.5rem;
+    padding: 2.25rem;
 }
 
 .login-brand {
@@ -287,24 +338,25 @@
 
 .login-logo {
     display: grid;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.75rem;
+    height: 2.75rem;
     place-items: center;
     border-radius: calc(var(--radius) - 2px);
     background: var(--primary);
     color: var(--primary-foreground);
+    box-shadow: 0 12px 26px color-mix(in oklab, var(--primary) 26%, transparent);
     font-weight: 700;
 }
 
-.login-brand h1,
-.login-heading h2 {
+.login-brand-name,
+.login-heading h1 {
     margin: 0;
     color: var(--foreground);
     font-weight: 700;
     letter-spacing: 0;
 }
 
-.login-brand h1 {
+.login-brand-name {
     font-size: 1rem;
     line-height: 1.25rem;
 }
@@ -323,18 +375,31 @@
 }
 
 .login-heading {
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
 }
 
-.login-heading h2 {
-    font-size: 1.5rem;
-    line-height: 2rem;
+.login-kicker {
+    margin: 0 0 0.5rem;
+    color: var(--primary) !important;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1rem;
+    text-transform: uppercase;
+}
+
+.login-heading h1 {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+}
+
+.login-heading h1:focus {
+    outline: none;
 }
 
 .login-heading p {
-    margin: 0.25rem 0 0;
+    margin: 0.5rem 0 0;
     font-size: 0.875rem;
-    line-height: 1.25rem;
+    line-height: 1.5rem;
 }
 
 .login-error {
@@ -354,47 +419,268 @@
 }
 
 .login-form {
-    gap: 1rem;
+    gap: 0.9rem;
 }
 
 .login-form label {
-    gap: 0.375rem;
+    gap: 0.45rem;
     font-size: 0.875rem;
     font-weight: 500;
 }
 
 .login-form input:not([type="checkbox"]) {
-    min-height: 2.5rem;
-    border: 1px solid var(--input);
+    min-height: 2.85rem;
+    border: 1px solid color-mix(in oklab, var(--input) 88%, transparent);
     border-radius: calc(var(--radius) - 2px);
-    background: var(--background);
+    background: color-mix(in oklab, var(--background) 92%, var(--card));
     color: var(--foreground);
-    padding: 0.5rem 0.75rem;
+    padding: 0.625rem 0.85rem;
     outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.login-form input:not([type="checkbox"])::placeholder {
+    color: color-mix(in oklab, var(--muted-foreground) 72%, transparent);
 }
 
 .login-form input:not([type="checkbox"]):focus {
     border-color: var(--ring);
-    box-shadow: 0 0 0 1px var(--ring);
+    background: var(--background);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 22%, transparent);
+}
+
+.login-form-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
 }
 
 .login-remember {
     flex-direction: row !important;
     align-items: center;
+    gap: 0.5rem !important;
+    color: var(--foreground);
+    font-weight: 500;
 }
 
 .login-remember input {
     width: 1rem;
     height: 1rem;
+    accent-color: var(--primary);
 }
 
 .login-form button {
-    min-height: 2.5rem;
+    display: inline-flex;
+    min-height: 2.85rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     border-radius: calc(var(--radius) - 2px);
     background: var(--primary);
     color: var(--primary-foreground);
     cursor: pointer;
     font-weight: 600;
+    transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.login-form button:hover {
+    background: color-mix(in oklab, var(--primary) 90%, var(--foreground));
+    box-shadow: 0 12px 26px color-mix(in oklab, var(--primary) 22%, transparent);
+}
+
+.login-form button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+.login-submit-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.login-context {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 1.5rem;
+    border-left: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+    background:
+        linear-gradient(145deg, color-mix(in oklab, var(--primary) 15%, transparent), transparent 30rem),
+        color-mix(in oklab, var(--muted) 48%, var(--card));
+    padding: 2.25rem;
+}
+
+.login-context::before {
+    content: "";
+    position: absolute;
+    inset: 1.25rem;
+    border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+    border-radius: var(--radius);
+    pointer-events: none;
+}
+
+.login-context > * {
+    position: relative;
+}
+
+.login-context-header {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+    border-radius: calc(var(--radius) - 2px);
+    background: color-mix(in oklab, var(--background) 66%, transparent);
+    color: var(--muted-foreground);
+    padding: 0.4rem 0.65rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.login-context-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--primary);
+}
+
+.login-context h3 {
+    max-width: 33rem;
+    margin: 0;
+    color: var(--foreground);
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 2.6rem;
+    letter-spacing: 0;
+}
+
+.login-context p {
+    max-width: 32rem;
+    margin: 0;
+    color: var(--muted-foreground);
+    font-size: 0.975rem;
+    line-height: 1.7rem;
+}
+
+.login-context-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.login-context-grid div {
+    display: flex;
+    min-height: 5.25rem;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
+    border-radius: calc(var(--radius) - 2px);
+    background: color-mix(in oklab, var(--card) 72%, transparent);
+    padding: 0.9rem;
+}
+
+.login-context-grid span {
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.login-context-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    color: var(--primary);
+}
+
+@media (max-width: 860px) {
+    .login-panel {
+        grid-template-columns: minmax(0, 1fr);
+        min-height: 0;
+    }
+
+    .login-context {
+        border-top: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+        border-left: 0;
+    }
+}
+
+@media (max-height: 680px) and (min-width: 861px) {
+    .login-shell {
+        place-items: start center;
+        padding: 3.75rem 1rem 0.75rem;
+    }
+
+    .login-panel {
+        min-height: 0;
+    }
+
+    .login-card,
+    .login-context {
+        padding: 1.75rem;
+    }
+
+    .login-brand,
+    .login-heading {
+        margin-bottom: 1rem;
+    }
+
+    .login-heading h1,
+    .login-context h3 {
+        font-size: 1.625rem;
+        line-height: 2rem;
+    }
+
+    .login-heading p,
+    .login-context p {
+        line-height: 1.45rem;
+    }
+
+    .login-form {
+        gap: 0.75rem;
+    }
+
+    .login-form input:not([type="checkbox"]),
+    .login-form button {
+        min-height: 2.65rem;
+    }
+
+    .login-context-grid div {
+        min-height: 4.4rem;
+    }
+}
+
+@media (max-width: 560px) {
+    .login-shell {
+        place-items: start center;
+        padding: 4.75rem 0.85rem 1rem;
+    }
+
+    .login-card,
+    .login-context {
+        padding: 1.25rem;
+    }
+
+    .login-heading h1,
+    .login-context h3 {
+        font-size: 1.5rem;
+        line-height: 2rem;
+    }
+
+    .login-form-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .login-context-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .profile-menu {

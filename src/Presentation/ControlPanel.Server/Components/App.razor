@@ -13,6 +13,37 @@
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
     <!-- App styles (Tailwind utilities) -->
     <link href="css/app.css" rel="stylesheet" />
+    <script>
+        (() => {
+            const storageKey = "bb-theme";
+            const root = document.documentElement;
+            const defaults = {
+                isDarkMode: window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false,
+                baseColor: "slate",
+                primaryColor: "blue",
+                radius: 0.5
+            };
+
+            let theme = defaults;
+            try {
+                const stored = localStorage.getItem(storageKey);
+                if (stored) {
+                    theme = { ...defaults, ...JSON.parse(stored) };
+                }
+            } catch {
+                theme = defaults;
+            }
+
+            root.classList.toggle("dark", Boolean(theme.isDarkMode));
+            root.setAttribute("data-base-color", theme.baseColor || defaults.baseColor);
+            if (theme.primaryColor && theme.primaryColor !== "default") {
+                root.setAttribute("data-primary-color", theme.primaryColor);
+            } else {
+                root.removeAttribute("data-primary-color");
+            }
+            root.style.setProperty("--radius", `${Number(theme.radius ?? defaults.radius)}rem`);
+        })();
+    </script>
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 <body class="font-sans antialiased">

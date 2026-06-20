@@ -1,6 +1,11 @@
 @inherits LayoutComponentBase
 
 <div class="login-shell">
+    <div class="login-theme-controls" aria-label="Theme controls">
+        <BbDarkModeToggle Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" />
+        <BbThemeSwitcher Variant="ButtonVariant.Ghost" TriggerClass="login-theme-button" />
+    </div>
     @Body
 </div>
 
+<BbPortalHost />
