@@ -46,7 +46,7 @@ builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
 {
     options.DefaultBaseColor = BaseColor.Slate;
     options.DefaultPrimaryColor = PrimaryColor.Blue;
-    options.DefaultDarkMode = true;
+    options.DefaultDarkMode = false;
     options.DetectSystemPreference = true;
     options.DefaultRadius = 0.5;
     options.PersistToLocalStorage = true;
