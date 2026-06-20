@@ -252,12 +252,13 @@ public sealed class ReservationService(
         DateTime? releasedAt = null,
         DateTime? fulfilledAt = null)
     {
+        dataContext.Update(reservation);
+
         reservation.Status = status;
         reservation.ReleasedAt = releasedAt;
         reservation.FulfilledAt = fulfilledAt;
         reservation.ModifiedAt = DateTime.UtcNow;
         reservation.ConcurrencyStamp = Guid.NewGuid();
-        dataContext.Update(reservation);
     }
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)

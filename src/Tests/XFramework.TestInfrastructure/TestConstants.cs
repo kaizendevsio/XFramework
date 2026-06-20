@@ -44,6 +44,8 @@ public class TestConstants
         public const string SmsGatewayServer = "http://localhost:18561";
 
         // Inventario
+        public const string InventarioBolt = "http://localhost:17200";
         public const string InventarioServer = "http://localhost:18461";
+        public const string InventarioTestClient = "http://localhost:18462";
     }
 }

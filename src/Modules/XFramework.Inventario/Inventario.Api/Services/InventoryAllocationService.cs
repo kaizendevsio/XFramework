@@ -320,11 +320,13 @@ public sealed class InventoryAllocationService(
         return Result<List<ReservationAllocation>>.Success([allocation]);
     }
 
-    private static void CompleteAllocation(
+    private void CompleteAllocation(
         ReservationAllocation allocation,
         ReservationAllocationStatus terminalStatus,
         DateTime completedAt)
     {
+        dataContext.Update(allocation);
+
         allocation.Status = terminalStatus;
         allocation.ReleasedAt = completedAt;
         allocation.FulfilledAt = terminalStatus == ReservationAllocationStatus.Fulfilled ? completedAt : null;

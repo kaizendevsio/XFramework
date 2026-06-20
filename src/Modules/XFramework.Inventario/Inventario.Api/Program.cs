@@ -1,6 +1,6 @@
 using FluentValidation;
-using IdentityServer.Domain.Shared.Contracts;
 using Inventario.Api.Features.Products.Update;
+using Inventario.Api.Infrastructure;
 using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
 using XFramework.Core.DataContext;
@@ -37,26 +37,7 @@ var app = (WebApplication)builder.Build();
 
 // Add correlation ID middleware early in the pipeline for request tracing
 app.UseCorrelationId();
-app.UseTenantModuleFeatureGate(options =>
-{
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/warehouses", "warehousing");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/locations", "warehousing");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/balances", "stock_balances");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/movements", "movements");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/post", "movements");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reservations", "reservations");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/allocations", "reservations");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/lots", "traceability");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reorder-rules", "planning");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/planning", "planning");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reports/near-expiry", "traceability");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reports/expired-stock", "traceability");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reports", "reporting");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/suppliers", "purchasing");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/purchase-orders", "purchasing");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/receiving", "purchasing");
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api");
-});
+app.UseTenantModuleFeatureGate(InventarioFeatureGateRoutes.Configure);
 
 app.EnsureDatabase<DbContext>();
 

@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -18,7 +19,8 @@ namespace XFramework.Inventario.Api.Services;
 public sealed class StockPostingService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor,
-    ITenantModuleFeatureService featureService)
+    ITenantModuleFeatureService featureService,
+    DbContext? dbContext = null)
 {
     private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -32,10 +34,17 @@ public sealed class StockPostingService(
         CancellationToken ct = default) =>
         await PostCoreAsync(request, saveChanges: false, ct);
 
+    internal async Task<Result<StockPostingResponse>> StageAsync(
+        PostStockMovementRequest request,
+        InventoryLot? stagedLot,
+        CancellationToken ct = default) =>
+        await PostCoreAsync(request, saveChanges: false, ct, stagedLot);
+
     private async Task<Result<StockPostingResponse>> PostCoreAsync(
         PostStockMovementRequest request,
         bool saveChanges,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        InventoryLot? stagedLot = null)
     {
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
@@ -60,7 +69,7 @@ public sealed class StockPostingService(
         if (product is null)
             return Result<StockPostingResponse>.NotFound("Product not found.");
 
-        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.LotId, ct);
+        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.LotId, stagedLot, ct);
         if (!lotResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(lotResult.Message!, lotResult.StatusCode);
 
@@ -211,7 +220,7 @@ public sealed class StockPostingService(
         if (product is null)
             return Result<StockPostingResponse>.NotFound("Product not found.");
 
-        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.LotId, ct);
+        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.LotId, stagedLot: null, ct);
         if (!lotResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(lotResult.Message!, lotResult.StatusCode);
 
@@ -295,20 +304,41 @@ public sealed class StockPostingService(
             isReplay: false));
     }
 
-    private async Task<Product?> GetProduct(Guid tenantId, Guid productId, CancellationToken ct) =>
-        await dataContext.Query<Product>()
+    private async Task<Product?> GetProduct(Guid tenantId, Guid productId, CancellationToken ct)
+    {
+        var tracked = dbContext?.Set<Product>().Local.FirstOrDefault(x =>
+            x.TenantId == tenantId &&
+            x.Id == productId &&
+            !x.IsDeleted);
+
+        if (tracked is not null)
+            return tracked;
+
+        return await dataContext.Query<Product>()
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.Id == productId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
+    }
 
     private async Task<Result<InventoryLot?>> ValidateLotAsync(
         Guid tenantId,
         Guid productId,
         Guid? lotId,
+        InventoryLot? stagedLot,
         CancellationToken ct)
     {
         if (lotId is null)
             return Result<InventoryLot?>.Success(null);
+
+        if (stagedLot is not null && stagedLot.Id == lotId.Value)
+        {
+            if (stagedLot.TenantId != tenantId)
+                return Result<InventoryLot?>.NotFound("Lot not found.");
+            if (stagedLot.ProductId != productId)
+                return Result<InventoryLot?>.Failure("Lot does not belong to the requested product.", 400);
+
+            return Result<InventoryLot?>.Success(stagedLot);
+        }
 
         var lot = await dataContext.Query<InventoryLot>()
             .IgnoreQueryFilters()
@@ -335,6 +365,17 @@ public sealed class StockPostingService(
         Guid? lotId,
         CancellationToken ct)
     {
+        var trackedBalance = dbContext?.Set<StockBalance>().Local.FirstOrDefault(x =>
+            x.TenantId == tenantId &&
+            x.ProductId == productId &&
+            x.WarehouseId == warehouseId &&
+            x.LocationId == locationId &&
+            x.LotId == lotId &&
+            !x.IsDeleted);
+
+        if (trackedBalance is not null)
+            return Result<StockBalanceLookup>.Success(new StockBalanceLookup(trackedBalance, IsNew: false));
+
         var warehouseExists = await dataContext.Query<Warehouse>()
             .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == warehouseId && !x.IsDeleted, ct);
