@@ -43,8 +43,42 @@
                             <BbSelectItem Value="@caseType.ToString()">@caseType</BbSelectItem>
                         }
                     </BbFormFieldSelect>
-                    <BbFormFieldInput TValue="string" @bind-Value="_walletId" Label="Wallet ID" Placeholder="Required" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_transactionId" Label="Original Transaction ID" Placeholder="Optional" />
+                    <XfEntityPicker TItem="Wallet"
+                                    Label="Wallet"
+                                    Value="@_walletId"
+                                    ValueChanged="@(value => _walletId = value ?? "")"
+                                    Items="@_wallets"
+                                    ValueSelector="@GetWalletPickerValue"
+                                    TextSelector="@BuildWalletLabel"
+                                    SearchTextSelector="@GetWalletSearchText"
+                                    AdvancedColumns="@WalletAdvancedColumns"
+                                    AdvancedFilters="@WalletAdvancedFilters"
+                                    AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                    Placeholder="Select wallet"
+                                    SearchPlaceholder="Search wallets..."
+                                    EmptyMessage="No wallets found."
+                                    AllowClear="true"
+                                    ClearText="Clear wallet"
+                                    AdvancedSearchTitle="Find Wallet"
+                                    AdvancedSearchDescription="Search wallets before creating a refund, dispute, or chargeback case." />
+                    <XfEntityPicker TItem="WalletTransaction"
+                                    Label="Original Transaction"
+                                    Value="@_transactionId"
+                                    ValueChanged="@OnTransactionPickerChanged"
+                                    Items="@_transactions"
+                                    ValueSelector="@GetTransactionPickerValue"
+                                    TextSelector="@BuildTransactionLabel"
+                                    SearchTextSelector="@GetTransactionSearchText"
+                                    AdvancedColumns="@TransactionAdvancedColumns"
+                                    AdvancedFilters="@TransactionAdvancedFilters"
+                                    AdvancedSearchScope="Searches transaction id, wallet, type, amount, fee, reference, held/released state, and created date."
+                                    Placeholder="No original transaction"
+                                    SearchPlaceholder="Search transactions..."
+                                    EmptyMessage="No transactions found."
+                                    AllowClear="true"
+                                    ClearText="No original transaction"
+                                    AdvancedSearchTitle="Find Original Transaction"
+                                    AdvancedSearchDescription="Search recent wallet transactions to link the case to its original movement." />
                     <BbFormFieldInput TValue="decimal" @bind-Value="_amount" Label="Amount" />
                     <BbFormFieldInput TValue="string" @bind-Value="_reason" Label="Reason" Placeholder="Customer refund or dispute reason" />
                 </div>
@@ -174,6 +208,7 @@
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<WalletTransaction> _transactions = [];
+    private List<Wallet> _wallets = [];
     private List<WalletOperation> _refundOperations = [];
     private List<WalletCase> _cases = [];
     private bool _loading = true;
@@ -207,6 +242,7 @@
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsPolicy);
             _transactions = [];
+            _wallets = [];
             _refundOperations = [];
             _cases = [];
             _creditCount = 0;
@@ -218,6 +254,16 @@
             }
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _wallets = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.WalletType)
+                .Include(x => x.Credential)
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(250)
+                .ToListAsync();
+
             _transactions = await DataContext.Query<WalletTransaction>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -257,6 +303,7 @@
         catch (Exception ex)
         {
             _transactions = [];
+            _wallets = [];
             _refundOperations = [];
             _cases = [];
             ToastService.Show($"Failed to load refunds and disputes: {ex.Message}");
@@ -296,6 +343,19 @@
         _transactionId = transaction.Id.ToString();
         _amount = Math.Abs(transaction.Amount);
         _reason = string.IsNullOrWhiteSpace(_reason) ? "ControlPanel case" : _reason;
+    }
+
+    private Task OnTransactionPickerChanged(string? value)
+    {
+        _transactionId = value ?? "";
+
+        if (Guid.TryParse(_transactionId, out var transactionId) &&
+            _transactions.FirstOrDefault(x => x.Id == transactionId) is { } transaction)
+        {
+            SelectTransaction(transaction);
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task SubmitCase()
@@ -347,6 +407,134 @@
             _acting = false;
         }
     }
+
+    private static string GetWalletPickerValue(Wallet wallet) => wallet.Id.ToString();
+    private static string GetTransactionPickerValue(WalletTransaction transaction) => transaction.Id.ToString();
+
+    private string BuildWalletLabel(Wallet wallet)
+    {
+        var account = string.IsNullOrWhiteSpace(wallet.AccountNumber)
+            ? wallet.Id.ToString()[..8]
+            : wallet.AccountNumber;
+        var credential = GetWalletCredentialLabel(wallet);
+        var type = wallet.WalletType?.Code
+            ?? (wallet.WalletTypeId.HasValue ? wallet.WalletTypeId.Value.ToString()[..8] : "No type");
+
+        return $"{account} - {credential} - {type} - {wallet.AvailableBalance:N2}";
+    }
+
+    private string GetWalletSearchText(Wallet wallet) =>
+        $"{wallet.AccountNumber} {wallet.CredentialId} {GetWalletCredentialLabel(wallet)} {wallet.WalletType?.Code} {wallet.WalletType?.Name} {wallet.Status} {wallet.AvailableBalance}";
+
+    private string BuildTransactionLabel(WalletTransaction transaction)
+    {
+        var wallet = GetWalletLabel(transaction.WalletId);
+        var reference = string.IsNullOrWhiteSpace(transaction.ReferenceNumber)
+            ? transaction.Id.ToString()[..8]
+            : transaction.ReferenceNumber;
+
+        return $"{reference} - {wallet} - {transaction.Amount:N2}";
+    }
+
+    private string GetTransactionSearchText(WalletTransaction transaction) =>
+        $"{transaction.Id} {transaction.WalletId} {GetWalletLabel(transaction.WalletId)} {transaction.TransactionType} {transaction.Amount} {transaction.TransactionFee} {transaction.ReferenceNumber} {transaction.Remarks}";
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallet>> WalletAdvancedColumns =>
+    [
+        new("Account", x => string.IsNullOrWhiteSpace(x.AccountNumber) ? x.Id.ToString()[..8] : x.AccountNumber),
+        new("Credential", GetWalletCredentialLabel),
+        new("Type", x => x.WalletType?.Name ?? ShortId(x.WalletTypeId)),
+        new("Status", x => x.Status.ToString()),
+        new("Available", x => FormatDecimal(x.AvailableBalance)),
+        new("Held", x => FormatDecimal(x.DebitOnHoldBalance + x.CreditOnHoldBalance)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Wallet>> WalletAdvancedFilters =>
+    [
+        new("status", "Status", BuildEnumFilterOptions<WalletStatus>(), x => x.Status.ToString(), "All statuses"),
+        new("type", "Wallet type", BuildDistinctFilterOptions(_wallets, x => x.WalletType?.Code ?? x.WalletTypeId?.ToString()), x => x.WalletType?.Code ?? x.WalletTypeId?.ToString(), "All wallet types")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<WalletTransaction>> TransactionAdvancedColumns =>
+    [
+        new("Transaction", x => x.Id.ToString()[..8]),
+        new("Wallet", x => GetWalletLabel(x.WalletId)),
+        new("Type", x => x.TransactionType?.ToString()),
+        new("Amount", x => FormatDecimal(x.Amount)),
+        new("Fee", x => FormatDecimal(x.TransactionFee)),
+        new("Reference", x => x.ReferenceNumber),
+        new("Held", x => FormatBoolean(x.Held)),
+        new("Released", x => FormatBoolean(x.Released)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<WalletTransaction>> TransactionAdvancedFilters =>
+    [
+        new("type", "Transaction type", BuildNullableEnumFilterOptions<TransactionType>(), x => x.TransactionType?.ToString(), "All types"),
+        new("held", "Held", YesNoFilterOptions, x => x.Held ? "true" : "false", "All held states"),
+        new("released", "Released", YesNoFilterOptions, x => x.Released ? "true" : "false", "All release states")
+    ];
+
+    private string GetWalletLabel(Guid walletId) =>
+        _wallets.FirstOrDefault(x => x.Id == walletId) is { } wallet
+            ? BuildWalletLabel(wallet)
+            : walletId.ToString()[..8];
+
+    private static string GetWalletCredentialLabel(Wallet wallet)
+    {
+        if (wallet.Credential is { } credential)
+        {
+            var displayName = credential.IdentityInfo?.FullName;
+            if (string.IsNullOrWhiteSpace(displayName))
+                displayName = credential.IdentityInfo?.IdentityName;
+            if (string.IsNullOrWhiteSpace(displayName))
+                displayName = credential.UserName ?? credential.UserAlias;
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+                return displayName;
+        }
+
+        return wallet.CredentialId.ToString()[..8];
+    }
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildEnumFilterOptions<TEnum>()
+        where TEnum : struct, Enum =>
+        Enum.GetValues<TEnum>()
+            .Select(value => new XfEntityPickerFilterOption(value.ToString(), value.ToString()))
+            .ToArray();
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildNullableEnumFilterOptions<TEnum>()
+        where TEnum : struct, Enum =>
+        Enum.GetValues<TEnum>()
+            .Select(value => new XfEntityPickerFilterOption(value.ToString(), value.ToString()))
+            .ToArray();
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+
+    private static string FormatDateTime(DateTime value) =>
+        value == default ? "N/A" : value.ToString("g");
+
+    private static string FormatDecimal(decimal value) => value.ToString("N2");
+
+    private static string ShortId(Guid? id) => id is Guid value ? value.ToString()[..8] : "N/A";
 
     public void Dispose()
     {

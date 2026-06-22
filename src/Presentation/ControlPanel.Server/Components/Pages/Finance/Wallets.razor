@@ -173,24 +173,38 @@ else
             <BbDialogDescription>Create a new wallet account for a user credential.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <BbFormFieldCombobox TValue="string"
-                                  @bind-Value="_newCredentialId"
-                                  Options="@_credentialOptions"
-                                  Label="User / Credential"
-                                  Placeholder="Select a user"
-                                  SearchPlaceholder="Search users or credentials..."
-                                  EmptyMessage="No users found."
-                                  MatchTriggerWidth="true"
-                                  Required="true" />
-            <BbFormFieldSelect TValue="string"
-                               @bind-Value="_newWalletTypeId"
-                               Label="Wallet Type"
-                               Placeholder="Select wallet type">
-                @foreach (var wt in _walletTypes)
-                {
-                    <BbSelectItem Value="@wt.Id.ToString()">@(wt.Name) (@(wt.Code))</BbSelectItem>
-                }
-            </BbFormFieldSelect>
+            <XfEntityPicker TItem="IdentityCredential"
+                            Label="User / Credential"
+                            Value="@_newCredentialId"
+                            ValueChanged="@(value => _newCredentialId = value ?? "")"
+                            Items="@_credentials"
+                            ValueSelector="@GetCredentialPickerValue"
+                            TextSelector="@BuildCredentialLabel"
+                            SearchTextSelector="@GetCredentialSearchText"
+                            AdvancedColumns="@CredentialAdvancedColumns"
+                            AdvancedFilters="@CredentialAdvancedFilters"
+                            AdvancedSearchScope="Searches credential username, alias, identity name, verified state, online state, last seen date, and credential id."
+                            Placeholder="Select user or credential"
+                            SearchPlaceholder="Search users or credentials..."
+                            EmptyMessage="No credentials found."
+                            AdvancedSearchTitle="Find Credential"
+                            AdvancedSearchDescription="Search credentials for the active tenant before creating a wallet." />
+            <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.WalletType"
+                            Label="Wallet Type"
+                            Value="@_newWalletTypeId"
+                            ValueChanged="@(value => _newWalletTypeId = value ?? "")"
+                            Items="@_walletTypes"
+                            ValueSelector="@GetWalletTypePickerValue"
+                            TextSelector="@BuildWalletTypeLabel"
+                            SearchTextSelector="@GetWalletTypeSearchText"
+                            AdvancedColumns="@WalletTypeAdvancedColumns"
+                            AdvancedFilters="@WalletTypeAdvancedFilters"
+                            AdvancedSearchScope="Searches wallet type code, name, currency, type code, transfer rules, and created date."
+                            Placeholder="Select wallet type"
+                            SearchPlaceholder="Search wallet types..."
+                            EmptyMessage="No wallet types found."
+                            AdvancedSearchTitle="Find Wallet Type"
+                            AdvancedSearchDescription="Search wallet types available to the active tenant." />
             <BbFormFieldInput TValue="string"
                               @bind-Value="_newInitialBalance"
                               Label="Initial Balance"
@@ -221,7 +235,7 @@ else
 
     private List<Wallet> _items = [];
     private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
-    private List<SelectOption<string>> _credentialOptions = [];
+    private List<IdentityCredential> _credentials = [];
     private Dictionary<Guid, string> _credentialLabels = [];
     private Dictionary<Guid, Guid> _credentialTenantIds = [];
     private bool _loading = true;
@@ -278,6 +292,7 @@ else
             _walletTypes = (await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
                     .IgnoreQueryFilters()
                     .NoCache()
+                    .Include(x => x.CurrencyType)
                     .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                     .OrderBy(x => x.Name)
                     .Take(100)
@@ -299,7 +314,7 @@ else
     {
         _items = [];
         _walletTypes = [];
-        _credentialOptions = [];
+        _credentials = [];
         _credentialLabels = [];
         _credentialTenantIds = [];
         _totalWallets = 0;
@@ -334,7 +349,7 @@ else
     {
         if (TenantFilter.SelectedTenantId is not Guid tenantId)
         {
-            _credentialOptions = [];
+            _credentials = [];
             _credentialLabels = [];
             _credentialTenantIds = [];
             return;
@@ -350,9 +365,7 @@ else
             .OrderBy(GetCredentialSortText)
             .ToList();
 
-        _credentialOptions = credentials
-            .Select(x => new SelectOption<string>(x.Id.ToString(), BuildCredentialLabel(x)))
-            .ToList();
+        _credentials = credentials;
         _credentialLabels = credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
         _credentialTenantIds = credentials.ToDictionary(x => x.Id, x => x.TenantId);
     }
@@ -513,12 +526,28 @@ else
             ? label
             : $"{credentialId.ToString()[..8]}...";
 
+    private static string GetCredentialPickerValue(IdentityCredential credential) => credential.Id.ToString();
+
+    private static string GetWalletTypePickerValue(global::Wallets.Domain.Shared.Contracts.WalletType walletType) =>
+        walletType.Id.ToString();
+
     private static string GetCredentialSortText(IdentityCredential credential) =>
         credential.IdentityInfo?.FullName
         ?? credential.IdentityInfo?.IdentityName
         ?? credential.UserName
         ?? credential.UserAlias
         ?? credential.Id.ToString();
+
+    private static string GetCredentialSearchText(IdentityCredential credential) =>
+        $"{credential.IdentityInfo?.FullName} {credential.IdentityInfo?.IdentityName} {credential.UserName} {credential.UserAlias} {credential.IdentityInfo?.IdentityDescription} {credential.Id}";
+
+    private static string BuildWalletTypeLabel(global::Wallets.Domain.Shared.Contracts.WalletType walletType) =>
+        string.IsNullOrWhiteSpace(walletType.Code)
+            ? walletType.Name
+            : $"{walletType.Name} ({walletType.Code})";
+
+    private static string GetWalletTypeSearchText(global::Wallets.Domain.Shared.Contracts.WalletType walletType) =>
+        $"{walletType.Code} {walletType.Name} {walletType.Desc} {walletType.Type} {walletType.CurrencyType?.CurrencyIsoCode3} {walletType.CurrencyType?.Name}";
 
     private static string BuildCredentialLabel(IdentityCredential credential)
     {
@@ -540,6 +569,66 @@ else
 
         return $"{displayName} ({suffix})";
     }
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityCredential>> CredentialAdvancedColumns =>
+    [
+        new("Name", x => x.IdentityInfo?.FullName ?? x.IdentityInfo?.IdentityName ?? x.UserName ?? x.UserAlias),
+        new("Username", x => x.UserName ?? x.UserAlias),
+        new("Verified", x => FormatBoolean(x.IdentityInfo?.IsVerified ?? false)),
+        new("Online", x => FormatBoolean(x.IsOnline)),
+        new("Last Seen", x => FormatDateTime(x.LastSeen)),
+        new("Credential", x => x.Id.ToString()[..8])
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityCredential>> CredentialAdvancedFilters =>
+    [
+        new("verified", "Verified", YesNoFilterOptions, x => (x.IdentityInfo?.IsVerified ?? false) ? "true" : "false", "All credentials"),
+        new("online", "Online", YesNoFilterOptions, x => x.IsOnline ? "true" : "false", "All online states")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<global::Wallets.Domain.Shared.Contracts.WalletType>> WalletTypeAdvancedColumns =>
+    [
+        new("Code", x => x.Code),
+        new("Name", x => x.Name),
+        new("Currency", x => x.CurrencyType?.CurrencyIsoCode3 ?? ShortId(x.CurrencyTypeId)),
+        new("Type", x => x.Type.ToString(CultureInfo.CurrentCulture)),
+        new("Min Transfer", x => FormatDecimal(x.MinTransferRule)),
+        new("Max Transfer", x => FormatDecimal(x.MaxTransferRule)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<global::Wallets.Domain.Shared.Contracts.WalletType>> WalletTypeAdvancedFilters =>
+    [
+        new("type", "Type", BuildDistinctFilterOptions(_walletTypes, x => x.Type.ToString(CultureInfo.CurrentCulture)), x => x.Type.ToString(CultureInfo.CurrentCulture), "All types"),
+        new("currency", "Currency", BuildDistinctFilterOptions(_walletTypes, x => x.CurrencyType?.CurrencyIsoCode3 ?? x.CurrencyTypeId?.ToString()), x => x.CurrencyType?.CurrencyIsoCode3 ?? x.CurrencyTypeId?.ToString(), "All currencies")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+
+    private static string FormatDateTime(DateTime value) =>
+        value == default ? "N/A" : value.ToString("g", CultureInfo.CurrentCulture);
+
+    private static string FormatDecimal(decimal? value) =>
+        value is { } amount ? amount.ToString("N2", CultureInfo.CurrentCulture) : "N/A";
+
+    private static string ShortId(Guid? id) => id is Guid value ? value.ToString()[..8] : "N/A";
 
     public void Dispose()
     {

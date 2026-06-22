@@ -39,43 +39,96 @@
             </BbCardHeader>
             <BbCardContent>
                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <BbFormFieldCombobox TValue="string"
-                                          @bind-Value="_createCredentialId"
-                                          Options="@_credentialOptions"
-                                          Label="Credential"
-                                          Placeholder="Select credential"
-                                          SearchPlaceholder="Search users or credentials..."
-                                          EmptyMessage="No credentials found."
-                                          MatchTriggerWidth="true"
-                                          Required="true" />
-                    <BbFormFieldSelect TValue="string" @bind-Value="_createWalletId" Label="Existing Wallet">
-                        <BbSelectItem Value="@NoSelectionValue">Create or resolve by wallet type</BbSelectItem>
-                        @foreach (var wallet in _wallets)
-                        {
-                            <BbSelectItem Value="@wallet.Id.ToString()">@BuildWalletLabel(wallet)</BbSelectItem>
-                        }
-                    </BbFormFieldSelect>
-                    <BbFormFieldSelect TValue="string" @bind-Value="_createWalletTypeId" Label="Wallet Type">
-                        <BbSelectItem Value="@NoSelectionValue">Use selected wallet</BbSelectItem>
-                        @foreach (var walletType in _walletTypes)
-                        {
-                            <BbSelectItem Value="@walletType.Id.ToString()">@(walletType.Name) (@walletType.Code)</BbSelectItem>
-                        }
-                    </BbFormFieldSelect>
-                    <BbFormFieldSelect TValue="string" @bind-Value="_createCurrencyId" Label="Currency">
-                        <BbSelectItem Value="@NoSelectionValue">Default wallet currency</BbSelectItem>
-                        @foreach (var currency in _currencies)
-                        {
-                            <BbSelectItem Value="@currency.Id.ToString()">@BuildCurrencyLabel(currency)</BbSelectItem>
-                        }
-                    </BbFormFieldSelect>
-                    <BbFormFieldSelect TValue="string" @bind-Value="_createGatewayId" Label="Gateway">
-                        <BbSelectItem Value="@NoSelectionValue">Select gateway</BbSelectItem>
-                        @foreach (var gateway in _gateways)
-                        {
-                            <BbSelectItem Value="@gateway.Id.ToString()">@BuildGatewayLabel(gateway)</BbSelectItem>
-                        }
-                    </BbFormFieldSelect>
+                    <XfEntityPicker TItem="IdentityCredential"
+                                    Label="Credential"
+                                    Value="@_createCredentialId"
+                                    ValueChanged="@(value => _createCredentialId = value ?? "")"
+                                    Items="@_credentials"
+                                    ValueSelector="@GetCredentialPickerValue"
+                                    TextSelector="@BuildCredentialLabel"
+                                    SearchTextSelector="@GetCredentialSearchText"
+                                    AdvancedColumns="@CredentialAdvancedColumns"
+                                    AdvancedFilters="@CredentialAdvancedFilters"
+                                    AdvancedSearchScope="Searches credential username, alias, identity name, verified state, online state, last seen date, and credential id."
+                                    Placeholder="Select credential"
+                                    SearchPlaceholder="Search users or credentials..."
+                                    EmptyMessage="No credentials found."
+                                    AllowClear="true"
+                                    ClearText="Clear credential"
+                                    AdvancedSearchTitle="Find Credential"
+                                    AdvancedSearchDescription="Search credentials for the active tenant." />
+                    <XfEntityPicker TItem="Wallet"
+                                    Label="Existing Wallet"
+                                    Value="@_createWalletId"
+                                    ValueChanged="@OnCreateWalletChanged"
+                                    Items="@_wallets"
+                                    ValueSelector="@GetWalletPickerValue"
+                                    TextSelector="@BuildWalletLabel"
+                                    SearchTextSelector="@GetWalletSearchText"
+                                    AdvancedColumns="@WalletAdvancedColumns"
+                                    AdvancedFilters="@WalletAdvancedFilters"
+                                    AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                    Placeholder="Create or resolve by wallet type"
+                                    SearchPlaceholder="Search wallets..."
+                                    EmptyMessage="No wallets found."
+                                    AllowClear="true"
+                                    ClearText="Create or resolve by wallet type"
+                                    AdvancedSearchTitle="Find Wallet"
+                                    AdvancedSearchDescription="Search active-tenant wallets before creating a deposit request." />
+                    <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.WalletType"
+                                    Label="Wallet Type"
+                                    Value="@_createWalletTypeId"
+                                    ValueChanged="@(value => _createWalletTypeId = value ?? NoSelectionValue)"
+                                    Items="@_walletTypes"
+                                    ValueSelector="@GetWalletTypePickerValue"
+                                    TextSelector="@BuildWalletTypeLabel"
+                                    SearchTextSelector="@GetWalletTypeSearchText"
+                                    AdvancedColumns="@WalletTypeAdvancedColumns"
+                                    AdvancedFilters="@WalletTypeAdvancedFilters"
+                                    AdvancedSearchScope="Searches wallet type code, name, currency, type code, transfer rules, and created date."
+                                    Placeholder="Use selected wallet"
+                                    SearchPlaceholder="Search wallet types..."
+                                    EmptyMessage="No wallet types found."
+                                    AllowClear="true"
+                                    ClearText="Use selected wallet"
+                                    AdvancedSearchTitle="Find Wallet Type"
+                                    AdvancedSearchDescription="Search wallet types when the deposit should resolve or create a wallet." />
+                    <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.CurrencyType"
+                                    Label="Currency"
+                                    Value="@_createCurrencyId"
+                                    ValueChanged="@(value => _createCurrencyId = value ?? NoSelectionValue)"
+                                    Items="@_currencies"
+                                    ValueSelector="@GetCurrencyPickerValue"
+                                    TextSelector="@BuildCurrencyLabel"
+                                    SearchTextSelector="@GetCurrencySearchText"
+                                    AdvancedColumns="@CurrencyAdvancedColumns"
+                                    AdvancedFilters="@CurrencyAdvancedFilters"
+                                    AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
+                                    Placeholder="Default wallet currency"
+                                    SearchPlaceholder="Search currencies..."
+                                    EmptyMessage="No currencies found."
+                                    AllowClear="true"
+                                    ClearText="Default wallet currency"
+                                    AdvancedSearchTitle="Find Currency"
+                                    AdvancedSearchDescription="Search tenant and global currencies available to Wallets." />
+                    <XfEntityPicker TItem="PaymentGateway"
+                                    Label="Gateway"
+                                    Value="@_createGatewayId"
+                                    ValueChanged="@(value => _createGatewayId = value ?? NoSelectionValue)"
+                                    Items="@_gateways"
+                                    ValueSelector="@GetGatewayPickerValue"
+                                    TextSelector="@BuildGatewayLabel"
+                                    SearchTextSelector="@GetGatewaySearchText"
+                                    AdvancedColumns="@GatewayAdvancedColumns"
+                                    AdvancedFilters="@GatewayAdvancedFilters"
+                                    AdvancedSearchScope="Searches gateway name, category/provider, enabled state, service charge, convenience fee, discount, and description."
+                                    Placeholder="Select gateway"
+                                    SearchPlaceholder="Search gateways..."
+                                    EmptyMessage="No gateways found."
+                                    AllowClear="true"
+                                    ClearText="Clear gateway"
+                                    AdvancedSearchTitle="Find Payment Gateway"
+                                    AdvancedSearchDescription="Search configured payment gateways for deposit settlement." />
                     <BbFormFieldInput TValue="decimal" @bind-Value="_createAmount" Label="Amount" />
                     <BbFormFieldInput TValue="decimal" @bind-Value="_createRequestedFee" Label="Requested Fee" />
                     <BbFormFieldInput TValue="string" @bind-Value="_createExternalReference" Label="External Reference" Placeholder="Optional provider/reference id" />
@@ -194,7 +247,7 @@
     private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
     private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _currencies = [];
     private List<PaymentGateway> _gateways = [];
-    private List<SelectOption<string>> _credentialOptions = [];
+    private List<IdentityCredential> _credentials = [];
     private Dictionary<Guid, string> _credentialLabels = [];
     private bool _loading = true;
     private bool _acting;
@@ -284,9 +337,7 @@
             .OrderBy(GetCredentialSortText)
             .ToList();
 
-        _credentialOptions = credentials
-            .Select(x => new SelectOption<string>(x.Id.ToString(), BuildCredentialLabel(x)))
-            .ToList();
+        _credentials = credentials;
         _credentialLabels = credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
 
         _wallets = await DataContext.Query<Wallet>()
@@ -304,6 +355,7 @@
         _walletTypes = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
             .IgnoreQueryFilters()
             .NoCache()
+            .Include(x => x.CurrencyType)
             .Where(x => x.TenantId == tenantId && !x.IsDeleted)
             .OrderBy(x => x.Name)
             .Take(100)
@@ -330,6 +382,7 @@
             _gateways = await DataContext.Query<PaymentGateway>()
                 .IgnoreQueryFilters()
                 .NoCache()
+                .Include(x => x.PaymentGatewayCategory)
                 .Where(x => !x.IsDeleted)
                 .OrderBy(x => x.Name)
                 .Take(100)
@@ -475,7 +528,7 @@
         _walletTypes = [];
         _currencies = [];
         _gateways = [];
-        _credentialOptions = [];
+        _credentials = [];
         _credentialLabels = [];
     }
 
@@ -494,6 +547,20 @@
     }
 
     private static decimal? PositiveOrNull(decimal value) => value > 0 ? value : null;
+
+    private Task OnCreateWalletChanged(string? value)
+    {
+        _createWalletId = string.IsNullOrWhiteSpace(value) ? NoSelectionValue : value;
+
+        if (Guid.TryParse(_createWalletId, out var walletId) &&
+            _wallets.FirstOrDefault(x => x.Id == walletId) is { } wallet)
+        {
+            _createCredentialId = wallet.CredentialId.ToString();
+            _createWalletTypeId = wallet.WalletTypeId?.ToString() ?? NoSelectionValue;
+        }
+
+        return Task.CompletedTask;
+    }
 
     private static string GetDepositStatusText(short? status) => status switch
     {
@@ -537,6 +604,35 @@
         return $"{account} - {credential} - {type} - {wallet.AvailableBalance.ToString("N2", CultureInfo.CurrentCulture)}";
     }
 
+    private static string GetCredentialPickerValue(IdentityCredential credential) => credential.Id.ToString();
+    private static string GetWalletPickerValue(Wallet wallet) => wallet.Id.ToString();
+    private static string GetWalletTypePickerValue(global::Wallets.Domain.Shared.Contracts.WalletType walletType) => walletType.Id.ToString();
+    private static string GetCurrencyPickerValue(global::Wallets.Domain.Shared.Contracts.CurrencyType currency) => currency.Id.ToString();
+    private static string GetGatewayPickerValue(PaymentGateway gateway) => gateway.Id.ToString();
+
+    private static string GetCredentialSearchText(IdentityCredential credential) =>
+        $"{credential.IdentityInfo?.FullName} {credential.IdentityInfo?.IdentityName} {credential.UserName} {credential.UserAlias} {credential.IdentityInfo?.IdentityDescription} {credential.Id}";
+
+    private string GetWalletSearchText(Wallet wallet) =>
+        $"{wallet.AccountNumber} {wallet.CredentialId} {GetCredentialLabel(wallet.CredentialId)} {wallet.WalletType?.Code} {wallet.WalletType?.Name} {wallet.Status} {wallet.AvailableBalance}";
+
+    private static string BuildWalletTypeLabel(global::Wallets.Domain.Shared.Contracts.WalletType walletType) =>
+        string.IsNullOrWhiteSpace(walletType.Code)
+            ? walletType.Name
+            : $"{walletType.Name} ({walletType.Code})";
+
+    private static string GetWalletTypeSearchText(global::Wallets.Domain.Shared.Contracts.WalletType walletType) =>
+        $"{walletType.Code} {walletType.Name} {walletType.Desc} {walletType.Type} {walletType.CurrencyType?.CurrencyIsoCode3} {walletType.CurrencyType?.Name}";
+
+    private static string GetCurrencySearchText(global::Wallets.Domain.Shared.Contracts.CurrencyType currency) =>
+        $"{currency.CurrencyIsoCode3} {currency.Name} {currency.Description} {currency.Type}";
+
+    private static string GetGatewaySearchText(PaymentGateway gateway) =>
+        $"{gateway.Name} {gateway.PaymentGatewayCategory?.Name} {gateway.Description} {gateway.ServiceCharge} {gateway.ConvenienceFee} {gateway.Discount}";
+
+    private string GetCredentialLabel(Guid credentialId) =>
+        _credentialLabels.TryGetValue(credentialId, out var label) ? label : credentialId.ToString()[..8];
+
     private static string BuildCurrencyLabel(global::Wallets.Domain.Shared.Contracts.CurrencyType currency) =>
         string.IsNullOrWhiteSpace(currency.CurrencyIsoCode3)
             ? currency.Name ?? currency.Id.ToString()[..8]
@@ -579,7 +675,136 @@
         return $"{displayName} ({suffix})";
     }
 
+    private IReadOnlyList<XfEntityPickerColumn<IdentityCredential>> CredentialAdvancedColumns =>
+    [
+        new("Name", x => x.IdentityInfo?.FullName ?? x.IdentityInfo?.IdentityName ?? x.UserName ?? x.UserAlias),
+        new("Username", x => x.UserName ?? x.UserAlias),
+        new("Verified", x => FormatBoolean(x.IdentityInfo?.IsVerified ?? false)),
+        new("Online", x => FormatBoolean(x.IsOnline)),
+        new("Last Seen", x => FormatDateTime(x.LastSeen)),
+        new("Credential", x => x.Id.ToString()[..8])
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityCredential>> CredentialAdvancedFilters =>
+    [
+        new("verified", "Verified", YesNoFilterOptions, x => (x.IdentityInfo?.IsVerified ?? false) ? "true" : "false", "All credentials"),
+        new("online", "Online", YesNoFilterOptions, x => x.IsOnline ? "true" : "false", "All online states")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallet>> WalletAdvancedColumns =>
+    [
+        new("Account", x => string.IsNullOrWhiteSpace(x.AccountNumber) ? x.Id.ToString()[..8] : x.AccountNumber),
+        new("Credential", x => GetCredentialLabel(x.CredentialId)),
+        new("Type", x => x.WalletType?.Name ?? ShortId(x.WalletTypeId)),
+        new("Status", x => x.Status.ToString()),
+        new("Available", x => FormatDecimal(x.AvailableBalance)),
+        new("Held", x => FormatDecimal(x.DebitOnHoldBalance + x.CreditOnHoldBalance)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Wallet>> WalletAdvancedFilters =>
+    [
+        new("status", "Status", BuildEnumFilterOptions<WalletStatus>(), x => x.Status.ToString(), "All statuses"),
+        new("type", "Wallet type", BuildWalletTypeFilterOptions(), x => x.WalletTypeId?.ToString(), "All wallet types")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<global::Wallets.Domain.Shared.Contracts.WalletType>> WalletTypeAdvancedColumns =>
+    [
+        new("Code", x => x.Code),
+        new("Name", x => x.Name),
+        new("Currency", x => x.CurrencyType?.CurrencyIsoCode3 ?? ShortId(x.CurrencyTypeId)),
+        new("Type", x => x.Type.ToString(CultureInfo.CurrentCulture)),
+        new("Min Transfer", x => FormatDecimal(x.MinTransferRule)),
+        new("Max Transfer", x => FormatDecimal(x.MaxTransferRule)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<global::Wallets.Domain.Shared.Contracts.WalletType>> WalletTypeAdvancedFilters =>
+    [
+        new("type", "Type", BuildDistinctFilterOptions(_walletTypes, x => x.Type.ToString(CultureInfo.CurrentCulture)), x => x.Type.ToString(CultureInfo.CurrentCulture), "All types"),
+        new("currency", "Currency", BuildDistinctFilterOptions(_walletTypes, x => x.CurrencyType?.CurrencyIsoCode3 ?? x.CurrencyTypeId?.ToString()), x => x.CurrencyType?.CurrencyIsoCode3 ?? x.CurrencyTypeId?.ToString(), "All currencies")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<global::Wallets.Domain.Shared.Contracts.CurrencyType>> CurrencyAdvancedColumns =>
+    [
+        new("ISO", x => x.CurrencyIsoCode3),
+        new("Name", x => x.Name),
+        new("Type", x => x.Type?.ToString(CultureInfo.CurrentCulture)),
+        new("Scope", x => x.TenantId == Guid.Empty ? "Global" : "Tenant"),
+        new("Description", x => x.Description)
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<global::Wallets.Domain.Shared.Contracts.CurrencyType>> CurrencyAdvancedFilters =>
+    [
+        new("scope", "Scope", ScopeFilterOptions, x => x.TenantId == Guid.Empty ? "global" : "tenant", "All scopes"),
+        new("type", "Type", BuildDistinctFilterOptions(_currencies, x => x.Type?.ToString(CultureInfo.CurrentCulture)), x => x.Type?.ToString(CultureInfo.CurrentCulture), "All types")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<PaymentGateway>> GatewayAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Category", x => x.PaymentGatewayCategory?.Name ?? ShortId(x.GatewayCategoryId)),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("Service Charge", x => FormatDecimal(x.ServiceCharge)),
+        new("Convenience Fee", x => FormatDecimal(x.ConvenienceFee)),
+        new("Discount", x => FormatDecimal(x.Discount)),
+        new("Description", x => x.Description)
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<PaymentGateway>> GatewayAdvancedFilters =>
+    [
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All gateways"),
+        new("category", "Category", BuildDistinctFilterOptions(_gateways, x => x.PaymentGatewayCategory?.Name ?? x.GatewayCategoryId.ToString()), x => x.PaymentGatewayCategory?.Name ?? x.GatewayCategoryId.ToString(), "All categories")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> ScopeFilterOptions =
+    [
+        new("tenant", "Tenant"),
+        new("global", "Global")
+    ];
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildEnumFilterOptions<TEnum>()
+        where TEnum : struct, Enum =>
+        Enum.GetValues<TEnum>()
+            .Select(value => new XfEntityPickerFilterOption(value.ToString(), value.ToString()))
+            .ToArray();
+
+    private IReadOnlyList<XfEntityPickerFilterOption> BuildWalletTypeFilterOptions() =>
+        _walletTypes
+            .OrderBy(x => x.Name)
+            .Select(x => new XfEntityPickerFilterOption(x.Id.ToString(), BuildWalletTypeLabel(x)))
+            .ToArray();
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+
+    private static string FormatDateTime(DateTime value) =>
+        value == default ? "N/A" : value.ToString("g", CultureInfo.CurrentCulture);
+
+    private static string FormatDecimal(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+
+    private static string FormatDecimal(decimal? value) =>
+        value is { } amount ? amount.ToString("N2", CultureInfo.CurrentCulture) : "N/A";
+
     private static string ShortId(Guid id) => id.ToString()[..8];
+
+    private static string ShortId(Guid? id) => id is Guid value ? ShortId(value) : "N/A";
 
     public void Dispose()
     {
