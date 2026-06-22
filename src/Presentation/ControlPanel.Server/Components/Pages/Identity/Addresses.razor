@@ -51,7 +51,7 @@
 </div>
 
 <BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
             <BbDialogTitle>@(_isEditing ? "Edit Address" : "Add Address")</BbDialogTitle>
             <BbDialogDescription>
@@ -59,11 +59,23 @@
             </BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_formIdentityInfoId"
-                              Label="User ID (IdentityInfoId)"
-                              Placeholder="Enter user GUID"
-                              Required="true" />
+            <XfEntityPicker TItem="IdentityInformation"
+                            Label="User"
+                            Value="@_formIdentityInfoId"
+                            ValueChanged="@(value => _formIdentityInfoId = value ?? "")"
+                            Items="@_users"
+                            ValueSelector="@GetUserPickerValue"
+                            TextSelector="@GetUserLabel"
+                            SearchTextSelector="@GetUserSearchText"
+                            AdvancedColumns="@UserAdvancedColumns"
+                            AdvancedFilters="@UserAdvancedFilters"
+                            AdvancedSearchScope="Searches full name, identity name, gender, civil status, verified state, enabled state, and created date."
+                            Placeholder="Select user"
+                            SearchPlaceholder="Search users..."
+                            EmptyMessage="No users found."
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find User"
+                            AdvancedSearchDescription="Search identity information records in the active tenant." />
             <div class="grid grid-cols-2 gap-4">
                 <BbFormFieldInput TValue="string"
                                   @bind-Value="_formUnitNumber"
@@ -106,6 +118,7 @@
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<IdentityAddress> _addresses = [];
+    private List<IdentityInformation> _users = [];
     private bool _loading = true;
     private bool _dialogOpen;
     private bool _deleteDialogOpen;
@@ -146,6 +159,18 @@
             _addresses = (await query.Take(100).ToListAsync())
                 .OrderByDescending(x => x.CreatedAt)
                 .ToList();
+
+            var userQuery = DataContext.Query<IdentityInformation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .OrderBy(x => x.LastName)
+                .ThenBy(x => x.FirstName);
+            if (TenantFilter.SelectedTenantId is { } userTenantId)
+            {
+                userQuery = userQuery.Where(x => x.TenantId == userTenantId);
+            }
+
+            _users = await userQuery.Take(500).ToListAsync();
         }
         catch { /* query may fail */ }
     }
@@ -263,4 +288,53 @@
             }
         }
     }
+
+    private static string GetUserPickerValue(IdentityInformation user) => user.Id.ToString();
+    private static string GetUserLabel(IdentityInformation user) =>
+        !string.IsNullOrWhiteSpace(user.FullName)
+            ? user.FullName
+            : !string.IsNullOrWhiteSpace(user.IdentityName)
+                ? user.IdentityName
+                : user.Id.ToString()[..8];
+
+    private static string GetUserSearchText(IdentityInformation user) =>
+        $"{user.FullName} {user.IdentityName} {user.Gender} {user.CivilStatus}";
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityInformation>> UserAdvancedColumns =>
+    [
+        new("Full Name", GetUserLabel),
+        new("Identity Name", x => x.IdentityName),
+        new("Gender", x => x.Gender?.ToString()),
+        new("Civil Status", x => x.CivilStatus?.ToString()),
+        new("Verified", x => FormatBoolean(x.IsVerified)),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityInformation>> UserAdvancedFilters =>
+    [
+        new("verified", "Verified", YesNoFilterOptions, x => x.IsVerified ? "true" : "false", "All users"),
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses"),
+        new("gender", "Gender", BuildDistinctFilterOptions(_users, x => x.Gender?.ToString()), x => x.Gender?.ToString(), "All genders")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
 }
