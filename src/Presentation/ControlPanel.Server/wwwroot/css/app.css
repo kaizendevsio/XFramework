@@ -245,6 +245,11 @@
     gap: 0.35rem;
 }
 
+.xf-entity-picker-advanced-dialog {
+    width: min(74rem, calc(100vw - 2rem));
+    max-width: min(74rem, calc(100vw - 2rem));
+}
+
 .xf-entity-picker-advanced-filters {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
@@ -271,7 +276,7 @@
 
 .xf-entity-picker-advanced-table {
     width: 100%;
-    min-width: 42rem;
+    min-width: 58rem;
     border-collapse: collapse;
     font-size: 0.875rem;
     line-height: 1.25rem;
@@ -288,6 +293,13 @@
     padding: 0.625rem 0.75rem;
     text-align: left;
     white-space: nowrap;
+}
+
+.xf-entity-picker-advanced-filter-row th {
+    top: 2.5rem;
+    z-index: 2;
+    background: color-mix(in oklab, var(--muted) 72%, var(--background));
+    padding: 0.45rem 0.5rem;
 }
 
 .xf-entity-picker-advanced-table td {
@@ -320,6 +332,29 @@
     cursor: pointer;
     font: inherit;
     padding: 0;
+}
+
+.xf-entity-picker-column-filter {
+    width: 100%;
+    min-width: 7rem;
+    height: 2rem;
+    border-radius: calc(var(--radius) - 4px);
+    border: 1px solid var(--input);
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    padding: 0.35rem 0.5rem;
+    outline: none;
+}
+
+.xf-entity-picker-column-filter::placeholder {
+    color: var(--muted-foreground);
+}
+
+.xf-entity-picker-column-filter:focus {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 1px var(--ring);
 }
 
 .xf-entity-picker-sort:hover {

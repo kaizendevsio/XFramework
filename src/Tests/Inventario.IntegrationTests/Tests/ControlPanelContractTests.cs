@@ -118,6 +118,10 @@ public sealed class ControlPanelContractTests
         pickerText.Should().Contain("xf-entity-picker-advanced-table", "advanced search must render a multi-column finder, not the same single-column command list");
         pickerText.Should().Contain("ToggleAdvancedSort", "advanced search columns should be sortable");
         pickerText.Should().Contain("AdvancedFilters", "advanced search should support explicit filters");
+        pickerText.Should().Contain("xf-entity-picker-advanced-dialog", "advanced search dialogs should be wide enough for multi-column finder tables");
+        pickerText.Should().Contain("ShowAdvancedColumnFilters", "advanced finder tables should support per-column filtering");
+        pickerText.Should().Contain("xf-entity-picker-column-filter", "advanced finder tables should render column filter inputs");
+        pickerText.Should().NotContain("__all__", "filter sentinels must not leak into selected filter labels");
     }
 
     private static IEnumerable<string> FindDirectMutations(
