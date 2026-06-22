@@ -49,20 +49,20 @@ else
                                 OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Product">
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Status">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="On Hand">
+                            <BbDataGridTemplateColumn Title="On Hand" Filterable="true" FilterBy="@(item => GetLotOnHand(item.Id))">
                                 <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("N2")</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View lot"

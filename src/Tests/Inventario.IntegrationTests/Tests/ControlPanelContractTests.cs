@@ -28,6 +28,22 @@ public sealed class ControlPanelContractTests
         "ReceivingLine"
     ];
 
+    private static readonly string[] InventarioListPagesRequiringFilteredDataGrids =
+    [
+        "Categories.razor",
+        "Lots.razor",
+        "Planning.razor",
+        "Products.razor",
+        "PurchaseOrders.razor",
+        "Receiving.razor",
+        "Reports.razor",
+        "Reservations.razor",
+        "Stock.razor",
+        "Suppliers.razor",
+        "Transactions.razor",
+        "Warehouses.razor"
+    ];
+
     [Test]
     public void InventarioPages_BusinessWorkflowMutations_DoNotUseDirectRemoteDataContextMutation()
     {
@@ -127,6 +143,69 @@ public sealed class ControlPanelContractTests
         pickerText.Should().NotContain("xf-entity-picker-column-filter", "advanced finder tables should not render custom filter inputs");
         pickerText.Should().NotContain("<table class=\"xf-entity-picker-advanced-table\"", "advanced finder tables should not use a custom table implementation");
         pickerText.Should().NotContain("__all__", "filter sentinels must not leak into selected filter labels");
+    }
+
+    [Test]
+    public void InventarioListPages_TabularSurfaces_UseFilteredBlazorBlueprintDataGrids()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario");
+
+        foreach (var page in InventarioListPagesRequiringFilteredDataGrids)
+        {
+            var pagePath = Path.Combine(pagesRoot, page);
+            var text = File.ReadAllText(pagePath);
+
+            text.Should().NotContain("<table", $"{page} should use BlazorBlueprint data grids instead of raw tables");
+            text.Should().Contain("<BbDataGrid", $"{page} should use BbDataGrid for list/report tabular records");
+            text.Should().NotMatchRegex(
+                @"<BbDataGridTemplateColumn\b[^>]*Title=""Actions""[^>]*Filterable=""true""",
+                $"{page} should not expose filters on command/action columns");
+
+            var grids = Regex.Matches(text, @"<BbDataGrid\b[\s\S]*?</BbDataGrid>", RegexOptions.Multiline);
+            grids.Should().NotBeEmpty($"{page} should render at least one data grid");
+
+            foreach (Match grid in grids)
+            {
+                grid.Value.Should().Contain(
+                    "Filterable=\"true\"",
+                    $"{page} data grids should expose native column filtering on useful business columns");
+            }
+        }
+    }
+
+    [Test]
+    public void AgentGuidance_ControlPanelTables_PrefersFilteredBlazorBlueprintDataGrids()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var agentsPath = Path.Combine(repositoryRoot.FullName, "AGENTS.md");
+        var blazorGuidePath = Path.Combine(
+            repositoryRoot.FullName,
+            "docs",
+            "solutions",
+            "tooling-decisions",
+            "blazor-blueprint-controlpanel-agent-guide.md");
+
+        var agentsText = File.ReadAllText(agentsPath);
+        var guideText = File.ReadAllText(blazorGuidePath);
+
+        agentsText.Should().Contain("BbDataGrid");
+        agentsText.Should().Contain("Filterable=\"true\"");
+        agentsText.Should().Contain("FilterBy");
+        agentsText.Should().Contain("Do not create raw HTML tables");
+
+        guideText.Should().Contain("BbDataGrid");
+        guideText.Should().Contain("Filterable=\"true\"");
+        guideText.Should().Contain("FilterBy");
+        guideText.Should().Contain("Prefer it over raw `<table>` markup");
+        guideText.Should().Contain("Do not make action/command columns filterable");
     }
 
     private static IEnumerable<string> FindDirectMutations(

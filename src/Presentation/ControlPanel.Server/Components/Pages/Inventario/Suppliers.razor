@@ -46,11 +46,11 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_suppliers" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ContactName)" Title="Contact" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Email)" Title="Email" />
-                            <BbDataGridTemplateColumn Title="Status">
+                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ContactName)" Title="Contact" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Email)" Title="Email" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsActive)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>

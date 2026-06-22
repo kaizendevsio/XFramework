@@ -49,19 +49,19 @@ else
                                 OnRowClick="@((ReceivingDocument item) => Navigation.NavigateTo($"/inventario/receiving/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Purchase Order">
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Purchase Order" Filterable="true" FilterBy="@(item => GetPurchaseOrderNumber(item.PurchaseOrderId))">
                                 <ChildContent Context="item">@GetPurchaseOrderNumber(item.PurchaseOrderId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Supplier">
+                            <BbDataGridTemplateColumn Title="Supplier" Filterable="true" FilterBy="@(item => GetSupplierName(item.SupplierId))">
                                 <ChildContent Context="item">@GetSupplierName(item.SupplierId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Warehouse">
+                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                                 <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
-                            <BbDataGridTemplateColumn Title="Lines">
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Lines" Filterable="true" FilterBy="@(item => _lines.Count(x => x.ReceivingDocumentId == item.Id))">
                                 <ChildContent Context="item">@_lines.Count(x => x.ReceivingDocumentId == item.Id)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">

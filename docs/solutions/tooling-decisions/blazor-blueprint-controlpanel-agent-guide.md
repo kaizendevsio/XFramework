@@ -62,7 +62,9 @@ Use these common styled components first:
 - `BbDropdownMenu` for command/profile menus.
 - `BbDialog` for modal forms.
 - `BbTabs` only when the tab count is small and does not cause horizontal scrolling.
-- `BbDataGrid` for data-heavy tables that need paging, search, row click, or column templates.
+- `BbDataGrid` for list, report, and data-heavy tabular UI that needs paging, search, row click, sorting, filtering, or column templates. Prefer it over raw `<table>` markup and custom table components.
+
+For `BbDataGrid`, enable native column filtering on useful user-facing data columns. Set `Filterable="true"` on property columns. For template columns, set both `Filterable="true"` and a `FilterBy` expression that matches the rendered business value. Do not make action/command columns filterable.
 
 For icons, use Lucide components from `BlazorBlueprint.Icons.Lucide.Components`. Do not hand-draw common UI icons.
 
@@ -118,13 +120,14 @@ For `BbCombobox`, prefer typed `SelectOption<TValue>` options when the selection
 
 For parent dependency entities, use the shared `XfEntityPicker<TItem>` pattern instead of embedding prerequisite forms in the parent workflow. The picker trigger should provide quick search/select, an `Advanced Search` dialog, and a `Create New` dialog. For example, a product stock dialog should pick a warehouse/location/lot through entity pickers; warehouse and location creation belongs to the picker-owned create dialogs, not directly inside the stock form.
 
-`Advanced Search` must be meaningfully advanced. Do not implement it as a larger copy of the quick dropdown. Configure entity-specific `AdvancedColumns`, `AdvancedFilters`, and `AdvancedSearchScope` so the dialog shows a sortable multi-column finder with explicit filter controls. The operator should be able to tell what is being searched and filtered, for example warehouse code/name/location/default status, lot number/status/expiry/on-hand quantity, or supplier code/name/contact/active status.
+`Advanced Search` must be meaningfully advanced. Do not implement it as a larger copy of the quick dropdown. Configure entity-specific `AdvancedColumns` and `AdvancedSearchScope` so the dialog shows a sortable multi-column `BbDataGrid` finder. Use the grid's native column filters (`Filterable` and `FilterBy`) instead of redundant top-of-dialog filter bands. The operator should be able to tell what is being searched and filtered, for example warehouse code/name/location/default status, lot number/status/expiry/on-hand quantity, or supplier code/name/contact/active status.
 
 ## Operational Page Layout
 
 For module admin surfaces such as Inventario, keep list and detail workflows distinct:
 
 - List pages are for scanning, filtering, creating small records, and navigating to detail pages.
+- List and report pages should use `BbDataGrid` for tabular records and should enable native filters on the business columns users naturally search by. Keep command/action columns unfiltered.
 - Viewing and editing existing records should happen on the detail page with a clear edit mode, not in list-page edit modals.
 - Detail pages should show the operational context users need for that entity. For example, product detail should include catalog fields, replenishment rules, stock balances by warehouse/location/lot, and traceability records when those features are enabled.
 - Header actions belong on the far right of the page header. Use the shared `xf-page-header` and `xf-page-actions` classes instead of hand-assembling inconsistent flex utility combinations.

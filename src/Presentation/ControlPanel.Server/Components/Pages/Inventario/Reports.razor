@@ -47,10 +47,10 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_lowStock" ShowPagination="true" InitialPageSize="10">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Scope" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Scope" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -64,11 +64,11 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_nearExpiry" ShowPagination="true" InitialPageSize="10">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -82,11 +82,11 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_expired" ShowPagination="true" InitialPageSize="10">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expired" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expired" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -100,12 +100,12 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_stockPositions" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" />
-                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -119,11 +119,11 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
-                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Reference)" Title="Reference" />
-                            <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Date" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Reference)" Title="Reference" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Date" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -137,11 +137,11 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_allocations" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
