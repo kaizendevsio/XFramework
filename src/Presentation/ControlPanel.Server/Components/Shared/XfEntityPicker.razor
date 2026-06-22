@@ -1,0 +1,263 @@
+@typeparam TItem
+
+<div class="xf-form-field xf-entity-picker">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <BbLabel>@Label</BbLabel>
+    }
+
+    <BbPopover Open="@_open" OpenChanged="@OnOpenChanged" RestoreFocusOnClose="true">
+        <BbPopoverTrigger AsChild="false">
+            <button type="button"
+                    class="xf-entity-picker-trigger"
+                    disabled="@Disabled"
+                    aria-label="@AriaLabel">
+                <span class="xf-entity-picker-trigger-text">@SelectedText</span>
+                <LucideIcon Name="chevrons-up-down" class="xf-entity-picker-trigger-icon" />
+            </button>
+        </BbPopoverTrigger>
+        <BbPopoverContent Class="xf-entity-picker-popover"
+                          MatchTriggerWidth="true"
+                          CloseOnClickOutside="true"
+                          CloseOnEscape="true"
+                          ZIndex="90">
+            <BbCommand SearchQuery="@_searchQuery"
+                       SearchQueryChanged="@OnSearchQueryChanged"
+                       CloseOnSelect="false"
+                       Class="xf-entity-picker-command">
+                <BbCommandInput Placeholder="@SearchPlaceholder" />
+                <BbCommandList Class="xf-entity-picker-list">
+                    @if (AllowClear)
+                    {
+                        <BbCommandItem Value="@($"{_instanceId}-clear")"
+                                       SearchText="@ClearText"
+                                       OnSelect="@ClearSelection">
+                            <div class="xf-entity-picker-action-row">
+                                <LucideIcon Name="x" class="xf-entity-picker-row-icon" />
+                                <span>@ClearText</span>
+                            </div>
+                        </BbCommandItem>
+                    }
+
+                    @if (!FilteredItems.Any())
+                    {
+                        <BbCommandEmpty>@EmptyMessage</BbCommandEmpty>
+                    }
+                    else
+                    {
+                        @foreach (var item in FilteredItems)
+                        {
+                            <BbCommandItem Value="@GetValue(item)"
+                                           SearchText="@GetSearchText(item)"
+                                           OnSelect="@(() => SelectItem(item))">
+                                @RenderItem(item)
+                            </BbCommandItem>
+                        }
+                    }
+
+                    @if (ShowAdvancedSearch || ShowCreate)
+                    {
+                        <BbCommandSeparator />
+                    }
+
+                    @if (ShowAdvancedSearch)
+                    {
+                        <BbCommandItem Value="@($"{_instanceId}-advanced")"
+                                       SearchText="@AdvancedSearchLabel"
+                                       OnSelect="@OpenAdvancedSearch">
+                            <div class="xf-entity-picker-action-row">
+                                <LucideIcon Name="search" class="xf-entity-picker-row-icon" />
+                                <span>@AdvancedSearchLabel</span>
+                            </div>
+                        </BbCommandItem>
+                    }
+
+                    @if (ShowCreate)
+                    {
+                        <BbCommandItem Value="@($"{_instanceId}-create")"
+                                       SearchText="@CreateLabel"
+                                       OnSelect="@OpenCreate">
+                            <div class="xf-entity-picker-action-row">
+                                <LucideIcon Name="plus" class="xf-entity-picker-row-icon" />
+                                <span>@CreateLabel</span>
+                            </div>
+                        </BbCommandItem>
+                    }
+                </BbCommandList>
+            </BbCommand>
+        </BbPopoverContent>
+    </BbPopover>
+
+    @if (!string.IsNullOrWhiteSpace(HelpText))
+    {
+        <BbTypographyMuted>@HelpText</BbTypographyMuted>
+    }
+</div>
+
+<BbDialog Open="@_advancedOpen" OpenChanged="@(value => _advancedOpen = value)">
+    <BbDialogContent TrapFocus="false" class="max-w-3xl">
+        <BbDialogHeader>
+            <BbDialogTitle>@AdvancedSearchTitle</BbDialogTitle>
+            <BbDialogDescription>@AdvancedSearchDescription</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_advancedSearchQuery"
+                              Label="Search"
+                              Placeholder="@SearchPlaceholder" />
+
+            <div class="xf-entity-picker-advanced-list">
+                @if (!AdvancedFilteredItems.Any())
+                {
+                    <div class="xf-entity-picker-empty">@EmptyMessage</div>
+                }
+                else
+                {
+                    @foreach (var item in AdvancedFilteredItems)
+                    {
+                        <button type="button"
+                                class="xf-entity-picker-advanced-row"
+                                @onclick="@(() => SelectItemFromAdvanced(item))">
+                            @RenderItem(item)
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+        <BbDialogFooter>
+            @if (ShowCreate)
+            {
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@OpenCreateFromAdvanced">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    @CreateLabel
+                </BbButton>
+            }
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _advancedOpen = false)">Close</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private readonly string _instanceId = $"entity-picker-{Guid.NewGuid():N}";
+    private bool _open;
+    private bool _advancedOpen;
+    private string _searchQuery = "";
+    private string _advancedSearchQuery = "";
+
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<TItem> Items { get; set; } = [];
+    [Parameter, EditorRequired] public Func<TItem, string> ValueSelector { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<TItem, string> TextSelector { get; set; } = default!;
+    [Parameter] public Func<TItem, string>? SearchTextSelector { get; set; }
+    [Parameter] public RenderFragment<TItem>? ItemTemplate { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool AllowClear { get; set; }
+    [Parameter] public bool ShowAdvancedSearch { get; set; } = true;
+    [Parameter] public bool ShowCreate { get; set; }
+    [Parameter] public EventCallback OnCreate { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Select item";
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search...";
+    [Parameter] public string EmptyMessage { get; set; } = "No results found.";
+    [Parameter] public string ClearText { get; set; } = "Clear selection";
+    [Parameter] public string AdvancedSearchLabel { get; set; } = "Advanced Search";
+    [Parameter] public string CreateLabel { get; set; } = "Create New";
+    [Parameter] public string? AdvancedSearchTitle { get; set; }
+    [Parameter] public string? AdvancedSearchDescription { get; set; }
+    [Parameter] public string? HelpText { get; set; }
+
+    private string AriaLabel => string.IsNullOrWhiteSpace(Label) ? Placeholder : Label;
+
+    private string SelectedText =>
+        Items.FirstOrDefault(item => string.Equals(GetValue(item), Value, StringComparison.OrdinalIgnoreCase)) is { } selected
+            ? TextSelector(selected)
+            : Placeholder;
+
+    private IReadOnlyList<TItem> FilteredItems => FilterItems(_searchQuery).ToList();
+    private IReadOnlyList<TItem> AdvancedFilteredItems => FilterItems(_advancedSearchQuery).ToList();
+
+    private IEnumerable<TItem> FilterItems(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return Items;
+
+        return Items.Where(item => GetSearchText(item).Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private RenderFragment RenderItem(TItem item) => builder =>
+    {
+        if (ItemTemplate is not null)
+        {
+            builder.AddContent(0, ItemTemplate(item));
+            return;
+        }
+
+        builder.OpenElement(1, "div");
+        builder.AddAttribute(2, "class", "xf-entity-picker-default-row");
+        builder.AddContent(3, TextSelector(item));
+        builder.CloseElement();
+    };
+
+    private string GetValue(TItem item) => ValueSelector(item);
+    private string GetSearchText(TItem item) => SearchTextSelector?.Invoke(item) ?? TextSelector(item);
+
+    private Task OnSearchQueryChanged(string value)
+    {
+        _searchQuery = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnOpenChanged(bool value)
+    {
+        _open = value;
+        if (!value)
+            _searchQuery = "";
+
+        return Task.CompletedTask;
+    }
+
+    private async Task SelectItem(TItem item)
+    {
+        _open = false;
+        _searchQuery = "";
+        await ValueChanged.InvokeAsync(GetValue(item));
+    }
+
+    private async Task SelectItemFromAdvanced(TItem item)
+    {
+        _advancedOpen = false;
+        _advancedSearchQuery = "";
+        await ValueChanged.InvokeAsync(GetValue(item));
+    }
+
+    private async Task ClearSelection()
+    {
+        _open = false;
+        _searchQuery = "";
+        await ValueChanged.InvokeAsync("");
+    }
+
+    private Task OpenAdvancedSearch()
+    {
+        _open = false;
+        _advancedOpen = true;
+        _advancedSearchQuery = _searchQuery;
+        _searchQuery = "";
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenCreate()
+    {
+        _open = false;
+        _searchQuery = "";
+        await OnCreate.InvokeAsync();
+    }
+
+    private async Task OpenCreateFromAdvanced()
+    {
+        _advancedOpen = false;
+        _advancedSearchQuery = "";
+        await OnCreate.InvokeAsync();
+    }
+}

@@ -116,6 +116,8 @@ ControlPanel forms should use framework controls that match the data type:
 
 For `BbCombobox`, prefer typed `SelectOption<TValue>` options when the selection is simple. Use compositional `BbComboboxItem` only when the option rows need rich custom markup.
 
+For parent dependency entities, use the shared `XfEntityPicker<TItem>` pattern instead of embedding prerequisite forms in the parent workflow. The picker trigger should provide search/select, an `Advanced Search` dialog, and a `Create New` dialog. For example, a product stock dialog should pick a warehouse/location/lot through entity pickers; warehouse and location creation belongs to the picker-owned create dialogs, not directly inside the stock form.
+
 ## Operational Page Layout
 
 For module admin surfaces such as Inventario, keep list and detail workflows distinct:

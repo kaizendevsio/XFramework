@@ -12,6 +12,7 @@ public class ProductVariationConfiguration : IEntityTypeConfiguration<ProductVar
         entity.ConfigureBaseModel("PK_Inventario_ProductVariation");
 
         entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+        entity.Property(e => e.VariationType).HasMaxLength(100);
         entity.Property(e => e.AdditionalPrice).HasPrecision(18, 2);
 
         entity.HasIndex(e => new { e.TenantId, e.ProductId });

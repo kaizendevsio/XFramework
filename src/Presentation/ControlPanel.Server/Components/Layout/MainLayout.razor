@@ -24,6 +24,10 @@
                 {
                     <TenantListSidebar />
                 }
+                else if (TryGetInventarioProductDetailRoute(out var productRouteId, out _))
+                {
+                    <ProductDetailSidebar ProductId="@productRouteId" />
+                }
                 else if (TryGetTenantDetailRoute(out var tenantRouteId, out _))
                 {
                     <TenantDetailSidebar TenantId="@tenantRouteId" />
@@ -340,6 +344,31 @@
             || !string.Equals(segments[0], "identity", StringComparison.OrdinalIgnoreCase)
             || !string.Equals(segments[1], "tenants", StringComparison.OrdinalIgnoreCase)
             || !Guid.TryParse(segments[2], out tenantId))
+        {
+            return false;
+        }
+
+        if (segments.Length >= 4)
+        {
+            section = segments[3];
+        }
+
+        return true;
+    }
+
+    private bool TryGetInventarioProductDetailRoute(out Guid productId, out string section)
+    {
+        productId = Guid.Empty;
+        section = "summary";
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 3
+            || !string.Equals(segments[0], "inventario", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(segments[1], "products", StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(segments[2], out productId))
         {
             return false;
         }

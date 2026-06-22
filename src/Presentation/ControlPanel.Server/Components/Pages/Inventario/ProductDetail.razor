@@ -1,5 +1,13 @@
 @page "/inventario/products/{Id:guid}"
+@page "/inventario/products/{Id:guid}/{Section}"
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Lots
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Planning
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Purchasing
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
+@using XFramework.Inventario.Domain.Shared.Enums
 @implements IDisposable
 
 <PageTitle>Inventario Product - Control Panel</PageTitle>
@@ -33,308 +41,613 @@ else if (_product is null)
 {
     <BbTypographyMuted>Product not found.</BbTypographyMuted>
 }
+else if (!IsSectionAvailable(CurrentSection))
+{
+    <div class="space-y-4">
+        @ProductHeader
+        <ModuleUnavailable ModuleName="@UnavailableSectionName" />
+    </div>
+}
 else
 {
     <FadeInContent>
         <div class="space-y-6">
-            <div class="xf-detail-header">
-                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to products"
-                          OnClick="@(() => Navigation.NavigateTo("/inventario/products"))">
-                    <LucideIcon Name="arrow-left" class="h-4 w-4" />
-                </BbButton>
-                <div class="xf-detail-header-main">
-                    <div class="xf-detail-header-title">
-                        <BbTypographyH3>@(_product.Name ?? "Unnamed Product")</BbTypographyH3>
-                        <StatusBadge Text="@(_product.IsAvailable ? "Available" : "Unavailable")"
-                                     Status="@(_product.IsAvailable ? "active" : "inactive")" />
-                    </div>
-                    <BbTypographyMuted>SKU: @(_product.SKU ?? "N/A") - Category: @GetCategoryName(_product.CategoryId)</BbTypographyMuted>
-                </div>
-                <div class="xf-page-actions">
-                    @if (_editMode)
-                    {
-                        <BbButton Variant="ButtonVariant.Outline" OnClick="@CancelEdit" Disabled="@_saving">
-                            Discard
-                        </BbButton>
-                        <BbButton OnClick="@SaveProduct" Disabled="@_saving">
-                            <LucideIcon Name="save" class="mr-2 h-4 w-4" />
-                            Save
-                        </BbButton>
-                    }
-                    else
-                    {
-                        <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
-                            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                            Refresh
-                        </BbButton>
-                        <BbButton OnClick="@StartEdit">
-                            <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
-                            Edit
-                        </BbButton>
-                    }
-                </div>
-            </div>
+            @ProductHeader
 
-            <div class="xf-summary-grid xf-summary-grid-4">
-                <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Price</BbTypographyMuted><BbTypographyH3>@_product.Price.ToString("N2")</BbTypographyH3></div></BbCardContent></BbCard>
-                <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Available Stock</BbTypographyMuted><BbTypographyH3>@TotalAvailable.ToString("N2")</BbTypographyH3></div></BbCardContent></BbCard>
-                <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Locations</BbTypographyMuted><BbTypographyH3>@ActiveLocationCount</BbTypographyH3></div></BbCardContent></BbCard>
-                <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Reorder Rules</BbTypographyMuted><BbTypographyH3>@_reorderRules.Count</BbTypographyH3></div></BbCardContent></BbCard>
-            </div>
-
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Product Summary</BbCardTitle>
-                    <BbCardDescription>Catalog fields, availability, and lifecycle metadata.</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    @if (_editMode)
-                    {
-                        <div class="grid gap-4">
-                            <div class="xf-detail-field-grid">
-                                <BbFormFieldInput TValue="string" @bind-Value="_productForm.Name" Label="Name" Required="true" />
-                                <BbFormFieldInput TValue="string" @bind-Value="_productForm.Sku" Label="SKU" />
-                            </div>
-                            <BbFormFieldCombobox TValue="string"
-                                                  @bind-Value="_productForm.CategoryId"
-                                                  Options="@CategoryOptions"
-                                                  Label="Category"
-                                                  Placeholder="Select category"
-                                                  SearchPlaceholder="Search categories..."
-                                                  EmptyMessage="No categories found."
-                                                  MatchTriggerWidth="true"
-                                                  Required="true" />
-                            <div class="xf-detail-field-grid">
-                                <BbFormFieldInput TValue="string" @bind-Value="_productForm.Price" Label="Price" />
-                                <BbFormFieldInput TValue="string" @bind-Value="_productForm.Brand" Label="Brand" />
-                            </div>
-                            <BbFormFieldInput TValue="string" @bind-Value="_productForm.Description" Label="Description" />
-                            <BbFormFieldSwitch Checked="@_productForm.IsAvailable"
-                                               CheckedChanged="@((bool value) => _productForm.IsAvailable = value)"
-                                               Label="Available" />
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="xf-detail-field-grid">
-                            <div>
-                                <BbTypographyMuted>Description</BbTypographyMuted>
-                                <div>@(_product.Description ?? "No description")</div>
-                            </div>
-                            <div>
-                                <BbTypographyMuted>Brand</BbTypographyMuted>
-                                <div>@(_product.Brand ?? "N/A")</div>
-                            </div>
-                            <div>
-                                <BbTypographyMuted>Created</BbTypographyMuted>
-                                <div>@_product.CreatedAt.ToLocalTime().ToString("g")</div>
-                            </div>
-                            <div>
-                                <BbTypographyMuted>Last Modified</BbTypographyMuted>
-                                <div>@(_product.ModifiedAt?.ToLocalTime().ToString("g") ?? "Never")</div>
-                            </div>
-                        </div>
-                    }
-                </BbCardContent>
-            </BbCard>
-
-            @if (_planningEnabled)
+            @if (CurrentSection == "summary")
             {
-                <BbCard>
-                    <BbCardHeader>
-                        <div class="xf-page-header">
-                            <div>
-                                <BbCardTitle>Replenishment Rules</BbCardTitle>
-                                <BbCardDescription>Min, max, reorder point, and scoped warehouse/location rules for this product.</BbCardDescription>
-                            </div>
-                            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo("/inventario/planning"))">
-                                <LucideIcon Name="external-link" class="mr-2 h-4 w-4" />
-                                Manage Rules
-                            </BbButton>
-                        </div>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <BbDataGrid Items="@_reorderRules" ShowPagination="true" InitialPageSize="10">
-                            <Columns>
-                                <BbDataGridTemplateColumn Title="Scope">
-                                    <ChildContent Context="item">@GetRuleScope(item)</ChildContent>
-                                </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Reorder Qty" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" />
-                                <BbDataGridTemplateColumn Title="Status">
-                                    <ChildContent Context="item">
-                                        <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
-                                    </ChildContent>
-                                </BbDataGridTemplateColumn>
-                            </Columns>
-                        </BbDataGrid>
-                    </BbCardContent>
-                </BbCard>
+                @SummarySection
             }
-
-            @if (_stockEnabled)
+            else if (CurrentSection == "stock")
             {
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Warehouse and Location Stock</BbCardTitle>
-                        <BbCardDescription>Current stock balances for this product.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="10"
-                                    OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
-                                    Class="cursor-pointer">
-                            <Columns>
-                                <BbDataGridTemplateColumn Title="Warehouse">
-                                    <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
-                                </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Location">
-                                    <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
-                                </BbDataGridTemplateColumn>
-                                @if (_traceabilityEnabled)
-                                {
-                                    <BbDataGridTemplateColumn Title="Lot">
-                                        <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                }
-                                <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
-                            </Columns>
-                        </BbDataGrid>
-                    </BbCardContent>
-                </BbCard>
+                @StockSection
             }
-
-            @if (_traceabilityEnabled)
+            else if (CurrentSection == "lots")
             {
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Lots and Batches</BbCardTitle>
-                        <BbCardDescription>Traceability records connected to this product.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <BbDataGrid Items="@_lots" ShowPagination="true" InitialPageSize="10"
-                                    OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
-                                    Class="cursor-pointer">
-                            <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" />
-                                <BbDataGridTemplateColumn Title="On Hand">
-                                    <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("N2")</ChildContent>
-                                </BbDataGridTemplateColumn>
-                            </Columns>
-                        </BbDataGrid>
-                    </BbCardContent>
-                </BbCard>
+                @LotsSection
             }
-
-            <BbCard>
-                <BbCardHeader>
-                    <div class="xf-page-header">
-                        <div>
-                            <BbCardTitle>Variations</BbCardTitle>
-                            <BbCardDescription>Optional product options and price adjustments.</BbCardDescription>
-                        </div>
-                        <BbButton Size="ButtonSize.Small" OnClick="@OpenVariationDialog">
-                            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
-                            Add Variation
-                        </BbButton>
-                    </div>
-                </BbCardHeader>
-                <BbCardContent>
-                    <BbDataGrid Items="@_variations" ShowPagination="true" InitialPageSize="10">
-                        <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Additional Price">
-                                <ChildContent Context="item">@item.AdditionalPrice.ToString("N2")</ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                        </Columns>
-                    </BbDataGrid>
-                </BbCardContent>
-            </BbCard>
-
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Transaction History</BbCardTitle>
-                    <BbCardDescription>Read-only product transaction history.</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="10">
-                        <Columns>
-                            <BbDataGridTemplateColumn Title="Quantity">
-                                <ChildContent Context="item">@item.Quantity</ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Total">
-                                <ChildContent Context="item">@item.TotalPrice.ToString("N2")</ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.TransactionDate)" Title="Transaction Date" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                        </Columns>
-                    </BbDataGrid>
-                </BbCardContent>
-            </BbCard>
+            else if (CurrentSection == "replenishment")
+            {
+                @ReplenishmentSection
+            }
+            else if (CurrentSection == "variations")
+            {
+                @VariationsSection
+            }
+            else if (CurrentSection == "transactions")
+            {
+                @TransactionsSection
+            }
         </div>
     </FadeInContent>
 }
 
-<BbDialog Open="@_variationDialogOpen" OpenChanged="@(v => _variationDialogOpen = v)">
-    <BbDialogContent>
-        <BbDialogHeader>
-            <BbDialogTitle>Add Variation</BbDialogTitle>
-            <BbDialogDescription>Add an option for this product.</BbDialogDescription>
-        </BbDialogHeader>
-        <div class="grid gap-4 py-4">
-            <BbFormFieldInput TValue="string" @bind-Value="_variationName" Label="Name" Required="true" />
-            <BbFormFieldInput TValue="string" @bind-Value="_variationAdditionalPrice" Label="Additional Price" />
-        </div>
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _variationDialogOpen = false)">Cancel</BbButton>
-            <BbButton OnClick="@SaveVariation" Disabled="@_saving">Create</BbButton>
-        </BbDialogFooter>
-    </BbDialogContent>
-</BbDialog>
+@if (_product is not null)
+{
+    <BbDialog Open="@_variationDialogOpen" OpenChanged="@(value => _variationDialogOpen = value)">
+        <BbDialogContent TrapFocus="false">
+            <BbDialogHeader>
+                <BbDialogTitle>Add Variation</BbDialogTitle>
+                <BbDialogDescription>Add a product option for @_product.Name.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                <BbFormFieldInput TValue="string" @bind-Value="_variationForm.VariationType" Label="Variation Type" Placeholder="Size, Color, Packaging, etc." />
+                <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Name" Label="Name" Required="true" />
+                <BbFormFieldInput TValue="string" @bind-Value="_variationForm.AdditionalPrice" Label="Additional Price" />
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _variationDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@SaveVariation" Disabled="@_saving">Create Variation</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog Open="@_movementDialogOpen" OpenChanged="@(value => _movementDialogOpen = value)">
+        <BbDialogContent TrapFocus="false" class="max-w-4xl">
+            <BbDialogHeader>
+                <BbDialogTitle>Post Stock Movement</BbDialogTitle>
+                <BbDialogDescription>Post movement for @_product.Name. The product is fixed by the open detail page.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                @FixedProductField
+
+                <div class="grid gap-3 md:grid-cols-2">
+                    <XfEntityPicker TItem="Warehouse"
+                                    Label="Warehouse"
+                                    Value="@_movementForm.WarehouseId"
+                                    ValueChanged="@(value => OnWorkflowWarehouseChanged(ProductWorkflow.Movement, value))"
+                                    Items="@_warehouses"
+                                    ValueSelector="@GetWarehousePickerValue"
+                                    TextSelector="@GetWarehouseLabel"
+                                    SearchTextSelector="@GetWarehouseSearchText"
+                                    Placeholder="Select warehouse"
+                                    SearchPlaceholder="Search warehouses..."
+                                    EmptyMessage="No warehouses found."
+                                    ShowCreate="true"
+                                    CreateLabel="Create Warehouse"
+                                    AdvancedSearchTitle="Find Warehouse"
+                                    AdvancedSearchDescription="Search all warehouses in the active tenant."
+                                    OnCreate="@(() => OpenWarehouseCreateDialog(ProductWorkflow.Movement))" />
+                    <XfEntityPicker TItem="InventoryLocation"
+                                    Label="Location"
+                                    Value="@_movementForm.LocationId"
+                                    ValueChanged="@(value => _movementForm.LocationId = value ?? "")"
+                                    Items="@MovementLocations"
+                                    ValueSelector="@GetLocationPickerValue"
+                                    TextSelector="@GetLocationLabel"
+                                    SearchTextSelector="@GetLocationSearchText"
+                                    Placeholder="Select location"
+                                    SearchPlaceholder="Search locations..."
+                                    EmptyMessage="No locations found."
+                                    ShowCreate="@CanCreateMovementLocation"
+                                    Disabled="@(!CanCreateMovementLocation)"
+                                    HelpText="@MovementLocationHelpText"
+                                    CreateLabel="Create Location"
+                                    AdvancedSearchTitle="Find Location"
+                                    AdvancedSearchDescription="Search locations for the selected warehouse."
+                                    OnCreate="@(() => OpenLocationCreateDialog(ProductWorkflow.Movement))" />
+                    @if (_traceabilityEnabled)
+                    {
+                        <XfEntityPicker TItem="InventoryLot"
+                                        Label="Lot / Batch"
+                                        Value="@_movementForm.LotId"
+                                        ValueChanged="@(value => _movementForm.LotId = value ?? "")"
+                                        Items="@_lots"
+                                        ValueSelector="@GetLotPickerValue"
+                                        TextSelector="@GetLotLabel"
+                                        SearchTextSelector="@GetLotSearchText"
+                                        Placeholder="No lot / untracked"
+                                        SearchPlaceholder="Search lots..."
+                                        EmptyMessage="No lots found."
+                                        AllowClear="true"
+                                        ClearText="No lot / untracked"
+                                        ShowCreate="true"
+                                        CreateLabel="Create Lot / Batch"
+                                        AdvancedSearchTitle="Find Lot / Batch"
+                                        AdvancedSearchDescription="Search lots and batches for this product."
+                                        OnCreate="@(() => OpenLotDialog(ProductWorkflow.Movement))" />
+                    }
+                    <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
+                        @foreach (var type in Enum.GetValues<InventoryMovementType>())
+                        {
+                            <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
+                        }
+                    </BbFormFieldSelect>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-3">
+                    <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Quantity" Label="Quantity" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
+                </div>
+                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Reason" Label="Reason" />
+                @if (_negativeStockEnabled)
+                {
+                    <BbFormFieldSwitch Checked="@_movementForm.AllowNegativeStock"
+                                       CheckedChanged="@((bool value) => _movementForm.AllowNegativeStock = value)"
+                                       Label="Allow negative stock for this posting" />
+                }
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _movementDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@PostMovement" Disabled="@IsPostMovementDisabled">Post Movement</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog Open="@_lotDialogOpen" OpenChanged="@(value => _lotDialogOpen = value)">
+        <BbDialogContent TrapFocus="false">
+            <BbDialogHeader>
+                <BbDialogTitle>Create Lot / Batch</BbDialogTitle>
+                <BbDialogDescription>Create a traceability lot for @_product.Name.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                @FixedProductField
+                <div class="grid gap-3 md:grid-cols-2">
+                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.LotNumber" Label="Lot / Batch Number" Required="true" />
+                    <BbFormFieldSelect TValue="string" @bind-Value="_lotForm.Status" Label="Status">
+                        @foreach (var status in Enum.GetValues<InventoryLotStatus>())
+                        {
+                            <BbSelectItem Value="@status.ToString()">@status</BbSelectItem>
+                        }
+                    </BbFormFieldSelect>
+                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.SupplierReference" Label="Supplier / Source Reference" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.UnitCost" Label="Unit Cost" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.ReceivedAt" Label="Received Date" Placeholder="YYYY-MM-DD" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.ManufacturedAt" Label="Manufacture Date" Placeholder="YYYY-MM-DD" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.ExpiresAt" Label="Expiration Date" Placeholder="YYYY-MM-DD" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.SourceReferenceType" Label="Source Type" />
+                </div>
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _lotDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@CreateLot" Disabled="@_savingLot">Create Lot</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog Open="@_receiveDialogOpen" OpenChanged="@(value => _receiveDialogOpen = value)">
+        <BbDialogContent TrapFocus="false" class="max-w-4xl">
+            <BbDialogHeader>
+                <BbDialogTitle>Receive Batch / Stock</BbDialogTitle>
+                <BbDialogDescription>Receive stock for @_product.Name into a warehouse location.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                @FixedProductField
+
+                <div class="grid gap-3 md:grid-cols-3">
+                    <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.ReceiptNumber" Label="Receipt Number" />
+                    <XfEntityPicker TItem="PurchaseOrder"
+                                    Label="Purchase Order"
+                                    Value="@_receiveForm.PurchaseOrderId"
+                                    ValueChanged="@(value => _receiveForm.PurchaseOrderId = value ?? "")"
+                                    Items="@OpenPurchaseOrders"
+                                    ValueSelector="@GetPurchaseOrderPickerValue"
+                                    TextSelector="@GetPurchaseOrderLabel"
+                                    SearchTextSelector="@GetPurchaseOrderSearchText"
+                                    Placeholder="No purchase order"
+                                    SearchPlaceholder="Search purchase orders..."
+                                    EmptyMessage="No purchase orders found."
+                                    AllowClear="true"
+                                    ClearText="No purchase order"
+                                    ShowCreate="false"
+                                    AdvancedSearchTitle="Find Purchase Order"
+                                    AdvancedSearchDescription="Search open and partially received purchase orders." />
+                    <XfEntityPicker TItem="Supplier"
+                                    Label="Supplier"
+                                    Value="@_receiveForm.SupplierId"
+                                    ValueChanged="@(value => _receiveForm.SupplierId = value ?? "")"
+                                    Items="@_suppliers"
+                                    ValueSelector="@GetSupplierPickerValue"
+                                    TextSelector="@GetSupplierLabel"
+                                    SearchTextSelector="@GetSupplierSearchText"
+                                    Placeholder="No supplier"
+                                    SearchPlaceholder="Search suppliers..."
+                                    EmptyMessage="No suppliers found."
+                                    AllowClear="true"
+                                    ClearText="No supplier"
+                                    ShowCreate="true"
+                                    CreateLabel="Create Supplier"
+                                    AdvancedSearchTitle="Find Supplier"
+                                    AdvancedSearchDescription="Search suppliers in the active tenant."
+                                    OnCreate="@(() => OpenSupplierCreateDialog(ProductWorkflow.Receiving))" />
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-3">
+                    <XfEntityPicker TItem="Warehouse"
+                                    Label="Warehouse"
+                                    Value="@_receiveForm.WarehouseId"
+                                    ValueChanged="@(value => OnWorkflowWarehouseChanged(ProductWorkflow.Receiving, value))"
+                                    Items="@_warehouses"
+                                    ValueSelector="@GetWarehousePickerValue"
+                                    TextSelector="@GetWarehouseLabel"
+                                    SearchTextSelector="@GetWarehouseSearchText"
+                                    Placeholder="Select warehouse"
+                                    SearchPlaceholder="Search warehouses..."
+                                    EmptyMessage="No warehouses found."
+                                    ShowCreate="true"
+                                    CreateLabel="Create Warehouse"
+                                    AdvancedSearchTitle="Find Warehouse"
+                                    AdvancedSearchDescription="Search all warehouses in the active tenant."
+                                    OnCreate="@(() => OpenWarehouseCreateDialog(ProductWorkflow.Receiving))" />
+                    <XfEntityPicker TItem="InventoryLocation"
+                                    Label="Location"
+                                    Value="@_receiveForm.LocationId"
+                                    ValueChanged="@(value => _receiveForm.LocationId = value ?? "")"
+                                    Items="@ReceiveLocations"
+                                    ValueSelector="@GetLocationPickerValue"
+                                    TextSelector="@GetLocationLabel"
+                                    SearchTextSelector="@GetLocationSearchText"
+                                    Placeholder="Select location"
+                                    SearchPlaceholder="Search locations..."
+                                    EmptyMessage="No locations found."
+                                    ShowCreate="@CanCreateReceiveLocation"
+                                    Disabled="@(!CanCreateReceiveLocation)"
+                                    HelpText="@ReceiveLocationHelpText"
+                                    CreateLabel="Create Location"
+                                    AdvancedSearchTitle="Find Location"
+                                    AdvancedSearchDescription="Search locations for the selected warehouse."
+                                    OnCreate="@(() => OpenLocationCreateDialog(ProductWorkflow.Receiving))" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.ReferenceNumber" Label="Reference" />
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-3">
+                    <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.Quantity" Label="Quantity" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.UnitCost" Label="Unit Cost" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.UnitOfMeasure" Label="Unit" />
+                </div>
+
+                @if (_traceabilityEnabled)
+                {
+                    <XfEntityPicker TItem="InventoryLot"
+                                    Label="Lot / Batch"
+                                    Value="@_receiveForm.LotId"
+                                    ValueChanged="@(value => _receiveForm.LotId = value ?? "")"
+                                    Items="@_lots"
+                                    ValueSelector="@GetLotPickerValue"
+                                    TextSelector="@GetLotLabel"
+                                    SearchTextSelector="@GetLotSearchText"
+                                    Placeholder="No lot / untracked"
+                                    SearchPlaceholder="Search lots..."
+                                    EmptyMessage="No lots found."
+                                    AllowClear="true"
+                                    ClearText="No lot / untracked"
+                                    ShowCreate="true"
+                                    CreateLabel="Create Lot / Batch"
+                                    AdvancedSearchTitle="Find Lot / Batch"
+                                    AdvancedSearchDescription="Search lots and batches for this product."
+                                    OnCreate="@(() => OpenLotDialog(ProductWorkflow.Receiving))" />
+                }
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _receiveDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@ReceiveStock" Disabled="@IsReceiveDisabled">Post Receiving</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog Open="@_ruleDialogOpen" OpenChanged="@(value => _ruleDialogOpen = value)">
+        <BbDialogContent TrapFocus="false">
+            <BbDialogHeader>
+                <BbDialogTitle>Add Reorder Rule</BbDialogTitle>
+                <BbDialogDescription>Add min/max/reorder rules for @_product.Name.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                @FixedProductField
+
+                <div class="grid gap-3 md:grid-cols-2">
+                    <XfEntityPicker TItem="Warehouse"
+                                    Label="Warehouse"
+                                    Value="@_ruleForm.WarehouseId"
+                                    ValueChanged="@(value => OnWorkflowWarehouseChanged(ProductWorkflow.Replenishment, value))"
+                                    Items="@_warehouses"
+                                    ValueSelector="@GetWarehousePickerValue"
+                                    TextSelector="@GetWarehouseLabel"
+                                    SearchTextSelector="@GetWarehouseSearchText"
+                                    Placeholder="Any warehouse"
+                                    SearchPlaceholder="Search warehouses..."
+                                    EmptyMessage="No warehouses found."
+                                    AllowClear="true"
+                                    ClearText="Any warehouse"
+                                    ShowCreate="true"
+                                    CreateLabel="Create Warehouse"
+                                    AdvancedSearchTitle="Find Warehouse"
+                                    AdvancedSearchDescription="Search all warehouses in the active tenant."
+                                    OnCreate="@(() => OpenWarehouseCreateDialog(ProductWorkflow.Replenishment))" />
+                    <XfEntityPicker TItem="InventoryLocation"
+                                    Label="Location"
+                                    Value="@_ruleForm.LocationId"
+                                    ValueChanged="@(value => _ruleForm.LocationId = value ?? "")"
+                                    Items="@RuleLocations"
+                                    ValueSelector="@GetLocationPickerValue"
+                                    TextSelector="@GetLocationLabel"
+                                    SearchTextSelector="@GetLocationSearchText"
+                                    Placeholder="Any location"
+                                    SearchPlaceholder="Search locations..."
+                                    EmptyMessage="No locations found."
+                                    AllowClear="true"
+                                    ClearText="Any location"
+                                    ShowCreate="@CanCreateRuleLocation"
+                                    Disabled="@(!CanCreateRuleLocation)"
+                                    HelpText="@RuleLocationHelpText"
+                                    CreateLabel="Create Location"
+                                    AdvancedSearchTitle="Find Location"
+                                    AdvancedSearchDescription="Search locations for the selected warehouse."
+                                    OnCreate="@(() => OpenLocationCreateDialog(ProductWorkflow.Replenishment))" />
+                    @if (_purchasingEnabled)
+                    {
+                        <XfEntityPicker TItem="Supplier"
+                                        Label="Preferred Supplier"
+                                        Value="@_ruleForm.PreferredSupplier"
+                                        ValueChanged="@(value => _ruleForm.PreferredSupplier = value ?? "")"
+                                        Items="@_suppliers"
+                                        ValueSelector="@GetSupplierPreferredValue"
+                                        TextSelector="@GetSupplierLabel"
+                                        SearchTextSelector="@GetSupplierSearchText"
+                                        Placeholder="No preferred supplier"
+                                        SearchPlaceholder="Search suppliers..."
+                                        EmptyMessage="No suppliers found."
+                                        AllowClear="true"
+                                        ClearText="No preferred supplier"
+                                        ShowCreate="true"
+                                        CreateLabel="Create Supplier"
+                                        AdvancedSearchTitle="Find Supplier"
+                                        AdvancedSearchDescription="Search suppliers in the active tenant."
+                                        OnCreate="@(() => OpenSupplierCreateDialog(ProductWorkflow.Replenishment))" />
+                    }
+                    else
+                    {
+                        <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.PreferredSupplier" Label="Preferred Supplier" />
+                    }
+                </div>
+                <div class="grid gap-3 md:grid-cols-4">
+                    <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.MinimumQuantity" Label="Minimum" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.MaximumQuantity" Label="Maximum" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.ReorderPoint" Label="Reorder Point" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.ReorderQuantity" Label="Reorder Qty" />
+                </div>
+                <BbFormFieldSwitch Checked="@_ruleForm.IsActive"
+                                   CheckedChanged="@((bool value) => _ruleForm.IsActive = value)"
+                                   Label="Rule active" />
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _ruleDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@CreateRule" Disabled="@_savingRule">Create Rule</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog Open="@_warehouseCreateDialogOpen" OpenChanged="@(value => _warehouseCreateDialogOpen = value)">
+        <BbDialogContent TrapFocus="false">
+            <BbDialogHeader>
+                <BbDialogTitle>Create Warehouse</BbDialogTitle>
+                <BbDialogDescription>Create a warehouse, then return to the product workflow with it selected.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                <div class="grid gap-3 md:grid-cols-2">
+                    <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Code" Label="Code" Required="true" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Name" Label="Name" Required="true" />
+                </div>
+                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Description" Label="Description" />
+                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.AddressLine" Label="Address" />
+                <div class="grid gap-3 md:grid-cols-3">
+                    <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.City" Label="City" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Region" Label="Region" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.CountryCode" Label="Country Code" />
+                </div>
+                <BbFormFieldSwitch Checked="@_warehouseForm.IsDefault"
+                                   CheckedChanged="@((bool value) => _warehouseForm.IsDefault = value)"
+                                   Label="Default warehouse" />
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _warehouseCreateDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@CreateWarehouseFromPicker" Disabled="@_savingWarehouse">Create Warehouse</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog Open="@_locationCreateDialogOpen" OpenChanged="@(value => _locationCreateDialogOpen = value)">
+        <BbDialogContent TrapFocus="false">
+            <BbDialogHeader>
+                <BbDialogTitle>Create Location</BbDialogTitle>
+                <BbDialogDescription>Create a location for the selected warehouse, then return to the product workflow.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                <XfEntityPicker TItem="Warehouse"
+                                Label="Warehouse"
+                                Value="@_locationForm.WarehouseId"
+                                ValueChanged="@(value => _locationForm.WarehouseId = value ?? "")"
+                                Items="@_warehouses"
+                                ValueSelector="@GetWarehousePickerValue"
+                                TextSelector="@GetWarehouseLabel"
+                                SearchTextSelector="@GetWarehouseSearchText"
+                                Placeholder="Select warehouse"
+                                SearchPlaceholder="Search warehouses..."
+                                EmptyMessage="No warehouses found."
+                                ShowCreate="false"
+                                AdvancedSearchTitle="Find Warehouse"
+                                AdvancedSearchDescription="Select the warehouse that owns the new location." />
+                <div class="grid gap-3 md:grid-cols-2">
+                    <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
+                </div>
+                <BbFormFieldSelect TValue="string" @bind-Value="_locationForm.LocationType" Label="Location Type">
+                    @foreach (var type in Enum.GetValues<InventoryLocationType>())
+                    {
+                        <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
+                    }
+                </BbFormFieldSelect>
+                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Description" Label="Description" />
+                <BbFormFieldSwitch Checked="@_locationForm.IsPickable"
+                                   CheckedChanged="@((bool value) => _locationForm.IsPickable = value)"
+                                   Label="Pickable location" />
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _locationCreateDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@CreateLocationFromPicker" Disabled="@_savingLocation">Create Location</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog Open="@_supplierCreateDialogOpen" OpenChanged="@(value => _supplierCreateDialogOpen = value)">
+        <BbDialogContent TrapFocus="false">
+            <BbDialogHeader>
+                <BbDialogTitle>Create Supplier</BbDialogTitle>
+                <BbDialogDescription>Create a supplier, then return to the product workflow with it selected.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                <div class="grid gap-3 md:grid-cols-2">
+                    <BbFormFieldInput TValue="string" @bind-Value="_supplierForm.Code" Label="Code" Required="true" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_supplierForm.Name" Label="Name" Required="true" />
+                </div>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <BbFormFieldInput TValue="string" @bind-Value="_supplierForm.ContactName" Label="Contact Name" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_supplierForm.Email" Label="Email" />
+                </div>
+                <BbFormFieldInput TValue="string" @bind-Value="_supplierForm.Phone" Label="Phone" />
+                <BbFormFieldSwitch Checked="@_supplierForm.IsActive"
+                                   CheckedChanged="@((bool value) => _supplierForm.IsActive = value)"
+                                   Label="Active supplier" />
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _supplierCreateDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@CreateSupplierFromPicker" Disabled="@_savingSupplier">Create Supplier</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+}
 
 @code {
     [Parameter] public Guid Id { get; set; }
+    [Parameter] public string? Section { get; set; }
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
 
     private readonly ProductForm _productForm = new();
+    private readonly VariationForm _variationForm = new();
+    private readonly MovementForm _movementForm = new();
+    private readonly LotForm _lotForm = new();
+    private readonly ReceiveForm _receiveForm = new();
+    private readonly RuleForm _ruleForm = new();
+    private readonly WarehouseForm _warehouseForm = new();
+    private readonly LocationForm _locationForm = new();
+    private readonly SupplierForm _supplierForm = new();
+
     private Product? _product;
     private List<ProductCategory> _categories = [];
     private List<ProductVariation> _variations = [];
     private List<ProductTransaction> _transactions = [];
     private List<InventoryReorderRule> _reorderRules = [];
     private List<StockBalance> _balances = [];
+    private List<InventoryMovement> _movements = [];
     private List<InventoryLot> _lots = [];
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
+    private List<Supplier> _suppliers = [];
+    private List<PurchaseOrder> _purchaseOrders = [];
+    private List<PurchaseOrderLine> _purchaseOrderLines = [];
     private bool _loading = true;
     private bool _saving;
+    private bool _savingLot;
+    private bool _savingRule;
+    private bool _savingMovement;
+    private bool _savingReceive;
+    private bool _savingWarehouse;
+    private bool _savingLocation;
+    private bool _savingSupplier;
     private bool _hasTenant;
     private bool _moduleEnabled;
     private bool _planningEnabled;
     private bool _stockEnabled;
+    private bool _movementsEnabled;
     private bool _traceabilityEnabled;
+    private bool _variationsEnabled;
+    private bool _transactionsEnabled;
+    private bool _purchasingEnabled;
+    private bool _negativeStockEnabled;
     private bool _outsideTenantContext;
     private bool _editMode;
     private bool _variationDialogOpen;
-    private string _variationName = "";
-    private string _variationAdditionalPrice = "0";
+    private bool _movementDialogOpen;
+    private bool _lotDialogOpen;
+    private bool _receiveDialogOpen;
+    private bool _ruleDialogOpen;
+    private bool _warehouseCreateDialogOpen;
+    private bool _locationCreateDialogOpen;
+    private bool _supplierCreateDialogOpen;
     private Guid? _loadedId;
+    private ProductWorkflow? _warehouseCreateTarget;
+    private ProductWorkflow? _locationCreateTarget;
+    private ProductWorkflow? _supplierCreateTarget;
+    private ProductWorkflow? _lotCreateTarget;
+
+    private string CurrentSection => NormalizeSection(Section);
+    private string UnavailableSectionName => CurrentSection switch
+    {
+        "stock" => "Inventario Stock",
+        "lots" => "Inventario Traceability",
+        "replenishment" => "Inventario Planning",
+        "variations" => "Inventario Variations",
+        "transactions" => "Inventario Transactions",
+        _ => "Inventario Product"
+    };
 
     private decimal TotalAvailable => _balances.Sum(x => x.AvailableQuantity);
+    private decimal TotalOnHand => _balances.Sum(x => x.OnHandQuantity);
+    private decimal TotalReserved => _balances.Sum(x => x.ReservedQuantity);
     private int ActiveLocationCount => _balances.Select(x => x.LocationId).Distinct().Count();
+    private bool IsPostMovementDisabled =>
+        _savingMovement ||
+        _warehouses.Count == 0 ||
+        _locations.Count == 0 ||
+        string.IsNullOrWhiteSpace(_movementForm.WarehouseId) ||
+        string.IsNullOrWhiteSpace(_movementForm.LocationId);
+    private bool IsReceiveDisabled =>
+        _savingReceive ||
+        _warehouses.Count == 0 ||
+        _locations.Count == 0 ||
+        string.IsNullOrWhiteSpace(_receiveForm.WarehouseId) ||
+        string.IsNullOrWhiteSpace(_receiveForm.LocationId);
+
+    private IReadOnlyList<InventoryLocation> MovementLocations => LocationsForWarehouse(_movementForm.WarehouseId).ToList();
+    private IReadOnlyList<InventoryLocation> ReceiveLocations => LocationsForWarehouse(_receiveForm.WarehouseId).ToList();
+    private IReadOnlyList<InventoryLocation> RuleLocations => string.IsNullOrWhiteSpace(_ruleForm.WarehouseId)
+        ? _locations
+        : LocationsForWarehouse(_ruleForm.WarehouseId).ToList();
+    private IReadOnlyList<PurchaseOrder> OpenPurchaseOrders =>
+        _purchaseOrders.Where(x => x.Status is PurchaseOrderStatus.Open or PurchaseOrderStatus.PartiallyReceived).ToList();
+    private bool CanCreateMovementLocation => Guid.TryParse(_movementForm.WarehouseId, out _);
+    private bool CanCreateReceiveLocation => Guid.TryParse(_receiveForm.WarehouseId, out _);
+    private bool CanCreateRuleLocation => Guid.TryParse(_ruleForm.WarehouseId, out _);
+    private string? MovementLocationHelpText => CanCreateMovementLocation ? null : "Select or create a warehouse first.";
+    private string? ReceiveLocationHelpText => CanCreateReceiveLocation ? null : "Select or create a warehouse first.";
+    private string? RuleLocationHelpText => CanCreateRuleLocation ? null : "Select a warehouse before scoping this rule to a location.";
+
     private List<SelectOption<string>> CategoryOptions =>
         _categories.Select(category => new SelectOption<string>(category.Id.ToString(), category.Name ?? category.Id.ToString()[..8])).ToList();
 
@@ -346,15 +659,12 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_loadedId == Id) return;
+        if (_loadedId == Id && _product is not null) return;
         _loadedId = Id;
         await Reload();
     }
 
-    private void OnTenantChanged()
-    {
-        _ = InvokeAsync(Reload);
-    }
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
 
     private async Task Reload()
     {
@@ -362,21 +672,8 @@ else
         try
         {
             await ModuleNavigation.EnsureLoadedAsync();
-            _hasTenant = TenantFilter.SelectedTenantId is Guid;
-            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
-            _planningEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning");
-            _stockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances");
-            _traceabilityEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability");
-            _outsideTenantContext = false;
-            _product = null;
-            _categories = [];
-            _variations = [];
-            _transactions = [];
-            _reorderRules = [];
-            _balances = [];
-            _lots = [];
-            _warehouses = [];
-            _locations = [];
+            LoadFeatureFlags();
+            ResetData();
 
             if (!_hasTenant || !_moduleEnabled) return;
 
@@ -389,85 +686,7 @@ else
             _outsideTenantContext = _product is not null && _product.TenantId != TenantFilter.SelectedTenantId;
             if (_product is null || _outsideTenantContext) return;
 
-            var tenantId = _product.TenantId;
-            _categories = await DataContext.Query<ProductCategory>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .OrderBy(x => x.Name)
-                .Take(200)
-                .ToListAsync();
-
-            _variations = await DataContext.Query<ProductVariation>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.ProductId == Id && x.TenantId == tenantId && !x.IsDeleted)
-                .OrderBy(x => x.Name)
-                .Take(100)
-                .ToListAsync();
-
-            _transactions = await DataContext.Query<ProductTransaction>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.ProductId == Id && x.TenantId == tenantId && !x.IsDeleted)
-                .OrderByDescending(x => x.TransactionDate)
-                .Take(100)
-                .ToListAsync();
-
-            if (_planningEnabled)
-                _reorderRules = await DataContext.Query<InventoryReorderRule>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.TenantId == tenantId && x.ProductId == Id && !x.IsDeleted)
-                    .OrderBy(x => x.WarehouseId)
-                    .ThenBy(x => x.LocationId)
-                    .Take(100)
-                    .ToListAsync();
-
-            if (_stockEnabled || _traceabilityEnabled)
-                _balances = await DataContext.Query<StockBalance>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.TenantId == tenantId && x.ProductId == Id && !x.IsDeleted)
-                    .OrderBy(x => x.WarehouseId)
-                    .ThenBy(x => x.LocationId)
-                    .Take(500)
-                    .ToListAsync();
-
-            if (_traceabilityEnabled)
-                _lots = await DataContext.Query<InventoryLot>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.TenantId == tenantId && x.ProductId == Id && !x.IsDeleted)
-                    .OrderBy(x => x.ExpiresAt)
-                    .ThenBy(x => x.LotNumber)
-                    .Take(500)
-                    .ToListAsync();
-
-            var warehouseIds = _balances.Select(x => x.WarehouseId)
-                .Concat(_reorderRules.Where(x => x.WarehouseId is not null).Select(x => x.WarehouseId!.Value))
-                .Distinct()
-                .ToList();
-            if (warehouseIds.Count > 0)
-                _warehouses = await DataContext.Query<Warehouse>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.TenantId == tenantId && warehouseIds.Contains(x.Id) && !x.IsDeleted)
-                    .Take(200)
-                    .ToListAsync();
-
-            var locationIds = _balances.Select(x => x.LocationId)
-                .Concat(_reorderRules.Where(x => x.LocationId is not null).Select(x => x.LocationId!.Value))
-                .Distinct()
-                .ToList();
-            if (locationIds.Count > 0)
-                _locations = await DataContext.Query<InventoryLocation>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.TenantId == tenantId && locationIds.Contains(x.Id) && !x.IsDeleted)
-                    .Take(500)
-                    .ToListAsync();
-
+            await LoadProductData(_product.TenantId);
             if (!_editMode)
                 LoadProductForm();
         }
@@ -481,6 +700,524 @@ else
             StateHasChanged();
         }
     }
+
+    private void LoadFeatureFlags()
+    {
+        _hasTenant = TenantFilter.SelectedTenantId is Guid;
+        _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
+        _planningEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning");
+        _stockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances");
+        _movementsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements");
+        _traceabilityEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability");
+        _variationsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "variations");
+        _transactionsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "transactions");
+        _purchasingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing");
+        _negativeStockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "negative_stock");
+        if (!_negativeStockEnabled)
+            _movementForm.AllowNegativeStock = false;
+    }
+
+    private void ResetData()
+    {
+        _outsideTenantContext = false;
+        _product = null;
+        _categories = [];
+        _variations = [];
+        _transactions = [];
+        _reorderRules = [];
+        _balances = [];
+        _movements = [];
+        _lots = [];
+        _warehouses = [];
+        _locations = [];
+        _suppliers = [];
+        _purchaseOrders = [];
+        _purchaseOrderLines = [];
+    }
+
+    private async Task LoadProductData(Guid tenantId)
+    {
+        _categories = await DataContext.Query<ProductCategory>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Take(500)
+            .ToListAsync();
+
+        if (_variationsEnabled)
+            _variations = await DataContext.Query<ProductVariation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.ProductId == Id && x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.VariationType)
+                .ThenBy(x => x.Name)
+                .Take(500)
+                .ToListAsync();
+
+        if (_transactionsEnabled)
+            _transactions = await DataContext.Query<ProductTransaction>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.ProductId == Id && x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.TransactionDate)
+                .Take(250)
+                .ToListAsync();
+
+        if (_planningEnabled)
+            _reorderRules = await DataContext.Query<InventoryReorderRule>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.ProductId == Id && !x.IsDeleted)
+                .OrderBy(x => x.WarehouseId)
+                .ThenBy(x => x.LocationId)
+                .Take(250)
+                .ToListAsync();
+
+        if (_stockEnabled)
+            _balances = await DataContext.Query<StockBalance>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.ProductId == Id && !x.IsDeleted)
+                .OrderBy(x => x.WarehouseId)
+                .ThenBy(x => x.LocationId)
+                .Take(1000)
+                .ToListAsync();
+
+        if (_movementsEnabled)
+            _movements = await DataContext.Query<InventoryMovement>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.ProductId == Id && !x.IsDeleted)
+                .OrderByDescending(x => x.MovementDate)
+                .Take(500)
+                .ToListAsync();
+
+        if (_traceabilityEnabled)
+            _lots = await DataContext.Query<InventoryLot>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.ProductId == Id && !x.IsDeleted)
+                .OrderBy(x => x.ExpiresAt)
+                .ThenBy(x => x.LotNumber)
+                .Take(500)
+                .ToListAsync();
+
+        if (_stockEnabled || _movementsEnabled || _purchasingEnabled || _planningEnabled)
+        {
+            await LoadOperationalLookups(tenantId);
+            ApplyWorkflowDefaults();
+        }
+    }
+
+    private async Task LoadOperationalLookups(Guid tenantId)
+    {
+        _warehouses = await DataContext.Query<Warehouse>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Code)
+            .Take(500)
+            .ToListAsync();
+
+        _locations = await DataContext.Query<InventoryLocation>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Code)
+            .Take(1000)
+            .ToListAsync();
+
+        if (_purchasingEnabled)
+        {
+            _suppliers = await DataContext.Query<Supplier>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(500)
+                .ToListAsync();
+
+            _purchaseOrders = await DataContext.Query<PurchaseOrder>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.OrderDate)
+                .Take(500)
+                .ToListAsync();
+
+            _purchaseOrderLines = await DataContext.Query<PurchaseOrderLine>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.ProductId == Id)
+                .Take(500)
+                .ToListAsync();
+        }
+    }
+
+    private RenderFragment ProductHeader => @<div class="xf-detail-header">
+        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to products"
+                  OnClick="@(() => Navigation.NavigateTo("/inventario/products"))">
+            <LucideIcon Name="arrow-left" class="h-4 w-4" />
+        </BbButton>
+        <div class="xf-detail-header-main">
+            <div class="xf-detail-header-title">
+                <BbTypographyH3>@(_product?.Name ?? "Unnamed Product")</BbTypographyH3>
+                <StatusBadge Text="@(_product?.IsAvailable == true ? "Available" : "Unavailable")"
+                             Status="@(_product?.IsAvailable == true ? "active" : "inactive")" />
+            </div>
+            <BbTypographyMuted>SKU: @(_product?.SKU ?? "N/A") - Category: @GetCategoryName(_product?.CategoryId ?? Guid.Empty)</BbTypographyMuted>
+        </div>
+        <div class="xf-page-actions">
+            @if (CurrentSection == "summary" && _editMode)
+            {
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@CancelEdit" Disabled="@_saving">Discard</BbButton>
+                <BbButton OnClick="@SaveProduct" Disabled="@_saving">
+                    <LucideIcon Name="save" class="mr-2 h-4 w-4" />
+                    Save
+                </BbButton>
+            }
+            else
+            {
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+                @if (CurrentSection == "summary")
+                {
+                    <BbButton OnClick="@StartEdit">
+                        <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
+                        Edit
+                    </BbButton>
+                }
+            }
+        </div>
+    </div>;
+
+    private RenderFragment SummarySection => @<div class="space-y-6">
+        <div class="xf-summary-grid xf-summary-grid-4">
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Price</BbTypographyMuted><BbTypographyH3>@(_product?.Price.ToString("N2") ?? "0.00")</BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Available Stock</BbTypographyMuted><BbTypographyH3>@TotalAvailable.ToString("N2")</BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Locations</BbTypographyMuted><BbTypographyH3>@ActiveLocationCount</BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Reorder Rules</BbTypographyMuted><BbTypographyH3>@_reorderRules.Count</BbTypographyH3></div></BbCardContent></BbCard>
+        </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Product Summary</BbCardTitle>
+                <BbCardDescription>Catalog fields, availability, and lifecycle metadata.</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                @if (_editMode)
+                {
+                    <div class="grid gap-4">
+                        <div class="xf-detail-field-grid">
+                            <BbFormFieldInput TValue="string" @bind-Value="_productForm.Name" Label="Name" Required="true" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_productForm.Sku" Label="SKU" />
+                        </div>
+                        <BbFormFieldCombobox TValue="string"
+                                             @bind-Value="_productForm.CategoryId"
+                                             Options="@CategoryOptions"
+                                             Label="Category"
+                                             Placeholder="Select category"
+                                             SearchPlaceholder="Search categories..."
+                                             EmptyMessage="No categories found."
+                                             MatchTriggerWidth="true"
+                                             Required="true" />
+                        <div class="xf-detail-field-grid">
+                            <BbFormFieldInput TValue="string" @bind-Value="_productForm.Price" Label="Price" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_productForm.Brand" Label="Brand" />
+                        </div>
+                        <BbFormFieldInput TValue="string" @bind-Value="_productForm.Description" Label="Description" />
+                        <BbFormFieldSwitch Checked="@_productForm.IsAvailable"
+                                           CheckedChanged="@((bool value) => _productForm.IsAvailable = value)"
+                                           Label="Available" />
+                    </div>
+                }
+                else
+                {
+                    <div class="xf-detail-field-grid">
+                        <div>
+                            <BbTypographyMuted>Description</BbTypographyMuted>
+                            <div>@(_product?.Description ?? "No description")</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Brand</BbTypographyMuted>
+                            <div>@(_product?.Brand ?? "N/A")</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Created</BbTypographyMuted>
+                            <div>@(_product?.CreatedAt.ToLocalTime().ToString("g") ?? "N/A")</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Last Modified</BbTypographyMuted>
+                            <div>@(_product?.ModifiedAt?.ToLocalTime().ToString("g") ?? "Never")</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Warehouse Assignment</BbTypographyMuted>
+                            <div>Products are assigned to warehouses through stock balances, movements, receiving, and replenishment rules.</div>
+                        </div>
+                    </div>
+                }
+            </BbCardContent>
+        </BbCard>
+    </div>;
+
+    private RenderFragment StockSection => @<div class="space-y-6">
+        <div class="xf-page-header">
+            <div>
+                <BbTypographyH3>Stock</BbTypographyH3>
+                <BbTypographyMuted>Post stock, receive batches, and inspect balances for this product.</BbTypographyMuted>
+            </div>
+            <div class="xf-page-actions">
+                @if (_movementsEnabled)
+                {
+                    <BbButton OnClick="@OpenMovementDialog">
+                        <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                        Post Stock Movement
+                    </BbButton>
+                }
+                @if (_purchasingEnabled)
+                {
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@OpenReceiveDialog">
+                        <LucideIcon Name="package-plus" class="mr-2 h-4 w-4" />
+                        Receive Batch / Stock
+                    </BbButton>
+                }
+            </div>
+        </div>
+
+        <div class="xf-summary-grid xf-summary-grid-3">
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>On Hand</BbTypographyMuted><BbTypographyH3>@TotalOnHand.ToString("N2")</BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Reserved</BbTypographyMuted><BbTypographyH3>@TotalReserved.ToString("N2")</BbTypographyH3></div></BbCardContent></BbCard>
+            <BbCard><BbCardContent><div class="space-y-1 pt-4"><BbTypographyMuted>Available</BbTypographyMuted><BbTypographyH3>@TotalAvailable.ToString("N2")</BbTypographyH3></div></BbCardContent></BbCard>
+        </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Stock Balances</BbCardTitle>
+                <BbCardDescription>@_balances.Count balance row(s) for this product</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="20"
+                            OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
+                            Class="cursor-pointer">
+                    <Columns>
+                        <BbDataGridTemplateColumn Title="Warehouse">
+                            <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Location">
+                            <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        @if (_traceabilityEnabled)
+                        {
+                            <BbDataGridTemplateColumn Title="Lot">
+                                <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        }
+                        <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Movement Ledger</BbCardTitle>
+                <BbCardDescription>@_movements.Count movement(s) for this product</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" />
+                        <BbDataGridTemplateColumn Title="Warehouse">
+                            <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Location">
+                            <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        @if (_traceabilityEnabled)
+                        {
+                            <BbDataGridTemplateColumn Title="Lot">
+                                <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        }
+                        <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
+                        <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+    </div>;
+
+    private RenderFragment LotsSection => @<div class="space-y-6">
+        <div class="xf-page-header">
+            <div>
+                <BbTypographyH3>Lots / Batches</BbTypographyH3>
+                <BbTypographyMuted>Traceability records scoped to this product.</BbTypographyMuted>
+            </div>
+            <div class="xf-page-actions">
+                <BbButton OnClick="@OpenLotDialog">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Create Lot
+                </BbButton>
+            </div>
+        </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Lots and Batches</BbCardTitle>
+                <BbCardDescription>@_lots.Count lot(s) connected to this product</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_lots" ShowPagination="true" InitialPageSize="20"
+                            OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
+                            Class="cursor-pointer">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.SupplierReference)" Title="Supplier Ref" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" />
+                        <BbDataGridTemplateColumn Title="On Hand">
+                            <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("N2")</ChildContent>
+                        </BbDataGridTemplateColumn>
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+    </div>;
+
+    private RenderFragment ReplenishmentSection => @<div class="space-y-6">
+        <div class="xf-page-header">
+            <div>
+                <BbTypographyH3>Replenishment</BbTypographyH3>
+                <BbTypographyMuted>Min, max, reorder point, and warehouse/location-scoped rules.</BbTypographyMuted>
+            </div>
+            <div class="xf-page-actions">
+                <BbButton OnClick="@OpenRuleDialog">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Reorder Rule
+                </BbButton>
+            </div>
+        </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Reorder Rules</BbCardTitle>
+                <BbCardDescription>@_reorderRules.Count rule(s) configured for this product</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_reorderRules" ShowPagination="true" InitialPageSize="20">
+                    <Columns>
+                        <BbDataGridTemplateColumn Title="Scope">
+                            <ChildContent Context="item">@GetRuleScope(item)</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Reorder Qty" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" />
+                        <BbDataGridTemplateColumn Title="Status">
+                            <ChildContent Context="item">
+                                <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+    </div>;
+
+    private RenderFragment VariationsSection => @<div class="space-y-6">
+        <div class="xf-page-header">
+            <div>
+                <BbTypographyH3>Variations</BbTypographyH3>
+                <BbTypographyMuted>Product option types, names, and price adjustments.</BbTypographyMuted>
+            </div>
+            <div class="xf-page-actions">
+                <BbButton OnClick="@OpenVariationDialog">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Variation
+                </BbButton>
+            </div>
+        </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Variation List</BbCardTitle>
+                <BbCardDescription>@_variations.Count variation(s) configured</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_variations" ShowPagination="true" InitialPageSize="20">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.VariationType)" Title="Type" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                        <BbDataGridTemplateColumn Title="Additional Price">
+                            <ChildContent Context="item">@item.AdditionalPrice.ToString("N2")</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+    </div>;
+
+    private RenderFragment TransactionsSection => @<div class="space-y-6">
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Transaction History</BbCardTitle>
+                <BbCardDescription>@_transactions.Count product transaction(s) loaded</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
+                    <Columns>
+                        <BbDataGridTemplateColumn Title="Quantity">
+                            <ChildContent Context="item">@item.Quantity</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Total">
+                            <ChildContent Context="item">@item.TotalPrice.ToString("N2")</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.TransactionDate)" Title="Transaction Date" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+    </div>;
+
+    private RenderFragment FixedProductField => @<div class="rounded-md border p-3">
+        <BbTypographyMuted>Product</BbTypographyMuted>
+        <div class="font-medium">@GetProductLabel(_product)</div>
+    </div>;
+
+    private bool IsSectionAvailable(string section) => section switch
+    {
+        "summary" => true,
+        "stock" => _stockEnabled || _movementsEnabled || _purchasingEnabled,
+        "lots" => _traceabilityEnabled,
+        "replenishment" => _planningEnabled,
+        "variations" => _variationsEnabled,
+        "transactions" => _transactionsEnabled,
+        _ => false
+    };
+
+    private static string NormalizeSection(string? section) =>
+        string.IsNullOrWhiteSpace(section)
+            ? "summary"
+            : section.ToLowerInvariant() switch
+            {
+                "batches" => "lots",
+                "lots-batches" => "lots",
+                "reorder" => "replenishment",
+                "rules" => "replenishment",
+                "stock-movements" => "stock",
+                _ => section.ToLowerInvariant()
+            };
 
     private void StartEdit()
     {
@@ -573,21 +1310,20 @@ else
 
     private void OpenVariationDialog()
     {
-        _variationName = "";
-        _variationAdditionalPrice = "0";
+        _variationForm.Reset();
         _variationDialogOpen = true;
     }
 
     private async Task SaveVariation()
     {
         if (_product is null) return;
-        if (string.IsNullOrWhiteSpace(_variationName))
+        if (string.IsNullOrWhiteSpace(_variationForm.Name))
         {
             ToastService.Show("Variation name is required.");
             return;
         }
 
-        if (!decimal.TryParse(_variationAdditionalPrice, out var additionalPrice))
+        if (!decimal.TryParse(_variationForm.AdditionalPrice, out var additionalPrice))
         {
             ToastService.Show("Additional price must be a valid number.");
             return;
@@ -601,7 +1337,8 @@ else
                 Id = Guid.NewGuid(),
                 TenantId = _product.TenantId,
                 ProductId = _product.Id,
-                Name = _variationName.Trim(),
+                VariationType = NullIfEmpty(_variationForm.VariationType),
+                Name = _variationForm.Name.Trim(),
                 AdditionalPrice = additionalPrice,
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
@@ -629,6 +1366,498 @@ else
         }
     }
 
+    private void OpenMovementDialog()
+    {
+        _movementForm.Reset();
+        _movementForm.ProductId = Id.ToString();
+        _movementForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
+        _movementForm.LocationId = FirstLocationForWarehouse(_movementForm.WarehouseId)?.Id.ToString() ?? "";
+        _movementDialogOpen = true;
+    }
+
+    private async Task PostMovement()
+    {
+        if (_product is null ||
+            !Guid.TryParse(_movementForm.WarehouseId, out var warehouseId) ||
+            !Guid.TryParse(_movementForm.LocationId, out var locationId))
+        {
+            ToastService.Show("Select warehouse and location.");
+            return;
+        }
+
+        if (!decimal.TryParse(_movementForm.Quantity, out var quantity) || quantity == 0)
+        {
+            ToastService.Show("Quantity must not be zero.");
+            return;
+        }
+
+        _savingMovement = true;
+        try
+        {
+            var lotId = Guid.TryParse(_movementForm.LotId, out var parsedLotId) ? parsedLotId : (Guid?)null;
+
+            var result = await Inventario.PostStockMovement(new PostStockMovementRequest
+            {
+                Metadata = BuildMetadata(),
+                ProductId = _product.Id,
+                WarehouseId = warehouseId,
+                LocationId = locationId,
+                LotId = lotId,
+                MovementType = Enum.TryParse<InventoryMovementType>(_movementForm.MovementType, out var type) ? type : InventoryMovementType.Adjustment,
+                Quantity = quantity,
+                UnitOfMeasure = NullIfEmpty(_movementForm.UnitOfMeasure),
+                ReferenceType = NullIfEmpty(_movementForm.ReferenceType),
+                Reason = NullIfEmpty(_movementForm.Reason),
+                AllowNegativeStock = _negativeStockEnabled && _movementForm.AllowNegativeStock
+            });
+
+            ToastService.Show(result.IsSuccess ? "Stock movement posted." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _movementDialogOpen = false;
+                await Reload();
+            }
+        }
+        finally
+        {
+            _savingMovement = false;
+        }
+    }
+
+    private void OpenLotDialog() => OpenLotDialog(null);
+
+    private void OpenLotDialog(ProductWorkflow? target)
+    {
+        _lotCreateTarget = target;
+        _lotForm.Reset();
+        _lotDialogOpen = true;
+    }
+
+    private async Task CreateLot()
+    {
+        if (_product is null) return;
+        if (string.IsNullOrWhiteSpace(_lotForm.LotNumber))
+        {
+            ToastService.Show("Lot number is required.");
+            return;
+        }
+
+        _savingLot = true;
+        try
+        {
+            var result = await Inventario.CreateInventoryLot(new CreateInventoryLotRequest
+            {
+                Metadata = BuildMetadata(),
+                ProductId = _product.Id,
+                LotNumber = _lotForm.LotNumber.Trim(),
+                SupplierReference = NullIfEmpty(_lotForm.SupplierReference),
+                SourceReferenceType = NullIfEmpty(_lotForm.SourceReferenceType),
+                ReceivedAt = ParseDate(_lotForm.ReceivedAt),
+                ManufacturedAt = ParseDate(_lotForm.ManufacturedAt),
+                ExpiresAt = ParseDate(_lotForm.ExpiresAt),
+                UnitCost = decimal.TryParse(_lotForm.UnitCost, out var cost) ? cost : null,
+                Status = Enum.TryParse<InventoryLotStatus>(_lotForm.Status, out var status) ? status : InventoryLotStatus.Available
+            });
+
+            ToastService.Show(result.IsSuccess ? "Lot created." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                var lotNumber = _lotForm.LotNumber.Trim();
+                var target = _lotCreateTarget;
+                _lotDialogOpen = false;
+                _lotCreateTarget = null;
+                await Reload();
+                var created = _lots.FirstOrDefault(x => string.Equals(x.LotNumber, lotNumber, StringComparison.OrdinalIgnoreCase));
+                if (created is not null && target is not null)
+                    ApplyWorkflowLot(target.Value, created.Id.ToString());
+            }
+        }
+        finally
+        {
+            _savingLot = false;
+        }
+    }
+
+    private void OpenReceiveDialog()
+    {
+        _receiveForm.Reset();
+        _receiveForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
+        _receiveForm.LocationId = FirstLocationForWarehouse(_receiveForm.WarehouseId)?.Id.ToString() ?? "";
+        _receiveDialogOpen = true;
+    }
+
+    private async Task ReceiveStock()
+    {
+        if (_product is null ||
+            !Guid.TryParse(_receiveForm.WarehouseId, out var warehouseId) ||
+            !Guid.TryParse(_receiveForm.LocationId, out var locationId))
+        {
+            ToastService.Show("Select warehouse and location.");
+            return;
+        }
+
+        if (!decimal.TryParse(_receiveForm.Quantity, out var quantity) || quantity <= 0)
+        {
+            ToastService.Show("Quantity must be greater than zero.");
+            return;
+        }
+
+        _savingReceive = true;
+        try
+        {
+            var result = await Inventario.ReceiveInventory(new ReceiveInventoryRequest
+            {
+                Metadata = BuildMetadata(),
+                ReceiptNumber = NullIfEmpty(_receiveForm.ReceiptNumber),
+                PurchaseOrderId = Guid.TryParse(_receiveForm.PurchaseOrderId, out var poId) ? poId : null,
+                WarehouseId = warehouseId,
+                LocationId = locationId,
+                SupplierId = Guid.TryParse(_receiveForm.SupplierId, out var supplierId) ? supplierId : null,
+                ReferenceNumber = NullIfEmpty(_receiveForm.ReferenceNumber),
+                IdempotencyKey = NullIfEmpty(_receiveForm.IdempotencyKey),
+                Lines =
+                [
+                    new ReceivingLineRequest
+                    {
+                        PurchaseOrderLineId = Guid.TryParse(_receiveForm.PurchaseOrderLineId, out var lineId) ? lineId : null,
+                        ProductId = _product.Id,
+                        Quantity = quantity,
+                        UnitCost = decimal.TryParse(_receiveForm.UnitCost, out var unitCost) ? unitCost : null,
+                        UnitOfMeasure = NullIfEmpty(_receiveForm.UnitOfMeasure),
+                        LotId = Guid.TryParse(_receiveForm.LotId, out var lotId) ? lotId : null
+                    }
+                ]
+            });
+
+            ToastService.Show(result.IsSuccess ? "Receiving posted." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _receiveDialogOpen = false;
+                await Reload();
+            }
+        }
+        finally
+        {
+            _savingReceive = false;
+        }
+    }
+
+    private void OpenRuleDialog()
+    {
+        _ruleForm.Reset();
+        _ruleDialogOpen = true;
+    }
+
+    private async Task CreateRule()
+    {
+        if (_product is null) return;
+        if (!decimal.TryParse(_ruleForm.MinimumQuantity, out var min) ||
+            !decimal.TryParse(_ruleForm.ReorderPoint, out var point) ||
+            !decimal.TryParse(_ruleForm.ReorderQuantity, out var qty) ||
+            min < 0 ||
+            point < 0 ||
+            qty <= 0)
+        {
+            ToastService.Show("Quantities must be valid.");
+            return;
+        }
+
+        decimal? max = null;
+        if (!string.IsNullOrWhiteSpace(_ruleForm.MaximumQuantity))
+        {
+            if (!decimal.TryParse(_ruleForm.MaximumQuantity, out var parsedMax) || parsedMax < min)
+            {
+                ToastService.Show("Maximum must be greater than or equal to minimum.");
+                return;
+            }
+            max = parsedMax;
+        }
+
+        _savingRule = true;
+        try
+        {
+            var result = await Inventario.CreateInventoryReorderRule(new CreateInventoryReorderRuleRequest
+            {
+                Metadata = BuildMetadata(),
+                ProductId = _product.Id,
+                WarehouseId = Guid.TryParse(_ruleForm.WarehouseId, out var warehouseId) ? warehouseId : null,
+                LocationId = Guid.TryParse(_ruleForm.LocationId, out var locationId) ? locationId : null,
+                MinimumQuantity = min,
+                MaximumQuantity = max,
+                ReorderPoint = point,
+                ReorderQuantity = qty,
+                PreferredSupplier = NullIfEmpty(_ruleForm.PreferredSupplier),
+                IsActive = _ruleForm.IsActive
+            });
+
+            ToastService.Show(result.IsSuccess ? "Reorder rule created." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _ruleDialogOpen = false;
+                await Reload();
+            }
+        }
+        finally
+        {
+            _savingRule = false;
+        }
+    }
+
+    private void OpenWarehouseCreateDialog(ProductWorkflow workflow)
+    {
+        _warehouseCreateTarget = workflow;
+        _warehouseForm.Reset();
+        _warehouseForm.IsDefault = _warehouses.Count == 0;
+        _warehouseCreateDialogOpen = true;
+    }
+
+    private async Task CreateWarehouseFromPicker()
+    {
+        if (_product is null) return;
+        if (string.IsNullOrWhiteSpace(_warehouseForm.Code) || string.IsNullOrWhiteSpace(_warehouseForm.Name))
+        {
+            ToastService.Show("Warehouse code and name are required.");
+            return;
+        }
+
+        var code = _warehouseForm.Code.Trim();
+        var target = _warehouseCreateTarget;
+        _savingWarehouse = true;
+        try
+        {
+            var result = await Inventario.CreateWarehouse(new CreateWarehouseRequest
+            {
+                Metadata = BuildMetadata(),
+                Code = code,
+                Name = _warehouseForm.Name.Trim(),
+                Description = NullIfEmpty(_warehouseForm.Description),
+                AddressLine = NullIfEmpty(_warehouseForm.AddressLine),
+                City = NullIfEmpty(_warehouseForm.City),
+                Region = NullIfEmpty(_warehouseForm.Region),
+                CountryCode = NullIfEmpty(_warehouseForm.CountryCode),
+                IsDefault = _warehouseForm.IsDefault
+            });
+
+            ToastService.Show(result.IsSuccess ? "Warehouse created." : $"Failed: {result.Message}");
+            if (!result.IsSuccess) return;
+
+            _warehouseCreateDialogOpen = false;
+            _warehouseCreateTarget = null;
+            _warehouseForm.Reset();
+            await LoadOperationalLookups(_product.TenantId);
+            var created = _warehouses.FirstOrDefault(x => string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase));
+            if (created is not null && target is not null)
+                ApplyWorkflowWarehouse(target.Value, created.Id.ToString());
+        }
+        finally
+        {
+            _savingWarehouse = false;
+        }
+    }
+
+    private void OpenLocationCreateDialog(ProductWorkflow workflow)
+    {
+        var warehouseId = GetWorkflowWarehouseId(workflow);
+        if (!Guid.TryParse(warehouseId, out _))
+        {
+            ToastService.Show("Select or create a warehouse before creating a location.");
+            return;
+        }
+
+        _locationCreateTarget = workflow;
+        _locationForm.Reset();
+        _locationForm.WarehouseId = warehouseId;
+        _locationCreateDialogOpen = true;
+    }
+
+    private async Task CreateLocationFromPicker()
+    {
+        if (_product is null) return;
+        if (!Guid.TryParse(_locationForm.WarehouseId, out var warehouseId))
+        {
+            ToastService.Show("Select a warehouse before creating a location.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_locationForm.Code) || string.IsNullOrWhiteSpace(_locationForm.Name))
+        {
+            ToastService.Show("Location code and name are required.");
+            return;
+        }
+
+        var code = _locationForm.Code.Trim();
+        var target = _locationCreateTarget;
+        _savingLocation = true;
+        try
+        {
+            var result = await Inventario.CreateInventoryLocation(new CreateInventoryLocationRequest
+            {
+                Metadata = BuildMetadata(),
+                WarehouseId = warehouseId,
+                Code = code,
+                Name = _locationForm.Name.Trim(),
+                Description = NullIfEmpty(_locationForm.Description),
+                LocationType = Enum.TryParse<InventoryLocationType>(_locationForm.LocationType, out var type) ? type : InventoryLocationType.Bin,
+                IsPickable = _locationForm.IsPickable
+            });
+
+            ToastService.Show(result.IsSuccess ? "Location created." : $"Failed: {result.Message}");
+            if (!result.IsSuccess) return;
+
+            _locationCreateDialogOpen = false;
+            _locationCreateTarget = null;
+            _locationForm.Reset();
+            await LoadOperationalLookups(_product.TenantId);
+            var created = _locations.FirstOrDefault(x => x.WarehouseId == warehouseId && string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase));
+            if (created is not null && target is not null)
+                ApplyWorkflowLocation(target.Value, created.Id.ToString());
+        }
+        finally
+        {
+            _savingLocation = false;
+        }
+    }
+
+    private void OpenSupplierCreateDialog(ProductWorkflow workflow)
+    {
+        _supplierCreateTarget = workflow;
+        _supplierForm.Reset();
+        _supplierCreateDialogOpen = true;
+    }
+
+    private async Task CreateSupplierFromPicker()
+    {
+        if (_product is null) return;
+        if (string.IsNullOrWhiteSpace(_supplierForm.Code) || string.IsNullOrWhiteSpace(_supplierForm.Name))
+        {
+            ToastService.Show("Supplier code and name are required.");
+            return;
+        }
+
+        var code = _supplierForm.Code.Trim();
+        var target = _supplierCreateTarget;
+        _savingSupplier = true;
+        try
+        {
+            var result = await Inventario.CreateSupplier(new CreateSupplierRequest
+            {
+                Metadata = BuildMetadata(),
+                Code = code,
+                Name = _supplierForm.Name.Trim(),
+                ContactName = NullIfEmpty(_supplierForm.ContactName),
+                Email = NullIfEmpty(_supplierForm.Email),
+                Phone = NullIfEmpty(_supplierForm.Phone),
+                IsActive = _supplierForm.IsActive
+            });
+
+            ToastService.Show(result.IsSuccess ? "Supplier created." : $"Failed: {result.Message}");
+            if (!result.IsSuccess) return;
+
+            _supplierCreateDialogOpen = false;
+            _supplierCreateTarget = null;
+            _supplierForm.Reset();
+            await LoadOperationalLookups(_product.TenantId);
+            var created = _suppliers.FirstOrDefault(x => string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase));
+            if (created is not null && target is not null)
+                ApplyWorkflowSupplier(target.Value, created);
+        }
+        finally
+        {
+            _savingSupplier = false;
+        }
+    }
+
+    private void OnWorkflowWarehouseChanged(ProductWorkflow workflow, string? value) =>
+        ApplyWorkflowWarehouse(workflow, value ?? "");
+
+    private void ApplyWorkflowWarehouse(ProductWorkflow workflow, string warehouseId)
+    {
+        switch (workflow)
+        {
+            case ProductWorkflow.Movement:
+                _movementForm.WarehouseId = warehouseId;
+                _movementForm.LocationId = FirstLocationForWarehouse(warehouseId)?.Id.ToString() ?? "";
+                break;
+            case ProductWorkflow.Receiving:
+                _receiveForm.WarehouseId = warehouseId;
+                _receiveForm.LocationId = FirstLocationForWarehouse(warehouseId)?.Id.ToString() ?? "";
+                break;
+            case ProductWorkflow.Replenishment:
+                _ruleForm.WarehouseId = warehouseId;
+                _ruleForm.LocationId = "";
+                break;
+        }
+    }
+
+    private void ApplyWorkflowLocation(ProductWorkflow workflow, string locationId)
+    {
+        switch (workflow)
+        {
+            case ProductWorkflow.Movement:
+                _movementForm.LocationId = locationId;
+                break;
+            case ProductWorkflow.Receiving:
+                _receiveForm.LocationId = locationId;
+                break;
+            case ProductWorkflow.Replenishment:
+                _ruleForm.LocationId = locationId;
+                break;
+        }
+    }
+
+    private void ApplyWorkflowLot(ProductWorkflow workflow, string lotId)
+    {
+        switch (workflow)
+        {
+            case ProductWorkflow.Movement:
+                _movementForm.LotId = lotId;
+                break;
+            case ProductWorkflow.Receiving:
+                _receiveForm.LotId = lotId;
+                break;
+        }
+    }
+
+    private void ApplyWorkflowSupplier(ProductWorkflow workflow, Supplier supplier)
+    {
+        switch (workflow)
+        {
+            case ProductWorkflow.Receiving:
+                _receiveForm.SupplierId = supplier.Id.ToString();
+                break;
+            case ProductWorkflow.Replenishment:
+                _ruleForm.PreferredSupplier = GetSupplierPreferredValue(supplier);
+                break;
+        }
+    }
+
+    private string GetWorkflowWarehouseId(ProductWorkflow workflow) => workflow switch
+    {
+        ProductWorkflow.Movement => _movementForm.WarehouseId,
+        ProductWorkflow.Receiving => _receiveForm.WarehouseId,
+        ProductWorkflow.Replenishment => _ruleForm.WarehouseId,
+        _ => ""
+    };
+
+    private void ApplyWorkflowDefaults()
+    {
+        if (string.IsNullOrWhiteSpace(_movementForm.WarehouseId))
+            ApplyWorkflowWarehouse(ProductWorkflow.Movement, _warehouses.FirstOrDefault()?.Id.ToString() ?? "");
+        if (string.IsNullOrWhiteSpace(_receiveForm.WarehouseId))
+            ApplyWorkflowWarehouse(ProductWorkflow.Receiving, _warehouses.FirstOrDefault()?.Id.ToString() ?? "");
+    }
+
+    private IEnumerable<InventoryLocation> LocationsForWarehouse(string? warehouseId)
+    {
+        if (!Guid.TryParse(warehouseId, out var parsedWarehouseId))
+            return _locations;
+
+        return _locations.Where(x => x.WarehouseId == parsedWarehouseId);
+    }
+
+    private InventoryLocation? FirstLocationForWarehouse(string? warehouseId) =>
+        LocationsForWarehouse(warehouseId).FirstOrDefault();
+
     private string GetCategoryName(Guid categoryId) =>
         _categories.FirstOrDefault(x => x.Id == categoryId)?.Name ?? "Uncategorized";
 
@@ -636,10 +1865,10 @@ else
         $"{GetWarehouseName(rule.WarehouseId)} / {GetLocationName(rule.LocationId)}";
 
     private string GetWarehouseName(Guid? warehouseId) =>
-        warehouseId is { } id ? _warehouses.FirstOrDefault(x => x.Id == id) is { } warehouse ? $"{warehouse.Code} - {warehouse.Name}" : id.ToString()[..8] : "Any warehouse";
+        warehouseId is { } id ? _warehouses.FirstOrDefault(x => x.Id == id) is { } warehouse ? GetWarehouseLabel(warehouse) : id.ToString()[..8] : "Any warehouse";
 
     private string GetLocationName(Guid? locationId) =>
-        locationId is { } id ? _locations.FirstOrDefault(x => x.Id == id) is { } location ? $"{location.Code} - {location.Name}" : id.ToString()[..8] : "Any location";
+        locationId is { } id ? _locations.FirstOrDefault(x => x.Id == id) is { } location ? GetLocationLabel(location) : id.ToString()[..8] : "Any location";
 
     private string GetLotNumber(Guid? lotId) =>
         lotId is { } id ? _lots.FirstOrDefault(x => x.Id == id)?.LotNumber ?? id.ToString()[..8] : "Untracked";
@@ -647,13 +1876,59 @@ else
     private decimal GetLotOnHand(Guid lotId) =>
         _balances.Where(x => x.LotId == lotId).Sum(x => x.OnHandQuantity);
 
+    private static string GetProductLabel(Product? product)
+    {
+        if (product is null) return "Product";
+        return string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
+    }
+
+    private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+    private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
+    private static string GetLotLabel(InventoryLot lot) =>
+        string.IsNullOrWhiteSpace(lot.LotNumber) ? lot.Id.ToString()[..8] : lot.LotNumber;
+    private static string GetSupplierLabel(Supplier supplier) => $"{supplier.Code} - {supplier.Name}";
+    private static string GetPurchaseOrderLabel(PurchaseOrder order) => $"{order.OrderNumber} ({order.Status})";
+    private static string GetWarehousePickerValue(Warehouse warehouse) => warehouse.Id.ToString();
+    private static string GetLocationPickerValue(InventoryLocation location) => location.Id.ToString();
+    private static string GetLotPickerValue(InventoryLot lot) => lot.Id.ToString();
+    private static string GetSupplierPickerValue(Supplier supplier) => supplier.Id.ToString();
+    private static string GetSupplierPreferredValue(Supplier supplier) => GetSupplierLabel(supplier);
+    private static string GetPurchaseOrderPickerValue(PurchaseOrder order) => order.Id.ToString();
+    private static string GetWarehouseSearchText(Warehouse warehouse) =>
+        $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
+    private static string GetLocationSearchText(InventoryLocation location) =>
+        $"{location.Code} {location.Name} {location.LocationType} {location.Description}";
+    private static string GetLotSearchText(InventoryLot lot) =>
+        $"{lot.LotNumber} {lot.SupplierReference} {lot.SourceReferenceType} {lot.Status}";
+    private static string GetSupplierSearchText(Supplier supplier) =>
+        $"{supplier.Code} {supplier.Name} {supplier.ContactName} {supplier.Email} {supplier.Phone}";
+    private static string GetPurchaseOrderSearchText(PurchaseOrder order) =>
+        $"{order.OrderNumber} {order.Status} {order.OrderDate:g} {order.ExpectedDate:g} {order.Notes}";
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel"
+    };
+
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static DateTime? ParseDate(string? value) =>
+        DateTime.TryParse(value, out var date) ? date : null;
 
     public void Dispose()
     {
         TenantFilter.OnChanged -= OnTenantChanged;
         ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private enum ProductWorkflow
+    {
+        Movement,
+        Receiving,
+        Replenishment
     }
 
     private sealed class ProductForm
@@ -665,5 +1940,191 @@ else
         public string Brand { get; set; } = "";
         public string Description { get; set; } = "";
         public bool IsAvailable { get; set; } = true;
+    }
+
+    private sealed class VariationForm
+    {
+        public string VariationType { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string AdditionalPrice { get; set; } = "0";
+
+        public void Reset()
+        {
+            VariationType = "";
+            Name = "";
+            AdditionalPrice = "0";
+        }
+    }
+
+    private sealed class MovementForm
+    {
+        public string ProductId { get; set; } = "";
+        public string WarehouseId { get; set; } = "";
+        public string LocationId { get; set; } = "";
+        public string LotId { get; set; } = "";
+        public string MovementType { get; set; } = InventoryMovementType.Adjustment.ToString();
+        public string Quantity { get; set; } = "0";
+        public string UnitOfMeasure { get; set; } = "each";
+        public string ReferenceType { get; set; } = "";
+        public string Reason { get; set; } = "";
+        public bool AllowNegativeStock { get; set; }
+
+        public void Reset()
+        {
+            ProductId = "";
+            WarehouseId = "";
+            LocationId = "";
+            LotId = "";
+            MovementType = InventoryMovementType.Adjustment.ToString();
+            Quantity = "0";
+            UnitOfMeasure = "each";
+            ReferenceType = "";
+            Reason = "";
+            AllowNegativeStock = false;
+        }
+    }
+
+    private sealed class LotForm
+    {
+        public string LotNumber { get; set; } = "";
+        public string SupplierReference { get; set; } = "";
+        public string SourceReferenceType { get; set; } = "";
+        public string ReceivedAt { get; set; } = "";
+        public string ManufacturedAt { get; set; } = "";
+        public string ExpiresAt { get; set; } = "";
+        public string UnitCost { get; set; } = "";
+        public string Status { get; set; } = InventoryLotStatus.Available.ToString();
+
+        public void Reset()
+        {
+            LotNumber = "";
+            SupplierReference = "";
+            SourceReferenceType = "";
+            ReceivedAt = "";
+            ManufacturedAt = "";
+            ExpiresAt = "";
+            UnitCost = "";
+            Status = InventoryLotStatus.Available.ToString();
+        }
+    }
+
+    private sealed class ReceiveForm
+    {
+        public string ReceiptNumber { get; set; } = "";
+        public string PurchaseOrderId { get; set; } = "";
+        public string PurchaseOrderLineId { get; set; } = "";
+        public string SupplierId { get; set; } = "";
+        public string WarehouseId { get; set; } = "";
+        public string LocationId { get; set; } = "";
+        public string ReferenceNumber { get; set; } = "";
+        public string IdempotencyKey { get; set; } = "";
+        public string Quantity { get; set; } = "1";
+        public string UnitCost { get; set; } = "";
+        public string UnitOfMeasure { get; set; } = "each";
+        public string LotId { get; set; } = "";
+
+        public void Reset()
+        {
+            ReceiptNumber = "";
+            PurchaseOrderId = "";
+            PurchaseOrderLineId = "";
+            SupplierId = "";
+            WarehouseId = "";
+            LocationId = "";
+            ReferenceNumber = "";
+            IdempotencyKey = "";
+            Quantity = "1";
+            UnitCost = "";
+            UnitOfMeasure = "each";
+            LotId = "";
+        }
+    }
+
+    private sealed class RuleForm
+    {
+        public string WarehouseId { get; set; } = "";
+        public string LocationId { get; set; } = "";
+        public string MinimumQuantity { get; set; } = "0";
+        public string MaximumQuantity { get; set; } = "";
+        public string ReorderPoint { get; set; } = "0";
+        public string ReorderQuantity { get; set; } = "1";
+        public string PreferredSupplier { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            WarehouseId = "";
+            LocationId = "";
+            MinimumQuantity = "0";
+            MaximumQuantity = "";
+            ReorderPoint = "0";
+            ReorderQuantity = "1";
+            PreferredSupplier = "";
+            IsActive = true;
+        }
+    }
+
+    private sealed class WarehouseForm
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string AddressLine { get; set; } = "";
+        public string City { get; set; } = "";
+        public string Region { get; set; } = "";
+        public string CountryCode { get; set; } = "";
+        public bool IsDefault { get; set; }
+
+        public void Reset()
+        {
+            Code = "";
+            Name = "";
+            Description = "";
+            AddressLine = "";
+            City = "";
+            Region = "";
+            CountryCode = "";
+            IsDefault = false;
+        }
+    }
+
+    private sealed class LocationForm
+    {
+        public string WarehouseId { get; set; } = "";
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string LocationType { get; set; } = InventoryLocationType.Bin.ToString();
+        public bool IsPickable { get; set; } = true;
+
+        public void Reset()
+        {
+            WarehouseId = "";
+            Code = "";
+            Name = "";
+            Description = "";
+            LocationType = InventoryLocationType.Bin.ToString();
+            IsPickable = true;
+        }
+    }
+
+    private sealed class SupplierForm
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string ContactName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Phone { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            Code = "";
+            Name = "";
+            ContactName = "";
+            Email = "";
+            Phone = "";
+            IsActive = true;
+        }
     }
 }

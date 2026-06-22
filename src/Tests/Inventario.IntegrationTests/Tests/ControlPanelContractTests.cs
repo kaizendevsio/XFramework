@@ -53,6 +53,32 @@ public sealed class ControlPanelContractTests
         offenders.Should().BeEmpty("business workflow entities must go through IInventarioServiceWrapper endpoints");
     }
 
+    [Test]
+    public void ProductDetail_DependencyCreation_UsesEntityPickerOwnedDialogs()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var productDetailPath = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario",
+            "ProductDetail.razor");
+
+        var text = File.ReadAllText(productDetailPath);
+
+        text.Should().Contain("<XfEntityPicker", "product workflows should select dependency entities through the shared picker");
+        text.Should().NotContain("PrerequisiteCreateBlock", "dependency creation belongs to picker-owned dialogs, not embedded parent form sections");
+        text.Should().NotContain("CreateWarehouseForWorkflow", "warehouse creation must be launched from the picker action, not inline in the stock form");
+        text.Should().NotContain("CreateLocationForWorkflow", "location creation must be launched from the picker action, not inline in the stock form");
+        text.Should().NotContain("WarehouseQuickForm", "quick prerequisite forms should not be embedded in product workflow dialogs");
+        text.Should().NotContain("LocationQuickForm", "quick prerequisite forms should not be embedded in product workflow dialogs");
+        text.Should().NotContain("Create the first warehouse without leaving this product workflow.");
+        text.Should().NotContain("The selected warehouse has no locations yet.");
+    }
+
     private static IEnumerable<string> FindDirectMutations(
         DirectoryInfo repositoryRoot,
         string path,

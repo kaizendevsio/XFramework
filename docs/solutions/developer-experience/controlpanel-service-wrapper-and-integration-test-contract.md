@@ -46,6 +46,18 @@ Examples:
 - Wallet operations: use wrapper methods for deposits, withdrawals, holds, transfers, closes, and status changes.
 - Identity authentication, credentials, sessions, and role assignment workflows should use the relevant IdentityServer wrapper operation when one exists.
 
+## Product-Centric Inventory UI
+
+Inventario product detail is the operational hub for product-specific inventory workflows. When adding UI for product stock, lots/batches, receiving, replenishment, variations, or product transaction history:
+
+- Keep the operator on `/inventario/products/{id}` or one of its detail-sidebar section routes.
+- Use product-preselected dialogs for product-specific stock movements, receiving, lot creation, and reorder rules.
+- Use shared entity pickers for dependency entities such as warehouse, location, lot, supplier, and purchase order.
+- Dependency creation belongs to picker-owned `Create New` dialogs and picker-owned `Advanced Search` dialogs. Do not embed warehouse/location/supplier create forms directly inside product stock, receiving, or replenishment forms.
+- Do not put existing-record edit workflows into list-page modals. List pages should navigate to detail pages; detail pages are the edit/operation surface.
+- Keep wrapper calls authoritative for stock, receiving, lots, reservations, planning, purchasing, reporting, and other advanced workflows.
+- Keep direct `IDataContext` mutations limited to the explicit Inventario catalog allowlist unless the contract is deliberately expanded and covered by tests.
+
 ## IDataContext Is Still Valid
 
 `IDataContext` remains the preferred ControlPanel API for:

@@ -166,6 +166,7 @@ public sealed class CatalogTests : InventarioTestBase
             Id = Guid.NewGuid(),
             TenantId = InventarioIntegrationTestFixture.TestTenantId,
             ProductId = product.Id,
+            VariationType = "Size",
             Name = $"Variation {Guid.NewGuid():N}",
             AdditionalPrice = 2.5m,
             IsEnabled = true,
@@ -181,6 +182,7 @@ public sealed class CatalogTests : InventarioTestBase
             .FirstOrDefaultAsync(x => x.Id == variation.Id);
         persisted.Should().NotBeNull();
         persisted!.ProductId.Should().Be(product.Id);
+        persisted.VariationType.Should().Be("Size");
     }
 
     [Test]
@@ -194,6 +196,7 @@ public sealed class CatalogTests : InventarioTestBase
             Id = Guid.NewGuid(),
             TenantId = InventarioIntegrationTestFixture.TestTenantId,
             ProductId = product.Id,
+            VariationType = "Size",
             Name = $"Variation {Guid.NewGuid():N}",
             AdditionalPrice = 2m,
             IsEnabled = true,
@@ -205,6 +208,7 @@ public sealed class CatalogTests : InventarioTestBase
         var ctx = InventarioIntegrationTestFixture.DataContext;
 
         variation.Name = $"Updated Variation {Guid.NewGuid():N}";
+        variation.VariationType = "Color";
         variation.AdditionalPrice = 4m;
         ctx.Update(variation);
         var save = await ctx.SaveChangesAsync();
@@ -216,6 +220,7 @@ public sealed class CatalogTests : InventarioTestBase
             .AsNoTracking()
             .FirstAsync(x => x.Id == variation.Id);
         persisted.Name.Should().Be(variation.Name);
+        persisted.VariationType.Should().Be("Color");
         persisted.AdditionalPrice.Should().Be(4m);
     }
 
