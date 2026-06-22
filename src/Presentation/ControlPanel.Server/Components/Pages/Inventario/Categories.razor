@@ -43,12 +43,12 @@ else
                                 OnRowClick="@((ProductCategory item) => Navigation.NavigateTo($"/inventario/categories/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
-                            <BbDataGridTemplateColumn Title="Products">
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Products" Filterable="true" FilterBy="@(item => GetProductCount(item.Id))">
                                 <ChildContent Context="item">@GetProductCount(item.Id)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <div class="flex items-center gap-1" @onclick:stopPropagation="true">

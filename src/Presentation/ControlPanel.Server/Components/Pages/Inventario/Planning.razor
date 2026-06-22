@@ -73,13 +73,13 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_suggestions" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.SuggestedQuantity)" Title="Suggested Qty" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.SuggestedQuantity)" Title="Suggested Qty" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -93,18 +93,18 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_rules" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Scope">
+                            <BbDataGridTemplateColumn Title="Scope" Filterable="true" FilterBy="@(item => GetScopeLabel(item))">
                                 <ChildContent Context="item">@GetScopeLabel(item)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Point" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Qty" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Supplier" />
-                            <BbDataGridTemplateColumn Title="Status">
+                            <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Point" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Qty" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Supplier" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsActive)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>

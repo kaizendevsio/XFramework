@@ -54,15 +54,15 @@ else
                                 OnRowClick="@((Warehouse item) => Navigation.NavigateTo($"/inventario/warehouses/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.City)" Title="City" />
-                            <BbDataGridTemplateColumn Title="Default">
+                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.City)" Title="City" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Default" Filterable="true" FilterBy="@(item => item.IsDefault)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsDefault ? "Default" : "Standard")" Status="@(item.IsDefault ? "active" : "inactive")" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Locations">
+                            <BbDataGridTemplateColumn Title="Locations" Filterable="true" FilterBy="@(item => _locations.Count(x => x.WarehouseId == item.Id))">
                                 <ChildContent Context="item">@_locations.Count(x => x.WarehouseId == item.Id)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
@@ -88,13 +88,13 @@ else
                                 OnRowClick="@((InventoryLocation item) => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Warehouse">
+                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                                 <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LocationType)" Title="Type" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Pickable">
+                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LocationType)" Title="Type" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Pickable" Filterable="true" FilterBy="@(item => item.IsPickable)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsPickable ? "Pickable" : "Storage")" Status="@(item.IsPickable ? "active" : "inactive")" />
                                 </ChildContent>

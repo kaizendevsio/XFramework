@@ -57,25 +57,25 @@ else
                                     OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                                     Class="cursor-pointer">
                             <Columns>
-                                <BbDataGridTemplateColumn Title="Product">
+                                <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Warehouse">
+                                <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                                     <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Location">
+                                <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
                                     <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                                 </BbDataGridTemplateColumn>
                                 @if (_traceabilityEnabled)
                                 {
-                                    <BbDataGridTemplateColumn Title="Lot">
+                                    <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId))">
                                         <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
                                     </BbDataGridTemplateColumn>
                                 }
-                                <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.LastMovementAt)" Title="Last Movement" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LastMovementAt)" Title="Last Movement" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View stock balance"
@@ -102,21 +102,21 @@ else
                                     OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                     Class="cursor-pointer">
                             <Columns>
-                                <BbDataGridTemplateColumn Title="Product">
+                                <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                                 </BbDataGridTemplateColumn>
                                 @if (_traceabilityEnabled)
                                 {
-                                    <BbDataGridTemplateColumn Title="Lot">
+                                    <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId))">
                                         <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
                                     </BbDataGridTemplateColumn>
                                 }
-                                <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="Before" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
-                                <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="Before" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View movement"

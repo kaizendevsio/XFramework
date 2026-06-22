@@ -49,18 +49,18 @@ else
                                 OnRowClick="@((PurchaseOrder item) => Navigation.NavigateTo($"/inventario/purchase-orders/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.OrderNumber)" Title="Order" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Supplier">
+                            <BbDataGridPropertyColumn Property="@(x => x.OrderNumber)" Title="Order" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Supplier" Filterable="true" FilterBy="@(item => GetSupplierName(item.SupplierId))">
                                 <ChildContent Context="item">@GetSupplierName(item.SupplierId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Status">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.OrderDate)" Title="Order Date" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ExpectedDate)" Title="Expected" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Lines">
+                            <BbDataGridPropertyColumn Property="@(x => x.OrderDate)" Title="Order Date" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ExpectedDate)" Title="Expected" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Lines" Filterable="true" FilterBy="@(item => _lines.Count(x => x.PurchaseOrderId == item.Id))">
                                 <ChildContent Context="item">@_lines.Count(x => x.PurchaseOrderId == item.Id)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
