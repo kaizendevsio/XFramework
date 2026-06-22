@@ -116,7 +116,9 @@ ControlPanel forms should use framework controls that match the data type:
 
 For `BbCombobox`, prefer typed `SelectOption<TValue>` options when the selection is simple. Use compositional `BbComboboxItem` only when the option rows need rich custom markup.
 
-For parent dependency entities, use the shared `XfEntityPicker<TItem>` pattern instead of embedding prerequisite forms in the parent workflow. The picker trigger should provide search/select, an `Advanced Search` dialog, and a `Create New` dialog. For example, a product stock dialog should pick a warehouse/location/lot through entity pickers; warehouse and location creation belongs to the picker-owned create dialogs, not directly inside the stock form.
+For parent dependency entities, use the shared `XfEntityPicker<TItem>` pattern instead of embedding prerequisite forms in the parent workflow. The picker trigger should provide quick search/select, an `Advanced Search` dialog, and a `Create New` dialog. For example, a product stock dialog should pick a warehouse/location/lot through entity pickers; warehouse and location creation belongs to the picker-owned create dialogs, not directly inside the stock form.
+
+`Advanced Search` must be meaningfully advanced. Do not implement it as a larger copy of the quick dropdown. Configure entity-specific `AdvancedColumns`, `AdvancedFilters`, and `AdvancedSearchScope` so the dialog shows a sortable multi-column finder with explicit filter controls. The operator should be able to tell what is being searched and filtered, for example warehouse code/name/location/default status, lot number/status/expiry/on-hand quantity, or supplier code/name/contact/active status.
 
 ## Operational Page Layout
 
