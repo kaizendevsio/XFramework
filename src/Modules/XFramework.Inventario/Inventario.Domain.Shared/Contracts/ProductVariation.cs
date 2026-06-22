@@ -22,4 +22,6 @@ public partial class ProductVariation : BaseModel
     public Guid ProductId { get; set; }
     [MemoryPackOrder(3)]
     public Product? Product { get; set; }
+    [MemoryPackOrder(4)]
+    public string? VariationType { get; set; }
 }

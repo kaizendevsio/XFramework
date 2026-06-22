@@ -1,0 +1,118 @@
+@inject NavigationManager Navigation
+@inject TenantModuleNavigationService ModuleNavigation
+@implements IDisposable
+
+<div class="space-y-1">
+    <NavLink href="/inventario/products"
+             Match="NavLinkMatch.All"
+             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+        <LucideIcon Name="arrow-left" class="h-4 w-4" />
+        Product List
+    </NavLink>
+</div>
+
+<div class="mt-4">
+    <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Product Detail</p>
+    <div class="space-y-0.5">
+        <a href="@SectionHref("summary")" class="@SectionClass("summary")">
+            <LucideIcon Name="file-text" class="h-4 w-4" />
+            Summary
+        </a>
+        @if (ShowStock)
+        {
+            <a href="@SectionHref("stock")" class="@SectionClass("stock")">
+                <LucideIcon Name="boxes" class="h-4 w-4" />
+                Stock
+            </a>
+        }
+        @if (ShowLots)
+        {
+            <a href="@SectionHref("lots")" class="@SectionClass("lots")">
+                <LucideIcon Name="package-search" class="h-4 w-4" />
+                Lots / Batches
+            </a>
+        }
+        @if (ShowReplenishment)
+        {
+            <a href="@SectionHref("replenishment")" class="@SectionClass("replenishment")">
+                <LucideIcon Name="chart-no-axes-combined" class="h-4 w-4" />
+                Replenishment
+            </a>
+        }
+        @if (ShowVariations)
+        {
+            <a href="@SectionHref("variations")" class="@SectionClass("variations")">
+                <LucideIcon Name="sliders-horizontal" class="h-4 w-4" />
+                Variations
+            </a>
+        }
+        @if (ShowTransactions)
+        {
+            <a href="@SectionHref("transactions")" class="@SectionClass("transactions")">
+                <LucideIcon Name="history" class="h-4 w-4" />
+                Transactions
+            </a>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid ProductId { get; set; }
+
+    private string CurrentPath => new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/');
+    private string BaseHref => $"/inventario/products/{ProductId}";
+    private bool ShowStock =>
+        ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances")
+        || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements")
+        || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing");
+    private bool ShowLots => ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability");
+    private bool ShowReplenishment => ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning");
+    private bool ShowVariations => ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "variations");
+    private bool ShowTransactions => ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "transactions");
+
+    private string CurrentSection
+    {
+        get
+        {
+            var segments = CurrentPath
+                .Trim('/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            return segments.Length >= 4 ? NormalizeSection(segments[3]) : "summary";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        ModuleNavigation.OnChanged += OnModuleNavigationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ModuleNavigation.EnsureLoadedAsync();
+    }
+
+    private void OnModuleNavigationChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private string SectionHref(string section) =>
+        section == "summary" ? BaseHref : $"{BaseHref}/{section}";
+
+    private string SectionClass(string section) =>
+        "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent "
+        + (CurrentSection == section ? "bg-sidebar-accent text-sidebar-accent-foreground" : "");
+
+    private static string NormalizeSection(string section) =>
+        section.ToLowerInvariant() switch
+        {
+            "batches" => "lots",
+            "lots-batches" => "lots",
+            "reorder" => "replenishment",
+            "rules" => "replenishment",
+            _ => section.ToLowerInvariant()
+        };
+
+    public void Dispose()
+    {
+        ModuleNavigation.OnChanged -= OnModuleNavigationChanged;
+    }
+}

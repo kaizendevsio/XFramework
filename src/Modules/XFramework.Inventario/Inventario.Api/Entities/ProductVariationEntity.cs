@@ -8,6 +8,7 @@ public partial class ProductVariationEntity
 {
     public Guid Id { get; set; }
     public string? Name { get; set; }
+    public string? VariationType { get; set; }
     public decimal AdditionalPrice { get; set; }
     public Guid ProductId { get; set; }
     
@@ -25,6 +26,7 @@ public partial class ProductVariationEntity
 public class CreateProductVariationEntityRequest
 {
     public string Name { get; set; } = string.Empty;
+    public string? VariationType { get; set; }
     public decimal AdditionalPrice { get; set; }
     public Guid ProductId { get; set; }
 }
@@ -35,6 +37,7 @@ public class CreateProductVariationEntityRequest
 public class UpdateProductVariationEntityRequest
 {
     public string Name { get; set; } = string.Empty;
+    public string? VariationType { get; set; }
     public decimal AdditionalPrice { get; set; }
     public Guid ProductId { get; set; }
 }
