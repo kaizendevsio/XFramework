@@ -187,6 +187,8 @@ else
                             Placeholder="Select user or credential"
                             SearchPlaceholder="Search users or credentials..."
                             EmptyMessage="No credentials found."
+                            AllowClear="true"
+                            ClearText="Clear credential"
                             AdvancedSearchTitle="Find Credential"
                             AdvancedSearchDescription="Search credentials for the active tenant before creating a wallet." />
             <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.WalletType"
@@ -203,6 +205,8 @@ else
                             Placeholder="Select wallet type"
                             SearchPlaceholder="Search wallet types..."
                             EmptyMessage="No wallet types found."
+                            AllowClear="true"
+                            ClearText="Clear wallet type"
                             AdvancedSearchTitle="Find Wallet Type"
                             AdvancedSearchDescription="Search wallet types available to the active tenant." />
             <BbFormFieldInput TValue="string"
