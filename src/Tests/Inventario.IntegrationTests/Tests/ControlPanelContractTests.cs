@@ -115,12 +115,17 @@ public sealed class ControlPanelContractTests
         productDetailText.Should().Contain("AdvancedColumns=\"@PurchaseOrderAdvancedColumns\"");
         productDetailText.Should().Contain("AdvancedFilters=\"@PurchaseOrderAdvancedFilters\"");
 
-        pickerText.Should().Contain("xf-entity-picker-advanced-table", "advanced search must render a multi-column finder, not the same single-column command list");
-        pickerText.Should().Contain("ToggleAdvancedSort", "advanced search columns should be sortable");
-        pickerText.Should().Contain("AdvancedFilters", "advanced search should support explicit filters");
+        pickerText.Should().Contain("<BbDataGrid", "advanced search must use the shared BlazorBlueprint data grid instead of a custom table");
+        pickerText.Should().Contain("BbDataGridTemplateColumn", "advanced search must render a multi-column finder, not the same single-column command list");
+        pickerText.Should().Contain("SortBy", "advanced search columns should use native data grid sorting");
         pickerText.Should().Contain("xf-entity-picker-advanced-dialog", "advanced search dialogs should be wide enough for multi-column finder tables");
+        pickerText.Should().Contain("Hover over a column header to reveal its filter.", "advanced search should make native column filters discoverable");
         pickerText.Should().Contain("ShowAdvancedColumnFilters", "advanced finder tables should support per-column filtering");
-        pickerText.Should().Contain("xf-entity-picker-column-filter", "advanced finder tables should render column filter inputs");
+        pickerText.Should().Contain("FilterBy", "advanced finder tables should use native data grid column filtering");
+        pickerText.Should().NotContain("xf-entity-picker-advanced-tools", "advanced search should not render a redundant search band above the data grid");
+        pickerText.Should().NotContain("xf-entity-picker-advanced-filters", "advanced search should use native data grid filters instead of duplicate select filters above the grid");
+        pickerText.Should().NotContain("xf-entity-picker-column-filter", "advanced finder tables should not render custom filter inputs");
+        pickerText.Should().NotContain("<table class=\"xf-entity-picker-advanced-table\"", "advanced finder tables should not use a custom table implementation");
         pickerText.Should().NotContain("__all__", "filter sentinels must not leak into selected filter labels");
     }
 
