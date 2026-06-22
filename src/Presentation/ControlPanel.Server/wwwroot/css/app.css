@@ -240,125 +240,25 @@
     color: var(--muted-foreground);
 }
 
-.xf-entity-picker-advanced-tools {
-    display: grid;
-    gap: 0.35rem;
-}
-
 .xf-entity-picker-advanced-dialog {
     width: min(74rem, calc(100vw - 2rem));
     max-width: min(74rem, calc(100vw - 2rem));
 }
 
-.xf-entity-picker-advanced-filters {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    gap: 0.75rem;
-    align-items: end;
-}
-
-.xf-entity-picker-advanced-meta {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0.75rem;
+.xf-entity-picker-advanced-hint {
     color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1rem;
-}
-
-.xf-entity-picker-advanced-table-wrap {
-    max-height: min(32rem, 60vh);
-    overflow: auto;
-    border: 1px solid var(--border);
-    border-radius: calc(var(--radius) - 2px);
-}
-
-.xf-entity-picker-advanced-table {
-    width: 100%;
-    min-width: 58rem;
-    border-collapse: collapse;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     line-height: 1.25rem;
+    margin: 0.25rem 0 0;
 }
 
-.xf-entity-picker-advanced-table th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    border-bottom: 1px solid var(--border);
-    background: var(--muted);
-    color: var(--muted-foreground);
-    font-weight: 500;
-    padding: 0.625rem 0.75rem;
-    text-align: left;
-    white-space: nowrap;
+.xf-entity-picker-advanced-grid-wrap {
+    max-height: min(34rem, 62vh);
+    overflow: auto;
 }
 
-.xf-entity-picker-advanced-filter-row th {
-    top: 2.5rem;
-    z-index: 2;
-    background: color-mix(in oklab, var(--muted) 72%, var(--background));
-    padding: 0.45rem 0.5rem;
-}
-
-.xf-entity-picker-advanced-table td {
-    border-bottom: 1px solid var(--border);
-    padding: 0.625rem 0.75rem;
-    vertical-align: top;
-}
-
-.xf-entity-picker-advanced-row {
-    cursor: pointer;
-    transition: background-color 150ms ease, box-shadow 150ms ease;
-}
-
-.xf-entity-picker-advanced-row:hover {
-    background: color-mix(in oklab, var(--muted) 45%, transparent);
-}
-
-.xf-entity-picker-advanced-row:focus-visible {
-    outline: none;
-    box-shadow: inset 0 0 0 1px var(--ring);
-}
-
-.xf-entity-picker-sort {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    padding: 0;
-}
-
-.xf-entity-picker-column-filter {
-    width: 100%;
-    min-width: 7rem;
-    height: 2rem;
-    border-radius: calc(var(--radius) - 4px);
-    border: 1px solid var(--input);
-    background: var(--background);
-    color: var(--foreground);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    padding: 0.35rem 0.5rem;
-    outline: none;
-}
-
-.xf-entity-picker-column-filter::placeholder {
-    color: var(--muted-foreground);
-}
-
-.xf-entity-picker-column-filter:focus {
-    border-color: var(--ring);
-    box-shadow: 0 0 0 1px var(--ring);
-}
-
-.xf-entity-picker-sort:hover {
-    color: var(--foreground);
+.xf-entity-picker-advanced-grid {
+    min-width: 58rem;
 }
 
 .xf-entity-picker-empty {
