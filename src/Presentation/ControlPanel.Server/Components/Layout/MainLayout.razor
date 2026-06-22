@@ -28,6 +28,10 @@
                 {
                     <ProductDetailSidebar ProductId="@productRouteId" />
                 }
+                else if (TryGetWalletDetailRoute(out var walletRouteId, out _))
+                {
+                    <WalletDetailSidebar WalletId="@walletRouteId" />
+                }
                 else if (TryGetTenantDetailRoute(out var tenantRouteId, out _))
                 {
                     <TenantDetailSidebar TenantId="@tenantRouteId" />
@@ -369,6 +373,31 @@
             || !string.Equals(segments[0], "inventario", StringComparison.OrdinalIgnoreCase)
             || !string.Equals(segments[1], "products", StringComparison.OrdinalIgnoreCase)
             || !Guid.TryParse(segments[2], out productId))
+        {
+            return false;
+        }
+
+        if (segments.Length >= 4)
+        {
+            section = segments[3];
+        }
+
+        return true;
+    }
+
+    private bool TryGetWalletDetailRoute(out Guid walletId, out string section)
+    {
+        walletId = Guid.Empty;
+        section = "summary";
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 3
+            || !string.Equals(segments[0], "finance", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(segments[1], "wallets", StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(segments[2], out walletId))
         {
             return false;
         }

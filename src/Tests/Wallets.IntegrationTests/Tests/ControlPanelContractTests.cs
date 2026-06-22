@@ -92,6 +92,56 @@ public sealed class ControlPanelContractTests
         offenders.Should().BeEmpty("Wallets dependency creation must stay behind existing service/API workflows unless a picker safely owns creation");
     }
 
+    [Test]
+    public void WalletsFinancePages_EntityDependencyPickers_EnableClearSelection()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+
+        var offenders = WalletPickerPages
+            .SelectMany(page =>
+            {
+                var text = File.ReadAllText(Path.Combine(pagesRoot.FullName, page));
+                return Regex.Matches(text, @"<XfEntityPicker[\s\S]*?/>")
+                    .Cast<Match>()
+                    .Select((match, index) => (Page: page, Picker: index + 1, Text: match.Value));
+            })
+            .Where(picker => !picker.Text.Contains("AllowClear=\"true\"", StringComparison.Ordinal)
+                || !picker.Text.Contains("ClearText=", StringComparison.Ordinal))
+            .Select(picker => $"{picker.Page} picker #{picker.Picker}")
+            .ToArray();
+
+        offenders.Should().BeEmpty("Wallets entity dependency pickers should let admins clear mistaken selections where the workflow continues to own creation/mutation");
+    }
+
+    [Test]
+    public void WalletDetail_UsesSectionSidebarNavigation()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+        var layoutRoot = GetLayoutRoot(repositoryRoot);
+
+        var detailPage = File.ReadAllText(Path.Combine(pagesRoot.FullName, "WalletDetail.razor"));
+        var mainLayout = File.ReadAllText(Path.Combine(layoutRoot.FullName, "MainLayout.razor"));
+        var sidebar = File.ReadAllText(Path.Combine(layoutRoot.FullName, "WalletDetailSidebar.razor"));
+
+        detailPage.Should().Contain("@page \"/finance/wallets/{Id:guid}/{Section}\"",
+            "wallet detail subpages should route to focused sections instead of one crammed page");
+        detailPage.Should().Contain("CurrentSection == \"summary\"");
+        detailPage.Should().Contain("CurrentSection == \"workflows\"");
+        detailPage.Should().Contain("CurrentSection == \"transactions\"");
+        detailPage.Should().Contain("CurrentSection == \"rules\"");
+
+        mainLayout.Should().Contain("TryGetWalletDetailRoute", "wallet detail routes should replace the main module nav with the detail sidebar");
+        mainLayout.Should().Contain("<WalletDetailSidebar WalletId=\"@walletRouteId\" />");
+
+        sidebar.Should().Contain("Wallet List");
+        sidebar.Should().Contain("SectionHref(\"summary\")");
+        sidebar.Should().Contain("SectionHref(\"workflows\")");
+        sidebar.Should().Contain("SectionHref(\"transactions\")");
+        sidebar.Should().Contain("SectionHref(\"rules\")");
+    }
+
     private static DirectoryInfo GetFinancePagesRoot(DirectoryInfo repositoryRoot) =>
         new(Path.Combine(
             repositoryRoot.FullName,
@@ -101,6 +151,15 @@ public sealed class ControlPanelContractTests
             "Components",
             "Pages",
             "Finance"));
+
+    private static DirectoryInfo GetLayoutRoot(DirectoryInfo repositoryRoot) =>
+        new(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Layout"));
 
     private static IEnumerable<string> FindDirectMutations(
         DirectoryInfo repositoryRoot,

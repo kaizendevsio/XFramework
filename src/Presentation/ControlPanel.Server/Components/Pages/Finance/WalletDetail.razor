@@ -1,4 +1,5 @@
 @page "/finance/wallets/{Id:guid}"
+@page "/finance/wallets/{Id:guid}/{Section}"
 @using System.Globalization
 @using global::Wallets.Domain.Shared.Enums
 @using global::Wallets.Integration.Drivers
@@ -73,6 +74,8 @@ else
             </div>
         </div>
 
+        @if (CurrentSection == "summary")
+        {
         @* Wallet Summary Card *@
         <BbCard>
             <BbCardHeader>
@@ -148,7 +151,10 @@ else
                 </div>
             </BbCardContent>
         </BbCard>
+        }
 
+        else if (CurrentSection == "workflows")
+        {
         @* Admin Operations *@
         <BbCard>
             <BbCardHeader>
@@ -317,7 +323,10 @@ else
                 </BbTabs>
             </BbCardContent>
         </BbCard>
+        }
 
+        else if (CurrentSection == "transactions")
+        {
         @* Transaction History *@
         <BbCard>
             <BbCardHeader>
@@ -420,7 +429,10 @@ else
                 </BbDataGrid>
             </BbCardContent>
         </BbCard>
+        }
 
+        else if (CurrentSection == "rules")
+        {
         @* Wallet Rules *@
         <BbCard>
             <BbCardHeader>
@@ -510,6 +522,7 @@ else
                 }
             </BbCardContent>
         </BbCard>
+        }
     </div>
     </FadeInContent>
 }
@@ -540,6 +553,7 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
+    [Parameter] public string? Section { get; set; }
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
@@ -585,6 +599,23 @@ else
     private string _rulesMaxTransfer = "";
     private string _rulesBondBalance = "";
     private string _rulesMaintainingBalance = "";
+    private string CurrentSection => NormalizeSection(Section);
+
+    private static string NormalizeSection(string? section) =>
+        string.IsNullOrWhiteSpace(section)
+            ? "summary"
+            : section.ToLowerInvariant() switch
+            {
+                "activity" => "transactions",
+                "history" => "transactions",
+                "operations" => "workflows",
+                "workflow" => "workflows",
+                "limits" => "rules",
+                "rules" => "rules",
+                "transactions" => "transactions",
+                "workflows" => "workflows",
+                _ => "summary"
+            };
 
     protected override void OnInitialized()
     {
