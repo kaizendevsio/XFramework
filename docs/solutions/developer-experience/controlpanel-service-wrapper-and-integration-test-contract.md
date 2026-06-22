@@ -54,6 +54,7 @@ Inventario product detail is the operational hub for product-specific inventory 
 - Use product-preselected dialogs for product-specific stock movements, receiving, lot creation, and reorder rules.
 - Use shared entity pickers for dependency entities such as warehouse, location, lot, supplier, and purchase order.
 - Dependency creation belongs to picker-owned `Create New` dialogs and picker-owned `Advanced Search` dialogs. Do not embed warehouse/location/supplier create forms directly inside product stock, receiving, or replenishment forms.
+- Picker `Advanced Search` dialogs must expose domain-specific columns, filters, and sorting. A plain single text search in a modal is not enough; the dialog should state what it searches and provide useful finder columns such as code, name, status, warehouse/location scope, expiry, supplier, active/default flags, and created dates where applicable.
 - Do not put existing-record edit workflows into list-page modals. List pages should navigate to detail pages; detail pages are the edit/operation surface.
 - Keep wrapper calls authoritative for stock, receiving, lots, reservations, planning, purchasing, reporting, and other advanced workflows.
 - Keep direct `IDataContext` mutations limited to the explicit Inventario catalog allowlist unless the contract is deliberately expanded and covered by tests.

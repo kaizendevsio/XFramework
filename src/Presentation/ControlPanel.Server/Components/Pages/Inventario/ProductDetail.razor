@@ -120,6 +120,9 @@ else
                                     ValueSelector="@GetWarehousePickerValue"
                                     TextSelector="@GetWarehouseLabel"
                                     SearchTextSelector="@GetWarehouseSearchText"
+                                    AdvancedColumns="@WarehouseAdvancedColumns"
+                                    AdvancedFilters="@WarehouseAdvancedFilters"
+                                    AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
                                     Placeholder="Select warehouse"
                                     SearchPlaceholder="Search warehouses..."
                                     EmptyMessage="No warehouses found."
@@ -136,6 +139,9 @@ else
                                     ValueSelector="@GetLocationPickerValue"
                                     TextSelector="@GetLocationLabel"
                                     SearchTextSelector="@GetLocationSearchText"
+                                    AdvancedColumns="@LocationAdvancedColumns"
+                                    AdvancedFilters="@LocationAdvancedFilters"
+                                    AdvancedSearchScope="Searches location code, name, warehouse, type, pickable flag, and description."
                                     Placeholder="Select location"
                                     SearchPlaceholder="Search locations..."
                                     EmptyMessage="No locations found."
@@ -156,6 +162,9 @@ else
                                         ValueSelector="@GetLotPickerValue"
                                         TextSelector="@GetLotLabel"
                                         SearchTextSelector="@GetLotSearchText"
+                                        AdvancedColumns="@LotAdvancedColumns"
+                                        AdvancedFilters="@LotAdvancedFilters"
+                                        AdvancedSearchScope="Searches lot number, status, expiry, received date, supplier/source reference, and on-hand quantity."
                                         Placeholder="No lot / untracked"
                                         SearchPlaceholder="Search lots..."
                                         EmptyMessage="No lots found."
@@ -245,6 +254,9 @@ else
                                     ValueSelector="@GetPurchaseOrderPickerValue"
                                     TextSelector="@GetPurchaseOrderLabel"
                                     SearchTextSelector="@GetPurchaseOrderSearchText"
+                                    AdvancedColumns="@PurchaseOrderAdvancedColumns"
+                                    AdvancedFilters="@PurchaseOrderAdvancedFilters"
+                                    AdvancedSearchScope="Searches purchase order number, status, supplier, order date, expected date, and notes."
                                     Placeholder="No purchase order"
                                     SearchPlaceholder="Search purchase orders..."
                                     EmptyMessage="No purchase orders found."
@@ -261,6 +273,9 @@ else
                                     ValueSelector="@GetSupplierPickerValue"
                                     TextSelector="@GetSupplierLabel"
                                     SearchTextSelector="@GetSupplierSearchText"
+                                    AdvancedColumns="@SupplierAdvancedColumns"
+                                    AdvancedFilters="@SupplierAdvancedFilters"
+                                    AdvancedSearchScope="Searches supplier code, name, contact, email, phone, active flag, and created date."
                                     Placeholder="No supplier"
                                     SearchPlaceholder="Search suppliers..."
                                     EmptyMessage="No suppliers found."
@@ -282,6 +297,9 @@ else
                                     ValueSelector="@GetWarehousePickerValue"
                                     TextSelector="@GetWarehouseLabel"
                                     SearchTextSelector="@GetWarehouseSearchText"
+                                    AdvancedColumns="@WarehouseAdvancedColumns"
+                                    AdvancedFilters="@WarehouseAdvancedFilters"
+                                    AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
                                     Placeholder="Select warehouse"
                                     SearchPlaceholder="Search warehouses..."
                                     EmptyMessage="No warehouses found."
@@ -298,6 +316,9 @@ else
                                     ValueSelector="@GetLocationPickerValue"
                                     TextSelector="@GetLocationLabel"
                                     SearchTextSelector="@GetLocationSearchText"
+                                    AdvancedColumns="@LocationAdvancedColumns"
+                                    AdvancedFilters="@LocationAdvancedFilters"
+                                    AdvancedSearchScope="Searches location code, name, warehouse, type, pickable flag, and description."
                                     Placeholder="Select location"
                                     SearchPlaceholder="Search locations..."
                                     EmptyMessage="No locations found."
@@ -327,6 +348,9 @@ else
                                     ValueSelector="@GetLotPickerValue"
                                     TextSelector="@GetLotLabel"
                                     SearchTextSelector="@GetLotSearchText"
+                                    AdvancedColumns="@LotAdvancedColumns"
+                                    AdvancedFilters="@LotAdvancedFilters"
+                                    AdvancedSearchScope="Searches lot number, status, expiry, received date, supplier/source reference, and on-hand quantity."
                                     Placeholder="No lot / untracked"
                                     SearchPlaceholder="Search lots..."
                                     EmptyMessage="No lots found."
@@ -364,6 +388,9 @@ else
                                     ValueSelector="@GetWarehousePickerValue"
                                     TextSelector="@GetWarehouseLabel"
                                     SearchTextSelector="@GetWarehouseSearchText"
+                                    AdvancedColumns="@WarehouseAdvancedColumns"
+                                    AdvancedFilters="@WarehouseAdvancedFilters"
+                                    AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
                                     Placeholder="Any warehouse"
                                     SearchPlaceholder="Search warehouses..."
                                     EmptyMessage="No warehouses found."
@@ -382,6 +409,9 @@ else
                                     ValueSelector="@GetLocationPickerValue"
                                     TextSelector="@GetLocationLabel"
                                     SearchTextSelector="@GetLocationSearchText"
+                                    AdvancedColumns="@LocationAdvancedColumns"
+                                    AdvancedFilters="@LocationAdvancedFilters"
+                                    AdvancedSearchScope="Searches location code, name, warehouse, type, pickable flag, and description."
                                     Placeholder="Any location"
                                     SearchPlaceholder="Search locations..."
                                     EmptyMessage="No locations found."
@@ -404,6 +434,9 @@ else
                                         ValueSelector="@GetSupplierPreferredValue"
                                         TextSelector="@GetSupplierLabel"
                                         SearchTextSelector="@GetSupplierSearchText"
+                                        AdvancedColumns="@SupplierAdvancedColumns"
+                                        AdvancedFilters="@SupplierAdvancedFilters"
+                                        AdvancedSearchScope="Searches supplier code, name, contact, email, phone, active flag, and created date."
                                         Placeholder="No preferred supplier"
                                         SearchPlaceholder="Search suppliers..."
                                         EmptyMessage="No suppliers found."
@@ -481,6 +514,9 @@ else
                                 ValueSelector="@GetWarehousePickerValue"
                                 TextSelector="@GetWarehouseLabel"
                                 SearchTextSelector="@GetWarehouseSearchText"
+                                AdvancedColumns="@WarehouseAdvancedColumns"
+                                AdvancedFilters="@WarehouseAdvancedFilters"
+                                AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
                                 Placeholder="Select warehouse"
                                 SearchPlaceholder="Search warehouses..."
                                 EmptyMessage="No warehouses found."
@@ -1904,6 +1940,157 @@ else
         $"{supplier.Code} {supplier.Name} {supplier.ContactName} {supplier.Email} {supplier.Phone}";
     private static string GetPurchaseOrderSearchText(PurchaseOrder order) =>
         $"{order.OrderNumber} {order.Status} {order.OrderDate:g} {order.ExpectedDate:g} {order.Notes}";
+
+    private IReadOnlyList<XfEntityPickerColumn<Warehouse>> WarehouseAdvancedColumns =>
+    [
+        new("Code", x => x.Code),
+        new("Name", x => x.Name),
+        new("City", x => x.City),
+        new("Region", x => x.Region),
+        new("Country", x => x.CountryCode),
+        new("Default", x => FormatBoolean(x.IsDefault)),
+        new("Locations", x => _locations.Count(location => location.WarehouseId == x.Id).ToString()),
+        new("Created", x => FormatDate(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Warehouse>> WarehouseAdvancedFilters =>
+    [
+        new("default", "Default warehouse", YesNoFilterOptions, x => x.IsDefault ? "true" : "false", "All warehouses"),
+        new("country", "Country", BuildDistinctFilterOptions(_warehouses, x => x.CountryCode), x => x.CountryCode, "All countries")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<InventoryLocation>> LocationAdvancedColumns =>
+    [
+        new("Warehouse", x => GetWarehouseName(x.WarehouseId)),
+        new("Code", x => x.Code),
+        new("Name", x => x.Name),
+        new("Type", x => x.LocationType.ToString()),
+        new("Pickable", x => FormatBoolean(x.IsPickable)),
+        new("Description", x => x.Description)
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<InventoryLocation>> LocationAdvancedFilters =>
+    [
+        new("type", "Location type", BuildEnumFilterOptions<InventoryLocationType>(), x => x.LocationType.ToString(), "All types"),
+        new("pickable", "Pickable", YesNoFilterOptions, x => x.IsPickable ? "true" : "false", "All locations")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<InventoryLot>> LotAdvancedColumns =>
+    [
+        new("Lot / Batch", x => GetLotLabel(x)),
+        new("Status", x => x.Status.ToString()),
+        new("Expiry", x => FormatDate(x.ExpiresAt)),
+        new("Received", x => FormatDate(x.ReceivedAt)),
+        new("Supplier Ref", x => x.SupplierReference),
+        new("Source", x => x.SourceReferenceType),
+        new("Unit Cost", x => FormatDecimal(x.UnitCost)),
+        new("On Hand", x => GetLotOnHand(x.Id).ToString("0.##"))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<InventoryLot>> LotAdvancedFilters =>
+    [
+        new("status", "Lot status", BuildEnumFilterOptions<InventoryLotStatus>(), x => x.Status.ToString(), "All statuses"),
+        new("expiry", "Expiry", LotExpiryFilterOptions, GetLotExpiryState, "All expiry states")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Supplier>> SupplierAdvancedColumns =>
+    [
+        new("Code", x => x.Code),
+        new("Name", x => x.Name),
+        new("Contact", x => x.ContactName),
+        new("Email", x => x.Email),
+        new("Phone", x => x.Phone),
+        new("Active", x => FormatBoolean(x.IsActive)),
+        new("Created", x => FormatDate(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Supplier>> SupplierAdvancedFilters =>
+    [
+        new("active", "Active", YesNoFilterOptions, x => x.IsActive ? "true" : "false", "All suppliers")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<PurchaseOrder>> PurchaseOrderAdvancedColumns =>
+    [
+        new("Order #", x => x.OrderNumber),
+        new("Status", x => x.Status.ToString()),
+        new("Supplier", GetPurchaseOrderSupplierLabel),
+        new("Order Date", x => FormatDate(x.OrderDate)),
+        new("Expected", x => FormatDate(x.ExpectedDate)),
+        new("Lines", x => x.Lines.Count.ToString()),
+        new("Notes", x => x.Notes)
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<PurchaseOrder>> PurchaseOrderAdvancedFilters =>
+    [
+        new("status", "Status", BuildEnumFilterOptions<PurchaseOrderStatus>(), x => x.Status.ToString(), "All statuses"),
+        new("supplier", "Supplier", BuildSupplierFilterOptions(), x => x.SupplierId?.ToString(), "All suppliers")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> LotExpiryFilterOptions =
+    [
+        new("valid", "Valid"),
+        new("near-expiry", "Near expiry"),
+        new("expired", "Expired"),
+        new("no-expiry", "No expiry")
+    ];
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildEnumFilterOptions<TEnum>()
+        where TEnum : struct, Enum =>
+        Enum.GetValues<TEnum>()
+            .Select(value => new XfEntityPickerFilterOption(value.ToString(), value.ToString()))
+            .ToArray();
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private IReadOnlyList<XfEntityPickerFilterOption> BuildSupplierFilterOptions() =>
+        _suppliers
+            .OrderBy(x => x.Name)
+            .Select(x => new XfEntityPickerFilterOption(x.Id.ToString(), GetSupplierLabel(x)))
+            .ToArray();
+
+    private string GetPurchaseOrderSupplierLabel(PurchaseOrder order)
+    {
+        if (order.Supplier is not null)
+            return GetSupplierLabel(order.Supplier);
+
+        return order.SupplierId is { } supplierId
+            ? _suppliers.FirstOrDefault(x => x.Id == supplierId) is { } supplier ? GetSupplierLabel(supplier) : supplierId.ToString()[..8]
+            : "No supplier";
+    }
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDate(DateTime value) => value == default ? "N/A" : value.ToString("yyyy-MM-dd");
+    private static string FormatDate(DateTime? value) => value is { } date ? FormatDate(date) : "N/A";
+    private static string FormatDecimal(decimal? value) => value is { } amount ? amount.ToString("0.####") : "N/A";
+
+    private static string GetLotExpiryState(InventoryLot lot)
+    {
+        if (lot.ExpiresAt is null)
+            return "no-expiry";
+
+        var expiryDate = lot.ExpiresAt.Value.Date;
+        var today = DateTime.UtcNow.Date;
+
+        if (expiryDate < today)
+            return "expired";
+
+        return expiryDate <= today.AddDays(30) ? "near-expiry" : "valid";
+    }
 
     private RequestMetadata BuildMetadata() => new()
     {

@@ -79,6 +79,47 @@ public sealed class ControlPanelContractTests
         text.Should().NotContain("The selected warehouse has no locations yet.");
     }
 
+    [Test]
+    public void ProductDetail_EntityPickers_DefineAdvancedSearchColumnsAndFilters()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var productDetailPath = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario",
+            "ProductDetail.razor");
+        var pickerPath = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Shared",
+            "XfEntityPicker.razor");
+
+        var productDetailText = File.ReadAllText(productDetailPath);
+        var pickerText = File.ReadAllText(pickerPath);
+
+        productDetailText.Should().Contain("AdvancedColumns=\"@WarehouseAdvancedColumns\"");
+        productDetailText.Should().Contain("AdvancedFilters=\"@WarehouseAdvancedFilters\"");
+        productDetailText.Should().Contain("AdvancedColumns=\"@LocationAdvancedColumns\"");
+        productDetailText.Should().Contain("AdvancedFilters=\"@LocationAdvancedFilters\"");
+        productDetailText.Should().Contain("AdvancedColumns=\"@LotAdvancedColumns\"");
+        productDetailText.Should().Contain("AdvancedFilters=\"@LotAdvancedFilters\"");
+        productDetailText.Should().Contain("AdvancedColumns=\"@SupplierAdvancedColumns\"");
+        productDetailText.Should().Contain("AdvancedFilters=\"@SupplierAdvancedFilters\"");
+        productDetailText.Should().Contain("AdvancedColumns=\"@PurchaseOrderAdvancedColumns\"");
+        productDetailText.Should().Contain("AdvancedFilters=\"@PurchaseOrderAdvancedFilters\"");
+
+        pickerText.Should().Contain("xf-entity-picker-advanced-table", "advanced search must render a multi-column finder, not the same single-column command list");
+        pickerText.Should().Contain("ToggleAdvancedSort", "advanced search columns should be sortable");
+        pickerText.Should().Contain("AdvancedFilters", "advanced search should support explicit filters");
+    }
+
     private static IEnumerable<string> FindDirectMutations(
         DirectoryInfo repositoryRoot,
         string path,
