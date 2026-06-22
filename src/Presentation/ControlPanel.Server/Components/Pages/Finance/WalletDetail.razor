@@ -170,20 +170,42 @@ else
                                               Label="Amount"
                                               Placeholder="0.00"
                                               Required="true" />
-                            <BbFormFieldSelect TValue="string" @bind-Value="_addFundsGatewayId" Label="Gateway">
-                                <BbSelectItem Value="@NoSelectionValue">Select gateway</BbSelectItem>
-                                @foreach (var gateway in _gateways)
-                                {
-                                    <BbSelectItem Value="@gateway.Id.ToString()">@BuildGatewayLabel(gateway)</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
-                            <BbFormFieldSelect TValue="string" @bind-Value="_addFundsCurrencyId" Label="Currency">
-                                <BbSelectItem Value="@NoSelectionValue">Default wallet currency</BbSelectItem>
-                                @foreach (var currency in _currencies)
-                                {
-                                    <BbSelectItem Value="@currency.Id.ToString()">@BuildCurrencyLabel(currency)</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
+                            <XfEntityPicker TItem="PaymentGateway"
+                                            Label="Gateway"
+                                            Value="@_addFundsGatewayId"
+                                            ValueChanged="@(value => _addFundsGatewayId = value ?? NoSelectionValue)"
+                                            Items="@_gateways"
+                                            ValueSelector="@GetGatewayPickerValue"
+                                            TextSelector="@BuildGatewayLabel"
+                                            SearchTextSelector="@GetGatewaySearchText"
+                                            AdvancedColumns="@GatewayAdvancedColumns"
+                                            AdvancedFilters="@GatewayAdvancedFilters"
+                                            AdvancedSearchScope="Searches gateway name, category/provider, enabled state, service charge, convenience fee, discount, and description."
+                                            Placeholder="Select gateway"
+                                            SearchPlaceholder="Search gateways..."
+                                            EmptyMessage="No gateways found."
+                                            AllowClear="true"
+                                            ClearText="Clear gateway"
+                                            AdvancedSearchTitle="Find Payment Gateway"
+                                            AdvancedSearchDescription="Search configured payment gateways for this deposit request." />
+                            <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.CurrencyType"
+                                            Label="Currency"
+                                            Value="@_addFundsCurrencyId"
+                                            ValueChanged="@(value => _addFundsCurrencyId = value ?? NoSelectionValue)"
+                                            Items="@_currencies"
+                                            ValueSelector="@GetCurrencyPickerValue"
+                                            TextSelector="@BuildCurrencyLabel"
+                                            SearchTextSelector="@GetCurrencySearchText"
+                                            AdvancedColumns="@CurrencyAdvancedColumns"
+                                            AdvancedFilters="@CurrencyAdvancedFilters"
+                                            AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
+                                            Placeholder="Default wallet currency"
+                                            SearchPlaceholder="Search currencies..."
+                                            EmptyMessage="No currencies found."
+                                            AllowClear="true"
+                                            ClearText="Default wallet currency"
+                                            AdvancedSearchTitle="Find Currency"
+                                            AdvancedSearchDescription="Search tenant and global currencies available to Wallets." />
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_addFundsRef"
                                               Label="External Reference"
@@ -210,20 +232,42 @@ else
                                               Label="Amount"
                                               Placeholder="0.00"
                                               Required="true" />
-                            <BbFormFieldSelect TValue="string" @bind-Value="_withdrawGatewayId" Label="Gateway">
-                                <BbSelectItem Value="@NoSelectionValue">No provider</BbSelectItem>
-                                @foreach (var gateway in _gateways)
-                                {
-                                    <BbSelectItem Value="@gateway.Id.ToString()">@BuildGatewayLabel(gateway)</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
-                            <BbFormFieldSelect TValue="string" @bind-Value="_withdrawCurrencyId" Label="Currency">
-                                <BbSelectItem Value="@NoSelectionValue">Default wallet currency</BbSelectItem>
-                                @foreach (var currency in _currencies)
-                                {
-                                    <BbSelectItem Value="@currency.Id.ToString()">@BuildCurrencyLabel(currency)</BbSelectItem>
-                                }
-                            </BbFormFieldSelect>
+                            <XfEntityPicker TItem="PaymentGateway"
+                                            Label="Gateway"
+                                            Value="@_withdrawGatewayId"
+                                            ValueChanged="@(value => _withdrawGatewayId = value ?? NoSelectionValue)"
+                                            Items="@_gateways"
+                                            ValueSelector="@GetGatewayPickerValue"
+                                            TextSelector="@BuildGatewayLabel"
+                                            SearchTextSelector="@GetGatewaySearchText"
+                                            AdvancedColumns="@GatewayAdvancedColumns"
+                                            AdvancedFilters="@GatewayAdvancedFilters"
+                                            AdvancedSearchScope="Searches gateway name, category/provider, enabled state, service charge, convenience fee, discount, and description."
+                                            Placeholder="No provider"
+                                            SearchPlaceholder="Search gateways..."
+                                            EmptyMessage="No gateways found."
+                                            AllowClear="true"
+                                            ClearText="No provider"
+                                            AdvancedSearchTitle="Find Payout Gateway"
+                                            AdvancedSearchDescription="Search configured payment gateways for this withdrawal request." />
+                            <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.CurrencyType"
+                                            Label="Currency"
+                                            Value="@_withdrawCurrencyId"
+                                            ValueChanged="@(value => _withdrawCurrencyId = value ?? NoSelectionValue)"
+                                            Items="@_currencies"
+                                            ValueSelector="@GetCurrencyPickerValue"
+                                            TextSelector="@BuildCurrencyLabel"
+                                            SearchTextSelector="@GetCurrencySearchText"
+                                            AdvancedColumns="@CurrencyAdvancedColumns"
+                                            AdvancedFilters="@CurrencyAdvancedFilters"
+                                            AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
+                                            Placeholder="Default wallet currency"
+                                            SearchPlaceholder="Search currencies..."
+                                            EmptyMessage="No currencies found."
+                                            AllowClear="true"
+                                            ClearText="Default wallet currency"
+                                            AdvancedSearchTitle="Find Currency"
+                                            AdvancedSearchDescription="Search tenant and global currencies available to Wallets." />
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_withdrawRef"
                                               Label="External Reference"
@@ -775,6 +819,7 @@ else
             _gateways = await DataContext.Query<PaymentGateway>()
                 .IgnoreQueryFilters()
                 .NoCache()
+                .Include(x => x.PaymentGatewayCategory)
                 .Where(x => !x.IsDeleted)
                 .OrderBy(x => x.Name)
                 .Take(100)
@@ -1023,6 +1068,15 @@ else
     private static Guid? ParseOptionalGuid(string value) =>
         Guid.TryParse(value, out var parsed) ? parsed : null;
 
+    private static string GetCurrencyPickerValue(global::Wallets.Domain.Shared.Contracts.CurrencyType currency) => currency.Id.ToString();
+    private static string GetGatewayPickerValue(PaymentGateway gateway) => gateway.Id.ToString();
+
+    private static string GetCurrencySearchText(global::Wallets.Domain.Shared.Contracts.CurrencyType currency) =>
+        $"{currency.CurrencyIsoCode3} {currency.Name} {currency.Description} {currency.Type}";
+
+    private static string GetGatewaySearchText(PaymentGateway gateway) =>
+        $"{gateway.Name} {gateway.PaymentGatewayCategory?.Name} {gateway.Description} {gateway.ServiceCharge} {gateway.ConvenienceFee} {gateway.Discount}";
+
     private static string BuildCurrencyLabel(global::Wallets.Domain.Shared.Contracts.CurrencyType currency) =>
         string.IsNullOrWhiteSpace(currency.CurrencyIsoCode3)
             ? currency.Name ?? currency.Id.ToString()[..8]
@@ -1036,6 +1090,70 @@ else
     private static bool IsMissingPaymentGatewayWrapper(Exception ex) =>
         ex.Message.Contains("PaymentGateway", StringComparison.OrdinalIgnoreCase)
         && ex.Message.Contains("service wrapper", StringComparison.OrdinalIgnoreCase);
+
+    private IReadOnlyList<XfEntityPickerColumn<global::Wallets.Domain.Shared.Contracts.CurrencyType>> CurrencyAdvancedColumns =>
+    [
+        new("ISO", x => x.CurrencyIsoCode3),
+        new("Name", x => x.Name),
+        new("Type", x => x.Type?.ToString(CultureInfo.CurrentCulture)),
+        new("Scope", x => x.TenantId == Guid.Empty ? "Global" : "Tenant"),
+        new("Description", x => x.Description)
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<global::Wallets.Domain.Shared.Contracts.CurrencyType>> CurrencyAdvancedFilters =>
+    [
+        new("scope", "Scope", ScopeFilterOptions, x => x.TenantId == Guid.Empty ? "global" : "tenant", "All scopes"),
+        new("type", "Type", BuildDistinctFilterOptions(_currencies, x => x.Type?.ToString(CultureInfo.CurrentCulture)), x => x.Type?.ToString(CultureInfo.CurrentCulture), "All types")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<PaymentGateway>> GatewayAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Category", x => x.PaymentGatewayCategory?.Name ?? ShortId(x.GatewayCategoryId)),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("Service Charge", x => FormatDecimal(x.ServiceCharge)),
+        new("Convenience Fee", x => FormatDecimal(x.ConvenienceFee)),
+        new("Discount", x => FormatDecimal(x.Discount)),
+        new("Description", x => x.Description)
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<PaymentGateway>> GatewayAdvancedFilters =>
+    [
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All gateways"),
+        new("category", "Category", BuildDistinctFilterOptions(_gateways, x => x.PaymentGatewayCategory?.Name ?? x.GatewayCategoryId.ToString()), x => x.PaymentGatewayCategory?.Name ?? x.GatewayCategoryId.ToString(), "All categories")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> ScopeFilterOptions =
+    [
+        new("tenant", "Tenant"),
+        new("global", "Global")
+    ];
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+
+    private static string FormatDecimal(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+
+    private static string FormatDecimal(decimal? value) =>
+        value is { } amount ? amount.ToString("N2", CultureInfo.CurrentCulture) : "N/A";
+
+    private static string ShortId(Guid id) => id.ToString()[..8];
 
     private async Task ReleaseTransaction(WalletTransaction transaction)
     {

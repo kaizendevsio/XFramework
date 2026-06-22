@@ -95,7 +95,7 @@
 </div>
 
 <BbDialog Open="@_advancedOpen" OpenChanged="@(value => _advancedOpen = value)">
-    <BbDialogContent TrapFocus="false" class="max-w-3xl">
+    <BbDialogContent TrapFocus="false" class="xf-entity-picker-advanced-dialog">
         <BbDialogHeader>
             <BbDialogTitle>@AdvancedSearchTitle</BbDialogTitle>
             <BbDialogDescription>@AdvancedSearchDescription</BbDialogDescription>
@@ -121,7 +121,7 @@
                                            Value="@GetAdvancedFilterValue(filter)"
                                            ValueChanged="@(value => SetAdvancedFilter(filter, value))"
                                            Label="@filter.Label">
-                            <BbSelectItem Value="@AllFilterValue">@filter.AllLabel</BbSelectItem>
+                            <BbSelectItem Value="@GetAllFilterValue(filter)">@GetAllFilterLabel(filter)</BbSelectItem>
                             @foreach (var option in filter.Options)
                             {
                                 <BbSelectItem Value="@option.Value">@option.Label</BbSelectItem>
@@ -175,6 +175,22 @@
                                     </th>
                                 }
                             </tr>
+                            @if (ShowAdvancedColumnFilters)
+                            {
+                                <tr class="xf-entity-picker-advanced-filter-row">
+                                    @foreach (var column in EffectiveAdvancedColumns)
+                                    {
+                                        <th class="@column.CssClass">
+                                            <input type="search"
+                                                   class="xf-entity-picker-column-filter"
+                                                   value="@GetAdvancedColumnFilterValue(column)"
+                                                   @oninput="@(args => SetAdvancedColumnFilter(column, args.Value?.ToString()))"
+                                                   placeholder="@($"Filter {column.Title}")"
+                                                   aria-label="@($"Filter {column.Title}")" />
+                                        </th>
+                                    }
+                                </tr>
+                            }
                         </thead>
                         <tbody>
                             @foreach (var item in AdvancedFilteredItems)
@@ -209,12 +225,12 @@
 
 @code {
     private readonly string _instanceId = $"entity-picker-{Guid.NewGuid():N}";
-    private const string AllFilterValue = "__all__";
     private bool _open;
     private bool _advancedOpen;
     private string _searchQuery = "";
     private string _advancedSearchQuery = "";
     private readonly Dictionary<string, string> _advancedFilterValues = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _advancedColumnFilterValues = new(StringComparer.Ordinal);
     private string? _advancedSortColumnKey;
     private bool _advancedSortDescending;
 
@@ -232,6 +248,7 @@
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool AllowClear { get; set; }
     [Parameter] public bool ShowAdvancedSearch { get; set; } = true;
+    [Parameter] public bool ShowAdvancedColumnFilters { get; set; } = true;
     [Parameter] public bool ShowCreate { get; set; }
     [Parameter] public EventCallback OnCreate { get; set; }
     [Parameter] public string Placeholder { get; set; } = "Select item";
@@ -306,6 +323,21 @@
                     return false;
             }
 
+            foreach (var column in EffectiveAdvancedColumns)
+            {
+                if (!_advancedColumnFilterValues.TryGetValue(GetAdvancedColumnKey(column), out var columnFilter) ||
+                    string.IsNullOrWhiteSpace(columnFilter))
+                {
+                    continue;
+                }
+
+                if (!FormatAdvancedCell(column.ValueSelector(item))
+                    .Contains(columnFilter.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
             return true;
         });
     }
@@ -351,15 +383,41 @@
         return $"{GetSearchText(item)} {string.Join(' ', values)}";
     }
 
+    private static string GetAdvancedColumnKey(XfEntityPickerColumn<TItem> column) => column.Title;
+
+    private string GetAdvancedColumnFilterValue(XfEntityPickerColumn<TItem> column) =>
+        _advancedColumnFilterValues.TryGetValue(GetAdvancedColumnKey(column), out var value) ? value : "";
+
+    private Task SetAdvancedColumnFilter(XfEntityPickerColumn<TItem> column, string? value)
+    {
+        var columnKey = GetAdvancedColumnKey(column);
+        if (string.IsNullOrWhiteSpace(value))
+            _advancedColumnFilterValues.Remove(columnKey);
+        else
+            _advancedColumnFilterValues[columnKey] = value;
+
+        return Task.CompletedTask;
+    }
+
+    private static string GetAllFilterLabel(XfEntityPickerFilter<TItem> filter) =>
+        string.IsNullOrWhiteSpace(filter.AllLabel) ? "All" : filter.AllLabel;
+
+    private static string GetAllFilterValue(XfEntityPickerFilter<TItem> filter) => GetAllFilterLabel(filter);
+
     private string GetAdvancedFilterValue(XfEntityPickerFilter<TItem> filter) =>
-        _advancedFilterValues.TryGetValue(filter.Key, out var value) ? value : AllFilterValue;
+        _advancedFilterValues.TryGetValue(filter.Key, out var value) ? value : GetAllFilterValue(filter);
 
     private Task SetAdvancedFilter(XfEntityPickerFilter<TItem> filter, string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, AllFilterValue, StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(value) ||
+            string.Equals(value, GetAllFilterValue(filter), StringComparison.Ordinal))
+        {
             _advancedFilterValues.Remove(filter.Key);
+        }
         else
+        {
             _advancedFilterValues[filter.Key] = value;
+        }
 
         return Task.CompletedTask;
     }
@@ -367,6 +425,7 @@
     private Task ResetAdvancedFilters()
     {
         _advancedFilterValues.Clear();
+        _advancedColumnFilterValues.Clear();
         _advancedSearchQuery = "";
         _advancedSortColumnKey = null;
         _advancedSortDescending = false;

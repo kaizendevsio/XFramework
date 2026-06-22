@@ -43,22 +43,44 @@
                         <BbSelectItem Value="@BatchDecrement">Decrement</BbSelectItem>
                         <BbSelectItem Value="@BatchTransfer">Transfer</BbSelectItem>
                     </BbFormFieldSelect>
-                    <BbFormFieldSelect TValue="string" @bind-Value="_sourceWalletId" Label="@SourceWalletLabel">
-                        <BbSelectItem Value="@NoSelectionValue">Select wallet</BbSelectItem>
-                        @foreach (var wallet in _wallets)
-                        {
-                            <BbSelectItem Value="@wallet.Id.ToString()">@BuildWalletLabel(wallet)</BbSelectItem>
-                        }
-                    </BbFormFieldSelect>
+                    <XfEntityPicker TItem="Wallet"
+                                    Label="@SourceWalletLabel"
+                                    Value="@_sourceWalletId"
+                                    ValueChanged="@(value => _sourceWalletId = value ?? NoSelectionValue)"
+                                    Items="@_wallets"
+                                    ValueSelector="@GetWalletPickerValue"
+                                    TextSelector="@BuildWalletLabel"
+                                    SearchTextSelector="@GetWalletSearchText"
+                                    AdvancedColumns="@WalletAdvancedColumns"
+                                    AdvancedFilters="@WalletAdvancedFilters"
+                                    AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                    Placeholder="Select wallet"
+                                    SearchPlaceholder="Search wallets..."
+                                    EmptyMessage="No wallets found."
+                                    AllowClear="true"
+                                    ClearText="Clear wallet"
+                                    AdvancedSearchTitle="Find Source Wallet"
+                                    AdvancedSearchDescription="Search wallets for batch increment, decrement, or transfer source." />
                     @if (_operation == BatchTransfer)
                     {
-                        <BbFormFieldSelect TValue="string" @bind-Value="_destinationWalletId" Label="Destination Wallet">
-                            <BbSelectItem Value="@NoSelectionValue">Select wallet</BbSelectItem>
-                            @foreach (var wallet in _wallets)
-                            {
-                                <BbSelectItem Value="@wallet.Id.ToString()">@BuildWalletLabel(wallet)</BbSelectItem>
-                            }
-                        </BbFormFieldSelect>
+                        <XfEntityPicker TItem="Wallet"
+                                        Label="Destination Wallet"
+                                        Value="@_destinationWalletId"
+                                        ValueChanged="@(value => _destinationWalletId = value ?? NoSelectionValue)"
+                                        Items="@DestinationWalletOptions"
+                                        ValueSelector="@GetWalletPickerValue"
+                                        TextSelector="@BuildWalletLabel"
+                                        SearchTextSelector="@GetWalletSearchText"
+                                        AdvancedColumns="@WalletAdvancedColumns"
+                                        AdvancedFilters="@WalletAdvancedFilters"
+                                        AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                        Placeholder="Select destination wallet"
+                                        SearchPlaceholder="Search destination wallets..."
+                                        EmptyMessage="No destination wallets found."
+                                        AllowClear="true"
+                                        ClearText="Clear destination wallet"
+                                        AdvancedSearchTitle="Find Destination Wallet"
+                                        AdvancedSearchDescription="Search wallets that can receive this batch transfer." />
                     }
                     <BbFormFieldInput TValue="decimal" @bind-Value="_amount" Label="Amount" />
                     <BbFormFieldInput TValue="decimal" @bind-Value="_fee" Label="Fee" />
@@ -153,6 +175,10 @@
     private decimal _fee;
 
     private string SourceWalletLabel => _operation == BatchTransfer ? "Source Wallet" : "Wallet";
+    private IReadOnlyList<Wallet> DestinationWalletOptions =>
+        Guid.TryParse(_sourceWalletId, out var sourceWalletId)
+            ? _wallets.Where(x => x.Id != sourceWalletId).ToArray()
+            : _wallets;
 
     protected override void OnInitialized()
     {
@@ -185,6 +211,8 @@
             _wallets = await DataContext.Query<Wallet>()
                 .IgnoreQueryFilters()
                 .NoCache()
+                .Include(x => x.WalletType)
+                .Include(x => x.Credential)
                 .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
                 .Take(250)
@@ -355,8 +383,71 @@
     private static string BuildWalletLabel(Wallet wallet)
     {
         var balance = wallet.Balance.ToString("N2", CultureInfo.InvariantCulture);
-        return $"{wallet.AccountNumber ?? wallet.Id.ToString()[..8]} - {wallet.CredentialId.ToString()[..8]} - {balance}";
+        return $"{wallet.AccountNumber ?? wallet.Id.ToString()[..8]} - {GetWalletCredentialLabel(wallet)} - {balance}";
     }
+
+    private static string GetWalletPickerValue(Wallet wallet) => wallet.Id.ToString();
+
+    private static string GetWalletSearchText(Wallet wallet) =>
+        $"{wallet.AccountNumber} {wallet.CredentialId} {GetWalletCredentialLabel(wallet)} {wallet.WalletType?.Code} {wallet.WalletType?.Name} {wallet.Status} {wallet.AvailableBalance}";
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallet>> WalletAdvancedColumns =>
+    [
+        new("Account", x => string.IsNullOrWhiteSpace(x.AccountNumber) ? x.Id.ToString()[..8] : x.AccountNumber),
+        new("Credential", GetWalletCredentialLabel),
+        new("Type", x => x.WalletType?.Name ?? ShortId(x.WalletTypeId)),
+        new("Status", x => x.Status.ToString()),
+        new("Available", x => FormatDecimal(x.AvailableBalance)),
+        new("Held", x => FormatDecimal(x.DebitOnHoldBalance + x.CreditOnHoldBalance)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Wallet>> WalletAdvancedFilters =>
+    [
+        new("status", "Status", BuildEnumFilterOptions<WalletStatus>(), x => x.Status.ToString(), "All statuses"),
+        new("type", "Wallet type", BuildDistinctFilterOptions(_wallets, x => x.WalletType?.Code ?? x.WalletTypeId?.ToString()), x => x.WalletType?.Code ?? x.WalletTypeId?.ToString(), "All wallet types")
+    ];
+
+    private static string GetWalletCredentialLabel(Wallet wallet)
+    {
+        if (wallet.Credential is { } credential)
+        {
+            var displayName = credential.IdentityInfo?.FullName;
+            if (string.IsNullOrWhiteSpace(displayName))
+                displayName = credential.IdentityInfo?.IdentityName;
+            if (string.IsNullOrWhiteSpace(displayName))
+                displayName = credential.UserName ?? credential.UserAlias;
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+                return displayName;
+        }
+
+        return wallet.CredentialId.ToString()[..8];
+    }
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildEnumFilterOptions<TEnum>()
+        where TEnum : struct, Enum =>
+        Enum.GetValues<TEnum>()
+            .Select(value => new XfEntityPickerFilterOption(value.ToString(), value.ToString()))
+            .ToArray();
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private static string FormatDateTime(DateTime value) =>
+        value == default ? "N/A" : value.ToString("g", CultureInfo.CurrentCulture);
+
+    private static string FormatDecimal(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+
+    private static string ShortId(Guid? id) => id is Guid value ? value.ToString()[..8] : "N/A";
 
     public void Dispose()
     {
