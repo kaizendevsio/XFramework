@@ -1,35 +1,17 @@
 @inject NavigationManager Navigation
 
-<div class="space-y-1">
-    <NavLink href="/finance/wallets"
-             Match="NavLinkMatch.All"
-             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-        <LucideIcon Name="arrow-left" class="h-4 w-4" />
-        Wallet List
-    </NavLink>
-</div>
+<SidebarNavItem Href="/finance/wallets"
+                Label="Wallet List"
+                Icon="arrow-left"
+                Match="NavLinkMatch.All"
+                Strong="true" />
 
-<div class="mt-4">
-    <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Wallet Detail</p>
-    <div class="space-y-0.5">
-        <a href="@SectionHref("summary")" class="@SectionClass("summary")">
-            <LucideIcon Name="wallet" class="h-4 w-4" />
-            Summary
-        </a>
-        <a href="@SectionHref("workflows")" class="@SectionClass("workflows")">
-            <LucideIcon Name="workflow" class="h-4 w-4" />
-            Workflows
-        </a>
-        <a href="@SectionHref("transactions")" class="@SectionClass("transactions")">
-            <LucideIcon Name="history" class="h-4 w-4" />
-            Transactions
-        </a>
-        <a href="@SectionHref("rules")" class="@SectionClass("rules")">
-            <LucideIcon Name="sliders-horizontal" class="h-4 w-4" />
-            Rules
-        </a>
-    </div>
-</div>
+<SidebarSection GroupId="wallet-detail" Title="Wallet Detail" Icon="wallet">
+    <SidebarAnchorItem Href="@SectionHref("summary")" Label="Summary" Icon="wallet" Active="@(CurrentSection == "summary")" />
+    <SidebarAnchorItem Href="@SectionHref("workflows")" Label="Workflows" Icon="workflow" Active="@(CurrentSection == "workflows")" />
+    <SidebarAnchorItem Href="@SectionHref("transactions")" Label="Transactions" Icon="history" Active="@(CurrentSection == "transactions")" />
+    <SidebarAnchorItem Href="@SectionHref("rules")" Label="Rules" Icon="sliders-horizontal" Active="@(CurrentSection == "rules")" />
+</SidebarSection>
 
 @code {
     [Parameter] public Guid WalletId { get; set; }
@@ -51,10 +33,6 @@
 
     private string SectionHref(string section) =>
         section == "summary" ? BaseHref : $"{BaseHref}/{section}";
-
-    private string SectionClass(string section) =>
-        "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent "
-        + (CurrentSection == section ? "bg-sidebar-accent text-sidebar-accent-foreground" : "");
 
     private static string NormalizeSection(string section) =>
         section.ToLowerInvariant() switch

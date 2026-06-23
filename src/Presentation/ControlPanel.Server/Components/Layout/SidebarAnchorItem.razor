@@ -1,0 +1,20 @@
+<a href="@Href"
+   class="@LinkClass"
+   title="@Label"
+   aria-label="@Label">
+    <LucideIcon Name="@Icon" class="sidebar-nav-icon h-4 w-4" />
+    <span class="sidebar-label">@Label</span>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Icon { get; set; } = "";
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public bool Strong { get; set; }
+
+    private string LinkClass =>
+        "sidebar-nav-item"
+        + (Strong ? " sidebar-nav-item-strong" : "")
+        + (Active ? " sidebar-nav-item-active" : "");
+}
