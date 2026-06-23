@@ -15,6 +15,7 @@ public partial record GetReservationAllocationStatusReportRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid? ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
     public Guid? LotId { get; init; }
     public ReservationAllocationStatus? Status { get; init; }
 }

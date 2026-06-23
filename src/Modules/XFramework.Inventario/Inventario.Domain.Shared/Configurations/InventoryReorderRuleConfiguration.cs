@@ -18,7 +18,7 @@ public class InventoryReorderRuleConfiguration : IEntityTypeConfiguration<Invent
         entity.Property(e => e.PreferredSupplier).HasMaxLength(200);
         entity.Property(e => e.IsActive).HasDefaultValue(true);
 
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.WarehouseId, e.LocationId });
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.WarehouseId, e.LocationId });
         entity.HasIndex(e => new { e.TenantId, e.IsActive });
 
         entity.HasOne(e => e.Product)
@@ -26,6 +26,12 @@ public class InventoryReorderRuleConfiguration : IEntityTypeConfiguration<Invent
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_InventoryReorderRule_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_InventoryReorderRule_ProductVariation");
 
         entity.HasOne(e => e.Warehouse)
             .WithMany()

@@ -20,6 +20,7 @@ public sealed class StockPostingService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor,
     ITenantModuleFeatureService featureService,
+    ProductVariationService productVariationService,
     DbContext? dbContext = null)
 {
     private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
@@ -69,13 +70,22 @@ public sealed class StockPostingService(
         if (product is null)
             return Result<StockPostingResponse>.NotFound("Product not found.");
 
-        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.LotId, stagedLot, ct);
+        var variationResult = await productVariationService.ValidateProductVariationAsync(
+            tenantId,
+            request.ProductId,
+            request.ProductVariationId,
+            ct);
+        if (!variationResult.IsSuccess)
+            return Result<StockPostingResponse>.Failure(variationResult.Message!, variationResult.StatusCode);
+
+        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.ProductVariationId, request.LotId, stagedLot, ct);
         if (!lotResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(lotResult.Message!, lotResult.StatusCode);
 
         var balanceResult = await GetOrCreateBalance(
             tenantId,
             request.ProductId,
+            request.ProductVariationId,
             request.WarehouseId,
             request.LocationId,
             request.LotId,
@@ -123,6 +133,7 @@ public sealed class StockPostingService(
         return Result<StockPostingResponse>.Success(CreateResponse(
             balance.Id,
             request.ProductId,
+            balance.ProductVariationId,
             balance.WarehouseId,
             balance.LocationId,
             balance.OnHandQuantity,
@@ -148,6 +159,9 @@ public sealed class StockPostingService(
 
         if (request.ProductId is { } id)
             query = query.Where(x => x.ProductId == id);
+
+        if (request.ProductVariationId is { } productVariationId)
+            query = query.Where(x => x.ProductVariationId == productVariationId);
 
         if (request.WarehouseId is { } warehouseId)
             query = query.Where(x => x.WarehouseId == warehouseId);
@@ -181,6 +195,9 @@ public sealed class StockPostingService(
 
         if (request.ProductId is { } id)
             query = query.Where(x => x.ProductId == id);
+
+        if (request.ProductVariationId is { } productVariationId)
+            query = query.Where(x => x.ProductVariationId == productVariationId);
 
         if (request.WarehouseId is { } warehouseId)
             query = query.Where(x => x.WarehouseId == warehouseId);
@@ -220,13 +237,22 @@ public sealed class StockPostingService(
         if (product is null)
             return Result<StockPostingResponse>.NotFound("Product not found.");
 
-        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.LotId, stagedLot: null, ct);
+        var variationResult = await productVariationService.ValidateProductVariationAsync(
+            tenantId,
+            request.ProductId,
+            request.ProductVariationId,
+            ct);
+        if (!variationResult.IsSuccess)
+            return Result<StockPostingResponse>.Failure(variationResult.Message!, variationResult.StatusCode);
+
+        var lotResult = await ValidateLotAsync(tenantId, request.ProductId, request.ProductVariationId, request.LotId, stagedLot: null, ct);
         if (!lotResult.IsSuccess)
             return Result<StockPostingResponse>.Failure(lotResult.Message!, lotResult.StatusCode);
 
         var sourceResult = await GetOrCreateBalance(
             tenantId,
             request.ProductId,
+            request.ProductVariationId,
             request.WarehouseId,
             request.LocationId,
             request.LotId,
@@ -237,6 +263,7 @@ public sealed class StockPostingService(
         var destinationResult = await GetOrCreateBalance(
             tenantId,
             request.ProductId,
+            request.ProductVariationId,
             destinationWarehouseId,
             destinationLocationId,
             request.LotId,
@@ -294,6 +321,7 @@ public sealed class StockPostingService(
         return Result<StockPostingResponse>.Success(CreateResponse(
             destination.Id,
             request.ProductId,
+            destination.ProductVariationId,
             destination.WarehouseId,
             destination.LocationId,
             destination.OnHandQuantity,
@@ -323,6 +351,7 @@ public sealed class StockPostingService(
     private async Task<Result<InventoryLot?>> ValidateLotAsync(
         Guid tenantId,
         Guid productId,
+        Guid? productVariationId,
         Guid? lotId,
         InventoryLot? stagedLot,
         CancellationToken ct)
@@ -336,6 +365,8 @@ public sealed class StockPostingService(
                 return Result<InventoryLot?>.NotFound("Lot not found.");
             if (stagedLot.ProductId != productId)
                 return Result<InventoryLot?>.Failure("Lot does not belong to the requested product.", 400);
+            if (stagedLot.ProductVariationId != productVariationId)
+                return Result<InventoryLot?>.Failure("Lot does not belong to the requested variant.", 400);
 
             return Result<InventoryLot?>.Success(stagedLot);
         }
@@ -353,6 +384,8 @@ public sealed class StockPostingService(
 
         if (lot.ProductId != productId)
             return Result<InventoryLot?>.Failure("Lot does not belong to the requested product.", 400);
+        if (lot.ProductVariationId != productVariationId)
+            return Result<InventoryLot?>.Failure("Lot does not belong to the requested variant.", 400);
 
         return Result<InventoryLot?>.Success(lot);
     }
@@ -360,6 +393,7 @@ public sealed class StockPostingService(
     private async Task<Result<StockBalanceLookup>> GetOrCreateBalance(
         Guid tenantId,
         Guid productId,
+        Guid? productVariationId,
         Guid warehouseId,
         Guid locationId,
         Guid? lotId,
@@ -368,6 +402,7 @@ public sealed class StockPostingService(
         var trackedBalance = dbContext?.Set<StockBalance>().Local.FirstOrDefault(x =>
             x.TenantId == tenantId &&
             x.ProductId == productId &&
+            x.ProductVariationId == productVariationId &&
             x.WarehouseId == warehouseId &&
             x.LocationId == locationId &&
             x.LotId == lotId &&
@@ -393,6 +428,7 @@ public sealed class StockPostingService(
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == productId &&
+                x.ProductVariationId == productVariationId &&
                 x.WarehouseId == warehouseId &&
                 x.LocationId == locationId &&
                 x.LotId == lotId &&
@@ -407,6 +443,7 @@ public sealed class StockPostingService(
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ProductId = productId,
+            ProductVariationId = productVariationId,
             WarehouseId = warehouseId,
             LocationId = locationId,
             LotId = lotId,
@@ -491,6 +528,7 @@ public sealed class StockPostingService(
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ProductId = request.ProductId,
+            ProductVariationId = request.ProductVariationId,
             WarehouseId = request.WarehouseId,
             LocationId = request.LocationId,
             StockBalanceId = stockBalanceId,
@@ -585,6 +623,7 @@ public sealed class StockPostingService(
         return Result<StockPostingResponse>.Success(CreateResponse(
             balance.Id,
             balance.ProductId,
+            balance.ProductVariationId,
             balance.WarehouseId,
             balance.LocationId,
             balance.OnHandQuantity,
@@ -604,6 +643,7 @@ public sealed class StockPostingService(
         {
             tenantId,
             request.ProductId,
+            request.ProductVariationId,
             request.WarehouseId,
             request.LocationId,
             request.LotId,
@@ -626,6 +666,7 @@ public sealed class StockPostingService(
     private static StockPostingResponse CreateResponse(
         Guid stockBalanceId,
         Guid productId,
+        Guid? productVariationId,
         Guid warehouseId,
         Guid locationId,
         decimal onHandQuantity,
@@ -637,6 +678,7 @@ public sealed class StockPostingService(
         new(
             stockBalanceId,
             productId,
+            productVariationId,
             warehouseId,
             locationId,
             onHandQuantity,

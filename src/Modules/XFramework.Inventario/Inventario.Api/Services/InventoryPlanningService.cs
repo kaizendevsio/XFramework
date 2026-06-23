@@ -14,7 +14,8 @@ namespace XFramework.Inventario.Api.Services;
 public sealed class InventoryPlanningService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor,
-    ITenantModuleFeatureService featureService)
+    ITenantModuleFeatureService featureService,
+    ProductVariationService productVariationService)
 {
     public async Task<Result<List<InventoryReorderRule>>> GetRulesAsync(
         GetInventoryReorderRulesRequest request,
@@ -35,6 +36,9 @@ public sealed class InventoryPlanningService(
 
         if (request.ProductId is { } productId)
             query = query.Where(x => x.ProductId == productId);
+
+        if (request.ProductVariationId is { } productVariationId)
+            query = query.Where(x => x.ProductVariationId == productVariationId);
 
         if (!request.IncludeInactive)
             query = query.Where(x => x.IsActive);
@@ -72,6 +76,14 @@ public sealed class InventoryPlanningService(
         if (!productExists)
             return Result<InventoryReorderRule>.NotFound("Product not found.");
 
+        var variationResult = await productVariationService.ValidateProductVariationAsync(
+            tenantId,
+            request.ProductId,
+            request.ProductVariationId,
+            ct);
+        if (!variationResult.IsSuccess)
+            return Result<InventoryReorderRule>.Failure(variationResult.Message!, variationResult.StatusCode);
+
         if (request.WarehouseId is { } warehouseId)
         {
             var warehouseExists = await dataContext.Query<Warehouse>()
@@ -99,6 +111,7 @@ public sealed class InventoryPlanningService(
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == request.ProductId &&
+                x.ProductVariationId == request.ProductVariationId &&
                 x.WarehouseId == request.WarehouseId &&
                 x.LocationId == request.LocationId &&
                 !x.IsDeleted, ct);
@@ -111,6 +124,7 @@ public sealed class InventoryPlanningService(
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ProductId = request.ProductId,
+            ProductVariationId = request.ProductVariationId,
             WarehouseId = request.WarehouseId,
             LocationId = request.LocationId,
             MinimumQuantity = request.MinimumQuantity,
@@ -144,7 +158,13 @@ public sealed class InventoryPlanningService(
         if (!featureResult.IsSuccess)
             return Result<List<LowStockReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
-        var rows = await BuildLowStockRowsAsync(tenantResult.Data, request.ProductId, request.WarehouseId, request.LocationId, ct);
+        var rows = await BuildLowStockRowsAsync(
+            tenantResult.Data,
+            request.ProductId,
+            request.ProductVariationId,
+            request.WarehouseId,
+            request.LocationId,
+            ct);
         return Result<List<LowStockReportRow>>.Success(rows);
     }
 
@@ -160,13 +180,26 @@ public sealed class InventoryPlanningService(
         if (!featureResult.IsSuccess)
             return Result<List<ReorderSuggestionRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
-        var lowStock = await BuildLowStockRowsAsync(tenantResult.Data, request.ProductId, request.WarehouseId, request.LocationId, ct);
-        var rules = await LoadRules(tenantResult.Data, request.ProductId, request.WarehouseId, request.LocationId, ct);
+        var lowStock = await BuildLowStockRowsAsync(
+            tenantResult.Data,
+            request.ProductId,
+            request.ProductVariationId,
+            request.WarehouseId,
+            request.LocationId,
+            ct);
+        var rules = await LoadRules(
+            tenantResult.Data,
+            request.ProductId,
+            request.ProductVariationId,
+            request.WarehouseId,
+            request.LocationId,
+            ct);
 
         var suggestions = lowStock.Select(row =>
         {
             var rule = rules.First(x =>
                 x.ProductId == row.ProductId &&
+                x.ProductVariationId == row.ProductVariationId &&
                 x.WarehouseId == row.WarehouseId &&
                 x.LocationId == row.LocationId);
             var targetQuantity = rule.MaximumQuantity ?? row.ReorderPoint + rule.ReorderQuantity;
@@ -175,6 +208,9 @@ public sealed class InventoryPlanningService(
             return new ReorderSuggestionRow(
                 row.ProductId,
                 row.ProductName,
+                row.ProductVariationId,
+                row.ProductVariationName,
+                row.ProductVariationTypeName,
                 row.WarehouseId,
                 row.WarehouseName,
                 row.LocationId,
@@ -191,11 +227,12 @@ public sealed class InventoryPlanningService(
     internal async Task<List<LowStockReportRow>> BuildLowStockRowsAsync(
         Guid tenantId,
         Guid? productId,
+        Guid? productVariationId,
         Guid? warehouseId,
         Guid? locationId,
         CancellationToken ct)
     {
-        var rules = await LoadRules(tenantId, productId, warehouseId, locationId, ct);
+        var rules = await LoadRules(tenantId, productId, productVariationId, warehouseId, locationId, ct);
         if (rules.Count == 0)
             return [];
 
@@ -203,6 +240,7 @@ public sealed class InventoryPlanningService(
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted)
             .ToListAsync(ct);
+        var variationLookups = await LoadVariationLookups(tenantId, ct);
         var warehouses = await dataContext.Query<Warehouse>()
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted)
@@ -226,6 +264,7 @@ public sealed class InventoryPlanningService(
             var available = balances
                 .Where(x =>
                     x.ProductId == rule.ProductId &&
+                    (rule.ProductVariationId is null || x.ProductVariationId == rule.ProductVariationId) &&
                     (rule.WarehouseId is null || x.WarehouseId == rule.WarehouseId) &&
                     (rule.LocationId is null || x.LocationId == rule.LocationId))
                 .Sum(x => x.AvailableQuantity);
@@ -236,6 +275,13 @@ public sealed class InventoryPlanningService(
             rows.Add(new LowStockReportRow(
                 rule.ProductId,
                 productNames.GetValueOrDefault(rule.ProductId, rule.ProductId.ToString()[..8]),
+                rule.ProductVariationId,
+                rule.ProductVariationId is { } variationId
+                    ? variationLookups.Names.GetValueOrDefault(variationId, variationId.ToString()[..8])
+                    : null,
+                rule.ProductVariationId is { } variationTypeId
+                    ? variationLookups.TypeNames.GetValueOrDefault(variationTypeId)
+                    : null,
                 rule.WarehouseId,
                 rule.WarehouseId is { } wh ? warehouseNames.GetValueOrDefault(wh, wh.ToString()[..8]) : null,
                 rule.LocationId,
@@ -255,6 +301,7 @@ public sealed class InventoryPlanningService(
     private async Task<List<InventoryReorderRule>> LoadRules(
         Guid tenantId,
         Guid? productId,
+        Guid? productVariationId,
         Guid? warehouseId,
         Guid? locationId,
         CancellationToken ct)
@@ -266,12 +313,44 @@ public sealed class InventoryPlanningService(
 
         if (productId is not null)
             rules = rules.Where(x => x.ProductId == productId).ToList();
+        if (productVariationId is not null)
+            rules = rules.Where(x => x.ProductVariationId == productVariationId).ToList();
         if (warehouseId is not null)
             rules = rules.Where(x => x.WarehouseId == null || x.WarehouseId == warehouseId).ToList();
         if (locationId is not null)
             rules = rules.Where(x => x.LocationId == null || x.LocationId == locationId).ToList();
 
         return rules;
+    }
+
+    private async Task<VariationLookups> LoadVariationLookups(Guid tenantId, CancellationToken ct)
+    {
+        var variations = await dataContext.Query<ProductVariation>()
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .ToListAsync(ct);
+        var typeIds = variations
+            .Where(x => x.ProductVariationTypeId is not null)
+            .Select(x => x.ProductVariationTypeId!.Value)
+            .Distinct()
+            .ToList();
+        var types = typeIds.Count == 0
+            ? []
+            : await dataContext.Query<ProductVariationType>()
+                .IgnoreQueryFilters()
+                .Where(x => x.TenantId == tenantId && typeIds.Contains(x.Id) && !x.IsDeleted)
+                .ToListAsync(ct);
+        var typeNames = types.ToDictionary<ProductVariationType, Guid, string?>(
+            x => x.Id,
+            x => x.Name ?? x.Id.ToString()[..8]);
+
+        return new VariationLookups(
+            variations.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]),
+            variations.ToDictionary(
+                x => x.Id,
+                x => x.ProductVariationTypeId is { } typeId
+                    ? typeNames.GetValueOrDefault(typeId, x.VariationType)
+                    : x.VariationType));
     }
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)
@@ -302,4 +381,8 @@ public sealed class InventoryPlanningService(
             TenantModuleFeatureKeys.Inventario,
             TenantModuleFeatureKeys.PlanningSubFeature,
             ct);
+
+    private sealed record VariationLookups(
+        Dictionary<Guid, string> Names,
+        Dictionary<Guid, string?> TypeNames);
 }

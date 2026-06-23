@@ -6589,6 +6589,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("ReceivedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -6622,17 +6625,23 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "IsDeleted");
 
                     b.HasIndex("TenantId", "Status");
 
-                    b.HasIndex("TenantId", "ProductId", "ExpiresAt");
-
                     b.HasIndex("TenantId", "ProductId", "LotNumber")
                         .IsUnique()
-                        .HasFilter("\"IsDeleted\" = false");
+                        .HasFilter("\"ProductVariationId\" IS NULL AND \"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "ExpiresAt");
+
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "LotNumber")
+                        .IsUnique()
+                        .HasFilter("\"ProductVariationId\" IS NOT NULL AND \"IsDeleted\" = false");
 
                     b.ToTable("InventoryLot", "Inventario");
                 });
@@ -6695,6 +6704,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("QuantityAfter")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
@@ -6744,6 +6756,8 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("StockBalanceId");
 
                     b.HasIndex("TenantId");
@@ -6756,11 +6770,11 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "IsDeleted");
 
-                    b.HasIndex("TenantId", "LotId", "MovementDate");
-
-                    b.HasIndex("TenantId", "ProductId", "MovementDate");
-
                     b.HasIndex("TenantId", "ReferenceType", "ReferenceId");
+
+                    b.HasIndex("TenantId", "LotId", "ProductVariationId", "MovementDate");
+
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "MovementDate");
 
                     b.ToTable("InventoryMovement", "Inventario");
                 });
@@ -6825,6 +6839,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("ReorderPoint")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
@@ -6846,6 +6863,8 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId");
@@ -6854,7 +6873,7 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "IsDeleted");
 
-                    b.HasIndex("TenantId", "ProductId", "WarehouseId", "LocationId");
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "WarehouseId", "LocationId");
 
                     b.ToTable("InventoryReorderRule", "Inventario");
                 });
@@ -7070,6 +7089,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
@@ -7090,11 +7112,13 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "IsDeleted");
 
-                    b.HasIndex("TenantId", "ProductId", "TransactionDate");
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "TransactionDate");
 
                     b.ToTable("ProductTransaction", "Inventario");
                 });
@@ -7145,7 +7169,14 @@ namespace XFramework.Domain.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProductVariationTypeId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
@@ -7160,13 +7191,96 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationTypeId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "IsDeleted");
 
                     b.HasIndex("TenantId", "ProductId");
 
+                    b.HasIndex("TenantId", "ProductVariationTypeId");
+
                     b.ToTable("ProductVariation", "Inventario");
+                });
+
+            modelBuilder.Entity("XFramework.Inventario.Domain.Shared.Contracts.ProductVariationType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Inventario_ProductVariationType");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.HasIndex("TenantId", "NormalizedName")
+                        .IsUnique()
+                        .HasFilter("\"ProductId\" IS NULL AND \"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "ProductId");
+
+                    b.HasIndex("TenantId", "ProductId", "NormalizedName")
+                        .IsUnique()
+                        .HasFilter("\"ProductId\" IS NOT NULL AND \"IsDeleted\" = false");
+
+                    b.ToTable("ProductVariationType", "Inventario");
                 });
 
             modelBuilder.Entity("XFramework.Inventario.Domain.Shared.Contracts.PurchaseOrder", b =>
@@ -7300,6 +7414,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("PurchaseOrderId")
                         .HasColumnType("uuid");
 
@@ -7323,15 +7440,17 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("PurchaseOrderId");
 
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "IsDeleted");
 
-                    b.HasIndex("TenantId", "ProductId");
-
                     b.HasIndex("TenantId", "PurchaseOrderId");
+
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId");
 
                     b.ToTable("PurchaseOrderLine", "Inventario");
                 });
@@ -7497,6 +7616,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("PurchaseOrderLineId")
                         .HasColumnType("uuid");
 
@@ -7530,6 +7652,8 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("PurchaseOrderLineId");
 
                     b.HasIndex("ReceivingDocumentId");
@@ -7544,7 +7668,7 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "ReceivingDocumentId");
 
-                    b.HasIndex("TenantId", "ProductId", "LotId");
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "LotId");
 
                     b.ToTable("ReceivingLine", "Inventario");
                 });
@@ -7598,6 +7722,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
@@ -7640,6 +7767,8 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("StockBalanceId");
 
                     b.HasIndex("TenantId");
@@ -7648,9 +7777,9 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "IsDeleted");
 
-                    b.HasIndex("TenantId", "ProductId", "Status");
-
                     b.HasIndex("TenantId", "ReferenceType", "ReferenceId");
+
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "Status");
 
                     b.ToTable("Reservation", "Inventario");
                 });
@@ -7708,6 +7837,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
@@ -7746,6 +7878,8 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("ReservationId");
 
                     b.HasIndex("StockBalanceId");
@@ -7756,11 +7890,11 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "IsDeleted");
 
-                    b.HasIndex("TenantId", "LotId", "Status");
-
                     b.HasIndex("TenantId", "ReservationId", "Status");
 
-                    b.HasIndex("TenantId", "ProductId", "WarehouseId", "LocationId", "LotId");
+                    b.HasIndex("TenantId", "LotId", "ProductVariationId", "Status");
+
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "WarehouseId", "LocationId", "LotId");
 
                     b.ToTable("ReservationAllocation", "Inventario");
                 });
@@ -7822,6 +7956,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("ReservedQuantity")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
@@ -7841,6 +7978,8 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariationId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId");
@@ -7849,11 +7988,20 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "ProductId", "WarehouseId", "LocationId")
                         .IsUnique()
-                        .HasFilter("\"LotId\" IS NULL AND \"IsDeleted\" = false");
+                        .HasFilter("\"ProductVariationId\" IS NULL AND \"LotId\" IS NULL AND \"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "WarehouseId", "LocationId")
+                        .IsUnique()
+                        .HasFilter("\"ProductVariationId\" IS NOT NULL AND \"LotId\" IS NULL AND \"IsDeleted\" = false");
 
                     b.HasIndex("TenantId", "ProductId", "WarehouseId", "LocationId", "LotId")
                         .IsUnique()
-                        .HasFilter("\"LotId\" IS NOT NULL AND \"IsDeleted\" = false");
+                        .HasFilter("\"ProductVariationId\" IS NULL AND \"LotId\" IS NOT NULL AND \"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "ProductId", "ProductVariationId", "WarehouseId", "LocationId", "LotId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_StockBalance_TenantId_ProductId_ProductVariationId_Warehou~1")
+                        .HasFilter("\"ProductVariationId\" IS NOT NULL AND \"LotId\" IS NOT NULL AND \"IsDeleted\" = false");
 
                     b.ToTable("StockBalance", "Inventario");
                 });
@@ -9396,7 +9544,15 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_InventoryLot_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_InventoryLot_ProductVariation");
+
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
                 });
 
             modelBuilder.Entity("XFramework.Inventario.Domain.Shared.Contracts.InventoryMovement", b =>
@@ -9420,6 +9576,12 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_InventoryMovement_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_InventoryMovement_ProductVariation");
+
                     b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.StockBalance", "StockBalance")
                         .WithMany()
                         .HasForeignKey("StockBalanceId")
@@ -9437,6 +9599,8 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Lot");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
 
                     b.Navigation("StockBalance");
 
@@ -9458,6 +9622,12 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_InventoryReorderRule_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_InventoryReorderRule_ProductVariation");
+
                     b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
@@ -9467,6 +9637,8 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Location");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
 
                     b.Navigation("Warehouse");
                 });
@@ -9492,7 +9664,15 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_ProductTransaction_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_ProductTransaction_ProductVariation");
+
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
                 });
 
             modelBuilder.Entity("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", b =>
@@ -9503,6 +9683,25 @@ namespace XFramework.Domain.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_ProductVariation_Product");
+
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariationType", "ProductVariationType")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_ProductVariation_ProductVariationType");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("ProductVariationType");
+                });
+
+            modelBuilder.Entity("XFramework.Inventario.Domain.Shared.Contracts.ProductVariationType", b =>
+                {
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("FK_Inventario_ProductVariationType_Product");
 
                     b.Navigation("Product");
                 });
@@ -9527,6 +9726,12 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_PurchaseOrderLine_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_PurchaseOrderLine_ProductVariation");
+
                     b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.PurchaseOrder", "PurchaseOrder")
                         .WithMany("Lines")
                         .HasForeignKey("PurchaseOrderId")
@@ -9534,6 +9739,8 @@ namespace XFramework.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
 
                     b.Navigation("PurchaseOrder");
                 });
@@ -9596,6 +9803,12 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_ReceivingLine_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_ReceivingLine_ProductVariation");
+
                     b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.PurchaseOrderLine", "PurchaseOrderLine")
                         .WithMany()
                         .HasForeignKey("PurchaseOrderLineId")
@@ -9620,6 +9833,8 @@ namespace XFramework.Domain.Migrations
 
                     b.Navigation("Product");
 
+                    b.Navigation("ProductVariation");
+
                     b.Navigation("PurchaseOrderLine");
 
                     b.Navigation("ReceivingDocument");
@@ -9642,6 +9857,12 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_Reservation_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_Reservation_ProductVariation");
+
                     b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.StockBalance", "StockBalance")
                         .WithMany()
                         .HasForeignKey("StockBalanceId")
@@ -9657,6 +9878,8 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Location");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
 
                     b.Navigation("StockBalance");
 
@@ -9685,6 +9908,12 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_ReservationAllocation_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_ReservationAllocation_ProductVariation");
+
                     b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.Reservation", "Reservation")
                         .WithMany("Allocations")
                         .HasForeignKey("ReservationId")
@@ -9711,6 +9940,8 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Lot");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
 
                     b.Navigation("Reservation");
 
@@ -9741,6 +9972,12 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Inventario_StockBalance_Product");
 
+                    b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Inventario_StockBalance_ProductVariation");
+
                     b.HasOne("XFramework.Inventario.Domain.Shared.Contracts.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
@@ -9753,6 +9990,8 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Lot");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
 
                     b.Navigation("Warehouse");
                 });

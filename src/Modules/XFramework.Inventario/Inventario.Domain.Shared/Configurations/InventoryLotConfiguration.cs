@@ -21,8 +21,11 @@ public class InventoryLotConfiguration : IEntityTypeConfiguration<InventoryLot>
 
         entity.HasIndex(e => new { e.TenantId, e.ProductId, e.LotNumber })
             .IsUnique()
-            .HasFilter("\"IsDeleted\" = false");
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ExpiresAt });
+            .HasFilter("\"ProductVariationId\" IS NULL AND \"IsDeleted\" = false");
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.LotNumber })
+            .IsUnique()
+            .HasFilter("\"ProductVariationId\" IS NOT NULL AND \"IsDeleted\" = false");
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.ExpiresAt });
         entity.HasIndex(e => new { e.TenantId, e.Status });
 
         entity.HasOne(e => e.Product)
@@ -30,5 +33,11 @@ public class InventoryLotConfiguration : IEntityTypeConfiguration<InventoryLot>
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_InventoryLot_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_InventoryLot_ProductVariation");
     }
 }

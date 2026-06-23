@@ -3,7 +3,6 @@ using XFramework.Domain.Shared.Attributes;
 namespace XFramework.Inventario.Domain.Shared.Contracts;
 
 [MemoryPackable(GenerateType.CircularReference)]
-[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Rest,
     Actions = EndpointActions.None,
@@ -24,4 +23,10 @@ public partial class ProductVariation : BaseModel
     public Product? Product { get; set; }
     [MemoryPackOrder(4)]
     public string? VariationType { get; set; }
+    [MemoryPackOrder(5)]
+    public Guid? ProductVariationTypeId { get; set; }
+    [MemoryPackIgnore]
+    public ProductVariationType? ProductVariationType { get; set; }
+    [MemoryPackOrder(6)]
+    public decimal Price { get; set; }
 }

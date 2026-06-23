@@ -15,6 +15,7 @@ public partial record GetReservationsRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid? ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
     public ReservationStatus? Status { get; init; }
     public string? ReferenceType { get; init; }
     public Guid? ReferenceId { get; init; }

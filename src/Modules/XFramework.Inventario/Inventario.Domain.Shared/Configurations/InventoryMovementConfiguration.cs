@@ -21,8 +21,8 @@ public class InventoryMovementConfiguration : IEntityTypeConfiguration<Inventory
         entity.Property(e => e.IdempotencyKey).HasMaxLength(200);
         entity.Property(e => e.RequestHash).HasMaxLength(128);
 
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.MovementDate });
-        entity.HasIndex(e => new { e.TenantId, e.LotId, e.MovementDate });
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.MovementDate });
+        entity.HasIndex(e => new { e.TenantId, e.LotId, e.ProductVariationId, e.MovementDate });
         entity.HasIndex(e => new { e.TenantId, e.ReferenceType, e.ReferenceId });
         entity.HasIndex(e => new { e.TenantId, e.IdempotencyKey })
             .IsUnique()
@@ -33,6 +33,12 @@ public class InventoryMovementConfiguration : IEntityTypeConfiguration<Inventory
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_InventoryMovement_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_InventoryMovement_ProductVariation");
 
         entity.HasOne(e => e.Warehouse)
             .WithMany()

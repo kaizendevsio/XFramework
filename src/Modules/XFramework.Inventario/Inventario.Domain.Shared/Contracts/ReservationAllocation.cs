@@ -24,31 +24,35 @@ public partial class ReservationAllocation : BaseModel
     [MemoryPackIgnore]
     public Product? Product { get; set; }
     [MemoryPackOrder(2)]
+    public Guid? ProductVariationId { get; set; }
+    [MemoryPackIgnore]
+    public ProductVariation? ProductVariation { get; set; }
+    [MemoryPackOrder(3)]
     public Guid WarehouseId { get; set; }
     [MemoryPackIgnore]
     public Warehouse? Warehouse { get; set; }
-    [MemoryPackOrder(3)]
+    [MemoryPackOrder(4)]
     public Guid LocationId { get; set; }
     [MemoryPackIgnore]
     public InventoryLocation? Location { get; set; }
-    [MemoryPackOrder(4)]
+    [MemoryPackOrder(5)]
     public Guid StockBalanceId { get; set; }
     [MemoryPackIgnore]
     public StockBalance? StockBalance { get; set; }
-    [MemoryPackOrder(5)]
+    [MemoryPackOrder(6)]
     public Guid? LotId { get; set; }
     [MemoryPackIgnore]
     public InventoryLot? Lot { get; set; }
-    [MemoryPackOrder(6)]
-    public decimal Quantity { get; set; }
     [MemoryPackOrder(7)]
-    public ReservationAllocationStatus Status { get; set; } = ReservationAllocationStatus.Reserved;
+    public decimal Quantity { get; set; }
     [MemoryPackOrder(8)]
-    public DateTime ReservedAt { get; set; }
+    public ReservationAllocationStatus Status { get; set; } = ReservationAllocationStatus.Reserved;
     [MemoryPackOrder(9)]
-    public DateTime? ReleasedAt { get; set; }
+    public DateTime ReservedAt { get; set; }
     [MemoryPackOrder(10)]
-    public DateTime? FulfilledAt { get; set; }
+    public DateTime? ReleasedAt { get; set; }
     [MemoryPackOrder(11)]
+    public DateTime? FulfilledAt { get; set; }
+    [MemoryPackOrder(12)]
     public string? ExpiredLotOverrideReason { get; set; }
 }

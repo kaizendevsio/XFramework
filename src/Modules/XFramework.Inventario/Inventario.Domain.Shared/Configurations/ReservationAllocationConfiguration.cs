@@ -18,8 +18,8 @@ public class ReservationAllocationConfiguration : IEntityTypeConfiguration<Reser
         entity.Property(e => e.ExpiredLotOverrideReason).HasMaxLength(500);
 
         entity.HasIndex(e => new { e.TenantId, e.ReservationId, e.Status });
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.WarehouseId, e.LocationId, e.LotId });
-        entity.HasIndex(e => new { e.TenantId, e.LotId, e.Status });
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.WarehouseId, e.LocationId, e.LotId });
+        entity.HasIndex(e => new { e.TenantId, e.LotId, e.ProductVariationId, e.Status });
 
         entity.HasOne(e => e.Reservation)
             .WithMany(e => e.Allocations)
@@ -32,6 +32,12 @@ public class ReservationAllocationConfiguration : IEntityTypeConfiguration<Reser
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_ReservationAllocation_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_ReservationAllocation_ProductVariation");
 
         entity.HasOne(e => e.Warehouse)
             .WithMany()

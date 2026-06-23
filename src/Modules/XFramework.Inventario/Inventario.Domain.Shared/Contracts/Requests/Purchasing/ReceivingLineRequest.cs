@@ -5,6 +5,7 @@ public partial record ReceivingLineRequest
 {
     public Guid? PurchaseOrderLineId { get; init; }
     public Guid ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
     public decimal Quantity { get; init; }
     public decimal? UnitCost { get; init; }
     public string? UnitOfMeasure { get; init; }

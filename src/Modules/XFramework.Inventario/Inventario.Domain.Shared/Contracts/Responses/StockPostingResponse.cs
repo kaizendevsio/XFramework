@@ -4,6 +4,7 @@ namespace XFramework.Inventario.Domain.Shared.Contracts.Responses;
 public partial record StockPostingResponse(
     Guid StockBalanceId,
     Guid ProductId,
+    Guid? ProductVariationId,
     Guid WarehouseId,
     Guid LocationId,
     decimal OnHandQuantity,

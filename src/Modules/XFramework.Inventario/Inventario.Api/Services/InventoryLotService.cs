@@ -12,7 +12,8 @@ namespace XFramework.Inventario.Api.Services;
 public sealed class InventoryLotService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor,
-    ITenantModuleFeatureService featureService)
+    ITenantModuleFeatureService featureService,
+    ProductVariationService productVariationService)
 {
     public async Task<Result<List<InventoryLot>>> GetLotsAsync(
         GetInventoryLotsRequest request,
@@ -32,6 +33,9 @@ public sealed class InventoryLotService(
 
         if (request.ProductId is { } productId)
             query = query.Where(x => x.ProductId == productId);
+
+        if (request.ProductVariationId is { } productVariationId)
+            query = query.Where(x => x.ProductVariationId == productVariationId);
 
         if (request.Status is { } status)
             query = query.Where(x => x.Status == status);
@@ -94,22 +98,32 @@ public sealed class InventoryLotService(
         if (!productExists)
             return Result<InventoryLot>.NotFound("Product not found.");
 
+        var variationResult = await productVariationService.ValidateProductVariationAsync(
+            tenantId,
+            request.ProductId,
+            request.ProductVariationId,
+            ct);
+        if (!variationResult.IsSuccess)
+            return Result<InventoryLot>.Failure(variationResult.Message!, variationResult.StatusCode);
+
         var duplicate = await dataContext.Query<InventoryLot>()
             .IgnoreQueryFilters()
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == request.ProductId &&
+                x.ProductVariationId == request.ProductVariationId &&
                 x.LotNumber == lotNumber &&
                 !x.IsDeleted,
                 ct);
         if (duplicate)
-            return Result<InventoryLot>.Conflict("A lot with the same number already exists for this product.");
+            return Result<InventoryLot>.Conflict("A lot with the same number already exists for this product and variant.");
 
         var lot = new InventoryLot
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ProductId = request.ProductId,
+            ProductVariationId = request.ProductVariationId,
             LotNumber = lotNumber,
             SupplierReference = NormalizeOptional(request.SupplierReference),
             SourceReferenceType = NormalizeOptional(request.SourceReferenceType),

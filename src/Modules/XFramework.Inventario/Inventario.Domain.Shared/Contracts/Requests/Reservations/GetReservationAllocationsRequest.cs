@@ -15,6 +15,7 @@ public partial record GetReservationAllocationsRequest : RequestBase,
 {
     public Guid? ReservationId { get; init; }
     public Guid? ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
     public Guid? LotId { get; init; }
     public ReservationAllocationStatus? Status { get; init; }
 }
