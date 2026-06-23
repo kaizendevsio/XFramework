@@ -14,6 +14,7 @@ public partial record GetMovementLedgerReportRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid? ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
     public Guid? WarehouseId { get; init; }
     public Guid? LocationId { get; init; }
     public Guid? LotId { get; init; }

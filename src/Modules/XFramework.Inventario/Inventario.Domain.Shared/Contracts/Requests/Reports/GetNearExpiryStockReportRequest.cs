@@ -15,4 +15,5 @@ public partial record GetNearExpiryStockReportRequest : RequestBase,
 {
     public int DaysAhead { get; init; } = 30;
     public Guid? ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
 }

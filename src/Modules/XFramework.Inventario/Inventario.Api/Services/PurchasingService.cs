@@ -18,6 +18,7 @@ public sealed class PurchasingService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor,
     StockPostingService stockPostingService,
+    ProductVariationService productVariationService,
     ITenantModuleFeatureService featureService)
 {
     private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
@@ -181,6 +182,14 @@ public sealed class PurchasingService(
                 .AnyAsync(x => x.TenantId == tenantId && x.Id == line.ProductId && !x.IsDeleted, ct);
             if (!productExists)
                 return Result<PurchaseOrder>.NotFound("Product not found.");
+
+            var variationResult = await productVariationService.ValidateProductVariationAsync(
+                tenantId,
+                line.ProductId,
+                line.ProductVariationId,
+                ct);
+            if (!variationResult.IsSuccess)
+                return Result<PurchaseOrder>.Failure(variationResult.Message!, variationResult.StatusCode);
         }
 
         var orderNumber = NormalizeOptional(request.OrderNumber) ?? GenerateDocumentNumber("PO");
@@ -215,6 +224,7 @@ public sealed class PurchasingService(
                 TenantId = tenantId,
                 PurchaseOrderId = order.Id,
                 ProductId = lineRequest.ProductId,
+                ProductVariationId = lineRequest.ProductVariationId,
                 OrderedQuantity = lineRequest.OrderedQuantity,
                 ReceivedQuantity = 0,
                 UnitCost = lineRequest.UnitCost,
@@ -444,10 +454,21 @@ public sealed class PurchasingService(
             if (purchaseOrderLine.ProductId != lineRequest.ProductId)
                 return Result<ReceivingLine>.Failure("Receiving line product does not match the purchase order line.", 400);
 
+            if (purchaseOrderLine.ProductVariationId != lineRequest.ProductVariationId)
+                return Result<ReceivingLine>.Failure("Receiving line variant does not match the purchase order line.", 400);
+
             var remaining = purchaseOrderLine.OrderedQuantity - purchaseOrderLine.ReceivedQuantity;
             if (lineRequest.Quantity > remaining)
                 return Result<ReceivingLine>.Conflict("Receiving quantity exceeds the remaining purchase order quantity.");
         }
+
+        var variationResult = await productVariationService.ValidateProductVariationAsync(
+            tenantId,
+            lineRequest.ProductId,
+            lineRequest.ProductVariationId,
+            ct);
+        if (!variationResult.IsSuccess)
+            return Result<ReceivingLine>.Failure(variationResult.Message!, variationResult.StatusCode);
 
         var lotResult = await ResolveLot(tenantId, document, lineRequest, ct);
         if (!lotResult.IsSuccess)
@@ -458,6 +479,7 @@ public sealed class PurchasingService(
             {
                 Metadata = new() { TenantId = tenantId },
                 ProductId = lineRequest.ProductId,
+                ProductVariationId = lineRequest.ProductVariationId,
                 WarehouseId = document.WarehouseId,
                 LocationId = document.LocationId,
                 LotId = lotResult.Data?.Id,
@@ -488,6 +510,7 @@ public sealed class PurchasingService(
             ReceivingDocumentId = document.Id,
             PurchaseOrderLineId = lineRequest.PurchaseOrderLineId,
             ProductId = lineRequest.ProductId,
+            ProductVariationId = lineRequest.ProductVariationId,
             LotId = lotResult.Data?.Id,
             StockBalanceId = stockResult.Data!.StockBalanceId,
             Quantity = lineRequest.Quantity,
@@ -518,6 +541,8 @@ public sealed class PurchasingService(
                 return Result<InventoryLot?>.NotFound("Lot not found.");
             if (existing.ProductId != lineRequest.ProductId)
                 return Result<InventoryLot?>.Failure("Lot does not belong to the receiving product.", 400);
+            if (existing.ProductVariationId != lineRequest.ProductVariationId)
+                return Result<InventoryLot?>.Failure("Lot does not belong to the receiving variant.", 400);
 
             return Result<InventoryLot?>.Success(existing);
         }
@@ -531,6 +556,7 @@ public sealed class PurchasingService(
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == lineRequest.ProductId &&
+                x.ProductVariationId == lineRequest.ProductVariationId &&
                 x.LotNumber == lotNumber &&
                 !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
@@ -549,6 +575,7 @@ public sealed class PurchasingService(
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ProductId = lineRequest.ProductId,
+            ProductVariationId = lineRequest.ProductVariationId,
             LotNumber = lotNumber,
             SupplierReference = NormalizeOptional(lineRequest.SupplierReference) ?? document.ReferenceNumber,
             SourceReferenceType = "receiving",
@@ -674,6 +701,7 @@ public sealed class PurchasingService(
             {
                 x.PurchaseOrderLineId,
                 x.ProductId,
+                x.ProductVariationId,
                 x.Quantity,
                 x.UnitCost,
                 x.UnitOfMeasure,

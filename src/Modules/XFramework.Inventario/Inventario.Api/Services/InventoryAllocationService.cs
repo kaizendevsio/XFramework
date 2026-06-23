@@ -34,6 +34,9 @@ public sealed class InventoryAllocationService(
         if (request.ProductId is { } productId)
             query = query.Where(x => x.ProductId == productId);
 
+        if (request.ProductVariationId is { } productVariationId)
+            query = query.Where(x => x.ProductVariationId == productVariationId);
+
         if (request.LotId is { } lotId)
             query = query.Where(x => x.LotId == lotId);
 
@@ -85,6 +88,7 @@ public sealed class InventoryAllocationService(
             {
                 Metadata = request.Metadata,
                 ProductId = request.ProductId,
+                ProductVariationId = request.ProductVariationId,
                 WarehouseId = request.WarehouseId,
                 LocationId = request.LocationId,
                 LotId = candidate.Balance.LotId,
@@ -105,6 +109,7 @@ public sealed class InventoryAllocationService(
                 TenantId = tenantId,
                 ReservationId = reservationId,
                 ProductId = request.ProductId,
+                ProductVariationId = request.ProductVariationId,
                 WarehouseId = request.WarehouseId,
                 LocationId = request.LocationId,
                 StockBalanceId = stockResult.Data!.StockBalanceId,
@@ -146,6 +151,7 @@ public sealed class InventoryAllocationService(
             {
                 Metadata = request.Metadata,
                 ProductId = allocation.ProductId,
+                ProductVariationId = allocation.ProductVariationId,
                 WarehouseId = allocation.WarehouseId,
                 LocationId = allocation.LocationId,
                 LotId = allocation.LotId,
@@ -187,6 +193,7 @@ public sealed class InventoryAllocationService(
             {
                 Metadata = request.Metadata,
                 ProductId = allocation.ProductId,
+                ProductVariationId = allocation.ProductVariationId,
                 WarehouseId = allocation.WarehouseId,
                 LocationId = allocation.LocationId,
                 LotId = allocation.LotId,
@@ -214,6 +221,7 @@ public sealed class InventoryAllocationService(
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == request.ProductId &&
+                x.ProductVariationId == request.ProductVariationId &&
                 x.WarehouseId == request.WarehouseId &&
                 x.LocationId == request.LocationId &&
                 !x.IsDeleted &&
@@ -304,6 +312,7 @@ public sealed class InventoryAllocationService(
             TenantId = reservation.TenantId,
             ReservationId = reservation.Id,
             ProductId = reservation.ProductId,
+            ProductVariationId = reservation.ProductVariationId,
             WarehouseId = balance.WarehouseId,
             LocationId = balance.LocationId,
             StockBalanceId = balance.Id,

@@ -18,12 +18,18 @@ public class PurchaseOrderLineConfiguration : IEntityTypeConfiguration<PurchaseO
         entity.Property(e => e.Notes).HasMaxLength(1000);
 
         entity.HasIndex(e => new { e.TenantId, e.PurchaseOrderId });
-        entity.HasIndex(e => new { e.TenantId, e.ProductId });
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId });
 
         entity.HasOne(e => e.Product)
             .WithMany()
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_PurchaseOrderLine_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_PurchaseOrderLine_ProductVariation");
     }
 }

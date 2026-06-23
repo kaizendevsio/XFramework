@@ -17,16 +17,28 @@ public class StockBalanceConfiguration : IEntityTypeConfiguration<StockBalance>
 
         entity.HasIndex(e => new { e.TenantId, e.ProductId, e.WarehouseId, e.LocationId })
             .IsUnique()
-            .HasFilter("\"LotId\" IS NULL AND \"IsDeleted\" = false");
+            .HasFilter("\"ProductVariationId\" IS NULL AND \"LotId\" IS NULL AND \"IsDeleted\" = false");
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.WarehouseId, e.LocationId })
+            .IsUnique()
+            .HasFilter("\"ProductVariationId\" IS NOT NULL AND \"LotId\" IS NULL AND \"IsDeleted\" = false");
         entity.HasIndex(e => new { e.TenantId, e.ProductId, e.WarehouseId, e.LocationId, e.LotId })
             .IsUnique()
-            .HasFilter("\"LotId\" IS NOT NULL AND \"IsDeleted\" = false");
+            .HasFilter("\"ProductVariationId\" IS NULL AND \"LotId\" IS NOT NULL AND \"IsDeleted\" = false");
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.WarehouseId, e.LocationId, e.LotId })
+            .IsUnique()
+            .HasFilter("\"ProductVariationId\" IS NOT NULL AND \"LotId\" IS NOT NULL AND \"IsDeleted\" = false");
 
         entity.HasOne(e => e.Product)
             .WithMany()
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_StockBalance_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_StockBalance_ProductVariation");
 
         entity.HasOne(e => e.Warehouse)
             .WithMany()

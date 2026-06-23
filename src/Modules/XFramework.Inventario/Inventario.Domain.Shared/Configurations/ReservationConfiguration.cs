@@ -17,7 +17,7 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
         entity.Property(e => e.ReferenceType).HasMaxLength(100);
         entity.Property(e => e.ReservedAt).HasDefaultValueSql("now()");
 
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.Status });
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.Status });
         entity.HasIndex(e => new { e.TenantId, e.ReferenceType, e.ReferenceId });
         entity.HasIndex(e => e.ExpiresAt);
 
@@ -26,6 +26,12 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_Reservation_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_Reservation_ProductVariation");
 
         entity.HasOne(e => e.Warehouse)
             .WithMany()

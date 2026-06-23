@@ -29,6 +29,9 @@ public sealed class ReservationService(
         if (request.ProductId is { } productId)
             query = query.Where(x => x.ProductId == productId);
 
+        if (request.ProductVariationId is { } productVariationId)
+            query = query.Where(x => x.ProductVariationId == productVariationId);
+
         if (request.Status is { } status)
             query = query.Where(x => x.Status == status);
 
@@ -69,6 +72,7 @@ public sealed class ReservationService(
             Id = reservationId,
             TenantId = tenantResult.Data,
             ProductId = request.ProductId,
+            ProductVariationId = request.ProductVariationId,
             WarehouseId = request.WarehouseId,
             LocationId = request.LocationId,
             StockBalanceId = allocations.FirstOrDefault()?.StockBalanceId,

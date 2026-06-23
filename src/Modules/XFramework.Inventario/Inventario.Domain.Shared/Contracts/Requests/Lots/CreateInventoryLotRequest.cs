@@ -14,6 +14,7 @@ public partial record CreateInventoryLotRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
     public string? LotNumber { get; init; }
     public string? SupplierReference { get; init; }
     public string? SourceReferenceType { get; init; }

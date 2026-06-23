@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using XFramework.Inventario.Domain.Shared.Contracts;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Variations;
 using XFramework.TestInfrastructure;
 
 namespace Inventario.IntegrationTests.Tests;
@@ -155,7 +156,127 @@ public sealed class CatalogTests : InventarioTestBase
 
     [Test]
     [Category(TestCategories.ExtendedIntegration)]
-    public async Task SaveChangesAsync_RemoteProductVariationCreate_PersistsWithProduct()
+    [Category(TestCategories.Wrappers)]
+    public async Task ProductVariationTypes_CreateThroughWrapper_ReturnsTenantAndProductScopedTypesAndRejectsDuplicates()
+    {
+        await using var db = CreateDbContext();
+        var category = await TestInventarioSeed.SeedCategory(db);
+        var product = await TestInventarioSeed.SeedProduct(db, categoryId: category.Id);
+
+        var tenantTypeName = $"Size {Guid.NewGuid():N}";
+        var productTypeName = $"Pack {Guid.NewGuid():N}";
+
+        var tenantWide = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProductVariationType(
+            new CreateProductVariationTypeRequest
+            {
+                Metadata = CreateMetadata(),
+                Name = tenantTypeName,
+                Code = "SIZE"
+            });
+        var duplicate = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProductVariationType(
+            new CreateProductVariationTypeRequest
+            {
+                Metadata = CreateMetadata(),
+                Name = tenantTypeName
+            });
+        var productLocal = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProductVariationType(
+            new CreateProductVariationTypeRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductId = product.Id,
+                Name = productTypeName
+            });
+
+        tenantWide.IsSuccess.Should().BeTrue(tenantWide.Message);
+        duplicate.IsSuccess.Should().BeFalse();
+        duplicate.HttpStatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        productLocal.IsSuccess.Should().BeTrue(productLocal.Message);
+
+        var types = await InventarioIntegrationTestFixture.ServiceWrapper.GetProductVariationTypes(
+            new GetProductVariationTypesRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductId = product.Id
+            });
+
+        types.IsSuccess.Should().BeTrue(types.Message);
+        types.Response.Should().Contain(x => x.Name == tenantTypeName && x.ProductId == null);
+        types.Response.Should().Contain(x => x.Name == productTypeName && x.ProductId == product.Id);
+    }
+
+    [Test]
+    [Category(TestCategories.ExtendedIntegration)]
+    [Category(TestCategories.Wrappers)]
+    public async Task ProductVariations_CreateAndUpdateThroughWrapper_PersistAbsolutePriceAndLegacyDelta()
+    {
+        await using var db = CreateDbContext();
+        var category = await TestInventarioSeed.SeedCategory(db);
+        var product = await TestInventarioSeed.SeedProduct(db, categoryId: category.Id);
+        product.Price = 12m;
+        db.Set<Product>().Update(product);
+        await db.SaveChangesAsync();
+
+        var typeName = $"Color {Guid.NewGuid():N}";
+        var type = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProductVariationType(
+            new CreateProductVariationTypeRequest
+            {
+                Metadata = CreateMetadata(),
+                Name = typeName
+            });
+        type.IsSuccess.Should().BeTrue(type.Message);
+
+        await using var typeDb = CreateDbContext();
+        var persistedType = await typeDb.Set<ProductVariationType>()
+            .IgnoreQueryFilters()
+            .FirstAsync(x => x.Name == typeName);
+
+        var variantName = $"Blue {Guid.NewGuid():N}";
+        var create = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProductVariation(
+            new CreateProductVariationRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductId = product.Id,
+                ProductVariationTypeId = persistedType.Id,
+                Name = variantName,
+                Price = 15.5m
+            });
+        create.IsSuccess.Should().BeTrue(create.Message);
+
+        await using var createdDb = CreateDbContext();
+        var variation = await createdDb.Set<ProductVariation>()
+            .IgnoreQueryFilters()
+            .FirstAsync(x => x.ProductId == product.Id && x.Name == variantName);
+        variation.ProductVariationTypeId.Should().Be(persistedType.Id);
+        variation.Price.Should().Be(15.5m);
+        variation.AdditionalPrice.Should().Be(3.5m);
+        variation.VariationType.Should().Be(typeName);
+
+        var updatedName = $"Blue Updated {Guid.NewGuid():N}";
+        var update = await InventarioIntegrationTestFixture.ServiceWrapper.UpdateProductVariation(
+            new UpdateProductVariationRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductVariationId = variation.Id,
+                ProductVariationTypeId = persistedType.Id,
+                Name = updatedName,
+                Price = 20m
+            });
+        update.IsSuccess.Should().BeTrue(update.Message);
+
+        await using var verifyDb = CreateDbContext();
+        var updated = await verifyDb.Set<ProductVariation>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstAsync(x => x.Id == variation.Id);
+        updated.Name.Should().Be(updatedName);
+        updated.Price.Should().Be(20m);
+        updated.AdditionalPrice.Should().Be(8m);
+    }
+
+    [Test]
+    [Category(TestCategories.ExtendedIntegration)]
+    [Category(TestCategories.ControlPanelContract)]
+    public async Task SaveChangesAsync_RemoteProductVariationCreate_ReturnsNotRegisteredForRemoteMutation()
     {
         await using var db = CreateDbContext();
         var category = await TestInventarioSeed.SeedCategory(db);
@@ -169,6 +290,7 @@ public sealed class CatalogTests : InventarioTestBase
             VariationType = "Size",
             Name = $"Variation {Guid.NewGuid():N}",
             AdditionalPrice = 2.5m,
+            Price = product.Price + 2.5m,
             IsEnabled = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -176,86 +298,33 @@ public sealed class CatalogTests : InventarioTestBase
         ctx.Add(variation);
         var save = await ctx.SaveChangesAsync();
 
-        save.IsSuccess.Should().BeTrue(save.Message);
-        var persisted = await db.Set<ProductVariation>()
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Id == variation.Id);
-        persisted.Should().NotBeNull();
-        persisted!.ProductId.Should().Be(product.Id);
-        persisted.VariationType.Should().Be("Size");
+        save.IsSuccess.Should().BeFalse();
+        save.Message.Should().Contain("ProductVariation");
+        save.Message.Should().Contain("not registered for remote mutation");
     }
 
     [Test]
     [Category(TestCategories.ExtendedIntegration)]
-    public async Task SaveChangesAsync_RemoteProductVariationUpdate_PersistsThroughInventarioDataContext()
+    [Category(TestCategories.ControlPanelContract)]
+    public async Task SaveChangesAsync_RemoteProductVariationTypeCreate_ReturnsNotRegisteredForRemoteMutation()
     {
-        await using var db = CreateDbContext();
-        var product = await TestInventarioSeed.SeedProduct(db);
-        var variation = new ProductVariation
+        var ctx = InventarioIntegrationTestFixture.DataContext;
+        var type = new ProductVariationType
         {
             Id = Guid.NewGuid(),
             TenantId = InventarioIntegrationTestFixture.TestTenantId,
-            ProductId = product.Id,
-            VariationType = "Size",
-            Name = $"Variation {Guid.NewGuid():N}",
-            AdditionalPrice = 2m,
+            Name = $"Type {Guid.NewGuid():N}",
+            NormalizedName = $"TYPE-{Guid.NewGuid():N}",
             IsEnabled = true,
-            CreatedAt = DateTime.UtcNow,
-            ConcurrencyStamp = Guid.NewGuid()
+            CreatedAt = DateTime.UtcNow
         };
-        db.Set<ProductVariation>().Add(variation);
-        await db.SaveChangesAsync();
-        var ctx = InventarioIntegrationTestFixture.DataContext;
 
-        variation.Name = $"Updated Variation {Guid.NewGuid():N}";
-        variation.VariationType = "Color";
-        variation.AdditionalPrice = 4m;
-        ctx.Update(variation);
+        ctx.Add(type);
         var save = await ctx.SaveChangesAsync();
 
-        save.IsSuccess.Should().BeTrue(save.Message);
-        await using var verifyDb = CreateDbContext();
-        var persisted = await verifyDb.Set<ProductVariation>()
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .FirstAsync(x => x.Id == variation.Id);
-        persisted.Name.Should().Be(variation.Name);
-        persisted.VariationType.Should().Be("Color");
-        persisted.AdditionalPrice.Should().Be(4m);
-    }
-
-    [Test]
-    [Category(TestCategories.ExtendedIntegration)]
-    public async Task SaveChangesAsync_RemoteProductVariationRemove_SoftDeletesThroughInventarioDataContext()
-    {
-        await using var db = CreateDbContext();
-        var product = await TestInventarioSeed.SeedProduct(db);
-        var variation = new ProductVariation
-        {
-            Id = Guid.NewGuid(),
-            TenantId = InventarioIntegrationTestFixture.TestTenantId,
-            ProductId = product.Id,
-            Name = $"Variation {Guid.NewGuid():N}",
-            AdditionalPrice = 2m,
-            IsEnabled = true,
-            CreatedAt = DateTime.UtcNow,
-            ConcurrencyStamp = Guid.NewGuid()
-        };
-        db.Set<ProductVariation>().Add(variation);
-        await db.SaveChangesAsync();
-        var ctx = InventarioIntegrationTestFixture.DataContext;
-
-        ctx.Remove(variation);
-        var save = await ctx.SaveChangesAsync();
-
-        save.IsSuccess.Should().BeTrue(save.Message);
-        await using var verifyDb = CreateDbContext();
-        var persisted = await verifyDb.Set<ProductVariation>()
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .FirstAsync(x => x.Id == variation.Id);
-        persisted.IsDeleted.Should().BeTrue();
-        persisted.DeletedAt.Should().NotBeNull();
+        save.IsSuccess.Should().BeFalse();
+        save.Message.Should().Contain("ProductVariationType");
+        save.Message.Should().Contain("not registered for remote mutation");
     }
 
     [Test]
@@ -307,9 +376,12 @@ public sealed class CatalogTests : InventarioTestBase
         var purchaseOrderId = Guid.NewGuid();
         var purchaseOrderLineId = Guid.NewGuid();
         var receivingDocumentId = Guid.NewGuid();
+        var variationTypeId = Guid.NewGuid();
 
         var rejectedEntities = new (string EntityName, object Entity)[]
         {
+            ("ProductVariationType", WithBase(new ProductVariationType { Id = variationTypeId, Name = "Rejected Type", NormalizedName = UniqueCode("TYPE") })),
+            ("ProductVariation", WithBase(new ProductVariation { ProductId = product.Id, ProductVariationTypeId = variationTypeId, VariationType = "Rejected Type", Name = "Rejected Variant", Price = 12m, AdditionalPrice = 2m })),
             ("Warehouse", WithBase(new Warehouse { Code = UniqueCode("WH"), Name = "Rejected Warehouse" })),
             ("InventoryLocation", WithBase(new InventoryLocation { WarehouseId = warehouse.Id, Code = UniqueCode("BIN"), Name = "Rejected Location" })),
             ("InventoryLot", WithBase(new InventoryLot { ProductId = product.Id, LotNumber = UniqueCode("LOT"), ReceivedAt = DateTime.UtcNow, Status = XFramework.Inventario.Domain.Shared.Enums.InventoryLotStatus.Available })),

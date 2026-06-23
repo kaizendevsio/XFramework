@@ -18,9 +18,13 @@ public partial class ProductTransaction : BaseModel
     [MemoryPackOrder(1)]
     public Product? Product { get; set; }
     [MemoryPackOrder(2)]
-    public int Quantity { get; set; }
+    public Guid? ProductVariationId { get; set; }
+    [MemoryPackIgnore]
+    public ProductVariation? ProductVariation { get; set; }
     [MemoryPackOrder(3)]
-    public decimal TotalPrice { get; set; }
+    public int Quantity { get; set; }
     [MemoryPackOrder(4)]
+    public decimal TotalPrice { get; set; }
+    [MemoryPackOrder(5)]
     public DateTime TransactionDate { get; set; }
 }

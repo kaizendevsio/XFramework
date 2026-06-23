@@ -27,23 +27,27 @@ public partial class ReceivingLine : BaseModel
     [MemoryPackIgnore]
     public Product? Product { get; set; }
     [MemoryPackOrder(3)]
+    public Guid? ProductVariationId { get; set; }
+    [MemoryPackIgnore]
+    public ProductVariation? ProductVariation { get; set; }
+    [MemoryPackOrder(4)]
     public Guid? LotId { get; set; }
     [MemoryPackIgnore]
     public InventoryLot? Lot { get; set; }
-    [MemoryPackOrder(4)]
+    [MemoryPackOrder(5)]
     public Guid? StockBalanceId { get; set; }
     [MemoryPackIgnore]
     public StockBalance? StockBalance { get; set; }
-    [MemoryPackOrder(5)]
+    [MemoryPackOrder(6)]
     public Guid? InventoryMovementId { get; set; }
     [MemoryPackIgnore]
     public InventoryMovement? InventoryMovement { get; set; }
-    [MemoryPackOrder(6)]
-    public decimal Quantity { get; set; }
     [MemoryPackOrder(7)]
-    public decimal? UnitCost { get; set; }
+    public decimal Quantity { get; set; }
     [MemoryPackOrder(8)]
-    public string? UnitOfMeasure { get; set; }
+    public decimal? UnitCost { get; set; }
     [MemoryPackOrder(9)]
+    public string? UnitOfMeasure { get; set; }
+    [MemoryPackOrder(10)]
     public string? LotNumber { get; set; }
 }

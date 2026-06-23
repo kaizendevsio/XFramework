@@ -16,6 +16,8 @@ public sealed class ControlPanelContractTests
         "Warehouse",
         "InventoryLocation",
         "InventoryLot",
+        "ProductVariationType",
+        "ProductVariation",
         "ProductTransaction",
         "StockBalance",
         "InventoryMovement",

@@ -6,6 +6,7 @@
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Planning
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Purchasing
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Variations
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
 @using XFramework.Inventario.Domain.Shared.Enums
 @implements IDisposable
@@ -87,17 +88,32 @@ else
     <BbDialog Open="@_variationDialogOpen" OpenChanged="@(value => _variationDialogOpen = value)">
         <BbDialogContent TrapFocus="false">
             <BbDialogHeader>
-                <BbDialogTitle>Add Variation</BbDialogTitle>
-                <BbDialogDescription>Add a product option for @_product.Name.</BbDialogDescription>
+                <BbDialogTitle>@(_variationForm.IsEditing ? "Edit Variant" : "Add Variant")</BbDialogTitle>
+                <BbDialogDescription>Configure a sellable variant for @_product.Name.</BbDialogDescription>
             </BbDialogHeader>
             <div class="grid gap-4 py-4">
-                <BbFormFieldInput TValue="string" @bind-Value="_variationForm.VariationType" Label="Variation Type" Placeholder="Size, Color, Packaging, etc." />
-                <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Name" Label="Name" Required="true" />
-                <BbFormFieldInput TValue="string" @bind-Value="_variationForm.AdditionalPrice" Label="Additional Price" />
+                <BbFormFieldCombobox TValue="string"
+                                     @bind-Value="_variationForm.ProductVariationTypeId"
+                                     Options="@VariationTypeOptions"
+                                     Label="Variation Type"
+                                     Placeholder="Select a variation type"
+                                     SearchPlaceholder="Search variation types..."
+                                     EmptyMessage="No variation types found."
+                                     MatchTriggerWidth="true" />
+                <div class="grid gap-3 md:grid-cols-2">
+                    <BbFormFieldInput TValue="string" @bind-Value="_variationForm.NewVariationTypeName" Label="New Variation Type" Placeholder="Size, Color, Packaging, etc." />
+                    <BbFormFieldSwitch Checked="@_variationForm.NewTypeProductLocal"
+                                       CheckedChanged="@((bool value) => _variationForm.NewTypeProductLocal = value)"
+                                       Label="Limit new type to this product" />
+                </div>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Name" Label="Variant" Required="true" />
+                    <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Price" Label="Variant Price" />
+                </div>
             </div>
             <BbDialogFooter>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _variationDialogOpen = false)">Cancel</BbButton>
-                <BbButton OnClick="@SaveVariation" Disabled="@_saving">Create Variation</BbButton>
+                <BbButton OnClick="@SaveVariation" Disabled="@_saving">@(_variationForm.IsEditing ? "Save Variant" : "Create Variant")</BbButton>
             </BbDialogFooter>
         </BbDialogContent>
     </BbDialog>
@@ -109,6 +125,17 @@ else
             </BbDialogHeader>
             <div class="grid gap-4 py-4">
                 @FixedProductField
+                @if (CanPickVariant)
+                {
+                    <BbFormFieldCombobox TValue="string"
+                                         @bind-Value="_movementForm.ProductVariationId"
+                                         Options="@VariantOptions"
+                                         Label="Variant"
+                                         Placeholder="Base product"
+                                         SearchPlaceholder="Search variants..."
+                                         EmptyMessage="No variants found."
+                                         MatchTriggerWidth="true" />
+                }
 
                 <div class="grid gap-3 md:grid-cols-2">
                     <XfEntityPicker TItem="Warehouse"
@@ -157,7 +184,7 @@ else
                                         Label="Lot / Batch"
                                         Value="@_movementForm.LotId"
                                         ValueChanged="@(value => _movementForm.LotId = value ?? "")"
-                                        Items="@_lots"
+                                        Items="@MovementLots"
                                         ValueSelector="@GetLotPickerValue"
                                         TextSelector="@GetLotLabel"
                                         SearchTextSelector="@GetLotSearchText"
@@ -211,6 +238,17 @@ else
             </BbDialogHeader>
             <div class="grid gap-4 py-4">
                 @FixedProductField
+                @if (CanPickVariant)
+                {
+                    <BbFormFieldCombobox TValue="string"
+                                         @bind-Value="_lotForm.ProductVariationId"
+                                         Options="@VariantOptions"
+                                         Label="Variant"
+                                         Placeholder="Base product"
+                                         SearchPlaceholder="Search variants..."
+                                         EmptyMessage="No variants found."
+                                         MatchTriggerWidth="true" />
+                }
                 <div class="grid gap-3 md:grid-cols-2">
                     <BbFormFieldInput TValue="string" @bind-Value="_lotForm.LotNumber" Label="Lot / Batch Number" Required="true" />
                     <BbFormFieldSelect TValue="string" @bind-Value="_lotForm.Status" Label="Status">
@@ -242,6 +280,17 @@ else
             </BbDialogHeader>
             <div class="grid gap-4 py-4">
                 @FixedProductField
+                @if (CanPickVariant)
+                {
+                    <BbFormFieldCombobox TValue="string"
+                                         @bind-Value="_receiveForm.ProductVariationId"
+                                         Options="@VariantOptions"
+                                         Label="Variant"
+                                         Placeholder="Base product"
+                                         SearchPlaceholder="Search variants..."
+                                         EmptyMessage="No variants found."
+                                         MatchTriggerWidth="true" />
+                }
 
                 <div class="grid gap-3 md:grid-cols-3">
                     <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.ReceiptNumber" Label="Receipt Number" />
@@ -343,7 +392,7 @@ else
                                     Label="Lot / Batch"
                                     Value="@_receiveForm.LotId"
                                     ValueChanged="@(value => _receiveForm.LotId = value ?? "")"
-                                    Items="@_lots"
+                                    Items="@ReceiveLots"
                                     ValueSelector="@GetLotPickerValue"
                                     TextSelector="@GetLotLabel"
                                     SearchTextSelector="@GetLotSearchText"
@@ -377,6 +426,17 @@ else
             </BbDialogHeader>
             <div class="grid gap-4 py-4">
                 @FixedProductField
+                @if (CanPickVariant)
+                {
+                    <BbFormFieldCombobox TValue="string"
+                                         @bind-Value="_ruleForm.ProductVariationId"
+                                         Options="@VariantOptions"
+                                         Label="Variant"
+                                         Placeholder="All variants and base product"
+                                         SearchPlaceholder="Search variants..."
+                                         EmptyMessage="No variants found."
+                                         MatchTriggerWidth="true" />
+                }
 
                 <div class="grid gap-3 md:grid-cols-2">
                     <XfEntityPicker TItem="Warehouse"
@@ -595,6 +655,7 @@ else
 
     private Product? _product;
     private List<ProductCategory> _categories = [];
+    private List<ProductVariationType> _variationTypes = [];
     private List<ProductVariation> _variations = [];
     private List<ProductTransaction> _transactions = [];
     private List<InventoryReorderRule> _reorderRules = [];
@@ -671,6 +732,8 @@ else
 
     private IReadOnlyList<InventoryLocation> MovementLocations => LocationsForWarehouse(_movementForm.WarehouseId).ToList();
     private IReadOnlyList<InventoryLocation> ReceiveLocations => LocationsForWarehouse(_receiveForm.WarehouseId).ToList();
+    private IReadOnlyList<InventoryLot> MovementLots => LotsForVariant(_movementForm.ProductVariationId).ToList();
+    private IReadOnlyList<InventoryLot> ReceiveLots => LotsForVariant(_receiveForm.ProductVariationId).ToList();
     private IReadOnlyList<InventoryLocation> RuleLocations => string.IsNullOrWhiteSpace(_ruleForm.WarehouseId)
         ? _locations
         : LocationsForWarehouse(_ruleForm.WarehouseId).ToList();
@@ -682,9 +745,19 @@ else
     private string? MovementLocationHelpText => CanCreateMovementLocation ? null : "Select or create a warehouse first.";
     private string? ReceiveLocationHelpText => CanCreateReceiveLocation ? null : "Select or create a warehouse first.";
     private string? RuleLocationHelpText => CanCreateRuleLocation ? null : "Select a warehouse before scoping this rule to a location.";
+    private bool CanPickVariant => _variationsEnabled && _variations.Count > 0;
 
     private List<SelectOption<string>> CategoryOptions =>
         _categories.Select(category => new SelectOption<string>(category.Id.ToString(), category.Name ?? category.Id.ToString()[..8])).ToList();
+    private List<SelectOption<string>> VariationTypeOptions =>
+        _variationTypes
+            .Select(type => new SelectOption<string>(type.Id.ToString(), GetVariationTypeLabel(type)))
+            .ToList();
+    private List<SelectOption<string>> VariantOptions =>
+    [
+        new("", "Base product"),
+        .. _variations.Select(variation => new SelectOption<string>(variation.Id.ToString(), GetVariantLabel(variation)))
+    ];
 
     protected override void OnInitialized()
     {
@@ -757,6 +830,7 @@ else
         _outsideTenantContext = false;
         _product = null;
         _categories = [];
+        _variationTypes = [];
         _variations = [];
         _transactions = [];
         _reorderRules = [];
@@ -781,6 +855,8 @@ else
             .ToListAsync();
 
         if (_variationsEnabled)
+        {
+            await LoadVariationTypes();
             _variations = await DataContext.Query<ProductVariation>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -789,6 +865,7 @@ else
                 .ThenBy(x => x.Name)
                 .Take(500)
                 .ToListAsync();
+        }
 
         if (_transactionsEnabled)
             _transactions = await DataContext.Query<ProductTransaction>()
@@ -888,6 +965,26 @@ else
                 .Take(500)
                 .ToListAsync();
         }
+    }
+
+    private async Task LoadVariationTypes()
+    {
+        var result = await Inventario.GetProductVariationTypes(new GetProductVariationTypesRequest
+        {
+            Metadata = BuildMetadata(),
+            ProductId = Id,
+            IncludeTenantWide = true,
+            IncludeProductLocal = true
+        });
+
+        if (result.IsSuccess)
+        {
+            _variationTypes = result.Response ?? [];
+            return;
+        }
+
+        ToastService.Show($"Failed to load variation types: {result.Message}");
+        _variationTypes = [];
     }
 
     private RenderFragment ProductHeader => @<div class="xf-detail-header">
@@ -1038,21 +1135,27 @@ else
                             OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                             Class="cursor-pointer">
                     <Columns>
-                        <BbDataGridTemplateColumn Title="Warehouse">
+                        @if (CanPickVariant)
+                        {
+                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                                <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        }
+                        <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                             <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Location">
+                        <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
                             <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                         </BbDataGridTemplateColumn>
                         @if (_traceabilityEnabled)
                         {
-                            <BbDataGridTemplateColumn Title="Lot">
+                            <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotNumber(item.LotId))">
                                 <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
                             </BbDataGridTemplateColumn>
                         }
-                        <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
@@ -1066,23 +1169,29 @@ else
             <BbCardContent>
                 <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20">
                     <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="Warehouse">
+                        <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
+                        @if (CanPickVariant)
+                        {
+                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                                <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        }
+                        <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                             <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Location">
+                        <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
                             <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                         </BbDataGridTemplateColumn>
                         @if (_traceabilityEnabled)
                         {
-                            <BbDataGridTemplateColumn Title="Lot">
+                            <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotNumber(item.LotId))">
                                 <ChildContent Context="item">@GetLotNumber(item.LotId)</ChildContent>
                             </BbDataGridTemplateColumn>
                         }
-                        <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
-                        <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
@@ -1113,12 +1222,18 @@ else
                             OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
                             Class="cursor-pointer">
                     <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.SupplierReference)" Title="Supplier Ref" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="On Hand">
+                        <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" Filterable="true" />
+                        @if (CanPickVariant)
+                        {
+                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                                <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        }
+                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.SupplierReference)" Title="Supplier Ref" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="On Hand" Filterable="true" FilterBy="@(item => GetLotOnHand(item.Id))">
                             <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("N2")</ChildContent>
                         </BbDataGridTemplateColumn>
                     </Columns>
@@ -1149,15 +1264,21 @@ else
             <BbCardContent>
                 <BbDataGrid Items="@_reorderRules" ShowPagination="true" InitialPageSize="20">
                     <Columns>
-                        <BbDataGridTemplateColumn Title="Scope">
+                        @if (CanPickVariant)
+                        {
+                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                                <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        }
+                        <BbDataGridTemplateColumn Title="Scope" Filterable="true" FilterBy="@(item => GetRuleScope(item))">
                             <ChildContent Context="item">@GetRuleScope(item)</ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Reorder Qty" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" />
-                        <BbDataGridTemplateColumn Title="Status">
+                        <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.MaximumQuantity)" Title="Max" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Reorder Qty" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsActive)">
                             <ChildContent Context="item">
                                 <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                             </ChildContent>
@@ -1171,31 +1292,43 @@ else
     private RenderFragment VariationsSection => @<div class="space-y-6">
         <div class="xf-page-header">
             <div>
-                <BbTypographyH3>Variations</BbTypographyH3>
-                <BbTypographyMuted>Product option types, names, and price adjustments.</BbTypographyMuted>
+                <BbTypographyH3>Variants</BbTypographyH3>
+                <BbTypographyMuted>Product options with reusable variation types and absolute prices.</BbTypographyMuted>
             </div>
             <div class="xf-page-actions">
                 <BbButton OnClick="@OpenVariationDialog">
                     <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
-                    Add Variation
+                    Add Variant
                 </BbButton>
             </div>
         </div>
 
         <BbCard>
             <BbCardHeader>
-                <BbCardTitle>Variation List</BbCardTitle>
-                <BbCardDescription>@_variations.Count variation(s) configured</BbCardDescription>
+                <BbCardTitle>Variant List</BbCardTitle>
+                <BbCardDescription>@_variations.Count variant(s) configured</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
                 <BbDataGrid Items="@_variations" ShowPagination="true" InitialPageSize="20">
                     <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.VariationType)" Title="Type" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="Additional Price">
-                            <ChildContent Context="item">@item.AdditionalPrice.ToString("N2")</ChildContent>
+                        <BbDataGridTemplateColumn Title="Variation Type" Filterable="true" FilterBy="@(item => GetVariationTypeName(item))">
+                            <ChildContent Context="item">@GetVariationTypeName(item)</ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Variant" Sortable="true" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Price" Filterable="true" FilterBy="@(item => GetVariantPrice(item))">
+                            <ChildContent Context="item">@GetVariantPrice(item).ToString("N2")</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Delta" Filterable="true" FilterBy="@(item => GetVariantDelta(item))">
+                            <ChildContent Context="item">@GetVariantDelta(item).ToString("+0.##;-0.##;0")</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Actions">
+                            <ChildContent Context="item">
+                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => OpenVariationDialog(item))">
+                                    Edit
+                                </BbButton>
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
@@ -1211,14 +1344,20 @@ else
             <BbCardContent>
                 <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
                     <Columns>
-                        <BbDataGridTemplateColumn Title="Quantity">
+                        @if (CanPickVariant)
+                        {
+                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => GetVariantName(item.ProductVariationId))">
+                                <ChildContent Context="item">@GetVariantName(item.ProductVariationId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        }
+                        <BbDataGridTemplateColumn Title="Quantity" Filterable="true" FilterBy="@(item => item.Quantity)">
                             <ChildContent Context="item">@item.Quantity</ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Total">
+                        <BbDataGridTemplateColumn Title="Total" Filterable="true" FilterBy="@(item => item.TotalPrice)">
                             <ChildContent Context="item">@item.TotalPrice.ToString("N2")</ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.TransactionDate)" Title="Transaction Date" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.TransactionDate)" Title="Transaction Date" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                     </Columns>
                 </BbDataGrid>
             </BbCardContent>
@@ -1346,6 +1485,17 @@ else
     private void OpenVariationDialog()
     {
         _variationForm.Reset();
+        _variationForm.Price = (_product?.Price ?? 0m).ToString("0.##");
+        _variationDialogOpen = true;
+    }
+
+    private void OpenVariationDialog(ProductVariation variation)
+    {
+        _variationForm.Reset();
+        _variationForm.ProductVariationId = variation.Id.ToString();
+        _variationForm.ProductVariationTypeId = variation.ProductVariationTypeId?.ToString() ?? "";
+        _variationForm.Name = variation.Name ?? "";
+        _variationForm.Price = GetVariantPrice(variation).ToString("0.##");
         _variationDialogOpen = true;
     }
 
@@ -1354,51 +1504,101 @@ else
         if (_product is null) return;
         if (string.IsNullOrWhiteSpace(_variationForm.Name))
         {
-            ToastService.Show("Variation name is required.");
+            ToastService.Show("Variant name is required.");
             return;
         }
 
-        if (!decimal.TryParse(_variationForm.AdditionalPrice, out var additionalPrice))
+        if (!decimal.TryParse(_variationForm.Price, out var price) || price < 0)
         {
-            ToastService.Show("Additional price must be a valid number.");
+            ToastService.Show("Variant price must be a non-negative number.");
             return;
         }
 
         _saving = true;
         try
         {
-            DataContext.Add(new ProductVariation
-            {
-                Id = Guid.NewGuid(),
-                TenantId = _product.TenantId,
-                ProductId = _product.Id,
-                VariationType = NullIfEmpty(_variationForm.VariationType),
-                Name = _variationForm.Name.Trim(),
-                AdditionalPrice = additionalPrice,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            });
+            var typeId = await ResolveVariationTypeId();
+            if (typeId is null)
+                return;
 
-            var result = await DataContext.SaveChangesAsync();
+            var requestName = _variationForm.Name.Trim();
+            var result = _variationForm.IsEditing && Guid.TryParse(_variationForm.ProductVariationId, out var variationId)
+                ? await Inventario.UpdateProductVariation(new UpdateProductVariationRequest
+                {
+                    Metadata = BuildMetadata(),
+                    ProductVariationId = variationId,
+                    ProductVariationTypeId = typeId.Value,
+                    Name = requestName,
+                    Price = price
+                })
+                : await Inventario.CreateProductVariation(new CreateProductVariationRequest
+                {
+                    Metadata = BuildMetadata(),
+                    ProductId = _product.Id,
+                    ProductVariationTypeId = typeId.Value,
+                    Name = requestName,
+                    Price = price
+                });
+
             if (result.IsSuccess)
             {
-                ToastService.Show("Variation added.");
+                ToastService.Show(_variationForm.IsEditing ? "Variant updated." : "Variant added.");
                 _variationDialogOpen = false;
                 await Reload();
             }
             else
             {
-                ToastService.Show($"Failed to add variation: {result.Message}");
+                ToastService.Show($"Failed to save variant: {result.Message}");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error adding variation: {ex.Message}");
+            ToastService.Show($"Error saving variant: {ex.Message}");
         }
         finally
         {
             _saving = false;
         }
+    }
+
+    private async Task<Guid?> ResolveVariationTypeId()
+    {
+        if (_product is null)
+            return null;
+
+        if (!string.IsNullOrWhiteSpace(_variationForm.NewVariationTypeName))
+        {
+            var name = _variationForm.NewVariationTypeName.Trim();
+            var productId = _variationForm.NewTypeProductLocal ? _product.Id : (Guid?)null;
+            var createType = await Inventario.CreateProductVariationType(new CreateProductVariationTypeRequest
+            {
+                Metadata = BuildMetadata(),
+                Name = name,
+                ProductId = productId
+            });
+
+            if (!createType.IsSuccess)
+            {
+                ToastService.Show($"Failed to create variation type: {createType.Message}");
+                return null;
+            }
+
+            await LoadVariationTypes();
+            var created = _variationTypes.FirstOrDefault(x =>
+                x.ProductId == productId &&
+                string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (created is not null)
+                return created.Id;
+
+            ToastService.Show("Variation type was created but could not be reloaded.");
+            return null;
+        }
+
+        if (Guid.TryParse(_variationForm.ProductVariationTypeId, out var selectedTypeId))
+            return selectedTypeId;
+
+        ToastService.Show("Select or create a variation type.");
+        return null;
     }
 
     private void OpenMovementDialog()
@@ -1430,11 +1630,15 @@ else
         try
         {
             var lotId = Guid.TryParse(_movementForm.LotId, out var parsedLotId) ? parsedLotId : (Guid?)null;
+            var productVariationId = Guid.TryParse(_movementForm.ProductVariationId, out var parsedVariationId)
+                ? parsedVariationId
+                : (Guid?)null;
 
             var result = await Inventario.PostStockMovement(new PostStockMovementRequest
             {
                 Metadata = BuildMetadata(),
                 ProductId = _product.Id,
+                ProductVariationId = productVariationId,
                 WarehouseId = warehouseId,
                 LocationId = locationId,
                 LotId = lotId,
@@ -1465,6 +1669,12 @@ else
     {
         _lotCreateTarget = target;
         _lotForm.Reset();
+        _lotForm.ProductVariationId = target switch
+        {
+            ProductWorkflow.Movement => _movementForm.ProductVariationId,
+            ProductWorkflow.Receiving => _receiveForm.ProductVariationId,
+            _ => ""
+        };
         _lotDialogOpen = true;
     }
 
@@ -1484,6 +1694,7 @@ else
             {
                 Metadata = BuildMetadata(),
                 ProductId = _product.Id,
+                ProductVariationId = Guid.TryParse(_lotForm.ProductVariationId, out var variationId) ? variationId : null,
                 LotNumber = _lotForm.LotNumber.Trim(),
                 SupplierReference = NullIfEmpty(_lotForm.SupplierReference),
                 SourceReferenceType = NullIfEmpty(_lotForm.SourceReferenceType),
@@ -1498,11 +1709,16 @@ else
             if (result.IsSuccess)
             {
                 var lotNumber = _lotForm.LotNumber.Trim();
+                var createdVariationId = Guid.TryParse(_lotForm.ProductVariationId, out var parsedCreatedVariationId)
+                    ? parsedCreatedVariationId
+                    : (Guid?)null;
                 var target = _lotCreateTarget;
                 _lotDialogOpen = false;
                 _lotCreateTarget = null;
                 await Reload();
-                var created = _lots.FirstOrDefault(x => string.Equals(x.LotNumber, lotNumber, StringComparison.OrdinalIgnoreCase));
+                var created = _lots.FirstOrDefault(x =>
+                    x.ProductVariationId == createdVariationId &&
+                    string.Equals(x.LotNumber, lotNumber, StringComparison.OrdinalIgnoreCase));
                 if (created is not null && target is not null)
                     ApplyWorkflowLot(target.Value, created.Id.ToString());
             }
@@ -1556,6 +1772,7 @@ else
                     {
                         PurchaseOrderLineId = Guid.TryParse(_receiveForm.PurchaseOrderLineId, out var lineId) ? lineId : null,
                         ProductId = _product.Id,
+                        ProductVariationId = Guid.TryParse(_receiveForm.ProductVariationId, out var variationId) ? variationId : null,
                         Quantity = quantity,
                         UnitCost = decimal.TryParse(_receiveForm.UnitCost, out var unitCost) ? unitCost : null,
                         UnitOfMeasure = NullIfEmpty(_receiveForm.UnitOfMeasure),
@@ -1615,6 +1832,7 @@ else
             {
                 Metadata = BuildMetadata(),
                 ProductId = _product.Id,
+                ProductVariationId = Guid.TryParse(_ruleForm.ProductVariationId, out var variationId) ? variationId : null,
                 WarehouseId = Guid.TryParse(_ruleForm.WarehouseId, out var warehouseId) ? warehouseId : null,
                 LocationId = Guid.TryParse(_ruleForm.LocationId, out var locationId) ? locationId : null,
                 MinimumQuantity = min,
@@ -1893,6 +2111,14 @@ else
     private InventoryLocation? FirstLocationForWarehouse(string? warehouseId) =>
         LocationsForWarehouse(warehouseId).FirstOrDefault();
 
+    private IEnumerable<InventoryLot> LotsForVariant(string? productVariationId)
+    {
+        if (Guid.TryParse(productVariationId, out var variationId))
+            return _lots.Where(x => x.ProductVariationId == variationId);
+
+        return _lots.Where(x => x.ProductVariationId is null);
+    }
+
     private string GetCategoryName(Guid categoryId) =>
         _categories.FirstOrDefault(x => x.Id == categoryId)?.Name ?? "Uncategorized";
 
@@ -1910,6 +2136,49 @@ else
 
     private decimal GetLotOnHand(Guid lotId) =>
         _balances.Where(x => x.LotId == lotId).Sum(x => x.OnHandQuantity);
+
+    private string GetVariantName(Guid? productVariationId) =>
+        productVariationId is { } id
+            ? _variations.FirstOrDefault(x => x.Id == id) is { } variation
+                ? GetVariantLabel(variation)
+                : id.ToString()[..8]
+            : "Base product";
+
+    private string GetVariantLabel(ProductVariation variation)
+    {
+        var name = string.IsNullOrWhiteSpace(variation.Name) ? variation.Id.ToString()[..8] : variation.Name;
+        var typeName = GetVariationTypeName(variation);
+        return string.IsNullOrWhiteSpace(typeName) ? name : $"{typeName}: {name}";
+    }
+
+    private string GetVariationTypeName(ProductVariation variation)
+    {
+        if (variation.ProductVariationTypeId is { } typeId &&
+            _variationTypes.FirstOrDefault(x => x.Id == typeId) is { } type)
+        {
+            return type.Name ?? type.Id.ToString()[..8];
+        }
+
+        return variation.VariationType ?? "";
+    }
+
+    private string GetVariationTypeLabel(ProductVariationType type)
+    {
+        var scope = type.ProductId is null ? "Tenant-wide" : "Product";
+        var name = string.IsNullOrWhiteSpace(type.Name) ? type.Id.ToString()[..8] : type.Name;
+        return $"{name} ({scope})";
+    }
+
+    private decimal GetVariantPrice(ProductVariation variation)
+    {
+        if (variation.ProductVariationTypeId is null && variation.Price == 0m)
+            return (_product?.Price ?? 0m) + variation.AdditionalPrice;
+
+        return variation.Price;
+    }
+
+    private decimal GetVariantDelta(ProductVariation variation) =>
+        GetVariantPrice(variation) - (_product?.Price ?? 0m);
 
     private static string GetProductLabel(Product? product)
     {
@@ -1933,8 +2202,8 @@ else
         $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
     private static string GetLocationSearchText(InventoryLocation location) =>
         $"{location.Code} {location.Name} {location.LocationType} {location.Description}";
-    private static string GetLotSearchText(InventoryLot lot) =>
-        $"{lot.LotNumber} {lot.SupplierReference} {lot.SourceReferenceType} {lot.Status}";
+    private string GetLotSearchText(InventoryLot lot) =>
+        $"{lot.LotNumber} {GetVariantName(lot.ProductVariationId)} {lot.SupplierReference} {lot.SourceReferenceType} {lot.Status}";
     private static string GetSupplierSearchText(Supplier supplier) =>
         $"{supplier.Code} {supplier.Name} {supplier.ContactName} {supplier.Email} {supplier.Phone}";
     private static string GetPurchaseOrderSearchText(PurchaseOrder order) =>
@@ -1977,6 +2246,7 @@ else
     private IReadOnlyList<XfEntityPickerColumn<InventoryLot>> LotAdvancedColumns =>
     [
         new("Lot / Batch", x => GetLotLabel(x)),
+        new("Variant", x => GetVariantName(x.ProductVariationId)),
         new("Status", x => x.Status.ToString()),
         new("Expiry", x => FormatDate(x.ExpiresAt)),
         new("Received", x => FormatDate(x.ReceivedAt)),
@@ -2130,21 +2400,29 @@ else
 
     private sealed class VariationForm
     {
-        public string VariationType { get; set; } = "";
+        public string ProductVariationId { get; set; } = "";
+        public string ProductVariationTypeId { get; set; } = "";
+        public string NewVariationTypeName { get; set; } = "";
+        public bool NewTypeProductLocal { get; set; }
         public string Name { get; set; } = "";
-        public string AdditionalPrice { get; set; } = "0";
+        public string Price { get; set; } = "0";
+        public bool IsEditing => !string.IsNullOrWhiteSpace(ProductVariationId);
 
         public void Reset()
         {
-            VariationType = "";
+            ProductVariationId = "";
+            ProductVariationTypeId = "";
+            NewVariationTypeName = "";
+            NewTypeProductLocal = false;
             Name = "";
-            AdditionalPrice = "0";
+            Price = "0";
         }
     }
 
     private sealed class MovementForm
     {
         public string ProductId { get; set; } = "";
+        public string ProductVariationId { get; set; } = "";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
         public string LotId { get; set; } = "";
@@ -2158,6 +2436,7 @@ else
         public void Reset()
         {
             ProductId = "";
+            ProductVariationId = "";
             WarehouseId = "";
             LocationId = "";
             LotId = "";
@@ -2172,6 +2451,7 @@ else
 
     private sealed class LotForm
     {
+        public string ProductVariationId { get; set; } = "";
         public string LotNumber { get; set; } = "";
         public string SupplierReference { get; set; } = "";
         public string SourceReferenceType { get; set; } = "";
@@ -2183,6 +2463,7 @@ else
 
         public void Reset()
         {
+            ProductVariationId = "";
             LotNumber = "";
             SupplierReference = "";
             SourceReferenceType = "";
@@ -2199,6 +2480,7 @@ else
         public string ReceiptNumber { get; set; } = "";
         public string PurchaseOrderId { get; set; } = "";
         public string PurchaseOrderLineId { get; set; } = "";
+        public string ProductVariationId { get; set; } = "";
         public string SupplierId { get; set; } = "";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
@@ -2214,6 +2496,7 @@ else
             ReceiptNumber = "";
             PurchaseOrderId = "";
             PurchaseOrderLineId = "";
+            ProductVariationId = "";
             SupplierId = "";
             WarehouseId = "";
             LocationId = "";
@@ -2228,6 +2511,7 @@ else
 
     private sealed class RuleForm
     {
+        public string ProductVariationId { get; set; } = "";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
         public string MinimumQuantity { get; set; } = "0";
@@ -2239,6 +2523,7 @@ else
 
         public void Reset()
         {
+            ProductVariationId = "";
             WarehouseId = "";
             LocationId = "";
             MinimumQuantity = "0";

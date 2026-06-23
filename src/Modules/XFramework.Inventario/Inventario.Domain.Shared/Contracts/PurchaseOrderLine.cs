@@ -23,13 +23,17 @@ public partial class PurchaseOrderLine : BaseModel
     [MemoryPackIgnore]
     public Product? Product { get; set; }
     [MemoryPackOrder(2)]
-    public decimal OrderedQuantity { get; set; }
+    public Guid? ProductVariationId { get; set; }
+    [MemoryPackIgnore]
+    public ProductVariation? ProductVariation { get; set; }
     [MemoryPackOrder(3)]
-    public decimal ReceivedQuantity { get; set; }
+    public decimal OrderedQuantity { get; set; }
     [MemoryPackOrder(4)]
-    public decimal? UnitCost { get; set; }
+    public decimal ReceivedQuantity { get; set; }
     [MemoryPackOrder(5)]
-    public string? UnitOfMeasure { get; set; }
+    public decimal? UnitCost { get; set; }
     [MemoryPackOrder(6)]
+    public string? UnitOfMeasure { get; set; }
+    [MemoryPackOrder(7)]
     public string? Notes { get; set; }
 }

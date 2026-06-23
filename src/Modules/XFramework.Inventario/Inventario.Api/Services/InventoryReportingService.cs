@@ -32,6 +32,7 @@ public sealed class InventoryReportingService(
         var rows = await planningService.BuildLowStockRowsAsync(
             tenantResult.Data,
             request.ProductId,
+            request.ProductVariationId,
             request.WarehouseId,
             request.LocationId,
             ct);
@@ -57,7 +58,7 @@ public sealed class InventoryReportingService(
 
         var now = DateTime.UtcNow;
         var cutoff = now.AddDays(Math.Clamp(request.DaysAhead, 1, 365));
-        var rows = await BuildExpiryRows(tenantResult.Data, request.ProductId, lot =>
+        var rows = await BuildExpiryRows(tenantResult.Data, request.ProductId, request.ProductVariationId, lot =>
             lot.ExpiresAt is not null && lot.ExpiresAt > now && lot.ExpiresAt <= cutoff, ct);
 
         return Result<List<NearExpiryStockReportRow>>.Success(rows);
@@ -80,7 +81,7 @@ public sealed class InventoryReportingService(
             return Result<List<NearExpiryStockReportRow>>.Failure(traceabilityResult.Message!, traceabilityResult.StatusCode);
 
         var now = DateTime.UtcNow;
-        var rows = await BuildExpiryRows(tenantResult.Data, request.ProductId, lot =>
+        var rows = await BuildExpiryRows(tenantResult.Data, request.ProductId, request.ProductVariationId, lot =>
             lot.Status == InventoryLotStatus.Expired || lot.ExpiresAt is not null && lot.ExpiresAt <= now, ct);
 
         return Result<List<NearExpiryStockReportRow>>.Success(rows);
@@ -106,6 +107,8 @@ public sealed class InventoryReportingService(
 
         if (request.ProductId is { } productId)
             balances = balances.Where(x => x.ProductId == productId).ToList();
+        if (request.ProductVariationId is { } productVariationId)
+            balances = balances.Where(x => x.ProductVariationId == productVariationId).ToList();
         if (request.WarehouseId is { } warehouseId)
             balances = balances.Where(x => x.WarehouseId == warehouseId).ToList();
         if (request.LocationId is { } locationId)
@@ -118,6 +121,13 @@ public sealed class InventoryReportingService(
                 balance.Id,
                 balance.ProductId,
                 lookups.ProductNames.GetValueOrDefault(balance.ProductId, balance.ProductId.ToString()[..8]),
+                balance.ProductVariationId,
+                balance.ProductVariationId is { } variationId
+                    ? lookups.VariationNames.GetValueOrDefault(variationId, variationId.ToString()[..8])
+                    : null,
+                balance.ProductVariationId is { } variationTypeId
+                    ? lookups.VariationTypeNames.GetValueOrDefault(variationTypeId)
+                    : null,
                 balance.WarehouseId,
                 lookups.WarehouseNames.GetValueOrDefault(balance.WarehouseId, balance.WarehouseId.ToString()[..8]),
                 balance.LocationId,
@@ -155,6 +165,8 @@ public sealed class InventoryReportingService(
 
         if (request.ProductId is { } productId)
             movements = movements.Where(x => x.ProductId == productId).ToList();
+        if (request.ProductVariationId is { } productVariationId)
+            movements = movements.Where(x => x.ProductVariationId == productVariationId).ToList();
         if (request.WarehouseId is { } warehouseId)
             movements = movements.Where(x => x.WarehouseId == warehouseId).ToList();
         if (request.LocationId is { } locationId)
@@ -178,6 +190,13 @@ public sealed class InventoryReportingService(
                 movement.Id,
                 movement.ProductId,
                 lookups.ProductNames.GetValueOrDefault(movement.ProductId, movement.ProductId.ToString()[..8]),
+                movement.ProductVariationId,
+                movement.ProductVariationId is { } variationId
+                    ? lookups.VariationNames.GetValueOrDefault(variationId, variationId.ToString()[..8])
+                    : null,
+                movement.ProductVariationId is { } variationTypeId
+                    ? lookups.VariationTypeNames.GetValueOrDefault(variationTypeId)
+                    : null,
                 movement.WarehouseId,
                 movement.WarehouseId is { } warehouseId
                     ? lookups.WarehouseNames.GetValueOrDefault(warehouseId, warehouseId.ToString()[..8])
@@ -218,6 +237,8 @@ public sealed class InventoryReportingService(
 
         if (request.ProductId is { } productId)
             allocations = allocations.Where(x => x.ProductId == productId).ToList();
+        if (request.ProductVariationId is { } productVariationId)
+            allocations = allocations.Where(x => x.ProductVariationId == productVariationId).ToList();
         if (request.LotId is { } lotId)
             allocations = allocations.Where(x => x.LotId == lotId).ToList();
         if (request.Status is { } status)
@@ -232,6 +253,13 @@ public sealed class InventoryReportingService(
                 allocation.ReservationId,
                 allocation.ProductId,
                 lookups.ProductNames.GetValueOrDefault(allocation.ProductId, allocation.ProductId.ToString()[..8]),
+                allocation.ProductVariationId,
+                allocation.ProductVariationId is { } variationId
+                    ? lookups.VariationNames.GetValueOrDefault(variationId, variationId.ToString()[..8])
+                    : null,
+                allocation.ProductVariationId is { } variationTypeId
+                    ? lookups.VariationTypeNames.GetValueOrDefault(variationTypeId)
+                    : null,
                 allocation.LotId,
                 allocation.LotId is { } lotId ? lookups.LotNumbers.GetValueOrDefault(lotId, lotId.ToString()[..8]) : null,
                 allocation.Quantity,
@@ -247,6 +275,7 @@ public sealed class InventoryReportingService(
     private async Task<List<NearExpiryStockReportRow>> BuildExpiryRows(
         Guid tenantId,
         Guid? productId,
+        Guid? productVariationId,
         Func<InventoryLot, bool> lotFilter,
         CancellationToken ct)
     {
@@ -256,6 +285,8 @@ public sealed class InventoryReportingService(
             .ToListAsync(ct);
         if (productId is { } id)
             lots = lots.Where(x => x.ProductId == id).ToList();
+        if (productVariationId is { } variantId)
+            lots = lots.Where(x => x.ProductVariationId == variantId).ToList();
 
         lots = lots.Where(lotFilter).ToList();
         if (lots.Count == 0)
@@ -279,6 +310,13 @@ public sealed class InventoryReportingService(
                     lot.LotNumber ?? lot.Id.ToString()[..8],
                     lot.ProductId,
                     lookups.ProductNames.GetValueOrDefault(lot.ProductId, lot.ProductId.ToString()[..8]),
+                    lot.ProductVariationId,
+                    lot.ProductVariationId is { } variationId
+                        ? lookups.VariationNames.GetValueOrDefault(variationId, variationId.ToString()[..8])
+                        : null,
+                    lot.ProductVariationId is { } variationTypeId
+                        ? lookups.VariationTypeNames.GetValueOrDefault(variationTypeId)
+                        : null,
                     balance.WarehouseId,
                     lookups.WarehouseNames.GetValueOrDefault(balance.WarehouseId, balance.WarehouseId.ToString()[..8]),
                     balance.LocationId,
@@ -311,12 +349,36 @@ public sealed class InventoryReportingService(
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted)
             .ToListAsync(ct);
+        var variations = await dataContext.Query<ProductVariation>()
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .ToListAsync(ct);
+        var typeIds = variations
+            .Where(x => x.ProductVariationTypeId is not null)
+            .Select(x => x.ProductVariationTypeId!.Value)
+            .Distinct()
+            .ToList();
+        var variationTypes = typeIds.Count == 0
+            ? []
+            : await dataContext.Query<ProductVariationType>()
+                .IgnoreQueryFilters()
+                .Where(x => x.TenantId == tenantId && typeIds.Contains(x.Id) && !x.IsDeleted)
+                .ToListAsync(ct);
+        var variationTypeNames = variationTypes.ToDictionary<ProductVariationType, Guid, string?>(
+            x => x.Id,
+            x => x.Name ?? x.Id.ToString()[..8]);
 
         return new LookupMaps(
             products.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]),
             warehouses.ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}"),
             locations.ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}"),
-            lots.ToDictionary(x => x.Id, x => x.LotNumber ?? x.Id.ToString()[..8]));
+            lots.ToDictionary(x => x.Id, x => x.LotNumber ?? x.Id.ToString()[..8]),
+            variations.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]),
+            variations.ToDictionary(
+                x => x.Id,
+                x => x.ProductVariationTypeId is { } typeId
+                    ? variationTypeNames.GetValueOrDefault(typeId, x.VariationType)
+                    : x.VariationType));
     }
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)
@@ -342,7 +404,9 @@ public sealed class InventoryReportingService(
         Dictionary<Guid, string> ProductNames,
         Dictionary<Guid, string> WarehouseNames,
         Dictionary<Guid, string> LocationNames,
-        Dictionary<Guid, string> LotNumbers);
+        Dictionary<Guid, string> LotNumbers,
+        Dictionary<Guid, string> VariationNames,
+        Dictionary<Guid, string?> VariationTypeNames);
 
     private async Task<Result> EnsureReportingEnabledAsync(Guid tenantId, CancellationToken ct) =>
         await featureService.EnsureEnabledAsync(

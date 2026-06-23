@@ -14,12 +14,18 @@ public class ProductTransactionConfiguration : IEntityTypeConfiguration<ProductT
         entity.Property(e => e.TotalPrice).HasPrecision(18, 2);
         entity.Property(e => e.TransactionDate).HasDefaultValueSql("now()");
 
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.TransactionDate });
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.TransactionDate });
 
         entity.HasOne(e => e.Product)
             .WithMany(e => e.Transactions)
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_ProductTransaction_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_ProductTransaction_ProductVariation");
     }
 }

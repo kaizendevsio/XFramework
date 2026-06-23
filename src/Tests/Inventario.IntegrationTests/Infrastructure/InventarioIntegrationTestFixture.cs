@@ -131,6 +131,7 @@ public sealed class InventarioIntegrationTestFixture
         builder.Services.AddScoped<InventoryPlanningService>();
         builder.Services.AddScoped<InventoryReportingService>();
         builder.Services.AddScoped<PurchasingService>();
+        builder.Services.AddScoped<ProductVariationService>();
         builder.Services.AddValidatorsFromAssemblyContaining<ProductService>();
         builder.Services.AddAuthentication("InventarioTest")
             .AddScheme<AuthenticationSchemeOptions, InventarioTestAuthHandler>("InventarioTest", _ => { });
@@ -280,5 +281,6 @@ public sealed class InventarioIntegrationTestFixture
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.PlanningSubFeature, true);
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.InventarioReportingSubFeature, true);
         await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.PurchasingSubFeature, true);
+        await TestInventarioSeed.SetInventarioFeature(db, IdentityServer.Domain.Shared.Contracts.TenantModuleFeatureKeys.VariationsSubFeature, true);
     }
 }

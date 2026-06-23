@@ -20,21 +20,25 @@ public partial class InventoryLot : BaseModel
     [MemoryPackIgnore]
     public Product? Product { get; set; }
     [MemoryPackOrder(1)]
-    public string? LotNumber { get; set; }
+    public Guid? ProductVariationId { get; set; }
+    [MemoryPackIgnore]
+    public ProductVariation? ProductVariation { get; set; }
     [MemoryPackOrder(2)]
-    public string? SupplierReference { get; set; }
+    public string? LotNumber { get; set; }
     [MemoryPackOrder(3)]
-    public string? SourceReferenceType { get; set; }
+    public string? SupplierReference { get; set; }
     [MemoryPackOrder(4)]
-    public Guid? SourceReferenceId { get; set; }
+    public string? SourceReferenceType { get; set; }
     [MemoryPackOrder(5)]
-    public DateTime ReceivedAt { get; set; }
+    public Guid? SourceReferenceId { get; set; }
     [MemoryPackOrder(6)]
-    public DateTime? ManufacturedAt { get; set; }
+    public DateTime ReceivedAt { get; set; }
     [MemoryPackOrder(7)]
-    public DateTime? ExpiresAt { get; set; }
+    public DateTime? ManufacturedAt { get; set; }
     [MemoryPackOrder(8)]
-    public decimal? UnitCost { get; set; }
+    public DateTime? ExpiresAt { get; set; }
     [MemoryPackOrder(9)]
+    public decimal? UnitCost { get; set; }
+    [MemoryPackOrder(10)]
     public InventoryLotStatus Status { get; set; }
 }

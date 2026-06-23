@@ -18,7 +18,7 @@ public class ReceivingLineConfiguration : IEntityTypeConfiguration<ReceivingLine
 
         entity.HasIndex(e => new { e.TenantId, e.ReceivingDocumentId });
         entity.HasIndex(e => new { e.TenantId, e.PurchaseOrderLineId });
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.LotId });
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.LotId });
 
         entity.HasOne(e => e.PurchaseOrderLine)
             .WithMany()
@@ -31,6 +31,12 @@ public class ReceivingLineConfiguration : IEntityTypeConfiguration<ReceivingLine
             .HasForeignKey(e => e.ProductId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_ReceivingLine_Product");
+
+        entity.HasOne(e => e.ProductVariation)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_ReceivingLine_ProductVariation");
 
         entity.HasOne(e => e.Lot)
             .WithMany()

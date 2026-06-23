@@ -13,5 +13,6 @@ public partial record GetInventoryReorderRulesRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid? ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
     public bool IncludeInactive { get; init; }
 }

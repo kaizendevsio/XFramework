@@ -15,6 +15,7 @@ public partial record GetInventoryLotsRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid? ProductId { get; init; }
+    public Guid? ProductVariationId { get; init; }
     public InventoryLotStatus? Status { get; init; }
     public bool IncludeExpired { get; init; }
 }
