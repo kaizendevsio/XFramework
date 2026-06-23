@@ -339,7 +339,7 @@ else
 
 @* -- Add / Edit Configuration Dialog -- *@
 <BbDialog Open="@_configDialogOpen" OpenChanged="@(v => _configDialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
             <BbDialogTitle>@(_isEditingConfig ? "Edit Configuration" : "Add Configuration")</BbDialogTitle>
             <BbDialogDescription>
@@ -354,14 +354,23 @@ else
             <div class="grid grid-cols-2 gap-4">
                 <BbFormFieldInput TValue="string" @bind-Value="_configForm.Unit" Label="Unit"
                                   Placeholder="e.g. count, MB, boolean" />
-                <BbFormFieldNativeSelect TValue="string" @bind-Value="_configForm.GroupIdString" Label="Group"
-                                         Placeholder="-- Select Group --">
-                    <option value="">-- Select Group --</option>
-                    @foreach (var group in _configGroups)
-                    {
-                        <option value="@group.Id.ToString()">@(group.Name ?? group.Id.ToString()[..8])</option>
-                    }
-                </BbFormFieldNativeSelect>
+                <XfEntityPicker TItem="RegistryConfigurationGroup"
+                                Label="Group"
+                                Value="@_configForm.GroupIdString"
+                                ValueChanged="@(value => _configForm.GroupIdString = value ?? "")"
+                                Items="@_configGroups"
+                                ValueSelector="@GetConfigurationGroupPickerValue"
+                                TextSelector="@GetConfigurationGroupLabel"
+                                SearchTextSelector="@GetConfigurationGroupSearchText"
+                                AdvancedColumns="@ConfigurationGroupAdvancedColumns"
+                                AdvancedFilters="@ConfigurationGroupAdvancedFilters"
+                                AdvancedSearchScope="Searches configuration group name, description, enabled state, system reference, configuration count, and created date."
+                                Placeholder="Select group"
+                                SearchPlaceholder="Search configuration groups..."
+                                EmptyMessage="No configuration groups found."
+                                ShowCreate="false"
+                                AdvancedSearchTitle="Find Configuration Group"
+                                AdvancedSearchDescription="Search registry configuration groups before assigning this setting." />
             </div>
         </div>
         <BbDialogFooter>
@@ -935,6 +944,39 @@ else
         public string? Unit { get; set; }
         public string GroupIdString { get; set; } = "";
     }
+
+    private static string GetConfigurationGroupPickerValue(RegistryConfigurationGroup group) => group.Id.ToString();
+    private static string GetConfigurationGroupLabel(RegistryConfigurationGroup group) =>
+        string.IsNullOrWhiteSpace(group.Name)
+            ? group.Id.ToString()[..8]
+            : group.Name;
+
+    private static string GetConfigurationGroupSearchText(RegistryConfigurationGroup group) =>
+        $"{group.Name} {group.Description} {group.SystemReferenceId}";
+
+    private IReadOnlyList<XfEntityPickerColumn<RegistryConfigurationGroup>> ConfigurationGroupAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Description", x => x.Description),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("Configurations", x => _detailConfigs.Count(config => config.GroupId == x.Id).ToString()),
+        new("System Ref", x => x.SystemReferenceId.ToString()[..8]),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<RegistryConfigurationGroup>> ConfigurationGroupAdvancedFilters =>
+    [
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
 
     private sealed class ModuleFeatureRow(
         Guid id,

@@ -516,22 +516,46 @@ else
 
 <!-- Assign Role Dialog -->
 <BbDialog Open="@_assignRoleDialogOpen" OpenChanged="@(v => _assignRoleDialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
             <BbDialogTitle>Assign Role</BbDialogTitle>
             <BbDialogDescription>Assign a role to one of this user's credentials.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <BbFormFieldSelect TValue="string"
-                               @bind-Value="_roleForm.CredentialId"
-                               Label="Credential"
-                               Placeholder="Select credential"
-                               Options="@CredentialOptions" />
-            <BbFormFieldSelect TValue="string"
-                               @bind-Value="_roleForm.RoleTypeId"
-                               Label="Role Type"
-                               Placeholder="Select role type"
-                               Options="@RoleTypeOptions" />
+            <XfEntityPicker TItem="IdentityCredential"
+                            Label="Credential"
+                            Value="@_roleForm.CredentialId"
+                            ValueChanged="@(value => _roleForm.CredentialId = value ?? "")"
+                            Items="@_credentials"
+                            ValueSelector="@GetCredentialPickerValue"
+                            TextSelector="@GetCredentialLabel"
+                            SearchTextSelector="@GetCredentialSearchText"
+                            AdvancedColumns="@CredentialAdvancedColumns"
+                            AdvancedFilters="@CredentialAdvancedFilters"
+                            AdvancedSearchScope="Searches username, alias, owning identity, online state, device, location, last seen, and created date."
+                            Placeholder="Select credential"
+                            SearchPlaceholder="Search credentials..."
+                            EmptyMessage="No credentials found for this user."
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Credential"
+                            AdvancedSearchDescription="Search this user's credentials before assigning a role." />
+            <XfEntityPicker TItem="IdentityRoleType"
+                            Label="Role Type"
+                            Value="@_roleForm.RoleTypeId"
+                            ValueChanged="@(value => _roleForm.RoleTypeId = value ?? "")"
+                            Items="@_roleTypes"
+                            ValueSelector="@GetRoleTypePickerValue"
+                            TextSelector="@GetRoleTypeLabel"
+                            SearchTextSelector="@GetRoleTypeSearchText"
+                            AdvancedColumns="@RoleTypeAdvancedColumns"
+                            AdvancedFilters="@RoleTypeAdvancedFilters"
+                            AdvancedSearchScope="Searches role type name, role level, group, enabled state, system reference, and created date."
+                            Placeholder="Select role type"
+                            SearchPlaceholder="Search role types..."
+                            EmptyMessage="No role types found."
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Role Type"
+                            AdvancedSearchDescription="Search available role types for the active tenant." />
             <div class="xf-form-field">
                 <BbLabel>Expiration Date</BbLabel>
                 <input type="datetime-local"
@@ -557,22 +581,65 @@ else
 
 <!-- Create/Edit Contact Dialog -->
 <BbDialog Open="@_contactDialogOpen" OpenChanged="@(v => _contactDialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
             <BbDialogTitle>@(_editingContact is not null ? "Edit Contact" : "Add Contact")</BbDialogTitle>
             <BbDialogDescription>@(_editingContact is not null ? "Update contact information." : "Add a new contact entry.")</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <BbFormFieldSelect TValue="string"
-                               @bind-Value="_contactForm.CredentialId"
-                               Label="Credential"
-                               Placeholder="Select credential"
-                               Options="@CredentialOptions" />
-            <BbFormFieldSelect TValue="string"
-                               @bind-Value="_contactForm.TypeId"
-                               Label="Contact Type"
-                               Placeholder="Select type"
-                               Options="@ContactTypeOptions" />
+            <XfEntityPicker TItem="IdentityCredential"
+                            Label="Credential"
+                            Value="@_contactForm.CredentialId"
+                            ValueChanged="@(value => _contactForm.CredentialId = value ?? "")"
+                            Items="@_credentials"
+                            ValueSelector="@GetCredentialPickerValue"
+                            TextSelector="@GetCredentialLabel"
+                            SearchTextSelector="@GetCredentialSearchText"
+                            AdvancedColumns="@CredentialAdvancedColumns"
+                            AdvancedFilters="@CredentialAdvancedFilters"
+                            AdvancedSearchScope="Searches username, alias, owning identity, online state, device, location, last seen, and created date."
+                            Placeholder="Select credential"
+                            SearchPlaceholder="Search credentials..."
+                            EmptyMessage="No credentials found for this user."
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Credential"
+                            AdvancedSearchDescription="Search this user's credentials before adding contact information." />
+            <XfEntityPicker TItem="IdentityContactType"
+                            Label="Contact Type"
+                            Value="@_contactForm.TypeId"
+                            ValueChanged="@(value => _contactForm.TypeId = value ?? "")"
+                            Items="@_contactTypes"
+                            ValueSelector="@GetContactTypePickerValue"
+                            TextSelector="@GetContactTypeLabel"
+                            SearchTextSelector="@GetContactTypeSearchText"
+                            AdvancedColumns="@ContactTypeAdvancedColumns"
+                            AdvancedFilters="@ContactTypeAdvancedFilters"
+                            AdvancedSearchScope="Searches contact type name, enabled state, system reference, and created date."
+                            Placeholder="No contact type"
+                            SearchPlaceholder="Search contact types..."
+                            EmptyMessage="No contact types found."
+                            AllowClear="true"
+                            ClearText="No contact type"
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Contact Type"
+                            AdvancedSearchDescription="Search contact classification types." />
+            <XfEntityPicker TItem="IdentityContactGroup"
+                            Label="Contact Group"
+                            Value="@_contactForm.GroupId"
+                            ValueChanged="@(value => _contactForm.GroupId = value ?? "")"
+                            Items="@_contactGroups"
+                            ValueSelector="@GetContactGroupPickerValue"
+                            TextSelector="@GetContactGroupLabel"
+                            SearchTextSelector="@GetContactGroupSearchText"
+                            AdvancedColumns="@ContactGroupAdvancedColumns"
+                            AdvancedFilters="@ContactGroupAdvancedFilters"
+                            AdvancedSearchScope="Searches contact group name, enabled state, system reference, contact count, and created date."
+                            Placeholder="Select contact group"
+                            SearchPlaceholder="Search contact groups..."
+                            EmptyMessage="No contact groups found."
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Contact Group"
+                            AdvancedSearchDescription="Search contact groups for the active tenant." />
             <BbFormFieldInput TValue="string"
                               @bind-Value="_contactForm.Value"
                               Label="Value"
@@ -652,6 +719,7 @@ else
     // Lookup data
     private List<IdentityRoleType> _roleTypes = [];
     private List<IdentityContactType> _contactTypes = [];
+    private List<IdentityContactGroup> _contactGroups = [];
 
     // State
     private bool _loading = true;
@@ -947,6 +1015,14 @@ else
                     .Take(100)
                     .ToListAsync())
                 .ToList();
+
+            _contactGroups = (await DataContext.Query<IdentityContactGroup>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .OrderBy(x => x.Name)
+                    .Take(100)
+                    .ToListAsync())
+                .ToList();
         }
         catch { /* lookups may fail */ }
     }
@@ -1200,6 +1276,10 @@ else
         {
             _contactForm.CredentialId = _credentials[0].Id.ToString();
         }
+        if (_contactGroups.Count == 1)
+        {
+            _contactForm.GroupId = _contactGroups[0].Id.ToString();
+        }
         _contactDialogOpen = true;
     }
 
@@ -1210,6 +1290,7 @@ else
         {
             CredentialId = contact.CredentialId.ToString(),
             TypeId = contact.TypeId?.ToString() ?? "",
+            GroupId = contact.GroupId.ToString(),
             Value = contact.Value
         };
         _contactDialogOpen = true;
@@ -1225,6 +1306,11 @@ else
         if (!Guid.TryParse(_contactForm.CredentialId, out var credId))
         {
             ToastService.Show("Please select a credential.");
+            return;
+        }
+        if (!Guid.TryParse(_contactForm.GroupId, out var groupId))
+        {
+            ToastService.Show("Please select a contact group.");
             return;
         }
 
@@ -1244,6 +1330,7 @@ else
                     fresh.Value = _contactForm.Value;
                     fresh.CredentialId = credId;
                     fresh.TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null;
+                    fresh.GroupId = groupId;
                     fresh.ModifiedAt = DateTime.UtcNow;
 
                     DataContext.Update(fresh);
@@ -1259,6 +1346,7 @@ else
                     TenantId = _user!.TenantId,
                     CredentialId = credId,
                     TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null,
+                    GroupId = groupId,
                     Value = _contactForm.Value,
                     IsEnabled = true,
                     CreatedAt = DateTime.UtcNow
@@ -1474,6 +1562,129 @@ else
             ? contactType.Id.ToString()[..8]
             : contactType.Name;
 
+    private static string GetCredentialPickerValue(IdentityCredential credential) => credential.Id.ToString();
+    private static string GetRoleTypePickerValue(IdentityRoleType roleType) => roleType.Id.ToString();
+    private static string GetContactTypePickerValue(IdentityContactType contactType) => contactType.Id.ToString();
+    private static string GetContactGroupPickerValue(IdentityContactGroup contactGroup) => contactGroup.Id.ToString();
+    private static string GetContactGroupLabel(IdentityContactGroup contactGroup) =>
+        string.IsNullOrWhiteSpace(contactGroup.Name)
+            ? contactGroup.Id.ToString()[..8]
+            : contactGroup.Name;
+
+    private string GetCredentialSearchText(IdentityCredential credential) =>
+        $"{credential.UserName} {credential.UserAlias} {credential.Device} {credential.Location} {GetIdentityLabel(credential.IdentityInfoId)}";
+
+    private string GetRoleTypeSearchText(IdentityRoleType roleType) =>
+        $"{roleType.Name} {roleType.RoleLevel} {GetRoleTypeGroupLabel(roleType.GroupId)} {roleType.SystemReferenceId}";
+
+    private static string GetContactTypeSearchText(IdentityContactType contactType) =>
+        $"{contactType.Name} {contactType.SystemReferenceId}";
+
+    private static string GetContactGroupSearchText(IdentityContactGroup contactGroup) =>
+        $"{contactGroup.Name} {contactGroup.SystemReferenceId}";
+
+    private string GetIdentityLabel(Guid identityInfoId)
+    {
+        if (_user?.Id == identityInfoId)
+            return _user.FullName ?? _user.IdentityName ?? identityInfoId.ToString()[..8];
+
+        return identityInfoId.ToString()[..8];
+    }
+
+    private string GetRoleTypeGroupLabel(Guid groupId) =>
+        _roleTypes.FirstOrDefault(x => x.GroupId == groupId)?.Group?.Name
+        ?? groupId.ToString()[..8];
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityCredential>> CredentialAdvancedColumns =>
+    [
+        new("Username", x => x.UserName),
+        new("Alias", x => x.UserAlias),
+        new("Identity", x => GetIdentityLabel(x.IdentityInfoId)),
+        new("Online", x => FormatBoolean(x.IsOnline)),
+        new("Device", x => x.Device),
+        new("Location", x => x.Location),
+        new("Last Seen", x => FormatDateTime(x.LastSeen)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityCredential>> CredentialAdvancedFilters =>
+    [
+        new("online", "Online", YesNoFilterOptions, x => x.IsOnline ? "true" : "false", "All credentials"),
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityRoleType>> RoleTypeAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Level", x => x.RoleLevel?.ToString()),
+        new("Group", x => x.Group?.Name ?? GetRoleTypeGroupLabel(x.GroupId)),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("System Ref", x => x.SystemReferenceId.ToString()[..8]),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityRoleType>> RoleTypeAdvancedFilters =>
+    [
+        new("group", "Group", BuildRoleTypeGroupFilterOptions(), x => x.GroupId.ToString(), "All groups"),
+        new("level", "Level", BuildDistinctFilterOptions(_roleTypes, x => x.RoleLevel?.ToString()), x => x.RoleLevel?.ToString(), "All levels"),
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityContactType>> ContactTypeAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("System Ref", x => x.SystemReferenceId.ToString()[..8]),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityContactType>> ContactTypeAdvancedFilters =>
+    [
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityContactGroup>> ContactGroupAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("Contacts", x => _contacts.Count(contact => contact.GroupId == x.Id).ToString()),
+        new("System Ref", x => x.SystemReferenceId.ToString()[..8]),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityContactGroup>> ContactGroupAdvancedFilters =>
+    [
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilterOption> BuildRoleTypeGroupFilterOptions() =>
+        _roleTypes
+            .Select(x => new { x.GroupId, Label = x.Group?.Name ?? x.GroupId.ToString()[..8] })
+            .DistinctBy(x => x.GroupId)
+            .OrderBy(x => x.Label)
+            .Select(x => new XfEntityPickerFilterOption(x.GroupId.ToString(), x.Label))
+            .ToArray();
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
+
     private static bool TryResolveRoleExpiration(string? value, out DateTime expiration)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1523,6 +1734,7 @@ else
     {
         public string CredentialId { get; set; } = "";
         public string TypeId { get; set; } = "";
+        public string GroupId { get; set; } = "";
         public string Value { get; set; } = "";
     }
 

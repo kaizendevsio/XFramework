@@ -105,7 +105,7 @@
 
 @* -- Create Tenant Dialog -- *@
 <BbDialog Open="@_tenantDialogOpen" OpenChanged="@(v => _tenantDialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
             <BbDialogTitle>Create Tenant</BbDialogTitle>
             <BbDialogDescription>Fill in the details for the new tenant.</BbDialogDescription>
@@ -144,10 +144,25 @@
                                   Label="Availability Date"
                                   Placeholder="YYYY-MM-DD" />
             </div>
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_tenantForm.ParentTenantIdString"
-                              Label="Parent Tenant ID"
-                              Placeholder="Optional — leave blank for root tenant" />
+            <XfEntityPicker TItem="Tenant"
+                              Value="@_tenantForm.ParentTenantIdString"
+                              ValueChanged="@(value => _tenantForm.ParentTenantIdString = value ?? "")"
+                              Label="Parent Tenant"
+                              Items="@_tenants"
+                              ValueSelector="@GetTenantPickerValue"
+                              TextSelector="@GetTenantLabel"
+                              SearchTextSelector="@GetTenantSearchText"
+                              AdvancedColumns="@TenantAdvancedColumns"
+                              AdvancedFilters="@TenantAdvancedFilters"
+                              AdvancedSearchScope="Searches tenant name, description, status, version, expiration, enabled state, and created date."
+                              SearchPlaceholder="Search tenants..."
+                              EmptyMessage="No tenants found."
+                              AllowClear="true"
+                              ClearText="No parent tenant"
+                              ShowCreate="false"
+                              AdvancedSearchTitle="Find Parent Tenant"
+                              AdvancedSearchDescription="Search existing tenants to use as the parent tenant."
+                              Placeholder="Optional - leave blank for root tenant" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _tenantDialogOpen = false)">Cancel</BbButton>
@@ -360,4 +375,57 @@
         public string AvailabilityString { get; set; } = "";
         public string ParentTenantIdString { get; set; } = "";
     }
+
+    private static string GetTenantPickerValue(Tenant tenant) => tenant.Id.ToString();
+    private static string GetTenantLabel(Tenant tenant) =>
+        string.IsNullOrWhiteSpace(tenant.Name)
+            ? tenant.Id.ToString()[..8]
+            : tenant.Name;
+
+    private static string GetTenantSearchText(Tenant tenant) =>
+        $"{tenant.Name} {tenant.Description} {GetTenantStatusText(tenant.Status)} {tenant.Version}";
+
+    private IReadOnlyList<XfEntityPickerColumn<Tenant>> TenantAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Description", x => x.Description),
+        new("Status", x => GetTenantStatusText(x.Status)),
+        new("Version", x => x.Version.ToString("0.##")),
+        new("Expiration", x => FormatDate(x.Expiration)),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Tenant>> TenantAdvancedFilters =>
+    [
+        new("status", "Status", TenantStatusFilterOptions, x => x.Status?.ToString(), "All statuses"),
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All tenants")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> TenantStatusFilterOptions =
+    [
+        new("0", "Pending"),
+        new("1", "Active"),
+        new("2", "Suspended"),
+        new("3", "Inactive")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static string GetTenantStatusText(short? status) => status switch
+    {
+        0 => "Pending",
+        1 => "Active",
+        2 => "Suspended",
+        3 => "Inactive",
+        _ => "Unknown"
+    };
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDate(DateTime? value) => value is { } date ? date.ToString("yyyy-MM-dd") : "N/A";
+    private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
 }
