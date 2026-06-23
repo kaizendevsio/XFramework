@@ -100,12 +100,13 @@ else
                                      SearchPlaceholder="Search variation types..."
                                      EmptyMessage="No variation types found."
                                      MatchTriggerWidth="true" />
-                <div class="grid gap-3 md:grid-cols-2">
-                    <BbFormFieldInput TValue="string" @bind-Value="_variationForm.NewVariationTypeName" Label="New Variation Type" Placeholder="Size, Color, Packaging, etc." />
-                    <BbFormFieldSwitch Checked="@_variationForm.NewTypeProductLocal"
-                                       CheckedChanged="@((bool value) => _variationForm.NewTypeProductLocal = value)"
-                                       Label="Limit new type to this product" />
-                </div>
+                @if (_variationTypes.Count == 0)
+                {
+                    <BbAlert>
+                        <BbAlertTitle>No variation types yet</BbAlertTitle>
+                        <BbAlertDescription>Create a variation type from the Variation Types panel before adding variants.</BbAlertDescription>
+                    </BbAlert>
+                }
                 <div class="grid gap-3 md:grid-cols-2">
                     <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Name" Label="Variant" Required="true" />
                     <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Price" Label="Variant Price" />
@@ -114,6 +115,26 @@ else
             <BbDialogFooter>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _variationDialogOpen = false)">Cancel</BbButton>
                 <BbButton OnClick="@SaveVariation" Disabled="@_saving">@(_variationForm.IsEditing ? "Save Variant" : "Create Variant")</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog Open="@_variationTypeDialogOpen" OpenChanged="@(value => _variationTypeDialogOpen = value)">
+        <BbDialogContent TrapFocus="false">
+            <BbDialogHeader>
+                <BbDialogTitle>Create Variation Type</BbDialogTitle>
+                <BbDialogDescription>Add a reusable tenant-wide type or limit it to @_product.Name.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
+                <BbFormFieldInput TValue="string" @bind-Value="_variationTypeForm.Name" Label="Name" Placeholder="Color, Size, Packaging" Required="true" />
+                <BbFormFieldInput TValue="string" @bind-Value="_variationTypeForm.Code" Label="Code" Placeholder="Optional" />
+                <BbFormFieldSwitch Checked="@_variationTypeForm.ProductLocal"
+                                   CheckedChanged="@((bool value) => _variationTypeForm.ProductLocal = value)"
+                                   Label="Limit this type to this product" />
+            </div>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _variationTypeDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@SaveVariationType" Disabled="@_savingVariationType">Create Type</BbButton>
             </BbDialogFooter>
         </BbDialogContent>
     </BbDialog>
@@ -645,6 +666,7 @@ else
 
     private readonly ProductForm _productForm = new();
     private readonly VariationForm _variationForm = new();
+    private readonly VariationTypeForm _variationTypeForm = new();
     private readonly MovementForm _movementForm = new();
     private readonly LotForm _lotForm = new();
     private readonly ReceiveForm _receiveForm = new();
@@ -669,6 +691,7 @@ else
     private List<PurchaseOrderLine> _purchaseOrderLines = [];
     private bool _loading = true;
     private bool _saving;
+    private bool _savingVariationType;
     private bool _savingLot;
     private bool _savingRule;
     private bool _savingMovement;
@@ -689,6 +712,7 @@ else
     private bool _outsideTenantContext;
     private bool _editMode;
     private bool _variationDialogOpen;
+    private bool _variationTypeDialogOpen;
     private bool _movementDialogOpen;
     private bool _lotDialogOpen;
     private bool _receiveDialogOpen;
@@ -1296,12 +1320,35 @@ else
                 <BbTypographyMuted>Product options with reusable variation types and absolute prices.</BbTypographyMuted>
             </div>
             <div class="xf-page-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@OpenVariationTypeDialog">
+                    <LucideIcon Name="list-plus" class="mr-2 h-4 w-4" />
+                    Add Variation Type
+                </BbButton>
                 <BbButton OnClick="@OpenVariationDialog">
                     <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                     Add Variant
                 </BbButton>
             </div>
         </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Variation Types</BbCardTitle>
+                <BbCardDescription>@_variationTypes.Count type(s) available for this product</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_variationTypes" ShowPagination="true" InitialPageSize="10">
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Scope" Filterable="true" FilterBy="@(item => GetVariationTypeScope(item))">
+                            <ChildContent Context="item">@GetVariationTypeScope(item)</ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
 
         <BbCard>
             <BbCardHeader>
@@ -1499,6 +1546,53 @@ else
         _variationDialogOpen = true;
     }
 
+    private void OpenVariationTypeDialog()
+    {
+        _variationTypeForm.Reset();
+        _variationTypeDialogOpen = true;
+    }
+
+    private async Task SaveVariationType()
+    {
+        if (_product is null) return;
+        if (string.IsNullOrWhiteSpace(_variationTypeForm.Name))
+        {
+            ToastService.Show("Variation type name is required.");
+            return;
+        }
+
+        _savingVariationType = true;
+        try
+        {
+            var result = await Inventario.CreateProductVariationType(new CreateProductVariationTypeRequest
+            {
+                Metadata = BuildMetadata(),
+                Name = _variationTypeForm.Name.Trim(),
+                Code = string.IsNullOrWhiteSpace(_variationTypeForm.Code) ? null : _variationTypeForm.Code.Trim(),
+                ProductId = _variationTypeForm.ProductLocal ? _product.Id : null
+            });
+
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Variation type created.");
+                _variationTypeDialogOpen = false;
+                await LoadVariationTypes();
+            }
+            else
+            {
+                ToastService.Show($"Failed to create variation type: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error creating variation type: {ex.Message}");
+        }
+        finally
+        {
+            _savingVariationType = false;
+        }
+    }
+
     private async Task SaveVariation()
     {
         if (_product is null) return;
@@ -1563,41 +1657,10 @@ else
 
     private async Task<Guid?> ResolveVariationTypeId()
     {
-        if (_product is null)
-            return null;
-
-        if (!string.IsNullOrWhiteSpace(_variationForm.NewVariationTypeName))
-        {
-            var name = _variationForm.NewVariationTypeName.Trim();
-            var productId = _variationForm.NewTypeProductLocal ? _product.Id : (Guid?)null;
-            var createType = await Inventario.CreateProductVariationType(new CreateProductVariationTypeRequest
-            {
-                Metadata = BuildMetadata(),
-                Name = name,
-                ProductId = productId
-            });
-
-            if (!createType.IsSuccess)
-            {
-                ToastService.Show($"Failed to create variation type: {createType.Message}");
-                return null;
-            }
-
-            await LoadVariationTypes();
-            var created = _variationTypes.FirstOrDefault(x =>
-                x.ProductId == productId &&
-                string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (created is not null)
-                return created.Id;
-
-            ToastService.Show("Variation type was created but could not be reloaded.");
-            return null;
-        }
-
         if (Guid.TryParse(_variationForm.ProductVariationTypeId, out var selectedTypeId))
             return selectedTypeId;
 
-        ToastService.Show("Select or create a variation type.");
+        ToastService.Show("Select a variation type.");
         return null;
     }
 
@@ -2164,10 +2227,13 @@ else
 
     private string GetVariationTypeLabel(ProductVariationType type)
     {
-        var scope = type.ProductId is null ? "Tenant-wide" : "Product";
+        var scope = GetVariationTypeScope(type);
         var name = string.IsNullOrWhiteSpace(type.Name) ? type.Id.ToString()[..8] : type.Name;
         return $"{name} ({scope})";
     }
+
+    private static string GetVariationTypeScope(ProductVariationType type) =>
+        type.ProductId is null ? "Tenant-wide" : "Product";
 
     private decimal GetVariantPrice(ProductVariation variation)
     {
@@ -2402,8 +2468,6 @@ else
     {
         public string ProductVariationId { get; set; } = "";
         public string ProductVariationTypeId { get; set; } = "";
-        public string NewVariationTypeName { get; set; } = "";
-        public bool NewTypeProductLocal { get; set; }
         public string Name { get; set; } = "";
         public string Price { get; set; } = "0";
         public bool IsEditing => !string.IsNullOrWhiteSpace(ProductVariationId);
@@ -2412,10 +2476,22 @@ else
         {
             ProductVariationId = "";
             ProductVariationTypeId = "";
-            NewVariationTypeName = "";
-            NewTypeProductLocal = false;
             Name = "";
             Price = "0";
+        }
+    }
+
+    private sealed class VariationTypeForm
+    {
+        public string Name { get; set; } = "";
+        public string Code { get; set; } = "";
+        public bool ProductLocal { get; set; }
+
+        public void Reset()
+        {
+            Name = "";
+            Code = "";
+            ProductLocal = false;
         }
     }
 
