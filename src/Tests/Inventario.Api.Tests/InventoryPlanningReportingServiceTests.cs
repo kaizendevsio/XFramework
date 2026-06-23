@@ -186,8 +186,14 @@ public sealed class InventoryPlanningReportingServiceTests
         return dataContext;
     }
 
-    private static InventoryPlanningService CreatePlanningService(FakeDataContext dataContext, Guid tenantId) =>
-        new(dataContext, CreateHttpContextAccessor(tenantId), new FakeTenantModuleFeatureService());
+    private static InventoryPlanningService CreatePlanningService(FakeDataContext dataContext, Guid tenantId)
+    {
+        var httpContextAccessor = CreateHttpContextAccessor(tenantId);
+        var featureService = new FakeTenantModuleFeatureService();
+        var productVariationService = new ProductVariationService(dataContext, httpContextAccessor, featureService);
+
+        return new InventoryPlanningService(dataContext, httpContextAccessor, featureService, productVariationService);
+    }
 
     private static InventoryReportingService CreateReportingService(
         FakeDataContext dataContext,

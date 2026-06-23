@@ -371,10 +371,14 @@ public sealed class StockPostingServiceTests
             }
         };
 
+        var featureService = new FakeTenantModuleFeatureService(negativeStockEnabled);
+        var productVariationService = new ProductVariationService(dataContext, httpContextAccessor, featureService);
+
         return new StockPostingService(
             dataContext,
             httpContextAccessor,
-            new FakeTenantModuleFeatureService(negativeStockEnabled));
+            featureService,
+            productVariationService);
     }
 
     private sealed class FakeTenantModuleFeatureService(bool negativeStockEnabled) : ITenantModuleFeatureService

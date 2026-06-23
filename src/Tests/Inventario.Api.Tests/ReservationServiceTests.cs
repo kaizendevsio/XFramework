@@ -365,10 +365,13 @@ public sealed class ReservationServiceTests
             }
         };
 
+        var featureService = new FakeTenantModuleFeatureService();
+        var productVariationService = new ProductVariationService(dataContext, httpContextAccessor, featureService);
         var stockPostingService = new StockPostingService(
             dataContext,
             httpContextAccessor,
-            new FakeTenantModuleFeatureService());
+            featureService,
+            productVariationService);
         var allocationService = new InventoryAllocationService(dataContext, httpContextAccessor, stockPostingService);
         return new ReservationService(dataContext, httpContextAccessor, allocationService);
     }

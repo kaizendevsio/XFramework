@@ -227,11 +227,13 @@ public sealed class PurchasingServiceTests
             }
         };
         var featureService = new FakeTenantModuleFeatureService();
+        var productVariationService = new ProductVariationService(dataContext, httpContextAccessor, featureService);
         var stockPostingService = new StockPostingService(
             dataContext,
             httpContextAccessor,
-            featureService);
-        return new PurchasingService(dataContext, httpContextAccessor, stockPostingService, featureService);
+            featureService,
+            productVariationService);
+        return new PurchasingService(dataContext, httpContextAccessor, stockPostingService, productVariationService, featureService);
     }
 
     private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService
