@@ -362,7 +362,7 @@ flowchart TB
 - Modify: `docs/solutions/architecture-patterns/unified-zlogger-logging-pipeline.md`
 - Modify: `docs/solutions/architecture-patterns/decentralized-remote-data-context.md`
 - Modify: `docs/solutions/architecture-patterns/local-first-sync-architecture.md`
-- Modify: `docs/solutions/developer-experience/blazor-idatacontext-migration.md`
+- Modify: `rules/UiGuidelines.md`
 - Inspect: `src/Kernel/XFramework.Domain/Contexts/AppDbContext.cs`
 - Inspect: `src/Kernel/XFramework.Domain/Contexts/XDbContext.cs`
 - Inspect: `src/Kernel/XFramework.Domain/Interceptors/AuditInterceptor.cs`
@@ -702,5 +702,5 @@ flowchart TB
 - Canonical conventions: `docs/solutions/conventions/xframework-best-practices.md`, `docs/solutions/conventions/xframework-vsa-agent-playbook.md`, `docs/solutions/conventions/logging-standards.md`.
 - Architecture docs: `docs/solutions/architecture-patterns/xframework-architecture-hardening.md`, `docs/solutions/architecture-patterns/bolt-signalr-removal.md`, `docs/solutions/architecture-patterns/bolt-unified-transport-layer.md`, `docs/solutions/architecture-patterns/unified-zlogger-logging-pipeline.md`, `docs/solutions/architecture-patterns/decentralized-remote-data-context.md`.
 - Generated endpoint docs: `docs/solutions/tooling-decisions/generated-endpoint-auto-discovery.md`, `docs/solutions/tooling-decisions/generate-endpoints-attribute-usage.md`, `docs/solutions/developer-experience/migration-to-auto-discovery.md`.
-- Subsystem docs: `docs/solutions/best-practices/xframework-caching-strategy.md`, `docs/solutions/tooling-decisions/opentelemetry-integration-guide.md`, `docs/solutions/developer-experience/blazor-idatacontext-migration.md`.
+- Subsystem docs: `docs/solutions/best-practices/xframework-caching-strategy.md`, `docs/solutions/tooling-decisions/opentelemetry-integration-guide.md`, `rules/UiGuidelines.md`.
 - Project structure: `XFramework.slnx`, `global.json`, `Directory.Packages.props`, `Version.props`, `src/`, `docs/`, `.opencode/`.

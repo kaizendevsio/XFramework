@@ -127,6 +127,6 @@ Do not treat remote `IDataContext` as direct EF Core. It is a remote query/chang
 ## Related Guidance
 
 - `docs/solutions/architecture-patterns/decentralized-remote-data-context.md` for remote data-context architecture.
-- `docs/solutions/developer-experience/blazor-idatacontext-migration.md` for migrating Blazor wrapper CRUD calls to `IDataContext`.
+- `docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md` for ControlPanel wrapper vs `IDataContext` write rules.
 - `docs/solutions/best-practices/xframework-caching-strategy.md` for cache-key and invalidation rules around EF reads.
 - `docs/solutions/conventions/xframework-best-practices.md` for broader VSA and service conventions.
