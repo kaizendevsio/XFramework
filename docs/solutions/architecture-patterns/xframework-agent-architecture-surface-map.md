@@ -30,7 +30,7 @@ Use this map to answer "where should I look first?" It is intentionally navigati
 | Historical local-first sync proposal | [Local-first sync architecture](local-first-sync-architecture.md) is preserved as StreamFlow/SignalR-era design history only; do not use it as current implementation guidance. |
 | Caching | [XFramework caching strategy](../best-practices/xframework-caching-strategy.md) |
 | Logging and observability | [Unified ZLogger logging pipeline](unified-zlogger-logging-pipeline.md), [Logging standards](../conventions/logging-standards.md), [OpenTelemetry integration guide](../tooling-decisions/opentelemetry-integration-guide.md) |
-| UI editing patterns | [Control panel editable UI patterns](../design-patterns/control-panel-editable-ui-patterns.md) |
+| UI rules | [UI guidelines](../../../rules/UiGuidelines.md) |
 | Historical architecture risks and hardening | [Architecture hardening](xframework-architecture-hardening.md) is a point-in-time hardening review; use it as backlog/context, not current implementation authority. |
 
 ## Repository Shape
