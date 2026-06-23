@@ -1,225 +1,127 @@
 @implements IDisposable
 @inject TenantModuleNavigationService ModuleNavigation
 
-@* Dashboard *@
-<div class="space-y-1">
-    <NavLink href="/" Match="NavLinkMatch.All"
-             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-             ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-        <LucideIcon Name="layout-dashboard" class="h-4 w-4" />
-        Dashboard
-    </NavLink>
-</div>
+<SidebarNavItem Href="/" Label="Dashboard" Icon="layout-dashboard" Match="NavLinkMatch.All" Strong="true" />
 
-@* Identity *@
-<div class="mt-4">
-    <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Identity</p>
-    <div class="space-y-0.5">
-        <NavLink href="/identity/users" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-            <LucideIcon Name="users" class="h-4 w-4" /> Users
-        </NavLink>
-        <NavLink href="/identity/sessions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-            <LucideIcon Name="monitor" class="h-4 w-4" /> Sessions
-        </NavLink>
-        <NavLink href="/identity/auth-logs" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-            <LucideIcon Name="scroll-text" class="h-4 w-4" /> Auth Logs
-        </NavLink>
-    </div>
-</div>
+<SidebarSection GroupId="identity" Title="Identity" Icon="users">
+    <SidebarNavItem Href="/identity/users" Label="Users" Icon="users" />
+    <SidebarNavItem Href="/identity/sessions" Label="Sessions" Icon="monitor" />
+    <SidebarNavItem Href="/identity/auth-logs" Label="Auth Logs" Icon="scroll-text" />
+</SidebarSection>
 
 @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario))
 {
-    @* Inventario *@
-    <div class="mt-4">
-        <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Inventario</p>
-        <div class="space-y-0.5">
-            <NavLink href="/inventario/products" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="package" class="h-4 w-4" /> Products
-            </NavLink>
-            <NavLink href="/inventario/categories" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="folders" class="h-4 w-4" /> Categories
-            </NavLink>
-            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing"))
-            {
-                <NavLink href="/inventario/warehouses" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="warehouse" class="h-4 w-4" /> Warehouses
-                </NavLink>
-            }
-            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability"))
-            {
-                <NavLink href="/inventario/lots" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="scan-barcode" class="h-4 w-4" /> Lots
-                </NavLink>
-            }
-            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances")
-                 || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements"))
-            {
-                <NavLink href="/inventario/stock" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="boxes" class="h-4 w-4" /> Stock
-                </NavLink>
-            }
-            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reservations"))
-            {
-                <NavLink href="/inventario/reservations" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="clipboard-check" class="h-4 w-4" /> Reservations
-                </NavLink>
-            }
-            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning"))
-            {
-                <NavLink href="/inventario/planning" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="chart-no-axes-combined" class="h-4 w-4" /> Planning
-                </NavLink>
-            }
-            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing"))
-            {
-                <NavLink href="/inventario/suppliers" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="truck" class="h-4 w-4" /> Suppliers
-                </NavLink>
-                <NavLink href="/inventario/purchase-orders" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="clipboard-list" class="h-4 w-4" /> Purchase Orders
-                </NavLink>
-                <NavLink href="/inventario/receiving" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="package-check" class="h-4 w-4" /> Receiving
-                </NavLink>
-            }
-            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting"))
-            {
-                <NavLink href="/inventario/reports" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="file-chart-column" class="h-4 w-4" /> Reports
-                </NavLink>
-            }
-            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "transactions"))
-            {
-                <NavLink href="/inventario/transactions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="arrow-left-right" class="h-4 w-4" /> Transactions
-                </NavLink>
-            }
-            <NavLink href="/inventario/settings" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="settings" class="h-4 w-4" /> Settings
-            </NavLink>
-        </div>
-    </div>
+    <SidebarSection GroupId="inventario" Title="Inventario" Icon="package">
+        <SidebarNavItem Href="/inventario/products" Label="Products" Icon="package" />
+        <SidebarNavItem Href="/inventario/categories" Label="Categories" Icon="folders" />
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing"))
+        {
+            <SidebarNavItem Href="/inventario/warehouses" Label="Warehouses" Icon="warehouse" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability"))
+        {
+            <SidebarNavItem Href="/inventario/lots" Label="Lots" Icon="scan-barcode" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances")
+             || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements"))
+        {
+            <SidebarNavItem Href="/inventario/stock" Label="Stock" Icon="boxes" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reservations"))
+        {
+            <SidebarNavItem Href="/inventario/reservations" Label="Reservations" Icon="clipboard-check" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning"))
+        {
+            <SidebarNavItem Href="/inventario/planning" Label="Planning" Icon="chart-no-axes-combined" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "purchasing"))
+        {
+            <SidebarNavItem Href="/inventario/suppliers" Label="Suppliers" Icon="truck" />
+            <SidebarNavItem Href="/inventario/purchase-orders" Label="Purchase Orders" Icon="clipboard-list" />
+            <SidebarNavItem Href="/inventario/receiving" Label="Receiving" Icon="package-check" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting"))
+        {
+            <SidebarNavItem Href="/inventario/reports" Label="Reports" Icon="file-chart-column" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "transactions"))
+        {
+            <SidebarNavItem Href="/inventario/transactions" Label="Transactions" Icon="arrow-left-right" />
+        }
+        <SidebarNavItem Href="/inventario/settings" Label="Settings" Icon="settings" />
+    </SidebarSection>
 }
 
 @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.MessagingChat))
 {
-    @* Messaging *@
-    <div class="mt-4">
-        <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Messaging</p>
-        <div class="space-y-0.5">
-            <NavLink href="/messaging/threads" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="messages-square" class="h-4 w-4" /> Threads
-            </NavLink>
-            <NavLink href="/messaging/direct-messages" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="send" class="h-4 w-4" /> Direct Messages
-            </NavLink>
-            <NavLink href="/messaging/settings" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="settings" class="h-4 w-4" /> Settings
-            </NavLink>
-        </div>
-    </div>
+    <SidebarSection GroupId="messaging" Title="Messaging" Icon="messages-square">
+        <SidebarNavItem Href="/messaging/threads" Label="Threads" Icon="messages-square" />
+        <SidebarNavItem Href="/messaging/direct-messages" Label="Direct Messages" Icon="send" />
+        <SidebarNavItem Href="/messaging/settings" Label="Settings" Icon="settings" />
+    </SidebarSection>
 }
 
 @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Community))
 {
-    @* Community *@
-    <div class="mt-4">
-        <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Community</p>
-        <div class="space-y-0.5">
-            <NavLink href="/community/identities" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="user-round" class="h-4 w-4" /> Identities
-            </NavLink>
-            <NavLink href="/community/content" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="newspaper" class="h-4 w-4" /> Content
-            </NavLink>
-            <NavLink href="/community/connections" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="network" class="h-4 w-4" /> Connections
-            </NavLink>
-            <NavLink href="/community/notifications" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="bell" class="h-4 w-4" /> Notifications
-            </NavLink>
-            <NavLink href="/community/settings" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="settings" class="h-4 w-4" /> Settings
-            </NavLink>
-        </div>
-    </div>
+    <SidebarSection GroupId="community" Title="Community" Icon="user-round">
+        <SidebarNavItem Href="/community/identities" Label="Identities" Icon="user-round" />
+        <SidebarNavItem Href="/community/content" Label="Content" Icon="newspaper" />
+        <SidebarNavItem Href="/community/connections" Label="Connections" Icon="network" />
+        <SidebarNavItem Href="/community/notifications" Label="Notifications" Icon="bell" />
+        <SidebarNavItem Href="/community/settings" Label="Settings" Icon="settings" />
+    </SidebarSection>
 }
 
 @if (AnyWalletFinanceFeatureEnabled())
 {
-    @* Finance *@
-    <div class="mt-4">
-        <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Finance</p>
-        <div class="space-y-0.5">
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.Wallets))
-            {
-                <NavLink href="/finance/wallets" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="wallet" class="h-4 w-4" /> Wallets
-                </NavLink>
-            }
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsDeposits))
-            {
-                <NavLink href="/finance/deposit-requests" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="arrow-down-to-line" class="h-4 w-4" /> Deposits
-                </NavLink>
-            }
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWithdrawals))
-            {
-                <NavLink href="/finance/withdrawal-requests" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="arrow-up-from-line" class="h-4 w-4" /> Withdrawals
-                </NavLink>
-            }
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsTransfers))
-            {
-                <NavLink href="/finance/transfers" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="arrow-left-right" class="h-4 w-4" /> Transfers
-                </NavLink>
-            }
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsBatch))
-            {
-                <NavLink href="/finance/batch" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="layers" class="h-4 w-4" /> Batch
-                </NavLink>
-            }
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting))
-            {
-                <NavLink href="/finance/wallet-operations" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="receipt-text" class="h-4 w-4" /> Operations
-                </NavLink>
-                <NavLink href="/finance/statements" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="file-text" class="h-4 w-4" /> Statements
-                </NavLink>
-                <NavLink href="/finance/wallet-audit" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="list-checks" class="h-4 w-4" /> Audit
-                </NavLink>
-            }
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReconciliation))
-            {
-                <NavLink href="/finance/reconciliation" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="scale" class="h-4 w-4" /> Reconciliation
-                </NavLink>
-            }
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWebhooks))
-            {
-                <NavLink href="/finance/outbox-webhooks" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="send" class="h-4 w-4" /> Outbox
-                </NavLink>
-            }
-            @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsPolicy))
-            {
-                <NavLink href="/finance/wallet-approvals" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="clipboard-check" class="h-4 w-4" /> Approvals
-                </NavLink>
-                <NavLink href="/finance/policy-decisions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="shield-check" class="h-4 w-4" /> Policy
-                </NavLink>
-                <NavLink href="/finance/refunds-disputes" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <LucideIcon Name="rotate-ccw" class="h-4 w-4" /> Refunds
-                </NavLink>
-            }
-        </div>
-    </div>
+    <SidebarSection GroupId="finance" Title="Finance" Icon="wallet">
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.Wallets))
+        {
+            <SidebarNavItem Href="/finance/wallets" Label="Wallets" Icon="wallet" />
+        }
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsDeposits))
+        {
+            <SidebarNavItem Href="/finance/deposit-requests" Label="Deposits" Icon="arrow-down-to-line" />
+        }
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWithdrawals))
+        {
+            <SidebarNavItem Href="/finance/withdrawal-requests" Label="Withdrawals" Icon="arrow-up-from-line" />
+        }
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsTransfers))
+        {
+            <SidebarNavItem Href="/finance/transfers" Label="Transfers" Icon="arrow-left-right" />
+        }
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsBatch))
+        {
+            <SidebarNavItem Href="/finance/batch" Label="Batch" Icon="layers" />
+        }
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting))
+        {
+            <SidebarNavItem Href="/finance/wallet-operations" Label="Operations" Icon="receipt-text" />
+            <SidebarNavItem Href="/finance/statements" Label="Statements" Icon="file-text" />
+            <SidebarNavItem Href="/finance/wallet-audit" Label="Audit" Icon="list-checks" />
+        }
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsReconciliation))
+        {
+            <SidebarNavItem Href="/finance/reconciliation" Label="Reconciliation" Icon="scale" />
+        }
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsWebhooks))
+        {
+            <SidebarNavItem Href="/finance/outbox-webhooks" Label="Outbox" Icon="send" />
+        }
+        @if (WalletFeatureEnabled(TenantModuleFeatureKeys.WalletsPolicy))
+        {
+            <SidebarNavItem Href="/finance/wallet-approvals" Label="Approvals" Icon="clipboard-check" />
+            <SidebarNavItem Href="/finance/policy-decisions" Label="Policy" Icon="shield-check" />
+            <SidebarNavItem Href="/finance/refunds-disputes" Label="Refunds" Icon="rotate-ccw" />
+        }
+    </SidebarSection>
 }
+
+<SidebarSection GroupId="system" Title="System" Icon="database">
+    <SidebarNavItem Href="/admin/reference-data" Label="Reference Data" Icon="database" />
+</SidebarSection>
 
 @code {
     protected override async Task OnInitializedAsync()
@@ -253,13 +155,3 @@
         ModuleNavigation.OnChanged -= OnModuleNavigationChanged;
     }
 }
-
-@* System *@
-<div class="mt-4">
-    <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">System</p>
-    <div class="space-y-0.5">
-        <NavLink href="/admin/reference-data" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-            <LucideIcon Name="database" class="h-4 w-4" /> Reference Data
-        </NavLink>
-    </div>
-</div>

@@ -1,58 +1,71 @@
 @inherits LayoutComponentBase
 @implements IDisposable
+@using System.Text.Json
 @using ControlPanel.Server.Services
 @using XFramework.Domain.Shared.DataContext
 
-<div class="flex min-h-screen bg-background text-foreground">
-    @* Fixed left sidebar — always visible *@
-    <aside class="app-sidebar w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground">
-        <div class="flex flex-col h-full">
+<div class="control-panel-shell flex h-screen overflow-hidden bg-background text-foreground">
+    @* Fixed left sidebar - always visible *@
+    <aside class="@SidebarClass"
+           aria-label="Control Panel navigation"
+           @onmouseenter="OnSidebarMouseEnter"
+           @onmouseleave="OnSidebarMouseLeave">
+        <div class="app-sidebar-inner flex h-full min-h-0 flex-col">
             @* Header *@
-            <div class="flex items-center gap-2 px-4 h-14 border-b border-sidebar-border">
-                <div class="flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
+            <div class="sidebar-header flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
+                <div class="sidebar-mark flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">
                     X
                 </div>
-                <div>
+                <div class="sidebar-brand min-w-0">
                     <span class="text-sm font-semibold">Control Panel</span>
-                    <p class="text-[10px] text-muted-foreground leading-none">XFramework Admin</p>
+                    <p class="text-[10px] leading-none text-muted-foreground">XFramework Admin</p>
                 </div>
             </div>
 
             @* Scrollable nav *@
-            <nav class="flex-1 overflow-y-auto p-3">
-                @if (IsTenantListRoute)
-                {
-                    <TenantListSidebar />
-                }
-                else if (TryGetInventarioProductDetailRoute(out var productRouteId, out _))
-                {
-                    <ProductDetailSidebar ProductId="@productRouteId" />
-                }
-                else if (TryGetWalletDetailRoute(out var walletRouteId, out _))
-                {
-                    <WalletDetailSidebar WalletId="@walletRouteId" />
-                }
-                else if (TryGetTenantDetailRoute(out var tenantRouteId, out _))
-                {
-                    <TenantDetailSidebar TenantId="@tenantRouteId" />
-                }
-                else
-                {
-                    <NavMenu />
-                }
+            <nav class="app-sidebar-nav flex-1 min-h-0 overflow-y-auto p-3">
+                <CascadingValue Value="_sidebarState" IsFixed="false">
+                    @if (IsTenantListRoute)
+                    {
+                        <TenantListSidebar />
+                    }
+                    else if (TryGetInventarioProductDetailRoute(out var productRouteId, out _))
+                    {
+                        <ProductDetailSidebar ProductId="@productRouteId" />
+                    }
+                    else if (TryGetWalletDetailRoute(out var walletRouteId, out _))
+                    {
+                        <WalletDetailSidebar WalletId="@walletRouteId" />
+                    }
+                    else if (TryGetTenantDetailRoute(out var tenantRouteId, out _))
+                    {
+                        <TenantDetailSidebar TenantId="@tenantRouteId" />
+                    }
+                    else
+                    {
+                        <NavMenu />
+                    }
+                </CascadingValue>
             </nav>
 
             @* Footer *@
-            <div class="border-t border-sidebar-border px-4 py-3">
-                <span class="text-xs text-muted-foreground">v1.0 — XFramework</span>
+            <div class="sidebar-footer flex items-center gap-2 border-t border-sidebar-border px-4 py-3">
+                <span class="sidebar-footer-text text-xs text-muted-foreground">v1.0 - XFramework</span>
+                <button type="button"
+                        class="sidebar-collapse-button"
+                        title="@SidebarToggleTitle"
+                        aria-label="@SidebarToggleTitle"
+                        @onclick="ToggleSidebarCollapsed">
+                    <LucideIcon Name="@SidebarToggleIcon" class="h-4 w-4" />
+                </button>
             </div>
         </div>
     </aside>
 
     @* Main content *@
-    <div class="flex-1 flex flex-col min-w-0">
-        <header class="flex items-center justify-between px-6 h-14 border-b shrink-0">
-            <div class="flex items-center gap-2">
+    <div class="app-content-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header class="app-header flex h-14 shrink-0 items-center justify-between border-b px-6">
+            <div class="app-header-breadcrumb flex min-w-0 items-center gap-2">
                 <BbBreadcrumb>
                     <BbBreadcrumbList>
                         <BbBreadcrumbItem>
@@ -67,30 +80,34 @@
                         }
                     </BbBreadcrumbList>
                 </BbBreadcrumb>
-                @if (!string.IsNullOrEmpty(_selectedTenantName))
-                {
-                    <BbBadge Variant="BadgeVariant.Outline" Class="ml-2 text-[10px]">@_selectedTenantName</BbBadge>
-                }
             </div>
-            <div class="flex items-center gap-2">
+            <div class="app-header-actions flex shrink-0 items-center gap-2">
                 <BbDarkModeToggle Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" />
                 <BbThemeSwitcher />
-                <BbPopover Open="@_profileMenuOpen" OpenChanged="@OnProfileMenuOpenChanged" RestoreFocusOnClose="true">
-                    <BbPopoverTrigger>
-                        <BbButton Variant="ButtonVariant.Ghost" Class="profile-trigger">
-                            <span class="profile-avatar">@_userInitials</span>
-                            <span class="profile-trigger-text">
-                                <span class="profile-name">@_displayName</span>
-                                <span class="profile-tenant">@ActiveTenantLabel</span>
-                            </span>
-                            <LucideIcon Name="chevron-down" class="h-4 w-4 text-muted-foreground" />
-                        </BbButton>
-                    </BbPopoverTrigger>
-                    <BbPopoverContent Class="profile-menu-panel"
-                                      Offset="8"
-                                      CloseOnClickOutside="true"
-                                      CloseOnEscape="true"
-                                      ZIndex="10000">
+                <div class="profile-menu">
+                    @if (_profileMenuOpen)
+                    {
+                        <button type="button"
+                                class="profile-menu-backdrop"
+                                aria-label="Close profile menu"
+                                @onclick="CloseProfileMenu"></button>
+                    }
+                    <BbPopover Open="@_profileMenuOpen" OpenChanged="@OnProfileMenuOpenChanged" RestoreFocusOnClose="true">
+                        <BbPopoverTrigger>
+                            <BbButton Variant="ButtonVariant.Ghost" Class="profile-trigger">
+                                <span class="profile-avatar">@_userInitials</span>
+                                <span class="profile-trigger-text">
+                                    <span class="profile-name">@_displayName</span>
+                                    <span class="profile-tenant">@ActiveTenantLabel</span>
+                                </span>
+                                <LucideIcon Name="chevron-down" class="h-4 w-4 text-muted-foreground" />
+                            </BbButton>
+                        </BbPopoverTrigger>
+                        <BbPopoverContent Class="profile-menu-panel"
+                                          Offset="8"
+                                          CloseOnClickOutside="false"
+                                          CloseOnEscape="true"
+                                          ZIndex="10000">
                             <div class="profile-menu-user">
                                 <span class="profile-avatar profile-avatar-large">@_userInitials</span>
                                 <div class="min-w-0">
@@ -113,6 +130,14 @@
                             </div>
 
                             <div class="profile-menu-actions">
+                                <BbButton Variant="ButtonVariant.Outline"
+                                          OnClick="@OpenActiveTenantSettings"
+                                          Disabled="@(!HasActiveTenant)"
+                                          Class="profile-menu-button"
+                                          title="@TenantSettingsTitle">
+                                    <LucideIcon Name="settings" class="mr-2 h-4 w-4" />
+                                    Tenant Settings
+                                </BbButton>
                                 <BbButton Variant="ButtonVariant.Outline" OnClick="@ManageTenants" Class="profile-menu-button">
                                     <LucideIcon Name="building-2" class="mr-2 h-4 w-4" />
                                     Manage Tenants
@@ -122,11 +147,12 @@
                                     Sign Out
                                 </BbButton>
                             </div>
-                    </BbPopoverContent>
-                </BbPopover>
+                        </BbPopoverContent>
+                    </BbPopover>
+                </div>
             </div>
         </header>
-        <main class="app-main flex-1 min-w-0 p-6 overflow-y-auto">
+        <main class="app-main flex-1 min-h-0 min-w-0 overflow-y-auto p-6">
             <FadeInContent @key="_contentRenderKey">
                 @Body
             </FadeInContent>
@@ -146,19 +172,33 @@
     [Inject] private IJSRuntime Js { get; set; } = default!;
     [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
 
-    private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
+    private static readonly string[] DefaultOpenSidebarGroups = [];
+
     private const string AllTenantsValue = "__all_tenants__";
     private const string ActiveTenantStorageKey = "xframework.controlpanel.activeTenantId";
+    private const string SidebarCollapsedStorageKey = "xframework.controlpanel.sidebarCollapsed";
+    private const string SidebarOpenGroupsStorageKey = "xframework.controlpanel.sidebarOpenGroups.v2";
+
+    private readonly ControlPanelSidebarState _sidebarState = new(DefaultOpenSidebarGroups);
+    private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
     private string _selectedTenantId = AllTenantsValue;
     private int _contentRenderKey;
     private string _displayName = "Administrator";
     private string _userName = "";
     private string _userInitials = "A";
     private bool _profileMenuOpen;
+
     private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
     private string ActiveTenantLabel => string.IsNullOrWhiteSpace(_selectedTenantName) ? "All Tenants" : _selectedTenantName;
     private string CurrentPath => new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
     private bool IsTenantListRoute => string.Equals(CurrentPath, "/identity/tenants", StringComparison.OrdinalIgnoreCase);
+    private bool HasActiveTenant => Guid.TryParse(_selectedTenantId, out _);
+    private string TenantSettingsTitle => HasActiveTenant ? "Open active tenant settings" : "Select a tenant to open tenant settings";
+    private string SidebarClass => "app-sidebar shrink-0 border-r bg-sidebar text-sidebar-foreground"
+        + (_sidebarState.IsCollapsed ? " app-sidebar-collapsed" : " app-sidebar-expanded")
+        + (_sidebarState.IsHoverExpanded ? " app-sidebar-hover-expanded" : "");
+    private string SidebarToggleTitle => _sidebarState.IsCollapsed ? "Expand sidebar" : "Collapse sidebar";
+    private string SidebarToggleIcon => _sidebarState.IsCollapsed ? "panel-left-open" : "panel-left-close";
 
     private List<SelectOption<string>> TenantOptions =>
     [
@@ -182,6 +222,9 @@
 
     protected override void OnInitialized()
     {
+        _sidebarState.ToggleGroupAsync = ToggleSidebarGroup;
+        UpdateActiveSidebarGroup();
+
         Nav.LocationChanged += OnLocationChanged;
         TenantFilter.OnChanged += OnTenantFilterChanged;
         TenantFilter.OnTenantsChanged += OnTenantsChanged;
@@ -211,7 +254,136 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+
+        await RestoreSidebarState();
         await LoadTenants();
+    }
+
+    private async Task RestoreSidebarState()
+    {
+        var storedCollapsed = await ReadStorageItem(SidebarCollapsedStorageKey);
+        if (bool.TryParse(storedCollapsed, out var isCollapsed))
+        {
+            _sidebarState.IsCollapsed = isCollapsed;
+        }
+
+        var storedOpenGroups = await ReadStorageItem(SidebarOpenGroupsStorageKey);
+        var restoredStoredOpenGroups = false;
+        if (!string.IsNullOrWhiteSpace(storedOpenGroups))
+        {
+            try
+            {
+                var groupIds = JsonSerializer.Deserialize<string[]>(storedOpenGroups);
+                if (groupIds is not null)
+                {
+                    _sidebarState.ReplaceOpenGroups(groupIds);
+                    restoredStoredOpenGroups = true;
+                }
+            }
+            catch (JsonException)
+            {
+                _sidebarState.ReplaceOpenGroups(DefaultOpenSidebarGroups);
+            }
+        }
+
+        var activeGroup = UpdateActiveSidebarGroup();
+
+        if (!restoredStoredOpenGroups && activeGroup is not null)
+        {
+            _sidebarState.SetGroupOpen(activeGroup, true);
+        }
+
+        await StoreSidebarGroups();
+        StateHasChanged();
+    }
+
+    private async Task ToggleSidebarCollapsed()
+    {
+        _sidebarState.IsCollapsed = !_sidebarState.IsCollapsed;
+        _sidebarState.IsHoverExpanded = false;
+        await StoreStorageItem(SidebarCollapsedStorageKey, _sidebarState.IsCollapsed.ToString());
+    }
+
+    private void OnSidebarMouseEnter()
+    {
+        if (!_sidebarState.IsCollapsed)
+        {
+            return;
+        }
+
+        _sidebarState.IsHoverExpanded = true;
+    }
+
+    private void OnSidebarMouseLeave()
+    {
+        if (!_sidebarState.IsHoverExpanded)
+        {
+            return;
+        }
+
+        _sidebarState.IsHoverExpanded = false;
+    }
+
+    private async Task ToggleSidebarGroup(string groupId)
+    {
+        _sidebarState.SetGroupOpen(groupId, !_sidebarState.IsGroupOpen(groupId));
+        await StoreSidebarGroups();
+    }
+
+    private async Task StoreSidebarGroups()
+    {
+        var groupIds = _sidebarState.OpenGroupIds.OrderBy(static groupId => groupId, StringComparer.OrdinalIgnoreCase);
+        await StoreStorageItem(SidebarOpenGroupsStorageKey, JsonSerializer.Serialize(groupIds));
+    }
+
+    private string? UpdateActiveSidebarGroup()
+    {
+        var activeGroup = GetActiveSidebarGroup();
+        _sidebarState.ActiveGroupId = activeGroup;
+        return activeGroup;
+    }
+
+    private string? GetActiveSidebarGroup()
+    {
+        if (IsTenantListRoute)
+        {
+            return "tenant-admin";
+        }
+
+        if (TryGetInventarioProductDetailRoute(out _, out _))
+        {
+            return "product-detail";
+        }
+
+        if (TryGetWalletDetailRoute(out _, out _))
+        {
+            return "wallet-detail";
+        }
+
+        if (TryGetTenantDetailRoute(out _, out _))
+        {
+            return "tenant-detail";
+        }
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length == 0)
+        {
+            return null;
+        }
+
+        return segments[0].ToLowerInvariant() switch
+        {
+            "identity" => "identity",
+            "inventario" => "inventario",
+            "messaging" => "messaging",
+            "community" => "community",
+            "finance" => "finance",
+            "admin" => "system",
+            _ => null
+        };
     }
 
     private async Task LoadTenants()
@@ -268,11 +440,17 @@
         }
     }
 
-    private async Task<string?> ReadStoredTenantId()
+    private Task<string?> ReadStoredTenantId() => ReadStorageItem(ActiveTenantStorageKey);
+
+    private Task StoreTenantId(string tenantId) => StoreStorageItem(ActiveTenantStorageKey, tenantId);
+
+    private Task ClearStoredTenantId() => RemoveStorageItem(ActiveTenantStorageKey);
+
+    private async Task<string?> ReadStorageItem(string key)
     {
         try
         {
-            return await Js.InvokeAsync<string?>("localStorage.getItem", ActiveTenantStorageKey);
+            return await Js.InvokeAsync<string?>("localStorage.getItem", key);
         }
         catch (JSException)
         {
@@ -284,21 +462,21 @@
         }
     }
 
-    private async Task StoreTenantId(string tenantId)
+    private async Task StoreStorageItem(string key, string value)
     {
         try
         {
-            await Js.InvokeVoidAsync("localStorage.setItem", ActiveTenantStorageKey, tenantId);
+            await Js.InvokeVoidAsync("localStorage.setItem", key, value);
         }
         catch (JSException) { }
         catch (InvalidOperationException) { }
     }
 
-    private async Task ClearStoredTenantId()
+    private async Task RemoveStorageItem(string key)
     {
         try
         {
-            await Js.InvokeVoidAsync("localStorage.removeItem", ActiveTenantStorageKey);
+            await Js.InvokeVoidAsync("localStorage.removeItem", key);
         }
         catch (JSException) { }
         catch (InvalidOperationException) { }
@@ -321,6 +499,17 @@
         }
 
         _profileMenuOpen = false;
+    }
+
+    private void OpenActiveTenantSettings()
+    {
+        if (!Guid.TryParse(_selectedTenantId, out var tenantId))
+        {
+            return;
+        }
+
+        _profileMenuOpen = false;
+        Nav.NavigateTo($"/identity/tenants/{tenantId}/configurations");
     }
 
     private void ManageTenants()
@@ -424,6 +613,7 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
+        UpdateActiveSidebarGroup();
         _contentRenderKey++;
         InvokeAsync(StateHasChanged);
     }

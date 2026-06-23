@@ -1,11 +1,8 @@
 @* Tenant administration list navigation *@
-<div class="space-y-1">
-    <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tenant Admin</p>
-    <NavLink href="/identity/tenants"
-             Match="NavLinkMatch.All"
-             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-             ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-        <LucideIcon Name="building-2" class="h-4 w-4" />
-        Tenant List
-    </NavLink>
-</div>
+<SidebarSection GroupId="tenant-admin" Title="Tenant Admin" Icon="building-2">
+    <SidebarNavItem Href="/identity/tenants"
+                    Label="Tenant List"
+                    Icon="building-2"
+                    Match="NavLinkMatch.All"
+                    Strong="true" />
+</SidebarSection>

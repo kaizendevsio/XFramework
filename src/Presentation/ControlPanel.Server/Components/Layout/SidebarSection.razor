@@ -1,0 +1,55 @@
+<div class="sidebar-section">
+    <button type="button"
+            class="@ToggleClass"
+            title="@Title"
+            aria-label="@Title"
+            aria-expanded="@AriaExpanded"
+            aria-controls="@ContentId"
+            @onclick="Toggle">
+        <LucideIcon Name="@Icon" class="sidebar-section-icon h-4 w-4" />
+        <span class="sidebar-label">@Title</span>
+        <LucideIcon Name="chevron-down" class="@ChevronClass" />
+    </button>
+
+    <div id="@ContentId"
+         class="@ItemsShellClass"
+         @attributes="ItemsAccessibilityAttributes">
+        <div class="sidebar-section-items">
+            @ChildContent
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] public ControlPanelSidebarState? Sidebar { get; set; }
+    [Parameter, EditorRequired] public string GroupId { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Icon { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool IsOpen => Sidebar?.IsGroupOpen(GroupId) ?? false;
+    private bool IsActiveGroup => string.Equals(Sidebar?.ActiveGroupId, GroupId, StringComparison.OrdinalIgnoreCase);
+    private bool ShowsItems => IsOpen && Sidebar?.IsVisuallyCollapsed != true;
+    private string ContentId => $"sidebar-section-{GroupId}";
+    private string AriaExpanded => ShowsItems.ToString().ToLowerInvariant();
+    private string ToggleClass => IsActiveGroup
+        ? "sidebar-section-toggle sidebar-section-toggle-active"
+        : "sidebar-section-toggle";
+    private IReadOnlyDictionary<string, object> ItemsAccessibilityAttributes => ShowsItems
+        ? new Dictionary<string, object> { ["aria-hidden"] = "false" }
+        : new Dictionary<string, object> { ["aria-hidden"] = "true", ["inert"] = "" };
+    private string ItemsShellClass => ShowsItems
+        ? "sidebar-section-items-shell sidebar-section-items-shell-open"
+        : "sidebar-section-items-shell";
+    private string ChevronClass => IsOpen
+        ? "sidebar-section-chevron sidebar-section-chevron-open h-4 w-4"
+        : "sidebar-section-chevron h-4 w-4";
+
+    private async Task Toggle()
+    {
+        if (Sidebar is not null)
+        {
+            await Sidebar.ToggleGroup(GroupId);
+        }
+    }
+}

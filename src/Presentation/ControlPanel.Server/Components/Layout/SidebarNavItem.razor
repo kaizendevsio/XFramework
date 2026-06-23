@@ -1,0 +1,20 @@
+<NavLink href="@Href"
+         Match="@Match"
+         class="@LinkClass"
+         ActiveClass="sidebar-nav-item-active"
+         title="@Label"
+         aria-label="@Label">
+    <LucideIcon Name="@Icon" class="sidebar-nav-icon h-4 w-4" />
+    <span class="sidebar-label">@Label</span>
+</NavLink>
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Icon { get; set; } = "";
+    [Parameter] public NavLinkMatch Match { get; set; } = NavLinkMatch.Prefix;
+    [Parameter] public bool Strong { get; set; }
+
+    private string LinkClass =>
+        Strong ? "sidebar-nav-item sidebar-nav-item-strong" : "sidebar-nav-item";
+}
