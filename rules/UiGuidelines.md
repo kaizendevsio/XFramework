@@ -121,6 +121,7 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 - List pages are for scanning, filtering, creating small records, and navigating to detail pages.
 - Existing-record edit workflows belong on detail pages with a clear edit mode, not list-page edit modals.
 - Detail pages should show the operational context needed for the entity.
+- If a detail page grows beyond a few scannable sections, add a local detail sidebar/navigation and split major sections into dedicated detail subpages or routes. Do not force many unrelated sections into one long scrolling page.
 - Product-specific inventory workflows should keep operators on `/inventario/products/{id}` or a detail-sidebar route when practical.
 - Use shared layout classes instead of ad hoc flex/responsive utility combinations:
   - `xf-page-header`
@@ -133,7 +134,7 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 ## Standard Page Recipes
 
 - List page: `xf-page-header` with title and `xf-page-actions`, optional `xf-filter-actions`, `BbDataGrid` with useful `Filterable` columns, pagination, row click when detail exists, and visible create/action buttons.
-- Detail page: stable header, summary/metrics in `xf-summary-grid`, inline edit through `EditableForm` when suitable, operational sections in grids/tabs, and wrapper-backed commands for business actions.
+- Detail page: stable header, summary/metrics in `xf-summary-grid`, inline edit through `EditableForm` when suitable, operational sections in grids/tabs, and wrapper-backed commands for business actions. When sections become too many or too tall, use a detail sidebar/nav and move sections to subpages/routes.
 - Report page: date/range and entity filters using Blueprint controls or `XfEntityPicker`, optional `BbFilterBuilder` for complex conditions, `BbDataGrid` or `BbDataView`, export/actions in the header, and explicit empty/loading states.
 - Picker dialog: quick search in the trigger popover, advanced search in a `BbDialog` with `BbDataGrid`, domain-specific columns, `Filterable`/`FilterBy`, and optional picker-owned create dialog.
 - Destructive action: use `DialogService.Confirm` or `BbAlertDialog`, use destructive button styling, describe the exact consequence, then call the wrapper/service and show a semantic toast.
