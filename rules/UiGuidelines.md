@@ -119,6 +119,7 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 ## Layout And Workflow
 
 - List pages are for scanning, filtering, creating small records, and navigating to detail pages.
+- List pages must not embed create or update forms as cards/sections above, below, or beside the grid. Provide a visible create action button that opens a focused dialog/sheet or navigates to a dedicated create page.
 - Existing-record edit workflows belong on detail pages with a clear edit mode, not list-page edit modals.
 - Detail pages should show the operational context needed for the entity.
 - If a detail page grows beyond a few scannable sections, add a local detail sidebar/navigation and split major sections into dedicated detail subpages or routes. Do not force many unrelated sections into one long scrolling page.
@@ -133,7 +134,7 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 
 ## Standard Page Recipes
 
-- List page: `xf-page-header` with title and `xf-page-actions`, optional `xf-filter-actions`, `BbDataGrid` with useful `Filterable` columns, pagination, row click when detail exists, and visible create/action buttons.
+- List page: `xf-page-header` with title and `xf-page-actions`, optional `xf-filter-actions`, `BbDataGrid` with useful `Filterable` columns, pagination, row click when detail exists, and visible create/action buttons. Do not render create/update forms inline on the list page; launch create from a button and route updates to detail/edit surfaces.
 - Detail page: stable header, summary/metrics in `xf-summary-grid`, inline edit through `EditableForm` when suitable, operational sections in grids/tabs, and wrapper-backed commands for business actions. When sections become too many or too tall, use a detail sidebar/nav and move sections to subpages/routes.
 - Report page: date/range and entity filters using Blueprint controls or `XfEntityPicker`, optional `BbFilterBuilder` for complex conditions, `BbDataGrid` or `BbDataView`, export/actions in the header, and explicit empty/loading states.
 - Picker dialog: quick search in the trigger popover, advanced search in a `BbDialog` with `BbDataGrid`, domain-specific columns, `Filterable`/`FilterBy`, and optional picker-owned create dialog.
@@ -148,6 +149,7 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 - Do not use native `<select>` for tenant, user, credential, entity, or long domain lookup selection.
 - Do not show GUIDs as primary user-facing labels.
 - Do not invent schema/configuration models when BlazorBlueprint already provides `FormSchema`, `FormFieldDefinition`, `FilterDefinition`, `FilterField`, `ToastData`, or dialog option models.
+- Do not place create or update forms in cards above list grids. Lists should expose actions, not permanently embedded mutation forms.
 - Do not put existing-record edits in list-page modals.
 - Do not put required information behind hover-only UI.
 - Do not hard-code third-party component chrome text when `IBbLocalizer` can override it.
