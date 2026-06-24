@@ -118,85 +118,99 @@
             </BbCard>
         </div>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Open Cases</BbCardTitle>
-                <BbCardDescription>@_cases.Count case(s) loaded</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_cases" ShowPagination="true" InitialPageSize="10">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.CaseType)" Title="Type" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReasonCode)" Title="Reason Code" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="Actions">
-                            <ChildContent Context="item">
-                                @if (item.Status is WalletCaseStatus.Open or WalletCaseStatus.OnHold)
-                                {
-                                    <div class="flex gap-2">
-                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ResolveCase(item, true))" Disabled="@_acting">
-                                            Approve
-                                        </BbButton>
-                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost" OnClick="@(() => ResolveCase(item, false))" Disabled="@_acting">
-                                            Reject
-                                        </BbButton>
-                                    </div>
-                                }
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+        <BbTabs DefaultValue="open-cases">
+            <BbTabsList>
+                <BbTabsTrigger Value="open-cases">Open Cases (@_cases.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="refund-operations">Refund Operations (@_refundOperations.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="transactions">Transactions (@_transactions.Count)</BbTabsTrigger>
+            </BbTabsList>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Recent Refund/Reversal Operations</BbCardTitle>
-                <BbCardDescription>@_refundOperations.Count operation(s) loaded</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_refundOperations" ShowPagination="true" InitialPageSize="10">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Type" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
-                        <BbDataGridPropertyColumn Property="@(x => x.FailureMessage)" Title="Failure" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+            <BbTabsContent Value="open-cases" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Open Cases</BbCardTitle>
+                        <BbCardDescription>@_cases.Count case(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_cases" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.CaseType)" Title="Type" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReasonCode)" Title="Reason Code" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        @if (item.Status is WalletCaseStatus.Open or WalletCaseStatus.OnHold)
+                                        {
+                                            <div class="flex gap-2">
+                                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ResolveCase(item, true))" Disabled="@_acting">
+                                                    Approve
+                                                </BbButton>
+                                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost" OnClick="@(() => ResolveCase(item, false))" Disabled="@_acting">
+                                                    Reject
+                                                </BbButton>
+                                            </div>
+                                        }
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Recent Transactions</BbCardTitle>
-                <BbCardDescription>@_transactions.Count transaction(s) available for reversal</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.Id)" Title="Transaction" />
-                        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="Actions">
-                            <ChildContent Context="item">
-                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => SelectTransaction(item))">
-                                    Use
-                                </BbButton>
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+            <BbTabsContent Value="refund-operations" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Recent Refund/Reversal Operations</BbCardTitle>
+                        <BbCardDescription>@_refundOperations.Count operation(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_refundOperations" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Type" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
+                                <BbDataGridPropertyColumn Property="@(x => x.FailureMessage)" Title="Failure" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            <BbTabsContent Value="transactions" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Recent Transactions</BbCardTitle>
+                        <BbCardDescription>@_transactions.Count transaction(s) available for reversal</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.Id)" Title="Transaction" />
+                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => SelectTransaction(item))">
+                                            Use
+                                        </BbButton>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+        </BbTabs>
     }
 </div>
 
