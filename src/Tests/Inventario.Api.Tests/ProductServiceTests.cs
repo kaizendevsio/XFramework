@@ -13,6 +13,7 @@ using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Api.Services;
 using XFramework.Inventario.Domain.Shared.Contracts;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace Inventario.Api.Tests;
