@@ -71,54 +71,65 @@
             </BbCard>
         </div>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Wallet Balances</BbCardTitle>
-                <BbCardDescription>@_wallets.Count wallet(s) loaded for the selected tenant</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_wallets" ShowPagination="true" InitialPageSize="20">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.DebitOnHoldBalance)" Title="Debit Hold" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreditOnHoldBalance)" Title="Credit Hold" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="Actions">
-                            <ChildContent Context="item">
-                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => GenerateStatement(item.Id))" Disabled="@_acting">
-                                    Statement
-                                </BbButton>
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+        <BbTabs DefaultValue="wallet-balances">
+            <BbTabsList>
+                <BbTabsTrigger Value="wallet-balances">Wallet Balances (@_wallets.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="statement-lines">Statement Lines (@_transactions.Count)</BbTabsTrigger>
+            </BbTabsList>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Recent Statement Lines</BbCardTitle>
-                <BbCardDescription>@_transactions.Count transaction(s) loaded</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running Balance" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+            <BbTabsContent Value="wallet-balances" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Wallet Balances</BbCardTitle>
+                        <BbCardDescription>@_wallets.Count wallet(s) loaded for the selected tenant</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_wallets" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DebitOnHoldBalance)" Title="Debit Hold" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreditOnHoldBalance)" Title="Credit Hold" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => GenerateStatement(item.Id))" Disabled="@_acting">
+                                            Statement
+                                        </BbButton>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            <BbTabsContent Value="statement-lines" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Recent Statement Lines</BbCardTitle>
+                        <BbCardDescription>@_transactions.Count transaction(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running Balance" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+        </BbTabs>
     }
 </div>
 

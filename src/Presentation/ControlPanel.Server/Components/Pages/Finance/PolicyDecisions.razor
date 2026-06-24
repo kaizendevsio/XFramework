@@ -124,85 +124,100 @@
             </BbCard>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Policy Rules</BbCardTitle>
-                    <BbCardDescription>@_rules.Count active rule(s) loaded</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    <BbDataGrid Items="@_rules" ShowPagination="true" InitialPageSize="10">
-                        <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.MaxSingleTransactionAmount)" Title="Max Single" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.DailyVelocityLimit)" Title="Daily" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ApprovalThreshold)" Title="Approval" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.IsEnabled)" Title="Enabled" Sortable="true" />
-                        </Columns>
-                    </BbDataGrid>
-                </BbCardContent>
-            </BbCard>
+        <BbTabs DefaultValue="policy-rules">
+            <BbTabsList>
+                <BbTabsTrigger Value="policy-rules">Policy Rules (@_rules.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="fee-schedules">Fee Schedules (@_feeSchedules.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="policy-decisions">Policy Decisions (@_items.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="fee-ledger">Fee Ledger (@_fees.Count)</BbTabsTrigger>
+            </BbTabsList>
 
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Fee Schedules</BbCardTitle>
-                    <BbCardDescription>@_feeSchedules.Count active schedule(s) loaded</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    <BbDataGrid Items="@_feeSchedules" ShowPagination="true" InitialPageSize="10">
-                        <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.FixedFee)" Title="Fixed" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.PercentageFee)" Title="Percent" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.MinimumFee)" Title="Min" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.MaximumFee)" Title="Max" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.IsEnabled)" Title="Enabled" Sortable="true" />
-                        </Columns>
-                    </BbDataGrid>
-                </BbCardContent>
-            </BbCard>
-        </div>
+            <BbTabsContent Value="policy-rules" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Policy Rules</BbCardTitle>
+                        <BbCardDescription>@_rules.Count active rule(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_rules" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.MaxSingleTransactionAmount)" Title="Max Single" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DailyVelocityLimit)" Title="Daily" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ApprovalThreshold)" Title="Approval" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.IsEnabled)" Title="Enabled" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Policy Decisions</BbCardTitle>
-                <BbCardDescription>@_items.Count operation(s) with risk or policy output</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.RiskDecision)" Title="Risk" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.PolicyDecision)" Title="Policy" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ActorCredentialId)" Title="Actor" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+            <BbTabsContent Value="fee-schedules" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Fee Schedules</BbCardTitle>
+                        <BbCardDescription>@_feeSchedules.Count active schedule(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_feeSchedules" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.FixedFee)" Title="Fixed" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.PercentageFee)" Title="Percent" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.MinimumFee)" Title="Min" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.MaximumFee)" Title="Max" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.IsEnabled)" Title="Enabled" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Fee Ledger</BbCardTitle>
-                <BbCardDescription>@_fees.Count fee posting(s) loaded</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_fees" ShowPagination="true" InitialPageSize="20">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Direction)" Title="Direction" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.BalanceBucket)" Title="Bucket" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+            <BbTabsContent Value="policy-decisions" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Policy Decisions</BbCardTitle>
+                        <BbCardDescription>@_items.Count operation(s) with risk or policy output</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Operation" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.RiskDecision)" Title="Risk" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.PolicyDecision)" Title="Policy" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ActorCredentialId)" Title="Actor" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            <BbTabsContent Value="fee-ledger" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Fee Ledger</BbCardTitle>
+                        <BbCardDescription>@_fees.Count fee posting(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_fees" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Direction)" Title="Direction" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.BalanceBucket)" Title="Bucket" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+        </BbTabs>
     }
 </div>
 

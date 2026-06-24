@@ -39,6 +39,15 @@ public sealed class ControlPanelContractTests
         "RefundsDisputes.razor"
     ];
 
+    private static readonly (string Page, string DefaultTab, string[] Tabs)[] MultiGridTabbedFinancePages =
+    [
+        ("PolicyDecisions.razor", "policy-rules", ["policy-rules", "fee-schedules", "policy-decisions", "fee-ledger"]),
+        ("RefundsDisputes.razor", "open-cases", ["open-cases", "refund-operations", "transactions"]),
+        ("Statements.razor", "wallet-balances", ["wallet-balances", "statement-lines"]),
+        ("Reconciliation.razor", "balance-snapshots", ["balance-snapshots", "reconciliation-items"]),
+        ("OutboxWebhooks.razor", "outbox-messages", ["outbox-messages", "webhook-audit"])
+    ];
+
     [Test]
     public void WalletsFinancePages_FinancialWorkflowMutations_DoNotUseDirectRemoteDataContextMutation()
     {
@@ -112,6 +121,53 @@ public sealed class ControlPanelContractTests
             .ToArray();
 
         offenders.Should().BeEmpty("Wallets entity dependency pickers should let admins clear mistaken selections where the workflow continues to own creation/mutation");
+    }
+
+    [Test]
+    public void WalletsMultiGridFinancePages_UseTabsInsteadOfStackedGridSections()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+
+        foreach (var (page, defaultTab, tabs) in MultiGridTabbedFinancePages)
+        {
+            var text = File.ReadAllText(Path.Combine(pagesRoot.FullName, page));
+
+            text.Should().Contain($"<BbTabs DefaultValue=\"{defaultTab}\"",
+                $"{page} should group multiple data-heavy sections in tabs");
+            text.Should().Contain("<BbTabsList>");
+
+            foreach (var tab in tabs)
+            {
+                text.Should().Contain($"<BbTabsTrigger Value=\"{tab}\"");
+                text.Should().Contain($"<BbTabsContent Value=\"{tab}\"");
+
+                var content = Regex.Match(
+                    text,
+                    $@"<BbTabsContent\b(?=[^>]*\bValue=""{Regex.Escape(tab)}"")[\s\S]*?</BbTabsContent>");
+
+                content.Success.Should().BeTrue($"{page} should render tab content for {tab}");
+                Regex.Matches(content.Value, @"<BbDataGrid\b").Count.Should().Be(1,
+                    $"{page} should keep the {tab} grid isolated in its own tab panel");
+            }
+
+            Regex.Matches(text, @"<BbTabsContent\b").Count.Should().Be(tabs.Length,
+                $"{page} should have one tab panel for each data-heavy section");
+            Regex.Matches(text, @"<BbDataGrid\b").Count.Should().Be(tabs.Length,
+                $"{page} should keep each data-heavy grid in its own tab panel");
+
+            var firstTabsIndex = text.IndexOf("<BbTabs", StringComparison.Ordinal);
+            var lastTabsCloseIndex = text.LastIndexOf("</BbTabs>", StringComparison.Ordinal);
+            firstTabsIndex.Should().BeGreaterThanOrEqualTo(0);
+            lastTabsCloseIndex.Should().BeGreaterThan(firstTabsIndex);
+
+            var outsideTabs = string.Concat(
+                text.AsSpan(0, firstTabsIndex).ToString(),
+                text.AsSpan(lastTabsCloseIndex + "</BbTabs>".Length).ToString());
+
+            Regex.Matches(outsideTabs, @"<BbDataGrid\b").Count.Should().Be(0,
+                $"{page} should not stack sibling grids outside the tabbed surface");
+        }
     }
 
     [Test]

@@ -65,86 +65,105 @@
             </BbCard>
         </div>
 
-        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-            <Columns>
-                <BbDataGridPropertyColumn Property="@(x => x.EventType)" Title="Event" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.AggregateType)" Title="Aggregate" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.AggregateId)" Title="Aggregate ID" />
-                <BbDataGridTemplateColumn Title="Status">
-                    <ChildContent Context="item">
-                        <BbBadge Variant="@(item.Status == WalletOutboxStatus.Pending ? BadgeVariant.Outline : BadgeVariant.Default)">@item.Status</BbBadge>
-                    </ChildContent>
-                </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.Attempts)" Title="Attempts" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.NextAttemptAt)" Title="Next Attempt" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.LastError)" Title="Last Error" />
-                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                <BbDataGridTemplateColumn Title="Actions">
-                    <ChildContent Context="item">
-                        @if (item.Status is WalletOutboxStatus.Failed or WalletOutboxStatus.DeadLetter)
-                        {
-                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => RetryOutbox(item))" Disabled="@_acting">
-                                Retry
-                            </BbButton>
-                        }
-                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReplayOutbox(item))" Disabled="@_acting">
-                            Replay
-                        </BbButton>
-                        @if (item.Status is not WalletOutboxStatus.DeadLetter)
-                        {
-                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => DeadLetterOutbox(item))" Disabled="@_acting">
-                                Dead-letter
-                            </BbButton>
-                        }
-                    </ChildContent>
-                </BbDataGridTemplateColumn>
-            </Columns>
-        </BbDataGrid>
+        <BbTabs DefaultValue="outbox-messages">
+            <BbTabsList>
+                <BbTabsTrigger Value="outbox-messages">Outbox Messages (@_items.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="webhook-audit">Webhook Audit (@_webhookEvents.Count)</BbTabsTrigger>
+            </BbTabsList>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Payment Webhook Audit</BbCardTitle>
-                <BbCardDescription>@_webhookEvents.Count provider webhook event(s) loaded</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_webhookEvents" ShowPagination="true" InitialPageSize="20">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.ProviderKey)" Title="Provider" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ExternalEventId)" Title="External Event" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ExternalReference)" Title="Reference" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="Status">
-                            <ChildContent Context="item">
-                                <BbBadge Variant="@GetWebhookStatusVariant(item.ProcessingStatus)">@item.ProcessingStatus</BbBadge>
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Signature">
-                            <ChildContent Context="item">
-                                <BbBadge Variant="@(item.SignatureValid ? BadgeVariant.Default : BadgeVariant.Destructive)">
-                                    @(item.SignatureValid ? "Valid" : "Invalid")
-                                </BbBadge>
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.MappedWorkflowStatus)" Title="Mapped" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="Links">
-                            <ChildContent Context="item">
-                                <div class="space-y-1 text-xs font-mono">
-                                    <div>Dep: @ShortId(item.DepositRequestId)</div>
-                                    <div>Wd: @ShortId(item.WithdrawalRequestId)</div>
-                                    <div>Op: @ShortId(item.OperationId)</div>
-                                </div>
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Error">
-                            <ChildContent Context="item">
-                                @ShortText(item.ProcessingError)
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ProcessedAt)" Title="Processed" Sortable="true" />
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+            <BbTabsContent Value="outbox-messages" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Outbox Messages</BbCardTitle>
+                        <BbCardDescription>@_items.Count integration event(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.EventType)" Title="Event" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AggregateType)" Title="Aggregate" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AggregateId)" Title="Aggregate ID" />
+                                <BbDataGridTemplateColumn Title="Status">
+                                    <ChildContent Context="item">
+                                        <BbBadge Variant="@(item.Status == WalletOutboxStatus.Pending ? BadgeVariant.Outline : BadgeVariant.Default)">@item.Status</BbBadge>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.Attempts)" Title="Attempts" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.NextAttemptAt)" Title="Next Attempt" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LastError)" Title="Last Error" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        @if (item.Status is WalletOutboxStatus.Failed or WalletOutboxStatus.DeadLetter)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => RetryOutbox(item))" Disabled="@_acting">
+                                                Retry
+                                            </BbButton>
+                                        }
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReplayOutbox(item))" Disabled="@_acting">
+                                            Replay
+                                        </BbButton>
+                                        @if (item.Status is not WalletOutboxStatus.DeadLetter)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => DeadLetterOutbox(item))" Disabled="@_acting">
+                                                Dead-letter
+                                            </BbButton>
+                                        }
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            <BbTabsContent Value="webhook-audit" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Payment Webhook Audit</BbCardTitle>
+                        <BbCardDescription>@_webhookEvents.Count provider webhook event(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_webhookEvents" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ProviderKey)" Title="Provider" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ExternalEventId)" Title="External Event" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ExternalReference)" Title="Reference" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Status">
+                                    <ChildContent Context="item">
+                                        <BbBadge Variant="@GetWebhookStatusVariant(item.ProcessingStatus)">@item.ProcessingStatus</BbBadge>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Signature">
+                                    <ChildContent Context="item">
+                                        <BbBadge Variant="@(item.SignatureValid ? BadgeVariant.Default : BadgeVariant.Destructive)">
+                                            @(item.SignatureValid ? "Valid" : "Invalid")
+                                        </BbBadge>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.MappedWorkflowStatus)" Title="Mapped" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Links">
+                                    <ChildContent Context="item">
+                                        <div class="space-y-1 text-xs font-mono">
+                                            <div>Dep: @ShortId(item.DepositRequestId)</div>
+                                            <div>Wd: @ShortId(item.WithdrawalRequestId)</div>
+                                            <div>Op: @ShortId(item.OperationId)</div>
+                                        </div>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Error">
+                                    <ChildContent Context="item">
+                                        @ShortText(item.ProcessingError)
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ProcessedAt)" Title="Processed" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+        </BbTabs>
     }
 </div>
 

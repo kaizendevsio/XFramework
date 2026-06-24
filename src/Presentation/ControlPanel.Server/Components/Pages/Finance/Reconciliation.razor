@@ -71,69 +71,88 @@
             </BbCard>
         </div>
 
-        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-            <Columns>
-                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.TransferableBalance)" Title="Transferable" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.DriftAmount)" Title="Drift" Sortable="true" />
-                <BbDataGridTemplateColumn Title="State">
-                    <ChildContent Context="item">
-                        <BbBadge Variant="@(item.IsReconciled ? BadgeVariant.Default : BadgeVariant.Destructive)">
-                            @(item.IsReconciled ? "Reconciled" : "Drift")
-                        </BbBadge>
-                    </ChildContent>
-                </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.ReconciledAt)" Title="Checked" Sortable="true" />
-                <BbDataGridTemplateColumn Title="Actions">
-                    <ChildContent Context="item">
-                        @if (!item.IsReconciled)
-                        {
-                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => RunWalletReconciliation(item.WalletId))" Disabled="@_acting">
-                                Re-run
-                            </BbButton>
-                        }
-                    </ChildContent>
-                </BbDataGridTemplateColumn>
-            </Columns>
-        </BbDataGrid>
+        <BbTabs DefaultValue="balance-snapshots">
+            <BbTabsList>
+                <BbTabsTrigger Value="balance-snapshots">Balance Snapshots (@_items.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="reconciliation-items">Reconciliation Items (@_reconciliationItems.Count)</BbTabsTrigger>
+            </BbTabsList>
 
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Reconciliation Items</BbCardTitle>
-            </BbCardHeader>
-            <BbCardContent>
-                <BbDataGrid Items="@_reconciliationItems" ShowPagination="true" InitialPageSize="20">
-                    <Columns>
-                        <BbDataGridPropertyColumn Property="@(x => x.CheckType)" Title="Check" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                        <BbDataGridTemplateColumn Title="Status">
-                            <ChildContent Context="item">
-                                <BbBadge Variant="@(item.Status == WalletReconciliationStatus.Drifted ? BadgeVariant.Destructive : BadgeVariant.Default)">
-                                    @item.Status
-                                </BbBadge>
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.ExpectedAmount)" Title="Expected" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ActualAmount)" Title="Actual" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.DriftAmount)" Title="Drift" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
-                        <BbDataGridPropertyColumn Property="@(x => x.RepairSuggestion)" Title="Repair Suggestion" />
-                        <BbDataGridTemplateColumn Title="Actions">
-                            <ChildContent Context="item">
-                                @if (item.Status == WalletReconciliationStatus.Drifted)
-                                {
-                                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => MarkReconciled(item))" Disabled="@_acting">
-                                        Mark Reconciled
-                                    </BbButton>
-                                }
-                            </ChildContent>
-                        </BbDataGridTemplateColumn>
-                    </Columns>
-                </BbDataGrid>
-            </BbCardContent>
-        </BbCard>
+            <BbTabsContent Value="balance-snapshots" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Balance Snapshots</BbCardTitle>
+                        <BbCardDescription>@_items.Count snapshot(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransferableBalance)" Title="Transferable" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DriftAmount)" Title="Drift" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="State">
+                                    <ChildContent Context="item">
+                                        <BbBadge Variant="@(item.IsReconciled ? BadgeVariant.Default : BadgeVariant.Destructive)">
+                                            @(item.IsReconciled ? "Reconciled" : "Drift")
+                                        </BbBadge>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReconciledAt)" Title="Checked" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        @if (!item.IsReconciled)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => RunWalletReconciliation(item.WalletId))" Disabled="@_acting">
+                                                Re-run
+                                            </BbButton>
+                                        }
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            <BbTabsContent Value="reconciliation-items" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Reconciliation Items</BbCardTitle>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_reconciliationItems" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.CheckType)" Title="Check" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
+                                <BbDataGridTemplateColumn Title="Status">
+                                    <ChildContent Context="item">
+                                        <BbBadge Variant="@(item.Status == WalletReconciliationStatus.Drifted ? BadgeVariant.Destructive : BadgeVariant.Default)">
+                                            @item.Status
+                                        </BbBadge>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.ExpectedAmount)" Title="Expected" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ActualAmount)" Title="Actual" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DriftAmount)" Title="Drift" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
+                                <BbDataGridPropertyColumn Property="@(x => x.RepairSuggestion)" Title="Repair Suggestion" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        @if (item.Status == WalletReconciliationStatus.Drifted)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => MarkReconciled(item))" Disabled="@_acting">
+                                                Mark Reconciled
+                                            </BbButton>
+                                        }
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+        </BbTabs>
     }
 </div>
 
