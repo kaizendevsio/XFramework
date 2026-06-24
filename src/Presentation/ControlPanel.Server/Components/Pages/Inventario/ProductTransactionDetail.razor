@@ -170,9 +170,9 @@ else
                 .Where(x => x.TenantId == _transaction.TenantId && x.Id == _transaction.ProductId && !x.IsDeleted)
                 .FirstOrDefaultAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load transaction: {ex.Message}");
+            ToastService.Show("Could not load transaction.");
         }
         finally
         {

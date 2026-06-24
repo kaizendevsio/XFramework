@@ -124,11 +124,11 @@ else
                                 OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="Before" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="Before" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -222,9 +222,9 @@ else
                 .Take(100)
                 .ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load stock balance: {ex.Message}");
+            ToastService.Show("Could not load stock balance.");
         }
         finally
         {

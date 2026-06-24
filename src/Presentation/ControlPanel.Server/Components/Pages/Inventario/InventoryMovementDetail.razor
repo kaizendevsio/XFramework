@@ -231,9 +231,9 @@ else
                     .FirstOrDefaultAsync();
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load movement: {ex.Message}");
+            ToastService.Show("Could not load movement.");
         }
         finally
         {

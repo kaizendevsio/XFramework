@@ -160,19 +160,19 @@ else
                     {
                         <BbDataGrid Items="@_allocations" ShowPagination="true" InitialPageSize="10">
                             <Columns>
-                                <BbDataGridTemplateColumn Title="Lot">
+                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId))">
                                     <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Sortable="true" />
-                                <BbDataGridTemplateColumn Title="Status">
+                                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
                                     <ChildContent Context="item">
                                         <StatusBadge Text="@item.Status.ToString()" Status="@GetAllocationStatusBadge(item.Status)" />
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReleasedAt)" Title="Released" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.FulfilledAt)" Title="Fulfilled" Sortable="true" />
-                                <BbDataGridTemplateColumn Title="Balance">
+                                <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReleasedAt)" Title="Released" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.FulfilledAt)" Title="Fulfilled" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Balance" Filterable="true" FilterBy="@(item => ShortId(item.StockBalanceId))">
                                     <ChildContent Context="item">
                                         <span class="font-mono text-xs">@ShortId(item.StockBalanceId)</span>
                                     </ChildContent>
@@ -308,9 +308,9 @@ else
                     .ToListAsync();
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load reservation: {ex.Message}");
+            ToastService.Show("Could not load reservation.");
         }
         finally
         {
@@ -352,7 +352,7 @@ else
         try
         {
             var result = await action();
-            ToastService.Show(result.IsSuccess ? successMessage : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? successMessage : "Could not update reservation.");
             if (result.IsSuccess)
                 await Reload();
         }

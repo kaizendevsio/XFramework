@@ -3,20 +3,20 @@ using XFramework.Integration.Attributes;
 using XFramework.Inventario.Api.Services;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 
-namespace Inventario.Api.Features.Products.Create;
+namespace Inventario.Api.Features.Products.Update;
 
-public static class CreateProductEndpoint
+public static class UpdateProductWrapperEndpoint
 {
     [BoltHandler]
-    [MapPost("/api/products", Tags = ["Products"],
-        Summary = "Create a new product",
-        Description = "Creates a new product in the inventory system")]
+    [MapPut("/api/products", Tags = ["Products"],
+        Summary = "Update an existing product",
+        Description = "Updates catalog fields for a product and invalidates the cache")]
     public static async Task<Result<ProductResponse>> Handle(
-        CreateProductRequest request,
+        UpdateProductRequest request,
         ProductService productService,
         CancellationToken ct)
     {
-        var result = await productService.CreateAsync(request, ct);
+        var result = await productService.UpdateAsync(request.ProductId, request, ct);
 
         if (!result.IsSuccess)
             return Result<ProductResponse>.Failure(result.Message!, result.StatusCode);

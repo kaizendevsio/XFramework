@@ -124,10 +124,10 @@ else
                                 OnRowClick="@((InventoryLocation item) => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LocationType)" Title="Type" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Pickable">
+                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LocationType)" Title="Type" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Pickable" Filterable="true" FilterBy="@(item => item.IsPickable ? "Pickable" : "Storage")">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsPickable ? "Pickable" : "Storage")" Status="@(item.IsPickable ? "active" : "inactive")" />
                                 </ChildContent>
@@ -147,15 +147,15 @@ else
                                 OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Location">
+                            <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
                                 <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -171,13 +171,13 @@ else
                                 OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -284,9 +284,9 @@ else
                 _productNames = products.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]);
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load warehouse: {ex.Message}");
+            ToastService.Show("Could not load warehouse.");
         }
         finally
         {
