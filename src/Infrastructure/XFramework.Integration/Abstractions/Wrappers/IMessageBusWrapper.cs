@@ -20,6 +20,8 @@ public interface IMessageBusWrapper : IXFrameworkService
         where TRequest : class, IHasRequestServer;
     public Task PublishAsync<TModel>(string eventName, string topic, TModel? data)
         where TModel : class, IHasRequestServer;
+    public Task PublishAsync<TModel>(string eventName, string topic, TModel? data, bool durable)
+        where TModel : class;
     public Task PublishAsync(string eventName, string topic);
     public Task Subscribe<TResponse>(BoltSubscriptionRequest<TResponse> request)
         where TResponse : class;

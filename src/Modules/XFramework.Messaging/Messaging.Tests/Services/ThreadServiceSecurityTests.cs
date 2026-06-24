@@ -1,3 +1,4 @@
+using System.Text.Json;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts;
 using Messaging.Api.Services;
@@ -145,6 +146,133 @@ public sealed class ThreadServiceSecurityTests
         Assert.That(dataContext.Set<MessageOutboxEvent>().Single().EventType, Is.EqualTo(MessageRealtimeEvents.ThreadMemberAdded));
     }
 
+    [Test]
+    public async Task CreateDirectThreadAsync_ExistingPair_ReturnsExistingThreadWithoutDuplicate()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var otherCredentialId = Guid.NewGuid();
+
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(Guid.NewGuid(), threadId, callerCredentialId, tenantId),
+            Member(Guid.NewGuid(), threadId, otherCredentialId, tenantId),
+            Credential(callerCredentialId, tenantId),
+            Credential(otherCredentialId, tenantId));
+
+        var service = CreateService(dataContext);
+        var result = await service.CreateDirectThreadAsync(new CreateDirectThreadRequest
+        {
+            OtherCredentialId = otherCredentialId,
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.ThreadId, Is.EqualTo(threadId));
+        Assert.That(dataContext.Set<MessageThread>().Count, Is.EqualTo(1));
+        Assert.That(dataContext.Set<MessageOutboxEvent>(), Is.Empty);
+    }
+
+    [Test]
+    public async Task GetUnreadCountsAsync_CountsOnlyUnreadMessagesFromOtherMembers()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var otherCredentialId = Guid.NewGuid();
+        var callerMemberId = Guid.NewGuid();
+        var otherMemberId = Guid.NewGuid();
+        var readMessageId = Guid.NewGuid();
+        var unreadMessageId = Guid.NewGuid();
+
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(callerMemberId, threadId, callerCredentialId, tenantId),
+            Member(otherMemberId, threadId, otherCredentialId, tenantId),
+            Message(readMessageId, threadId, otherMemberId, tenantId, "read"),
+            Message(unreadMessageId, threadId, otherMemberId, tenantId, "unread"),
+            Message(Guid.NewGuid(), threadId, callerMemberId, tenantId, "own"),
+            Delivery(Guid.NewGuid(), callerMemberId, readMessageId, tenantId, MessageDeliveryTypes.Read));
+
+        var service = CreateService(dataContext);
+        var result = await service.GetUnreadCountsAsync(new GetUnreadCountsRequest
+        {
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.TotalUnreadCount, Is.EqualTo(1));
+        Assert.That(result.Data.Threads.Single().UnreadCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task CreateThreadMessageAsync_BlockedDirectThread_ReturnsForbidden()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var otherCredentialId = Guid.NewGuid();
+
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(Guid.NewGuid(), threadId, callerCredentialId, tenantId),
+            Member(Guid.NewGuid(), threadId, otherCredentialId, tenantId),
+            Block(Guid.NewGuid(), callerCredentialId, otherCredentialId, tenantId));
+
+        var service = CreateService(dataContext);
+        var result = await service.CreateThreadMessageAsync(new CreateThreadMessageRequest
+        {
+            ThreadId = threadId,
+            Text = "blocked",
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(403));
+        Assert.That(dataContext.Set<Message>(), Is.Empty);
+        Assert.That(dataContext.Set<MessageOutboxEvent>(), Is.Empty);
+    }
+
+    [Test]
+    public async Task CreateThreadMessageAsync_WithReplyAndMentions_PersistsMetadata()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var mentionedCredentialId = Guid.NewGuid();
+        var callerMemberId = Guid.NewGuid();
+        var mentionedMemberId = Guid.NewGuid();
+        var parentMessageId = Guid.NewGuid();
+
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(callerMemberId, threadId, callerCredentialId, tenantId),
+            Member(mentionedMemberId, threadId, mentionedCredentialId, tenantId),
+            Message(parentMessageId, threadId, mentionedMemberId, tenantId, "parent"));
+
+        var service = CreateService(dataContext);
+        var result = await service.CreateThreadMessageAsync(new CreateThreadMessageRequest
+        {
+            ThreadId = threadId,
+            Text = "reply",
+            ParentMessageId = parentMessageId,
+            MentionedCredentialIds = [mentionedCredentialId],
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        var createdMessage = dataContext.Set<Message>().Single(message => message.Id == result.Data!.MessageId);
+        Assert.That(createdMessage.ParentMessageId, Is.EqualTo(parentMessageId));
+
+        var mentions = JsonSerializer.Deserialize<List<Guid>>(createdMessage.MentionedCredentialIdsJson);
+        Assert.That(mentions, Is.EquivalentTo(new[] { mentionedCredentialId }));
+    }
+
     private static ThreadService CreateService(InMemoryDataContext dataContext) =>
         new(
             dataContext,
@@ -194,6 +322,43 @@ public sealed class ThreadServiceSecurityTests
         Emoji = string.Empty,
         Description = string.Empty,
         Status = 1,
+        Role = MessageThreadMemberRoles.Member,
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
+    };
+
+    private static Message Message(Guid id, Guid threadId, Guid memberId, Guid tenantId, string text) => new()
+    {
+        Id = id,
+        TenantId = tenantId,
+        MessageThreadId = threadId,
+        MessageThreadMemberId = memberId,
+        Text = text,
+        MentionedCredentialIdsJson = "[]",
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
+    };
+
+    private static MessageDelivery Delivery(Guid id, Guid memberId, Guid messageId, Guid tenantId, Guid typeId) => new()
+    {
+        Id = id,
+        TenantId = tenantId,
+        MessageThreadMemberId = memberId,
+        MessageId = messageId,
+        TypeId = typeId,
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
+    };
+
+    private static MessageBlock Block(Guid id, Guid blockerCredentialId, Guid blockedCredentialId, Guid tenantId) => new()
+    {
+        Id = id,
+        TenantId = tenantId,
+        BlockerCredentialId = blockerCredentialId,
+        BlockedCredentialId = blockedCredentialId,
         IsEnabled = true,
         CreatedAt = DateTime.UtcNow,
         ConcurrencyStamp = Guid.NewGuid()

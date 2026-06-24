@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts;
 
 namespace Messaging.Domain.Shared.Configurations;
@@ -19,6 +20,9 @@ public class MessageThreadMemberConfiguration : IEntityTypeConfiguration<Message
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.Description).HasColumnType("character varying");
         entity.Property(e => e.Emoji).HasColumnType("character varying");
+        entity.Property(e => e.Role)
+            .HasColumnType("character varying")
+            .HasDefaultValue(MessageThreadMemberRoles.Member);
 
         entity.Property(e => e.IsEnabled)
             .IsRequired()
@@ -33,7 +37,7 @@ public class MessageThreadMemberConfiguration : IEntityTypeConfiguration<Message
         entity.HasIndex(e => new { e.CredentialId, e.MessageThreadId })
             .HasDatabaseName("IX_MessageThreadMember_Credential_Thread");
 
-        entity.HasOne(d => d.Group).WithMany()
+        entity.HasOne(d => d.Group).WithMany(p => p.MessageThreadMembers)
             .HasForeignKey(d => d.GroupId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("messagethreadmember_messagethreadmembergroup_id_fk");
@@ -43,7 +47,7 @@ public class MessageThreadMemberConfiguration : IEntityTypeConfiguration<Message
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("messagethreadmember_identitycredential_id_fk");
 
-        entity.HasOne(d => d.MessageThread).WithMany()
+        entity.HasOne(d => d.MessageThread).WithMany(p => p.MessageThreadMembers)
             .HasForeignKey(d => d.MessageThreadId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("messagethreadmember_messagethread_id_fk");

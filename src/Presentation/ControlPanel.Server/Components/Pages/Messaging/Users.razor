@@ -1,0 +1,249 @@
+@page "/messaging/users"
+@implements IDisposable
+
+<PageTitle>Messaging Users - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (_guard is { IsEnabled: false })
+{
+    <div class="space-y-4">
+        <BbAlert Variant="@(_guard.HasSelectedTenant ? AlertVariant.Warning : AlertVariant.Info)">
+            <BbAlertTitle>@_guard.Title</BbAlertTitle>
+            <BbAlertDescription>@_guard.Description</BbAlertDescription>
+        </BbAlert>
+        @if (_guard.TenantId is Guid tenantId)
+        {
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/identity/tenants/{tenantId}/modules"))">
+                <LucideIcon Name="blocks" class="mr-2 h-4 w-4" />
+                Tenant Modules
+            </BbButton>
+        }
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <BbTypographyH3>Messaging Users</BbTypographyH3>
+                    <BbTypographyMuted>User-centered chat diagnostics for @(_guard?.TenantName ?? "selected tenant")</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            @if (_error is not null)
+            {
+                <BbAlert Variant="AlertVariant.Danger">
+                    <BbAlertTitle>Messaging User Query Error</BbAlertTitle>
+                    <BbAlertDescription>@_error</BbAlertDescription>
+                </BbAlert>
+            }
+
+            <div class="xf-summary-grid xf-summary-grid-4">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Messaging Users</BbCardTitle>
+                        <BbCardDescription>Credentials with thread membership</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_messagingUserCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Online</BbCardTitle>
+                        <BbCardDescription>Loaded credentials online now</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_onlineCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Muted</BbCardTitle>
+                        <BbCardDescription>Users with muted memberships</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_mutedUserCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Blocked</BbCardTitle>
+                        <BbCardDescription>Users with block relationships</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_blockedUserCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>User Directory</BbCardTitle>
+                    <BbCardDescription>@_messagingUserCount credential row(s) available. Open a row to review that user's threads and messages.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_messagingUserCount == 0)
+                    {
+                        <BbAlert Variant="AlertVariant.Info">No Messaging users were found for this tenant.</BbAlert>
+                    }
+                    else
+                    {
+                        <BbDataGrid @key="_gridKey"
+                                    TData="MessagingUserAdminRow"
+                                    ItemsProvider="@LoadUsers"
+                                    ShowPagination="true"
+                                    InitialPageSize="20"
+                                    OnRowClick="@((MessagingUserAdminRow row) => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))"
+                                    Class="cursor-pointer">
+                            <Columns>
+                                <BbDataGridTemplateColumn Title="User" Sortable="true" Filterable="true" FilterBy="@(row => row.DisplayName)">
+                                    <ChildContent Context="row">
+                                        <div>
+                                            <div class="font-medium">@row.DisplayName</div>
+                                            <div class="text-xs text-muted-foreground">@row.UserName</div>
+                                        </div>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Presence" Sortable="true" Filterable="true" FilterBy="@(row => row.PresenceText)">
+                                    <ChildContent Context="row">
+                                        <div>
+                                            <StatusBadge Text="@row.PresenceText" Status="@(row.IsOnline ? "online" : "inactive")" />
+                                            <div class="text-xs text-muted-foreground">@row.LastSeenText</div>
+                                        </div>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(row => row.ThreadCount)" Title="Threads" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(row => row.MessageCount)" Title="Messages" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(row => row.MutedThreadCount)" Title="Muted" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(row => row.ArchivedThreadCount)" Title="Archived" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(row => row.PendingInviteCount)" Title="Invites" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(row => row.BlockRelationshipCount)" Title="Blocks" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Role Mix" Sortable="true" Filterable="true" FilterBy="@(row => row.RoleSummary)">
+                                    <ChildContent Context="row">@row.RoleSummary</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Identity" Sortable="true" Filterable="true" FilterBy="@(row => row.IdentityLabel)">
+                                    <ChildContent Context="row">
+                                        @if (row.IdentityInfoId is Guid identityInfoId)
+                                        {
+                                            <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/identity/users/{identityInfoId}"))">
+                                                @row.IdentityLabel
+                                            </BbButton>
+                                        }
+                                        else
+                                        {
+                                            @row.IdentityLabel
+                                        }
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="row">
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View Messaging user"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))">
+                                            <LucideIcon Name="eye" class="h-4 w-4" />
+                                        </BbButton>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
+    [Inject] private MessagingControlPanelReadService ReadService { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private MessagingControlPanelGuardResult? _guard;
+    private bool _loading = true;
+    private string? _error;
+    private int _gridKey;
+    private int _messagingUserCount;
+    private int _onlineCount;
+    private int _mutedUserCount;
+    private int _blockedUserCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _guard = await Guard.GetCurrentTenantStateAsync();
+            if (!_guard.IsEnabled || _guard.TenantId is not Guid tenantId)
+            {
+                ResetCounts();
+                return;
+            }
+
+            var summary = await ReadService.GetUsersSummaryAsync(tenantId);
+            _messagingUserCount = summary.MessagingUserCount;
+            _onlineCount = summary.OnlineCount;
+            _mutedUserCount = summary.MutedUserCount;
+            _blockedUserCount = summary.BlockedUserCount;
+            _gridKey++;
+        }
+        catch
+        {
+            _error = "Messaging users could not be loaded. Check service health and tenant access.";
+            ToastService.Error("Messaging users could not be loaded.", "Users Unavailable");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingUserAdminRow>> LoadUsers(
+        BlazorBlueprint.Primitives.DataGrid.DataGridRequest request)
+    {
+        return _guard?.TenantId is Guid tenantId
+            ? ReadService.GetUsersAsync(tenantId, request)
+            : ValueTask.FromResult(new BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingUserAdminRow>
+            {
+                Items = [],
+                TotalItemCount = 0
+            });
+    }
+
+    private void ResetCounts(bool keepMessagingUsers = false)
+    {
+        if (!keepMessagingUsers)
+        {
+            _messagingUserCount = 0;
+        }
+
+        _onlineCount = 0;
+        _mutedUserCount = 0;
+        _blockedUserCount = 0;
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+}

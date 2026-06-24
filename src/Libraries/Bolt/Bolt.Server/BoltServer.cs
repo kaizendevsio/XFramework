@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net;
+using System.Security.Claims;
 using System.Threading.Channels;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
@@ -53,19 +54,25 @@ public sealed class BoltServer : IDisposable
 
     // Pub/sub state — durable (persistent identity)
     private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), BoltHubConnection> _liveDurableConnections = new();
+    private readonly ConcurrentDictionary<int, string> _topicNamesByHash = new();
 
     // Durable queue backend (injected)
     private readonly Bolt.Server.Durable.IDurableQueueStore? _durableStore;
     private readonly Bolt.Server.Durable.DurableQueueOptions? _durableOptions;
+    private readonly IReadOnlyList<IBoltTopicAuthorizer> _topicAuthorizers;
 
     public BoltServer(ILogger<BoltServer> logger)
         : this(logger, new BoltServerOptions())
     {
     }
 
-    public BoltServer(ILogger<BoltServer> logger, BoltServerOptions options)
+    public BoltServer(
+        ILogger<BoltServer> logger,
+        BoltServerOptions options,
+        IEnumerable<IBoltTopicAuthorizer>? topicAuthorizers = null)
     {
         _logger = logger;
+        _topicAuthorizers = topicAuthorizers?.ToList() ?? [];
         _invocationTimeoutMs = Math.Max(1, options.InvocationTimeoutMs);
         var cleanupInterval = TimeSpan.FromSeconds(Math.Max(1, options.CleanupIntervalSeconds));
         _cleanupTimer = new Timer(CleanupStaleInvocations, null, cleanupInterval, cleanupInterval);
@@ -90,8 +97,9 @@ public sealed class BoltServer : IDisposable
         ILogger<BoltServer> logger,
         BoltServerOptions options,
         Bolt.Server.Durable.IDurableQueueStore durableStore,
-        Microsoft.Extensions.Options.IOptions<Bolt.Server.Durable.DurableQueueOptions> durableOptions)
-        : this(logger, options)
+        Microsoft.Extensions.Options.IOptions<Bolt.Server.Durable.DurableQueueOptions> durableOptions,
+        IEnumerable<IBoltTopicAuthorizer>? topicAuthorizers = null)
+        : this(logger, options, topicAuthorizers)
     {
         _durableStore = durableStore;
         _durableOptions = durableOptions.Value;
@@ -130,9 +138,15 @@ public sealed class BoltServer : IDisposable
 
     public event Func<BoltClientConnectionEvent, CancellationToken, Task>? ClientDisconnected;
 
-    public async Task HandleConnectionAsync(IBoltConnection transport, CancellationToken ct)
+    public Task HandleConnectionAsync(IBoltConnection transport, CancellationToken ct) =>
+        HandleConnectionAsync(transport, user: null, ct);
+
+    public async Task HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal? user, CancellationToken ct)
     {
-        var connection = new BoltHubConnection(transport);
+        var connection = new BoltHubConnection(transport)
+        {
+            User = user
+        };
         connection.StartSendLoop(ct);
         var receiveBuffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
         byte[]? largeBuffer = null;
@@ -1058,6 +1072,24 @@ public sealed class BoltServer : IDisposable
         if (!BoltCodec.TryReadSubscribe(buffer.AsSpan(0, length), out var topicHash, out var durable, out var subscriberId, out var topic, out _))
             return;
 
+        _topicNamesByHash[topicHash] = topic;
+        if (!await AuthorizeTopicAsync(
+                conn,
+                BoltTopicOperation.Subscribe,
+                topic,
+                topicHash,
+                durable,
+                subscriberId,
+                ct))
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized Bolt subscription. client={ClientId} topic={Topic} durable={Durable}",
+                conn.ClientId,
+                topic,
+                durable);
+            return;
+        }
+
         // Add to live subscribers
         var topicSet = _liveSubscribersByTopic.GetOrAdd(topicHash, _ => new ConcurrentDictionary<BoltHubConnection, byte>());
         topicSet.TryAdd(conn, 0);
@@ -1116,6 +1148,23 @@ public sealed class BoltServer : IDisposable
     {
         if (!BoltCodec.TryReadPublish(buffer.AsSpan(0, length), out var topicHash, out var durableEligible, out var payloadOffset, out var payloadLength, out _))
             return;
+
+        _topicNamesByHash.TryGetValue(topicHash, out var topic);
+        if (!await AuthorizeTopicAsync(
+                publisher,
+                BoltTopicOperation.Publish,
+                topic,
+                topicHash,
+                durableEligible,
+                subscriberId: null,
+                ct))
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized Bolt publish. client={ClientId} topicHash={TopicHash}",
+                publisher.ClientId,
+                topicHash);
+            return;
+        }
 
         var payload = new byte[payloadLength];
         buffer.AsSpan(payloadOffset, payloadLength).CopyTo(payload);
@@ -1183,6 +1232,38 @@ public sealed class BoltServer : IDisposable
         {
             _logger.LogError(ex, "Durable ack failed for topic={TopicHash} subscriber={Subscriber}", topicHash, subscriberId);
         }
+    }
+
+    private async ValueTask<bool> AuthorizeTopicAsync(
+        BoltHubConnection connection,
+        BoltTopicOperation operation,
+        string? topic,
+        int topicHash,
+        bool durable,
+        string? subscriberId,
+        CancellationToken ct)
+    {
+        if (_topicAuthorizers.Count == 0)
+            return true;
+
+        var context = new BoltTopicAuthorizationContext(
+            operation,
+            topic,
+            topicHash,
+            durable,
+            subscriberId,
+            connection.StreamId,
+            connection.ClientId,
+            connection.ClientName,
+            connection.User);
+
+        foreach (var authorizer in _topicAuthorizers)
+        {
+            if (!await authorizer.AuthorizeAsync(context, ct))
+                return false;
+        }
+
+        return true;
     }
 
     private BoltHubConnection? GetRecipient(int serviceHash)
@@ -1466,6 +1547,7 @@ public sealed class BoltHubConnection
     public string StreamId { get; } = Guid.NewGuid().ToString("N");
     public string? ClientId { get; set; }
     public string? ClientName { get; set; }
+    public ClaimsPrincipal? User { get; set; }
     public int ServiceHash { get; set; }
     public bool IsAlive => _transport.IsConnected;
     public BoltTransport TransportType => _transport.TransportType;

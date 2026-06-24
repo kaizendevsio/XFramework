@@ -8,4 +8,8 @@ public partial record ThreadMessageItemResponse
     public Guid SenderCredentialId { get; set; }
     public string SenderAlias { get; set; } = null!;
     public DateTime CreatedAt { get; set; }
+    public Guid? ParentMessageId { get; set; }
+    public List<Guid> MentionedCredentialIds { get; set; } = [];
+    public bool IsPinned { get; set; }
+    public bool IsSaved { get; set; }
 }

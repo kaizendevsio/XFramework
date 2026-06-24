@@ -89,6 +89,12 @@ public sealed class BoltDriver : IMessageBusWrapper
         await _client.PublishAsync(topic, data, durable: false);
     }
 
+    public async Task PublishAsync<TModel>(string eventName, string topic, TModel? data, bool durable)
+        where TModel : class
+    {
+        await _client.PublishAsync(topic, data, durable);
+    }
+
     public Task PublishAsync(string eventName, string topic)
         => _client.PublishAsync<object?>(topic, null, durable: false).AsTask();
 

@@ -30,7 +30,7 @@ else if (_thread is null)
         </BbButton>
         <BbAlert Variant="AlertVariant.Danger">
             <BbAlertTitle>Thread Not Found</BbAlertTitle>
-            <BbAlertDescription>No messaging thread was found with the specified ID.</BbAlertDescription>
+            <BbAlertDescription>No messaging thread was found with the specified ID for the selected tenant.</BbAlertDescription>
         </BbAlert>
     </div>
 }
@@ -50,304 +50,208 @@ else if (_outsideTenantContext)
 else
 {
     <FadeInContent>
-    <div class="space-y-6">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div class="flex items-start gap-3">
-                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="@GoBack">
-                    <LucideIcon Name="arrow-left" class="h-4 w-4" />
-                </BbButton>
-                <div>
-                    <BbTypographyH3>@DisplayThreadName(_thread)</BbTypographyH3>
-                    <BbTypographyMuted>ID: @_thread.Id - Type: @(_thread.Type?.Name ?? "N/A")</BbTypographyMuted>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div class="flex items-start gap-3">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to threads" OnClick="@GoBack">
+                        <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                    </BbButton>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <BbTypographyH3>@DisplayThreadName(_thread)</BbTypographyH3>
+                            <StatusBadge Text="@(_thread.IsEnabled ? "Enabled" : "Disabled")"
+                                         Status="@(_thread.IsEnabled ? "active" : "inactive")" />
+                        </div>
+                        <BbTypographyMuted>ID: @ShortId(_thread.Id) - Type: @(_thread.Type?.Name ?? "N/A")</BbTypographyMuted>
+                    </div>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo("/messaging/operations"))">
+                        <LucideIcon Name="radio-tower" class="mr-2 h-4 w-4" />
+                        Operations
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo("/messaging/moderation"))">
+                        <LucideIcon Name="shield-alert" class="mr-2 h-4 w-4" />
+                        Moderation
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <StatusBadge Text="@(_thread.IsEnabled ? "Enabled" : "Disabled")"
-                             Status="@(_thread.IsEnabled ? "active" : "inactive")" />
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
-                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                    Refresh
-                </BbButton>
+
+            @if (_error is not null)
+            {
+                <BbAlert Variant="AlertVariant.Danger">
+                    <BbAlertTitle>Messaging Query Error</BbAlertTitle>
+                    <BbAlertDescription>@_error</BbAlertDescription>
+                </BbAlert>
+            }
+
+            <div class="xf-summary-grid xf-summary-grid-4">
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Members</BbCardTitle><BbCardDescription>Active memberships</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_members.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Messages</BbCardTitle><BbCardDescription>Loaded recent messages</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_messages.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Muted</BbCardTitle><BbCardDescription>Muted memberships</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_members.Count(x => x.IsMuted)</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Archived</BbCardTitle><BbCardDescription>Archived memberships</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_members.Count(x => x.IsArchived)</BbTypographyH2></BbCardContent>
+                </BbCard>
             </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Thread Context</BbCardTitle>
+                    <BbCardDescription>@(string.IsNullOrWhiteSpace(_thread.Description) ? "No description" : _thread.Description)</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="xf-detail-field-grid-wide">
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Name</BbTypographyMuted>
+                            <BbTypographyLarge>@DisplayThreadName(_thread)</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Type</BbTypographyMuted>
+                            <BbTypographyLarge>@(_thread.Type?.Name ?? _thread.TypeId.ToString()[..8])</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Created</BbTypographyMuted>
+                            <BbTypographyLarge>@_thread.CreatedAt.ToString("g")</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Modified</BbTypographyMuted>
+                            <BbTypographyLarge>@(_thread.ModifiedAt?.ToString("g") ?? "N/A")</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Last Message</BbTypographyMuted>
+                            <BbTypographyLarge>@(_messages.FirstOrDefault()?.CreatedAt.ToString("g") ?? "No loaded messages")</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Tenant</BbTypographyMuted>
+                            <BbTypographyLarge>@(_guard?.TenantName ?? _thread.TenantId.ToString()[..8])</BbTypographyLarge>
+                        </div>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <BbTabs DefaultValue="members">
+                <BbTabsList>
+                    <BbTabsTrigger Value="members">Members (@_memberRows.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="messages">Messages (@_messageRows.Count)</BbTabsTrigger>
+                </BbTabsList>
+
+                <BbTabsContent Value="members" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <BbCardTitle>Thread Members</BbCardTitle>
+                            <BbCardDescription>Review users linked to this thread.</BbCardDescription>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            @if (_memberRows.Count == 0)
+                            {
+                                <BbAlert Variant="AlertVariant.Info">No members found for this thread.</BbAlert>
+                            }
+                            else
+                            {
+                                <BbDataGrid Items="@_memberRows" ShowPagination="true" InitialPageSize="20"
+                                            OnRowClick="@((ThreadMemberRow row) => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))"
+                                            Class="cursor-pointer">
+                                    <Columns>
+                                        <BbDataGridTemplateColumn Title="User" Sortable="true" Filterable="true" FilterBy="@(row => row.DisplayName)">
+                                            <ChildContent Context="row">
+                                                <div>
+                                                    <div class="font-medium">@row.DisplayName</div>
+                                                    <div class="text-xs text-muted-foreground">@ShortId(row.CredentialId)</div>
+                                                </div>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.Alias)" Title="Alias" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.Group)" Title="Group" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.Role)" Title="Role" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Muted" Sortable="true" Filterable="true" FilterBy="@(row => row.IsMuted)">
+                                            <ChildContent Context="row">
+                                                <StatusBadge Text="@(row.IsMuted ? "Muted" : "Audible")"
+                                                             Status="@(row.IsMuted ? "pending" : "active")" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Archived" Sortable="true" Filterable="true" FilterBy="@(row => row.IsArchived)">
+                                            <ChildContent Context="row">
+                                                <StatusBadge Text="@(row.IsArchived ? "Archived" : "Active")"
+                                                             Status="@(row.IsArchived ? "inactive" : "active")" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.LastSeenAt)" Title="Last Seen" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Joined" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Actions">
+                                            <ChildContent Context="row">
+                                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View Messaging user"
+                                                          OnClick="@(() => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))">
+                                                    <LucideIcon Name="user" class="h-4 w-4" />
+                                                </BbButton>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                    </Columns>
+                                </BbDataGrid>
+                            }
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="messages" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <BbCardTitle>Recent Messages</BbCardTitle>
+                            <BbCardDescription>Latest loaded messages for this thread, scoped to this tenant.</BbCardDescription>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            @if (_messageRows.Count == 0)
+                            {
+                                <BbAlert Variant="AlertVariant.Info">No messages found for this thread.</BbAlert>
+                            }
+                            else
+                            {
+                                <BbDataGrid Items="@_messageRows" ShowPagination="true" InitialPageSize="20">
+                                    <Columns>
+                                        <BbDataGridTemplateColumn Title="Message" Sortable="true" Filterable="true" FilterBy="@(row => row.Preview)">
+                                            <ChildContent Context="row">
+                                                <div>
+                                                    <div>@row.Preview</div>
+                                                    <div class="mt-1 font-mono text-xs text-muted-foreground">@ShortId(row.MessageId)</div>
+                                                </div>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Author" Sortable="true" Filterable="true" FilterBy="@(row => row.Author)">
+                                            <ChildContent Context="row">
+                                                <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))">
+                                                    @row.Author
+                                                </BbButton>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Reply" Sortable="true" Filterable="true" FilterBy="@(row => row.IsReply)">
+                                            <ChildContent Context="row">
+                                                <StatusBadge Text="@(row.IsReply ? "Reply" : "Root")"
+                                                             Status="@(row.IsReply ? "pending" : "active")" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.MentionCount)" Title="Mentions" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                    </Columns>
+                                </BbDataGrid>
+                            }
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+            </BbTabs>
         </div>
-
-        @if (_error is not null)
-        {
-            <BbAlert Variant="AlertVariant.Danger">
-                <BbAlertTitle>Messaging Query Error</BbAlertTitle>
-                <BbAlertDescription>@_error</BbAlertDescription>
-            </BbAlert>
-        }
-
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Thread Summary</BbCardTitle>
-                <BbCardDescription>@(string.IsNullOrWhiteSpace(_thread.Description) ? "No description" : _thread.Description)</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Members</BbTypographyMuted>
-                        <BbTypographyH3>@_members.Count</BbTypographyH3>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Messages</BbTypographyMuted>
-                        <BbTypographyH3>@_messages.Count</BbTypographyH3>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Deliveries</BbTypographyMuted>
-                        <BbTypographyH3>@_deliveries.Count</BbTypographyH3>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Reactions</BbTypographyMuted>
-                        <BbTypographyH3>@_reactions.Count</BbTypographyH3>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Files</BbTypographyMuted>
-                        <BbTypographyH3>@_files.Count</BbTypographyH3>
-                    </div>
-                </div>
-                <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Created</BbTypographyMuted>
-                        <BbTypographyP>@_thread.CreatedAt.ToString("g")</BbTypographyP>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Modified</BbTypographyMuted>
-                        <BbTypographyP>@(_thread.ModifiedAt?.ToString("g") ?? "N/A")</BbTypographyP>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Last Message</BbTypographyMuted>
-                        <BbTypographyP>@(_messages.FirstOrDefault()?.CreatedAt.ToString("g") ?? "No sampled messages")</BbTypographyP>
-                    </div>
-                </div>
-            </BbCardContent>
-        </BbCard>
-
-        <BbTabs DefaultValue="messages">
-            <BbTabsList>
-                <BbTabsTrigger Value="messages">Messages (@_messages.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="members">Members (@_members.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="deliveries">Deliveries (@_deliveries.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="reactions">Reactions (@_reactions.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="files">Files (@_files.Count)</BbTabsTrigger>
-            </BbTabsList>
-
-            <BbTabsContent Value="messages" Class="xf-fade-in">
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Recent Messages</BbCardTitle>
-                        <BbCardDescription>Latest @_messages.Count messages for this thread.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        @if (_messages.Count == 0)
-                        {
-                            <BbAlert Variant="AlertVariant.Info">No messages found for this thread.</BbAlert>
-                        }
-                        else
-                        {
-                            <BbDataGrid Items="@_messages" ShowPagination="true" InitialPageSize="20">
-                                <Columns>
-                                    <BbDataGridTemplateColumn Title="Message">
-                                        <ChildContent Context="message">
-                                            <div>
-                                                <div>@Truncate(message.Text, 140)</div>
-                                                <div class="mt-1 font-mono text-xs text-muted-foreground">@message.Id</div>
-                                            </div>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Member">
-                                        <ChildContent Context="message">
-                                            @GetMemberLabel(message.MessageThreadMemberId)
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Deliveries">
-                                        <ChildContent Context="message">
-                                            @_deliveries.Count(delivery => delivery.MessageId == message.Id)
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Reactions">
-                                        <ChildContent Context="message">
-                                            @_reactions.Count(reaction => reaction.MessageId == message.Id)
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Files">
-                                        <ChildContent Context="message">
-                                            @_files.Count(file => file.MessageId == message.Id)
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(message => message.CreatedAt)" Title="Created" Sortable="true" />
-                                </Columns>
-                            </BbDataGrid>
-                        }
-                    </BbCardContent>
-                </BbCard>
-            </BbTabsContent>
-
-            <BbTabsContent Value="members" Class="xf-fade-in">
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Thread Members</BbCardTitle>
-                        <BbCardDescription>@_members.Count member(s) loaded for this thread.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        @if (_members.Count == 0)
-                        {
-                            <BbAlert Variant="AlertVariant.Info">No members found for this thread.</BbAlert>
-                        }
-                        else
-                        {
-                            <BbDataGrid Items="@_members" ShowPagination="true" InitialPageSize="20">
-                                <Columns>
-                                    <BbDataGridTemplateColumn Title="Member">
-                                        <ChildContent Context="member">
-                                            <div>
-                                                <div class="font-medium">@GetCredentialLabel(member.Credential)</div>
-                                                <div class="text-xs text-muted-foreground">@member.CredentialId</div>
-                                            </div>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Alias">
-                                        <ChildContent Context="member">
-                                            @(string.IsNullOrWhiteSpace(member.Alias) ? "N/A" : member.Alias)
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Group">
-                                        <ChildContent Context="member">
-                                            @(member.Group?.Alias ?? member.GroupId.ToString()[..8])
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(member => member.Status)" Title="Status" Sortable="true" />
-                                    <BbDataGridTemplateColumn Title="Enabled">
-                                        <ChildContent Context="member">
-                                            <StatusBadge Text="@(member.IsEnabled ? "Enabled" : "Disabled")"
-                                                         Status="@(member.IsEnabled ? "active" : "inactive")" />
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(member => member.CreatedAt)" Title="Created" Sortable="true" />
-                                </Columns>
-                            </BbDataGrid>
-                        }
-                    </BbCardContent>
-                </BbCard>
-            </BbTabsContent>
-
-            <BbTabsContent Value="deliveries" Class="xf-fade-in">
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Deliveries</BbCardTitle>
-                        <BbCardDescription>@_deliveries.Count delivery state records loaded.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        @if (_deliveries.Count == 0)
-                        {
-                            <BbAlert Variant="AlertVariant.Info">No deliveries found for sampled messages.</BbAlert>
-                        }
-                        else
-                        {
-                            <BbDataGrid Items="@_deliveries" ShowPagination="true" InitialPageSize="20">
-                                <Columns>
-                                    <BbDataGridTemplateColumn Title="Type">
-                                        <ChildContent Context="delivery">
-                                            @(delivery.Type?.Name ?? delivery.TypeId.ToString()[..8])
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Member">
-                                        <ChildContent Context="delivery">
-                                            @GetMemberLabel(delivery.MessageThreadMemberId)
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Message">
-                                        <ChildContent Context="delivery">
-                                            <span class="font-mono text-xs">@delivery.MessageId</span>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(delivery => delivery.CreatedAt)" Title="Created" Sortable="true" />
-                                </Columns>
-                            </BbDataGrid>
-                        }
-                    </BbCardContent>
-                </BbCard>
-            </BbTabsContent>
-
-            <BbTabsContent Value="reactions" Class="xf-fade-in">
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Reactions</BbCardTitle>
-                        <BbCardDescription>@_reactions.Count reaction records loaded.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        @if (_reactions.Count == 0)
-                        {
-                            <BbAlert Variant="AlertVariant.Info">No reactions found for sampled messages.</BbAlert>
-                        }
-                        else
-                        {
-                            <BbDataGrid Items="@_reactions" ShowPagination="true" InitialPageSize="20">
-                                <Columns>
-                                    <BbDataGridTemplateColumn Title="Reaction">
-                                        <ChildContent Context="reaction">
-                                            @ReactionLabel(reaction)
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Member">
-                                        <ChildContent Context="reaction">
-                                            @GetMemberLabel(reaction.MessageThreadMemberId)
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Message">
-                                        <ChildContent Context="reaction">
-                                            <span class="font-mono text-xs">@reaction.MessageId</span>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(reaction => reaction.CreatedAt)" Title="Created" Sortable="true" />
-                                </Columns>
-                            </BbDataGrid>
-                        }
-                    </BbCardContent>
-                </BbCard>
-            </BbTabsContent>
-
-            <BbTabsContent Value="files" Class="xf-fade-in">
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Attachments</BbCardTitle>
-                        <BbCardDescription>@_files.Count attachment records loaded.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        @if (_files.Count == 0)
-                        {
-                            <BbAlert Variant="AlertVariant.Info">No attachment records found for sampled messages.</BbAlert>
-                        }
-                        else
-                        {
-                            <BbDataGrid Items="@_files" ShowPagination="true" InitialPageSize="20">
-                                <Columns>
-                                    <BbDataGridTemplateColumn Title="Storage ID">
-                                        <ChildContent Context="file">
-                                            <span class="font-mono text-xs">@file.StorageId</span>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Message">
-                                        <ChildContent Context="file">
-                                            <span class="font-mono text-xs">@file.MessageId</span>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Enabled">
-                                        <ChildContent Context="file">
-                                            <StatusBadge Text="@(file.IsEnabled ? "Enabled" : "Disabled")"
-                                                         Status="@(file.IsEnabled ? "active" : "inactive")" />
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(file => file.CreatedAt)" Title="Created" Sortable="true" />
-                                </Columns>
-                            </BbDataGrid>
-                        }
-                    </BbCardContent>
-                </BbCard>
-            </BbTabsContent>
-        </BbTabs>
-    </div>
     </FadeInContent>
 }
 
@@ -362,20 +266,19 @@ else
 
     private MessagingControlPanelGuardResult? _guard;
     private MessageThread? _thread;
-    private List<Message> _messages = [];
     private List<MessageThreadMember> _members = [];
-    private List<MessageDelivery> _deliveries = [];
-    private List<MessageReaction> _reactions = [];
-    private List<MessageFile> _files = [];
+    private List<Message> _messages = [];
+    private List<ThreadMemberRow> _memberRows = [];
+    private List<ThreadMessageRow> _messageRows = [];
     private bool _loading = true;
     private bool _outsideTenantContext;
     private string? _error;
-
     private Guid? _loadedId;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
     }
 
     protected override async Task OnParametersSetAsync()
@@ -403,14 +306,17 @@ else
         _loading = true;
         _error = null;
         _outsideTenantContext = false;
-        ClearRelatedData();
+        _thread = null;
+        _members = [];
+        _messages = [];
+        _memberRows = [];
+        _messageRows = [];
 
         try
         {
             _guard = await Guard.GetCurrentTenantStateAsync();
             if (!_guard.IsEnabled || _guard.TenantId is not Guid tenantId)
             {
-                _thread = null;
                 return;
             }
 
@@ -435,7 +341,7 @@ else
                 .Where(x => x.TenantId == tenantId)
                 .Where(x => x.MessageThreadId == Id)
                 .Where(x => !x.IsDeleted)
-                .OrderBy(x => x.Alias)
+                .OrderBy(x => x.CreatedAt)
                 .Take(200)
                 .ToListAsync();
 
@@ -449,42 +355,16 @@ else
                 .Take(100)
                 .ToListAsync();
 
-            _deliveries = await DataContext.Query<MessageDelivery>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.Type)
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => x.Message.MessageThreadId == Id)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            _reactions = await DataContext.Query<MessageReaction>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.Type)
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => x.Message.MessageThreadId == Id)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            _files = await DataContext.Query<MessageFile>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => x.Message.MessageThreadId == Id)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(200)
-                .ToListAsync();
+            var memberMap = _members.ToDictionary(x => x.Id);
+            _memberRows = _members.Select(CreateMemberRow).ToList();
+            _messageRows = _messages
+                .Select(message => CreateMessageRow(message, memberMap.GetValueOrDefault(message.MessageThreadMemberId)))
+                .ToList();
         }
-        catch (Exception ex)
+        catch
         {
-            _error = ex.Message;
-            ToastService.Show($"Failed to load messaging thread: {ex.Message}");
+            _error = "Messaging thread detail could not be loaded. Check service health and tenant access.";
+            ToastService.Error("Messaging thread detail could not be loaded.", "Thread Unavailable");
         }
         finally
         {
@@ -492,28 +372,35 @@ else
         }
     }
 
-    private void ClearRelatedData()
-    {
-        _messages = [];
-        _members = [];
-        _deliveries = [];
-        _reactions = [];
-        _files = [];
-    }
+    private ThreadMemberRow CreateMemberRow(MessageThreadMember member) =>
+        new(
+            member.Id,
+            member.CredentialId,
+            GetCredentialLabel(member.Credential),
+            string.IsNullOrWhiteSpace(member.Alias) ? "N/A" : member.Alias,
+            member.Group is not null && !string.IsNullOrWhiteSpace(member.Group.Alias) ? member.Group.Alias : member.GroupId.ToString()[..8],
+            string.IsNullOrWhiteSpace(member.Role) ? MessageThreadMemberRoles.Member : member.Role,
+            member.IsMuted,
+            member.IsArchived,
+            member.LastSeenAt,
+            member.CreatedAt);
 
-    private void GoBack() => Navigation.NavigateTo("/messaging/threads");
+    private ThreadMessageRow CreateMessageRow(Message message, MessageThreadMember? member) =>
+        new(
+            message.Id,
+            message.MessageThreadMemberId,
+            member?.CredentialId ?? Guid.Empty,
+            member is null ? message.MessageThreadMemberId.ToString()[..8] : GetMemberLabel(member),
+            Truncate(message.Text, 160),
+            message.ParentMessageId.HasValue,
+            CountMentions(message.MentionedCredentialIdsJson),
+            message.CreatedAt);
 
     private static string DisplayThreadName(MessageThread thread) =>
-        string.IsNullOrWhiteSpace(thread.Name) ? thread.Id.ToString()[..8] : thread.Name;
+        string.IsNullOrWhiteSpace(thread.Name) ? ShortId(thread.Id) : thread.Name;
 
-    private string GetMemberLabel(Guid memberId)
+    private static string GetMemberLabel(MessageThreadMember member)
     {
-        var member = _members.FirstOrDefault(x => x.Id == memberId);
-        if (member is null)
-        {
-            return memberId.ToString()[..8];
-        }
-
         if (!string.IsNullOrWhiteSpace(member.Alias))
         {
             return member.Alias;
@@ -534,31 +421,61 @@ else
             ?? credential.Id.ToString()[..8];
     }
 
-    private static string ReactionLabel(MessageReaction reaction)
+    private static int CountMentions(string? mentionedCredentialIdsJson)
     {
-        var type = reaction.Type;
-        if (type is null)
+        if (string.IsNullOrWhiteSpace(mentionedCredentialIdsJson))
         {
-            return reaction.TypeId.ToString()[..8];
+            return 0;
         }
 
-        return string.IsNullOrWhiteSpace(type.Emoji)
-            ? type.Name
-            : $"{type.Emoji} {type.Name}";
+        try
+        {
+            return JsonSerializer.Deserialize<List<Guid>>(mentionedCredentialIdsJson)?.Count ?? 0;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     private static string Truncate(string? value, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return "Empty message";
+            return "N/A";
         }
 
         return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
     }
 
+    private static string ShortId(Guid value) => value.ToString()[..8];
+
+    private void GoBack() => Navigation.NavigateTo("/messaging/threads");
+
     public void Dispose()
     {
         TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
+
+    private sealed record ThreadMemberRow(
+        Guid MemberId,
+        Guid CredentialId,
+        string DisplayName,
+        string Alias,
+        string Group,
+        string Role,
+        bool IsMuted,
+        bool IsArchived,
+        DateTime? LastSeenAt,
+        DateTime CreatedAt);
+
+    private sealed record ThreadMessageRow(
+        Guid MessageId,
+        Guid MemberId,
+        Guid CredentialId,
+        string Author,
+        string Preview,
+        bool IsReply,
+        int MentionCount,
+        DateTime CreatedAt);
 }

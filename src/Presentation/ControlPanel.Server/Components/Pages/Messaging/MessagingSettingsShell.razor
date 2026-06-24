@@ -1,0 +1,247 @@
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>@CurrentSection.Title - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (_guard is { IsEnabled: false })
+{
+    <div class="space-y-4">
+        <BbAlert Variant="@(_guard.HasSelectedTenant ? AlertVariant.Warning : AlertVariant.Info)">
+            <BbAlertTitle>@_guard.Title</BbAlertTitle>
+            <BbAlertDescription>@_guard.Description</BbAlertDescription>
+        </BbAlert>
+        @if (_guard.TenantId is Guid tenantId)
+        {
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/identity/tenants/{tenantId}/modules"))">
+                <LucideIcon Name="blocks" class="mr-2 h-4 w-4" />
+                Tenant Modules
+            </BbButton>
+        }
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <BbTypographyH3>Messaging Settings</BbTypographyH3>
+                    <BbTypographyMuted>Communication controls for @(_guard?.TenantName ?? "selected tenant")</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@RefreshOverview" Disabled="@_overviewRefreshing">
+                        @if (_overviewRefreshing)
+                        {
+                            <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                        }
+                        else
+                        {
+                            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        }
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <div class="xf-summary-grid xf-summary-grid-4">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Threads</BbCardTitle>
+                        <BbCardDescription>Tenant records</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbTypographyH2>@_threadCount</BbTypographyH2>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Users</BbCardTitle>
+                        <BbCardDescription>Chat access</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbTypographyH2>@_messagingUserCount</BbTypographyH2>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Reports</BbCardTitle>
+                        <BbCardDescription>Open items</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbTypographyH2>@_openReportCount</BbTypographyH2>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Outbox</BbCardTitle>
+                        <BbCardDescription>Pending events</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbTypographyH2>@_pendingOutboxCount</BbTypographyH2>
+                    </BbCardContent>
+                </BbCard>
+            </div>
+
+            <div class="messaging-settings-layout">
+                <aside class="messaging-settings-section-nav" aria-label="Messaging settings sections">
+                    <div class="messaging-settings-section-links">
+                        @foreach (var settingSection in Sections)
+                        {
+                            <NavLink href="@(settingSection.Href)"
+                                     Match="NavLinkMatch.All"
+                                     class="sidebar-nav-item"
+                                     ActiveClass="sidebar-nav-item-active"
+                                     title="@(settingSection.Title)"
+                                     aria-label="@(settingSection.Title)">
+                                <LucideIcon Name="@(settingSection.Icon)" class="sidebar-nav-icon h-4 w-4" />
+                                <span class="sidebar-label">@settingSection.Title</span>
+                            </NavLink>
+                        }
+                    </div>
+                </aside>
+
+                <section class="messaging-settings-content">
+                    <MessagingSettingsEditor Title="@CurrentSection.Title"
+                                             Description="@CurrentSection.Description"
+                                             SectionKey="@CurrentSection.SectionKey" />
+                </section>
+            </div>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public string? SectionKey { get; set; }
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private static readonly IReadOnlyList<SettingsSection> Sections =
+    [
+        new(MessagingSettingsCatalog.ChatSectionKey, "Chat Controls", "Thread, direct-message, read-state, typing, and presence defaults.", "message-circle", "/messaging/settings/chat"),
+        new(MessagingSettingsCatalog.PolicySectionKey, "Policy", "Retention, attachment, rate-limit, and moderation policy values.", "shield-check", "/messaging/settings/policy"),
+        new(MessagingSettingsCatalog.TemplatesSectionKey, "Templates", "Identity message templates and direct-message transport defaults.", "file-text", "/messaging/settings/templates")
+    ];
+
+    private MessagingControlPanelGuardResult? _guard;
+    private bool _loading = true;
+    private bool _overviewRefreshing;
+    private int _threadCount;
+    private int _messagingUserCount;
+    private int _openReportCount;
+    private int _pendingOutboxCount;
+
+    private SettingsSection CurrentSection =>
+        Sections.FirstOrDefault(section => string.Equals(section.SectionKey, SectionKey, StringComparison.OrdinalIgnoreCase))
+        ?? Sections[0];
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshOverview()
+    {
+        _overviewRefreshing = true;
+
+        try
+        {
+            await LoadData(showFeedback: true);
+        }
+        finally
+        {
+            _overviewRefreshing = false;
+        }
+    }
+
+    private async Task LoadData(bool showFeedback = false)
+    {
+        _loading = !showFeedback;
+        ResetCounts();
+
+        try
+        {
+            _guard = await Guard.GetCurrentTenantStateAsync();
+            if (!_guard.IsEnabled || _guard.TenantId is not Guid tenantId)
+            {
+                return;
+            }
+
+            _threadCount = await DataContext.Query<MessageThread>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .CountAsync();
+
+            var members = await DataContext.Query<MessageThreadMember>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Take(1000)
+                .ToListAsync();
+            _messagingUserCount = members.Select(x => x.CredentialId).Distinct().Count();
+
+            _openReportCount = await DataContext.Query<MessageReport>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Where(x => x.Status == MessageReportStatuses.Open)
+                .CountAsync();
+
+            _pendingOutboxCount = await DataContext.Query<MessageOutboxEvent>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Where(x => x.ProcessedAt == null)
+                .CountAsync();
+        }
+        catch
+        {
+            if (showFeedback)
+            {
+                ToastService.Error("Messaging settings overview could not be refreshed.");
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ResetCounts()
+    {
+        _threadCount = 0;
+        _messagingUserCount = 0;
+        _openReportCount = 0;
+        _pendingOutboxCount = 0;
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+
+    private sealed record SettingsSection(
+        string SectionKey,
+        string Title,
+        string Description,
+        string Icon,
+        string Href);
+}

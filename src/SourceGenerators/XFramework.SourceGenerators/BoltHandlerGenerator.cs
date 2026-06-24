@@ -207,6 +207,7 @@ public class BoltHandlerGenerator : ISourceGenerator
         var hasCancellationToken = false;
         var requestTypeFullName = ToGlobalQualified(requestType.ToDisplayString());
         var queryParameters = CollectQueryParameters(requestType);
+        var routeParameters = CollectRouteParameters(route, queryParameters);
         var constructorBoundProperties = CollectConstructorBoundProperties(requestType, queryParameters);
 
         for (int i = 1; i < methodSymbol.Parameters.Length; i++)
@@ -258,6 +259,7 @@ public class BoltHandlerGenerator : ISourceGenerator
             IsGenericResult = isGenericResult,
             DiParameters = diParams,
             QueryParameters = queryParameters,
+            RouteParameters = routeParameters,
             ConstructorBoundProperties = constructorBoundProperties,
             HasCancellationToken = hasCancellationToken,
             Namespace = containingClass.ContainingNamespace.ToDisplayString(),
@@ -312,6 +314,41 @@ public class BoltHandlerGenerator : ISourceGenerator
         }
 
         return parameters;
+    }
+
+    private static List<QueryParameterInfo> CollectRouteParameters(
+        string? route,
+        IReadOnlyCollection<QueryParameterInfo> queryParameters)
+    {
+        if (string.IsNullOrWhiteSpace(route) || queryParameters.Count == 0)
+            return [];
+
+        var routeText = route!;
+        var routeParameterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var start = -1;
+        for (var i = 0; i < routeText.Length; i++)
+        {
+            if (routeText[i] == '{')
+            {
+                start = i + 1;
+                continue;
+            }
+
+            if (routeText[i] != '}' || start < 0)
+                continue;
+
+            var token = routeText.Substring(start, i - start);
+            var parameterName = token.Split(':')[0].Trim();
+            if (!string.IsNullOrWhiteSpace(parameterName))
+                routeParameterNames.Add(parameterName);
+
+            start = -1;
+        }
+
+        return queryParameters
+            .Where(p => routeParameterNames.Contains(p.ParameterName) ||
+                        routeParameterNames.Contains(p.PropertyName))
+            .ToList();
     }
 
     private static List<string> CollectConstructorBoundProperties(
@@ -645,6 +682,29 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
         return builder.ToString();
     }
 
+    private static string GenerateBodyRouteAssignments(HandlerInfo h)
+    {
+        if (h.RouteParameters.Count == 0)
+            return string.Empty;
+
+        var builder = new StringBuilder();
+        foreach (var routeParameter in h.RouteParameters)
+        {
+            if (routeParameter.AssignWhenHasValue)
+            {
+                builder.AppendLine(
+                    $"        if ({routeParameter.ParameterName}.HasValue) request.{routeParameter.PropertyName} = {routeParameter.ParameterName}.Value;");
+            }
+            else
+            {
+                builder.AppendLine(
+                    $"        request.{routeParameter.PropertyName} = {routeParameter.ParameterName};");
+            }
+        }
+
+        return builder.ToString();
+    }
+
     private static string ToQueryValueExpression(QueryParameterInfo queryParameter)
     {
         if (!queryParameter.AssignWhenHasValue)
@@ -707,6 +767,10 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
         else
         {
             AppendRestParameter($"{h.RequestTypeFullName} request");
+            foreach (var routeParameter in h.RouteParameters)
+                AppendRestParameter($"{routeParameter.ParameterTypeFullName} {routeParameter.ParameterName}");
+
+            requestInitialization = GenerateBodyRouteAssignments(h);
         }
 
         // DI service parameters
@@ -964,6 +1028,7 @@ public static class GeneratedEndpointRoutes
         public bool IsGenericResult { get; set; }
         public List<(string TypeFullName, string Name, bool IsValidator)> DiParameters { get; set; } = new();
         public List<QueryParameterInfo> QueryParameters { get; set; } = new();
+        public List<QueryParameterInfo> RouteParameters { get; set; } = new();
         public List<string> ConstructorBoundProperties { get; set; } = new();
         public bool HasCancellationToken { get; set; }
         public string Namespace { get; set; } = "";

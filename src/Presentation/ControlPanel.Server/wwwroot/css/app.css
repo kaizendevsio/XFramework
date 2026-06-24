@@ -401,6 +401,31 @@
     gap: 1rem;
 }
 
+.messaging-settings-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.messaging-settings-section-nav,
+.messaging-settings-content,
+.messaging-settings-editor {
+    min-width: 0;
+    width: 100%;
+}
+
+.messaging-settings-section-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.messaging-settings-section-links .sidebar-nav-item {
+    width: auto;
+    min-width: 12rem;
+}
+
 .xf-detail-header {
     display: flex;
     align-items: center;
@@ -460,6 +485,20 @@
 
     .xf-summary-grid-4 {
         grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .messaging-settings-layout {
+        grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
+        align-items: start;
+    }
+
+    .messaging-settings-section-links {
+        flex-direction: column;
+    }
+
+    .messaging-settings-section-links .sidebar-nav-item {
+        width: 100%;
+        min-width: 0;
     }
 
     .xf-detail-field-grid {

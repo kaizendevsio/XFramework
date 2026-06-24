@@ -21,6 +21,9 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .IsRequired()
             .HasDefaultValueSql("true");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+        entity.Property(e => e.MentionedCredentialIdsJson)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb");
         entity.Property(e => e.Text).HasColumnType("character varying");
 
         entity.HasIndex(e => new { e.MessageThreadId, e.CreatedAt, e.Id })
@@ -38,5 +41,9 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasForeignKey(d => d.MessageThreadMemberId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("message_messagethreadmember_id_fk");
+
+        entity.HasOne(d => d.ParentMessage).WithMany(p => p.Replies)
+            .HasForeignKey(d => d.ParentMessageId)
+            .HasConstraintName("message_parent_message_id_fk");
     }
 }

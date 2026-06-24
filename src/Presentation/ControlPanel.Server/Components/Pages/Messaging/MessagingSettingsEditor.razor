@@ -1,0 +1,471 @@
+@using System.Globalization
+@using global::Messaging.Domain.Shared.Contracts.Requests.Settings
+@using global::Messaging.Domain.Shared.Contracts.Responses
+@implements IDisposable
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else
+{
+    <div class="messaging-settings-editor space-y-6">
+        <div class="xf-page-header">
+            <div>
+                <BbTypographyH3>@Title</BbTypographyH3>
+                <BbTypographyMuted>@Description</BbTypographyMuted>
+            </div>
+            <div class="xf-page-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@RefreshSettings" Disabled="@_saving">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@ResetToDefaults" Disabled="@(_saving || _schema is null)">
+                    <LucideIcon Name="rotate-ccw" class="mr-2 h-4 w-4" />
+                    Defaults
+                </BbButton>
+                <BbButton OnClick="@SaveSettings" Disabled="@(_saving || _schema is null || !_dirty)">
+                    @if (_saving)
+                    {
+                        <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                    }
+                    else
+                    {
+                        <LucideIcon Name="save" class="mr-2 h-4 w-4" />
+                    }
+                    Save
+                </BbButton>
+            </div>
+        </div>
+
+        @if (_error is not null)
+        {
+            <BbAlert Variant="AlertVariant.Danger">
+                <BbAlertTitle>Settings Unavailable</BbAlertTitle>
+                <BbAlertDescription>@_error</BbAlertDescription>
+            </BbAlert>
+        }
+        else
+        {
+            @if (_validationErrors.Count > 0)
+            {
+                <BbAlert Variant="AlertVariant.Warning">
+                    <BbAlertTitle>Review Settings</BbAlertTitle>
+                    <BbAlertDescription>@string.Join(" ", _validationErrors)</BbAlertDescription>
+                </BbAlert>
+            }
+
+            @if (_schema is null || _visibleSettings.Count == 0)
+            {
+                <BbAlert Variant="AlertVariant.Info">No Messaging settings are available for this section.</BbAlert>
+            }
+            else
+            {
+                <BbCard>
+                    <BbCardHeader>
+                        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <BbCardTitle>@Title</BbCardTitle>
+                                <BbCardDescription>@_settingsSummary</BbCardDescription>
+                            </div>
+                            <StatusBadge Text="@(_dirty ? "Unsaved" : "Current")"
+                                         Status="@(_dirty ? "pending" : "active")" />
+                        </div>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDynamicForm Schema="@_schema"
+                                       Values="@_formValues"
+                                       ValuesChanged="@OnValuesChanged"
+                                       OnFieldChanged="@OnFieldChanged"
+                                       Layout="FormLayout.Vertical"
+                                       Columns="2"
+                                       Disabled="@_saving"
+                                       ShowSubmitButton="false"
+                                       ShowValidationSummary="true" />
+                    </BbCardContent>
+                </BbCard>
+
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Setting Sources</BbCardTitle>
+                        <BbCardDescription>Stored values override defaults for the selected tenant.</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_visibleSettings" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(item => item.Label)" Title="Setting" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(item => item.GroupName)" Title="Group" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Source" Sortable="true" Filterable="true" FilterBy="@(item => item.Source)">
+                                    <ChildContent Context="item">
+                                        <StatusBadge Text="@item.Source"
+                                                     Status="@(item.Source == MessagingSettingSources.Stored ? "active" : "pending")" />
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Value" Filterable="true" FilterBy="@(item => item.Value)">
+                                    <ChildContent Context="item">@FormatPreview(item)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Updated" Sortable="true" Filterable="true" FilterBy="@(item => item.LastUpdated)">
+                                    <ChildContent Context="item">@(item.LastUpdated?.ToString("g") ?? "Default")</ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            }
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string SectionKey { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+
+    [Inject] private MessagingControlPanelSettingsService SettingsService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private MessagingSettingsResponse? _settings;
+    private FormSchema? _schema;
+    private Dictionary<string, object> _formValues = [];
+    private List<MessagingSettingValueResponse> _visibleSettings = [];
+    private List<string> _validationErrors = [];
+    private string _settingsSummary = "Tenant-scoped Messaging configuration.";
+    private bool _loading = true;
+    private bool _saving;
+    private bool _dirty;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_loading && _settings is not null)
+        {
+            BuildForm();
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private Task RefreshSettings() => LoadData(showFeedback: true);
+
+    private async Task LoadData(bool showFeedback = false)
+    {
+        _loading = true;
+        _error = null;
+        _validationErrors = [];
+        _schema = null;
+        _settings = null;
+        _visibleSettings = [];
+        _formValues = [];
+        _dirty = false;
+
+        try
+        {
+            var result = await SettingsService.GetSettingsAsync();
+            if (!result.IsSuccess || result.Settings is null)
+            {
+                _error = result.Message;
+                if (showFeedback)
+                {
+                    ToastService.Error("Messaging settings could not be refreshed.", "Settings Unavailable");
+                }
+
+                return;
+            }
+
+            _settings = result.Settings;
+            BuildForm();
+            if (showFeedback)
+            {
+                ToastService.Success("Messaging settings refreshed.", "Settings Refreshed");
+            }
+        }
+        catch
+        {
+            _error = "Messaging settings could not be loaded. Check service health and tenant module state.";
+            if (showFeedback)
+            {
+                ToastService.Error("Messaging settings could not be refreshed.", "Settings Unavailable");
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void BuildForm()
+    {
+        if (_settings is null)
+        {
+            return;
+        }
+
+        var groups = _settings.Groups
+            .Where(group => string.Equals(group.SectionKey, SectionKey, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        _visibleSettings = groups
+            .SelectMany(group => group.Settings)
+            .ToList();
+
+        _formValues = _visibleSettings.ToDictionary(
+            GetFieldName,
+            setting => ToFormValue(setting),
+            StringComparer.OrdinalIgnoreCase);
+
+        _schema = new FormSchema
+        {
+            Title = Title,
+            Description = Description,
+            Columns = 2,
+            Sections = groups
+                .Select(group => new FormSectionDefinition
+                {
+                    Title = group.Title,
+                    Description = group.Description,
+                    Columns = 2,
+                    Fields = group.Settings
+                        .Select(ToFieldDefinition)
+                        .ToList()
+                })
+                .ToList()
+        };
+
+        var storedCount = _visibleSettings.Count(x => x.Source == MessagingSettingSources.Stored);
+        _settingsSummary = $"{storedCount} stored value(s), {_visibleSettings.Count - storedCount} default value(s)";
+        _dirty = false;
+    }
+
+    private Task OnValuesChanged(Dictionary<string, object> values)
+    {
+        _formValues = values;
+        _dirty = true;
+        _validationErrors = [];
+        return Task.CompletedTask;
+    }
+
+    private Task OnFieldChanged(FormFieldChangedEventArgs _)
+    {
+        _dirty = true;
+        _validationErrors = [];
+        return Task.CompletedTask;
+    }
+
+    private void ResetToDefaults()
+    {
+        if (_visibleSettings.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var setting in _visibleSettings)
+        {
+            _formValues[GetFieldName(setting)] = ToFormValue(setting with { Value = setting.DefaultValue });
+        }
+
+        _dirty = true;
+        _validationErrors = [];
+    }
+
+    private async Task SaveSettings()
+    {
+        if (_settings is null || _visibleSettings.Count == 0)
+        {
+            return;
+        }
+
+        _validationErrors = ValidateFormValues();
+        if (_validationErrors.Count > 0)
+        {
+            ToastService.Warning("Review Messaging settings before saving.", "Validation Required");
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var requestValues = _visibleSettings
+                .Select(setting => new UpdateMessagingSettingValueRequest
+                {
+                    GroupName = setting.GroupName,
+                    Key = setting.Key,
+                    Value = ToRequestValue(setting)
+                })
+                .ToList();
+
+            var result = await SettingsService.UpdateSettingsAsync(requestValues);
+            if (!result.IsSuccess || result.Settings is null)
+            {
+                _error = result.Message;
+                ToastService.Error("Messaging settings could not be saved.", "Save Failed");
+                return;
+            }
+
+            _settings = result.Settings;
+            BuildForm();
+            ToastService.Success("Messaging settings saved.", "Settings Saved");
+        }
+        catch
+        {
+            _error = "Messaging settings could not be saved. Check validation and service health.";
+            ToastService.Error("Messaging settings could not be saved.", "Save Failed");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private List<string> ValidateFormValues()
+    {
+        var errors = new List<string>();
+
+        foreach (var setting in _visibleSettings)
+        {
+            var value = ToRequestValue(setting);
+            switch (setting.ValueKind)
+            {
+                case MessagingSettingValueKind.Boolean when !bool.TryParse(value, out _):
+                    errors.Add($"{setting.Label} must be true or false.");
+                    break;
+                case MessagingSettingValueKind.Number when !long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) || number < 0:
+                    errors.Add($"{setting.Label} must be a non-negative whole number.");
+                    break;
+                case MessagingSettingValueKind.Option when !setting.Options.Any(option => string.Equals(option, value, StringComparison.OrdinalIgnoreCase)):
+                    errors.Add($"{setting.Label} must use a supported option.");
+                    break;
+                case MessagingSettingValueKind.Template when string.IsNullOrWhiteSpace(value) || value.Length > 4000:
+                    errors.Add($"{setting.Label} must be provided and stay below 4,000 characters.");
+                    break;
+                case MessagingSettingValueKind.Csv when value.Length > 2000 ||
+                    (value.Length > 0 && value.Split(',', StringSplitOptions.TrimEntries).Any(string.IsNullOrWhiteSpace)):
+                    errors.Add($"{setting.Label} must be a valid comma-separated list.");
+                    break;
+                case MessagingSettingValueKind.Text when string.Equals(setting.Unit, "guid", StringComparison.OrdinalIgnoreCase) &&
+                    value.Length > 0 &&
+                    !Guid.TryParse(value, out _):
+                    errors.Add($"{setting.Label} must be a valid GUID.");
+                    break;
+            }
+        }
+
+        return errors;
+    }
+
+    private static FormFieldDefinition ToFieldDefinition(MessagingSettingValueResponse setting)
+    {
+        var validations = new List<FieldValidation>();
+        if (setting.ValueKind is not MessagingSettingValueKind.Text and not MessagingSettingValueKind.Csv)
+        {
+            validations.Add(new FieldValidation
+            {
+                Type = ValidationType.Required,
+                Message = "Value is required."
+            });
+        }
+
+        if (setting.ValueKind == MessagingSettingValueKind.Number)
+        {
+            validations.Add(new FieldValidation
+            {
+                Type = ValidationType.Min,
+                Value = 0,
+                Message = "Value must be zero or greater."
+            });
+        }
+
+        if (setting.ValueKind == MessagingSettingValueKind.Template)
+        {
+            validations.Add(new FieldValidation
+            {
+                Type = ValidationType.MaxLength,
+                Value = 4000,
+                Message = "Template cannot exceed 4,000 characters."
+            });
+        }
+
+        return new FormFieldDefinition
+        {
+            Name = GetFieldName(setting),
+            Label = setting.Label,
+            Description = $"{setting.Description} Key: {setting.Key}",
+            Type = ToFieldType(setting.ValueKind),
+            Required = validations.Any(x => x.Type == ValidationType.Required),
+            ColSpan = setting.ValueKind == MessagingSettingValueKind.Template ? 2 : 1,
+            Options = setting.Options
+                .Select(option => new SelectOption<string>(option, option))
+                .ToList(),
+            Validations = validations
+        };
+    }
+
+    private static FieldType ToFieldType(MessagingSettingValueKind kind) =>
+        kind switch
+        {
+            MessagingSettingValueKind.Boolean => FieldType.Switch,
+            MessagingSettingValueKind.Number => FieldType.Number,
+            MessagingSettingValueKind.Option => FieldType.Select,
+            MessagingSettingValueKind.Template => FieldType.Textarea,
+            _ => FieldType.Text
+        };
+
+    private static object ToFormValue(MessagingSettingValueResponse setting) =>
+        setting.ValueKind switch
+        {
+            MessagingSettingValueKind.Boolean => bool.TryParse(setting.Value, out var parsed) && parsed,
+            MessagingSettingValueKind.Number => long.TryParse(setting.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0,
+            _ => setting.Value
+        };
+
+    private string ToRequestValue(MessagingSettingValueResponse setting)
+    {
+        if (!_formValues.TryGetValue(GetFieldName(setting), out var value) || value is null)
+        {
+            return string.Empty;
+        }
+
+        return value switch
+        {
+            bool boolean => boolean.ToString().ToLowerInvariant(),
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
+            IEnumerable<string> strings => string.Join(',', strings.Select(x => x.Trim()).Where(x => x.Length > 0)),
+            _ => value.ToString()?.Trim() ?? string.Empty
+        };
+    }
+
+    private static string GetFieldName(MessagingSettingValueResponse setting) =>
+        $"{setting.GroupName}::{setting.Key}";
+
+    private static string FormatPreview(MessagingSettingValueResponse setting)
+    {
+        if (string.IsNullOrWhiteSpace(setting.Value))
+        {
+            return "N/A";
+        }
+
+        return setting.Value.Length <= 96 ? setting.Value : $"{setting.Value[..96]}...";
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+}

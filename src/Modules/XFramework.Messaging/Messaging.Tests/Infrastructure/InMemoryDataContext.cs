@@ -142,6 +142,8 @@ internal sealed class InMemoryRemoteQuery<T>(IQueryable<T> queryable) : IRemoteQ
 
     public IRemoteQuery<T> NoCache() => this;
 
+    public IRemoteQuery<T> IgnoreQueryFilters() => this;
+
     public Task<List<T>> ToListAsync(CancellationToken ct = default) =>
         Task.FromResult(_queryable.ToList());
 

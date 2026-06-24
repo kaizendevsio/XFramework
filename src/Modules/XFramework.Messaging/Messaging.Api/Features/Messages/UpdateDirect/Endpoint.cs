@@ -8,8 +8,7 @@ public static class UpdateDirectMessageEndpoint
 {
     [BoltHandler]
     [MapPatch("/api/messages/direct", Tags = ["Messages"],
-        Summary = "Update a direct message",
-        ExcludeFromOpenApi = true)]
+        Summary = "Update a direct message")]
     public static async Task<Result<CmdResponse>> Handle(
         UpdateMessageDirectRequest request,
         IMessagingService messagingService,
