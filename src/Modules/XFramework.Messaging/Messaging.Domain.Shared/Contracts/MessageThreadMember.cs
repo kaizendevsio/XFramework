@@ -45,4 +45,22 @@ public partial class MessageThreadMember : BaseModel
 
     [MemoryPackOrder(12)]
     public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
+
+    [MemoryPackOrder(13)]
+    public bool IsMuted { get; set; }
+
+    [MemoryPackOrder(14)]
+    public DateTime? MutedAt { get; set; }
+
+    [MemoryPackOrder(15)]
+    public bool IsArchived { get; set; }
+
+    [MemoryPackOrder(16)]
+    public DateTime? ArchivedAt { get; set; }
+
+    [MemoryPackOrder(17)]
+    public DateTime? LastSeenAt { get; set; }
+
+    [MemoryPackOrder(18)]
+    public string Role { get; set; } = global::Messaging.Domain.Shared.MessageThreadMemberRoles.Member;
 }

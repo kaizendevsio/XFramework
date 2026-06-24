@@ -10,8 +10,7 @@ public static class GetThreadMessagesEndpoint
     [BoltHandler]
     [MapGet("/api/threads/{threadId:guid}/messages", Tags = ["Messages"],
         Summary = "Get messages for a thread",
-        Description = "Returns a paginated list of messages for the specified thread, ordered by creation date descending. Validates that the requester is a member.",
-        ExcludeFromOpenApi = true)]
+        Description = "Returns a paginated list of messages for the specified thread, ordered by creation date descending. Validates that the requester is a member.")]
     public static async Task<Result<GetThreadMessagesResponse>> Handle(
         GetThreadMessagesRequest request,
         IThreadService threadService,

@@ -35,8 +35,38 @@ public static class MessageRealtimeEvents
     public static readonly string ReactionCreated = nameof(ReactionCreated);
     public static readonly string ReactionDeleted = nameof(ReactionDeleted);
     public static readonly string MessagesRead = nameof(MessagesRead);
+    public static readonly string ThreadMuted = nameof(ThreadMuted);
+    public static readonly string ThreadArchived = nameof(ThreadArchived);
+    public static readonly string ThreadLeft = nameof(ThreadLeft);
+    public static readonly string ThreadInviteCreated = nameof(ThreadInviteCreated);
+    public static readonly string ThreadInviteAccepted = nameof(ThreadInviteAccepted);
+    public static readonly string ThreadInviteDeclined = nameof(ThreadInviteDeclined);
+    public static readonly string ThreadMemberRoleChanged = nameof(ThreadMemberRoleChanged);
+    public static readonly string MessagePinned = nameof(MessagePinned);
+    public static readonly string MessageUnpinned = nameof(MessageUnpinned);
+    public static readonly string MessageSaved = nameof(MessageSaved);
+    public static readonly string MessageUnsaved = nameof(MessageUnsaved);
+    public static readonly string MessageReported = nameof(MessageReported);
+    public static readonly string CredentialBlocked = nameof(CredentialBlocked);
+    public static readonly string CredentialUnblocked = nameof(CredentialUnblocked);
 
     // TODO: Add audio/video call event types only after call/session feature flags exist in Messaging.
+}
+
+public static class MessageRealtimeTopics
+{
+    public static readonly string EventName = "MessagingRealtimeEvent";
+    public static readonly string TypingEventName = "MessagingTypingState";
+    public static readonly string PresenceEventName = "MessagingPresenceState";
+
+    public static string User(Guid tenantId, Guid credentialId) =>
+        $"messaging.tenant.{tenantId:N}.user.{credentialId:N}";
+
+    public static string ThreadTyping(Guid tenantId, Guid threadId) =>
+        $"messaging.tenant.{tenantId:N}.thread.{threadId:N}.typing";
+
+    public static string Presence(Guid tenantId) =>
+        $"messaging.tenant.{tenantId:N}.presence";
 }
 
 
@@ -49,4 +79,25 @@ public static class MessageDeliveryTypes
 {
     public static readonly Guid Delivered = new("b1000000-0000-0000-0000-000000000001");
     public static readonly Guid Read = new("b1000000-0000-0000-0000-000000000002");
+}
+
+public static class MessageThreadMemberRoles
+{
+    public const string Owner = nameof(Owner);
+    public const string Admin = nameof(Admin);
+    public const string Member = nameof(Member);
+}
+
+public static class MessageThreadInviteStatuses
+{
+    public const short Pending = 0;
+    public const short Accepted = 1;
+    public const short Declined = 2;
+}
+
+public static class MessageReportStatuses
+{
+    public const short Open = 0;
+    public const short Reviewed = 1;
+    public const short Dismissed = 2;
 }

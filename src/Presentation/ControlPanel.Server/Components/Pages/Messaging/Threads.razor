@@ -1,5 +1,4 @@
 @page "/messaging/threads"
-@using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
 <PageTitle>Messaging Threads - Control Panel</PageTitle>
@@ -28,15 +27,17 @@ else
 {
     <FadeInContent>
     <div class="space-y-6">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="xf-page-header">
             <div>
                 <BbTypographyH3>Messaging Threads</BbTypographyH3>
                 <BbTypographyMuted>Thread diagnostics for @(_guard?.TenantName ?? "selected tenant")</BbTypographyMuted>
             </div>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
-                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                Refresh
-            </BbButton>
+            <div class="xf-page-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
         </div>
 
         @if (_error is not null)
@@ -47,7 +48,7 @@ else
             </BbAlert>
         }
 
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div class="xf-summary-grid xf-summary-grid-4">
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Threads</BbCardTitle>
@@ -77,32 +78,36 @@ else
             </BbCard>
             <BbCard>
                 <BbCardHeader>
-                    <BbCardTitle>Recently Active</BbCardTitle>
-                    <BbCardDescription>Threads with sampled activity</BbCardDescription>
+                    <BbCardTitle>Outbox Pending</BbCardTitle>
+                    <BbCardDescription>Realtime events awaiting dispatch</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbTypographyH2>@_recentlyActiveThreads</BbTypographyH2>
+                    <BbTypographyH2>@_pendingOutboxCount</BbTypographyH2>
                 </BbCardContent>
             </BbCard>
         </div>
 
         <BbCard>
             <BbCardHeader>
-                <BbCardTitle>Recent Threads</BbCardTitle>
-                <BbCardDescription>@_rows.Count thread(s) loaded; message and member columns use the current diagnostic sample.</BbCardDescription>
+                <BbCardTitle>Thread Directory</BbCardTitle>
+                <BbCardDescription>@_totalThreads thread(s) available; message, invite, pin, and report columns use the current diagnostics window.</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                @if (_rows.Count == 0)
+                @if (_totalThreads == 0)
                 {
                     <BbAlert Variant="AlertVariant.Info">No messaging threads found for this tenant.</BbAlert>
                 }
                 else
                 {
-                    <BbDataGrid Items="@_rows" ShowPagination="true" InitialPageSize="20"
-                                OnRowClick="@((ThreadRow row) => Navigation.NavigateTo($"/messaging/threads/{row.Id}"))"
+                    <BbDataGrid @key="_gridKey"
+                                TData="MessagingThreadAdminRow"
+                                ItemsProvider="@LoadThreads"
+                                ShowPagination="true"
+                                InitialPageSize="20"
+                                OnRowClick="@((MessagingThreadAdminRow row) => Navigation.NavigateTo($"/messaging/threads/{row.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Thread" Sortable="true">
+                            <BbDataGridTemplateColumn Title="Thread" Sortable="true" Filterable="true" FilterBy="@(row => row.Name)">
                                 <ChildContent Context="row">
                                     <div>
                                         <div class="font-medium">@row.Name</div>
@@ -110,28 +115,35 @@ else
                                     </div>
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Type">
+                            <BbDataGridPropertyColumn Property="@(row => row.TypeName)" Title="Type" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(row => row.MemberCount)" Title="Members" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(row => row.MessageCount)" Title="Messages" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(row => row.PendingInviteCount)" Title="Invites" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(row => row.PinnedCount)" Title="Pins" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(row => row.ReportCount)" Title="Reports" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Member State" Sortable="true" Filterable="true" FilterBy="@(row => row.MemberState)">
                                 <ChildContent Context="row">
-                                    @(row.TypeName ?? "N/A")
+                                    @row.MemberState
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(row => row.MemberCount)" Title="Members" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(row => row.MessageCount)" Title="Messages" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Status">
+                            <BbDataGridTemplateColumn Title="Last Message" Sortable="true" Filterable="true" FilterBy="@(row => row.LastMessagePreview)">
                                 <ChildContent Context="row">
-                                    <StatusBadge Text="@(row.IsEnabled ? "Enabled" : "Disabled")"
+                                    <div>
+                                        <div>@row.LastMessagePreview</div>
+                                        <div class="text-xs text-muted-foreground">@(row.LastMessageAt?.ToString("g") ?? "No messages loaded")</div>
+                                    </div>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(row => row.StatusText)">
+                                <ChildContent Context="row">
+                                    <StatusBadge Text="@row.StatusText"
                                                  Status="@(row.IsEnabled ? "active" : "inactive")" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Last Message">
-                                <ChildContent Context="row">
-                                    @(row.LastMessageAt?.ToString("g") ?? "No sampled messages")
-                                </ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Created" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="row">
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View thread"
                                               OnClick="@(() => Navigation.NavigateTo($"/messaging/threads/{row.Id}"))">
                                         <LucideIcon Name="eye" class="h-4 w-4" />
                                     </BbButton>
@@ -147,20 +159,20 @@ else
 }
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
+    [Inject] private MessagingControlPanelReadService ReadService { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private MessagingControlPanelGuardResult? _guard;
-    private List<ThreadRow> _rows = [];
     private bool _loading = true;
     private string? _error;
+    private int _gridKey;
     private int _totalThreads;
     private int _totalMessages;
     private int _totalMembers;
-    private int _recentlyActiveThreads;
+    private int _pendingOutboxCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -181,7 +193,6 @@ else
     {
         _loading = true;
         _error = null;
-        _rows = [];
 
         try
         {
@@ -192,71 +203,17 @@ else
                 return;
             }
 
-            _totalThreads = await ThreadQuery(tenantId).CountAsync();
-            _totalMessages = await DataContext.Query<Message>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .CountAsync();
-            _totalMembers = await DataContext.Query<MessageThreadMember>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .CountAsync();
-
-            var threads = await ThreadQuery(tenantId)
-                .Include(x => x.Type)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(100)
-                .ToListAsync();
-
-            var sampledMessages = await DataContext.Query<Message>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            var sampledMembers = await DataContext.Query<MessageThreadMember>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            _rows = threads
-                .Select(thread =>
-                {
-                    var threadMessages = sampledMessages
-                        .Where(message => message.MessageThreadId == thread.Id)
-                        .ToList();
-
-                    return new ThreadRow(
-                        thread.Id,
-                        string.IsNullOrWhiteSpace(thread.Name) ? thread.Id.ToString()[..8] : thread.Name,
-                        Truncate(thread.Description, 90),
-                        thread.Type?.Name,
-                        sampledMembers.Count(member => member.MessageThreadId == thread.Id),
-                        threadMessages.Count,
-                        threadMessages.Select(message => (DateTime?)message.CreatedAt).Max(),
-                        thread.IsEnabled,
-                        thread.CreatedAt);
-                })
-                .OrderByDescending(row => row.LastMessageAt ?? row.CreatedAt)
-                .ToList();
-
-            _recentlyActiveThreads = _rows.Count(row => row.LastMessageAt is not null);
+            var summary = await ReadService.GetThreadsSummaryAsync(tenantId);
+            _totalThreads = summary.TotalThreads;
+            _totalMessages = summary.TotalMessages;
+            _totalMembers = summary.TotalMembers;
+            _pendingOutboxCount = summary.PendingOutboxCount;
+            _gridKey++;
         }
-        catch (Exception ex)
+        catch
         {
-            _error = ex.Message;
-            ToastService.Show($"Failed to load messaging threads: {ex.Message}");
+            _error = "Messaging threads could not be loaded. Check service health and tenant access.";
+            ToastService.Error("Messaging threads could not be loaded.", "Threads Unavailable");
         }
         finally
         {
@@ -264,44 +221,28 @@ else
         }
     }
 
-    private IRemoteQuery<MessageThread> ThreadQuery(Guid tenantId) =>
-        DataContext.Query<MessageThread>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId)
-            .Where(x => !x.IsDeleted);
+    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingThreadAdminRow>> LoadThreads(
+        BlazorBlueprint.Primitives.DataGrid.DataGridRequest request)
+    {
+        return _guard?.TenantId is Guid tenantId
+            ? ReadService.GetThreadsAsync(tenantId, request)
+            : ValueTask.FromResult(new BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingThreadAdminRow>
+            {
+                Items = [],
+                TotalItemCount = 0
+            });
+    }
 
     private void ResetStats()
     {
         _totalThreads = 0;
         _totalMessages = 0;
         _totalMembers = 0;
-        _recentlyActiveThreads = 0;
-    }
-
-    private static string Truncate(string? value, int maxLength)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return "No description";
-        }
-
-        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
+        _pendingOutboxCount = 0;
     }
 
     public void Dispose()
     {
         TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
-
-    private sealed record ThreadRow(
-        Guid Id,
-        string Name,
-        string Description,
-        string? TypeName,
-        int MemberCount,
-        int MessageCount,
-        DateTime? LastMessageAt,
-        bool IsEnabled,
-        DateTime CreatedAt);
 }

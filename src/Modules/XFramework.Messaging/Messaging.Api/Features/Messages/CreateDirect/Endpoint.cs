@@ -8,8 +8,7 @@ public static class CreateDirectMessageEndpoint
 {
     [BoltHandler]
     [MapPost("/api/messages/direct", Tags = ["Messages"],
-        Summary = "Create and send a direct message",
-        ExcludeFromOpenApi = true)]
+        Summary = "Create and send a direct message")]
     public static async Task<Result<CmdResponse>> Handle(
         CreateDirectMessageRequest request,
         IMessagingService messagingService,

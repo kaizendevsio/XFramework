@@ -23,7 +23,7 @@ public class MessageFileConfiguration : IEntityTypeConfiguration<MessageFile>
             .HasDefaultValueSql("true");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
-        entity.HasOne(d => d.Message).WithMany()
+        entity.HasOne(d => d.Message).WithMany(p => p.MessageFiles)
             .HasForeignKey(d => d.MessageId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("messagefiles_message_id_fk");

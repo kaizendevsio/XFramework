@@ -10,8 +10,7 @@ public static class CreateThreadMessageEndpoint
     [BoltHandler]
     [MapPost("/api/threads/{threadId:guid}/messages", Tags = ["Messages"],
         Summary = "Create a message in a thread",
-        Description = "Creates a new message in the specified thread. Validates that the sender is a member of the thread.",
-        ExcludeFromOpenApi = true)]
+        Description = "Creates a new message in the specified thread. Validates that the sender is a member of the thread.")]
     public static async Task<Result<CreateThreadMessageResponse>> Handle(
         CreateThreadMessageRequest request,
         IThreadService threadService,

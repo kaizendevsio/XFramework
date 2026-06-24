@@ -9,8 +9,7 @@ public static class AddThreadMemberEndpoint
     [BoltHandler]
     [MapPost("/api/threads/{threadId:guid}/members", Tags = ["Thread Members"],
         Summary = "Add a member to a thread",
-        Description = "Adds a credential as a member of the specified thread. Validates that the thread and credential exist, and that the credential is not already a member.",
-        ExcludeFromOpenApi = true)]
+        Description = "Adds a credential as a member of the specified thread. Validates that the thread and credential exist, and that the credential is not already a member.")]
     public static async Task<Result<CmdResponse>> Handle(
         AddThreadMemberRequest request,
         IThreadService threadService,

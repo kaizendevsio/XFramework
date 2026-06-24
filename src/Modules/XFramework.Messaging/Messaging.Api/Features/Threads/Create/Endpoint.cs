@@ -10,8 +10,7 @@ public static class CreateThreadEndpoint
     [BoltHandler]
     [MapPost("/api/threads", Tags = ["Threads"],
         Summary = "Create a new message thread",
-        Description = "Creates a new message thread with initial members. The first member is considered the creator.",
-        ExcludeFromOpenApi = true)]
+        Description = "Creates a new message thread with initial members. The first member is considered the creator.")]
     public static async Task<Result<CreateThreadResponse>> Handle(
         CreateThreadRequest request,
         IThreadService threadService,

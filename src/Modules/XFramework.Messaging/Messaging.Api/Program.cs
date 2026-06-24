@@ -20,6 +20,9 @@ builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
 builder.Services.AddScoped<IMessagingService, MessagingService>();
 builder.Services.AddScoped<IThreadService, ThreadService>();
 builder.Services.AddScoped<IMessagingRequestContextResolver, MessagingRequestContextResolver>();
+builder.Services.AddScoped<IMessagingRealtimePublisher, MessagingRealtimePublisher>();
+builder.Services.AddScoped<IMessagingNotificationFanout, MessagingNotificationFanout>();
+builder.Services.AddScoped<IMessagingSettingsService, MessagingSettingsService>();
 
 // Register validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -36,6 +39,7 @@ app.UseTenantModuleFeatureGate(options =>
 {
     options.RequireFeature(TenantModuleFeatureKeys.MessagingChat, "/api/threads");
     options.RequireFeature(TenantModuleFeatureKeys.MessagingChat, "/api/messages");
+    options.RequireFeature(TenantModuleFeatureKeys.MessagingChat, "/api/messaging");
 });
 
 // Database migration

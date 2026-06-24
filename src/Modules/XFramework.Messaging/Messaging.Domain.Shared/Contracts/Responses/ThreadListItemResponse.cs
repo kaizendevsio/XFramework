@@ -11,4 +11,7 @@ public partial record ThreadListItemResponse
     public int MemberCount { get; set; }
     public string? LastMessagePreview { get; set; }
     public DateTime? LastMessageAt { get; set; }
+    public int UnreadCount { get; set; }
+    public bool IsMuted { get; set; }
+    public bool IsArchived { get; set; }
 }

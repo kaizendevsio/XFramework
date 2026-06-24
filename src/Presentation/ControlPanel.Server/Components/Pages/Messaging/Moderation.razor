@@ -1,0 +1,603 @@
+@page "/messaging/moderation"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Messaging Moderation - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (_guard is { IsEnabled: false })
+{
+    <div class="space-y-4">
+        <BbAlert Variant="@(_guard.HasSelectedTenant ? AlertVariant.Warning : AlertVariant.Info)">
+            <BbAlertTitle>@_guard.Title</BbAlertTitle>
+            <BbAlertDescription>@_guard.Description</BbAlertDescription>
+        </BbAlert>
+        @if (_guard.TenantId is Guid tenantId)
+        {
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/identity/tenants/{tenantId}/modules"))">
+                <LucideIcon Name="blocks" class="mr-2 h-4 w-4" />
+                Tenant Modules
+            </BbButton>
+        }
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <BbTypographyH3>Messaging Moderation</BbTypographyH3>
+                    <BbTypographyMuted>Reports, direct-message blocks, and enforced chat policy state for @(_guard?.TenantName ?? "selected tenant")</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            @if (_error is not null)
+            {
+                <BbAlert Variant="AlertVariant.Danger">
+                    <BbAlertTitle>Messaging Moderation Unavailable</BbAlertTitle>
+                    <BbAlertDescription>@_error</BbAlertDescription>
+                </BbAlert>
+            }
+
+            <div class="xf-summary-grid xf-summary-grid-4">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Open Reports</BbCardTitle>
+                        <BbCardDescription>Awaiting review</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_openReportCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Reviewed</BbCardTitle>
+                        <BbCardDescription>Resolved in loaded data</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_reviewedReportCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Dismissed</BbCardTitle>
+                        <BbCardDescription>Dismissed in loaded data</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_dismissedReportCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Active Blocks</BbCardTitle>
+                        <BbCardDescription>1:1 DM restrictions</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_activeBlockCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbTabs DefaultValue="reports">
+                <BbTabsList>
+                    <BbTabsTrigger Value="reports">Reports (@FilteredReportRows.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="blocks">Blocks (@FilteredBlockRows.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="policies">Policy (@_policyRows.Count)</BbTabsTrigger>
+                </BbTabsList>
+
+                <BbTabsContent Value="reports" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <div class="xf-page-header">
+                                <div>
+                                    <BbCardTitle>Reported Messages</BbCardTitle>
+                                    <BbCardDescription>@FilteredReportRows.Count report(s) shown from @_reportRows.Count loaded.</BbCardDescription>
+                                </div>
+                                <div class="xf-filter-actions">
+                                    <BbFormFieldInput TValue="string" @bind-Value="_reportSearch" Label="Search Reports" Placeholder="Reason, details, reporter, thread" />
+                                    <BbFormFieldSelect TValue="string" @bind-Value="_reportStatusFilter" Label="Status">
+                                        <BbSelectItem Value="@("all")">All</BbSelectItem>
+                                        <BbSelectItem Value="@("open")">Open</BbSelectItem>
+                                        <BbSelectItem Value="@("reviewed")">Reviewed</BbSelectItem>
+                                        <BbSelectItem Value="@("dismissed")">Dismissed</BbSelectItem>
+                                    </BbFormFieldSelect>
+                                </div>
+                            </div>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            @if (FilteredReportRows.Count == 0)
+                            {
+                                <BbAlert Variant="AlertVariant.Info">No reported messages match the current filters.</BbAlert>
+                            }
+                            else
+                            {
+                                <BbDataGrid Items="@FilteredReportRows" ShowPagination="true" InitialPageSize="20">
+                                    <Columns>
+                                        <BbDataGridTemplateColumn Title="Status" Sortable="true" Filterable="true" FilterBy="@(row => row.Status)">
+                                            <ChildContent Context="row">
+                                                <StatusBadge Text="@row.Status" Status="@row.StatusKey" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.Reason)" Title="Reason" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Thread" Sortable="true" Filterable="true" FilterBy="@(row => row.Thread)">
+                                            <ChildContent Context="row">
+                                                @if (row.ThreadId is Guid threadId)
+                                                {
+                                                    <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/messaging/threads/{threadId}"))">
+                                                        @row.Thread
+                                                    </BbButton>
+                                                }
+                                                else
+                                                {
+                                                    @row.Thread
+                                                }
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.MessagePreview)" Title="Message" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.Reporter)" Title="Reporter" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Details" Filterable="true" FilterBy="@(row => row.Details)">
+                                            <ChildContent Context="row">@Truncate(row.Details, 96)</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                    </Columns>
+                                </BbDataGrid>
+                            }
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="blocks" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <div class="xf-page-header">
+                                <div>
+                                    <BbCardTitle>Credential Blocks</BbCardTitle>
+                                    <BbCardDescription>@FilteredBlockRows.Count block record(s) shown from @_blockRows.Count loaded.</BbCardDescription>
+                                </div>
+                                <div class="xf-filter-actions">
+                                    <BbFormFieldInput TValue="string" @bind-Value="_blockSearch" Label="Search Blocks" Placeholder="Blocker or blocked credential" />
+                                    <BbFormFieldSelect TValue="string" @bind-Value="_blockStatusFilter" Label="Status">
+                                        <BbSelectItem Value="@("all")">All</BbSelectItem>
+                                        <BbSelectItem Value="@("active")">Active</BbSelectItem>
+                                        <BbSelectItem Value="@("inactive")">Inactive</BbSelectItem>
+                                    </BbFormFieldSelect>
+                                </div>
+                            </div>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            @if (FilteredBlockRows.Count == 0)
+                            {
+                                <BbAlert Variant="AlertVariant.Info">No credential blocks match the current filters.</BbAlert>
+                            }
+                            else
+                            {
+                                <BbDataGrid Items="@FilteredBlockRows" ShowPagination="true" InitialPageSize="20">
+                                    <Columns>
+                                        <BbDataGridPropertyColumn Property="@(row => row.Blocker)" Title="Blocker" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.Blocked)" Title="Blocked" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Status" Sortable="true" Filterable="true" FilterBy="@(row => row.Status)">
+                                            <ChildContent Context="row">
+                                                <StatusBadge Text="@row.Status" Status="@row.StatusKey" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                    </Columns>
+                                </BbDataGrid>
+                            }
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="policies" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <div class="xf-page-header">
+                                <div>
+                                    <BbCardTitle>Enforced Platform Policies</BbCardTitle>
+                                    <BbCardDescription>Current Messaging API safeguards surfaced for operations review.</BbCardDescription>
+                                </div>
+                                <div class="xf-page-actions">
+                                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ConfigurePolicy">
+                                        <LucideIcon Name="settings" class="mr-2 h-4 w-4" />
+                                        Configure Policy
+                                    </BbButton>
+                                </div>
+                            </div>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            <BbDataGrid Items="@_policyRows" ShowPagination="true" InitialPageSize="10">
+                                <Columns>
+                                    <BbDataGridPropertyColumn Property="@(row => row.Policy)" Title="Policy" Sortable="true" Filterable="true" />
+                                    <BbDataGridPropertyColumn Property="@(row => row.Scope)" Title="Scope" Sortable="true" Filterable="true" />
+                                    <BbDataGridTemplateColumn Title="Status" Sortable="true" Filterable="true" FilterBy="@(row => row.Status)">
+                                        <ChildContent Context="row">
+                                            <StatusBadge Text="@row.Status" Status="@row.StatusKey" />
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(row => row.Details)" Title="Details" Sortable="true" Filterable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+            </BbTabs>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private MessagingControlPanelGuardResult? _guard;
+    private List<ReportRow> _reportRows = [];
+    private List<BlockRow> _blockRows = [];
+    private List<PolicyRow> _policyRows = CreatePolicyRows();
+    private List<MessageThread> _threads = [];
+    private List<MessageThreadMember> _members = [];
+    private List<Message> _messages = [];
+    private List<IdentityCredential> _credentials = [];
+    private Dictionary<Guid, string> _threadLabels = [];
+    private Dictionary<Guid, string> _memberLabels = [];
+    private Dictionary<Guid, string> _credentialLabels = [];
+    private bool _loading = true;
+    private string? _error;
+    private string _reportSearch = "";
+    private string _reportStatusFilter = "all";
+    private string _blockSearch = "";
+    private string _blockStatusFilter = "all";
+    private int _openReportCount;
+    private int _reviewedReportCount;
+    private int _dismissedReportCount;
+    private int _activeBlockCount;
+
+    private List<ReportRow> FilteredReportRows
+    {
+        get
+        {
+            var rows = _reportRows.AsEnumerable();
+
+            rows = _reportStatusFilter switch
+            {
+                "open" => rows.Where(x => x.Status == "Open"),
+                "reviewed" => rows.Where(x => x.Status == "Reviewed"),
+                "dismissed" => rows.Where(x => x.Status == "Dismissed"),
+                _ => rows
+            };
+
+            if (!string.IsNullOrWhiteSpace(_reportSearch))
+            {
+                var search = _reportSearch.Trim();
+                rows = rows.Where(x =>
+                    Contains(x.Reason, search) ||
+                    Contains(x.Details, search) ||
+                    Contains(x.Thread, search) ||
+                    Contains(x.MessagePreview, search) ||
+                    Contains(x.Reporter, search));
+            }
+
+            return rows.ToList();
+        }
+    }
+
+    private List<BlockRow> FilteredBlockRows
+    {
+        get
+        {
+            var rows = _blockRows.AsEnumerable();
+
+            rows = _blockStatusFilter switch
+            {
+                "active" => rows.Where(x => x.Status == "Active"),
+                "inactive" => rows.Where(x => x.Status == "Inactive"),
+                _ => rows
+            };
+
+            if (!string.IsNullOrWhiteSpace(_blockSearch))
+            {
+                var search = _blockSearch.Trim();
+                rows = rows.Where(x =>
+                    Contains(x.Blocker, search) ||
+                    Contains(x.Blocked, search));
+            }
+
+            return rows.ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _error = null;
+        ClearData();
+
+        try
+        {
+            _guard = await Guard.GetCurrentTenantStateAsync();
+            if (!_guard.IsEnabled || _guard.TenantId is not Guid tenantId)
+            {
+                return;
+            }
+
+            _threads = await DataContext.Query<MessageThread>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            _members = await DataContext.Query<MessageThreadMember>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Credential)
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(1500)
+                .ToListAsync();
+
+            _messages = await DataContext.Query<Message>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(1500)
+                .ToListAsync();
+
+            _credentials = await DataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderBy(x => x.UserName)
+                .Take(1500)
+                .ToListAsync();
+
+            BuildLookupLabels();
+
+            var reports = await DataContext.Query<MessageReport>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            var blocks = await DataContext.Query<MessageBlock>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            _reportRows = reports.Select(ToReportRow).ToList();
+            _blockRows = blocks.Select(ToBlockRow).ToList();
+            _openReportCount = reports.Count(x => x.Status == MessageReportStatuses.Open);
+            _reviewedReportCount = reports.Count(x => x.Status == MessageReportStatuses.Reviewed);
+            _dismissedReportCount = reports.Count(x => x.Status == MessageReportStatuses.Dismissed);
+            _activeBlockCount = blocks.Count(x => x.IsEnabled);
+        }
+        catch
+        {
+            _error = "Messaging moderation data could not be loaded. Check service health and data-context access.";
+            ToastService.Error("Messaging moderation data could not be loaded.", "Moderation Unavailable");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ConfigurePolicy() =>
+        Navigation.NavigateTo("/messaging/settings/policy");
+
+    private void ClearData()
+    {
+        _reportRows = [];
+        _blockRows = [];
+        _threads = [];
+        _members = [];
+        _messages = [];
+        _credentials = [];
+        _threadLabels = [];
+        _memberLabels = [];
+        _credentialLabels = [];
+        _openReportCount = 0;
+        _reviewedReportCount = 0;
+        _dismissedReportCount = 0;
+        _activeBlockCount = 0;
+        _policyRows = CreatePolicyRows();
+    }
+
+    private void BuildLookupLabels()
+    {
+        _threadLabels = _threads.ToDictionary(x => x.Id, DisplayThreadName);
+
+        _credentialLabels = _credentials
+            .GroupBy(x => x.Id)
+            .ToDictionary(group => group.Key, group => BuildCredentialLabel(group.First()));
+
+        foreach (var member in _members.Where(x => x.Credential is not null))
+        {
+            _credentialLabels[member.CredentialId] = BuildCredentialLabel(member.Credential);
+        }
+
+        _memberLabels = _members.ToDictionary(x => x.Id, GetMemberLabel);
+    }
+
+    private ReportRow ToReportRow(MessageReport report)
+    {
+        var message = _messages.FirstOrDefault(x => x.Id == report.MessageId);
+        var threadId = message?.MessageThreadId;
+        var status = ReportStatusLabel(report.Status);
+
+        return new ReportRow(
+            report.Id,
+            status,
+            ReportStatusKey(report.Status),
+            string.IsNullOrWhiteSpace(report.Reason) ? "N/A" : report.Reason,
+            report.Details ?? string.Empty,
+            threadId,
+            threadId is Guid id ? GetThreadLabel(id) : "Unknown thread",
+            message is null ? $"{report.MessageId.ToString()[..8]}..." : Truncate(message.Text, 96),
+            GetMemberLabel(report.ReporterMemberId),
+            report.CreatedAt);
+    }
+
+    private BlockRow ToBlockRow(MessageBlock block)
+    {
+        var status = block.IsEnabled ? "Active" : "Inactive";
+        return new BlockRow(
+            block.Id,
+            GetCredentialLabel(block.BlockerCredentialId),
+            GetCredentialLabel(block.BlockedCredentialId),
+            status,
+            block.IsEnabled ? "active" : "inactive",
+            block.CreatedAt);
+    }
+
+    private string GetThreadLabel(Guid threadId) =>
+        _threadLabels.TryGetValue(threadId, out var label) ? label : $"{threadId.ToString()[..8]}...";
+
+    private string GetMemberLabel(Guid memberId) =>
+        _memberLabels.TryGetValue(memberId, out var label) ? label : $"{memberId.ToString()[..8]}...";
+
+    private string GetMemberLabel(MessageThreadMember member)
+    {
+        if (!string.IsNullOrWhiteSpace(member.Alias))
+        {
+            return member.Alias;
+        }
+
+        if (member.Credential is not null)
+        {
+            return BuildCredentialLabel(member.Credential);
+        }
+
+        return GetCredentialLabel(member.CredentialId);
+    }
+
+    private string GetCredentialLabel(Guid credentialId) =>
+        _credentialLabels.TryGetValue(credentialId, out var label) ? label : $"{credentialId.ToString()[..8]}...";
+
+    private static string DisplayThreadName(MessageThread thread) =>
+        string.IsNullOrWhiteSpace(thread.Name) ? $"{thread.Id.ToString()[..8]}..." : thread.Name;
+
+    private static string BuildCredentialLabel(IdentityCredential credential) =>
+        credential.UserName
+        ?? credential.UserAlias
+        ?? $"{credential.Id.ToString()[..8]}...";
+
+    private static string ReportStatusLabel(short status) => status switch
+    {
+        MessageReportStatuses.Reviewed => "Reviewed",
+        MessageReportStatuses.Dismissed => "Dismissed",
+        _ => "Open"
+    };
+
+    private static string ReportStatusKey(short status) => status switch
+    {
+        MessageReportStatuses.Reviewed => "active",
+        MessageReportStatuses.Dismissed => "inactive",
+        _ => "pending"
+    };
+
+    private static List<PolicyRow> CreatePolicyRows() =>
+    [
+        new(
+            "Global API rate limit",
+            "Messaging API",
+            "Active",
+            "active",
+            "100 requests per minute per IP through XFramework rate limiting."),
+        new(
+            "General API policy",
+            "Named policy",
+            "Active",
+            "active",
+            "60 requests per minute per IP where the API policy is applied."),
+        new(
+            "Attachment validation",
+            "Message file links",
+            "Active",
+            "active",
+            "25 MB maximum, tenant-owned StorageFile required, deleted files rejected, executable/script extensions blocked."),
+        new(
+            "DM blocking",
+            "1:1 direct threads",
+            "Active",
+            "active",
+            "Blocked credentials cannot continue direct-message creation or sending with the blocker.")
+    ];
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "N/A";
+        }
+
+        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
+    }
+
+    private static bool Contains(string? value, string search) =>
+        value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true;
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+
+    private sealed record ReportRow(
+        Guid Id,
+        string Status,
+        string StatusKey,
+        string Reason,
+        string Details,
+        Guid? ThreadId,
+        string Thread,
+        string MessagePreview,
+        string Reporter,
+        DateTime CreatedAt);
+
+    private sealed record BlockRow(
+        Guid Id,
+        string Blocker,
+        string Blocked,
+        string Status,
+        string StatusKey,
+        DateTime CreatedAt);
+
+    private sealed record PolicyRow(
+        string Policy,
+        string Scope,
+        string Status,
+        string StatusKey,
+        string Details);
+}

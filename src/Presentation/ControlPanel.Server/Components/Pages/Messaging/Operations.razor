@@ -1,0 +1,631 @@
+@page "/messaging/operations"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Messaging Operations - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (_guard is { IsEnabled: false })
+{
+    <div class="space-y-4">
+        <BbAlert Variant="@(_guard.HasSelectedTenant ? AlertVariant.Warning : AlertVariant.Info)">
+            <BbAlertTitle>@_guard.Title</BbAlertTitle>
+            <BbAlertDescription>@_guard.Description</BbAlertDescription>
+        </BbAlert>
+        @if (_guard.TenantId is Guid tenantId)
+        {
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/identity/tenants/{tenantId}/modules"))">
+                <LucideIcon Name="blocks" class="mr-2 h-4 w-4" />
+                Tenant Modules
+            </BbButton>
+        }
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <BbTypographyH3>Messaging Operations</BbTypographyH3>
+                    <BbTypographyMuted>Realtime delivery, invites, pins, and saved-message diagnostics for @(_guard?.TenantName ?? "selected tenant")</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            @if (_error is not null)
+            {
+                <BbAlert Variant="AlertVariant.Danger">
+                    <BbAlertTitle>Messaging Operations Unavailable</BbAlertTitle>
+                    <BbAlertDescription>@_error</BbAlertDescription>
+                </BbAlert>
+            }
+
+            <div class="xf-summary-grid xf-summary-grid-4">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Outbox Pending</BbCardTitle>
+                        <BbCardDescription>Durable events not processed</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_pendingOutboxCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Outbox Failed</BbCardTitle>
+                        <BbCardDescription>Pending events with errors</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_failedOutboxCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Pending Invites</BbCardTitle>
+                        <BbCardDescription>Awaiting invite response</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_pendingInviteCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Notifications</BbCardTitle>
+                        <BbCardDescription>Tenant fanout dependency</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <StatusBadge Text="@(_notificationsEnabled ? "Enabled" : "Disabled")"
+                                     Status="@(_notificationsEnabled ? "active" : "inactive")" />
+                    </BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbTabs DefaultValue="outbox">
+                <BbTabsList>
+                    <BbTabsTrigger Value="outbox">Outbox (@_outboxRows.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="invites">Invites (@_inviteRows.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="pins">Pins (@_pinRows.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="saved">Saved (@_savedRows.Count)</BbTabsTrigger>
+                </BbTabsList>
+
+                <BbTabsContent Value="outbox" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <BbCardTitle>Durable Realtime Outbox</BbCardTitle>
+                            <BbCardDescription>@_outboxRows.Count event(s) loaded for the current tenant.</BbCardDescription>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            @if (_outboxRows.Count == 0)
+                            {
+                                <BbAlert Variant="AlertVariant.Info">No messaging outbox events found for this tenant.</BbAlert>
+                            }
+                            else
+                            {
+                                <BbDataGrid Items="@_outboxRows" ShowPagination="true" InitialPageSize="20">
+                                    <Columns>
+                                        <BbDataGridPropertyColumn Property="@(row => row.EventType)" Title="Event" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.AggregateType)" Title="Aggregate" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Thread" Filterable="true" FilterBy="@(row => row.Thread)">
+                                            <ChildContent Context="row">
+                                                @if (row.ThreadId is Guid threadId)
+                                                {
+                                                    <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/messaging/threads/{threadId}"))">
+                                                        @row.Thread
+                                                    </BbButton>
+                                                }
+                                                else
+                                                {
+                                                    @row.Thread
+                                                }
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.Actor)" Title="Actor" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Status" Sortable="true" Filterable="true" FilterBy="@(row => row.Status)">
+                                            <ChildContent Context="row">
+                                                <StatusBadge Text="@row.Status" Status="@row.StatusKey" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.Attempts)" Title="Attempts" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.OccurredAt)" Title="Occurred" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Processed" Sortable="true" Filterable="true" FilterBy="@(row => row.ProcessedDisplay)">
+                                            <ChildContent Context="row">@row.ProcessedDisplay</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Last Error" Filterable="true" FilterBy="@(row => row.LastError)">
+                                            <ChildContent Context="row">@Truncate(row.LastError, 96)</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                    </Columns>
+                                </BbDataGrid>
+                            }
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="invites" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <BbCardTitle>Thread Invites</BbCardTitle>
+                            <BbCardDescription>@_inviteRows.Count invite record(s) loaded.</BbCardDescription>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            @if (_inviteRows.Count == 0)
+                            {
+                                <BbAlert Variant="AlertVariant.Info">No messaging invites found for this tenant.</BbAlert>
+                            }
+                            else
+                            {
+                                <BbDataGrid Items="@_inviteRows" ShowPagination="true" InitialPageSize="20">
+                                    <Columns>
+                                        <BbDataGridTemplateColumn Title="Thread" Sortable="true" Filterable="true" FilterBy="@(row => row.Thread)">
+                                            <ChildContent Context="row">
+                                                <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/messaging/threads/{row.ThreadId}"))">
+                                                    @row.Thread
+                                                </BbButton>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.InvitedCredential)" Title="Invited" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.InvitedBy)" Title="Invited By" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Status" Sortable="true" Filterable="true" FilterBy="@(row => row.Status)">
+                                            <ChildContent Context="row">
+                                                <StatusBadge Text="@row.Status" Status="@row.StatusKey" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Responded" Sortable="true" Filterable="true" FilterBy="@(row => row.RespondedDisplay)">
+                                            <ChildContent Context="row">@row.RespondedDisplay</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                    </Columns>
+                                </BbDataGrid>
+                            }
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="pins" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <BbCardTitle>Pinned Messages</BbCardTitle>
+                            <BbCardDescription>@_pinRows.Count pinned message record(s) loaded.</BbCardDescription>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            @if (_pinRows.Count == 0)
+                            {
+                                <BbAlert Variant="AlertVariant.Info">No pinned messages found for this tenant.</BbAlert>
+                            }
+                            else
+                            {
+                                <BbDataGrid Items="@_pinRows" ShowPagination="true" InitialPageSize="20">
+                                    <Columns>
+                                        <BbDataGridTemplateColumn Title="Thread" Sortable="true" Filterable="true" FilterBy="@(row => row.Thread)">
+                                            <ChildContent Context="row">
+                                                <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/messaging/threads/{row.ThreadId}"))">
+                                                    @row.Thread
+                                                </BbButton>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.MessagePreview)" Title="Message" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.PinnedBy)" Title="Pinned By" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                    </Columns>
+                                </BbDataGrid>
+                            }
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="saved" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader>
+                            <BbCardTitle>Saved Messages</BbCardTitle>
+                            <BbCardDescription>@_savedRows.Count saved-message record(s) loaded.</BbCardDescription>
+                        </BbCardHeader>
+                        <BbCardContent>
+                            @if (_savedRows.Count == 0)
+                            {
+                                <BbAlert Variant="AlertVariant.Info">No saved messages found for this tenant.</BbAlert>
+                            }
+                            else
+                            {
+                                <BbDataGrid Items="@_savedRows" ShowPagination="true" InitialPageSize="20">
+                                    <Columns>
+                                        <BbDataGridTemplateColumn Title="Thread" Sortable="true" Filterable="true" FilterBy="@(row => row.Thread)">
+                                            <ChildContent Context="row">
+                                                @if (row.ThreadId is Guid threadId)
+                                                {
+                                                    <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/messaging/threads/{threadId}"))">
+                                                        @row.Thread
+                                                    </BbButton>
+                                                }
+                                                else
+                                                {
+                                                    @row.Thread
+                                                }
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(row => row.MessagePreview)" Title="Message" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.SavedBy)" Title="Saved By" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(row => row.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                    </Columns>
+                                </BbDataGrid>
+                            }
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+            </BbTabs>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private MessagingControlPanelGuardResult? _guard;
+    private List<OutboxRow> _outboxRows = [];
+    private List<InviteRow> _inviteRows = [];
+    private List<MessagePinRow> _pinRows = [];
+    private List<MessageSavedRow> _savedRows = [];
+    private List<MessageThread> _threads = [];
+    private List<MessageThreadMember> _members = [];
+    private List<Message> _messages = [];
+    private List<IdentityCredential> _credentials = [];
+    private Dictionary<Guid, string> _threadLabels = [];
+    private Dictionary<Guid, string> _memberLabels = [];
+    private Dictionary<Guid, string> _credentialLabels = [];
+    private bool _loading = true;
+    private bool _notificationsEnabled;
+    private string? _error;
+    private int _pendingOutboxCount;
+    private int _failedOutboxCount;
+    private int _pendingInviteCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _error = null;
+        ClearData();
+
+        try
+        {
+            _guard = await Guard.GetCurrentTenantStateAsync();
+            if (!_guard.IsEnabled || _guard.TenantId is not Guid tenantId)
+            {
+                return;
+            }
+
+            _notificationsEnabled = await DataContext.Query<TenantModuleFeature>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => x.ModuleKey == TenantModuleFeatureKeys.Notifications)
+                .Where(x => x.SubFeatureKey == string.Empty)
+                .Where(x => x.IsEnabled && !x.IsDeleted)
+                .AnyAsync();
+
+            _threads = await DataContext.Query<MessageThread>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            _members = await DataContext.Query<MessageThreadMember>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Credential)
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(1500)
+                .ToListAsync();
+
+            _messages = await DataContext.Query<Message>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(1500)
+                .ToListAsync();
+
+            _credentials = await DataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderBy(x => x.UserName)
+                .Take(1500)
+                .ToListAsync();
+
+            BuildLookupLabels();
+
+            var outbox = await DataContext.Query<MessageOutboxEvent>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.OccurredAt)
+                .Take(500)
+                .ToListAsync();
+
+            var invites = await DataContext.Query<MessageThreadInvite>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            var pins = await DataContext.Query<MessagePin>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            var savedMessages = await DataContext.Query<MessageSaved>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            _outboxRows = outbox.Select(ToOutboxRow).ToList();
+            _inviteRows = invites.Select(ToInviteRow).ToList();
+            _pinRows = pins.Select(ToPinRow).ToList();
+            _savedRows = savedMessages.Select(ToSavedRow).ToList();
+
+            _pendingOutboxCount = outbox.Count(x => x.ProcessedAt is null);
+            _failedOutboxCount = outbox.Count(x => x.ProcessedAt is null && (!string.IsNullOrWhiteSpace(x.LastError) || x.Attempts > 0));
+            _pendingInviteCount = invites.Count(x => x.Status == MessageThreadInviteStatuses.Pending);
+        }
+        catch
+        {
+            _error = "Messaging operations could not be loaded. Check service health and data-context access.";
+            ToastService.Error("Messaging operations could not be loaded.", "Operations Unavailable");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ClearData()
+    {
+        _outboxRows = [];
+        _inviteRows = [];
+        _pinRows = [];
+        _savedRows = [];
+        _threads = [];
+        _members = [];
+        _messages = [];
+        _credentials = [];
+        _threadLabels = [];
+        _memberLabels = [];
+        _credentialLabels = [];
+        _notificationsEnabled = false;
+        _pendingOutboxCount = 0;
+        _failedOutboxCount = 0;
+        _pendingInviteCount = 0;
+    }
+
+    private void BuildLookupLabels()
+    {
+        _threadLabels = _threads.ToDictionary(x => x.Id, DisplayThreadName);
+
+        _credentialLabels = _credentials
+            .GroupBy(x => x.Id)
+            .ToDictionary(group => group.Key, group => BuildCredentialLabel(group.First()));
+
+        foreach (var member in _members.Where(x => x.Credential is not null))
+        {
+            _credentialLabels[member.CredentialId] = BuildCredentialLabel(member.Credential);
+        }
+
+        _memberLabels = _members.ToDictionary(x => x.Id, GetMemberLabel);
+    }
+
+    private OutboxRow ToOutboxRow(MessageOutboxEvent item)
+    {
+        var status = item.ProcessedAt is not null
+            ? "Processed"
+            : string.IsNullOrWhiteSpace(item.LastError) && item.Attempts == 0
+                ? "Pending"
+                : "Retrying";
+
+        var statusKey = item.ProcessedAt is not null ? "active" : status == "Pending" ? "pending" : "inactive";
+
+        return new OutboxRow(
+            item.Id,
+            item.EventType,
+            item.AggregateType,
+            item.ThreadId,
+            item.ThreadId is Guid threadId ? GetThreadLabel(threadId) : "Tenant event",
+            GetCredentialLabel(item.ActorCredentialId),
+            status,
+            statusKey,
+            item.Attempts,
+            item.OccurredAt,
+            item.ProcessedAt?.ToString("g") ?? "Not processed",
+            item.LastError ?? string.Empty);
+    }
+
+    private InviteRow ToInviteRow(MessageThreadInvite item)
+    {
+        var status = InviteStatusLabel(item.Status);
+        return new InviteRow(
+            item.Id,
+            item.MessageThreadId,
+            GetThreadLabel(item.MessageThreadId),
+            GetCredentialLabel(item.InvitedCredentialId),
+            GetCredentialLabel(item.InvitedByCredentialId),
+            status,
+            InviteStatusKey(item.Status),
+            item.RespondedAt?.ToString("g") ?? "No response",
+            item.CreatedAt);
+    }
+
+    private MessagePinRow ToPinRow(MessagePin item) =>
+        new(
+            item.Id,
+            item.MessageThreadId,
+            GetThreadLabel(item.MessageThreadId),
+            GetMessagePreview(item.MessageId),
+            GetMemberLabel(item.PinnedByMemberId),
+            item.CreatedAt);
+
+    private MessageSavedRow ToSavedRow(MessageSaved item)
+    {
+        var message = _messages.FirstOrDefault(x => x.Id == item.MessageId);
+        return new MessageSavedRow(
+            item.Id,
+            message?.MessageThreadId,
+            message is null ? "Unknown thread" : GetThreadLabel(message.MessageThreadId),
+            GetMessagePreview(item.MessageId),
+            GetMemberLabel(item.MessageThreadMemberId),
+            item.CreatedAt);
+    }
+
+    private string GetThreadLabel(Guid threadId) =>
+        _threadLabels.TryGetValue(threadId, out var label) ? label : $"{threadId.ToString()[..8]}...";
+
+    private string GetMemberLabel(Guid memberId) =>
+        _memberLabels.TryGetValue(memberId, out var label) ? label : $"{memberId.ToString()[..8]}...";
+
+    private string GetMemberLabel(MessageThreadMember member)
+    {
+        if (!string.IsNullOrWhiteSpace(member.Alias))
+        {
+            return member.Alias;
+        }
+
+        if (member.Credential is not null)
+        {
+            return BuildCredentialLabel(member.Credential);
+        }
+
+        return GetCredentialLabel(member.CredentialId);
+    }
+
+    private string GetCredentialLabel(Guid? credentialId)
+    {
+        if (credentialId is not Guid id)
+        {
+            return "System";
+        }
+
+        return _credentialLabels.TryGetValue(id, out var label) ? label : $"{id.ToString()[..8]}...";
+    }
+
+    private string GetMessagePreview(Guid messageId)
+    {
+        var message = _messages.FirstOrDefault(x => x.Id == messageId);
+        return message is null ? $"{messageId.ToString()[..8]}..." : Truncate(message.Text, 96);
+    }
+
+    private static string DisplayThreadName(MessageThread thread) =>
+        string.IsNullOrWhiteSpace(thread.Name) ? $"{thread.Id.ToString()[..8]}..." : thread.Name;
+
+    private static string BuildCredentialLabel(IdentityCredential credential) =>
+        credential.UserName
+        ?? credential.UserAlias
+        ?? $"{credential.Id.ToString()[..8]}...";
+
+    private static string InviteStatusLabel(short status) => status switch
+    {
+        MessageThreadInviteStatuses.Accepted => "Accepted",
+        MessageThreadInviteStatuses.Declined => "Declined",
+        _ => "Pending"
+    };
+
+    private static string InviteStatusKey(short status) => status switch
+    {
+        MessageThreadInviteStatuses.Accepted => "active",
+        MessageThreadInviteStatuses.Declined => "inactive",
+        _ => "pending"
+    };
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "N/A";
+        }
+
+        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+
+    private sealed record OutboxRow(
+        Guid Id,
+        string EventType,
+        string AggregateType,
+        Guid? ThreadId,
+        string Thread,
+        string Actor,
+        string Status,
+        string StatusKey,
+        int Attempts,
+        DateTime OccurredAt,
+        string ProcessedDisplay,
+        string LastError);
+
+    private sealed record InviteRow(
+        Guid Id,
+        Guid ThreadId,
+        string Thread,
+        string InvitedCredential,
+        string InvitedBy,
+        string Status,
+        string StatusKey,
+        string RespondedDisplay,
+        DateTime CreatedAt);
+
+    private sealed record MessagePinRow(
+        Guid Id,
+        Guid ThreadId,
+        string Thread,
+        string MessagePreview,
+        string PinnedBy,
+        DateTime CreatedAt);
+
+    private sealed record MessageSavedRow(
+        Guid Id,
+        Guid? ThreadId,
+        string Thread,
+        string MessagePreview,
+        string SavedBy,
+        DateTime CreatedAt);
+}

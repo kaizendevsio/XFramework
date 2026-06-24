@@ -23,6 +23,7 @@
         
         <!-- Domain Shared (contracts and DTOs) -->
         <ProjectReference Include="..\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\XFramework.Notifications\Notifications.Domain.Shared\Notifications.Domain.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>

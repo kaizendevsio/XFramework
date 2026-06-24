@@ -42,12 +42,13 @@ public static class BoltServerExtensions
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<BoltServer>>();
             var durableStore = sp.GetService<Bolt.Server.Durable.IDurableQueueStore>();
             var durableOptions = sp.GetService<Microsoft.Extensions.Options.IOptions<Bolt.Server.Durable.DurableQueueOptions>>();
+            var topicAuthorizers = sp.GetServices<IBoltTopicAuthorizer>();
 
             BoltServer server;
             if (durableStore is not null && durableOptions is not null)
-                server = new BoltServer(logger, options, durableStore, durableOptions);
+                server = new BoltServer(logger, options, durableStore, durableOptions, topicAuthorizers);
             else
-                server = new BoltServer(logger, options);
+                server = new BoltServer(logger, options, topicAuthorizers);
 
             foreach (var processor in options.MediaProcessors)
                 server.RegisterMediaProcessor(processor);
@@ -78,7 +79,7 @@ public static class BoltServerExtensions
             var server = context.RequestServices.GetRequiredService<BoltServer>();
             var webSocket = await context.WebSockets.AcceptWebSocketAsync();
             var transport = new WebSocketBoltConnection(webSocket);
-            await server.HandleConnectionAsync(transport, context.RequestAborted);
+            await server.HandleConnectionAsync(transport, context.User, context.RequestAborted);
         });
 
         return endpoints;

@@ -56,8 +56,10 @@
 @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.MessagingChat))
 {
     <SidebarSection GroupId="messaging" Title="Messaging" Icon="messages-square">
+        <SidebarNavItem Href="/messaging/users" Label="Users" Icon="users" />
         <SidebarNavItem Href="/messaging/threads" Label="Threads" Icon="messages-square" />
-        <SidebarNavItem Href="/messaging/direct-messages" Label="Direct Messages" Icon="send" />
+        <SidebarNavItem Href="/messaging/operations" Label="Operations" Icon="radio-tower" />
+        <SidebarNavItem Href="/messaging/moderation" Label="Moderation" Icon="shield-alert" />
         <SidebarNavItem Href="/messaging/settings" Label="Settings" Icon="settings" />
     </SidebarSection>
 }

@@ -18,6 +18,7 @@ public sealed class ThreadService(
     ILogger<ThreadService> logger
 ) : IThreadService
 {
+    private const decimal MaxAttachmentSizeBytes = 25 * 1024 * 1024;
     private static readonly JsonSerializerOptions OutboxJsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<Result<CreateThreadResponse>> CreateThreadAsync(CreateThreadRequest request, CancellationToken ct = default)
@@ -81,6 +82,9 @@ public sealed class ThreadService(
                     Emoji = string.Empty,
                     Description = string.Empty,
                     Status = 1, // Active
+                    Role = credentialId == caller.CredentialId
+                        ? MessageThreadMemberRoles.Owner
+                        : MessageThreadMemberRoles.Member,
                     IsEnabled = true,
                     CreatedAt = DateTime.UtcNow,
                     ConcurrencyStamp = Guid.NewGuid()
@@ -117,6 +121,103 @@ public sealed class ThreadService(
         {
             logger.LogError(ex, "Error creating thread: {Name}", request.Name);
             return Result<CreateThreadResponse>.Failure($"Error creating thread: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CreateThreadResponse>> CreateDirectThreadAsync(CreateDirectThreadRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CreateThreadResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            if (request.OtherCredentialId == caller.CredentialId)
+                return Result<CreateThreadResponse>.Failure("Direct thread requires another credential", 400);
+
+            var isBlocked = await IsBlockedAsync(caller.TenantId, caller.CredentialId, request.OtherCredentialId, ct);
+            if (isBlocked)
+                return Result<CreateThreadResponse>.Forbidden("Direct messaging is blocked between these credentials");
+
+            var otherCredentialExists = await dataContext.Query<IdentityCredential>()
+                .Where(c => c.Id == request.OtherCredentialId)
+                .Where(c => c.TenantId == caller.TenantId)
+                .Where(c => !c.IsDeleted && c.IsEnabled)
+                .AnyAsync(ct);
+            if (!otherCredentialExists)
+                return Result<CreateThreadResponse>.NotFound("Credential not found");
+
+            var existingThreadId = await FindDirectThreadAsync(caller.TenantId, caller.CredentialId, request.OtherCredentialId, ct);
+            if (existingThreadId is Guid existing)
+                return Result<CreateThreadResponse>.Success(new CreateThreadResponse { ThreadId = existing });
+
+            var typeId = request.TypeId ?? await ResolveChatThreadTypeIdAsync(caller.TenantId, ct);
+            if (typeId is null)
+                return Result<CreateThreadResponse>.NotFound("Chat thread type not found");
+
+            var thread = new MessageThread
+            {
+                Id = Guid.NewGuid(),
+                TenantId = caller.TenantId,
+                Name = request.Name ?? "Direct message",
+                Description = string.Empty,
+                TypeId = typeId.Value,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
+            dataContext.Add(thread);
+
+            var group = CreateDefaultThreadMemberGroup(thread.Id, caller.TenantId);
+            dataContext.Add(group);
+
+            foreach (var (credentialId, role) in new[]
+                     {
+                         (caller.CredentialId, MessageThreadMemberRoles.Owner),
+                         (request.OtherCredentialId, MessageThreadMemberRoles.Member)
+                     })
+            {
+                dataContext.Add(new MessageThreadMember
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = caller.TenantId,
+                    MessageThreadId = thread.Id,
+                    CredentialId = credentialId,
+                    GroupId = group.Id,
+                    Alias = string.Empty,
+                    Emoji = string.Empty,
+                    Description = string.Empty,
+                    Status = 1,
+                    Role = role,
+                    IsEnabled = true,
+                    CreatedAt = DateTime.UtcNow,
+                    ConcurrencyStamp = Guid.NewGuid()
+                });
+            }
+
+            AddOutboxEvent(
+                MessageRealtimeEvents.ThreadCreated,
+                caller.TenantId,
+                thread.Id,
+                thread.Id,
+                nameof(MessageThread),
+                caller.CredentialId,
+                new
+                {
+                    thread.Id,
+                    thread.Name,
+                    IsDirect = true,
+                    MemberCredentialIds = new[] { caller.CredentialId, request.OtherCredentialId }
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CreateThreadResponse>.Success(new CreateThreadResponse { ThreadId = thread.Id }, 201);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error creating direct thread for credential {CredentialId}", request.OtherCredentialId);
+            return Result<CreateThreadResponse>.Failure($"Error creating direct thread: {ex.Message}");
         }
     }
 
@@ -174,10 +275,17 @@ public sealed class ThreadService(
                 .GroupBy(m => m.MessageThreadId)
                 .ToDictionary(g => g.Key, g => g.First());
 
+            var unreadMap = await GetUnreadCountMapAsync(caller.TenantId, caller.CredentialId, threadIds, ct);
+            var membershipMap = memberships
+                .GroupBy(m => m.MessageThreadId)
+                .ToDictionary(g => g.Key, g => g.First());
+
             var items = threads.Select(t =>
             {
                 lastMessageMap.TryGetValue(t.Id, out var lastMsg);
                 memberCountMap.TryGetValue(t.Id, out var count);
+                unreadMap.TryGetValue(t.Id, out var unreadCount);
+                membershipMap.TryGetValue(t.Id, out var membership);
 
                 return new ThreadListItemResponse
                 {
@@ -190,7 +298,10 @@ public sealed class ThreadService(
                     LastMessagePreview = lastMsg?.Text?.Length > 100
                         ? lastMsg.Text[..100] + "..."
                         : lastMsg?.Text,
-                    LastMessageAt = lastMsg?.CreatedAt
+                    LastMessageAt = lastMsg?.CreatedAt,
+                    UnreadCount = unreadCount,
+                    IsMuted = membership?.IsMuted == true,
+                    IsArchived = membership?.IsArchived == true
                 };
             }).ToList();
 
@@ -270,6 +381,48 @@ public sealed class ThreadService(
         }
     }
 
+    public async Task<Result<GetUnreadCountsResponse>> GetUnreadCountsAsync(GetUnreadCountsRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<GetUnreadCountsResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var memberships = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.CredentialId == caller.CredentialId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .ToListAsync(ct);
+
+            var threadIds = memberships
+                .Select(m => m.MessageThreadId)
+                .Distinct()
+                .ToList();
+
+            var unreadMap = await GetUnreadCountMapAsync(caller.TenantId, caller.CredentialId, threadIds, ct);
+            var items = unreadMap
+                .Select(pair => new UnreadThreadCountResponse
+                {
+                    ThreadId = pair.Key,
+                    UnreadCount = pair.Value
+                })
+                .ToList();
+
+            return Result<GetUnreadCountsResponse>.Success(new GetUnreadCountsResponse
+            {
+                Threads = items,
+                TotalUnreadCount = items.Sum(item => item.UnreadCount)
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting unread counts");
+            return Result<GetUnreadCountsResponse>.Failure($"Error getting unread counts: {ex.Message}");
+        }
+    }
+
     public async Task<Result<CmdResponse>> UpdateThreadAsync(UpdateThreadRequest request, CancellationToken ct = default)
     {
         try
@@ -336,6 +489,164 @@ public sealed class ThreadService(
         {
             logger.LogError(ex, "Error updating thread {ThreadId}", request.ThreadId);
             return Result<CmdResponse>.Failure($"Error updating thread: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> LeaveThreadAsync(LeaveThreadRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (member is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            var activeMembers = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .OrderBy(m => m.CreatedAt)
+                .ToListAsync(ct);
+
+            if (activeMembers.Count <= 1)
+                return Result<CmdResponse>.Failure("Cannot leave as the last member of a thread", 400);
+
+            member.IsDeleted = true;
+            member.IsEnabled = false;
+            member.DeletedAt = DateTime.UtcNow;
+            member.ModifiedAt = DateTime.UtcNow;
+            dataContext.Update(member);
+
+            if (member.Role == MessageThreadMemberRoles.Owner &&
+                activeMembers.Where(m => m.Id != member.Id).All(m => m.Role != MessageThreadMemberRoles.Owner))
+            {
+                var replacementOwner = activeMembers.First(m => m.Id != member.Id);
+                replacementOwner.Role = MessageThreadMemberRoles.Owner;
+                replacementOwner.ModifiedAt = DateTime.UtcNow;
+                dataContext.Update(replacementOwner);
+            }
+
+            AddOutboxEvent(
+                MessageRealtimeEvents.ThreadLeft,
+                member.TenantId,
+                request.ThreadId,
+                member.Id,
+                nameof(MessageThreadMember),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    MemberId = member.Id,
+                    member.CredentialId
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Thread left successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error leaving thread {ThreadId}", request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error leaving thread: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> MuteThreadAsync(MuteThreadRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (member is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            member.IsMuted = request.IsMuted;
+            member.MutedAt = request.IsMuted ? DateTime.UtcNow : null;
+            member.ModifiedAt = DateTime.UtcNow;
+            dataContext.Update(member);
+
+            AddOutboxEvent(
+                MessageRealtimeEvents.ThreadMuted,
+                member.TenantId,
+                request.ThreadId,
+                member.Id,
+                nameof(MessageThreadMember),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    MemberId = member.Id,
+                    request.IsMuted
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = request.IsMuted ? "Thread muted successfully" : "Thread unmuted successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating mute state for thread {ThreadId}", request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error updating mute state: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> ArchiveThreadAsync(ArchiveThreadRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (member is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            member.IsArchived = request.IsArchived;
+            member.ArchivedAt = request.IsArchived ? DateTime.UtcNow : null;
+            member.ModifiedAt = DateTime.UtcNow;
+            dataContext.Update(member);
+
+            AddOutboxEvent(
+                MessageRealtimeEvents.ThreadArchived,
+                member.TenantId,
+                request.ThreadId,
+                member.Id,
+                nameof(MessageThreadMember),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    MemberId = member.Id,
+                    request.IsArchived
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = request.IsArchived ? "Thread archived successfully" : "Thread unarchived successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating archive state for thread {ThreadId}", request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error updating archive state: {ex.Message}");
         }
     }
 
@@ -417,6 +728,7 @@ public sealed class ThreadService(
                 Emoji = string.Empty,
                 Description = string.Empty,
                 Status = 1, // Active
+                Role = MessageThreadMemberRoles.Member,
                 IsEnabled = true,
                 CreatedAt = DateTime.UtcNow,
                 ConcurrencyStamp = Guid.NewGuid()
@@ -527,6 +839,273 @@ public sealed class ThreadService(
         }
     }
 
+    public async Task<Result<CmdResponse>> CreateThreadInviteAsync(CreateThreadInviteRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var actorMember = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (actorMember is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            if (!await CanManageThreadAsync(actorMember, ct))
+                return Result<CmdResponse>.Forbidden("Only thread admins can invite members");
+
+            var credentialExists = await dataContext.Query<IdentityCredential>()
+                .Where(c => c.Id == request.CredentialId)
+                .Where(c => c.TenantId == caller.TenantId)
+                .Where(c => !c.IsDeleted && c.IsEnabled)
+                .AnyAsync(ct);
+            if (!credentialExists)
+                return Result<CmdResponse>.NotFound("Credential not found");
+
+            var alreadyMember = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.CredentialId == request.CredentialId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .AnyAsync(ct);
+            if (alreadyMember)
+                return Result<CmdResponse>.Conflict("Credential is already a member of this thread");
+
+            var pendingInvite = await dataContext.Query<MessageThreadInvite>()
+                .Where(i => i.MessageThreadId == request.ThreadId)
+                .Where(i => i.InvitedCredentialId == request.CredentialId)
+                .Where(i => i.TenantId == caller.TenantId)
+                .Where(i => i.Status == MessageThreadInviteStatuses.Pending)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+            if (pendingInvite is not null)
+                return Result<CmdResponse>.Conflict("A pending invite already exists for this credential");
+
+            var invite = new MessageThreadInvite
+            {
+                Id = Guid.NewGuid(),
+                TenantId = caller.TenantId,
+                MessageThreadId = request.ThreadId,
+                InvitedCredentialId = request.CredentialId,
+                InvitedByCredentialId = caller.CredentialId,
+                Status = MessageThreadInviteStatuses.Pending,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
+
+            dataContext.Add(invite);
+            AddOutboxEvent(
+                MessageRealtimeEvents.ThreadInviteCreated,
+                caller.TenantId,
+                request.ThreadId,
+                invite.Id,
+                nameof(MessageThreadInvite),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    InviteId = invite.Id,
+                    invite.InvitedCredentialId,
+                    invite.InvitedByCredentialId
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.Created,
+                Message = "Thread invite created successfully"
+            }, 201);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error creating invite for thread {ThreadId}", request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error creating thread invite: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> RespondThreadInviteAsync(RespondThreadInviteRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var invite = await dataContext.Query<MessageThreadInvite>()
+                .Where(i => i.Id == request.InviteId)
+                .Where(i => i.MessageThreadId == request.ThreadId)
+                .Where(i => i.InvitedCredentialId == caller.CredentialId)
+                .Where(i => i.TenantId == caller.TenantId)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+            if (invite is null)
+                return Result<CmdResponse>.NotFound("Thread invite not found");
+
+            if (invite.Status != MessageThreadInviteStatuses.Pending)
+                return Result<CmdResponse>.Conflict("Thread invite has already been resolved");
+
+            invite.Status = request.Accept
+                ? MessageThreadInviteStatuses.Accepted
+                : MessageThreadInviteStatuses.Declined;
+            invite.RespondedAt = DateTime.UtcNow;
+            invite.ModifiedAt = DateTime.UtcNow;
+            dataContext.Update(invite);
+
+            MessageThreadMember? member = null;
+            if (request.Accept)
+            {
+                member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+                if (member is null)
+                {
+                    var group = await dataContext.Query<MessageThreadMemberGroup>()
+                        .Where(g => g.MessageThreadId == request.ThreadId)
+                        .Where(g => g.TenantId == caller.TenantId)
+                        .Where(g => !g.IsDeleted && g.IsEnabled)
+                        .OrderBy(g => g.CreatedAt)
+                        .FirstOrDefaultAsync(ct);
+
+                    if (group is null)
+                    {
+                        group = CreateDefaultThreadMemberGroup(request.ThreadId, caller.TenantId);
+                        dataContext.Add(group);
+                    }
+
+                    member = new MessageThreadMember
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = caller.TenantId,
+                        MessageThreadId = request.ThreadId,
+                        CredentialId = caller.CredentialId,
+                        GroupId = group.Id,
+                        Alias = string.Empty,
+                        Emoji = string.Empty,
+                        Description = string.Empty,
+                        Status = 1,
+                        Role = MessageThreadMemberRoles.Member,
+                        IsEnabled = true,
+                        CreatedAt = DateTime.UtcNow,
+                        ConcurrencyStamp = Guid.NewGuid()
+                    };
+                    dataContext.Add(member);
+                }
+            }
+
+            AddOutboxEvent(
+                request.Accept ? MessageRealtimeEvents.ThreadInviteAccepted : MessageRealtimeEvents.ThreadInviteDeclined,
+                caller.TenantId,
+                request.ThreadId,
+                invite.Id,
+                nameof(MessageThreadInvite),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    InviteId = invite.Id,
+                    invite.InvitedCredentialId,
+                    MemberId = member?.Id
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = request.Accept ? "Thread invite accepted successfully" : "Thread invite declined successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error responding to invite {InviteId} for thread {ThreadId}", request.InviteId, request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error responding to thread invite: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> UpdateThreadMemberRoleAsync(UpdateThreadMemberRoleRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var actorMember = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (actorMember is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            var targetMember = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.Id == request.MemberId)
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+            if (targetMember is null)
+                return Result<CmdResponse>.NotFound("Thread member not found");
+
+            var normalizedRole = NormalizeRole(request.Role);
+            if (normalizedRole == MessageThreadMemberRoles.Owner && actorMember.Role != MessageThreadMemberRoles.Owner)
+                return Result<CmdResponse>.Forbidden("Only a thread owner can transfer ownership");
+
+            if (normalizedRole != MessageThreadMemberRoles.Owner && !await CanManageThreadAsync(actorMember, ct))
+                return Result<CmdResponse>.Forbidden("Only thread admins can update member roles");
+
+            var owners = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => m.Role == MessageThreadMemberRoles.Owner)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .ToListAsync(ct);
+
+            if (targetMember.Role == MessageThreadMemberRoles.Owner &&
+                normalizedRole != MessageThreadMemberRoles.Owner &&
+                owners.All(owner => owner.Id == targetMember.Id))
+                return Result<CmdResponse>.Failure("Cannot remove the last owner from a thread", 400);
+
+            if (normalizedRole == MessageThreadMemberRoles.Owner)
+            {
+                foreach (var owner in owners.Where(owner => owner.Id != targetMember.Id))
+                {
+                    owner.Role = MessageThreadMemberRoles.Admin;
+                    owner.ModifiedAt = DateTime.UtcNow;
+                    dataContext.Update(owner);
+                }
+            }
+
+            targetMember.Role = normalizedRole;
+            targetMember.ModifiedAt = DateTime.UtcNow;
+            dataContext.Update(targetMember);
+
+            AddOutboxEvent(
+                MessageRealtimeEvents.ThreadMemberRoleChanged,
+                targetMember.TenantId,
+                request.ThreadId,
+                targetMember.Id,
+                nameof(MessageThreadMember),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    MemberId = targetMember.Id,
+                    targetMember.CredentialId,
+                    Role = normalizedRole
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Thread member role updated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating member {MemberId} role in thread {ThreadId}", request.MemberId, request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error updating thread member role: {ex.Message}");
+        }
+    }
+
     public async Task<Result<CreateThreadMessageResponse>> CreateThreadMessageAsync(CreateThreadMessageRequest request, CancellationToken ct = default)
     {
         try
@@ -562,6 +1141,45 @@ public sealed class ThreadService(
                 return Result<CreateThreadMessageResponse>.Failure("Sender is not a member of this thread", 403);
             }
 
+            var activeThreadMembers = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .ToListAsync(ct);
+
+            if (activeThreadMembers.Count == 2)
+            {
+                var otherCredentialId = activeThreadMembers
+                    .First(m => m.CredentialId != caller.CredentialId)
+                    .CredentialId;
+
+                if (await IsBlockedAsync(caller.TenantId, caller.CredentialId, otherCredentialId, ct))
+                    return Result<CreateThreadMessageResponse>.Forbidden("Direct messaging is blocked between these credentials");
+            }
+
+            if (request.ParentMessageId is Guid parentMessageId)
+            {
+                var parentExists = await dataContext.Query<Message>()
+                    .Where(m => m.Id == parentMessageId)
+                    .Where(m => m.MessageThreadId == request.ThreadId)
+                    .Where(m => m.TenantId == caller.TenantId)
+                    .Where(m => !m.IsDeleted)
+                    .AnyAsync(ct);
+                if (!parentExists)
+                    return Result<CreateThreadMessageResponse>.NotFound("Parent message not found in this thread");
+            }
+
+            var mentionedCredentialIds = request.MentionedCredentialIds
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+            if (mentionedCredentialIds.Count > 0)
+            {
+                var activeCredentialIds = activeThreadMembers.Select(m => m.CredentialId).ToHashSet();
+                if (mentionedCredentialIds.Any(id => !activeCredentialIds.Contains(id)))
+                    return Result<CreateThreadMessageResponse>.Failure("Mentioned credentials must be active members of this thread", 400);
+            }
+
             var message = new Message
             {
                 Id = Guid.NewGuid(),
@@ -569,6 +1187,8 @@ public sealed class ThreadService(
                 MessageThreadId = request.ThreadId,
                 MessageThreadMemberId = senderMember.Id,
                 Text = request.Text,
+                ParentMessageId = request.ParentMessageId,
+                MentionedCredentialIdsJson = JsonSerializer.Serialize(mentionedCredentialIds, OutboxJsonOptions),
                 IsEnabled = true,
                 CreatedAt = DateTime.UtcNow,
                 ConcurrencyStamp = Guid.NewGuid()
@@ -586,7 +1206,9 @@ public sealed class ThreadService(
                 {
                     ThreadId = thread.Id,
                     MessageId = message.Id,
-                    SenderMemberId = senderMember.Id
+                    SenderMemberId = senderMember.Id,
+                    message.ParentMessageId,
+                    MentionedCredentialIds = mentionedCredentialIds
                 });
 
             await dataContext.SaveChangesAsync(ct);
@@ -681,6 +1303,23 @@ public sealed class ThreadService(
                 .ToListAsync(ct);
 
             var memberMap = members.ToDictionary(m => m.Id);
+            var messageIds = messages.Select(m => m.Id).ToList();
+            var pins = await dataContext.Query<MessagePin>()
+                .Where(p => messageIds.Contains(p.MessageId))
+                .Where(p => p.MessageThreadId == request.ThreadId)
+                .Where(p => p.TenantId == caller.TenantId)
+                .Where(p => !p.IsDeleted && p.IsEnabled)
+                .ToListAsync(ct);
+
+            var saved = await dataContext.Query<MessageSaved>()
+                .Where(s => messageIds.Contains(s.MessageId))
+                .Where(s => s.MessageThreadMemberId == requesterMember.Id)
+                .Where(s => s.TenantId == caller.TenantId)
+                .Where(s => !s.IsDeleted && s.IsEnabled)
+                .ToListAsync(ct);
+
+            var pinnedSet = pins.Select(p => p.MessageId).ToHashSet();
+            var savedSet = saved.Select(s => s.MessageId).ToHashSet();
 
             var items = messages.Select(m =>
             {
@@ -691,7 +1330,11 @@ public sealed class ThreadService(
                     Text = m.Text,
                     SenderCredentialId = sender?.CredentialId ?? Guid.Empty,
                     SenderAlias = sender?.Alias ?? string.Empty,
-                    CreatedAt = m.CreatedAt
+                    CreatedAt = m.CreatedAt,
+                    ParentMessageId = m.ParentMessageId,
+                    MentionedCredentialIds = DeserializeMentionedCredentialIds(m.MentionedCredentialIdsJson),
+                    IsPinned = pinnedSet.Contains(m.Id),
+                    IsSaved = savedSet.Contains(m.Id)
                 };
             }).ToList();
 
@@ -707,6 +1350,85 @@ public sealed class ThreadService(
         {
             logger.LogError(ex, "Error getting messages for thread {ThreadId}", request.ThreadId);
             return Result<GetThreadMessagesResponse>.Failure($"Error getting messages: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<SearchMessagesResponse>> SearchMessagesAsync(SearchMessagesRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<SearchMessagesResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var queryText = request.Query.Trim();
+            if (queryText.Length == 0)
+                return Result<SearchMessagesResponse>.Failure("Search query is required", 400);
+
+            var memberships = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.CredentialId == caller.CredentialId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .ToListAsync(ct);
+
+            var allowedThreadIds = memberships.Select(m => m.MessageThreadId).Distinct().ToList();
+            if (request.ThreadId is Guid threadId)
+            {
+                if (!allowedThreadIds.Contains(threadId))
+                    return Result<SearchMessagesResponse>.Forbidden("Requester is not a member of this thread");
+
+                allowedThreadIds = [threadId];
+            }
+
+            var pageIndex = request.PageIndex < 0 ? 0 : request.PageIndex;
+            var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
+            var normalizedQuery = queryText.ToLowerInvariant();
+
+            var baseQuery = dataContext.Query<Message>()
+                .Where(m => allowedThreadIds.Contains(m.MessageThreadId))
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted)
+                .Where(m => m.Text.ToLower().Contains(normalizedQuery));
+
+            var totalCount = await baseQuery.CountAsync(ct);
+            var messages = await baseQuery
+                .OrderByDescending(m => m.CreatedAt)
+                .Skip(pageIndex * pageSize)
+                .Take(pageSize)
+                .ToListAsync(ct);
+
+            var memberIds = messages.Select(m => m.MessageThreadMemberId).Distinct().ToList();
+            var members = await dataContext.Query<MessageThreadMember>()
+                .Where(m => memberIds.Contains(m.Id))
+                .Where(m => m.TenantId == caller.TenantId)
+                .ToListAsync(ct);
+
+            var memberMap = members.ToDictionary(m => m.Id);
+
+            return Result<SearchMessagesResponse>.Success(new SearchMessagesResponse
+            {
+                Items = messages.Select(message =>
+                {
+                    memberMap.TryGetValue(message.MessageThreadMemberId, out var sender);
+                    return new SearchMessageItemResponse
+                    {
+                        ThreadId = message.MessageThreadId,
+                        MessageId = message.Id,
+                        SenderCredentialId = sender?.CredentialId ?? Guid.Empty,
+                        Text = message.Text,
+                        CreatedAt = message.CreatedAt
+                    };
+                }).ToList(),
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error searching messages");
+            return Result<SearchMessagesResponse>.Failure($"Error searching messages: {ex.Message}");
         }
     }
 
@@ -840,6 +1562,383 @@ public sealed class ThreadService(
         }
     }
 
+    public async Task<Result<CmdResponse>> PinMessageAsync(PinMessageRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (member is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            if (!await CanManageThreadAsync(member, ct))
+                return Result<CmdResponse>.Forbidden("Only thread admins can pin messages");
+
+            var messageExists = await dataContext.Query<Message>()
+                .Where(m => m.Id == request.MessageId)
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted)
+                .AnyAsync(ct);
+            if (!messageExists)
+                return Result<CmdResponse>.NotFound("Message not found");
+
+            var existingPin = await dataContext.Query<MessagePin>()
+                .Where(p => p.MessageThreadId == request.ThreadId)
+                .Where(p => p.MessageId == request.MessageId)
+                .Where(p => p.TenantId == caller.TenantId)
+                .Where(p => !p.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (request.IsPinned)
+            {
+                if (existingPin is null)
+                {
+                    existingPin = new MessagePin
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = caller.TenantId,
+                        MessageThreadId = request.ThreadId,
+                        MessageId = request.MessageId,
+                        PinnedByMemberId = member.Id,
+                        IsEnabled = true,
+                        CreatedAt = DateTime.UtcNow,
+                        ConcurrencyStamp = Guid.NewGuid()
+                    };
+                    dataContext.Add(existingPin);
+                }
+                else
+                {
+                    existingPin.IsEnabled = true;
+                    existingPin.ModifiedAt = DateTime.UtcNow;
+                    dataContext.Update(existingPin);
+                }
+            }
+            else if (existingPin is not null)
+            {
+                existingPin.IsDeleted = true;
+                existingPin.IsEnabled = false;
+                existingPin.DeletedAt = DateTime.UtcNow;
+                existingPin.ModifiedAt = DateTime.UtcNow;
+                dataContext.Update(existingPin);
+            }
+
+            AddOutboxEvent(
+                request.IsPinned ? MessageRealtimeEvents.MessagePinned : MessageRealtimeEvents.MessageUnpinned,
+                caller.TenantId,
+                request.ThreadId,
+                request.MessageId,
+                nameof(MessagePin),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    request.MessageId,
+                    MemberId = member.Id
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = request.IsPinned ? "Message pinned successfully" : "Message unpinned successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating pin for message {MessageId}", request.MessageId);
+            return Result<CmdResponse>.Failure($"Error updating message pin: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> SaveMessageAsync(SaveMessageRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (member is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            var messageExists = await dataContext.Query<Message>()
+                .Where(m => m.Id == request.MessageId)
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted)
+                .AnyAsync(ct);
+            if (!messageExists)
+                return Result<CmdResponse>.NotFound("Message not found");
+
+            var existingSaved = await dataContext.Query<MessageSaved>()
+                .Where(s => s.MessageId == request.MessageId)
+                .Where(s => s.MessageThreadMemberId == member.Id)
+                .Where(s => s.TenantId == caller.TenantId)
+                .Where(s => !s.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (request.IsSaved)
+            {
+                if (existingSaved is null)
+                {
+                    existingSaved = new MessageSaved
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = caller.TenantId,
+                        MessageId = request.MessageId,
+                        MessageThreadMemberId = member.Id,
+                        IsEnabled = true,
+                        CreatedAt = DateTime.UtcNow,
+                        ConcurrencyStamp = Guid.NewGuid()
+                    };
+                    dataContext.Add(existingSaved);
+                }
+                else
+                {
+                    existingSaved.IsEnabled = true;
+                    existingSaved.ModifiedAt = DateTime.UtcNow;
+                    dataContext.Update(existingSaved);
+                }
+            }
+            else if (existingSaved is not null)
+            {
+                existingSaved.IsDeleted = true;
+                existingSaved.IsEnabled = false;
+                existingSaved.DeletedAt = DateTime.UtcNow;
+                existingSaved.ModifiedAt = DateTime.UtcNow;
+                dataContext.Update(existingSaved);
+            }
+
+            AddOutboxEvent(
+                request.IsSaved ? MessageRealtimeEvents.MessageSaved : MessageRealtimeEvents.MessageUnsaved,
+                caller.TenantId,
+                request.ThreadId,
+                request.MessageId,
+                nameof(MessageSaved),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    request.MessageId,
+                    MemberId = member.Id
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = request.IsSaved ? "Message saved successfully" : "Message unsaved successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating saved state for message {MessageId}", request.MessageId);
+            return Result<CmdResponse>.Failure($"Error updating saved message: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> ReportMessageAsync(ReportMessageRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (member is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            var messageExists = await dataContext.Query<Message>()
+                .Where(m => m.Id == request.MessageId)
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted)
+                .AnyAsync(ct);
+            if (!messageExists)
+                return Result<CmdResponse>.NotFound("Message not found");
+
+            var report = new MessageReport
+            {
+                Id = Guid.NewGuid(),
+                TenantId = caller.TenantId,
+                MessageId = request.MessageId,
+                ReporterMemberId = member.Id,
+                Reason = request.Reason.Trim(),
+                Details = request.Details,
+                Status = MessageReportStatuses.Open,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
+
+            dataContext.Add(report);
+            AddOutboxEvent(
+                MessageRealtimeEvents.MessageReported,
+                caller.TenantId,
+                request.ThreadId,
+                report.Id,
+                nameof(MessageReport),
+                caller.CredentialId,
+                new
+                {
+                    request.ThreadId,
+                    request.MessageId,
+                    ReportId = report.Id,
+                    MemberId = member.Id,
+                    report.Reason
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.Created,
+                Message = "Message reported successfully"
+            }, 201);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error reporting message {MessageId}", request.MessageId);
+            return Result<CmdResponse>.Failure($"Error reporting message: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> BlockCredentialAsync(BlockCredentialRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            if (request.CredentialId == caller.CredentialId)
+                return Result<CmdResponse>.Failure("Cannot block your own credential", 400);
+
+            var credentialExists = await dataContext.Query<IdentityCredential>()
+                .Where(c => c.Id == request.CredentialId)
+                .Where(c => c.TenantId == caller.TenantId)
+                .Where(c => !c.IsDeleted && c.IsEnabled)
+                .AnyAsync(ct);
+            if (!credentialExists)
+                return Result<CmdResponse>.NotFound("Credential not found");
+
+            var existingBlock = await dataContext.Query<MessageBlock>()
+                .Where(b => b.BlockerCredentialId == caller.CredentialId)
+                .Where(b => b.BlockedCredentialId == request.CredentialId)
+                .Where(b => b.TenantId == caller.TenantId)
+                .Where(b => !b.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (existingBlock is null)
+            {
+                existingBlock = new MessageBlock
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = caller.TenantId,
+                    BlockerCredentialId = caller.CredentialId,
+                    BlockedCredentialId = request.CredentialId,
+                    IsEnabled = true,
+                    CreatedAt = DateTime.UtcNow,
+                    ConcurrencyStamp = Guid.NewGuid()
+                };
+                dataContext.Add(existingBlock);
+            }
+            else
+            {
+                existingBlock.IsEnabled = true;
+                existingBlock.ModifiedAt = DateTime.UtcNow;
+                dataContext.Update(existingBlock);
+            }
+
+            AddOutboxEvent(
+                MessageRealtimeEvents.CredentialBlocked,
+                caller.TenantId,
+                null,
+                existingBlock.Id,
+                nameof(MessageBlock),
+                caller.CredentialId,
+                new
+                {
+                    BlockId = existingBlock.Id,
+                    existingBlock.BlockerCredentialId,
+                    existingBlock.BlockedCredentialId
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.Created,
+                Message = "Credential blocked successfully"
+            }, 201);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error blocking credential {CredentialId}", request.CredentialId);
+            return Result<CmdResponse>.Failure($"Error blocking credential: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> DeleteCredentialBlockAsync(DeleteCredentialBlockRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var block = await dataContext.Query<MessageBlock>()
+                .Where(b => b.BlockerCredentialId == caller.CredentialId)
+                .Where(b => b.BlockedCredentialId == request.CredentialId)
+                .Where(b => b.TenantId == caller.TenantId)
+                .Where(b => !b.IsDeleted && b.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+            if (block is null)
+                return Result<CmdResponse>.NotFound("Credential block not found");
+
+            block.IsDeleted = true;
+            block.IsEnabled = false;
+            block.DeletedAt = DateTime.UtcNow;
+            block.ModifiedAt = DateTime.UtcNow;
+            dataContext.Update(block);
+
+            AddOutboxEvent(
+                MessageRealtimeEvents.CredentialUnblocked,
+                caller.TenantId,
+                null,
+                block.Id,
+                nameof(MessageBlock),
+                caller.CredentialId,
+                new
+                {
+                    BlockId = block.Id,
+                    block.BlockerCredentialId,
+                    block.BlockedCredentialId
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Credential block removed successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error removing credential block for {CredentialId}", request.CredentialId);
+            return Result<CmdResponse>.Failure($"Error removing credential block: {ex.Message}");
+        }
+    }
+
     public async Task<Result<CmdResponse>> CreateMessageFileAsync(CreateMessageFileRequest request, CancellationToken ct = default)
     {
         try
@@ -868,6 +1967,20 @@ public sealed class ThreadService(
 
             if (message is null)
                 return Result<CmdResponse>.NotFound("Message not found");
+
+            var storageFile = await dataContext.Query<StorageFile>()
+                .Where(f => f.Id == request.StorageFileId)
+                .Where(f => f.TenantId == caller.TenantId)
+                .Where(f => !f.IsDeleted && f.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+            if (storageFile is null)
+                return Result<CmdResponse>.NotFound("Storage file not found");
+
+            if (storageFile.FileSize is decimal fileSize && fileSize > MaxAttachmentSizeBytes)
+                return Result<CmdResponse>.Failure("Storage file exceeds the Messaging attachment size policy", 400);
+
+            if (!IsAllowedAttachmentFileType(storageFile))
+                return Result<CmdResponse>.Failure("Storage file type is not allowed for Messaging attachments", 400);
 
             var file = new MessageFile
             {
@@ -1179,6 +2292,10 @@ public sealed class ThreadService(
                 }
             }
 
+            member.LastSeenAt = DateTime.UtcNow;
+            member.ModifiedAt = DateTime.UtcNow;
+            dataContext.Update(member);
+
             if (markedCount > 0)
             {
                 AddOutboxEvent(
@@ -1276,10 +2393,176 @@ public sealed class ThreadService(
 
     private async Task<bool> CanManageThreadAsync(MessageThreadMember member, CancellationToken ct)
     {
+        if (member.Role is MessageThreadMemberRoles.Owner or MessageThreadMemberRoles.Admin)
+            return true;
+
         if (await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct))
             return true;
 
         return !await ThreadHasExplicitRolesAsync(member.TenantId, member.MessageThreadId, ct);
+    }
+
+    private async Task<Guid?> ResolveChatThreadTypeIdAsync(Guid tenantId, CancellationToken ct)
+    {
+        var type = await dataContext.Query<MessageThreadType>()
+            .Where(t => t.TenantId == tenantId)
+            .Where(t => t.MessageTypeId == MessageTypes.Chat)
+            .Where(t => !t.IsDeleted && t.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+
+        return type?.Id;
+    }
+
+    private async Task<Guid?> FindDirectThreadAsync(
+        Guid tenantId,
+        Guid credentialId,
+        Guid otherCredentialId,
+        CancellationToken ct)
+    {
+        var participantIds = new[] { credentialId, otherCredentialId };
+        var participantMemberships = await dataContext.Query<MessageThreadMember>()
+            .Where(m => participantIds.Contains(m.CredentialId))
+            .Where(m => m.TenantId == tenantId)
+            .Where(m => !m.IsDeleted && m.IsEnabled)
+            .ToListAsync(ct);
+
+        var candidateThreadIds = participantMemberships
+            .GroupBy(m => m.MessageThreadId)
+            .Where(g => g.Select(m => m.CredentialId).Distinct().Count() == 2)
+            .Select(g => g.Key)
+            .ToList();
+        if (candidateThreadIds.Count == 0)
+            return null;
+
+        var allCandidateMembers = await dataContext.Query<MessageThreadMember>()
+            .Where(m => candidateThreadIds.Contains(m.MessageThreadId))
+            .Where(m => m.TenantId == tenantId)
+            .Where(m => !m.IsDeleted && m.IsEnabled)
+            .ToListAsync(ct);
+
+        return allCandidateMembers
+            .GroupBy(m => m.MessageThreadId)
+            .FirstOrDefault(g =>
+                g.Count() == 2 &&
+                g.Select(m => m.CredentialId).OrderBy(id => id)
+                    .SequenceEqual(participantIds.OrderBy(id => id)))
+            ?.Key;
+    }
+
+    private async Task<Dictionary<Guid, int>> GetUnreadCountMapAsync(
+        Guid tenantId,
+        Guid credentialId,
+        List<Guid> threadIds,
+        CancellationToken ct)
+    {
+        if (threadIds.Count == 0)
+            return [];
+
+        var memberships = await dataContext.Query<MessageThreadMember>()
+            .Where(m => threadIds.Contains(m.MessageThreadId))
+            .Where(m => m.CredentialId == credentialId)
+            .Where(m => m.TenantId == tenantId)
+            .Where(m => !m.IsDeleted && m.IsEnabled)
+            .ToListAsync(ct);
+
+        var memberByThread = memberships.ToDictionary(m => m.MessageThreadId);
+        var memberIds = memberships.Select(m => m.Id).ToList();
+
+        var messages = await dataContext.Query<Message>()
+            .Where(m => threadIds.Contains(m.MessageThreadId))
+            .Where(m => m.TenantId == tenantId)
+            .Where(m => !m.IsDeleted)
+            .ToListAsync(ct);
+
+        var readDeliveries = await dataContext.Query<MessageDelivery>()
+            .Where(d => memberIds.Contains(d.MessageThreadMemberId))
+            .Where(d => d.TenantId == tenantId)
+            .Where(d => d.TypeId == MessageDeliveryTypes.Read)
+            .Where(d => !d.IsDeleted)
+            .ToListAsync(ct);
+
+        var readIdsByMember = readDeliveries
+            .GroupBy(d => d.MessageThreadMemberId)
+            .ToDictionary(g => g.Key, g => g.Select(d => d.MessageId).ToHashSet());
+
+        return threadIds.ToDictionary(
+            threadId => threadId,
+            threadId =>
+            {
+                if (!memberByThread.TryGetValue(threadId, out var member))
+                    return 0;
+
+                readIdsByMember.TryGetValue(member.Id, out var readIds);
+                readIds ??= [];
+
+                return messages.Count(m =>
+                    m.MessageThreadId == threadId &&
+                    m.MessageThreadMemberId != member.Id &&
+                    !readIds.Contains(m.Id));
+            });
+    }
+
+    private async Task<bool> IsBlockedAsync(Guid tenantId, Guid firstCredentialId, Guid secondCredentialId, CancellationToken ct) =>
+        await dataContext.Query<MessageBlock>()
+            .Where(b => b.TenantId == tenantId)
+            .Where(b => !b.IsDeleted && b.IsEnabled)
+            .Where(b =>
+                (b.BlockerCredentialId == firstCredentialId && b.BlockedCredentialId == secondCredentialId) ||
+                (b.BlockerCredentialId == secondCredentialId && b.BlockedCredentialId == firstCredentialId))
+            .AnyAsync(ct);
+
+    private static string NormalizeRole(string role) =>
+        role.Trim() switch
+        {
+            nameof(MessageThreadMemberRoles.Owner) => MessageThreadMemberRoles.Owner,
+            nameof(MessageThreadMemberRoles.Admin) => MessageThreadMemberRoles.Admin,
+            _ => MessageThreadMemberRoles.Member
+        };
+
+    private static List<Guid> DeserializeMentionedCredentialIds(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<Guid>>(json, OutboxJsonOptions) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static bool IsAllowedAttachmentFileType(StorageFile file)
+    {
+        var blockedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".bat",
+            ".cmd",
+            ".com",
+            ".dll",
+            ".exe",
+            ".js",
+            ".msi",
+            ".ps1",
+            ".scr",
+            ".sh",
+            ".vbs"
+        };
+
+        var extension = Path.GetExtension(file.Name ?? file.ContentPath);
+        if (!string.IsNullOrWhiteSpace(extension) && blockedExtensions.Contains(extension))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(file.ContentType))
+            return true;
+
+        return file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
+               file.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ||
+               file.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ||
+               file.ContentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase) ||
+               file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) ||
+               file.ContentType.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
+               file.ContentType.Equals("application/zip", StringComparison.OrdinalIgnoreCase) ||
+               file.ContentType.StartsWith("application/vnd.", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task AddAdminRoleBindingsAsync(

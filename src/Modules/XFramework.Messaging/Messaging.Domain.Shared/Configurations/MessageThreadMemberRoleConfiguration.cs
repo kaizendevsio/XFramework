@@ -30,7 +30,7 @@ public class MessageThreadMemberRoleConfiguration : IEntityTypeConfiguration<Mes
         entity.HasIndex(e => e.RoleId)
             .HasDatabaseName("IX_MessageThreadMemberRole_RoleId");
 
-        entity.HasOne(d => d.MessageThreadMember).WithMany()
+        entity.HasOne(d => d.MessageThreadMember).WithMany(p => p.MessageThreadMemberRoles)
             .HasForeignKey(d => d.MessageThreadMemberId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("messagethreadmemberrole_messagethreadmember_id_fk");
