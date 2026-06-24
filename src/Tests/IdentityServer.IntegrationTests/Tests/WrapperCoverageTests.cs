@@ -20,6 +20,45 @@ namespace IdentityServer.IntegrationTests.Tests;
 public sealed class WrapperCoverageTests : IntegrationTestBase
 {
     [Test]
+    public async Task CreateCredential_WithValidData_HashesPasswordAndCreatesCredential()
+    {
+        var info = await SeedIdentityInfo();
+        var username = UniqueUsername();
+        var password = "WrapperPassword123!";
+
+        var result = await IntegrationTestFixture.ServiceWrapper.CreateCredential(new CreateCredentialRequest
+        {
+            IdentityInfoId = info.Id,
+            UserName = username,
+            UserAlias = "Wrapper Alias",
+            Password = password,
+            Metadata = CreateMetadata()
+        });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        result.IsSuccess.Should().BeTrue();
+
+        await using var db = CreateDbContext();
+        var credential = await db.Set<IdentityCredential>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.IdentityInfoId == info.Id && c.UserName == username);
+
+        credential.Should().NotBeNull();
+        credential!.PasswordByte.Should().NotBeNullOrEmpty();
+        BCrypt.Net.BCrypt.Verify(password, Encoding.ASCII.GetString(credential.PasswordByte!)).Should().BeTrue();
+
+        var verify = await IntegrationTestFixture.ServiceWrapper.VerifyPassword(
+            new VerifyPasswordRequest
+            {
+                CredentialId = credential.Id,
+                Password = password,
+                Metadata = CreateMetadata()
+            });
+
+        verify.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Test]
     public async Task ForgotPassword_WithUnknownEmail_ReturnsSuccess()
     {
         var result = await IntegrationTestFixture.ServiceWrapper.ForgotPassword(new ForgotPasswordRequest
@@ -195,6 +234,23 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         result.Response.Credential.Should().NotBeNull();
 
         return result;
+    }
+
+    private async Task<IdentityInformation> SeedIdentityInfo()
+    {
+        await using var db = CreateDbContext();
+
+        var info = new IdentityInformation
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Test",
+            LastName = "User",
+            TenantId = IntegrationTestFixture.TestTenantId
+        };
+        db.Set<IdentityInformation>().Add(info);
+
+        await db.SaveChangesAsync();
+        return info;
     }
 
     private async Task<IdentityCredential> SeedCredentialWithRole(string username, string password)

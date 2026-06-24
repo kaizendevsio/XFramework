@@ -18,7 +18,7 @@
                     <BbButton Variant="ButtonVariant.Ghost" OnClick="Discard" Disabled="@Saving">
                         Discard Changes
                     </BbButton>
-                    <BbButton OnClick="Save" Disabled="@(!_context.IsDirty || Saving)">
+                    <BbButton OnClick="Save" Disabled="@((RequireDirtyForSave && !_context.IsDirty) || Saving)">
                         @if (Saving)
                         {
                             <BbSpinner Size="SpinnerSize.Small" Class="mr-2" />
@@ -42,6 +42,7 @@
     [Parameter] public EventCallback OnSave { get; set; }
     [Parameter] public EventCallback OnDiscard { get; set; }
     [Parameter] public bool Saving { get; set; }
+    [Parameter] public bool RequireDirtyForSave { get; set; } = true;
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     private readonly EditableFormContext _context = new();

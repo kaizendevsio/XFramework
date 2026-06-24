@@ -16,20 +16,27 @@
     }
     else
     {
-    <BbDataGrid Items="@_logs">
+    <BbDataGrid Items="@_logs" ShowPagination="true" InitialPageSize="20" ShowSearch="true" SearchPlaceholder="Search authorization logs...">
         <Columns>
-            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.Ipaddress)" Title="IP Address" Sortable="true" />
-            <BbDataGridTemplateColumn Title="Success">
+            <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(item => GetCredentialLabel(item))">
+                <ChildContent Context="item">
+                    @GetCredentialLabel(item)
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.Ipaddress)" Title="IP Address" Sortable="true" Filterable="true" />
+            <BbDataGridTemplateColumn Title="Success" Filterable="true" FilterBy="@(item => GetResultLabel(item))">
                 <ChildContent Context="item">
                     <StatusBadge Text="@(item.IsSuccess == true ? "Success" : "Failed")"
                                  Status="@(item.IsSuccess == true ? "success" : "failed")" />
                 </ChildContent>
             </BbDataGridTemplateColumn>
-            <BbDataGridPropertyColumn Property="@(x => x.LoginSource)" Title="Login Source" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.DeviceName)" Title="Device" />
-            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.LoginSource)" Title="Login Source" Sortable="true" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.DeviceName)" Title="Device" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
         </Columns>
+        <EmptyTemplate>
+            <BbEmpty Title="No authorization logs" Description="No authorization logs found for the selected tenant." />
+        </EmptyTemplate>
     </BbDataGrid>
     }
 </div>
@@ -37,6 +44,7 @@
 @code {
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<AuthorizationLog> _logs = [];
     private bool _loading = true;
@@ -51,7 +59,8 @@
         _loading = true;
         try
         {
-            var query = DataContext.Query<AuthorizationLog>();
+            var query = DataContext.Query<AuthorizationLog>()
+                .Include(x => x.IdentityCredentials);
             if (TenantFilter.SelectedTenantId is { } tenantId)
             {
                 query = query.Where(x => x.TenantId == tenantId);
@@ -61,10 +70,29 @@
                 .OrderByDescending(x => x.CreatedAt)
                 .ToList();
         }
-        catch { /* query may fail */ }
+        catch
+        {
+            _logs = [];
+            ToastService.Error("Authorization logs could not be loaded.", "Load failed");
+        }
         finally
         {
             _loading = false;
         }
     }
+
+    private static string GetCredentialLabel(AuthorizationLog log)
+    {
+        var credential = log.IdentityCredentials;
+        if (!string.IsNullOrWhiteSpace(credential?.UserName))
+            return credential.UserName;
+
+        if (!string.IsNullOrWhiteSpace(credential?.UserAlias))
+            return credential.UserAlias;
+
+        return "Unknown credential";
+    }
+
+    private static string GetResultLabel(AuthorizationLog log) =>
+        log.IsSuccess == true ? "Success" : "Failed";
 }

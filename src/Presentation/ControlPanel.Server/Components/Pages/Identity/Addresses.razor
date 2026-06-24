@@ -3,12 +3,17 @@
 <PageTitle>Addresses - Control Panel</PageTitle>
 
 <div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <BbTypographyH3>Addresses</BbTypographyH3>
+    <div class="xf-page-header">
+        <div>
+            <BbTypographyH3>Addresses</BbTypographyH3>
+            <BbTypographyMuted>Scan address records and open a detail page to edit relationships.</BbTypographyMuted>
+        </div>
+        <div class="xf-page-actions">
         <BbButton OnClick="@OpenAddDialog">
             <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
             Add Address
         </BbButton>
+        </div>
     </div>
 
     @if (_loading)
@@ -17,26 +22,35 @@
     }
     else
     {
-    <BbDataGrid Items="@_addresses">
+    <BbDataGrid Items="@_addresses"
+                ShowPagination="true"
+                InitialPageSize="20"
+                ShowSearch="true"
+                SearchPlaceholder="Search addresses..."
+                OnRowClick="@((IdentityAddress item) => OpenAddressDetail(item))">
         <Columns>
-            <BbDataGridPropertyColumn Property="@(x => x.IdentityInfoId)" Title="User ID" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" />
-            <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" />
-            <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" Sortable="true" />
-            <BbDataGridTemplateColumn Title="Default">
+            <BbDataGridTemplateColumn Title="User" Filterable="true" FilterBy="@(item => GetUserLabelById(item.IdentityInfoId))">
+                <ChildContent Context="item">
+                    @GetUserLabelById(item.IdentityInfoId)
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" Sortable="true" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" Sortable="true" Filterable="true" />
+            <BbDataGridTemplateColumn Title="Default" Filterable="true" FilterBy="@(item => GetDefaultAddressLabel(item))">
                 <ChildContent Context="item">
                     <StatusBadge Text="@(item.DefaultAddress == true ? "Default" : "No")"
                                  Status="@(item.DefaultAddress == true ? "active" : "inactive")" />
                 </ChildContent>
             </BbDataGridTemplateColumn>
-            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
             <BbDataGridTemplateColumn Title="Actions">
                 <ChildContent Context="item">
                     <div class="flex items-center gap-2">
                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                  OnClick="@(() => OpenEditDialog(item))">
-                            <LucideIcon Name="pencil" class="h-4 w-4" />
+                                  OnClick="@(() => OpenAddressDetail(item))">
+                            <LucideIcon Name="eye" class="h-4 w-4" />
                         </BbButton>
                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                   OnClick="@(() => OpenDeleteDialog(item))">
@@ -46,6 +60,9 @@
                 </ChildContent>
             </BbDataGridTemplateColumn>
         </Columns>
+        <EmptyTemplate>
+            <BbEmpty Title="No addresses" Description="No addresses found for the selected tenant." />
+        </EmptyTemplate>
     </BbDataGrid>
     }
 </div>
@@ -53,10 +70,8 @@
 <BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
     <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
-            <BbDialogTitle>@(_isEditing ? "Edit Address" : "Add Address")</BbDialogTitle>
-            <BbDialogDescription>
-                @(_isEditing ? "Update address details." : "Create a new address record.")
-            </BbDialogDescription>
+            <BbDialogTitle>Add Address</BbDialogTitle>
+            <BbDialogDescription>Create a new address record.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <XfEntityPicker TItem="IdentityInformation"
@@ -103,7 +118,7 @@
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>
-            <BbButton OnClick="@SaveAddress">@(_isEditing ? "Update" : "Create")</BbButton>
+            <BbButton OnClick="@SaveAddress">Create</BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
@@ -114,6 +129,7 @@
 
 @code {
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
@@ -122,8 +138,6 @@
     private bool _loading = true;
     private bool _dialogOpen;
     private bool _deleteDialogOpen;
-    private bool _isEditing;
-    private Guid _editingId;
     private IdentityAddress? _deletingAddress;
 
     private string _formIdentityInfoId = "";
@@ -172,12 +186,16 @@
 
             _users = await userQuery.Take(500).ToListAsync();
         }
-        catch { /* query may fail */ }
+        catch
+        {
+            _addresses = [];
+            _users = [];
+            ToastService.Error("Addresses could not be loaded.", "Load failed");
+        }
     }
 
     private void OpenAddDialog()
     {
-        _isEditing = false;
         _formIdentityInfoId = "";
         _formUnitNumber = "";
         _formStreet = "";
@@ -187,18 +205,8 @@
         _dialogOpen = true;
     }
 
-    private void OpenEditDialog(IdentityAddress addr)
-    {
-        _isEditing = true;
-        _editingId = addr.Id;
-        _formIdentityInfoId = addr.IdentityInfoId.ToString();
-        _formUnitNumber = addr.UnitNumber ?? "";
-        _formStreet = addr.Street ?? "";
-        _formBuilding = addr.Building ?? "";
-        _formSubdivision = addr.Subdivision ?? "";
-        _formConsolidatedName = addr.ConsolidatedName ?? "";
-        _dialogOpen = true;
-    }
+    private void OpenAddressDetail(IdentityAddress address) =>
+        Navigation.NavigateTo($"/identity/addresses/{address.Id}");
 
     private void OpenDeleteDialog(IdentityAddress addr)
     {
@@ -210,54 +218,31 @@
     {
         if (!Guid.TryParse(_formIdentityInfoId, out var identityInfoId))
         {
-            ToastService.Show("Invalid User ID.");
+            ToastService.Warning("Select a user.", "Missing user");
             return;
         }
 
         try
         {
-            if (_isEditing)
+            var addr = new IdentityAddress
             {
-                var addr = await DataContext.Query<IdentityAddress>()
-                    .Where(x => x.Id == _editingId)
-                    .FirstOrDefaultAsync();
-
-                if (addr is not null)
-                {
-                    addr.IdentityInfoId = identityInfoId;
-                    addr.UnitNumber = _formUnitNumber;
-                    addr.Street = _formStreet;
-                    addr.Building = _formBuilding;
-                    addr.Subdivision = _formSubdivision;
-                    addr.ConsolidatedName = _formConsolidatedName;
-                    addr.ModifiedAt = DateTime.UtcNow;
-                    DataContext.Update(addr);
-                    var result = await DataContext.SaveChangesAsync();
-                    ToastService.Show(result.IsSuccess ? "Address updated." : $"Error: {result.Message}");
-                }
-            }
-            else
-            {
-                var addr = new IdentityAddress
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = TenantFilter.SelectedTenantId ?? Guid.Empty,
-                    IdentityInfoId = identityInfoId,
-                    UnitNumber = _formUnitNumber,
-                    Street = _formStreet,
-                    Building = _formBuilding,
-                    Subdivision = _formSubdivision,
-                    ConsolidatedName = _formConsolidatedName,
-                    CreatedAt = DateTime.UtcNow
-                };
-                DataContext.Add(addr);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Address created." : $"Error: {result.Message}");
-            }
+                Id = Guid.NewGuid(),
+                TenantId = TenantFilter.SelectedTenantId ?? Guid.Empty,
+                IdentityInfoId = identityInfoId,
+                UnitNumber = _formUnitNumber,
+                Street = _formStreet,
+                Building = _formBuilding,
+                Subdivision = _formSubdivision,
+                ConsolidatedName = _formConsolidatedName,
+                CreatedAt = DateTime.UtcNow
+            };
+            DataContext.Add(addr);
+            var result = await DataContext.SaveChangesAsync();
+            ShowSaveResult(result.IsSuccess, "Address created.", "Address could not be created.");
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("Address could not be saved.", "Save failed");
         }
 
         _dialogOpen = false;
@@ -274,11 +259,11 @@
                 _deletingAddress.IsEnabled = false;
                 DataContext.Update(_deletingAddress);
                 var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Address deleted." : $"Error: {result.Message}");
+                ShowSaveResult(result.IsSuccess, "Address deleted.", "Address could not be deleted.");
             }
-            catch (Exception ex)
+            catch
             {
-                ToastService.Show($"Error: {ex.Message}");
+                ToastService.Error("Address could not be deleted.", "Delete failed");
             }
             finally
             {
@@ -296,6 +281,25 @@
             : !string.IsNullOrWhiteSpace(user.IdentityName)
                 ? user.IdentityName
                 : user.Id.ToString()[..8];
+
+    private string GetUserLabelById(Guid identityInfoId) =>
+        _users.FirstOrDefault(x => x.Id == identityInfoId) is { } user
+            ? GetUserLabel(user)
+            : "Unknown user";
+
+    private static string GetDefaultAddressLabel(IdentityAddress address) =>
+        address.DefaultAddress == true ? "Default" : "No";
+
+    private void ShowSaveResult(bool isSuccess, string successMessage, string errorMessage)
+    {
+        if (isSuccess)
+        {
+            ToastService.Success(successMessage, "Saved");
+            return;
+        }
+
+        ToastService.Error(errorMessage, "Save failed");
+    }
 
     private static string GetUserSearchText(IdentityInformation user) =>
         $"{user.FullName} {user.IdentityName} {user.Gender} {user.CivilStatus}";

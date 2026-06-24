@@ -31,11 +31,12 @@
         </BbCardHeader>
         <BbCardContent>
             <BbDataGrid Items="@_tenants" ShowPagination="true" InitialPageSize="15"
+                        ShowSearch="true" SearchPlaceholder="Search tenants..."
                         OnRowClick="@((Tenant item) => Navigation.NavigateTo($"/identity/tenants/{item.Id}"))" Class="cursor-pointer">
                 <Columns>
-                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
-                    <BbDataGridTemplateColumn Title="Status">
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Filterable="true" />
+                    <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => GetTenantStatusText(item.Status))">
                         <ChildContent Context="item">
                             @{
                                 var statusText = item.Status switch
@@ -58,8 +59,8 @@
                             <StatusBadge Text="@statusText" Status="@statusKey" />
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridPropertyColumn Property="@(x => x.Version)" Title="Version" Sortable="true" />
-                    <BbDataGridTemplateColumn Title="Expiration" Sortable="true">
+                    <BbDataGridPropertyColumn Property="@(x => x.Version)" Title="Version" Sortable="true" Filterable="true" />
+                    <BbDataGridTemplateColumn Title="Expiration" Sortable="true" Filterable="true" FilterBy="@(item => FormatDate(item.Expiration))">
                         <ChildContent Context="item">
                             @if (item.Expiration.HasValue)
                             {
@@ -74,8 +75,8 @@
                             }
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                    <BbDataGridTemplateColumn Title="Enabled">
+                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                    <BbDataGridTemplateColumn Title="Enabled" Filterable="true" FilterBy="@(item => FormatBoolean(item.IsEnabled))">
                         <ChildContent Context="item">
                             <StatusBadge Text="@(item.IsEnabled ? "Enabled" : "Disabled")"
                                          Status="@(item.IsEnabled ? "active" : "inactive")" />
@@ -96,6 +97,9 @@
                         </ChildContent>
                     </BbDataGridTemplateColumn>
                 </Columns>
+                <EmptyTemplate>
+                    <BbEmpty Title="No tenants" Description="No tenants found." />
+                </EmptyTemplate>
             </BbDataGrid>
         </BbCardContent>
     </BbCard>
@@ -222,9 +226,9 @@
                 .Take(100)
                 .ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load tenants: {ex.Message}");
+            ToastService.Error("Tenants could not be loaded.", "Load failed");
         }
         finally
         {
@@ -248,7 +252,7 @@
     {
         if (string.IsNullOrWhiteSpace(_tenantForm.Name))
         {
-            ToastService.Show("Tenant name is required.");
+            ToastService.Warning("Tenant name is required.", "Missing name");
             return;
         }
 
@@ -285,23 +289,23 @@
 
                 if (createdTenant is null || createdTenant.IsDeleted)
                 {
-                    ToastService.Show("Tenant save completed, but the tenant could not be reloaded.");
+                    ToastService.Warning("Tenant save completed, but the tenant could not be reloaded.", "Reload needed");
                     return;
                 }
 
-                ToastService.Show("Tenant created successfully.");
+                ToastService.Success("Tenant created successfully.", "Tenant saved");
                 _tenantDialogOpen = false;
                 await LoadTenants();
                 TenantFilter.NotifyTenantsChanged();
             }
             else
             {
-                ToastService.Show($"Failed to create tenant: {result.Message}");
+                ToastService.Error("Tenant could not be created.", "Save failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error creating tenant: {ex.Message}");
+            ToastService.Error("Tenant could not be created.", "Save failed");
         }
         finally
         {
@@ -330,7 +334,7 @@
 
             if (fresh is null)
             {
-                ToastService.Show("Tenant not found.");
+                ToastService.Warning("Tenant was not found.", "Tenant unavailable");
                 _deleteDialogOpen = false;
                 return;
             }
@@ -345,21 +349,21 @@
 
             if (result.IsSuccess)
             {
-                ToastService.Show("Tenant deleted.");
+                ToastService.Success("Tenant deleted.", "Tenant deleted");
                 TenantFilter.NotifyTenantsChanged();
             }
             else
             {
-                ToastService.Show($"Failed to delete tenant: {result.Message}");
+                ToastService.Error("Tenant could not be deleted.", "Delete failed");
             }
 
             _deleteDialogOpen = false;
             _deletingTenant = null;
             await LoadTenants();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error deleting tenant: {ex.Message}");
+            ToastService.Error("Tenant could not be deleted.", "Delete failed");
         }
     }
 
