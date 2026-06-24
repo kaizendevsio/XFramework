@@ -27,16 +27,10 @@ else if (!_moduleEnabled)
 }
 else if (_outsideTenantContext)
 {
-    <div class="space-y-4">
-        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/inventario/products"))">
-            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
-            Back to Products
-        </BbButton>
-        <BbAlert>
-            <BbAlertTitle>Product Outside Active Tenant</BbAlertTitle>
-            <BbAlertDescription>Switch to this product's tenant to view its details.</BbAlertDescription>
-        </BbAlert>
-    </div>
+    <BbAlert>
+        <BbAlertTitle>Product Outside Active Tenant</BbAlertTitle>
+        <BbAlertDescription>Switch to this product's tenant to view its details.</BbAlertDescription>
+    </BbAlert>
 }
 else if (_product is null)
 {
@@ -1093,10 +1087,6 @@ else
     }
 
     private RenderFragment ProductHeader => @<div class="xf-detail-header">
-        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to products"
-                  OnClick="@(() => Navigation.NavigateTo("/inventario/products"))">
-            <LucideIcon Name="arrow-left" class="h-4 w-4" />
-        </BbButton>
         <div class="xf-detail-header-main">
             <div class="xf-detail-header-title">
                 <BbTypographyH3>@(_product?.Name ?? "Unnamed Product")</BbTypographyH3>

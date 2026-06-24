@@ -288,7 +288,12 @@ public sealed class ControlPanelContractTests
         productDetailText.Should().NotContain("ProductSectionHref");
         productDetailText.Should().NotContain("ProductSectionNavClass");
         productDetailText.Should().NotContain("xf-detail-sidebar");
+        productDetailText.Should().NotContain("Back to Products");
+        productDetailText.Should().NotContain("Back to products");
+        productDetailText.Should().NotContain("AriaLabel=\"Back to products\"");
 
+        productSidebarText.Should().Contain("Label=\"Product List\"");
+        productSidebarText.Should().Contain("Href=\"/inventario/products\"");
         productSidebarText.Should().Contain("Product Detail");
         productSidebarText.Should().Contain("Label=\"Summary\"");
         productSidebarText.Should().Contain("Label=\"Stock\"");
