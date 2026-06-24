@@ -64,7 +64,7 @@ else
 }
 
 <BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Create Supplier</BbDialogTitle>
             <BbDialogDescription>Supplier codes are unique inside the selected tenant.</BbDialogDescription>
@@ -137,9 +137,9 @@ else
                 .Take(500)
                 .ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load suppliers: {ex.Message}");
+            ToastService.Show("Could not load suppliers.");
         }
         finally
         {
@@ -170,7 +170,7 @@ else
                 IsActive = _form.IsActive
             });
 
-            ToastService.Show(result.IsSuccess ? "Supplier created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Supplier created." : "Could not create supplier.");
             if (result.IsSuccess)
             {
                 _createDialogOpen = false;

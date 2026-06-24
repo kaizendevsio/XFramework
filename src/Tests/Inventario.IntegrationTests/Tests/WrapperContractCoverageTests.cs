@@ -4,6 +4,7 @@ using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Lots;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Planning;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Purchasing;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses;
@@ -19,6 +20,60 @@ namespace Inventario.IntegrationTests.Tests;
 [Category(TestCategories.Wrappers)]
 public sealed class WrapperContractCoverageTests : InventarioTestBase
 {
+    [Test]
+    [Category(TestCategories.Catalog)]
+    public async Task ProductWriteWrappers_CreateAndUpdateProduct_PersistChanges()
+    {
+        await using var setupDb = CreateDbContext();
+        var category = await TestInventarioSeed.SeedCategory(setupDb);
+        var sku = UniqueCode("SKU");
+
+        var create = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProduct(
+            new CreateProductRequest
+            {
+                Metadata = CreateMetadata(),
+                Name = $"Wrapper Product {sku}",
+                SKU = sku,
+                CategoryId = category.Id,
+                Price = 25m,
+                StockQuantity = 0,
+                Brand = "Wrapper Brand",
+                IsAvailable = true
+            });
+        create.IsSuccess.Should().BeTrue(create.Message);
+
+        await using var createdDb = CreateDbContext();
+        var product = await createdDb.Set<Product>()
+            .IgnoreQueryFilters()
+            .SingleAsync(x => x.SKU == sku);
+
+        var update = await InventarioIntegrationTestFixture.ServiceWrapper.UpdateProduct(
+            new UpdateProductRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductId = product.Id,
+                Name = $"{product.Name} Updated",
+                SKU = sku,
+                CategoryId = category.Id,
+                Price = 31.50m,
+                Brand = "Updated Wrapper Brand",
+                Description = "Updated through wrapper coverage",
+                IsAvailable = false
+            });
+        update.IsSuccess.Should().BeTrue(update.Message);
+
+        await using var updatedDb = CreateDbContext();
+        var updated = await updatedDb.Set<Product>()
+            .IgnoreQueryFilters()
+            .SingleAsync(x => x.Id == product.Id);
+
+        updated.Name.Should().EndWith("Updated");
+        updated.Price.Should().Be(31.50m);
+        updated.Brand.Should().Be("Updated Wrapper Brand");
+        updated.Description.Should().Be("Updated through wrapper coverage");
+        updated.IsAvailable.Should().BeFalse();
+    }
+
     [Test]
     [Category(TestCategories.Warehousing)]
     public async Task GetWarehouseAndLocationWrappers_TenantScopedRecords_ReturnOnlyRequestTenant()

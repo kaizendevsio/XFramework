@@ -86,20 +86,29 @@ else
 @if (_product is not null)
 {
     <BbDialog Open="@_variationDialogOpen" OpenChanged="@(value => _variationDialogOpen = value)">
-        <BbDialogContent TrapFocus="false">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
             <BbDialogHeader>
                 <BbDialogTitle>@(_variationForm.IsEditing ? "Edit Variant" : "Add Variant")</BbDialogTitle>
                 <BbDialogDescription>Configure a sellable variant for @_product.Name.</BbDialogDescription>
             </BbDialogHeader>
             <div class="grid gap-4 py-4">
-                <BbFormFieldCombobox TValue="string"
-                                     @bind-Value="_variationForm.ProductVariationTypeId"
-                                     Options="@VariationTypeOptions"
-                                     Label="Variation Type"
-                                     Placeholder="Select a variation type"
-                                     SearchPlaceholder="Search variation types..."
-                                     EmptyMessage="No variation types found."
-                                     MatchTriggerWidth="true" />
+                <XfEntityPicker TItem="ProductVariationType"
+                                Label="Variation Type"
+                                Value="@_variationForm.ProductVariationTypeId"
+                                ValueChanged="@(value => _variationForm.ProductVariationTypeId = value ?? "")"
+                                Items="@_variationTypes"
+                                ValueSelector="@GetVariationTypePickerValue"
+                                TextSelector="@GetVariationTypeLabel"
+                                SearchTextSelector="@GetVariationTypeSearchText"
+                                AdvancedColumns="@VariationTypeAdvancedColumns"
+                                AdvancedFilters="@VariationTypeAdvancedFilters"
+                                AdvancedSearchScope="Searches variation type name, code, scope, and created date."
+                                Placeholder="Select a variation type"
+                                SearchPlaceholder="Search variation types..."
+                                EmptyMessage="No variation types found."
+                                ShowCreate="false"
+                                AdvancedSearchTitle="Find Variation Type"
+                                AdvancedSearchDescription="Select the variation type for this variant." />
                 @if (_variationTypes.Count == 0)
                 {
                     <BbAlert>
@@ -109,7 +118,11 @@ else
                 }
                 <div class="grid gap-3 md:grid-cols-2">
                     <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Name" Label="Variant" Required="true" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_variationForm.Price" Label="Variant Price" />
+                    <BbFormFieldCurrencyInput @bind-Value="_variationForm.Price"
+                                              Label="Variant Price"
+                                              Min="0"
+                                              Required="true"
+                                              ShowSymbol="false" />
                 </div>
             </div>
             <BbDialogFooter>
@@ -120,7 +133,7 @@ else
     </BbDialog>
 
     <BbDialog Open="@_variationTypeDialogOpen" OpenChanged="@(value => _variationTypeDialogOpen = value)">
-        <BbDialogContent TrapFocus="false">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
             <BbDialogHeader>
                 <BbDialogTitle>Create Variation Type</BbDialogTitle>
                 <BbDialogDescription>Add a reusable tenant-wide type or limit it to @_product.Name.</BbDialogDescription>
@@ -140,7 +153,7 @@ else
     </BbDialog>
 
     <BbDialog Open="@_movementDialogOpen" OpenChanged="@(value => _movementDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" class="max-w-4xl">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
             <BbDialogHeader>
                 <BbDialogTitle>Post Stock Movement</BbDialogTitle>
             </BbDialogHeader>
@@ -148,14 +161,25 @@ else
                 @FixedProductField
                 @if (CanPickVariant)
                 {
-                    <BbFormFieldCombobox TValue="string"
-                                         @bind-Value="_movementForm.ProductVariationId"
-                                         Options="@VariantOptions"
-                                         Label="Variant"
-                                         Placeholder="Base product"
-                                         SearchPlaceholder="Search variants..."
-                                         EmptyMessage="No variants found."
-                                         MatchTriggerWidth="true" />
+                    <XfEntityPicker TItem="ProductVariation"
+                                    Label="Variant"
+                                    Value="@_movementForm.ProductVariationId"
+                                    ValueChanged="@(value => _movementForm.ProductVariationId = value ?? "")"
+                                    Items="@_variations"
+                                    ValueSelector="@GetVariantPickerValue"
+                                    TextSelector="@GetVariantLabel"
+                                    SearchTextSelector="@GetVariantSearchText"
+                                    AdvancedColumns="@VariantAdvancedColumns"
+                                    AdvancedFilters="@VariantAdvancedFilters"
+                                    AdvancedSearchScope="Searches variant name, type, price, price delta, and created date."
+                                    Placeholder="Base product"
+                                    SearchPlaceholder="Search variants..."
+                                    EmptyMessage="No variants found."
+                                    AllowClear="true"
+                                    ClearText="Base product"
+                                    ShowCreate="false"
+                                    AdvancedSearchTitle="Find Variant"
+                                    AdvancedSearchDescription="Select a variant for this stock movement." />
                 }
 
                 <div class="grid gap-3 md:grid-cols-2">
@@ -232,7 +256,12 @@ else
                 </div>
 
                 <div class="grid gap-3 md:grid-cols-3">
-                    <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Quantity" Label="Quantity" />
+                    <BbFormFieldNumericInput TValue="decimal"
+                                             @bind-Value="_movementForm.Quantity"
+                                             Label="Quantity"
+                                             DecimalPlaces="2"
+                                             Step="1"
+                                             AllowNegative="true" />
                     <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
                     <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
                 </div>
@@ -252,7 +281,7 @@ else
     </BbDialog>
 
     <BbDialog Open="@_lotDialogOpen" OpenChanged="@(value => _lotDialogOpen = value)">
-        <BbDialogContent TrapFocus="false">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
             <BbDialogHeader>
                 <BbDialogTitle>Create Lot / Batch</BbDialogTitle>
                 <BbDialogDescription>Create a traceability lot for @_product.Name.</BbDialogDescription>
@@ -261,14 +290,25 @@ else
                 @FixedProductField
                 @if (CanPickVariant)
                 {
-                    <BbFormFieldCombobox TValue="string"
-                                         @bind-Value="_lotForm.ProductVariationId"
-                                         Options="@VariantOptions"
-                                         Label="Variant"
-                                         Placeholder="Base product"
-                                         SearchPlaceholder="Search variants..."
-                                         EmptyMessage="No variants found."
-                                         MatchTriggerWidth="true" />
+                    <XfEntityPicker TItem="ProductVariation"
+                                    Label="Variant"
+                                    Value="@_lotForm.ProductVariationId"
+                                    ValueChanged="@(value => _lotForm.ProductVariationId = value ?? "")"
+                                    Items="@_variations"
+                                    ValueSelector="@GetVariantPickerValue"
+                                    TextSelector="@GetVariantLabel"
+                                    SearchTextSelector="@GetVariantSearchText"
+                                    AdvancedColumns="@VariantAdvancedColumns"
+                                    AdvancedFilters="@VariantAdvancedFilters"
+                                    AdvancedSearchScope="Searches variant name, type, price, price delta, and created date."
+                                    Placeholder="Base product"
+                                    SearchPlaceholder="Search variants..."
+                                    EmptyMessage="No variants found."
+                                    AllowClear="true"
+                                    ClearText="Base product"
+                                    ShowCreate="false"
+                                    AdvancedSearchTitle="Find Variant"
+                                    AdvancedSearchDescription="Select a variant for this lot." />
                 }
                 <div class="grid gap-3 md:grid-cols-2">
                     <BbFormFieldInput TValue="string" @bind-Value="_lotForm.LotNumber" Label="Lot / Batch Number" Required="true" />
@@ -279,10 +319,13 @@ else
                         }
                     </BbFormFieldSelect>
                     <BbFormFieldInput TValue="string" @bind-Value="_lotForm.SupplierReference" Label="Supplier / Source Reference" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.UnitCost" Label="Unit Cost" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.ReceivedAt" Label="Received Date" Placeholder="YYYY-MM-DD" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.ManufacturedAt" Label="Manufacture Date" Placeholder="YYYY-MM-DD" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_lotForm.ExpiresAt" Label="Expiration Date" Placeholder="YYYY-MM-DD" />
+                    <BbFormFieldCurrencyInput @bind-Value="_lotForm.UnitCost"
+                                              Label="Unit Cost"
+                                              Min="0"
+                                              ShowSymbol="false" />
+                    <BbFormFieldDatePicker @bind-Value="_lotForm.ReceivedAt" Label="Received Date" />
+                    <BbFormFieldDatePicker @bind-Value="_lotForm.ManufacturedAt" Label="Manufacture Date" />
+                    <BbFormFieldDatePicker @bind-Value="_lotForm.ExpiresAt" Label="Expiration Date" />
                     <BbFormFieldInput TValue="string" @bind-Value="_lotForm.SourceReferenceType" Label="Source Type" />
                 </div>
             </div>
@@ -294,7 +337,7 @@ else
     </BbDialog>
 
     <BbDialog Open="@_receiveDialogOpen" OpenChanged="@(value => _receiveDialogOpen = value)">
-        <BbDialogContent TrapFocus="false" class="max-w-4xl">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-extra-wide">
             <BbDialogHeader>
                 <BbDialogTitle>Receive Batch / Stock</BbDialogTitle>
                 <BbDialogDescription>Receive stock for @_product.Name into a warehouse location.</BbDialogDescription>
@@ -303,14 +346,25 @@ else
                 @FixedProductField
                 @if (CanPickVariant)
                 {
-                    <BbFormFieldCombobox TValue="string"
-                                         @bind-Value="_receiveForm.ProductVariationId"
-                                         Options="@VariantOptions"
-                                         Label="Variant"
-                                         Placeholder="Base product"
-                                         SearchPlaceholder="Search variants..."
-                                         EmptyMessage="No variants found."
-                                         MatchTriggerWidth="true" />
+                    <XfEntityPicker TItem="ProductVariation"
+                                    Label="Variant"
+                                    Value="@_receiveForm.ProductVariationId"
+                                    ValueChanged="@(value => _receiveForm.ProductVariationId = value ?? "")"
+                                    Items="@_variations"
+                                    ValueSelector="@GetVariantPickerValue"
+                                    TextSelector="@GetVariantLabel"
+                                    SearchTextSelector="@GetVariantSearchText"
+                                    AdvancedColumns="@VariantAdvancedColumns"
+                                    AdvancedFilters="@VariantAdvancedFilters"
+                                    AdvancedSearchScope="Searches variant name, type, price, price delta, and created date."
+                                    Placeholder="Base product"
+                                    SearchPlaceholder="Search variants..."
+                                    EmptyMessage="No variants found."
+                                    AllowClear="true"
+                                    ClearText="Base product"
+                                    ShowCreate="false"
+                                    AdvancedSearchTitle="Find Variant"
+                                    AdvancedSearchDescription="Select a variant for this receiving line." />
                 }
 
                 <div class="grid gap-3 md:grid-cols-3">
@@ -402,8 +456,16 @@ else
                 </div>
 
                 <div class="grid gap-3 md:grid-cols-3">
-                    <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.Quantity" Label="Quantity" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.UnitCost" Label="Unit Cost" />
+                    <BbFormFieldNumericInput TValue="decimal"
+                                             @bind-Value="_receiveForm.Quantity"
+                                             Label="Quantity"
+                                             Min="0"
+                                             DecimalPlaces="2"
+                                             Step="1" />
+                    <BbFormFieldCurrencyInput @bind-Value="_receiveForm.UnitCost"
+                                              Label="Unit Cost"
+                                              Min="0"
+                                              ShowSymbol="false" />
                     <BbFormFieldInput TValue="string" @bind-Value="_receiveForm.UnitOfMeasure" Label="Unit" />
                 </div>
 
@@ -440,7 +502,7 @@ else
     </BbDialog>
 
     <BbDialog Open="@_ruleDialogOpen" OpenChanged="@(value => _ruleDialogOpen = value)">
-        <BbDialogContent TrapFocus="false">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
             <BbDialogHeader>
                 <BbDialogTitle>Add Reorder Rule</BbDialogTitle>
                 <BbDialogDescription>Add min/max/reorder rules for @_product.Name.</BbDialogDescription>
@@ -449,14 +511,25 @@ else
                 @FixedProductField
                 @if (CanPickVariant)
                 {
-                    <BbFormFieldCombobox TValue="string"
-                                         @bind-Value="_ruleForm.ProductVariationId"
-                                         Options="@VariantOptions"
-                                         Label="Variant"
-                                         Placeholder="All variants and base product"
-                                         SearchPlaceholder="Search variants..."
-                                         EmptyMessage="No variants found."
-                                         MatchTriggerWidth="true" />
+                    <XfEntityPicker TItem="ProductVariation"
+                                    Label="Variant"
+                                    Value="@_ruleForm.ProductVariationId"
+                                    ValueChanged="@(value => _ruleForm.ProductVariationId = value ?? "")"
+                                    Items="@_variations"
+                                    ValueSelector="@GetVariantPickerValue"
+                                    TextSelector="@GetVariantLabel"
+                                    SearchTextSelector="@GetVariantSearchText"
+                                    AdvancedColumns="@VariantAdvancedColumns"
+                                    AdvancedFilters="@VariantAdvancedFilters"
+                                    AdvancedSearchScope="Searches variant name, type, price, price delta, and created date."
+                                    Placeholder="All variants and base product"
+                                    SearchPlaceholder="Search variants..."
+                                    EmptyMessage="No variants found."
+                                    AllowClear="true"
+                                    ClearText="All variants and base product"
+                                    ShowCreate="false"
+                                    AdvancedSearchTitle="Find Variant"
+                                    AdvancedSearchDescription="Select the variant scope for this reorder rule." />
                 }
 
                 <div class="grid gap-3 md:grid-cols-2">
@@ -534,10 +607,30 @@ else
                     }
                 </div>
                 <div class="grid gap-3 md:grid-cols-4">
-                    <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.MinimumQuantity" Label="Minimum" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.MaximumQuantity" Label="Maximum" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.ReorderPoint" Label="Reorder Point" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_ruleForm.ReorderQuantity" Label="Reorder Qty" />
+                    <BbFormFieldNumericInput TValue="decimal"
+                                             @bind-Value="_ruleForm.MinimumQuantity"
+                                             Label="Minimum"
+                                             Min="0"
+                                             DecimalPlaces="2"
+                                             Step="1" />
+                    <BbFormFieldNumericInput TValue="decimal"
+                                             @bind-Value="_ruleForm.MaximumQuantity"
+                                             Label="Maximum"
+                                             Min="0"
+                                             DecimalPlaces="2"
+                                             Step="1" />
+                    <BbFormFieldNumericInput TValue="decimal"
+                                             @bind-Value="_ruleForm.ReorderPoint"
+                                             Label="Reorder Point"
+                                             Min="0"
+                                             DecimalPlaces="2"
+                                             Step="1" />
+                    <BbFormFieldNumericInput TValue="decimal"
+                                             @bind-Value="_ruleForm.ReorderQuantity"
+                                             Label="Reorder Qty"
+                                             Min="0"
+                                             DecimalPlaces="2"
+                                             Step="1" />
                 </div>
                 <BbFormFieldSwitch Checked="@_ruleForm.IsActive"
                                    CheckedChanged="@((bool value) => _ruleForm.IsActive = value)"
@@ -551,7 +644,7 @@ else
     </BbDialog>
 
     <BbDialog Open="@_warehouseCreateDialogOpen" OpenChanged="@(value => _warehouseCreateDialogOpen = value)">
-        <BbDialogContent TrapFocus="false">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
             <BbDialogHeader>
                 <BbDialogTitle>Create Warehouse</BbDialogTitle>
                 <BbDialogDescription>Create a warehouse, then return to the product workflow with it selected.</BbDialogDescription>
@@ -580,7 +673,7 @@ else
     </BbDialog>
 
     <BbDialog Open="@_locationCreateDialogOpen" OpenChanged="@(value => _locationCreateDialogOpen = value)">
-        <BbDialogContent TrapFocus="false">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
             <BbDialogHeader>
                 <BbDialogTitle>Create Location</BbDialogTitle>
                 <BbDialogDescription>Create a location for the selected warehouse, then return to the product workflow.</BbDialogDescription>
@@ -626,7 +719,7 @@ else
     </BbDialog>
 
     <BbDialog Open="@_supplierCreateDialogOpen" OpenChanged="@(value => _supplierCreateDialogOpen = value)">
-        <BbDialogContent TrapFocus="false">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
             <BbDialogHeader>
                 <BbDialogTitle>Create Supplier</BbDialogTitle>
                 <BbDialogDescription>Create a supplier, then return to the product workflow with it selected.</BbDialogDescription>
@@ -771,18 +864,6 @@ else
     private string? RuleLocationHelpText => CanCreateRuleLocation ? null : "Select a warehouse before scoping this rule to a location.";
     private bool CanPickVariant => _variationsEnabled && _variations.Count > 0;
 
-    private List<SelectOption<string>> CategoryOptions =>
-        _categories.Select(category => new SelectOption<string>(category.Id.ToString(), category.Name ?? category.Id.ToString()[..8])).ToList();
-    private List<SelectOption<string>> VariationTypeOptions =>
-        _variationTypes
-            .Select(type => new SelectOption<string>(type.Id.ToString(), GetVariationTypeLabel(type)))
-            .ToList();
-    private List<SelectOption<string>> VariantOptions =>
-    [
-        new("", "Base product"),
-        .. _variations.Select(variation => new SelectOption<string>(variation.Id.ToString(), GetVariantLabel(variation)))
-    ];
-
     protected override void OnInitialized()
     {
         TenantFilter.OnChanged += OnTenantChanged;
@@ -822,9 +903,9 @@ else
             if (!_editMode)
                 LoadProductForm();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load product: {ex.Message}");
+            ToastService.Show("Could not load product.");
         }
         finally
         {
@@ -1007,7 +1088,7 @@ else
             return;
         }
 
-        ToastService.Show($"Failed to load variation types: {result.Message}");
+        ToastService.Show("Could not load variation types.");
         _variationTypes = [];
     }
 
@@ -1071,17 +1152,29 @@ else
                             <BbFormFieldInput TValue="string" @bind-Value="_productForm.Name" Label="Name" Required="true" />
                             <BbFormFieldInput TValue="string" @bind-Value="_productForm.Sku" Label="SKU" />
                         </div>
-                        <BbFormFieldCombobox TValue="string"
-                                             @bind-Value="_productForm.CategoryId"
-                                             Options="@CategoryOptions"
-                                             Label="Category"
-                                             Placeholder="Select category"
-                                             SearchPlaceholder="Search categories..."
-                                             EmptyMessage="No categories found."
-                                             MatchTriggerWidth="true"
-                                             Required="true" />
+                        <XfEntityPicker TItem="ProductCategory"
+                                        Label="Category"
+                                        Value="@_productForm.CategoryId"
+                                        ValueChanged="@(value => _productForm.CategoryId = value ?? "")"
+                                        Items="@_categories"
+                                        ValueSelector="@GetCategoryPickerValue"
+                                        TextSelector="@GetCategoryLabel"
+                                        SearchTextSelector="@GetCategorySearchText"
+                                        AdvancedColumns="@CategoryAdvancedColumns"
+                                        AdvancedFilters="@CategoryAdvancedFilters"
+                                        AdvancedSearchScope="Searches category name, description, and created date."
+                                        Placeholder="Select category"
+                                        SearchPlaceholder="Search categories..."
+                                        EmptyMessage="No categories found."
+                                        ShowCreate="false"
+                                        AdvancedSearchTitle="Find Category"
+                                        AdvancedSearchDescription="Select the category for this product." />
                         <div class="xf-detail-field-grid">
-                            <BbFormFieldInput TValue="string" @bind-Value="_productForm.Price" Label="Price" />
+                            <BbFormFieldCurrencyInput @bind-Value="_productForm.Price"
+                                                      Label="Price"
+                                                      Min="0"
+                                                      Required="true"
+                                                      ShowSymbol="false" />
                             <BbFormFieldInput TValue="string" @bind-Value="_productForm.Brand" Label="Brand" />
                         </div>
                         <BbFormFieldInput TValue="string" @bind-Value="_productForm.Description" Label="Description" />
@@ -1458,7 +1551,7 @@ else
         _productForm.Name = _product.Name ?? "";
         _productForm.Sku = _product.SKU ?? "";
         _productForm.CategoryId = _product.CategoryId.ToString();
-        _productForm.Price = _product.Price.ToString("0.##");
+        _productForm.Price = _product.Price;
         _productForm.Brand = _product.Brand ?? "";
         _productForm.Description = _product.Description ?? "";
         _productForm.IsAvailable = _product.IsAvailable;
@@ -1477,37 +1570,27 @@ else
             ToastService.Show("Select a category.");
             return;
         }
-        if (!decimal.TryParse(_productForm.Price, out var price) || price < 0)
+        if (_productForm.Price < 0)
         {
-            ToastService.Show("Price must be a non-negative number.");
+            ToastService.Show("Price must be zero or greater.");
             return;
         }
 
         _saving = true;
         try
         {
-            var fresh = await DataContext.Query<Product>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == _product.Id && x.TenantId == tenantId && !x.IsDeleted)
-                .FirstOrDefaultAsync();
-            if (fresh is null)
+            var result = await Inventario.UpdateProduct(new UpdateProductRequest
             {
-                ToastService.Show("Product not found.");
-                return;
-            }
-
-            fresh.Name = _productForm.Name.Trim();
-            fresh.SKU = NullIfEmpty(_productForm.Sku);
-            fresh.CategoryId = categoryId;
-            fresh.Price = price;
-            fresh.Brand = NullIfEmpty(_productForm.Brand);
-            fresh.Description = NullIfEmpty(_productForm.Description);
-            fresh.IsAvailable = _productForm.IsAvailable;
-            fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-
-            var result = await DataContext.SaveChangesAsync();
+                Metadata = BuildMetadata(),
+                ProductId = _product.Id,
+                Name = _productForm.Name.Trim(),
+                SKU = NullIfEmpty(_productForm.Sku),
+                CategoryId = categoryId,
+                Price = _productForm.Price,
+                Brand = NullIfEmpty(_productForm.Brand),
+                Description = NullIfEmpty(_productForm.Description),
+                IsAvailable = _productForm.IsAvailable
+            });
             if (result.IsSuccess)
             {
                 ToastService.Show("Product updated.");
@@ -1516,12 +1599,12 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to save product: {result.Message}");
+                ToastService.Show("Could not save product.");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error saving product: {ex.Message}");
+            ToastService.Show("Could not save product.");
         }
         finally
         {
@@ -1532,7 +1615,7 @@ else
     private void OpenVariationDialog()
     {
         _variationForm.Reset();
-        _variationForm.Price = (_product?.Price ?? 0m).ToString("0.##");
+        _variationForm.Price = _product?.Price ?? 0m;
         _variationDialogOpen = true;
     }
 
@@ -1542,7 +1625,7 @@ else
         _variationForm.ProductVariationId = variation.Id.ToString();
         _variationForm.ProductVariationTypeId = variation.ProductVariationTypeId?.ToString() ?? "";
         _variationForm.Name = variation.Name ?? "";
-        _variationForm.Price = GetVariantPrice(variation).ToString("0.##");
+        _variationForm.Price = GetVariantPrice(variation);
         _variationDialogOpen = true;
     }
 
@@ -1580,12 +1663,12 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to create variation type: {result.Message}");
+                ToastService.Show("Could not create variation type.");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error creating variation type: {ex.Message}");
+            ToastService.Show("Could not create variation type.");
         }
         finally
         {
@@ -1602,11 +1685,13 @@ else
             return;
         }
 
-        if (!decimal.TryParse(_variationForm.Price, out var price) || price < 0)
+        if (_variationForm.Price < 0)
         {
             ToastService.Show("Variant price must be a non-negative number.");
             return;
         }
+
+        var price = _variationForm.Price;
 
         _saving = true;
         try
@@ -1642,12 +1727,12 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to save variant: {result.Message}");
+                ToastService.Show("Could not save variant.");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error saving variant: {ex.Message}");
+            ToastService.Show("Could not save variant.");
         }
         finally
         {
@@ -1683,7 +1768,7 @@ else
             return;
         }
 
-        if (!decimal.TryParse(_movementForm.Quantity, out var quantity) || quantity == 0)
+        if (_movementForm.Quantity == 0)
         {
             ToastService.Show("Quantity must not be zero.");
             return;
@@ -1706,14 +1791,14 @@ else
                 LocationId = locationId,
                 LotId = lotId,
                 MovementType = Enum.TryParse<InventoryMovementType>(_movementForm.MovementType, out var type) ? type : InventoryMovementType.Adjustment,
-                Quantity = quantity,
+                Quantity = _movementForm.Quantity,
                 UnitOfMeasure = NullIfEmpty(_movementForm.UnitOfMeasure),
                 ReferenceType = NullIfEmpty(_movementForm.ReferenceType),
                 Reason = NullIfEmpty(_movementForm.Reason),
                 AllowNegativeStock = _negativeStockEnabled && _movementForm.AllowNegativeStock
             });
 
-            ToastService.Show(result.IsSuccess ? "Stock movement posted." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Stock movement posted." : "Could not post stock movement.");
             if (result.IsSuccess)
             {
                 _movementDialogOpen = false;
@@ -1761,14 +1846,14 @@ else
                 LotNumber = _lotForm.LotNumber.Trim(),
                 SupplierReference = NullIfEmpty(_lotForm.SupplierReference),
                 SourceReferenceType = NullIfEmpty(_lotForm.SourceReferenceType),
-                ReceivedAt = ParseDate(_lotForm.ReceivedAt),
-                ManufacturedAt = ParseDate(_lotForm.ManufacturedAt),
-                ExpiresAt = ParseDate(_lotForm.ExpiresAt),
-                UnitCost = decimal.TryParse(_lotForm.UnitCost, out var cost) ? cost : null,
+                ReceivedAt = _lotForm.ReceivedAt,
+                ManufacturedAt = _lotForm.ManufacturedAt,
+                ExpiresAt = _lotForm.ExpiresAt,
+                UnitCost = _lotForm.UnitCost > 0 ? _lotForm.UnitCost : null,
                 Status = Enum.TryParse<InventoryLotStatus>(_lotForm.Status, out var status) ? status : InventoryLotStatus.Available
             });
 
-            ToastService.Show(result.IsSuccess ? "Lot created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Lot created." : "Could not create lot.");
             if (result.IsSuccess)
             {
                 var lotNumber = _lotForm.LotNumber.Trim();
@@ -1810,7 +1895,7 @@ else
             return;
         }
 
-        if (!decimal.TryParse(_receiveForm.Quantity, out var quantity) || quantity <= 0)
+        if (_receiveForm.Quantity <= 0)
         {
             ToastService.Show("Quantity must be greater than zero.");
             return;
@@ -1836,15 +1921,15 @@ else
                         PurchaseOrderLineId = Guid.TryParse(_receiveForm.PurchaseOrderLineId, out var lineId) ? lineId : null,
                         ProductId = _product.Id,
                         ProductVariationId = Guid.TryParse(_receiveForm.ProductVariationId, out var variationId) ? variationId : null,
-                        Quantity = quantity,
-                        UnitCost = decimal.TryParse(_receiveForm.UnitCost, out var unitCost) ? unitCost : null,
+                        Quantity = _receiveForm.Quantity,
+                        UnitCost = _receiveForm.UnitCost > 0 ? _receiveForm.UnitCost : null,
                         UnitOfMeasure = NullIfEmpty(_receiveForm.UnitOfMeasure),
                         LotId = Guid.TryParse(_receiveForm.LotId, out var lotId) ? lotId : null
                     }
                 ]
             });
 
-            ToastService.Show(result.IsSuccess ? "Receiving posted." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Receiving posted." : "Could not post receiving.");
             if (result.IsSuccess)
             {
                 _receiveDialogOpen = false;
@@ -1866,26 +1951,23 @@ else
     private async Task CreateRule()
     {
         if (_product is null) return;
-        if (!decimal.TryParse(_ruleForm.MinimumQuantity, out var min) ||
-            !decimal.TryParse(_ruleForm.ReorderPoint, out var point) ||
-            !decimal.TryParse(_ruleForm.ReorderQuantity, out var qty) ||
-            min < 0 ||
-            point < 0 ||
-            qty <= 0)
+        if (_ruleForm.MinimumQuantity < 0 ||
+            _ruleForm.ReorderPoint < 0 ||
+            _ruleForm.ReorderQuantity <= 0)
         {
             ToastService.Show("Quantities must be valid.");
             return;
         }
 
         decimal? max = null;
-        if (!string.IsNullOrWhiteSpace(_ruleForm.MaximumQuantity))
+        if (_ruleForm.MaximumQuantity > 0)
         {
-            if (!decimal.TryParse(_ruleForm.MaximumQuantity, out var parsedMax) || parsedMax < min)
+            if (_ruleForm.MaximumQuantity < _ruleForm.MinimumQuantity)
             {
                 ToastService.Show("Maximum must be greater than or equal to minimum.");
                 return;
             }
-            max = parsedMax;
+            max = _ruleForm.MaximumQuantity;
         }
 
         _savingRule = true;
@@ -1898,15 +1980,15 @@ else
                 ProductVariationId = Guid.TryParse(_ruleForm.ProductVariationId, out var variationId) ? variationId : null,
                 WarehouseId = Guid.TryParse(_ruleForm.WarehouseId, out var warehouseId) ? warehouseId : null,
                 LocationId = Guid.TryParse(_ruleForm.LocationId, out var locationId) ? locationId : null,
-                MinimumQuantity = min,
+                MinimumQuantity = _ruleForm.MinimumQuantity,
                 MaximumQuantity = max,
-                ReorderPoint = point,
-                ReorderQuantity = qty,
+                ReorderPoint = _ruleForm.ReorderPoint,
+                ReorderQuantity = _ruleForm.ReorderQuantity,
                 PreferredSupplier = NullIfEmpty(_ruleForm.PreferredSupplier),
                 IsActive = _ruleForm.IsActive
             });
 
-            ToastService.Show(result.IsSuccess ? "Reorder rule created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Reorder rule created." : "Could not create reorder rule.");
             if (result.IsSuccess)
             {
                 _ruleDialogOpen = false;
@@ -1954,7 +2036,7 @@ else
                 IsDefault = _warehouseForm.IsDefault
             });
 
-            ToastService.Show(result.IsSuccess ? "Warehouse created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Warehouse created." : "Could not create warehouse.");
             if (!result.IsSuccess) return;
 
             _warehouseCreateDialogOpen = false;
@@ -2017,7 +2099,7 @@ else
                 IsPickable = _locationForm.IsPickable
             });
 
-            ToastService.Show(result.IsSuccess ? "Location created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Location created." : "Could not create location.");
             if (!result.IsSuccess) return;
 
             _locationCreateDialogOpen = false;
@@ -2066,7 +2148,7 @@ else
                 IsActive = _supplierForm.IsActive
             });
 
-            ToastService.Show(result.IsSuccess ? "Supplier created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Supplier created." : "Could not create supplier.");
             if (!result.IsSuccess) return;
 
             _supplierCreateDialogOpen = false;
@@ -2185,6 +2267,12 @@ else
     private string GetCategoryName(Guid categoryId) =>
         _categories.FirstOrDefault(x => x.Id == categoryId)?.Name ?? "Uncategorized";
 
+    private static string GetCategoryPickerValue(ProductCategory category) => category.Id.ToString();
+    private static string GetCategoryLabel(ProductCategory category) =>
+        string.IsNullOrWhiteSpace(category.Name) ? category.Id.ToString()[..8] : category.Name;
+    private static string GetCategorySearchText(ProductCategory category) =>
+        $"{category.Name} {category.Description}";
+
     private string GetRuleScope(InventoryReorderRule rule) =>
         $"{GetWarehouseName(rule.WarehouseId)} / {GetLocationName(rule.LocationId)}";
 
@@ -2214,6 +2302,10 @@ else
         return string.IsNullOrWhiteSpace(typeName) ? name : $"{typeName}: {name}";
     }
 
+    private static string GetVariantPickerValue(ProductVariation variation) => variation.Id.ToString();
+    private string GetVariantSearchText(ProductVariation variation) =>
+        $"{variation.Name} {GetVariationTypeName(variation)} {GetVariantPrice(variation):0.##} {GetVariantDelta(variation):+0.##;-0.##;0}";
+
     private string GetVariationTypeName(ProductVariation variation)
     {
         if (variation.ProductVariationTypeId is { } typeId &&
@@ -2231,6 +2323,10 @@ else
         var name = string.IsNullOrWhiteSpace(type.Name) ? type.Id.ToString()[..8] : type.Name;
         return $"{name} ({scope})";
     }
+
+    private static string GetVariationTypePickerValue(ProductVariationType type) => type.Id.ToString();
+    private static string GetVariationTypeSearchText(ProductVariationType type) =>
+        $"{type.Name} {type.Code} {GetVariationTypeScope(type)}";
 
     private static string GetVariationTypeScope(ProductVariationType type) =>
         type.ProductId is null ? "Tenant-wide" : "Product";
@@ -2287,6 +2383,15 @@ else
         new("Created", x => FormatDate(x.CreatedAt))
     ];
 
+    private IReadOnlyList<XfEntityPickerColumn<ProductCategory>> CategoryAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Description", x => x.Description),
+        new("Created", x => FormatDate(x.CreatedAt))
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilter<ProductCategory>> CategoryAdvancedFilters = [];
+
     private IReadOnlyList<XfEntityPickerFilter<Warehouse>> WarehouseAdvancedFilters =>
     [
         new("default", "Default warehouse", YesNoFilterOptions, x => x.IsDefault ? "true" : "false", "All warehouses"),
@@ -2307,6 +2412,41 @@ else
     [
         new("type", "Location type", BuildEnumFilterOptions<InventoryLocationType>(), x => x.LocationType.ToString(), "All types"),
         new("pickable", "Pickable", YesNoFilterOptions, x => x.IsPickable ? "true" : "false", "All locations")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<ProductVariationType>> VariationTypeAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Code", x => x.Code),
+        new("Scope", GetVariationTypeScope),
+        new("Created", x => FormatDate(x.CreatedAt))
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilter<ProductVariationType>> VariationTypeAdvancedFilters =
+    [
+        new(
+            "scope",
+            "Scope",
+            [
+                new XfEntityPickerFilterOption("Tenant-wide", "Tenant-wide"),
+                new XfEntityPickerFilterOption("Product", "Product")
+            ],
+            GetVariationTypeScope,
+            "All scopes")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<ProductVariation>> VariantAdvancedColumns =>
+    [
+        new("Variant", x => x.Name),
+        new("Type", GetVariationTypeName),
+        new("Price", x => GetVariantPrice(x).ToString("0.##")),
+        new("Delta", x => GetVariantDelta(x).ToString("+0.##;-0.##;0")),
+        new("Created", x => FormatDate(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<ProductVariation>> VariantAdvancedFilters =>
+    [
+        new("type", "Variation type", BuildDistinctFilterOptions(_variations, GetVariationTypeName), GetVariationTypeName, "All types")
     ];
 
     private IReadOnlyList<XfEntityPickerColumn<InventoryLot>> LotAdvancedColumns =>
@@ -2437,9 +2577,6 @@ else
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static DateTime? ParseDate(string? value) =>
-        DateTime.TryParse(value, out var date) ? date : null;
-
     public void Dispose()
     {
         TenantFilter.OnChanged -= OnTenantChanged;
@@ -2458,7 +2595,7 @@ else
         public string Name { get; set; } = "";
         public string Sku { get; set; } = "";
         public string CategoryId { get; set; } = "";
-        public string Price { get; set; } = "0";
+        public decimal Price { get; set; }
         public string Brand { get; set; } = "";
         public string Description { get; set; } = "";
         public bool IsAvailable { get; set; } = true;
@@ -2469,7 +2606,7 @@ else
         public string ProductVariationId { get; set; } = "";
         public string ProductVariationTypeId { get; set; } = "";
         public string Name { get; set; } = "";
-        public string Price { get; set; } = "0";
+        public decimal Price { get; set; }
         public bool IsEditing => !string.IsNullOrWhiteSpace(ProductVariationId);
 
         public void Reset()
@@ -2477,7 +2614,7 @@ else
             ProductVariationId = "";
             ProductVariationTypeId = "";
             Name = "";
-            Price = "0";
+            Price = 0m;
         }
     }
 
@@ -2503,7 +2640,7 @@ else
         public string LocationId { get; set; } = "";
         public string LotId { get; set; } = "";
         public string MovementType { get; set; } = InventoryMovementType.Adjustment.ToString();
-        public string Quantity { get; set; } = "0";
+        public decimal Quantity { get; set; }
         public string UnitOfMeasure { get; set; } = "each";
         public string ReferenceType { get; set; } = "";
         public string Reason { get; set; } = "";
@@ -2517,7 +2654,7 @@ else
             LocationId = "";
             LotId = "";
             MovementType = InventoryMovementType.Adjustment.ToString();
-            Quantity = "0";
+            Quantity = 0m;
             UnitOfMeasure = "each";
             ReferenceType = "";
             Reason = "";
@@ -2531,10 +2668,10 @@ else
         public string LotNumber { get; set; } = "";
         public string SupplierReference { get; set; } = "";
         public string SourceReferenceType { get; set; } = "";
-        public string ReceivedAt { get; set; } = "";
-        public string ManufacturedAt { get; set; } = "";
-        public string ExpiresAt { get; set; } = "";
-        public string UnitCost { get; set; } = "";
+        public DateTime? ReceivedAt { get; set; }
+        public DateTime? ManufacturedAt { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public decimal UnitCost { get; set; }
         public string Status { get; set; } = InventoryLotStatus.Available.ToString();
 
         public void Reset()
@@ -2543,10 +2680,10 @@ else
             LotNumber = "";
             SupplierReference = "";
             SourceReferenceType = "";
-            ReceivedAt = "";
-            ManufacturedAt = "";
-            ExpiresAt = "";
-            UnitCost = "";
+            ReceivedAt = DateTime.Today;
+            ManufacturedAt = null;
+            ExpiresAt = null;
+            UnitCost = 0m;
             Status = InventoryLotStatus.Available.ToString();
         }
     }
@@ -2562,8 +2699,8 @@ else
         public string LocationId { get; set; } = "";
         public string ReferenceNumber { get; set; } = "";
         public string IdempotencyKey { get; set; } = "";
-        public string Quantity { get; set; } = "1";
-        public string UnitCost { get; set; } = "";
+        public decimal Quantity { get; set; } = 1m;
+        public decimal UnitCost { get; set; }
         public string UnitOfMeasure { get; set; } = "each";
         public string LotId { get; set; } = "";
 
@@ -2578,8 +2715,8 @@ else
             LocationId = "";
             ReferenceNumber = "";
             IdempotencyKey = "";
-            Quantity = "1";
-            UnitCost = "";
+            Quantity = 1m;
+            UnitCost = 0m;
             UnitOfMeasure = "each";
             LotId = "";
         }
@@ -2590,10 +2727,10 @@ else
         public string ProductVariationId { get; set; } = "";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
-        public string MinimumQuantity { get; set; } = "0";
-        public string MaximumQuantity { get; set; } = "";
-        public string ReorderPoint { get; set; } = "0";
-        public string ReorderQuantity { get; set; } = "1";
+        public decimal MinimumQuantity { get; set; }
+        public decimal MaximumQuantity { get; set; }
+        public decimal ReorderPoint { get; set; }
+        public decimal ReorderQuantity { get; set; } = 1m;
         public string PreferredSupplier { get; set; } = "";
         public bool IsActive { get; set; } = true;
 
@@ -2602,10 +2739,10 @@ else
             ProductVariationId = "";
             WarehouseId = "";
             LocationId = "";
-            MinimumQuantity = "0";
-            MaximumQuantity = "";
-            ReorderPoint = "0";
-            ReorderQuantity = "1";
+            MinimumQuantity = 0m;
+            MaximumQuantity = 0m;
+            ReorderPoint = 0m;
+            ReorderQuantity = 1m;
             PreferredSupplier = "";
             IsActive = true;
         }

@@ -135,62 +135,68 @@ else
 }
 
 <BbDialog Open="@_movementDialogOpen" OpenChanged="@(v => _movementDialogOpen = v)">
-    <BbDialogContent TrapFocus="false">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Post Movement</BbDialogTitle>
             <BbDialogDescription>Movements are append-only and update stock balances through Inventario services.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <div class="grid gap-3 xl:grid-cols-2">
-                <div class="xf-form-field">
-                    <BbLabel>Product</BbLabel>
-                    <BbCombobox TValue="string"
-                                 Value="@_movementForm.ProductId"
-                                 ValueChanged="@OnMovementProductChanged"
-                                 Options="@ProductOptions"
-                                 Placeholder="Select product"
-                                 SearchPlaceholder="Search products..."
-                                 EmptyMessage="No products found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
+                <XfEntityPicker TItem="Product"
+                                Value="@_movementForm.ProductId"
+                                ValueChanged="@OnMovementProductChanged"
+                                Items="@_products"
+                                Label="Product"
+                                Placeholder="Select product"
+                                SearchPlaceholder="Search products..."
+                                EmptyMessage="No products found."
+                                ValueSelector="@GetProductPickerValue"
+                                TextSelector="@GetProductLabel"
+                                SearchTextSelector="@GetProductSearchText"
+                                AdvancedSearchTitle="Find Product"
+                                AdvancedSearchDescription="Search products in the active tenant." />
                 @if (_traceabilityEnabled)
                 {
-                    <div class="xf-form-field">
-                        <BbLabel>Lot / Batch</BbLabel>
-                        <BbCombobox TValue="string"
-                                     @bind-Value="_movementForm.LotId"
-                                     Options="@MovementLotOptions"
-                                     Placeholder="No lot"
-                                     SearchPlaceholder="Search lots..."
-                                     EmptyMessage="No lots found."
-                                     Class="xf-entity-combobox"
-                                     MatchTriggerWidth="true" />
-                    </div>
+                    <XfEntityPicker TItem="InventoryLot"
+                                    @bind-Value="_movementForm.LotId"
+                                    Items="@LotsForSelectedProduct().ToList()"
+                                    Label="Lot / Batch"
+                                    Placeholder="No lot"
+                                    SearchPlaceholder="Search lots..."
+                                    EmptyMessage="No lots found."
+                                    ValueSelector="@GetLotPickerValue"
+                                    TextSelector="@GetLotLabel"
+                                    SearchTextSelector="@GetLotSearchText"
+                                    AllowClear="true"
+                                    ClearText="No lot / untracked"
+                                    AdvancedSearchTitle="Find Lot / Batch"
+                                    AdvancedSearchDescription="Search lots for the selected product." />
                 }
-                <div class="xf-form-field">
-                    <BbLabel>Warehouse</BbLabel>
-                    <BbCombobox TValue="string"
-                                 Value="@_movementForm.WarehouseId"
-                                 ValueChanged="@OnMovementWarehouseChanged"
-                                 Options="@WarehouseOptions"
-                                 Placeholder="Select warehouse"
-                                 SearchPlaceholder="Search warehouses..."
-                                 EmptyMessage="No warehouses found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
-                <div class="xf-form-field">
-                    <BbLabel>Location</BbLabel>
-                    <BbCombobox TValue="string"
-                                 @bind-Value="_movementForm.LocationId"
-                                 Options="@MovementLocationOptions"
-                                 Placeholder="Select location"
-                                 SearchPlaceholder="Search locations..."
-                                 EmptyMessage="No locations found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
+                <XfEntityPicker TItem="Warehouse"
+                                Value="@_movementForm.WarehouseId"
+                                ValueChanged="@OnMovementWarehouseChanged"
+                                Items="@_warehouses"
+                                Label="Warehouse"
+                                Placeholder="Select warehouse"
+                                SearchPlaceholder="Search warehouses..."
+                                EmptyMessage="No warehouses found."
+                                ValueSelector="@GetWarehousePickerValue"
+                                TextSelector="@GetWarehouseLabel"
+                                SearchTextSelector="@GetWarehouseSearchText"
+                                AdvancedSearchTitle="Find Warehouse"
+                                AdvancedSearchDescription="Search warehouses in the active tenant." />
+                <XfEntityPicker TItem="InventoryLocation"
+                                @bind-Value="_movementForm.LocationId"
+                                Items="@LocationsForSelectedWarehouse().ToList()"
+                                Label="Location"
+                                Placeholder="Select location"
+                                SearchPlaceholder="Search locations..."
+                                EmptyMessage="No locations found."
+                                ValueSelector="@GetLocationPickerValue"
+                                TextSelector="@GetLocationLabel"
+                                SearchTextSelector="@GetLocationSearchText"
+                                AdvancedSearchTitle="Find Location"
+                                AdvancedSearchDescription="Search locations for the selected warehouse." />
                 <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
                     @foreach (var type in Enum.GetValues<InventoryMovementType>())
                     {
@@ -199,7 +205,11 @@ else
                 </BbFormFieldSelect>
             </div>
             <div class="grid gap-3 md:grid-cols-3">
-                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Quantity" Label="Quantity" />
+                <BbFormFieldNumericInput TValue="decimal"
+                                         @bind-Value="_movementForm.Quantity"
+                                         Label="Quantity"
+                                         DecimalPlaces="2"
+                                         Step="1" />
                 <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
                 <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
             </div>
@@ -244,26 +254,6 @@ else
     private bool _postingMovement;
     private bool _movementDialogOpen;
     private bool IsPostMovementDisabled => _postingMovement || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
-    private List<SelectOption<string>> ProductOptions =>
-        _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
-    private List<SelectOption<string>> WarehouseOptions =>
-        _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
-    private List<SelectOption<string>> MovementLocationOptions =>
-        LocationsForSelectedWarehouse().Select(location => new SelectOption<string>(location.Id.ToString(), GetLocationLabel(location))).ToList();
-    private List<SelectOption<string>> MovementLotOptions
-    {
-        get
-        {
-            var options = new List<SelectOption<string>>
-            {
-                new("", "No lot / untracked")
-            };
-            options.AddRange(LotsForSelectedProduct()
-                .Select(lot => new SelectOption<string>(lot.Id.ToString(), GetLotLabel(lot))));
-            return options;
-        }
-    }
-
     protected override void OnInitialized()
     {
         TenantFilter.OnChanged += OnTenantChanged;
@@ -350,9 +340,9 @@ else
 
             ApplyDefaultMovementSelections();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load stock control: {ex.Message}");
+            ToastService.Show("Could not load stock control.");
         }
         finally
         {
@@ -371,7 +361,7 @@ else
             return;
         }
 
-        if (!decimal.TryParse(_movementForm.Quantity, out var quantity) || quantity == 0)
+        if (_movementForm.Quantity == 0)
         {
             ToastService.Show("Quantity must not be zero.");
             return;
@@ -388,17 +378,17 @@ else
                 LocationId = locationId,
                 LotId = Guid.TryParse(_movementForm.LotId, out var lotId) ? lotId : null,
                 MovementType = Enum.TryParse<InventoryMovementType>(_movementForm.MovementType, out var type) ? type : InventoryMovementType.Adjustment,
-                Quantity = quantity,
+                Quantity = _movementForm.Quantity,
                 UnitOfMeasure = NullIfEmpty(_movementForm.UnitOfMeasure),
                 ReferenceType = NullIfEmpty(_movementForm.ReferenceType),
                 Reason = NullIfEmpty(_movementForm.Reason),
                 AllowNegativeStock = _negativeStockEnabled && _movementForm.AllowNegativeStock
             });
 
-            ToastService.Show(result.IsSuccess ? "Stock movement posted." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Stock movement posted." : "Could not post stock movement.");
             if (result.IsSuccess)
             {
-                _movementForm.Quantity = "0";
+                _movementForm.Quantity = 0m;
                 _movementForm.Reason = "";
                 _movementDialogOpen = false;
                 await Reload();
@@ -463,10 +453,20 @@ else
     private string GetProductLabel(Product product) =>
         string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
 
+    private static string GetProductPickerValue(Product product) => product.Id.ToString();
+
+    private static string GetProductSearchText(Product product) =>
+        $"{product.Name} {product.SKU} {product.Brand} {product.Description}";
+
     private string GetProductName(Guid productId) =>
         _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
 
     private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+
+    private static string GetWarehousePickerValue(Warehouse warehouse) => warehouse.Id.ToString();
+
+    private static string GetWarehouseSearchText(Warehouse warehouse) =>
+        $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
 
     private string GetWarehouseName(Guid warehouseId) =>
         _warehouses.FirstOrDefault(x => x.Id == warehouseId)?.Name ?? warehouseId.ToString()[..8];
@@ -476,6 +476,11 @@ else
 
     private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
 
+    private static string GetLocationPickerValue(InventoryLocation location) => location.Id.ToString();
+
+    private string GetLocationSearchText(InventoryLocation location) =>
+        $"{location.Code} {location.Name} {GetWarehouseName(location.WarehouseId)} {location.LocationType} {location.Description}";
+
     private string GetLotLabel(Guid? lotId) =>
         lotId is { } id
             ? _lots.FirstOrDefault(x => x.Id == id)?.LotNumber ?? id.ToString()[..8]
@@ -483,6 +488,11 @@ else
 
     private string GetLotLabel(InventoryLot lot) =>
         string.IsNullOrWhiteSpace(lot.LotNumber) ? lot.Id.ToString()[..8] : lot.LotNumber;
+
+    private static string GetLotPickerValue(InventoryLot lot) => lot.Id.ToString();
+
+    private string GetLotSearchText(InventoryLot lot) =>
+        $"{lot.LotNumber} {lot.Status} {GetProductName(lot.ProductId)} {lot.SupplierReference} {lot.SourceReferenceType}";
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -500,7 +510,7 @@ else
         public string LocationId { get; set; } = "";
         public string LotId { get; set; } = "";
         public string MovementType { get; set; } = InventoryMovementType.Adjustment.ToString();
-        public string Quantity { get; set; } = "0";
+        public decimal Quantity { get; set; }
         public string UnitOfMeasure { get; set; } = "each";
         public string ReferenceType { get; set; } = "";
         public string Reason { get; set; } = "";

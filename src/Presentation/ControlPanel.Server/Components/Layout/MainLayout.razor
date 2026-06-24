@@ -3,6 +3,7 @@
 @using System.Text.Json
 @using ControlPanel.Server.Services
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts
 
 <div class="control-panel-shell flex h-screen overflow-hidden bg-background text-foreground">
     @* Fixed left sidebar - always visible *@
@@ -186,6 +187,8 @@
     private string _displayName = "Administrator";
     private string _userName = "";
     private string _userInitials = "A";
+    private Guid? _breadcrumbProductId;
+    private string? _breadcrumbProductLabel;
     private bool _profileMenuOpen;
 
     private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
@@ -212,13 +215,64 @@
 
     private List<string> GetBreadcrumbs()
     {
+        if (TryGetInventarioProductDetailRoute(out var productId, out var section))
+        {
+            return BuildInventarioProductBreadcrumbs(productId, section);
+        }
+
         var path = new Uri(Nav.Uri).AbsolutePath.Trim('/');
         if (string.IsNullOrEmpty(path)) return [];
 
         return path.Split('/')
-            .Select(s => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.Replace("-", " ")))
+            .Select(HumanizeSegment)
             .ToList();
     }
+
+    private List<string> BuildInventarioProductBreadcrumbs(Guid productId, string section)
+    {
+        var normalizedSection = NormalizeProductDetailSection(section);
+
+        return
+        [
+            "Inventario",
+            "Products",
+            GetProductBreadcrumbLabel(productId),
+            ProductSectionLabel(normalizedSection)
+        ];
+    }
+
+    private string GetProductBreadcrumbLabel(Guid productId) =>
+        _breadcrumbProductId == productId && !string.IsNullOrWhiteSpace(_breadcrumbProductLabel)
+            ? _breadcrumbProductLabel
+            : ShortId(productId);
+
+    private static string NormalizeProductDetailSection(string? section) =>
+        string.IsNullOrWhiteSpace(section)
+            ? "summary"
+            : section.ToLowerInvariant() switch
+            {
+                "batches" => "lots",
+                "lots-batches" => "lots",
+                "reorder" => "replenishment",
+                "rules" => "replenishment",
+                _ => section.ToLowerInvariant()
+            };
+
+    private static string ProductSectionLabel(string section) => section switch
+    {
+        "summary" => "Summary",
+        "stock" => "Stock",
+        "lots" => "Lots / Batches",
+        "replenishment" => "Replenishment",
+        "variations" => "Variations",
+        "transactions" => "Transactions",
+        _ => HumanizeSegment(section)
+    };
+
+    private static string HumanizeSegment(string segment) =>
+        System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(segment.Replace("-", " "));
+
+    private static string ShortId(Guid id) => id.ToString("N")[..8];
 
     protected override void OnInitialized()
     {
@@ -249,6 +303,8 @@
             ?? user.Identity.Name
             ?? "Administrator";
         _userInitials = BuildInitials(_displayName);
+
+        await RefreshBreadcrumbEntityLabels();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -574,6 +630,47 @@
         return true;
     }
 
+    private async Task RefreshBreadcrumbEntityLabels()
+    {
+        if (!TryGetInventarioProductDetailRoute(out var productId, out _))
+        {
+            _breadcrumbProductId = null;
+            _breadcrumbProductLabel = null;
+            return;
+        }
+
+        if (_breadcrumbProductId == productId && !string.IsNullOrWhiteSpace(_breadcrumbProductLabel))
+        {
+            return;
+        }
+
+        _breadcrumbProductId = productId;
+        _breadcrumbProductLabel = ShortId(productId);
+
+        try
+        {
+            var product = (await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == productId && !x.IsDeleted)
+                .Take(1)
+                .ToListAsync())
+                .FirstOrDefault();
+
+            _breadcrumbProductLabel = product is null
+                ? ShortId(productId)
+                : !string.IsNullOrWhiteSpace(product.Name)
+                    ? product.Name
+                    : !string.IsNullOrWhiteSpace(product.SKU)
+                        ? product.SKU
+                        : ShortId(productId);
+        }
+        catch
+        {
+            _breadcrumbProductLabel = ShortId(productId);
+        }
+    }
+
     private bool TryGetWalletDetailRoute(out Guid walletId, out string section)
     {
         walletId = Guid.Empty;
@@ -613,15 +710,23 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
-        UpdateActiveSidebarGroup();
-        _contentRenderKey++;
-        InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(async () =>
+        {
+            UpdateActiveSidebarGroup();
+            _contentRenderKey++;
+            await RefreshBreadcrumbEntityLabels();
+            StateHasChanged();
+        });
     }
 
     private void OnTenantFilterChanged()
     {
-        _contentRenderKey++;
-        InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(async () =>
+        {
+            _contentRenderKey++;
+            await RefreshBreadcrumbEntityLabels();
+            StateHasChanged();
+        });
     }
 
     private void OnTenantsChanged()

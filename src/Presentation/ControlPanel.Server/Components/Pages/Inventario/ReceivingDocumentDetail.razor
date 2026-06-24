@@ -90,15 +90,15 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_lines" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Lot">
+                            <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId, item.LotNumber))">
                                 <ChildContent Context="item">@GetLotLabel(item.LotId, item.LotNumber)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" />
-                            <BbDataGridTemplateColumn Title="Stock Balance">
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Stock Balance" Filterable="true" FilterBy="@(item => GetStockBalanceFilterText(item))">
                                 <ChildContent Context="item">
                                     @if (item.StockBalanceId is { } balanceId)
                                     {
@@ -181,9 +181,9 @@ else
             _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(500).ToListAsync();
             _lots = await DataContext.Query<InventoryLot>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(500).ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load receiving document: {ex.Message}");
+            ToastService.Show("Could not load receiving document.");
         }
         finally
         {
@@ -199,6 +199,7 @@ else
     private string GetWarehouseName(Guid warehouseId) => _warehouses.FirstOrDefault(x => x.Id == warehouseId)?.Name ?? warehouseId.ToString()[..8];
     private string GetLocationName(Guid locationId) => _locations.FirstOrDefault(x => x.Id == locationId)?.Name ?? locationId.ToString()[..8];
     private string GetLotLabel(Guid? lotId, string? fallback) => lotId is { } id ? _lots.FirstOrDefault(x => x.Id == id)?.LotNumber ?? id.ToString()[..8] : fallback ?? "Untracked";
+    private static string GetStockBalanceFilterText(ReceivingLine line) => line.StockBalanceId is { } id ? id.ToString()[..8] : "N/A";
 
     public void Dispose()
     {

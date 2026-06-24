@@ -313,6 +313,16 @@
     max-width: min(74rem, calc(100vw - 2rem));
 }
 
+.xf-dialog-wide {
+    width: min(64rem, calc(100vw - 2rem));
+    max-width: min(64rem, calc(100vw - 2rem));
+}
+
+.xf-dialog-extra-wide {
+    width: min(74rem, calc(100vw - 2rem));
+    max-width: min(74rem, calc(100vw - 2rem));
+}
+
 .xf-entity-picker-advanced-hint {
     color: var(--muted-foreground);
     font-size: 0.8125rem;
@@ -459,6 +469,7 @@
     .xf-detail-field-grid-wide {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+
 }
 
 .login-shell {

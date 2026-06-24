@@ -111,9 +111,9 @@ else
             _skuRequired = bool.TryParse(GetValue(configs, SkuRequiredKey, "true"), out var skuRequired) && skuRequired;
             _allowNegativeStock = bool.TryParse(GetValue(configs, AllowNegativeStockKey, "false"), out var allowNegative) && allowNegative;
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load Inventario settings: {ex.Message}");
+            ToastService.Show("Could not load Inventario settings.");
         }
         finally
         {
@@ -141,11 +141,11 @@ else
             await UpsertSetting(tenantId, AllowNegativeStockKey, _allowNegativeStock.ToString(), "boolean");
 
             var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Inventario settings saved." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Inventario settings saved." : "Could not save Inventario settings.");
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error saving Inventario settings: {ex.Message}");
+            ToastService.Show("Could not save Inventario settings.");
         }
         finally
         {
@@ -186,7 +186,7 @@ else
         var result = await DataContext.SaveChangesAsync();
         if (!result.IsSuccess)
         {
-            throw new InvalidOperationException(result.Message ?? "Unable to create settings group.");
+            throw new InvalidOperationException("Unable to create settings group.");
         }
 
         return created.Id;

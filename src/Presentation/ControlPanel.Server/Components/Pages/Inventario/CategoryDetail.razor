@@ -127,25 +127,25 @@ else
                                 OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="SKU">
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="SKU" Filterable="true" FilterBy="@(item => item.SKU ?? string.Empty)">
                                 <ChildContent Context="item">
                                     <span class="font-mono text-xs">@(item.SKU ?? "N/A")</span>
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Price" Sortable="true">
+                            <BbDataGridTemplateColumn Title="Price" Sortable="true" Filterable="true" FilterBy="@(item => item.Price)">
                                 <ChildContent Context="item">@item.Price.ToString("N2")</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Stock" Sortable="true">
+                            <BbDataGridTemplateColumn Title="Stock" Sortable="true" Filterable="true" FilterBy="@(item => item.StockQuantity)">
                                 <ChildContent Context="item">@item.StockQuantity</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Status">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsAvailable ? "Available" : "Unavailable")">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsAvailable ? "Available" : "Unavailable")"
                                                  Status="@(item.IsAvailable ? "active" : "inactive")" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -225,9 +225,9 @@ else
             if (!_editMode)
                 LoadForm();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load category: {ex.Message}");
+            ToastService.Show("Could not load category.");
         }
         finally
         {
@@ -294,12 +294,12 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to save category: {result.Message}");
+                ToastService.Show("Could not save category.");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error saving category: {ex.Message}");
+            ToastService.Show("Could not save category.");
         }
         finally
         {

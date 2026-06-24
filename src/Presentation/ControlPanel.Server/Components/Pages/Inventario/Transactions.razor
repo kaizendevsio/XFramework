@@ -118,9 +118,9 @@ else
                 .Take(250)
                 .ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load inventory transactions: {ex.Message}");
+            ToastService.Show("Could not load inventory transactions.");
         }
         finally
         {

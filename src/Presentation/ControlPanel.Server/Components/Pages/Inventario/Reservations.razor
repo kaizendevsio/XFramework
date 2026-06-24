@@ -101,63 +101,69 @@ else
 }
 
 <BbDialog Open="@_reservationDialogOpen" OpenChanged="@(v => _reservationDialogOpen = v)">
-    <BbDialogContent TrapFocus="false">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Reserve Inventory</BbDialogTitle>
             <BbDialogDescription>Reservations reduce available quantity without changing on-hand stock.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <div class="grid gap-3 xl:grid-cols-3">
-                <div class="xf-form-field">
-                    <BbLabel>Product</BbLabel>
-                    <BbCombobox TValue="string"
-                                 Value="@_form.ProductId"
-                                 ValueChanged="@OnReservationProductChanged"
-                                 Options="@ProductOptions"
-                                 Placeholder="Select product"
-                                 SearchPlaceholder="Search products..."
-                                 EmptyMessage="No products found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
-                <div class="xf-form-field">
-                    <BbLabel>Warehouse</BbLabel>
-                    <BbCombobox TValue="string"
-                                 Value="@_form.WarehouseId"
-                                 ValueChanged="@OnReservationWarehouseChanged"
-                                 Options="@WarehouseOptions"
-                                 Placeholder="Select warehouse"
-                                 SearchPlaceholder="Search warehouses..."
-                                 EmptyMessage="No warehouses found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
-                <div class="xf-form-field">
-                    <BbLabel>Location</BbLabel>
-                    <BbCombobox TValue="string"
-                                 @bind-Value="_form.LocationId"
-                                 Options="@ReservationLocationOptions"
-                                 Placeholder="Select location"
-                                 SearchPlaceholder="Search locations..."
-                                 EmptyMessage="No locations found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
+                <XfEntityPicker TItem="Product"
+                                Value="@_form.ProductId"
+                                ValueChanged="@OnReservationProductChanged"
+                                Items="@_products"
+                                Label="Product"
+                                Placeholder="Select product"
+                                SearchPlaceholder="Search products..."
+                                EmptyMessage="No products found."
+                                ValueSelector="@GetProductPickerValue"
+                                TextSelector="@GetProductLabel"
+                                SearchTextSelector="@GetProductSearchText"
+                                AdvancedSearchTitle="Find Product"
+                                AdvancedSearchDescription="Search products in the active tenant." />
+                <XfEntityPicker TItem="Warehouse"
+                                Value="@_form.WarehouseId"
+                                ValueChanged="@OnReservationWarehouseChanged"
+                                Items="@_warehouses"
+                                Label="Warehouse"
+                                Placeholder="Select warehouse"
+                                SearchPlaceholder="Search warehouses..."
+                                EmptyMessage="No warehouses found."
+                                ValueSelector="@GetWarehousePickerValue"
+                                TextSelector="@GetWarehouseLabel"
+                                SearchTextSelector="@GetWarehouseSearchText"
+                                AdvancedSearchTitle="Find Warehouse"
+                                AdvancedSearchDescription="Search warehouses in the active tenant." />
+                <XfEntityPicker TItem="InventoryLocation"
+                                @bind-Value="_form.LocationId"
+                                Items="@LocationsForSelectedWarehouse().ToList()"
+                                Label="Location"
+                                Placeholder="Select location"
+                                SearchPlaceholder="Search locations..."
+                                EmptyMessage="No locations found."
+                                ValueSelector="@GetLocationPickerValue"
+                                TextSelector="@GetLocationLabel"
+                                SearchTextSelector="@GetLocationSearchText"
+                                AdvancedSearchTitle="Find Location"
+                                AdvancedSearchDescription="Search locations for the selected warehouse." />
             </div>
             @if (_traceabilityEnabled)
             {
                 <div class="grid gap-3 md:grid-cols-2">
-                    <div class="xf-form-field">
-                        <BbLabel>Lot / Batch</BbLabel>
-                        <BbCombobox TValue="string"
-                                     @bind-Value="_form.LotId"
-                                     Options="@ReservationLotOptions"
-                                     Placeholder="Auto FEFO allocation"
-                                     SearchPlaceholder="Search lots..."
-                                     EmptyMessage="No lots found."
-                                     Class="xf-entity-combobox"
-                                     MatchTriggerWidth="true" />
-                    </div>
+                    <XfEntityPicker TItem="InventoryLot"
+                                    @bind-Value="_form.LotId"
+                                    Items="@LotsForSelectedProduct().ToList()"
+                                    Label="Lot / Batch"
+                                    Placeholder="Auto FEFO allocation"
+                                    SearchPlaceholder="Search lots..."
+                                    EmptyMessage="No lots found."
+                                    ValueSelector="@GetLotPickerValue"
+                                    TextSelector="@GetLotLabel"
+                                    SearchTextSelector="@GetLotSearchText"
+                                    AllowClear="true"
+                                    ClearText="Auto FEFO allocation"
+                                    AdvancedSearchTitle="Find Lot / Batch"
+                                    AdvancedSearchDescription="Search lots for the selected product." />
                     <BbFormFieldSwitch Checked="@_form.AllowExpiredLotOverride"
                                        CheckedChanged="@((bool value) => _form.AllowExpiredLotOverride = value)"
                                        Label="Allow expired lot override" />
@@ -168,14 +174,13 @@ else
                 }
             }
             <div class="grid gap-3 md:grid-cols-3">
-                <BbFormFieldInput TValue="string" @bind-Value="_form.Quantity" Label="Quantity" />
-                <div class="xf-form-field">
-                    <BbLabel>Expires At</BbLabel>
-                    <input type="datetime-local"
-                           class="xf-datetime-input"
-                           value="@_form.ExpiresAt"
-                           @oninput="@((ChangeEventArgs e) => _form.ExpiresAt = e.Value?.ToString() ?? string.Empty)" />
-                </div>
+                <BbFormFieldNumericInput TValue="decimal"
+                                         @bind-Value="_form.Quantity"
+                                         Label="Quantity"
+                                         Min="0"
+                                         DecimalPlaces="2"
+                                         Step="1" />
+                <BbFormFieldDatePicker @bind-Value="_form.ExpiresAt" Label="Expires At" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceType" Label="Reference Type" />
             </div>
             <div class="grid gap-3 md:grid-cols-2">
@@ -214,25 +219,6 @@ else
     private bool _expiring;
     private bool _reservationDialogOpen;
     private bool IsReserveDisabled => _reserving || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
-    private List<SelectOption<string>> ProductOptions =>
-        _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
-    private List<SelectOption<string>> WarehouseOptions =>
-        _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
-    private List<SelectOption<string>> ReservationLocationOptions =>
-        LocationsForSelectedWarehouse().Select(location => new SelectOption<string>(location.Id.ToString(), GetLocationLabel(location))).ToList();
-    private List<SelectOption<string>> ReservationLotOptions
-    {
-        get
-        {
-            var options = new List<SelectOption<string>>
-            {
-                new("", "Auto FEFO allocation")
-            };
-            options.AddRange(LotsForSelectedProduct()
-                .Select(lot => new SelectOption<string>(lot.Id.ToString(), GetLotLabel(lot))));
-            return options;
-        }
-    }
 
     protected override void OnInitialized()
     {
@@ -308,9 +294,9 @@ else
 
             ApplyDefaultSelections();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load reservations: {ex.Message}");
+            ToastService.Show("Could not load reservations.");
         }
         finally
         {
@@ -329,15 +315,9 @@ else
             return;
         }
 
-        if (!decimal.TryParse(_form.Quantity, out var quantity) || quantity <= 0)
+        if (_form.Quantity <= 0)
         {
             ToastService.Show("Quantity must be greater than zero.");
-            return;
-        }
-
-        if (!TryParseOptionalDate(_form.ExpiresAt, out var expiresAt))
-        {
-            ToastService.Show("Expiration date is invalid.");
             return;
         }
 
@@ -350,9 +330,9 @@ else
                 ProductId = productId,
                 WarehouseId = warehouseId,
                 LocationId = locationId,
-                Quantity = quantity,
+                Quantity = _form.Quantity,
                 LotId = Guid.TryParse(_form.LotId, out var lotId) ? lotId : null,
-                ExpiresAt = expiresAt,
+                ExpiresAt = _form.ExpiresAt,
                 ReferenceType = NullIfEmpty(_form.ReferenceType),
                 ReferenceId = Guid.TryParse(_form.ReferenceId, out var referenceId) ? referenceId : (Guid?)null,
                 Reason = NullIfEmpty(_form.Reason),
@@ -360,11 +340,11 @@ else
                 ExpiredLotOverrideReason = NullIfEmpty(_form.ExpiredLotOverrideReason)
             });
 
-            ToastService.Show(result.IsSuccess ? "Inventory reserved." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Inventory reserved." : "Could not reserve inventory.");
             if (result.IsSuccess)
             {
-                _form.Quantity = "0";
-                _form.ExpiresAt = "";
+                _form.Quantity = 0m;
+                _form.ExpiresAt = null;
                 _form.LotId = "";
                 _form.AllowExpiredLotOverride = false;
                 _form.ExpiredLotOverrideReason = "";
@@ -434,7 +414,7 @@ else
     private async Task RunReservationAction(Func<Task<CmdResponse>> action, string successMessage)
     {
         var result = await action();
-        ToastService.Show(result.IsSuccess ? successMessage : $"Failed: {result.Message}");
+        ToastService.Show(result.IsSuccess ? successMessage : "Could not update reservation.");
         if (result.IsSuccess)
             await Reload();
     }
@@ -486,6 +466,11 @@ else
     private string GetProductLabel(Product product) =>
         string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
 
+    private static string GetProductPickerValue(Product product) => product.Id.ToString();
+
+    private static string GetProductSearchText(Product product) =>
+        $"{product.Name} {product.SKU} {product.Brand} {product.Description}";
+
     private string GetProductName(Guid productId) =>
         _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
 
@@ -498,8 +483,13 @@ else
     }
 
     private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+    private static string GetWarehousePickerValue(Warehouse warehouse) => warehouse.Id.ToString();
+    private static string GetWarehouseSearchText(Warehouse warehouse) => $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
+    private string GetWarehouseName(Guid warehouseId) => _warehouses.FirstOrDefault(x => x.Id == warehouseId) is { } warehouse ? GetWarehouseLabel(warehouse) : warehouseId.ToString()[..8];
 
     private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
+    private static string GetLocationPickerValue(InventoryLocation location) => location.Id.ToString();
+    private string GetLocationSearchText(InventoryLocation location) => $"{location.Code} {location.Name} {GetWarehouseName(location.WarehouseId)} {location.LocationType} {location.Description}";
 
     private static string GetLotLabel(InventoryLot lot)
     {
@@ -507,21 +497,13 @@ else
         return $"{lot.LotNumber} - {expiry}";
     }
 
+    private static string GetLotPickerValue(InventoryLot lot) => lot.Id.ToString();
+
+    private string GetLotSearchText(InventoryLot lot) =>
+        $"{lot.LotNumber} {lot.Status} {GetProductName(lot.ProductId)} {lot.SupplierReference}";
+
     private static string GetStatusBadge(ReservationStatus status) =>
         status == ReservationStatus.Active ? "active" : "inactive";
-
-    private static bool TryParseOptionalDate(string? value, out DateTime? date)
-    {
-        date = null;
-        if (string.IsNullOrWhiteSpace(value))
-            return true;
-
-        if (!DateTime.TryParse(value, out var parsed))
-            return false;
-
-        date = parsed.ToUniversalTime();
-        return true;
-    }
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -538,8 +520,8 @@ else
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
         public string LotId { get; set; } = "";
-        public string Quantity { get; set; } = "0";
-        public string ExpiresAt { get; set; } = "";
+        public decimal Quantity { get; set; }
+        public DateTime? ExpiresAt { get; set; }
         public string ReferenceType { get; set; } = "";
         public string ReferenceId { get; set; } = "";
         public string Reason { get; set; } = "";

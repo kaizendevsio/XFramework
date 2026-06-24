@@ -80,7 +80,7 @@ else
 }
 
 <BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" class="max-w-4xl">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Create Purchase Order</BbDialogTitle>
             <BbDialogDescription>Add one or more product lines. Receiving will update line quantities later.</BbDialogDescription>
@@ -88,24 +88,27 @@ else
         <div class="grid gap-4 py-4">
             <div class="grid gap-3 md:grid-cols-3">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.OrderNumber" Label="Order Number" />
-                <div class="xf-form-field">
-                    <BbLabel>Supplier</BbLabel>
-                    <BbCombobox TValue="string"
-                                 @bind-Value="_form.SupplierId"
-                                 Options="@SupplierOptions"
-                                 Placeholder="No supplier"
-                                 SearchPlaceholder="Search suppliers..."
-                                 EmptyMessage="No suppliers found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
+                <XfEntityPicker TItem="Supplier"
+                                @bind-Value="_form.SupplierId"
+                                Items="@_suppliers"
+                                Label="Supplier"
+                                Placeholder="No supplier"
+                                SearchPlaceholder="Search suppliers..."
+                                EmptyMessage="No suppliers found."
+                                ValueSelector="@GetSupplierPickerValue"
+                                TextSelector="@GetSupplierLabel"
+                                SearchTextSelector="@GetSupplierSearchText"
+                                AllowClear="true"
+                                ClearText="No supplier"
+                                AdvancedSearchTitle="Find Supplier"
+                                AdvancedSearchDescription="Search suppliers in the active tenant." />
                 <BbFormFieldSelect TValue="string" @bind-Value="_form.Status" Label="Status">
                     <BbSelectItem Value="@PurchaseOrderStatus.Open.ToString()">Open</BbSelectItem>
                     <BbSelectItem Value="@PurchaseOrderStatus.Draft.ToString()">Draft</BbSelectItem>
                 </BbFormFieldSelect>
             </div>
             <div class="grid gap-3 md:grid-cols-2">
-                <BbFormFieldInput TValue="string" @bind-Value="_form.ExpectedDate" Label="Expected Date" />
+                <BbFormFieldDatePicker @bind-Value="_form.ExpectedDate" Label="Expected Date" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Notes" Label="Notes" />
             </div>
 
@@ -123,19 +126,28 @@ else
                         var index = i;
                         var line = _form.Lines[index];
                         <div class="grid gap-3 rounded-md border p-3 md:grid-cols-[2fr_1fr_1fr_auto]">
-                            <div class="xf-form-field">
-                                <BbLabel>Product</BbLabel>
-                                <BbCombobox TValue="string"
-                                             @bind-Value="line.ProductId"
-                                             Options="@ProductOptions"
-                                             Placeholder="Select product"
-                                             SearchPlaceholder="Search products..."
-                                             EmptyMessage="No products found."
-                                             Class="xf-entity-combobox"
-                                             MatchTriggerWidth="true" />
-                            </div>
-                            <BbFormFieldInput TValue="string" @bind-Value="line.Quantity" Label="Quantity" />
-                            <BbFormFieldInput TValue="string" @bind-Value="line.UnitCost" Label="Unit Cost" />
+                            <XfEntityPicker TItem="Product"
+                                            @bind-Value="line.ProductId"
+                                            Items="@_products"
+                                            Label="Product"
+                                            Placeholder="Select product"
+                                            SearchPlaceholder="Search products..."
+                                            EmptyMessage="No products found."
+                                            ValueSelector="@GetProductPickerValue"
+                                            TextSelector="@GetProductLabel"
+                                            SearchTextSelector="@GetProductSearchText"
+                                            AdvancedSearchTitle="Find Product"
+                                            AdvancedSearchDescription="Search products in the active tenant." />
+                            <BbFormFieldNumericInput TValue="decimal"
+                                                     @bind-Value="line.Quantity"
+                                                     Label="Quantity"
+                                                     Min="0"
+                                                     DecimalPlaces="2"
+                                                     Step="1" />
+                            <BbFormFieldCurrencyInput @bind-Value="line.UnitCost"
+                                                      Label="Unit Cost"
+                                                      Min="0"
+                                                      ShowSymbol="false" />
                             <div class="flex items-end">
                                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Remove line"
                                           Disabled="@(_form.Lines.Count == 1)"
@@ -173,10 +185,7 @@ else
     private bool _purchasingEnabled;
     private bool _saving;
     private bool _createDialogOpen;
-    private bool IsCreateDisabled => _saving || _products.Count == 0 || _form.Lines.Any(x => string.IsNullOrWhiteSpace(x.ProductId) || !decimal.TryParse(x.Quantity, out var quantity) || quantity <= 0);
-
-    private List<SelectOption<string>> SupplierOptions => [new("", "No supplier"), .. _suppliers.Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Code} - {x.Name}"))];
-    private List<SelectOption<string>> ProductOptions => _products.Select(x => new SelectOption<string>(x.Id.ToString(), $"{x.Name} ({x.SKU ?? x.Id.ToString()[..8]})")).ToList();
+    private bool IsCreateDisabled => _saving || _products.Count == 0 || _form.Lines.Any(x => string.IsNullOrWhiteSpace(x.ProductId) || x.Quantity <= 0);
 
     protected override void OnInitialized()
     {
@@ -232,9 +241,9 @@ else
                 .Take(1000)
                 .ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load purchase orders: {ex.Message}");
+            ToastService.Show("Could not load purchase orders.");
         }
         finally
         {
@@ -249,7 +258,7 @@ else
         _createDialogOpen = true;
     }
 
-    private void AddLine() => _form.Lines.Add(new PurchaseOrderLineForm { ProductId = _products.FirstOrDefault()?.Id.ToString() ?? "", Quantity = "1" });
+    private void AddLine() => _form.Lines.Add(new PurchaseOrderLineForm { ProductId = _products.FirstOrDefault()?.Id.ToString() ?? "", Quantity = 1m });
 
     private void RemoveLine(int index)
     {
@@ -268,21 +277,21 @@ else
                 OrderNumber = NullIfEmpty(_form.OrderNumber),
                 SupplierId = Guid.TryParse(_form.SupplierId, out var supplierId) ? supplierId : null,
                 Status = Enum.TryParse<PurchaseOrderStatus>(_form.Status, out var status) ? status : PurchaseOrderStatus.Open,
-                ExpectedDate = ParseDate(_form.ExpectedDate),
+                ExpectedDate = _form.ExpectedDate,
                 Notes = NullIfEmpty(_form.Notes),
                 Lines = _form.Lines
-                    .Where(x => Guid.TryParse(x.ProductId, out _) && decimal.TryParse(x.Quantity, out var quantity) && quantity > 0)
+                    .Where(x => Guid.TryParse(x.ProductId, out _) && x.Quantity > 0)
                     .Select(x => new PurchaseOrderLineRequest
                     {
                         ProductId = Guid.Parse(x.ProductId),
-                        OrderedQuantity = decimal.Parse(x.Quantity),
-                        UnitCost = decimal.TryParse(x.UnitCost, out var unitCost) ? unitCost : null,
+                        OrderedQuantity = x.Quantity,
+                        UnitCost = x.UnitCost > 0 ? x.UnitCost : null,
                         UnitOfMeasure = NullIfEmpty(x.UnitOfMeasure)
                     })
                     .ToList()
             });
 
-            ToastService.Show(result.IsSuccess ? "Purchase order created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Purchase order created." : "Could not create purchase order.");
             if (result.IsSuccess)
             {
                 _createDialogOpen = false;
@@ -298,6 +307,22 @@ else
     private string GetSupplierName(Guid? supplierId) =>
         supplierId is { } id ? _suppliers.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString()[..8] : "No supplier";
 
+    private static string GetSupplierPickerValue(Supplier supplier) => supplier.Id.ToString();
+
+    private static string GetSupplierLabel(Supplier supplier) =>
+        string.IsNullOrWhiteSpace(supplier.Code) ? supplier.Name ?? supplier.Id.ToString()[..8] : $"{supplier.Code} - {supplier.Name}";
+
+    private static string GetSupplierSearchText(Supplier supplier) =>
+        $"{supplier.Code} {supplier.Name} {supplier.ContactName} {supplier.Email} {supplier.Phone}";
+
+    private static string GetProductPickerValue(Product product) => product.Id.ToString();
+
+    private static string GetProductLabel(Product product) =>
+        string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
+
+    private static string GetProductSearchText(Product product) =>
+        $"{product.Name} {product.SKU} {product.Brand} {product.Description}";
+
     private static string GetStatusBadge(PurchaseOrderStatus status) =>
         status switch
         {
@@ -309,8 +334,6 @@ else
 
     private RequestMetadata BuildMetadata() => new() { TenantId = TenantFilter.SelectedTenantId };
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static DateTime? ParseDate(string? value) => DateTime.TryParse(value, out var date) ? date : null;
-
     public void Dispose()
     {
         TenantFilter.OnChanged -= OnTenantChanged;
@@ -322,7 +345,7 @@ else
         public string OrderNumber { get; set; } = "";
         public string SupplierId { get; set; } = "";
         public string Status { get; set; } = PurchaseOrderStatus.Open.ToString();
-        public string ExpectedDate { get; set; } = "";
+        public DateTime? ExpectedDate { get; set; }
         public string Notes { get; set; } = "";
         public List<PurchaseOrderLineForm> Lines { get; } = [];
 
@@ -331,18 +354,18 @@ else
             OrderNumber = "";
             SupplierId = "";
             Status = PurchaseOrderStatus.Open.ToString();
-            ExpectedDate = "";
+            ExpectedDate = null;
             Notes = "";
             Lines.Clear();
-            Lines.Add(new PurchaseOrderLineForm { ProductId = productId, Quantity = "1" });
+            Lines.Add(new PurchaseOrderLineForm { ProductId = productId, Quantity = 1m });
         }
     }
 
     private sealed class PurchaseOrderLineForm
     {
         public string ProductId { get; set; } = "";
-        public string Quantity { get; set; } = "1";
-        public string UnitCost { get; set; } = "";
+        public decimal Quantity { get; set; } = 1m;
+        public decimal UnitCost { get; set; }
         public string UnitOfMeasure { get; set; } = "";
     }
 }

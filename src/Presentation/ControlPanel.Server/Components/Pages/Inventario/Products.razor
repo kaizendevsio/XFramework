@@ -1,5 +1,6 @@
 @page "/inventario/products"
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Domain.Shared.BusinessObjects
 @implements IDisposable
 
 <PageTitle>Inventario Products - Control Panel</PageTitle>
@@ -118,25 +119,39 @@ else
 }
 
 <BbDialog Open="@_productDialogOpen" OpenChanged="@(v => _productDialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Create Product</BbDialogTitle>
             <BbDialogDescription>Catalog data belongs to the selected tenant.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
-            <BbFormFieldInput TValue="string" @bind-Value="_form.Sku" Label="SKU" />
-            <BbFormFieldCombobox TValue="string"
-                                  @bind-Value="_form.CategoryId"
-                                  Options="@CategoryOptions"
-                                  Label="Category"
-                                  Placeholder="Select category"
-                                  SearchPlaceholder="Search categories..."
-                                  EmptyMessage="No categories found."
-                                  MatchTriggerWidth="true"
-                                  Required="true" />
             <div class="grid gap-4 md:grid-cols-2">
-                <BbFormFieldInput TValue="string" @bind-Value="_form.Price" Label="Price" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Sku" Label="SKU" />
+            </div>
+            <XfEntityPicker TItem="ProductCategory"
+                            Label="Category"
+                            Value="@_form.CategoryId"
+                            ValueChanged="@(value => _form.CategoryId = value ?? "")"
+                            Items="@_categories"
+                            ValueSelector="@GetCategoryPickerValue"
+                            TextSelector="@GetCategoryLabel"
+                            SearchTextSelector="@GetCategorySearchText"
+                            AdvancedColumns="@CategoryAdvancedColumns"
+                            AdvancedFilters="@CategoryAdvancedFilters"
+                            AdvancedSearchScope="Searches category name, description, product count, and created date."
+                            Placeholder="Select category"
+                            SearchPlaceholder="Search categories..."
+                            EmptyMessage="No categories found."
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Category"
+                            AdvancedSearchDescription="Select the category for this product." />
+            <div class="grid gap-4 md:grid-cols-2">
+                <BbFormFieldCurrencyInput @bind-Value="_form.Price"
+                                           Label="Price"
+                                           Min="0"
+                                          Required="true"
+                                          ShowSymbol="false" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Brand" Label="Brand" />
             </div>
             <BbFormFieldInput TValue="string" @bind-Value="_form.Description" Label="Description" />
@@ -155,6 +170,7 @@ else
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
@@ -225,9 +241,9 @@ else
             await LoadSettings();
             ApplySearch();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load products: {ex.Message}");
+            ToastService.Show("Could not load products.");
         }
         finally
         {
@@ -273,10 +289,21 @@ else
     private string GetCategoryName(Guid categoryId) =>
         _categories.FirstOrDefault(x => x.Id == categoryId)?.Name ?? "Uncategorized";
 
-    private List<SelectOption<string>> CategoryOptions =>
-        _categories
-            .Select(category => new SelectOption<string>(category.Id.ToString(), category.Name ?? category.Id.ToString()[..8]))
-            .ToList();
+    private static string GetCategoryPickerValue(ProductCategory category) => category.Id.ToString();
+    private static string GetCategoryLabel(ProductCategory category) =>
+        string.IsNullOrWhiteSpace(category.Name) ? category.Id.ToString()[..8] : category.Name;
+    private static string GetCategorySearchText(ProductCategory category) =>
+        $"{category.Name} {category.Description}";
+
+    private IReadOnlyList<XfEntityPickerColumn<ProductCategory>> CategoryAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Description", x => x.Description),
+        new("Products", x => _products.Count(product => product.CategoryId == x.Id).ToString()),
+        new("Created", x => x.CreatedAt.ToString("yyyy-MM-dd"))
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilter<ProductCategory>> CategoryAdvancedFilters = [];
 
     private void OpenCreateDialog()
     {
@@ -288,7 +315,7 @@ else
 
     private async Task SaveProduct()
     {
-        if (TenantFilter.SelectedTenantId is not Guid tenantId)
+        if (TenantFilter.SelectedTenantId is not Guid)
         {
             ToastService.Show("Select a tenant before saving products.");
             return;
@@ -306,32 +333,28 @@ else
             return;
         }
 
-        if (!decimal.TryParse(_form.Price, out var price) || price < 0)
+        if (_form.Price < 0)
         {
-            ToastService.Show("Price must be a non-negative number.");
+            ToastService.Show("Price must be zero or greater.");
             return;
         }
 
         _saving = true;
         try
         {
-            DataContext.Add(new Product
+            var result = await Inventario.CreateProduct(new CreateProductRequest
             {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
+                Metadata = BuildMetadata(),
                 Name = _form.Name.Trim(),
                 SKU = NullIfEmpty(_form.Sku),
                 CategoryId = categoryId,
-                Price = price,
+                Price = _form.Price,
                 StockQuantity = 0,
                 Brand = NullIfEmpty(_form.Brand),
                 Description = NullIfEmpty(_form.Description),
-                IsAvailable = _form.IsAvailable,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
+                IsAvailable = _form.IsAvailable
             });
 
-            var result = await DataContext.SaveChangesAsync();
             if (result.IsSuccess)
             {
                 ToastService.Show("Product created.");
@@ -340,12 +363,12 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to save product: {result.Message}");
+                ToastService.Show("Could not save product.");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error saving product: {ex.Message}");
+            ToastService.Show("Could not save product.");
         }
         finally
         {
@@ -355,6 +378,13 @@ else
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel"
+    };
 
     public void Dispose()
     {
@@ -367,7 +397,7 @@ else
         public string Name { get; set; } = "";
         public string Sku { get; set; } = "";
         public string CategoryId { get; set; } = "";
-        public string Price { get; set; } = "0";
+        public decimal Price { get; set; }
         public string Brand { get; set; } = "";
         public string Description { get; set; } = "";
         public bool IsAvailable { get; set; } = true;
@@ -377,7 +407,7 @@ else
             Name = "";
             Sku = "";
             CategoryId = "";
-            Price = "0";
+            Price = 0m;
             Brand = "";
             Description = "";
             IsAvailable = true;

@@ -80,23 +80,24 @@ else
 }
 
 <BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
-    <BbDialogContent TrapFocus="false">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Create Lot</BbDialogTitle>
             <BbDialogDescription>Lot numbers are unique per product inside the selected tenant.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="xf-form-field">
-                <BbLabel>Product</BbLabel>
-                <BbCombobox TValue="string"
-                             @bind-Value="_form.ProductId"
-                             Options="@ProductOptions"
-                             Placeholder="Select product"
-                             SearchPlaceholder="Search products..."
-                             EmptyMessage="No products found."
-                             Class="xf-entity-combobox"
-                             MatchTriggerWidth="true" />
-            </div>
+            <XfEntityPicker TItem="Product"
+                            @bind-Value="_form.ProductId"
+                            Items="@_products"
+                            Label="Product"
+                            Placeholder="Select product"
+                            SearchPlaceholder="Search products..."
+                            EmptyMessage="No products found."
+                            ValueSelector="@GetProductPickerValue"
+                            TextSelector="@GetProductLabel"
+                            SearchTextSelector="@GetProductSearchText"
+                            AdvancedSearchTitle="Find Product"
+                            AdvancedSearchDescription="Search products in the active tenant." />
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.LotNumber" Label="Lot / Batch Number" Required="true" />
                 <BbFormFieldSelect TValue="string" @bind-Value="_form.Status" Label="Status">
@@ -108,12 +109,15 @@ else
             </div>
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.SupplierReference" Label="Supplier / Source Ref" />
-                <BbFormFieldInput TValue="string" @bind-Value="_form.UnitCost" Label="Unit Cost" />
+                <BbFormFieldCurrencyInput @bind-Value="_form.UnitCost"
+                                          Label="Unit Cost"
+                                          Min="0"
+                                          ShowSymbol="false" />
             </div>
             <div class="grid gap-3 md:grid-cols-3">
-                <BbFormFieldInput TValue="string" @bind-Value="_form.ReceivedAt" Label="Received Date" />
-                <BbFormFieldInput TValue="string" @bind-Value="_form.ManufacturedAt" Label="Manufacture Date" />
-                <BbFormFieldInput TValue="string" @bind-Value="_form.ExpiresAt" Label="Expiration Date" />
+                <BbFormFieldDatePicker @bind-Value="_form.ReceivedAt" Label="Received Date" />
+                <BbFormFieldDatePicker @bind-Value="_form.ManufacturedAt" Label="Manufacture Date" />
+                <BbFormFieldDatePicker @bind-Value="_form.ExpiresAt" Label="Expiration Date" />
             </div>
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.SourceReferenceType" Label="Source Type" />
@@ -145,9 +149,6 @@ else
     private bool _saving;
     private bool _createDialogOpen;
     private bool IsCreateDisabled => _saving || _products.Count == 0 || string.IsNullOrWhiteSpace(_form.ProductId) || string.IsNullOrWhiteSpace(_form.LotNumber);
-
-    private List<SelectOption<string>> ProductOptions =>
-        _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
 
     protected override void OnInitialized()
     {
@@ -199,9 +200,9 @@ else
 
             _form.ProductId = _products.FirstOrDefault()?.Id.ToString() ?? "";
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load lots: {ex.Message}");
+            ToastService.Show("Could not load lots.");
         }
         finally
         {
@@ -235,14 +236,14 @@ else
                 SupplierReference = NullIfEmpty(_form.SupplierReference),
                 SourceReferenceType = NullIfEmpty(_form.SourceReferenceType),
                 SourceReferenceId = Guid.TryParse(_form.SourceReferenceId, out var sourceId) ? sourceId : null,
-                ReceivedAt = ParseDate(_form.ReceivedAt),
-                ManufacturedAt = ParseDate(_form.ManufacturedAt),
-                ExpiresAt = ParseDate(_form.ExpiresAt),
-                UnitCost = decimal.TryParse(_form.UnitCost, out var unitCost) ? unitCost : null,
+                ReceivedAt = _form.ReceivedAt,
+                ManufacturedAt = _form.ManufacturedAt,
+                ExpiresAt = _form.ExpiresAt,
+                UnitCost = _form.UnitCost > 0 ? _form.UnitCost : null,
                 Status = Enum.TryParse<InventoryLotStatus>(_form.Status, out var status) ? status : InventoryLotStatus.Available
             });
 
-            ToastService.Show(result.IsSuccess ? "Lot created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Lot created." : "Could not create lot.");
             if (result.IsSuccess)
             {
                 _createDialogOpen = false;
@@ -268,14 +269,16 @@ else
     private static string GetProductLabel(Product product) =>
         string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
 
+    private static string GetProductPickerValue(Product product) => product.Id.ToString();
+
+    private static string GetProductSearchText(Product product) =>
+        $"{product.Name} {product.SKU} {product.Brand} {product.Description}";
+
     private decimal GetLotOnHand(Guid lotId) =>
         _balances.Where(x => x.LotId == lotId).Sum(x => x.OnHandQuantity);
 
     private static string GetStatusBadge(InventoryLotStatus status) =>
         status is InventoryLotStatus.Available ? "active" : "inactive";
-
-    private static DateTime? ParseDate(string? value) =>
-        DateTime.TryParse(value, out var parsed) ? parsed : null;
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -293,10 +296,10 @@ else
         public string SupplierReference { get; set; } = "";
         public string SourceReferenceType { get; set; } = "";
         public string SourceReferenceId { get; set; } = "";
-        public string ReceivedAt { get; set; } = "";
-        public string ManufacturedAt { get; set; } = "";
-        public string ExpiresAt { get; set; } = "";
-        public string UnitCost { get; set; } = "";
+        public DateTime? ReceivedAt { get; set; }
+        public DateTime? ManufacturedAt { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public decimal UnitCost { get; set; }
         public string Status { get; set; } = InventoryLotStatus.Available.ToString();
 
         public void Reset(string productId)
@@ -306,10 +309,10 @@ else
             SupplierReference = "";
             SourceReferenceType = "";
             SourceReferenceId = "";
-            ReceivedAt = DateTime.Today.ToString("yyyy-MM-dd");
-            ManufacturedAt = "";
-            ExpiresAt = "";
-            UnitCost = "";
+            ReceivedAt = DateTime.Today;
+            ManufacturedAt = null;
+            ExpiresAt = null;
+            UnitCost = 0m;
             Status = InventoryLotStatus.Available.ToString();
         }
     }

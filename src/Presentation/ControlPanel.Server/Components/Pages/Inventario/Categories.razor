@@ -151,9 +151,9 @@ else
                 .ToListAsync();
             _productCounts = products.GroupBy(x => x.CategoryId).ToDictionary(x => x.Key, x => x.Count());
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load categories: {ex.Message}");
+            ToastService.Show("Could not load categories.");
         }
         finally
         {
@@ -209,12 +209,12 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to save category: {result.Message}");
+                ToastService.Show("Could not save category.");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error saving category: {ex.Message}");
+            ToastService.Show("Could not save category.");
         }
         finally
         {
@@ -232,14 +232,14 @@ else
             _deletingCategory.ModifiedAt = DateTime.UtcNow;
             DataContext.Update(_deletingCategory);
             var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Category deleted." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Category deleted." : "Could not delete category.");
             _deleteDialogOpen = false;
             _deletingCategory = null;
             await Reload();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error deleting category: {ex.Message}");
+            ToastService.Show("Could not delete category.");
         }
     }
 

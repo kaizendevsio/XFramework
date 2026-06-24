@@ -4,8 +4,10 @@ using XFramework.Core.Loggers;
 using XFramework.Core.Observability;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.Caching;
+using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Inventario.Api.Services;
@@ -37,7 +39,7 @@ public class ProductService
     /// </summary>
     public async Task<Result<Product>> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
     {
-        var tenantResult = GetCurrentTenantId();
+        var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<Product>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
@@ -286,7 +288,7 @@ public class ProductService
     /// </summary>
     public async Task<Result<Product>> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct = default)
     {
-        var tenantResult = GetCurrentTenantId();
+        var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<Product>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
@@ -412,8 +414,11 @@ public class ProductService
         }
     }
 
-    private Result<Guid> GetCurrentTenantId()
+    private Result<Guid> GetCurrentTenantId(RequestBase? request = null)
     {
+        if (request?.Metadata?.TenantId is { } metadataTenantId && metadataTenantId != Guid.Empty)
+            return Result<Guid>.Success(metadataTenantId);
+
         var user = _httpContextAccessor.HttpContext?.User;
         if (user?.Identity?.IsAuthenticated != true)
             return Result<Guid>.Unauthorized("Authentication is required for product catalog operations");
@@ -436,39 +441,6 @@ public class ProductService
 
     private static string? NormalizeSku(string? sku) =>
         string.IsNullOrWhiteSpace(sku) ? null : sku.Trim();
-}
-
-/// <summary>
-/// Request for creating a product
-/// </summary>
-public record CreateProductRequest
-{
-    public required string Name { get; init; }
-    public string? Description { get; init; }
-    public decimal Price { get; init; }
-    public int StockQuantity { get; init; }
-    public Guid CategoryId { get; init; }
-    public string? SKU { get; init; }
-    public string? Brand { get; init; }
-    public decimal? Weight { get; init; }
-    public string? Image { get; init; }
-    public bool? IsAvailable { get; init; }
-}
-
-/// <summary>
-/// Request for updating a product
-/// </summary>
-public record UpdateProductRequest
-{
-    public required string Name { get; init; }
-    public string? Description { get; init; }
-    public decimal Price { get; init; }
-    public Guid CategoryId { get; init; }
-    public string? SKU { get; init; }
-    public string? Brand { get; init; }
-    public decimal? Weight { get; init; }
-    public string? Image { get; init; }
-    public bool? IsAvailable { get; init; }
 }
 
 /// <summary>

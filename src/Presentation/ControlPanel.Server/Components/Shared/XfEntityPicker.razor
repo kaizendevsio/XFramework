@@ -94,21 +94,50 @@
     }
 </div>
 
-<BbDialog Open="@_advancedOpen" OpenChanged="@(value => _advancedOpen = value)">
+<BbDialog Open="@_advancedOpen" OpenChanged="@OnAdvancedOpenChanged">
     <BbDialogContent TrapFocus="false" class="xf-entity-picker-advanced-dialog">
         <BbDialogHeader>
             <BbDialogTitle>@AdvancedSearchTitle</BbDialogTitle>
             <BbDialogDescription>@AdvancedSearchDescription</BbDialogDescription>
+            @if (!string.IsNullOrWhiteSpace(AdvancedSearchScope))
+            {
+                <BbTypographyMuted>@AdvancedSearchScope</BbTypographyMuted>
+            }
             @if (ShowAdvancedColumnFilters)
             {
                 <p class="xf-entity-picker-advanced-hint">Hover over a column header to reveal its filter.</p>
             }
         </BbDialogHeader>
         <div class="grid gap-3 py-4">
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_advancedSearchQuery"
+                              Label="Search"
+                              Placeholder="@AdvancedSearchPlaceholder" />
+
+            @if (HasAdvancedFilters)
+            {
+                <div class="grid gap-3 md:grid-cols-2">
+                    @foreach (var filter in AdvancedFilters)
+                    {
+                        <BbFormFieldSelect TValue="string"
+                                           Value="@GetAdvancedFilterValue(filter)"
+                                           ValueChanged="@((string value) => SetAdvancedFilterValue(filter, value))"
+                                           Label="@filter.Label">
+                            <BbSelectItem Value="@AdvancedFilterAllValue">@filter.AllLabel</BbSelectItem>
+                            @foreach (var option in filter.Options)
+                            {
+                                <BbSelectItem Value="@option.Value">@option.Label</BbSelectItem>
+                            }
+                        </BbFormFieldSelect>
+                    }
+                </div>
+            }
+
             <div class="xf-entity-picker-advanced-grid-wrap">
                 @if (!AdvancedFilteredItems.Any())
                 {
-                    <div class="xf-entity-picker-empty">@EmptyMessage</div>
+                    <BbEmpty Title="@EmptyMessage"
+                             Description="No records are available for this selection." />
                 }
                 else
                 {
@@ -150,16 +179,19 @@
                     @CreateLabel
                 </BbButton>
             }
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _advancedOpen = false)">Close</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@CloseAdvancedSearch">Close</BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
 @code {
+    private const string AdvancedFilterAllValue = "All";
     private readonly string _instanceId = $"entity-picker-{Guid.NewGuid():N}";
+    private readonly Dictionary<string, string> _advancedFilterValues = [];
     private bool _open;
     private bool _advancedOpen;
     private string _searchQuery = "";
+    private string _advancedSearchQuery = "";
 
     [Parameter] public string? Label { get; set; }
     [Parameter] public string? Value { get; set; }
@@ -198,16 +230,26 @@
             : Placeholder;
 
     private IReadOnlyList<TItem> FilteredItems => FilterItems(_searchQuery).ToList();
+    private bool HasAdvancedFilters => AdvancedFilters.Count > 0;
+    private IReadOnlyList<TItem> AdvancedFilteredItems =>
+        Items
+            .Where(AdvancedFiltersMatch)
+            .Where(AdvancedSearchMatches)
+            .ToList();
+
     private IReadOnlyList<XfEntityPickerColumn<TItem>> EffectiveAdvancedColumns =>
-        AdvancedColumns.Count > 0
-            ? AdvancedColumns
+        BuildEffectiveAdvancedColumns();
+
+    private IReadOnlyList<XfEntityPickerColumn<TItem>> BuildEffectiveAdvancedColumns()
+    {
+        return AdvancedColumns.Count > 0
+            ? AdvancedColumns.ToList()
             :
             [
-                new("Name", TextSelector),
-                new("Identifier", GetValue)
+                new XfEntityPickerColumn<TItem>("Name", TextSelector),
+                new XfEntityPickerColumn<TItem>("Identifier", GetValue)
             ];
-
-    private IReadOnlyList<TItem> AdvancedFilteredItems => Items;
+    }
 
     private IEnumerable<TItem> FilterItems(string query)
     {
@@ -239,6 +281,60 @@
     private static string FormatAdvancedCell(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "N/A" : value;
 
+    private bool AdvancedFiltersMatch(TItem item)
+    {
+        foreach (var filter in AdvancedFilters)
+        {
+            var selected = GetAdvancedFilterValue(filter);
+            if (string.Equals(selected, AdvancedFilterAllValue, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var value = filter.ValueSelector(item);
+            if (!string.Equals(value, selected, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
+    }
+
+    private bool AdvancedSearchMatches(TItem item)
+    {
+        if (string.IsNullOrWhiteSpace(_advancedSearchQuery))
+            return true;
+
+        return GetAdvancedSearchText(item).Contains(_advancedSearchQuery, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetAdvancedSearchText(TItem item)
+    {
+        if (AdvancedSearchTextSelector is not null)
+            return AdvancedSearchTextSelector(item);
+
+        return string.Join(
+            " ",
+            EffectiveAdvancedColumns.Select(column => FormatAdvancedCell(column.ValueSelector(item))));
+    }
+
+    private string GetAdvancedFilterValue(XfEntityPickerFilter<TItem> filter) =>
+        _advancedFilterValues.TryGetValue(filter.Key, out var value)
+            ? value
+            : AdvancedFilterAllValue;
+
+    private Task SetAdvancedFilterValue(XfEntityPickerFilter<TItem> filter, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || string.Equals(value, AdvancedFilterAllValue, StringComparison.OrdinalIgnoreCase))
+        {
+            _advancedFilterValues.Remove(filter.Key);
+        }
+        else
+        {
+            _advancedFilterValues[filter.Key] = value;
+        }
+
+        return Task.CompletedTask;
+    }
+
     private Task OnSearchQueryChanged(string value)
     {
         _searchQuery = value;
@@ -254,16 +350,27 @@
         return Task.CompletedTask;
     }
 
+    private Task OnAdvancedOpenChanged(bool value)
+    {
+        _advancedOpen = value;
+        if (!value)
+            ResetAdvancedSearchState();
+
+        return Task.CompletedTask;
+    }
+
     private async Task SelectItem(TItem item)
     {
         _open = false;
         _searchQuery = "";
+        ResetAdvancedSearchState();
         await ValueChanged.InvokeAsync(GetValue(item));
     }
 
     private async Task SelectItemFromAdvanced(TItem item)
     {
         _advancedOpen = false;
+        ResetAdvancedSearchState();
         await ValueChanged.InvokeAsync(GetValue(item));
     }
 
@@ -271,6 +378,7 @@
     {
         _open = false;
         _searchQuery = "";
+        ResetAdvancedSearchState();
         await ValueChanged.InvokeAsync("");
     }
 
@@ -293,6 +401,20 @@
     private async Task OpenCreateFromAdvanced()
     {
         _advancedOpen = false;
+        ResetAdvancedSearchState();
         await OnCreate.InvokeAsync();
+    }
+
+    private Task CloseAdvancedSearch()
+    {
+        _advancedOpen = false;
+        ResetAdvancedSearchState();
+        return Task.CompletedTask;
+    }
+
+    private void ResetAdvancedSearchState()
+    {
+        _advancedSearchQuery = "";
+        _advancedFilterValues.Clear();
     }
 }

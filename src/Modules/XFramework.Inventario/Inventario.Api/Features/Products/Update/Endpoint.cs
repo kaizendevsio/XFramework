@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using XFramework.Core.Patterns;
 using XFramework.Inventario.Api.Services;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 
 namespace Inventario.Api.Features.Products.Update;
 

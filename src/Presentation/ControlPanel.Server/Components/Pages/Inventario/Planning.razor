@@ -118,54 +118,81 @@ else
 }
 
 <BbDialog Open="@_ruleDialogOpen" OpenChanged="@(v => _ruleDialogOpen = v)">
-    <BbDialogContent TrapFocus="false">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Add Reorder Rule</BbDialogTitle>
             <BbDialogDescription>Rules can apply tenant-wide for a product or be scoped to a warehouse/location.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <div class="grid gap-3 md:grid-cols-2">
-                <div class="xf-form-field">
-                    <BbLabel>Product</BbLabel>
-                    <BbCombobox TValue="string"
-                                 @bind-Value="_form.ProductId"
-                                 Options="@ProductOptions"
-                                 Placeholder="Select product"
-                                 SearchPlaceholder="Search products..."
-                                 EmptyMessage="No products found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
-                <div class="xf-form-field">
-                    <BbLabel>Warehouse</BbLabel>
-                    <BbCombobox TValue="string"
-                                 Value="@_form.WarehouseId"
-                                 ValueChanged="@OnWarehouseChanged"
-                                 Options="@WarehouseOptions"
-                                 Placeholder="Any warehouse"
-                                 SearchPlaceholder="Search warehouses..."
-                                 EmptyMessage="No warehouses found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
-                <div class="xf-form-field">
-                    <BbLabel>Location</BbLabel>
-                    <BbCombobox TValue="string"
-                                 @bind-Value="_form.LocationId"
-                                 Options="@LocationOptions"
-                                 Placeholder="Any location"
-                                 SearchPlaceholder="Search locations..."
-                                 EmptyMessage="No locations found."
-                                 Class="xf-entity-combobox"
-                                 MatchTriggerWidth="true" />
-                </div>
+                <XfEntityPicker TItem="Product"
+                                @bind-Value="_form.ProductId"
+                                Items="@_products"
+                                Label="Product"
+                                Placeholder="Select product"
+                                SearchPlaceholder="Search products..."
+                                EmptyMessage="No products found."
+                                ValueSelector="@GetProductPickerValue"
+                                TextSelector="@GetProductLabel"
+                                SearchTextSelector="@GetProductSearchText"
+                                AdvancedSearchTitle="Find Product"
+                                AdvancedSearchDescription="Search products in the active tenant." />
+                <XfEntityPicker TItem="Warehouse"
+                                Value="@_form.WarehouseId"
+                                ValueChanged="@OnWarehouseChanged"
+                                Items="@_warehouses"
+                                Label="Warehouse"
+                                Placeholder="Any warehouse"
+                                SearchPlaceholder="Search warehouses..."
+                                EmptyMessage="No warehouses found."
+                                ValueSelector="@GetWarehousePickerValue"
+                                TextSelector="@GetWarehouseLabel"
+                                SearchTextSelector="@GetWarehouseSearchText"
+                                AllowClear="true"
+                                ClearText="Any warehouse"
+                                AdvancedSearchTitle="Find Warehouse"
+                                AdvancedSearchDescription="Search warehouses in the active tenant." />
+                <XfEntityPicker TItem="InventoryLocation"
+                                @bind-Value="_form.LocationId"
+                                Items="@LocationsForSelectedWarehouse().ToList()"
+                                Label="Location"
+                                Placeholder="Any location"
+                                SearchPlaceholder="Search locations..."
+                                EmptyMessage="No locations found."
+                                ValueSelector="@GetLocationPickerValue"
+                                TextSelector="@GetLocationLabel"
+                                SearchTextSelector="@GetLocationSearchText"
+                                AllowClear="true"
+                                ClearText="Any location"
+                                AdvancedSearchTitle="Find Location"
+                                AdvancedSearchDescription="Search locations for the selected warehouse." />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.PreferredSupplier" Label="Preferred Supplier" />
             </div>
             <div class="grid gap-3 md:grid-cols-4">
-                <BbFormFieldInput TValue="string" @bind-Value="_form.MinimumQuantity" Label="Minimum" />
-                <BbFormFieldInput TValue="string" @bind-Value="_form.MaximumQuantity" Label="Maximum" />
-                <BbFormFieldInput TValue="string" @bind-Value="_form.ReorderPoint" Label="Reorder Point" />
-                <BbFormFieldInput TValue="string" @bind-Value="_form.ReorderQuantity" Label="Reorder Qty" />
+                <BbFormFieldNumericInput TValue="decimal"
+                                         @bind-Value="_form.MinimumQuantity"
+                                         Label="Minimum"
+                                         Min="0"
+                                         DecimalPlaces="2"
+                                         Step="1" />
+                <BbFormFieldNumericInput TValue="decimal"
+                                         @bind-Value="_form.MaximumQuantity"
+                                         Label="Maximum"
+                                         Min="0"
+                                         DecimalPlaces="2"
+                                         Step="1" />
+                <BbFormFieldNumericInput TValue="decimal"
+                                         @bind-Value="_form.ReorderPoint"
+                                         Label="Reorder Point"
+                                         Min="0"
+                                         DecimalPlaces="2"
+                                         Step="1" />
+                <BbFormFieldNumericInput TValue="decimal"
+                                         @bind-Value="_form.ReorderQuantity"
+                                         Label="Reorder Qty"
+                                         Min="0"
+                                         DecimalPlaces="2"
+                                         Step="1" />
             </div>
             <BbFormFieldSwitch Checked="@_form.IsActive"
                                CheckedChanged="@((bool value) => _form.IsActive = value)"
@@ -198,27 +225,6 @@ else
     private bool _planningEnabled;
     private bool _ruleDialogOpen;
     private bool _savingRule;
-
-    private List<SelectOption<string>> ProductOptions =>
-        _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
-    private List<SelectOption<string>> WarehouseOptions
-    {
-        get
-        {
-            var options = new List<SelectOption<string>> { new("", "Any warehouse") };
-            options.AddRange(_warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))));
-            return options;
-        }
-    }
-    private List<SelectOption<string>> LocationOptions
-    {
-        get
-        {
-            var options = new List<SelectOption<string>> { new("", "Any location") };
-            options.AddRange(LocationsForSelectedWarehouse().Select(location => new SelectOption<string>(location.Id.ToString(), GetLocationLabel(location))));
-            return options;
-        }
-    }
 
     protected override void OnInitialized()
     {
@@ -263,9 +269,9 @@ else
             BuildSuggestions();
             ApplyDefaults();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load planning: {ex.Message}");
+            ToastService.Show("Could not load planning.");
         }
         finally
         {
@@ -310,24 +316,16 @@ else
             return;
         }
 
-        if (!decimal.TryParse(_form.MinimumQuantity, out var min) ||
-            !decimal.TryParse(_form.ReorderPoint, out var point) ||
-            !decimal.TryParse(_form.ReorderQuantity, out var qty) ||
-            min < 0 || point < 0 || qty <= 0)
+        if (_form.MinimumQuantity < 0 || _form.ReorderPoint < 0 || _form.ReorderQuantity <= 0)
         {
             ToastService.Show("Quantities must be valid.");
             return;
         }
 
-        decimal? max = null;
-        if (!string.IsNullOrWhiteSpace(_form.MaximumQuantity))
+        if (_form.MaximumQuantity > 0 && _form.MaximumQuantity < _form.MinimumQuantity)
         {
-            if (!decimal.TryParse(_form.MaximumQuantity, out var parsedMax) || parsedMax < min)
-            {
-                ToastService.Show("Maximum must be greater than or equal to minimum.");
-                return;
-            }
-            max = parsedMax;
+            ToastService.Show("Maximum must be greater than or equal to minimum.");
+            return;
         }
 
         _savingRule = true;
@@ -339,14 +337,14 @@ else
                 ProductId = productId,
                 WarehouseId = Guid.TryParse(_form.WarehouseId, out var warehouseId) ? warehouseId : null,
                 LocationId = Guid.TryParse(_form.LocationId, out var locationId) ? locationId : null,
-                MinimumQuantity = min,
-                MaximumQuantity = max,
-                ReorderPoint = point,
-                ReorderQuantity = qty,
+                MinimumQuantity = _form.MinimumQuantity,
+                MaximumQuantity = _form.MaximumQuantity > 0 ? _form.MaximumQuantity : null,
+                ReorderPoint = _form.ReorderPoint,
+                ReorderQuantity = _form.ReorderQuantity,
                 PreferredSupplier = NullIfEmpty(_form.PreferredSupplier),
                 IsActive = _form.IsActive
             });
-            ToastService.Show(result.IsSuccess ? "Reorder rule created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Reorder rule created." : "Could not create reorder rule.");
             if (result.IsSuccess)
             {
                 _ruleDialogOpen = false;
@@ -387,10 +385,10 @@ else
         _form.ProductId = "";
         _form.WarehouseId = "";
         _form.LocationId = "";
-        _form.MinimumQuantity = "0";
-        _form.MaximumQuantity = "";
-        _form.ReorderPoint = "0";
-        _form.ReorderQuantity = "1";
+        _form.MinimumQuantity = 0m;
+        _form.MaximumQuantity = 0m;
+        _form.ReorderPoint = 0m;
+        _form.ReorderQuantity = 1m;
         _form.PreferredSupplier = "";
         _form.IsActive = true;
     }
@@ -400,6 +398,11 @@ else
 
     private string GetProductLabel(Product product) =>
         string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
+
+    private static string GetProductPickerValue(Product product) => product.Id.ToString();
+
+    private static string GetProductSearchText(Product product) =>
+        $"{product.Name} {product.SKU} {product.Brand} {product.Description}";
 
     private string GetWarehouseName(Guid? warehouseId) =>
         warehouseId is { } id ? _warehouses.FirstOrDefault(x => x.Id == id) is { } warehouse ? GetWarehouseLabel(warehouse) : id.ToString()[..8] : "Any warehouse";
@@ -419,6 +422,10 @@ else
 
     private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
     private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
+    private static string GetWarehousePickerValue(Warehouse warehouse) => warehouse.Id.ToString();
+    private static string GetWarehouseSearchText(Warehouse warehouse) => $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
+    private static string GetLocationPickerValue(InventoryLocation location) => location.Id.ToString();
+    private string GetLocationSearchText(InventoryLocation location) => $"{location.Code} {location.Name} {GetWarehouseName(location.WarehouseId)} {location.LocationType} {location.Description}";
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     public void Dispose()
@@ -441,10 +448,10 @@ else
         public string ProductId { get; set; } = "";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
-        public string MinimumQuantity { get; set; } = "0";
-        public string MaximumQuantity { get; set; } = "";
-        public string ReorderPoint { get; set; } = "0";
-        public string ReorderQuantity { get; set; } = "1";
+        public decimal MinimumQuantity { get; set; }
+        public decimal MaximumQuantity { get; set; }
+        public decimal ReorderPoint { get; set; }
+        public decimal ReorderQuantity { get; set; } = 1m;
         public string PreferredSupplier { get; set; } = "";
         public bool IsActive { get; set; } = true;
     }

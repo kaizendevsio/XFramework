@@ -12,6 +12,7 @@ public sealed class ControlPanelContractTests
 {
     private static readonly string[] BusinessWorkflowEntities =
     [
+        "Product",
         "InventoryReorderRule",
         "Warehouse",
         "InventoryLocation",
@@ -43,6 +44,31 @@ public sealed class ControlPanelContractTests
         "Stock.razor",
         "Suppliers.razor",
         "Transactions.razor",
+        "Warehouses.razor"
+    ];
+
+    private static readonly string[] InventarioDetailPagesRequiringFilteredDataGrids =
+    [
+        "CategoryDetail.razor",
+        "WarehouseDetail.razor",
+        "LocationDetail.razor",
+        "LotDetail.razor",
+        "StockBalanceDetail.razor",
+        "ReceivingDocumentDetail.razor",
+        "ReservationDetail.razor",
+        "PurchaseOrderDetail.razor"
+    ];
+
+    private static readonly string[] InventarioWorkflowPagesRequiringEntityPickers =
+    [
+        "Products.razor",
+        "ProductDetail.razor",
+        "Lots.razor",
+        "Stock.razor",
+        "Receiving.razor",
+        "PurchaseOrders.razor",
+        "Reservations.razor",
+        "Planning.razor",
         "Warehouses.razor"
     ];
 
@@ -148,6 +174,182 @@ public sealed class ControlPanelContractTests
     }
 
     [Test]
+    public void ProductPages_ProductWrites_UseInventarioServiceWrapper()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario");
+        var productsText = File.ReadAllText(Path.Combine(pagesRoot, "Products.razor"));
+        var productDetailText = File.ReadAllText(Path.Combine(pagesRoot, "ProductDetail.razor"));
+
+        productsText.Should().Contain("IInventarioServiceWrapper Inventario");
+        productsText.Should().Contain("Inventario.CreateProduct(");
+        productsText.Should().NotContain("DataContext.Add(new Product");
+
+        productDetailText.Should().Contain("IInventarioServiceWrapper Inventario");
+        productDetailText.Should().Contain("Inventario.UpdateProduct(");
+        productDetailText.Should().NotContain("DataContext.Update");
+    }
+
+    [Test]
+    public void ProductPages_CategorySelectors_UseEntityPicker()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario");
+        var productsText = File.ReadAllText(Path.Combine(pagesRoot, "Products.razor"));
+        var productDetailText = File.ReadAllText(Path.Combine(pagesRoot, "ProductDetail.razor"));
+
+        productsText.Should().Contain("XfEntityPicker TItem=\"ProductCategory\"");
+        productsText.Should().Contain("AdvancedColumns=\"@CategoryAdvancedColumns\"");
+        productsText.Should().NotContain("CategoryOptions");
+
+        productDetailText.Should().Contain("XfEntityPicker TItem=\"ProductCategory\"");
+        productDetailText.Should().Contain("AdvancedColumns=\"@CategoryAdvancedColumns\"");
+        productDetailText.Should().NotContain("Options=\"@CategoryOptions\"");
+    }
+
+    [Test]
+    public void ProductDetail_LongWorkflowDialogs_UseWideResponsiveLayoutsAndTypedInputs()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var productDetailPath = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario",
+            "ProductDetail.razor");
+        var text = File.ReadAllText(productDetailPath);
+
+        text.Should().Contain("Class=\"xf-dialog-wide\"");
+        text.Should().Contain("Class=\"xf-dialog-extra-wide\"");
+        text.Should().Contain("@page \"/inventario/products/{Id:guid}/{Section}\"");
+        text.Should().NotContain("xf-detail-layout");
+        text.Should().NotContain("xf-detail-sidebar");
+        text.Should().NotContain("xf-detail-nav");
+        text.Should().NotContain("ProductSectionNav");
+        text.Should().Contain("BbFormFieldNumericInput TValue=\"decimal\"");
+        text.Should().Contain("BbFormFieldCurrencyInput");
+        text.Should().Contain("BbFormFieldDatePicker");
+        text.Should().Contain("md:grid-cols-2");
+        text.Should().Contain("md:grid-cols-3");
+
+        text.Should().NotContain("TValue=\"string\" @bind-Value=\"_movementForm.Quantity\"");
+        text.Should().NotContain("TValue=\"string\" @bind-Value=\"_receiveForm.Quantity\"");
+        text.Should().NotContain("ParseDate(");
+    }
+
+    [Test]
+    public void ProductDetailNavigation_UsesShellSidebarAndHumanReadableBreadcrumbs()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var controlPanelRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components");
+        var productDetailPath = Path.Combine(
+            controlPanelRoot,
+            "Pages",
+            "Inventario",
+            "ProductDetail.razor");
+        var productSidebarPath = Path.Combine(
+            controlPanelRoot,
+            "Layout",
+            "ProductDetailSidebar.razor");
+        var mainLayoutPath = Path.Combine(
+            controlPanelRoot,
+            "Layout",
+            "MainLayout.razor");
+
+        var productDetailText = File.ReadAllText(productDetailPath);
+        var productSidebarText = File.ReadAllText(productSidebarPath);
+        var mainLayoutText = File.ReadAllText(mainLayoutPath);
+
+        productDetailText.Should().Contain("@page \"/inventario/products/{Id:guid}\"");
+        productDetailText.Should().Contain("@page \"/inventario/products/{Id:guid}/{Section}\"");
+        productDetailText.Should().NotContain("ProductSectionNav");
+        productDetailText.Should().NotContain("ProductSectionHref");
+        productDetailText.Should().NotContain("ProductSectionNavClass");
+        productDetailText.Should().NotContain("xf-detail-sidebar");
+
+        productSidebarText.Should().Contain("Product Detail");
+        productSidebarText.Should().Contain("Label=\"Summary\"");
+        productSidebarText.Should().Contain("Label=\"Stock\"");
+        productSidebarText.Should().Contain("Label=\"Lots / Batches\"");
+        productSidebarText.Should().Contain("Label=\"Replenishment\"");
+        productSidebarText.Should().Contain("Label=\"Variations\"");
+        productSidebarText.Should().Contain("Label=\"Transactions\"");
+
+        mainLayoutText.Should().Contain("BuildInventarioProductBreadcrumbs");
+        mainLayoutText.Should().Contain("RefreshBreadcrumbEntityLabels");
+        mainLayoutText.Should().Contain("GetProductBreadcrumbLabel");
+        mainLayoutText.Should().Contain("DataContext.Query<Product>()");
+        mainLayoutText.Should().Contain("ProductSectionLabel(normalizedSection)");
+        mainLayoutText.Should().Contain("ShortId(productId)");
+
+        var getBreadcrumbsBody = Regex.Match(
+            mainLayoutText,
+            @"private\s+List<string>\s+GetBreadcrumbs\(\)\s*\{(?<body>.*?)\n\s*\}",
+            RegexOptions.Singleline).Groups["body"].Value;
+
+        getBreadcrumbsBody.Should().Contain("TryGetInventarioProductDetailRoute");
+        getBreadcrumbsBody.Should().Contain("BuildInventarioProductBreadcrumbs");
+        getBreadcrumbsBody.Should().NotContain("TitleCase(s.Replace");
+    }
+
+    [Test]
+    public void InventarioPages_Toasts_DoNotExposeRawTechnicalDetails()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario");
+
+        var forbiddenPatterns = new[]
+        {
+            @"ToastService\.[A-Za-z]+\s*\([^;]*(?:ex|exception)\.Message",
+            @"ToastService\.[A-Za-z]+\s*\([^;]*result\.Message",
+            @"ToastService\.[A-Za-z]+\s*\([^;]*SqlException",
+            @"ToastService\.[A-Za-z]+\s*\([^;]*DbUpdateException",
+            @"ToastService\.[A-Za-z]+\s*\([^;]*stack trace"
+        };
+
+        var offenders = Directory.EnumerateFiles(pagesRoot, "*.razor", SearchOption.AllDirectories)
+            .SelectMany(path =>
+            {
+                var text = File.ReadAllText(path);
+                return forbiddenPatterns
+                    .Where(pattern => Regex.IsMatch(text, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline))
+                    .Select(pattern => $"{Path.GetRelativePath(repositoryRoot.FullName, path)} matched {pattern}");
+            })
+            .ToArray();
+
+        offenders.Should().BeEmpty("Inventario toasts should use semantic user-facing copy while logging technical details separately");
+    }
+
+    [Test]
     public void InventarioListPages_TabularSurfaces_UseFilteredBlazorBlueprintDataGrids()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -180,6 +382,66 @@ public sealed class ControlPanelContractTests
                     "Filterable=\"true\"",
                     $"{page} data grids should expose native column filtering on useful business columns");
             }
+        }
+    }
+
+    [Test]
+    public void InventarioDetailPages_TabularSurfaces_UseFilteredBlazorBlueprintDataGrids()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario");
+
+        foreach (var page in InventarioDetailPagesRequiringFilteredDataGrids)
+        {
+            var pagePath = Path.Combine(pagesRoot, page);
+            var text = File.ReadAllText(pagePath);
+
+            text.Should().NotContain("<table", $"{page} should use BlazorBlueprint data grids instead of raw tables");
+            text.Should().Contain("<BbDataGrid", $"{page} should use BbDataGrid for detail tabular records");
+            text.Should().NotMatchRegex(
+                @"<BbDataGridTemplateColumn\b[^>]*Title=""Actions""[^>]*Filterable=""true""",
+                $"{page} should not expose filters on command/action columns");
+
+            var grids = Regex.Matches(text, @"<BbDataGrid\b[\s\S]*?</BbDataGrid>", RegexOptions.Multiline);
+            grids.Should().NotBeEmpty($"{page} should render at least one data grid");
+
+            foreach (Match grid in grids)
+            {
+                grid.Value.Should().Contain(
+                    "Filterable=\"true\"",
+                    $"{page} detail grids should expose native column filtering on useful business columns");
+            }
+        }
+    }
+
+    [Test]
+    public void InventarioWorkflowPages_DomainEntitySelectors_UseSharedEntityPicker()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "Components",
+            "Pages",
+            "Inventario");
+
+        foreach (var page in InventarioWorkflowPagesRequiringEntityPickers)
+        {
+            var pagePath = Path.Combine(pagesRoot, page);
+            var text = File.ReadAllText(pagePath);
+
+            text.Should().Contain("<XfEntityPicker", $"{page} should use the shared entity picker for domain entity selectors");
+            text.Should().NotContain("<BbCombobox", $"{page} should not use plain comboboxes for product, warehouse, location, lot, supplier, or purchase-order selectors");
+            text.Should().NotContain("<BbFormFieldCombobox", $"{page} should not use form-field comboboxes for domain entity selectors");
         }
     }
 

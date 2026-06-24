@@ -79,16 +79,16 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_lines" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.OrderedQuantity)" Title="Ordered" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedQuantity)" Title="Received" Sortable="true" />
-                            <BbDataGridTemplateColumn Title="Remaining">
+                            <BbDataGridPropertyColumn Property="@(x => x.OrderedQuantity)" Title="Ordered" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedQuantity)" Title="Received" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Remaining" Filterable="true" FilterBy="@(item => Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity))">
                                 <ChildContent Context="item">@Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity).ToString("N2")</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" />
-                            <BbDataGridPropertyColumn Property="@(x => x.UnitOfMeasure)" Title="Unit" />
+                            <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.UnitOfMeasure)" Title="Unit" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -104,10 +104,10 @@ else
                                 OnRowClick="@((ReceivingDocument item) => Navigation.NavigateTo($"/inventario/receiving/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -192,9 +192,9 @@ else
                 .Take(500)
                 .ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load purchase order: {ex.Message}");
+            ToastService.Show("Could not load purchase order.");
         }
         finally
         {

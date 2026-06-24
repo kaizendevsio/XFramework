@@ -116,7 +116,7 @@ else
 }
 
 <BbDialog Open="@_warehouseDialogOpen" OpenChanged="@(v => _warehouseDialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Create Warehouse</BbDialogTitle>
             <BbDialogDescription>Warehouse codes are unique inside the selected tenant.</BbDialogDescription>
@@ -147,23 +147,29 @@ else
 </BbDialog>
 
 <BbDialog Open="@_locationDialogOpen" OpenChanged="@(v => _locationDialogOpen = v)">
-    <BbDialogContent TrapFocus="false">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
         <BbDialogHeader>
             <BbDialogTitle>Create Location</BbDialogTitle>
             <BbDialogDescription>Locations belong to a warehouse and represent bins, shelves, or zones.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="xf-form-field">
-                <BbLabel>Warehouse</BbLabel>
-                <BbCombobox TValue="string"
-                             @bind-Value="_locationForm.WarehouseId"
-                             Options="@WarehouseOptions"
-                             Placeholder="Select warehouse"
-                             SearchPlaceholder="Search warehouses..."
-                             EmptyMessage="No warehouses found."
-                             Class="xf-entity-combobox"
-                             MatchTriggerWidth="true" />
-            </div>
+            <XfEntityPicker TItem="Warehouse"
+                            Label="Warehouse"
+                            Value="@_locationForm.WarehouseId"
+                            ValueChanged="@(value => _locationForm.WarehouseId = value ?? "")"
+                            Items="@_warehouses"
+                            ValueSelector="@GetWarehousePickerValue"
+                            TextSelector="@GetWarehouseLabel"
+                            SearchTextSelector="@GetWarehouseSearchText"
+                            AdvancedColumns="@WarehouseAdvancedColumns"
+                            AdvancedFilters="@WarehouseAdvancedFilters"
+                            AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
+                            Placeholder="Select warehouse"
+                            SearchPlaceholder="Search warehouses..."
+                            EmptyMessage="No warehouses found."
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Warehouse"
+                            AdvancedSearchDescription="Select the warehouse that owns this location." />
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
                 <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
@@ -208,8 +214,6 @@ else
     private bool _warehouseDialogOpen;
     private bool _locationDialogOpen;
     private bool IsCreateLocationDisabled => _savingLocation || _warehouses.Count == 0;
-    private List<SelectOption<string>> WarehouseOptions =>
-        _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
 
     protected override void OnInitialized()
     {
@@ -252,9 +256,9 @@ else
                 .Take(500)
                 .ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load warehouses: {ex.Message}");
+            ToastService.Show("Could not load warehouses.");
         }
         finally
         {
@@ -305,7 +309,7 @@ else
                 CountryCode = NullIfEmpty(_warehouseForm.CountryCode),
                 IsDefault = _warehouseForm.IsDefault
             });
-            ToastService.Show(result.IsSuccess ? "Warehouse created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Warehouse created." : "Could not create warehouse.");
             if (result.IsSuccess)
             {
                 _warehouseForm.Reset();
@@ -346,7 +350,7 @@ else
                 LocationType = Enum.TryParse<InventoryLocationType>(_locationForm.LocationType, out var type) ? type : InventoryLocationType.Bin,
                 IsPickable = _locationForm.IsPickable
             });
-            ToastService.Show(result.IsSuccess ? "Location created." : $"Failed: {result.Message}");
+            ToastService.Show(result.IsSuccess ? "Location created." : "Could not create location.");
             if (result.IsSuccess)
             {
                 _locationForm.Reset();
@@ -374,6 +378,46 @@ else
             : warehouseId.ToString()[..8];
 
     private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+    private static string GetWarehousePickerValue(Warehouse warehouse) => warehouse.Id.ToString();
+    private static string GetWarehouseSearchText(Warehouse warehouse) =>
+        $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
+
+    private IReadOnlyList<XfEntityPickerColumn<Warehouse>> WarehouseAdvancedColumns =>
+    [
+        new("Code", x => x.Code),
+        new("Name", x => x.Name),
+        new("City", x => x.City),
+        new("Region", x => x.Region),
+        new("Country", x => x.CountryCode),
+        new("Default", x => FormatBoolean(x.IsDefault)),
+        new("Locations", x => _locations.Count(location => location.WarehouseId == x.Id).ToString()),
+        new("Created", x => x.CreatedAt.ToString("yyyy-MM-dd"))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Warehouse>> WarehouseAdvancedFilters =>
+    [
+        new("default", "Default warehouse", YesNoFilterOptions, x => x.IsDefault ? "true" : "false", "All warehouses"),
+        new("country", "Country", BuildDistinctFilterOptions(_warehouses, x => x.CountryCode), x => x.CountryCode, "All countries")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> selector) =>
+        items
+            .Select(selector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToList();
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
