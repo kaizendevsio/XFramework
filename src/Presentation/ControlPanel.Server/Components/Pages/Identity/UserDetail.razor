@@ -1,4 +1,5 @@
 @page "/identity/users/{Id:guid}"
+@page "/identity/users/{Id:guid}/{Section}"
 @using global::Wallets.Domain.Shared.Enums
 @implements IDisposable
 
@@ -39,7 +40,7 @@ else
     <FadeInContent>
     <div class="space-y-6">
         <!-- Header -->
-        <div class="flex items-center justify-between">
+        <div class="xf-page-header">
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                           OnClick="@(() => Navigation.NavigateTo("/identity/users"))">
@@ -56,31 +57,22 @@ else
                     <BbTypographyMuted>@(_user.IdentityName ?? "No identity name") &mdash; ID: @_user.Id.ToString()[..8]...</BbTypographyMuted>
                 </div>
             </div>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@ReloadAllData">
-                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                Refresh
-            </BbButton>
+            <div class="xf-page-actions">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@ReloadAllData">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
         </div>
 
-        <!-- Tabbed Detail Sections -->
-        <BbTabs DefaultValue="info">
-            <BbTabsList>
-                <BbTabsTrigger Value="info">User Info</BbTabsTrigger>
-                <BbTabsTrigger Value="credentials">Credentials (@_credentials.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="roles">Roles (@_roles.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="contacts">Contacts (@_contacts.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="addresses">Addresses (@_addresses.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="sessions">Sessions (@_sessions.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="auth-logs">Auth Logs (@_authLogs.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="wallets">Wallets (@_wallets.Count)</BbTabsTrigger>
-            </BbTabsList>
-
-            <!-- User Info Tab -->
-            <BbTabsContent Value="info" Class="xf-fade-in">
+        @switch (CurrentSection)
+        {
+            case "summary":
+                <div class="xf-fade-in">
                 <EditableForm @ref="_editableForm" TModel="IdentityInformation" Model="_user"
                               OnSave="SaveUserEdit" OnDiscard="DiscardUserEdit"
                               Saving="_saving" Title="User Information">
-                    <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <div class="xf-detail-field-grid">
                         <EditableField Label="First Name" @bind-Value="_editFirstName" />
                         <EditableField Label="Middle Name" @bind-Value="_editMiddleName" />
                         <EditableField Label="Last Name" @bind-Value="_editLastName" />
@@ -103,10 +95,11 @@ else
                         <EditableField Label="Created" DisplayValue="@_user.CreatedAt.ToString("g")" ReadOnly="true" />
                     </div>
                 </EditableForm>
-            </BbTabsContent>
+                </div>
+                break;
 
-            <!-- Credentials Tab -->
-            <BbTabsContent Value="credentials" Class="xf-fade-in">
+            case "credentials":
+                <div class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -118,11 +111,11 @@ else
                         </div>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_credentials">
+                        <BbDataGrid Items="@_credentials" ShowPagination="true" InitialPageSize="10" ShowSearch="true" SearchPlaceholder="Search credentials...">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.UserName)" Title="Username" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.UserAlias)" Title="Alias" Sortable="true" />
-                                <BbDataGridTemplateColumn Title="Online">
+                                <BbDataGridPropertyColumn Property="@(x => x.UserName)" Title="Username" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.UserAlias)" Title="Alias" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Online" Filterable="true" FilterBy="@(cred => GetCredentialOnlineFilter(cred))">
                                     <ChildContent Context="cred">
                                         <StatusBadge Text="@(cred.IsOnline ? "Online" : "Offline")"
                                                      Status="@(cred.IsOnline ? "online" : "inactive")" />
@@ -133,23 +126,27 @@ else
                                         @(cred.LastSeen == default ? "Never" : cred.LastSeen.ToString("g"))
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.Device)" Title="Device" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Location)" Title="Location" />
-                                <BbDataGridTemplateColumn Title="Status">
+                                <BbDataGridPropertyColumn Property="@(x => x.Device)" Title="Device" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Location)" Title="Location" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(cred => GetEnabledFilter(cred.IsEnabled))">
                                     <ChildContent Context="cred">
                                         <StatusBadge Text="@(cred.IsEnabled ? "Enabled" : "Disabled")"
                                                      Status="@(cred.IsEnabled ? "active" : "inactive")" />
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No credentials" Description="No credentials are linked to this user." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
-            </BbTabsContent>
+                </div>
+                break;
 
-            <!-- Roles Tab -->
-            <BbTabsContent Value="roles" Class="xf-fade-in">
+            case "roles":
+                <div class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -161,19 +158,19 @@ else
                         </div>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_roles">
+                        <BbDataGrid Items="@_roles" ShowPagination="true" InitialPageSize="10" ShowSearch="true" SearchPlaceholder="Search roles...">
                             <Columns>
-                                <BbDataGridTemplateColumn Title="Role Type" Sortable="true">
+                                <BbDataGridTemplateColumn Title="Role Type" Sortable="true" Filterable="true" FilterBy="@(role => GetRoleTypeColumnFilter(role))">
                                     <ChildContent Context="role">
-                                        @(role.Type?.Name ?? role.TypeId?.ToString()?[..8] ?? "N/A")
+                                        @(role.Type?.Name ?? "Unknown role type")
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Credential">
+                                <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(role => GetCredentialLabelById(role.CredentialId))">
                                     <ChildContent Context="role">
                                         @{
                                             var roleCred = _credentials.FirstOrDefault(c => c.Id == role.CredentialId);
                                         }
-                                        <span class="text-sm">@(roleCred?.UserName ?? role.CredentialId.ToString()[..8] + "...")</span>
+                                        <span class="text-sm">@(roleCred is null ? "Unknown credential" : GetCredentialLabel(roleCred))</span>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                                 <BbDataGridTemplateColumn Title="Level">
@@ -196,7 +193,7 @@ else
                                         </span>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="role">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
@@ -206,13 +203,17 @@ else
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No assigned roles" Description="No roles are assigned to this user's credentials." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
-            </BbTabsContent>
+                </div>
+                break;
 
-            <!-- Contacts Tab -->
-            <BbTabsContent Value="contacts" Class="xf-fade-in">
+            case "contacts":
+                <div class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -224,45 +225,44 @@ else
                         </div>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_contacts">
+                        <BbDataGrid Items="@_contacts" ShowPagination="true" InitialPageSize="10" ShowSearch="true" SearchPlaceholder="Search contacts...">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
-                                <BbDataGridTemplateColumn Title="Type">
+                                <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Type" Filterable="true" FilterBy="@(contact => GetContactTypeColumnFilter(contact))">
                                     <ChildContent Context="contact">
                                         @(contact.Type?.Name ?? "N/A")
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Credential">
+                                <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(contact => GetCredentialLabelById(contact.CredentialId))">
                                     <ChildContent Context="contact">
                                         @{
                                             var contactCred = _credentials.FirstOrDefault(c => c.Id == contact.CredentialId);
                                         }
-                                        <span class="text-sm">@(contactCred?.UserName ?? contact.CredentialId.ToString()[..8] + "...")</span>
+                                        <span class="text-sm">@(contactCred is null ? "Unknown credential" : GetCredentialLabel(contactCred))</span>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="contact">
-                                        <div class="flex items-center gap-1">
-                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                                      OnClick="@(() => OpenEditContactDialog(contact))">
-                                                <LucideIcon Name="pencil" class="h-4 w-4" />
-                                            </BbButton>
-                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                                      OnClick="@(() => DeleteContact(contact))">
-                                                <LucideIcon Name="trash-2" class="h-4 w-4 text-destructive" />
-                                            </BbButton>
-                                        </div>
+                                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/identity/contacts/{contact.Id}"))">
+                                            <LucideIcon Name="external-link" class="mr-1 h-3 w-3" />
+                                            View
+                                        </BbButton>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No contacts" Description="No contact records are linked to this user." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
-            </BbTabsContent>
+                </div>
+                break;
 
-            <!-- Addresses Tab -->
-            <BbTabsContent Value="addresses" Class="xf-fade-in">
+            case "addresses":
+                <div class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -274,58 +274,57 @@ else
                         </div>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_addresses">
+                        <BbDataGrid Items="@_addresses" ShowPagination="true" InitialPageSize="10" ShowSearch="true" SearchPlaceholder="Search addresses...">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.UnitNumber)" Title="Unit" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" />
-                                <BbDataGridTemplateColumn Title="Default">
+                                <BbDataGridPropertyColumn Property="@(x => x.UnitNumber)" Title="Unit" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Default" Filterable="true" FilterBy="@(addr => GetDefaultAddressFilter(addr))">
                                     <ChildContent Context="addr">
                                         <StatusBadge Text="@(addr.DefaultAddress == true ? "Default" : "No")"
                                                      Status="@(addr.DefaultAddress == true ? "active" : "inactive")" />
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="addr">
-                                        <div class="flex items-center gap-1">
-                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                                      OnClick="@(() => OpenEditAddressDialog(addr))">
-                                                <LucideIcon Name="pencil" class="h-4 w-4" />
-                                            </BbButton>
-                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                                      OnClick="@(() => DeleteAddress(addr))">
-                                                <LucideIcon Name="trash-2" class="h-4 w-4 text-destructive" />
-                                            </BbButton>
-                                        </div>
+                                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/identity/addresses/{addr.Id}"))">
+                                            <LucideIcon Name="external-link" class="mr-1 h-3 w-3" />
+                                            View
+                                        </BbButton>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No addresses" Description="No address records are linked to this user." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
-            </BbTabsContent>
+                </div>
+                break;
 
-            <!-- Sessions Tab -->
-            <BbTabsContent Value="sessions" Class="xf-fade-in">
+            case "sessions":
+                <div class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <BbCardTitle>Sessions</BbCardTitle>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_sessions">
+                        <BbDataGrid Items="@_sessions" ShowPagination="true" InitialPageSize="10" ShowSearch="true" SearchPlaceholder="Search sessions...">
                             <Columns>
-                                <BbDataGridTemplateColumn Title="Credential">
+                                <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(session => GetCredentialLabelById(session.CredentialId))">
                                     <ChildContent Context="session">
                                         @{
                                             var sessCred = _credentials.FirstOrDefault(c => c.Id == session.CredentialId);
                                         }
-                                        <span class="text-sm">@(sessCred?.UserName ?? session.CredentialId.ToString()[..8] + "...")</span>
+                                        <span class="text-sm">@(sessCred is null ? "Unknown credential" : GetCredentialLabel(sessCred))</span>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Status">
+                                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(session => session.Status.ToString())">
                                     <ChildContent Context="session">
                                         @{
                                             var sessStatusText = session.Status.ToString();
@@ -341,13 +340,9 @@ else
                                         <StatusBadge Text="@sessStatusText" Status="@sessStatusKey" />
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Session Data">
+                                <BbDataGridTemplateColumn Title="Session Type" Filterable="true" FilterBy="@(session => GetSessionTypeLabel(session))">
                                     <ChildContent Context="session">
-                                        <span class="text-xs font-mono">
-                                            @(session.SessionData is { Length: > 50 }
-                                                ? session.SessionData[..50] + "..."
-                                                : session.SessionData ?? "N/A")
-                                        </span>
+                                        @GetSessionTypeLabel(session)
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                                 <BbDataGridTemplateColumn Title="Expires At" Sortable="true">
@@ -355,7 +350,7 @@ else
                                         @(session.ExpiresAt?.ToString("g") ?? "N/A")
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="session">
                                         @if (session.Status == CurrentSessionState.Active)
@@ -368,61 +363,69 @@ else
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No sessions" Description="No sessions are linked to this user's credentials." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
-            </BbTabsContent>
+                </div>
+                break;
 
-            <!-- Auth Logs Tab -->
-            <BbTabsContent Value="auth-logs" Class="xf-fade-in">
+            case "auth-logs":
+                <div class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <BbCardTitle>Authorization Logs</BbCardTitle>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_authLogs" ShowPagination="true" InitialPageSize="20">
+                        <BbDataGrid Items="@_authLogs" ShowPagination="true" InitialPageSize="20" ShowSearch="true" SearchPlaceholder="Search authorization logs...">
                             <Columns>
-                                <BbDataGridTemplateColumn Title="Credential">
+                                <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(log => GetCredentialLabelById(log.CredentialId))">
                                     <ChildContent Context="log">
                                         @{
                                             var logCred = _credentials.FirstOrDefault(c => c.Id == log.CredentialId);
                                         }
-                                        <span class="text-sm">@(logCred?.UserName ?? log.CredentialId.ToString()[..8] + "...")</span>
+                                        <span class="text-sm">@(logCred is null ? "Unknown credential" : GetCredentialLabel(logCred))</span>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Result">
+                                <BbDataGridTemplateColumn Title="Result" Filterable="true" FilterBy="@(log => GetAuthorizationLogResultFilter(log))">
                                     <ChildContent Context="log">
                                         <StatusBadge Text="@(log.IsSuccess == true ? "Success" : log.IsSuccess == false ? "Failed" : "Unknown")"
                                                      Status="@(log.IsSuccess == true ? "success" : log.IsSuccess == false ? "failed" : "inactive")" />
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.Ipaddress)" Title="IP Address" />
-                                <BbDataGridPropertyColumn Property="@(x => x.LoginSource)" Title="Source" />
-                                <BbDataGridPropertyColumn Property="@(x => x.DeviceName)" Title="Device" />
-                                <BbDataGridPropertyColumn Property="@(x => x.DeviceAgent)" Title="Agent" />
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Time" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Ipaddress)" Title="IP Address" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LoginSource)" Title="Source" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DeviceName)" Title="Device" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DeviceAgent)" Title="Agent" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Time" Sortable="true" Filterable="true" />
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No authorization logs" Description="No authorization logs are linked to this user's credentials." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
-            </BbTabsContent>
+                </div>
+                break;
 
-            <!-- Wallets Tab -->
-            <BbTabsContent Value="wallets" Class="xf-fade-in">
+            case "wallets":
+                <div class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <BbCardTitle>Wallets</BbCardTitle>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_wallets">
+                        <BbDataGrid Items="@_wallets" ShowPagination="true" InitialPageSize="10" ShowSearch="true" SearchPlaceholder="Search wallets...">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account Number" Sortable="true" />
-                                <BbDataGridTemplateColumn Title="Credential">
+                                <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account Number" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(wallet => GetCredentialLabelById(wallet.CredentialId))">
                                     <ChildContent Context="wallet">
                                         @{
                                             var walCred = _credentials.FirstOrDefault(c => c.Id == wallet.CredentialId);
                                         }
-                                        <span class="text-sm">@(walCred?.UserName ?? wallet.CredentialId.ToString()[..8] + "...")</span>
+                                        <span class="text-sm">@(walCred is null ? "Unknown credential" : GetCredentialLabel(walCred))</span>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                                 <BbDataGridTemplateColumn Title="Balance" Sortable="true">
@@ -440,7 +443,7 @@ else
                                         <span class="font-mono text-muted-foreground">@wallet.DebitOnHoldBalance.ToString("N2")</span>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Status">
+                                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(wallet => wallet.Status.ToString())">
                                     <ChildContent Context="wallet">
                                         @{
                                             var walStatusText = wallet.Status.ToString();
@@ -466,11 +469,15 @@ else
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No wallets" Description="No wallets are linked to this user's credentials." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
-            </BbTabsContent>
-        </BbTabs>
+                </div>
+                break;
+        }
     </div>
     </FadeInContent>
 }
@@ -579,12 +586,12 @@ else
                      Message="@($"Remove the role \"{_removingRole?.Type?.Name ?? "this role"}\" from the credential? This action cannot be undone.")"
                      OnConfirm="@ConfirmRemoveRole" />
 
-<!-- Create/Edit Contact Dialog -->
+<!-- Create Contact Dialog -->
 <BbDialog Open="@_contactDialogOpen" OpenChanged="@(v => _contactDialogOpen = v)">
     <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
-            <BbDialogTitle>@(_editingContact is not null ? "Edit Contact" : "Add Contact")</BbDialogTitle>
-            <BbDialogDescription>@(_editingContact is not null ? "Update contact information." : "Add a new contact entry.")</BbDialogDescription>
+            <BbDialogTitle>Add Contact</BbDialogTitle>
+            <BbDialogDescription>Add a new contact entry.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <XfEntityPicker TItem="IdentityCredential"
@@ -649,18 +656,18 @@ else
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _contactDialogOpen = false)">Cancel</BbButton>
             <BbButton OnClick="@SaveContact" Disabled="@_saving">
-                @(_saving ? "Saving..." : (_editingContact is not null ? "Update" : "Create"))
+                @(_saving ? "Saving..." : "Create")
             </BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
-<!-- Create/Edit Address Dialog -->
+<!-- Create Address Dialog -->
 <BbDialog Open="@_addressDialogOpen" OpenChanged="@(v => _addressDialogOpen = v)">
     <BbDialogContent>
         <BbDialogHeader>
-            <BbDialogTitle>@(_editingAddress is not null ? "Edit Address" : "Add Address")</BbDialogTitle>
-            <BbDialogDescription>@(_editingAddress is not null ? "Update address information." : "Add a new address.")</BbDialogDescription>
+            <BbDialogTitle>Add Address</BbDialogTitle>
+            <BbDialogDescription>Add a new address.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <div class="grid grid-cols-2 gap-4">
@@ -692,7 +699,7 @@ else
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _addressDialogOpen = false)">Cancel</BbButton>
             <BbButton OnClick="@SaveAddress" Disabled="@_saving">
-                @(_saving ? "Saving..." : (_editingAddress is not null ? "Update" : "Create"))
+                @(_saving ? "Saving..." : "Create")
             </BbButton>
         </BbDialogFooter>
     </BbDialogContent>
@@ -700,11 +707,13 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
+    [Parameter] public string? Section { get; set; }
 
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityServer { get; set; } = default!;
 
     // Main data
     private IdentityInformation? _user;
@@ -726,6 +735,7 @@ else
     private bool _saving;
     private bool _outsideTenantContext;
     private Guid? _loadedId;
+    private string CurrentSection => NormalizeSection(Section);
 
     // Editable form
     private EditableForm<IdentityInformation>? _editableForm;
@@ -764,12 +774,10 @@ else
 
     // Contact dialog
     private bool _contactDialogOpen;
-    private IdentityContact? _editingContact;
     private ContactForm _contactForm = new();
 
     // Address dialog
     private bool _addressDialogOpen;
-    private IdentityAddress? _editingAddress;
     private AddressForm _addressForm = new();
 
     protected override void OnInitialized()
@@ -779,6 +787,12 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        var normalizedSection = NormalizeSection(Section);
+        if (ShouldCanonicalizeSection(normalizedSection))
+        {
+            Navigation.NavigateTo(GetSectionHref(normalizedSection), replace: true);
+        }
+
         if (_loadedId == Id)
         {
             return;
@@ -786,6 +800,34 @@ else
 
         _loadedId = Id;
         await ReloadAllData();
+    }
+
+    private bool ShouldCanonicalizeSection(string normalizedSection) =>
+        Section is not null
+        && (!string.Equals(Section, normalizedSection, StringComparison.OrdinalIgnoreCase)
+            || normalizedSection == "summary");
+
+    private string GetSectionHref(string section) =>
+        section == "summary" ? $"/identity/users/{Id}" : $"/identity/users/{Id}/{section}";
+
+    private static string NormalizeSection(string? section)
+    {
+        if (string.IsNullOrWhiteSpace(section) || section.Equals("info", StringComparison.OrdinalIgnoreCase))
+        {
+            return "summary";
+        }
+
+        var normalized = section.ToLowerInvariant();
+        return normalized is "summary"
+            or "credentials"
+            or "roles"
+            or "contacts"
+            or "addresses"
+            or "sessions"
+            or "auth-logs"
+            or "wallets"
+            ? normalized
+            : "summary";
     }
 
     private void OnTenantFilterChanged()
@@ -831,9 +873,9 @@ else
             await LoadWallets();
             await LoadLookups();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error loading user data: {ex.Message}");
+            ToastService.Error("The user data could not be loaded.", "Load failed");
         }
         finally
         {
@@ -942,6 +984,7 @@ else
                     .IgnoreQueryFilters()
                     .NoCache()
                     .Where(x => x.CredentialId == credId)
+                    .Include(x => x.SessionType)
                     .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync();
@@ -1058,7 +1101,7 @@ else
 
             if (fresh is null)
             {
-                ToastService.Show("User not found.");
+                ToastService.Warning("User was not found.", "User unavailable");
                 return;
             }
 
@@ -1078,19 +1121,19 @@ else
 
             if (result.IsSuccess)
             {
-                ToastService.Show("User updated successfully.");
+                ToastService.Success("User updated successfully.", "User saved");
                 _user = fresh;
                 SyncEditFields();
                 _editableForm?.ExitEditMode();
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Error("User could not be updated.", "Save failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("User could not be updated.", "Save failed");
         }
         finally
         {
@@ -1110,52 +1153,46 @@ else
     {
         if (string.IsNullOrWhiteSpace(_credForm.UserName))
         {
-            ToastService.Show("Username is required.");
+            ToastService.Warning("Username is required.", "Missing username");
             return;
         }
         if (string.IsNullOrWhiteSpace(_credForm.Password))
         {
-            ToastService.Show("Password is required.");
+            ToastService.Warning("Password is required.", "Missing password");
             return;
         }
         if (_credForm.Password != _credForm.ConfirmPassword)
         {
-            ToastService.Show("Passwords do not match.");
+            ToastService.Warning("Passwords do not match.", "Password mismatch");
             return;
         }
 
         _saving = true;
         try
         {
-            var credential = new IdentityCredential
+            var result = await IdentityServer.CreateCredential(new CreateCredentialRequest
             {
-                Id = Guid.NewGuid(),
-                TenantId = _user!.TenantId,
                 IdentityInfoId = Id,
                 UserName = _credForm.UserName,
                 UserAlias = _credForm.UserAlias,
-                PasswordByte = System.Text.Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: _credForm.Password, workFactor: 11)),
-                IsEnabled = true,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            DataContext.Add(credential);
-            var result = await DataContext.SaveChangesAsync();
+                Password = _credForm.Password,
+                Metadata = CreateMetadata(_user!.TenantId)
+            });
 
             if (result.IsSuccess)
             {
-                ToastService.Show("Credential created.");
+                ToastService.Success("Credential created.", "Credential saved");
                 _createCredDialogOpen = false;
                 await LoadCredentials();
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Error("Credential creation failed.", "Credential failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("Credential creation failed.", "Credential failed");
         }
         finally
         {
@@ -1175,12 +1212,12 @@ else
     {
         if (!Guid.TryParse(_roleForm.CredentialId, out var credId))
         {
-            ToastService.Show("Please select a credential.");
+            ToastService.Warning("Please select a credential.", "Missing credential");
             return;
         }
         if (!Guid.TryParse(_roleForm.RoleTypeId, out var typeId))
         {
-            ToastService.Show("Please select a role type.");
+            ToastService.Warning("Please select a role type.", "Missing role type");
             return;
         }
 
@@ -1189,7 +1226,7 @@ else
         {
             if (!TryResolveRoleExpiration(_roleForm.ExpirationString, out var expiration))
             {
-                ToastService.Show("Choose a valid expiration date and time.");
+                ToastService.Warning("Choose a valid expiration date and time.", "Invalid expiration");
                 return;
             }
 
@@ -1209,18 +1246,18 @@ else
 
             if (result.IsSuccess)
             {
-                ToastService.Show("Role assigned.");
+                ToastService.Success("Role assigned.", "Role saved");
                 _assignRoleDialogOpen = false;
                 await LoadRoles();
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Error("Role could not be assigned.", "Save failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("Role could not be assigned.", "Save failed");
         }
         finally
         {
@@ -1247,16 +1284,16 @@ else
 
             if (result.IsSuccess)
             {
-                ToastService.Show("Role removed.");
+                ToastService.Success("Role removed.", "Role removed");
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Error("Role could not be removed.", "Delete failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("Role could not be removed.", "Delete failed");
         }
         finally
         {
@@ -1270,7 +1307,6 @@ else
 
     private void OpenCreateContactDialog()
     {
-        _editingContact = null;
         _contactForm = new ContactForm();
         if (_credentials.Count == 1)
         {
@@ -1283,86 +1319,49 @@ else
         _contactDialogOpen = true;
     }
 
-    private void OpenEditContactDialog(IdentityContact contact)
-    {
-        _editingContact = contact;
-        _contactForm = new ContactForm
-        {
-            CredentialId = contact.CredentialId.ToString(),
-            TypeId = contact.TypeId?.ToString() ?? "",
-            GroupId = contact.GroupId.ToString(),
-            Value = contact.Value
-        };
-        _contactDialogOpen = true;
-    }
-
     private async Task SaveContact()
     {
         if (string.IsNullOrWhiteSpace(_contactForm.Value))
         {
-            ToastService.Show("Contact value is required.");
+            ToastService.Warning("Contact value is required.", "Missing value");
             return;
         }
         if (!Guid.TryParse(_contactForm.CredentialId, out var credId))
         {
-            ToastService.Show("Please select a credential.");
+            ToastService.Warning("Please select a credential.", "Missing credential");
             return;
         }
         if (!Guid.TryParse(_contactForm.GroupId, out var groupId))
         {
-            ToastService.Show("Please select a contact group.");
+            ToastService.Warning("Please select a contact group.", "Missing contact group");
             return;
         }
 
         _saving = true;
         try
         {
-            if (_editingContact is not null)
+            var contact = new IdentityContact
             {
-                var fresh = await DataContext.Query<IdentityContact>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.Id == _editingContact.Id)
-                    .FirstOrDefaultAsync();
+                Id = Guid.NewGuid(),
+                TenantId = _user!.TenantId,
+                CredentialId = credId,
+                TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null,
+                GroupId = groupId,
+                Value = _contactForm.Value,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow
+            };
 
-                if (fresh is not null)
-                {
-                    fresh.Value = _contactForm.Value;
-                    fresh.CredentialId = credId;
-                    fresh.TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null;
-                    fresh.GroupId = groupId;
-                    fresh.ModifiedAt = DateTime.UtcNow;
-
-                    DataContext.Update(fresh);
-                    var result = await DataContext.SaveChangesAsync();
-                    ToastService.Show(result.IsSuccess ? "Contact updated." : $"Error: {result.Message}");
-                }
-            }
-            else
-            {
-                var contact = new IdentityContact
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = _user!.TenantId,
-                    CredentialId = credId,
-                    TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null,
-                    GroupId = groupId,
-                    Value = _contactForm.Value,
-                    IsEnabled = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                DataContext.Add(contact);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Contact created." : $"Error: {result.Message}");
-            }
+            DataContext.Add(contact);
+            var result = await DataContext.SaveChangesAsync();
+            ShowMutationResult(result.IsSuccess, "Contact created.", "Contact could not be created.");
 
             _contactDialogOpen = false;
             await LoadContacts();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("Contact could not be saved.", "Save failed");
         }
         finally
         {
@@ -1370,44 +1369,11 @@ else
         }
     }
 
-    private async Task DeleteContact(IdentityContact contact)
-    {
-        try
-        {
-            contact.IsDeleted = true;
-            contact.IsEnabled = false;
-            DataContext.Update(contact);
-            var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Contact deleted." : $"Error: {result.Message}");
-            await LoadContacts();
-        }
-        catch (Exception ex)
-        {
-            ToastService.Show($"Error: {ex.Message}");
-        }
-    }
-
     // ─── Addresses ────────────────────────────────────────────────────
 
     private void OpenCreateAddressDialog()
     {
-        _editingAddress = null;
         _addressForm = new AddressForm();
-        _addressDialogOpen = true;
-    }
-
-    private void OpenEditAddressDialog(IdentityAddress address)
-    {
-        _editingAddress = address;
-        _addressForm = new AddressForm
-        {
-            UnitNumber = address.UnitNumber,
-            Street = address.Street,
-            Building = address.Building,
-            Subdivision = address.Subdivision,
-            ConsolidatedName = address.ConsolidatedName,
-            IsDefault = address.DefaultAddress == true
-        };
         _addressDialogOpen = true;
     }
 
@@ -1416,78 +1382,35 @@ else
         _saving = true;
         try
         {
-            if (_editingAddress is not null)
+            var address = new IdentityAddress
             {
-                var fresh = await DataContext.Query<IdentityAddress>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.Id == _editingAddress.Id)
-                    .FirstOrDefaultAsync();
+                Id = Guid.NewGuid(),
+                TenantId = _user!.TenantId,
+                IdentityInfoId = Id,
+                UnitNumber = _addressForm.UnitNumber,
+                Street = _addressForm.Street,
+                Building = _addressForm.Building,
+                Subdivision = _addressForm.Subdivision,
+                ConsolidatedName = _addressForm.ConsolidatedName,
+                DefaultAddress = _addressForm.IsDefault,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow
+            };
 
-                if (fresh is not null)
-                {
-                    fresh.UnitNumber = _addressForm.UnitNumber;
-                    fresh.Street = _addressForm.Street;
-                    fresh.Building = _addressForm.Building;
-                    fresh.Subdivision = _addressForm.Subdivision;
-                    fresh.ConsolidatedName = _addressForm.ConsolidatedName;
-                    fresh.DefaultAddress = _addressForm.IsDefault;
-                    fresh.ModifiedAt = DateTime.UtcNow;
-
-                    DataContext.Update(fresh);
-                    var result = await DataContext.SaveChangesAsync();
-                    ToastService.Show(result.IsSuccess ? "Address updated." : $"Error: {result.Message}");
-                }
-            }
-            else
-            {
-                var address = new IdentityAddress
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = _user!.TenantId,
-                    IdentityInfoId = Id,
-                    UnitNumber = _addressForm.UnitNumber,
-                    Street = _addressForm.Street,
-                    Building = _addressForm.Building,
-                    Subdivision = _addressForm.Subdivision,
-                    ConsolidatedName = _addressForm.ConsolidatedName,
-                    DefaultAddress = _addressForm.IsDefault,
-                    IsEnabled = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                DataContext.Add(address);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Address created." : $"Error: {result.Message}");
-            }
+            DataContext.Add(address);
+            var result = await DataContext.SaveChangesAsync();
+            ShowMutationResult(result.IsSuccess, "Address created.", "Address could not be created.");
 
             _addressDialogOpen = false;
             await LoadAddresses();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("Address could not be saved.", "Save failed");
         }
         finally
         {
             _saving = false;
-        }
-    }
-
-    private async Task DeleteAddress(IdentityAddress address)
-    {
-        try
-        {
-            address.IsDeleted = true;
-            address.IsEnabled = false;
-            DataContext.Update(address);
-            var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Address deleted." : $"Error: {result.Message}");
-            await LoadAddresses();
-        }
-        catch (Exception ex)
-        {
-            ToastService.Show($"Error: {ex.Message}");
         }
     }
 
@@ -1497,37 +1420,26 @@ else
     {
         try
         {
-            var fresh = await DataContext.Query<Session>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == session.Id)
-                .FirstOrDefaultAsync();
-
-            if (fresh is null)
+            var result = await IdentityServer.Logout(new LogoutRequest
             {
-                ToastService.Show("Session not found.");
-                return;
-            }
-
-            fresh.Status = CurrentSessionState.Inactive;
-            fresh.ModifiedAt = DateTime.UtcNow;
-
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+                SessionId = session.Id,
+                CredentialId = session.CredentialId,
+                Metadata = CreateMetadata(session.TenantId)
+            });
 
             if (result.IsSuccess)
             {
-                ToastService.Show("Session terminated.");
+                ToastService.Success("Session terminated.", "Session updated");
                 await LoadSessions();
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Error("Session termination failed.", "Session failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("Session termination failed.", "Session failed");
         }
     }
 
@@ -1547,6 +1459,61 @@ else
 
         return credential.Id.ToString()[..8];
     }
+
+    private string GetCredentialLabelById(Guid credentialId) =>
+        _credentials.FirstOrDefault(c => c.Id == credentialId) is { } credential
+            ? GetCredentialLabel(credential)
+            : "Unknown credential";
+
+    private static string GetSessionTypeLabel(Session session) =>
+        !string.IsNullOrWhiteSpace(session.SessionType?.Name)
+            ? session.SessionType.Name
+            : session.SessionTypeId.HasValue
+                ? "Unknown session type"
+                : "Default session";
+
+    private void ShowMutationResult(bool isSuccess, string successMessage, string errorMessage)
+    {
+        if (isSuccess)
+        {
+            ToastService.Success(successMessage, "Saved");
+            return;
+        }
+
+        ToastService.Error(errorMessage, "Save failed");
+    }
+
+    private static string GetRoleTypeColumnFilter(IdentityRole role) =>
+        role.Type?.Name ?? string.Empty;
+
+    private static string GetContactTypeColumnFilter(IdentityContact contact) =>
+        contact.Type?.Name ?? string.Empty;
+
+    private static string GetCredentialOnlineFilter(IdentityCredential credential) =>
+        credential.IsOnline ? "Online" : "Offline";
+
+    private static string GetEnabledFilter(bool isEnabled) =>
+        isEnabled ? "Enabled" : "Disabled";
+
+    private static string GetDefaultAddressFilter(IdentityAddress address) =>
+        address.DefaultAddress == true ? "Default" : "No";
+
+    private static string GetAuthorizationLogResultFilter(AuthorizationLog log) =>
+        log.IsSuccess == true
+            ? "Success"
+            : log.IsSuccess == false
+                ? "Failed"
+                : "Unknown";
+
+    private static RequestMetadata CreateMetadata(Guid? tenantId) => new()
+    {
+        TenantId = tenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel",
+        DeviceName = "ControlPanel",
+        DeviceAgent = "ControlPanel",
+        IpAddress = "ControlPanel"
+    };
 
     private static string GetRoleTypeLabel(IdentityRoleType roleType)
     {

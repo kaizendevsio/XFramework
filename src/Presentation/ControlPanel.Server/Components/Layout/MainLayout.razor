@@ -42,6 +42,10 @@
                     {
                         <TenantDetailSidebar TenantId="@tenantRouteId" />
                     }
+                    else if (TryGetUserDetailRoute(out var userRouteId, out _))
+                    {
+                        <UserDetailSidebar UserId="@userRouteId" />
+                    }
                     else
                     {
                         <NavMenu />
@@ -421,6 +425,11 @@
             return "tenant-detail";
         }
 
+        if (TryGetUserDetailRoute(out _, out _))
+        {
+            return "user-detail";
+        }
+
         var segments = CurrentPath
             .Trim('/')
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -593,6 +602,31 @@
             || !string.Equals(segments[0], "identity", StringComparison.OrdinalIgnoreCase)
             || !string.Equals(segments[1], "tenants", StringComparison.OrdinalIgnoreCase)
             || !Guid.TryParse(segments[2], out tenantId))
+        {
+            return false;
+        }
+
+        if (segments.Length >= 4)
+        {
+            section = segments[3];
+        }
+
+        return true;
+    }
+
+    private bool TryGetUserDetailRoute(out Guid userId, out string section)
+    {
+        userId = Guid.Empty;
+        section = "summary";
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 3
+            || !string.Equals(segments[0], "identity", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(segments[1], "users", StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(segments[2], out userId))
         {
             return false;
         }

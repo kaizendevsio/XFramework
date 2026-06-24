@@ -16,23 +16,30 @@
     }
     else
     {
-    <BbDataGrid Items="@_sessions">
+    <BbDataGrid Items="@_sessions" ShowPagination="true" InitialPageSize="20" ShowSearch="true" SearchPlaceholder="Search sessions...">
         <Columns>
-            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-            <BbDataGridTemplateColumn Title="Status">
+            <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(item => GetCredentialLabel(item.CredentialId))">
+                <ChildContent Context="item">
+                    @GetCredentialLabel(item.CredentialId)
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => GetStatusText(item.Status))">
                 <ChildContent Context="item">
                     <StatusBadge Text="@GetStatusText(item.Status)"
                                  Status="@GetStatusKey(item.Status)" />
                 </ChildContent>
             </BbDataGridTemplateColumn>
-            <BbDataGridTemplateColumn Title="Session Data">
+            <BbDataGridTemplateColumn Title="Session Type" Filterable="true" FilterBy="@(item => GetSessionTypeLabel(item))">
                 <ChildContent Context="item">
-                    @(Truncate(item.SessionData, 50))
+                    @GetSessionTypeLabel(item)
                 </ChildContent>
             </BbDataGridTemplateColumn>
-            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires At" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires At" Sortable="true" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
         </Columns>
+        <EmptyTemplate>
+            <BbEmpty Title="No sessions" Description="No sessions found for the selected tenant." />
+        </EmptyTemplate>
     </BbDataGrid>
     }
 </div>
@@ -40,8 +47,10 @@
 @code {
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<Session> _sessions = [];
+    private List<IdentityCredential> _credentials = [];
     private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
@@ -54,7 +63,8 @@
         _loading = true;
         try
         {
-            var query = DataContext.Query<Session>();
+            var query = DataContext.Query<Session>()
+                .Include(x => x.SessionType);
             if (TenantFilter.SelectedTenantId is { } tenantId)
             {
                 query = query.Where(x => x.TenantId == tenantId);
@@ -63,10 +73,23 @@
             _sessions = (await query.Take(100).ToListAsync())
                 .OrderByDescending(x => x.CreatedAt)
                 .ToList();
+
+            var credentialQuery = DataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .OrderBy(x => x.UserName);
+            if (TenantFilter.SelectedTenantId is { } credentialTenantId)
+            {
+                credentialQuery = credentialQuery.Where(x => x.TenantId == credentialTenantId);
+            }
+
+            _credentials = await credentialQuery.Take(500).ToListAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"Sessions load error: {ex.Message}");
+            _sessions = [];
+            _credentials = [];
+            ToastService.Error("Sessions could not be loaded.", "Load failed");
         }
         finally
         {
@@ -92,9 +115,26 @@
         _ => "inactive"
     };
 
-    private static string Truncate(string? value, int maxLength)
+    private string GetCredentialLabel(Guid credentialId) =>
+        _credentials.FirstOrDefault(x => x.Id == credentialId) is { } credential
+            ? GetCredentialLabel(credential)
+            : "Unknown credential";
+
+    private static string GetCredentialLabel(IdentityCredential credential)
     {
-        if (string.IsNullOrEmpty(value)) return "N/A";
-        return value.Length <= maxLength ? value : value[..maxLength] + "...";
+        if (!string.IsNullOrWhiteSpace(credential.UserName))
+            return credential.UserName;
+
+        if (!string.IsNullOrWhiteSpace(credential.UserAlias))
+            return credential.UserAlias;
+
+        return "Unnamed credential";
     }
+
+    private static string GetSessionTypeLabel(Session session) =>
+        !string.IsNullOrWhiteSpace(session.SessionType?.Name)
+            ? session.SessionType.Name
+            : session.SessionTypeId.HasValue
+                ? "Unknown session type"
+                : "Default session";
 }

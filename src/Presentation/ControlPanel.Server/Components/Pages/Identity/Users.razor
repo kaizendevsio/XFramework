@@ -33,9 +33,10 @@
             </BbCardHeader>
             <BbCardContent>
                 <BbDataGrid Items="@_users" ShowPagination="true" InitialPageSize="20"
+                            ShowSearch="true" SearchPlaceholder="Search users..."
                             OnRowClick="@((IdentityInformation item) => Navigation.NavigateTo($"/identity/users/{item.Id}"))" Class="cursor-pointer">
                     <Columns>
-                        <BbDataGridTemplateColumn Title="Full Name" Sortable="true">
+                        <BbDataGridTemplateColumn Title="Full Name" Sortable="true" Filterable="true" FilterBy="@(item => GetUserSearchLabel(item))">
                             <ChildContent Context="item">
                                 <div class="flex items-center gap-2">
                                     <div>
@@ -45,7 +46,7 @@
                                 </div>
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Username">
+                        <BbDataGridTemplateColumn Title="Username" Filterable="true" FilterBy="@(item => GetPrimaryUsername(item.Id) ?? string.Empty)">
                             <ChildContent Context="item">
                                 @{
                                     var username = GetPrimaryUsername(item.Id);
@@ -53,19 +54,19 @@
                                 <span class="text-sm">@(username ?? "No credential")</span>
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Verified">
+                        <BbDataGridTemplateColumn Title="Verified" Filterable="true" FilterBy="@(item => GetVerifiedLabel(item))">
                             <ChildContent Context="item">
                                 <StatusBadge Text="@(item.IsVerified ? "Verified" : "Unverified")"
                                              Status="@(item.IsVerified ? "active" : "inactive")" />
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Gender">
+                        <BbDataGridTemplateColumn Title="Gender" Filterable="true" FilterBy="@(item => GetGenderLabel(item))">
                             <ChildContent Context="item">
                                 @(item.Gender?.ToString() ?? "N/A")
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-                        <BbDataGridTemplateColumn Title="Status">
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                        <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => GetEnabledLabel(item))">
                             <ChildContent Context="item">
                                 <StatusBadge Text="@(item.IsEnabled ? "Enabled" : "Disabled")"
                                              Status="@(item.IsEnabled ? "active" : "inactive")" />
@@ -97,6 +98,9 @@
                             </ChildContent>
                         </BbDataGridTemplateColumn>
                     </Columns>
+                    <EmptyTemplate>
+                        <BbEmpty Title="No users" Description="No users found for the selected tenant." />
+                    </EmptyTemplate>
                 </BbDataGrid>
             </BbCardContent>
         </BbCard>
@@ -106,7 +110,7 @@
 
 <!-- Create User Dialog -->
 <BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
-    <BbDialogContent>
+    <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
             <BbDialogTitle>Create User</BbDialogTitle>
             <BbDialogDescription>Create a new identity information record.</BbDialogDescription>
@@ -240,9 +244,9 @@
                 _credentialUsernames[user.Id] = cred?.UserName;
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error loading users: {ex.Message}");
+            ToastService.Error("Users could not be loaded.", "Load failed");
         }
         finally
         {
@@ -254,6 +258,18 @@
     {
         return _credentialUsernames.TryGetValue(userId, out var username) ? username : null;
     }
+
+    private static string GetUserSearchLabel(IdentityInformation user) =>
+        $"{user.FullName} {user.IdentityName}";
+
+    private static string GetVerifiedLabel(IdentityInformation user) =>
+        user.IsVerified ? "Verified" : "Unverified";
+
+    private static string GetEnabledLabel(IdentityInformation user) =>
+        user.IsEnabled ? "Enabled" : "Disabled";
+
+    private static string GetGenderLabel(IdentityInformation user) =>
+        user.Gender?.ToString() ?? string.Empty;
 
     private void NavigateToDetail(Guid id)
     {
@@ -286,9 +302,10 @@
             var tenant = await tenantQuery.Take(1).FirstOrDefaultAsync();
             if (tenant is null)
             {
-                ToastService.Show(TenantFilter.SelectedTenantId is null
+                ToastService.Warning(TenantFilter.SelectedTenantId is null
                     ? "No tenants exist. Create a tenant first."
-                    : "Selected tenant was not found. Refresh tenants and try again.");
+                    : "Selected tenant was not found. Refresh tenants and try again.",
+                    "Tenant required");
                 _saving = false;
                 return;
             }
@@ -314,18 +331,18 @@
 
             if (result.IsSuccess)
             {
-                ToastService.Show("User created successfully.");
+                ToastService.Success("User created successfully.", "User saved");
                 _createDialogOpen = false;
                 await LoadData();
             }
             else
             {
-                ToastService.Show($"Error creating user: {result.Message}");
+                ToastService.Error("User could not be created.", "Save failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("User could not be created.", "Save failed");
         }
         finally
         {
@@ -345,7 +362,7 @@
 
             if (fresh is null)
             {
-                ToastService.Show("User not found.");
+                ToastService.Warning("User was not found.", "User unavailable");
                 return;
             }
 
@@ -356,17 +373,17 @@
 
             if (result.IsSuccess)
             {
-                ToastService.Show(fresh.IsEnabled ? "User enabled." : "User disabled.");
+                ToastService.Success(fresh.IsEnabled ? "User enabled." : "User disabled.", "User updated");
                 await LoadData();
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Error("User status could not be updated.", "Save failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("User status could not be updated.", "Save failed");
         }
     }
 
@@ -390,7 +407,7 @@
 
             if (fresh is null)
             {
-                ToastService.Show("User not found.");
+                ToastService.Warning("User was not found.", "User unavailable");
                 return;
             }
 
@@ -403,16 +420,16 @@
 
             if (result.IsSuccess)
             {
-                ToastService.Show("User deleted.");
+                ToastService.Success("User deleted.", "User deleted");
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Error("User could not be deleted.", "Delete failed");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error("User could not be deleted.", "Delete failed");
         }
         finally
         {

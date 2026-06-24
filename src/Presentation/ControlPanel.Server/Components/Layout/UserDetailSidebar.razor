@@ -1,0 +1,44 @@
+@* User detail section navigation *@
+@inject NavigationManager Navigation
+
+<SidebarNavItem Href="/identity/users"
+                Label="User List"
+                Icon="arrow-left"
+                Match="NavLinkMatch.All"
+                Strong="true" />
+
+<SidebarSection GroupId="user-detail" Title="User Detail" Icon="user">
+    <SidebarAnchorItem Href="@SectionHref("summary")" Label="Summary" Icon="file-text" Active="@(CurrentSection == "summary")" />
+    <SidebarAnchorItem Href="@SectionHref("credentials")" Label="Credentials" Icon="key-round" Active="@(CurrentSection == "credentials")" />
+    <SidebarAnchorItem Href="@SectionHref("roles")" Label="Roles" Icon="shield" Active="@(CurrentSection == "roles")" />
+    <SidebarAnchorItem Href="@SectionHref("contacts")" Label="Contacts" Icon="mail" Active="@(CurrentSection == "contacts")" />
+    <SidebarAnchorItem Href="@SectionHref("addresses")" Label="Addresses" Icon="map-pin" Active="@(CurrentSection == "addresses")" />
+    <SidebarAnchorItem Href="@SectionHref("sessions")" Label="Sessions" Icon="monitor" Active="@(CurrentSection == "sessions")" />
+    <SidebarAnchorItem Href="@SectionHref("auth-logs")" Label="Auth Logs" Icon="clipboard-list" Active="@(CurrentSection == "auth-logs")" />
+    <SidebarAnchorItem Href="@SectionHref("wallets")" Label="Wallets" Icon="wallet" Active="@(CurrentSection == "wallets")" />
+</SidebarSection>
+
+@code {
+    [Parameter] public Guid UserId { get; set; }
+
+    private string CurrentPath => new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/');
+    private string BaseHref => $"/identity/users/{UserId}";
+
+    private string CurrentSection
+    {
+        get
+        {
+            var segments = CurrentPath
+                .Trim('/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            return segments.Length >= 4 ? NormalizeSection(segments[3]) : "summary";
+        }
+    }
+
+    private string SectionHref(string section) =>
+        section == "summary" ? BaseHref : $"{BaseHref}/{section}";
+
+    private static string NormalizeSection(string section) =>
+        section.Equals("info", StringComparison.OrdinalIgnoreCase) ? "summary" : section.ToLowerInvariant();
+}

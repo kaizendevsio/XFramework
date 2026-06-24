@@ -83,9 +83,6 @@ else
                         <EditableField Label="Availability Date" @bind-Value="_editAvailability"
                                        DisplayValue="@(_tenant.AvailabilityDate?.ToString("yyyy-MM-dd") ?? "N/A")"
                                        Placeholder="YYYY-MM-DD" />
-                        <EditableField Label="Parent Tenant" @bind-Value="_editParentTenantId"
-                                       DisplayValue="@(_tenant.ParentTenantId?.ToString() ?? "None (root)")"
-                                       Placeholder="GUID or blank for root" />
                         <EditableField Label="Created" DisplayValue="@_tenant.CreatedAt.ToString("g")" ReadOnly="true" />
                         <EditableField Label="Last Modified" DisplayValue="@(_tenant.ModifiedAt?.ToString("g") ?? "Never")" ReadOnly="true" />
                         <EditableField Label="Enabled" ReadOnly="true">
@@ -98,6 +95,16 @@ else
                         <EditableField Label="Configurations" DisplayValue="@_detailConfigs.Count.ToString()" ReadOnly="true" />
                     </div>
                 </EditableForm>
+                <div class="mt-4 flex flex-col gap-3 rounded-md border bg-card p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <div class="text-sm font-medium">Parent Tenant</div>
+                        <div class="mt-1 text-sm text-muted-foreground">@GetParentTenantDisplay()</div>
+                    </div>
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@OpenParentTenantDialog">
+                        <LucideIcon Name="network" class="mr-2 h-4 w-4" />
+                        Change Parent
+                    </BbButton>
+                </div>
             </BbTabsContent>
 
             <BbTabsContent Value="modules" Class="xf-fade-in">
@@ -223,17 +230,17 @@ else
                                         OnRowClick="@((IdentityInformation user) => OpenUserDetail(user))"
                                         Class="cursor-pointer">
                                 <Columns>
-                                    <BbDataGridPropertyColumn Property="@(x => x.FirstName)" Title="First Name" Sortable="true" />
-                                    <BbDataGridPropertyColumn Property="@(x => x.LastName)" Title="Last Name" Sortable="true" />
-                                    <BbDataGridPropertyColumn Property="@(x => x.IdentityName)" Title="Identity Name" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.FirstName)" Title="First Name" Sortable="true" Filterable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.LastName)" Title="Last Name" Sortable="true" Filterable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.IdentityName)" Title="Identity Name" Sortable="true" Filterable="true" />
                                     <BbDataGridTemplateColumn Title="Verified">
                                         <ChildContent Context="user">
                                             <StatusBadge Text="@(user.IsVerified ? "Verified" : "Unverified")"
                                                          Status="@(user.IsVerified ? "active" : "inactive")" />
                                         </ChildContent>
                                     </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(x => x.BirthDate)" Title="Birth Date" Sortable="true" />
-                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.BirthDate)" Title="Birth Date" Sortable="true" Filterable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 </Columns>
                             </BbDataGrid>
                         }
@@ -261,9 +268,9 @@ else
                         {
                             <BbDataGrid Items="@_detailConfigs" ShowPagination="true" InitialPageSize="10">
                                 <Columns>
-                                    <BbDataGridPropertyColumn Property="@(x => x.Key)" Title="Key" Sortable="true" />
-                                    <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" />
-                                    <BbDataGridPropertyColumn Property="@(x => x.Unit)" Title="Unit" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.Key)" Title="Key" Sortable="true" Filterable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Filterable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.Unit)" Title="Unit" Filterable="true" />
                                     <BbDataGridTemplateColumn Title="Group">
                                         <ChildContent Context="cfg">
                                             @(cfg.Group?.Name ?? cfg.GroupId.ToString()[..8])
@@ -275,7 +282,7 @@ else
                                                          Status="@(cfg.IsEnabled ? "active" : "inactive")" />
                                         </ChildContent>
                                     </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                     <BbDataGridTemplateColumn Title="Actions">
                                         <ChildContent Context="cfg">
                                             <div class="flex items-center gap-1">
@@ -308,7 +315,7 @@ else
                         {
                             <BbDataGrid Items="@_detailRoleTypes" ShowPagination="true" InitialPageSize="10">
                                 <Columns>
-                                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
                                     <BbDataGridTemplateColumn Title="Role Level">
                                         <ChildContent Context="rt">
                                             @(rt.RoleLevel?.ToString() ?? "N/A")
@@ -325,7 +332,7 @@ else
                                                          Status="@(rt.IsEnabled ? "active" : "inactive")" />
                                         </ChildContent>
                                     </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 </Columns>
                             </BbDataGrid>
                         }
@@ -382,6 +389,41 @@ else
     </BbDialogContent>
 </BbDialog>
 
+@* -- Parent Tenant Dialog -- *@
+<BbDialog Open="@_parentTenantDialogOpen" OpenChanged="@(value => _parentTenantDialogOpen = value)">
+    <BbDialogContent TrapFocus="false">
+        <BbDialogHeader>
+            <BbDialogTitle>Change Parent Tenant</BbDialogTitle>
+            <BbDialogDescription>Select an existing tenant or clear the parent relationship.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <XfEntityPicker TItem="Tenant"
+                            Label="Parent Tenant"
+                            Value="@_parentTenantId"
+                            ValueChanged="@(value => _parentTenantId = value ?? "")"
+                            Items="@_tenantOptions"
+                            ValueSelector="@GetTenantPickerValue"
+                            TextSelector="@GetTenantLabel"
+                            SearchTextSelector="@GetTenantSearchText"
+                            AdvancedColumns="@TenantAdvancedColumns"
+                            AdvancedFilters="@TenantAdvancedFilters"
+                            AdvancedSearchScope="Searches tenant name, description, status, version, expiration, enabled state, and created date."
+                            Placeholder="No parent tenant"
+                            SearchPlaceholder="Search tenants..."
+                            EmptyMessage="No eligible parent tenants found."
+                            AllowClear="true"
+                            ClearText="No parent tenant"
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Parent Tenant"
+                            AdvancedSearchDescription="Search tenant records before changing this parent relationship." />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _parentTenantDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveParentTenant" Disabled="@_saving">Save Parent</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 <ConfirmDeleteDialog Open="@_deleteConfigDialogOpen"
                      OpenChanged="@(v => _deleteConfigDialogOpen = v)"
                      Message="@($"Delete configuration \"{_deletingConfig?.Key}\"? This cannot be undone.")"
@@ -411,7 +453,6 @@ else
     private string? _editVersion;
     private string? _editExpiration;
     private string? _editAvailability;
-    private string? _editParentTenantId;
 
     private static readonly List<SelectOption<string>> _statusOptions =
     [
@@ -426,6 +467,7 @@ else
     private List<RegistryConfiguration> _detailConfigs = [];
     private List<IdentityRoleType> _detailRoleTypes = [];
     private List<TenantModuleFeature> _detailModuleFeatures = [];
+    private List<Tenant> _tenantOptions = [];
     private List<ModuleFeatureRow> _moduleFeatureRows = [];
     private List<ModuleFeatureRow> _rootModuleFeatureRows = [];
     private List<ModuleFeatureRow> _inventarioSubFeatureRows = [];
@@ -441,6 +483,8 @@ else
     private List<RegistryConfigurationGroup> _configGroups = [];
     private bool _deleteConfigDialogOpen;
     private RegistryConfiguration? _deletingConfig;
+    private bool _parentTenantDialogOpen;
+    private string _parentTenantId = "";
 
     protected override void OnInitialized()
     {
@@ -501,7 +545,7 @@ else
                 ClearDetailData();
             }
         }
-        catch (Exception ex) { ToastService.Show($"Failed to load tenant: {ex.Message}"); }
+        catch { ToastService.Error("Tenant could not be loaded.", "Load failed"); }
         finally { _loading = false; }
     }
 
@@ -511,6 +555,7 @@ else
         _detailConfigs = [];
         _detailRoleTypes = [];
         _detailModuleFeatures = [];
+        _tenantOptions = [];
         _moduleFeatureRows = [];
         _rootModuleFeatureRows = [];
         _inventarioSubFeatureRows = [];
@@ -525,7 +570,6 @@ else
         _editVersion = _tenant.Version.ToString("F1");
         _editExpiration = _tenant.Expiration?.ToString("yyyy-MM-dd") ?? "";
         _editAvailability = _tenant.AvailabilityDate?.ToString("yyyy-MM-dd") ?? "";
-        _editParentTenantId = _tenant.ParentTenantId?.ToString() ?? "";
     }
 
     private async Task LoadDetailData()
@@ -570,8 +614,17 @@ else
                     .Take(100)
                     .ToListAsync())
                 .ToList();
+
+            _tenantOptions = (await DataContext.Query<Tenant>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => !x.IsDeleted && x.Id != Id)
+                    .OrderBy(x => x.Name)
+                    .Take(500)
+                    .ToListAsync())
+                .ToList();
         }
-        catch (Exception ex) { ToastService.Show($"Failed to load tenant details: {ex.Message}"); }
+        catch { ToastService.Error("Tenant details could not be loaded.", "Load failed"); }
     }
 
     private async Task LoadModuleFeatures()
@@ -615,7 +668,7 @@ else
                 var seedResult = await DataContext.SaveChangesAsync();
                 if (!seedResult.IsSuccess)
                 {
-                    ToastService.Show($"Failed to initialize module toggles: {seedResult.Message}");
+                    ToastService.Error("Module toggles could not be initialized.", "Initialization failed");
                 }
 
                 _detailModuleFeatures = (await DataContext.Query<TenantModuleFeature>()
@@ -653,9 +706,9 @@ else
                 .ToList();
             ApplyModuleFeatureGrouping();
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Failed to load module toggles: {ex.Message}");
+            ToastService.Error("Module toggles could not be loaded.", "Load failed");
         }
         finally
         {
@@ -678,13 +731,13 @@ else
     {
         if (enabled && row.IsBlocked)
         {
-            ToastService.Show($"Cannot enable {row.DisplayName}: {row.DependencySummary}");
+            ToastService.Warning($"Cannot enable {row.DisplayName}: {row.DependencySummary}", "Missing dependency");
             return;
         }
 
         if (row.Id == Guid.Empty)
         {
-            ToastService.Show("Module toggle is still initializing. Refresh the page and try again.");
+            ToastService.Warning("Module toggle is still initializing. Refresh the page and try again.", "Toggle unavailable");
             return;
         }
 
@@ -699,7 +752,7 @@ else
 
             if (feature is null)
             {
-                ToastService.Show("Module toggle not found.");
+                ToastService.Warning("Module toggle was not found.", "Toggle unavailable");
                 await LoadModuleFeatures();
                 return;
             }
@@ -719,17 +772,17 @@ else
                     cachedFeature.ModifiedAt = feature.ModifiedAt;
                 }
 
-                ToastService.Show($"{row.DisplayName} {(enabled ? "enabled" : "disabled")}.");
+                ToastService.Success($"{row.DisplayName} {(enabled ? "enabled" : "disabled")}.", "Module updated");
             }
             else
             {
-                ToastService.Show($"Failed to update {row.DisplayName}: {result.Message}");
+                ToastService.Error($"{row.DisplayName} could not be updated.", "Save failed");
                 await LoadModuleFeatures();
             }
         }
-        catch (Exception ex)
+        catch
         {
-            ToastService.Show($"Error: {ex.Message}");
+            ToastService.Error($"{row.DisplayName} could not be updated.", "Save failed");
             await LoadModuleFeatures();
         }
         finally
@@ -740,7 +793,7 @@ else
 
     private async Task SaveTenant()
     {
-        if (string.IsNullOrWhiteSpace(_editName)) { ToastService.Show("Tenant name is required."); return; }
+        if (string.IsNullOrWhiteSpace(_editName)) { ToastService.Warning("Tenant name is required.", "Missing name"); return; }
         _saving = true;
         try
         {
@@ -749,7 +802,7 @@ else
                 .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
-            if (tenant is null) { ToastService.Show("Tenant not found."); return; }
+            if (tenant is null) { ToastService.Warning("Tenant was not found.", "Tenant unavailable"); return; }
 
             tenant.Name = _editName;
             tenant.Description = _editDescription;
@@ -757,19 +810,77 @@ else
             tenant.Status = short.TryParse(_editStatus, out var s) ? s : tenant.Status;
             tenant.Expiration = DateTime.TryParse(_editExpiration, out var exp) ? exp : null;
             tenant.AvailabilityDate = DateTime.TryParse(_editAvailability, out var avail) ? avail : null;
-            tenant.ParentTenantId = Guid.TryParse(_editParentTenantId, out var pid) ? pid : null;
             tenant.ModifiedAt = DateTime.UtcNow;
 
             DataContext.Update(tenant);
             var result = await DataContext.SaveChangesAsync();
-            if (result.IsSuccess) { ToastService.Show("Tenant updated."); _tenant = tenant; _editableForm?.ExitEditMode(); }
-            else { ToastService.Show($"Failed: {result.Message}"); }
+            if (result.IsSuccess) { ToastService.Success("Tenant updated.", "Tenant saved"); _tenant = tenant; _editableForm?.ExitEditMode(); }
+            else { ToastService.Error("Tenant could not be updated.", "Save failed"); }
         }
-        catch (Exception ex) { ToastService.Show($"Error: {ex.Message}"); }
+        catch { ToastService.Error("Tenant could not be updated.", "Save failed"); }
         finally { _saving = false; }
     }
 
     private void DiscardTenantEdit() => SyncEditFields();
+
+    private void OpenParentTenantDialog()
+    {
+        _parentTenantId = _tenant?.ParentTenantId?.ToString() ?? "";
+        _parentTenantDialogOpen = true;
+    }
+
+    private async Task SaveParentTenant()
+    {
+        if (!string.IsNullOrWhiteSpace(_parentTenantId)
+            && !Guid.TryParse(_parentTenantId, out _))
+        {
+            ToastService.Warning("Select a valid parent tenant.", "Invalid parent");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var tenant = await DataContext.Query<Tenant>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (tenant is null)
+            {
+                ToastService.Error("Tenant was not found.", "Save failed");
+                return;
+            }
+
+            tenant.ParentTenantId = Guid.TryParse(_parentTenantId, out var parentTenantId)
+                ? parentTenantId
+                : null;
+            tenant.ModifiedAt = DateTime.UtcNow;
+
+            DataContext.Update(tenant);
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                _tenant = tenant;
+                SyncEditFields();
+                _parentTenantDialogOpen = false;
+                ToastService.Success("Parent tenant updated.", "Tenant updated");
+            }
+            else
+            {
+                ToastService.Error("Parent tenant could not be updated.", "Save failed");
+            }
+        }
+        catch
+        {
+            ToastService.Error("Parent tenant could not be updated.", "Save failed");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
 
     private async Task ToggleEnabled()
     {
@@ -781,15 +892,15 @@ else
                 .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
-            if (fresh is null) { ToastService.Show("Tenant not found."); return; }
+            if (fresh is null) { ToastService.Warning("Tenant was not found.", "Tenant unavailable"); return; }
             fresh.IsEnabled = !fresh.IsEnabled;
             fresh.ModifiedAt = DateTime.UtcNow;
             DataContext.Update(fresh);
             var result = await DataContext.SaveChangesAsync();
-            if (result.IsSuccess) { ToastService.Show(fresh.IsEnabled ? "Tenant enabled." : "Tenant disabled."); _tenant = fresh; }
-            else { ToastService.Show($"Failed: {result.Message}"); }
+            if (result.IsSuccess) { ToastService.Success(fresh.IsEnabled ? "Tenant enabled." : "Tenant disabled.", "Tenant updated"); _tenant = fresh; }
+            else { ToastService.Error("Tenant status could not be updated.", "Save failed"); }
         }
-        catch (Exception ex) { ToastService.Show($"Error: {ex.Message}"); }
+        catch { ToastService.Error("Tenant status could not be updated.", "Save failed"); }
     }
 
     private static string GetStatusText(short? status) => status switch { 0 => "Pending", 1 => "Active", 2 => "Suspended", 3 => "Inactive", _ => "Unknown" };
@@ -888,7 +999,7 @@ else
 
     private async Task SaveConfig()
     {
-        if (string.IsNullOrWhiteSpace(_configForm.Key)) { ToastService.Show("Key is required."); return; }
+        if (string.IsNullOrWhiteSpace(_configForm.Key)) { ToastService.Warning("Key is required.", "Missing key"); return; }
         _saving = true;
         try
         {
@@ -899,25 +1010,25 @@ else
                     .NoCache()
                     .Where(x => x.Id == _editingConfigId)
                     .FirstOrDefaultAsync();
-                if (c is null) { ToastService.Show("Not found."); return; }
+                if (c is null) { ToastService.Warning("Configuration was not found.", "Configuration unavailable"); return; }
                 c.Key = _configForm.Key; c.Value = _configForm.Value; c.Unit = _configForm.Unit;
                 c.GroupId = Guid.TryParse(_configForm.GroupIdString, out var gid) ? gid : c.GroupId;
                 c.ModifiedAt = DateTime.UtcNow;
                 DataContext.Update(c);
                 var r = await DataContext.SaveChangesAsync();
-                ToastService.Show(r.IsSuccess ? "Updated." : $"Error: {r.Message}");
+                ShowConfigMutationResult(r.IsSuccess, "Configuration updated.", "Configuration could not be updated.");
             }
             else
             {
                 var config = new RegistryConfiguration { Id = Guid.NewGuid(), Key = _configForm.Key, Value = _configForm.Value, Unit = _configForm.Unit, GroupId = Guid.TryParse(_configForm.GroupIdString, out var gid) ? gid : Guid.Empty, TenantId = Id, CreatedAt = DateTime.UtcNow, IsEnabled = true };
                 DataContext.Add(config);
                 var r = await DataContext.SaveChangesAsync();
-                ToastService.Show(r.IsSuccess ? "Created." : $"Error: {r.Message}");
+                ShowConfigMutationResult(r.IsSuccess, "Configuration created.", "Configuration could not be created.");
             }
             _configDialogOpen = false;
             await LoadDetailData();
         }
-        catch (Exception ex) { ToastService.Show($"Error: {ex.Message}"); }
+        catch { ToastService.Error("Configuration could not be saved.", "Save failed"); }
         finally { _saving = false; }
     }
 
@@ -930,11 +1041,22 @@ else
             _deletingConfig.IsEnabled = false;
             DataContext.Update(_deletingConfig);
             var r = await DataContext.SaveChangesAsync();
-            ToastService.Show(r.IsSuccess ? "Deleted." : $"Error: {r.Message}");
+            ShowConfigMutationResult(r.IsSuccess, "Configuration deleted.", "Configuration could not be deleted.");
             _deleteConfigDialogOpen = false; _deletingConfig = null;
             await LoadDetailData();
         }
-        catch (Exception ex) { ToastService.Show($"Error: {ex.Message}"); }
+        catch { ToastService.Error("Configuration could not be deleted.", "Delete failed"); }
+    }
+
+    private void ShowConfigMutationResult(bool isSuccess, string successMessage, string errorMessage)
+    {
+        if (isSuccess)
+        {
+            ToastService.Success(successMessage, "Saved");
+            return;
+        }
+
+        ToastService.Error(errorMessage, "Save failed");
     }
 
     private class ConfigFormModel
@@ -953,6 +1075,48 @@ else
 
     private static string GetConfigurationGroupSearchText(RegistryConfigurationGroup group) =>
         $"{group.Name} {group.Description} {group.SystemReferenceId}";
+
+    private static string GetTenantPickerValue(Tenant tenant) => tenant.Id.ToString();
+
+    private static string GetTenantLabel(Tenant tenant) =>
+        string.IsNullOrWhiteSpace(tenant.Name)
+            ? "Unnamed tenant"
+            : tenant.Name;
+
+    private static string GetTenantSearchText(Tenant tenant) =>
+        $"{tenant.Name} {tenant.Description} {GetStatusText(tenant.Status)} {tenant.Version}";
+
+    private string GetParentTenantDisplay() =>
+        _tenant?.ParentTenantId is { } parentTenantId
+            ? _tenantOptions.FirstOrDefault(x => x.Id == parentTenantId) is { } parentTenant
+                ? GetTenantLabel(parentTenant)
+                : "Unknown parent tenant"
+            : "None (root tenant)";
+
+    private IReadOnlyList<XfEntityPickerColumn<Tenant>> TenantAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Description", x => x.Description),
+        new("Status", x => GetStatusText(x.Status)),
+        new("Version", x => x.Version.ToString("0.##")),
+        new("Expiration", x => x.Expiration?.ToString("yyyy-MM-dd")),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Tenant>> TenantAdvancedFilters =>
+    [
+        new("status", "Status", TenantStatusFilterOptions, x => x.Status?.ToString(), "All statuses"),
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All tenants")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> TenantStatusFilterOptions =
+    [
+        new("0", "Pending"),
+        new("1", "Active"),
+        new("2", "Suspended"),
+        new("3", "Inactive")
+    ];
 
     private IReadOnlyList<XfEntityPickerColumn<RegistryConfigurationGroup>> ConfigurationGroupAdvancedColumns =>
     [

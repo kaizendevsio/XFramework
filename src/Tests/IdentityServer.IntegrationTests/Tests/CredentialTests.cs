@@ -1,37 +1,73 @@
 using System.Net;
 using System.Text;
+using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts.Requests;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Shared.BusinessObjects;
-using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Requests;
 
 namespace IdentityServer.IntegrationTests.Tests;
 
 /// <summary>
 /// Integration tests for credential CRUD operations.
-/// Note: IdentityCredential.Password has [JsonIgnore] so it cannot be sent via JSON.
-/// Password-based credential creation is tested through the Authenticate flow in AuthenticationTests.
-/// These tests cover the credential CRUD endpoints for non-password fields.
 /// </summary>
 [TestFixture]
 public class CredentialTests : IntegrationTestBase
 {
     [Test]
-    [Ignore("IdentityCredential.Password has [JsonIgnore] — cannot be sent via JSON. " +
-            "Password hashing is tested via AuthenticationTests.SeedCredentialWithRole.")]
-    public async Task CreateCredential_WithValidData_Returns201()
+    public async Task CreateCredential_WithValidData_ReturnsOk()
     {
-        // This endpoint requires Password but the property has [JsonIgnore] on IdentityCredential.
-        // Credential creation with password is done internally (not via public API).
-        await Task.CompletedTask;
+        var info = await SeedIdentityInfo();
+        var username = UniqueUsername();
+        var request = new CreateCredentialRequest
+        {
+            IdentityInfoId = info.Id,
+            UserName = username,
+            UserAlias = "Test Alias",
+            Password = "TestPassword123!",
+            Metadata = CreateMetadata()
+        };
+
+        var response = await HttpClient.PostAsJsonAsync("/api/credentials", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var created = await db.Set<IdentityCredential>()
+            .FirstOrDefaultAsync(c => c.IdentityInfoId == info.Id && c.UserName == username);
+
+        created.Should().NotBeNull();
+        created!.TenantId.Should().Be(IntegrationTestFixture.TestTenantId);
+        created.UserAlias.Should().Be("Test Alias");
+        created.IsEnabled.Should().BeTrue();
     }
 
     [Test]
-    [Ignore("IdentityCredential.Password has [JsonIgnore] — cannot be sent via JSON. " +
-            "Password hashing is verified in AuthenticationTests where credentials are seeded with BCrypt.")]
     public async Task CreateCredential_PasswordIsHashed_NotStoredPlaintext()
     {
-        await Task.CompletedTask;
+        var info = await SeedIdentityInfo();
+        var username = UniqueUsername();
+        var password = "AnotherPassword123!";
+        var request = new CreateCredentialRequest
+        {
+            IdentityInfoId = info.Id,
+            UserName = username,
+            Password = password,
+            Metadata = CreateMetadata()
+        };
+
+        var response = await HttpClient.PostAsJsonAsync("/api/credentials", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var created = await db.Set<IdentityCredential>()
+            .FirstOrDefaultAsync(c => c.IdentityInfoId == info.Id && c.UserName == username);
+
+        created.Should().NotBeNull();
+        created!.PasswordByte.Should().NotBeNullOrEmpty();
+        Encoding.ASCII.GetString(created.PasswordByte!).Should().NotBe(password);
+        BCrypt.Net.BCrypt.Verify(password, Encoding.ASCII.GetString(created.PasswordByte!)).Should().BeTrue();
     }
 
     [Test]
@@ -81,8 +117,6 @@ public class CredentialTests : IntegrationTestBase
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
-
-    #region Helpers
 
     private static RequestMetadata CreateMetadata() => new()
     {
@@ -137,6 +171,4 @@ public class CredentialTests : IntegrationTestBase
         await db.SaveChangesAsync();
         return credential;
     }
-
-    #endregion
 }
