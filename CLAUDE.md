@@ -33,6 +33,7 @@ Use this file to orient quickly, then follow the canonical docs. Do not treat th
 - VSA execution: [VSA agent playbook](docs/solutions/conventions/xframework-vsa-agent-playbook.md).
 - Generated endpoints: [generated endpoint auto-discovery](docs/solutions/tooling-decisions/generated-endpoint-auto-discovery.md) and [GenerateEndpoints usage](docs/solutions/tooling-decisions/generate-endpoints-attribute-usage.md).
 - Bolt: [Bolt unified transport layer](docs/solutions/architecture-patterns/bolt-unified-transport-layer.md), [Bolt SignalR removal](docs/solutions/architecture-patterns/bolt-signalr-removal.md), `src/Libraries/Bolt/BOLT.md`, and `src/Libraries/Bolt/BOLT-MEDIA.md`.
+- Backend/database boundaries: [backend guidelines](rules/BackendGuidelines.md).
 - EF Core/data access: [EF Core data access patterns](docs/solutions/conventions/ef-core-data-access-patterns.md).
 - ControlPanel API usage and broad integration tests: [ControlPanel service wrapper and integration test contract](docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md).
 - Caching: [XFramework caching strategy](docs/solutions/best-practices/xframework-caching-strategy.md).
@@ -47,6 +48,6 @@ Use this file to orient quickly, then follow the canonical docs. Do not treat th
 
 ## Expected Routes
 
-- `AGENTS.md` -> `CLAUDE.md` -> `docs/solutions/conventions/xframework-best-practices.md`.
+- `AGENTS.md` -> `CLAUDE.md` -> `docs/solutions/conventions/xframework-best-practices.md`; backend work also reads `rules/BackendGuidelines.md`.
 - `README.md` -> `docs/README.md` -> `docs/solutions/README.md`.
 - `.github/copilot-instructions.md` -> VSA, Bolt, and source-generator guidance in `docs/solutions/`.

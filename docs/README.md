@@ -15,6 +15,7 @@ This is the repository documentation map. It points to the current knowledgebase
 - [`docs/solutions/README.md`](solutions/README.md) - category map for solution docs, current-vs-historical guidance, and required YAML frontmatter fields.
 - [`docs/solutions/architecture-patterns/xframework-agent-architecture-surface-map.md`](solutions/architecture-patterns/xframework-agent-architecture-surface-map.md) - current architecture surface map for agents and maintainers.
 - [`docs/solutions/conventions/xframework-feature-surface-map.md`](solutions/conventions/xframework-feature-surface-map.md) - current module and feature surface map with representative paths.
+- [`rules/BackendGuidelines.md`](../rules/BackendGuidelines.md) - mandatory backend rules for the single-database, schema-per-module architecture.
 - [`docs/plans/README.md`](plans/README.md) - plan filename conventions, active status rules, and historical-plan handling.
 - `docs/brainstorms/` - requirements and brainstorm artifacts created by `/ce-brainstorm` when needed.
 - `.opencode/commands/` and `.opencode/skills/` - project-local OpenCode commands and auto-selectable skills for XFramework workflows.

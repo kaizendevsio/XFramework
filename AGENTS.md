@@ -8,8 +8,14 @@ Primary route:
 - [docs/README.md](docs/README.md) - repository documentation map.
 - [docs/solutions/README.md](docs/solutions/README.md) - durable solution knowledgebase and category index.
 - [docs/solutions/conventions/xframework-best-practices.md](docs/solutions/conventions/xframework-best-practices.md) - canonical implementation standard.
+- [rules/BackendGuidelines.md](rules/BackendGuidelines.md) - mandatory backend rules for the single-database, schema-per-module architecture.
 - [docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md](docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md) - ControlPanel wrapper vs `IDataContext` rules and integration-test coverage tiers.
 - [rules/UiGuidelines.md](rules/UiGuidelines.md) - primary UI rules for ControlPanel and Blazor surfaces.
+
+Backend rule:
+
+- Read [rules/BackendGuidelines.md](rules/BackendGuidelines.md) before changing API modules, backend services, EF Core entities/configurations, migrations, database/runtime configuration, service wrappers, caching, or remote `IDataContext` behavior.
+- XFramework uses one physical PostgreSQL database with schema-per-module separation. Do not introduce database-per-service or direct cross-module schema writes unless an explicit architecture decision approves the exception.
 
 ControlPanel UI rule:
 

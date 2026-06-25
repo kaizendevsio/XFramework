@@ -44,6 +44,7 @@ status: current
 ## Current Subsystem Guidance
 
 - [EF Core data access patterns](conventions/ef-core-data-access-patterns.md) - `AppDbContext` discovery, module configurations, migrations, tests, and local/remote `IDataContext` behavior.
+- [Backend guidelines](../../rules/BackendGuidelines.md) - mandatory backend rules for the single-database, schema-per-module architecture, service ownership, EF performance, caching, migrations, and cross-module boundaries.
 - [XFramework caching strategy](best-practices/xframework-caching-strategy.md) - custom `HybridCacheService`, Redis/distributed cache, remote data-context client cache, module-local caches, and generated endpoint cache metadata.
 - [OpenTelemetry integration guide](tooling-decisions/opentelemetry-integration-guide.md) - tracing, metrics, resources, exporters, and log correlation.
 - [Logging standards](conventions/logging-standards.md) - structured logging conventions for the current ZLogger pipeline.
