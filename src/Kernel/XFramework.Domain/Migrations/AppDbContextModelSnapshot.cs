@@ -2639,6 +2639,12 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
+                    b.Property<string>("MentionedCredentialIdsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<Guid>("MessageThreadId")
                         .HasColumnType("uuid");
 
@@ -2650,6 +2656,24 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<Guid?>("ParentMessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplateKey")
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("TemplateType")
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("TemplateVariablesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -2660,6 +2684,11 @@ namespace XFramework.Domain.Migrations
                     b.HasKey("Id")
                         .HasName("message_pk");
 
+                    b.HasIndex("ParentMessageId");
+
+                    b.HasIndex("TemplateId")
+                        .HasDatabaseName("IX_Message_TemplateId");
+
                     b.HasIndex("MessageThreadMemberId", "CreatedAt")
                         .HasDatabaseName("IX_Message_Member_CreatedAt");
 
@@ -2667,6 +2696,58 @@ namespace XFramework.Domain.Migrations
                         .HasDatabaseName("IX_Message_Thread_CreatedAt_Id");
 
                     b.ToTable("Message", "Messaging");
+                });
+
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageBlock", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("BlockedCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BlockerCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messageblock_pk");
+
+                    b.HasIndex("BlockerCredentialId", "BlockedCredentialId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageBlock_Blocker_Blocked_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("MessageBlock", "Messaging");
                 });
 
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageDelivery", b =>
@@ -2853,6 +2934,21 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("SubscriptionId")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplateKey")
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("TemplateType")
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("TemplateVariablesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -2867,6 +2963,9 @@ namespace XFramework.Domain.Migrations
                     b.HasIndex("RecipientId");
 
                     b.HasIndex("SenderId");
+
+                    b.HasIndex("TemplateId")
+                        .HasDatabaseName("IX_MessageDirect_TemplateId");
 
                     b.HasIndex("TypeId");
 
@@ -2903,9 +3002,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("MessageId1")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -2921,8 +3017,6 @@ namespace XFramework.Domain.Migrations
                         .HasName("messagefiles_pk");
 
                     b.HasIndex("MessageId");
-
-                    b.HasIndex("MessageId1");
 
                     b.HasIndex("StorageId");
 
@@ -3014,6 +3108,61 @@ namespace XFramework.Domain.Migrations
                         .HasDatabaseName("IX_MessageOutboxEvent_Tenant_Processed_Occurred");
 
                     b.ToTable("MessageOutboxEvent", "Messaging");
+                });
+
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessagePin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MessageThreadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("PinnedByMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messagepin_pk");
+
+                    b.HasIndex("MessageThreadId", "MessageId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessagePin_Thread_Message_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("MessagePin", "Messaging");
                 });
 
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageReaction", b =>
@@ -3128,6 +3277,214 @@ namespace XFramework.Domain.Migrations
                     b.ToTable("MessageReactionType", "Messaging");
                 });
 
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("character varying");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid>("ReporterMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messagereport_pk");
+
+                    b.HasIndex("TenantId", "Status", "CreatedAt")
+                        .HasDatabaseName("IX_MessageReport_Tenant_Status_CreatedAt");
+
+                    b.ToTable("MessageReport", "Messaging");
+                });
+
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageSaved", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MessageThreadMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messagesaved_pk");
+
+                    b.HasIndex("MessageId", "MessageThreadMemberId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageSaved_Message_Member_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("MessageSaved", "Messaging");
+                });
+
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("character varying");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid?>("OwnerCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequiredVariablesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<string>("Subject")
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid?>("SystemReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplateType")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messagetemplate_pk");
+
+                    b.HasIndex("OwnerCredentialId");
+
+                    b.HasIndex("TenantId", "OwnerCredentialId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageTemplate_User_Key_Active")
+                        .HasFilter("\"IsDeleted\" = false AND \"OwnerCredentialId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "TemplateType", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageTemplate_Tenant_Type_Key_Active")
+                        .HasFilter("\"IsDeleted\" = false AND \"OwnerCredentialId\" IS NULL");
+
+                    b.HasIndex("TenantId", "TemplateType", "ModifiedAt")
+                        .HasDatabaseName("IX_MessageTemplate_Tenant_Type_ModifiedAt");
+
+                    b.ToTable("MessageTemplate", "Messaging");
+                });
+
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageThread", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3185,6 +3542,66 @@ namespace XFramework.Domain.Migrations
                     b.ToTable("MessageThread", "Messaging");
                 });
 
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageThreadInvite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InvitedByCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("InvitedCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<Guid>("MessageThreadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messagethreadinvite_pk");
+
+                    b.HasIndex("MessageThreadId", "InvitedCredentialId", "Status")
+                        .HasDatabaseName("IX_MessageThreadInvite_Thread_Credential_Status")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("MessageThreadInvite", "Messaging");
+                });
+
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageThreadMember", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3196,6 +3613,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Alias")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -3222,6 +3642,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -3230,19 +3653,28 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
+                    b.Property<bool>("IsMuted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("MessageThreadId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("MessageThreadId1")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("MessageThreadMemberGroupId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("MutedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("character varying")
+                        .HasDefaultValue("Member");
 
                     b.Property<short>("Status")
                         .HasColumnType("smallint");
@@ -3254,10 +3686,6 @@ namespace XFramework.Domain.Migrations
                         .HasName("messagethreadmember_pk");
 
                     b.HasIndex("GroupId");
-
-                    b.HasIndex("MessageThreadId1");
-
-                    b.HasIndex("MessageThreadMemberGroupId");
 
                     b.HasIndex("CredentialId", "MessageThreadId")
                         .HasDatabaseName("IX_MessageThreadMember_Credential_Thread");
@@ -3364,9 +3792,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("MessageThreadMemberId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("MessageThreadMemberId1")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -3380,8 +3805,6 @@ namespace XFramework.Domain.Migrations
 
                     b.HasKey("Id")
                         .HasName("messagethreadmemberrole_pk");
-
-                    b.HasIndex("MessageThreadMemberId1");
 
                     b.HasIndex("RoleId")
                         .HasDatabaseName("IX_MessageThreadMemberRole_RoleId");
@@ -8723,9 +9146,16 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("message_messagethreadmember_id_fk");
 
+                    b.HasOne("Messaging.Domain.Shared.Contracts.Message", "ParentMessage")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentMessageId")
+                        .HasConstraintName("message_parent_message_id_fk");
+
                     b.Navigation("MessageThread");
 
                     b.Navigation("MessageThreadMember");
+
+                    b.Navigation("ParentMessage");
                 });
 
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageDelivery", b =>
@@ -8789,14 +9219,10 @@ namespace XFramework.Domain.Migrations
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageFile", b =>
                 {
                     b.HasOne("Messaging.Domain.Shared.Contracts.Message", "Message")
-                        .WithMany()
+                        .WithMany("MessageFiles")
                         .HasForeignKey("MessageId")
                         .IsRequired()
                         .HasConstraintName("messagefiles_message_id_fk");
-
-                    b.HasOne("Messaging.Domain.Shared.Contracts.Message", null)
-                        .WithMany("MessageFiles")
-                        .HasForeignKey("MessageId1");
 
                     b.HasOne("XFramework.Domain.Shared.Contracts.StorageFile", "Storage")
                         .WithMany()
@@ -8836,6 +9262,16 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Type");
                 });
 
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageTemplate", b =>
+                {
+                    b.HasOne("IdentityServer.Domain.Shared.Contracts.IdentityCredential", "OwnerCredential")
+                        .WithMany()
+                        .HasForeignKey("OwnerCredentialId")
+                        .HasConstraintName("messagetemplate_ownercredential_id_fk");
+
+                    b.Navigation("OwnerCredential");
+                });
+
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageThread", b =>
                 {
                     b.HasOne("Messaging.Domain.Shared.Contracts.MessageThreadType", "Type")
@@ -8856,24 +9292,16 @@ namespace XFramework.Domain.Migrations
                         .HasConstraintName("messagethreadmember_identitycredential_id_fk");
 
                     b.HasOne("Messaging.Domain.Shared.Contracts.MessageThreadMemberGroup", "Group")
-                        .WithMany()
+                        .WithMany("MessageThreadMembers")
                         .HasForeignKey("GroupId")
                         .IsRequired()
                         .HasConstraintName("messagethreadmember_messagethreadmembergroup_id_fk");
 
                     b.HasOne("Messaging.Domain.Shared.Contracts.MessageThread", "MessageThread")
-                        .WithMany()
+                        .WithMany("MessageThreadMembers")
                         .HasForeignKey("MessageThreadId")
                         .IsRequired()
                         .HasConstraintName("messagethreadmember_messagethread_id_fk");
-
-                    b.HasOne("Messaging.Domain.Shared.Contracts.MessageThread", null)
-                        .WithMany("MessageThreadMembers")
-                        .HasForeignKey("MessageThreadId1");
-
-                    b.HasOne("Messaging.Domain.Shared.Contracts.MessageThreadMemberGroup", null)
-                        .WithMany("MessageThreadMembers")
-                        .HasForeignKey("MessageThreadMemberGroupId");
 
                     b.Navigation("Credential");
 
@@ -8896,14 +9324,10 @@ namespace XFramework.Domain.Migrations
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageThreadMemberRole", b =>
                 {
                     b.HasOne("Messaging.Domain.Shared.Contracts.MessageThreadMember", "MessageThreadMember")
-                        .WithMany()
+                        .WithMany("MessageThreadMemberRoles")
                         .HasForeignKey("MessageThreadMemberId")
                         .IsRequired()
                         .HasConstraintName("messagethreadmemberrole_messagethreadmember_id_fk");
-
-                    b.HasOne("Messaging.Domain.Shared.Contracts.MessageThreadMember", null)
-                        .WithMany("MessageThreadMemberRoles")
-                        .HasForeignKey("MessageThreadMemberId1");
 
                     b.HasOne("IdentityServer.Domain.Shared.Contracts.IdentityRole", "Role")
                         .WithMany()
@@ -10172,6 +10596,8 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("MessageFiles");
 
                     b.Navigation("MessageReactions");
+
+                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageDeliveryType", b =>

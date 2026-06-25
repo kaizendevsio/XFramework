@@ -51,17 +51,29 @@ public partial class MessageDirect : BaseModel
     public DateTime? ReceivedAt { get; set; }
 
     [MemoryPackOrder(15)]
-    public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = [];
+    public Guid? TemplateId { get; set; }
 
     [MemoryPackOrder(16)]
-    public virtual MessageDirect? ParentMessage { get; set; }
+    public string? TemplateKey { get; set; }
 
     [MemoryPackOrder(17)]
-    public virtual IdentityCredential? Recipient { get; set; }
+    public string? TemplateType { get; set; }
 
     [MemoryPackOrder(18)]
-    public virtual IdentityCredential? Sender { get; set; } = null!;
+    public string TemplateVariablesJson { get; set; } = "{}";
 
     [MemoryPackOrder(19)]
+    public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = [];
+
+    [MemoryPackOrder(20)]
+    public virtual MessageDirect? ParentMessage { get; set; }
+
+    [MemoryPackOrder(21)]
+    public virtual IdentityCredential? Recipient { get; set; }
+
+    [MemoryPackOrder(22)]
+    public virtual IdentityCredential? Sender { get; set; } = null!;
+
+    [MemoryPackOrder(23)]
     public virtual MessageType Type { get; set; } = null!;
 }

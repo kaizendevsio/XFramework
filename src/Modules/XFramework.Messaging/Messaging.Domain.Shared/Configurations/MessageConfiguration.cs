@@ -24,6 +24,11 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
         entity.Property(e => e.MentionedCredentialIdsJson)
             .HasColumnType("jsonb")
             .HasDefaultValueSql("'[]'::jsonb");
+        entity.Property(e => e.TemplateKey).HasColumnType("character varying");
+        entity.Property(e => e.TemplateType).HasColumnType("character varying");
+        entity.Property(e => e.TemplateVariablesJson)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'{}'::jsonb");
         entity.Property(e => e.Text).HasColumnType("character varying");
 
         entity.HasIndex(e => new { e.MessageThreadId, e.CreatedAt, e.Id })
@@ -31,6 +36,9 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
 
         entity.HasIndex(e => new { e.MessageThreadMemberId, e.CreatedAt })
             .HasDatabaseName("IX_Message_Member_CreatedAt");
+
+        entity.HasIndex(e => e.TemplateId)
+            .HasDatabaseName("IX_Message_TemplateId");
 
         entity.HasOne(d => d.MessageThread).WithMany(p => p.Messages)
             .HasForeignKey(d => d.MessageThreadId)

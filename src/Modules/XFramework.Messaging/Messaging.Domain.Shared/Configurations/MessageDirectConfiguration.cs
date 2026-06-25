@@ -26,6 +26,14 @@ public class MessageDirectConfiguration : IEntityTypeConfiguration<MessageDirect
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.ReceivedAt).HasColumnName("RecievedAt");
         entity.Property(e => e.Subject).HasColumnType("character varying");
+        entity.Property(e => e.TemplateKey).HasColumnType("character varying");
+        entity.Property(e => e.TemplateType).HasColumnType("character varying");
+        entity.Property(e => e.TemplateVariablesJson)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'{}'::jsonb");
+
+        entity.HasIndex(e => e.TemplateId)
+            .HasDatabaseName("IX_MessageDirect_TemplateId");
 
         entity.HasOne(d => d.ParentMessage).WithMany(p => p.InverseParentMessage)
             .HasForeignKey(d => d.ParentMessageId)

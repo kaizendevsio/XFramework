@@ -110,6 +110,7 @@ builder.Services.AddScoped<TenantModuleFeatureDefinitionResolver>();
 builder.Services.AddScoped<MessagingControlPanelGuard>();
 builder.Services.AddScoped<MessagingControlPanelReadService>();
 builder.Services.AddScoped<MessagingControlPanelSettingsService>();
+builder.Services.AddScoped<MessagingControlPanelTemplateService>();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddScoped<CommunityControlPanelAccessService>();
 builder.Services.AddScoped<WalletsAdminBackendContractService>();

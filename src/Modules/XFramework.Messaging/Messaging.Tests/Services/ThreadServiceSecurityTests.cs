@@ -4,11 +4,14 @@ using IdentityServer.Domain.Shared.Contracts;
 using Messaging.Api.Services;
 using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts;
+using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
+using Messaging.Domain.Shared.Contracts.Responses;
 using Messaging.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 
 namespace Messaging.Tests.Services;
@@ -273,10 +276,56 @@ public sealed class ThreadServiceSecurityTests
         Assert.That(mentions, Is.EquivalentTo(new[] { mentionedCredentialId }));
     }
 
-    private static ThreadService CreateService(InMemoryDataContext dataContext) =>
+    [Test]
+    public async Task CreateThreadMessageAsync_WithTemplate_StoresRenderedTextAndTemplateAuditFields()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var callerMemberId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(callerMemberId, threadId, callerCredentialId, tenantId));
+        var service = CreateService(
+            dataContext,
+            new TestMessagingTemplateService(new RenderMessageTemplateResponse
+            {
+                TemplateId = templateId,
+                TemplateKey = "tenant.notice",
+                TemplateType = MessageTemplateTypes.Tenant,
+                Body = "Rendered notice",
+                TemplateVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Name"] = "Ava"
+                }
+            }));
+
+        var result = await service.CreateThreadMessageAsync(new CreateThreadMessageRequest
+        {
+            ThreadId = threadId,
+            TemplateId = templateId,
+            TemplateVariables = new Dictionary<string, string> { ["Name"] = "Ava" },
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        var message = dataContext.Set<Message>().Single();
+        Assert.That(message.Text, Is.EqualTo("Rendered notice"));
+        Assert.That(message.TemplateId, Is.EqualTo(templateId));
+        Assert.That(message.TemplateKey, Is.EqualTo("tenant.notice"));
+        Assert.That(message.TemplateType, Is.EqualTo(MessageTemplateTypes.Tenant));
+        Assert.That(message.TemplateVariablesJson, Does.Contain("Ava"));
+    }
+
+    private static ThreadService CreateService(
+        InMemoryDataContext dataContext,
+        IMessagingTemplateService? templateService = null) =>
         new(
             dataContext,
             new MessagingRequestContextResolver(new HttpContextAccessor()),
+            templateService ?? new TestMessagingTemplateService(),
             NullLogger<ThreadService>.Instance);
 
     private static RequestMetadata Metadata(Guid credentialId, Guid tenantId) => new()
@@ -399,4 +448,45 @@ public sealed class ThreadServiceSecurityTests
         CreatedAt = DateTime.UtcNow,
         ConcurrencyStamp = Guid.NewGuid()
     };
+
+    private sealed class TestMessagingTemplateService(
+        RenderMessageTemplateResponse? renderResponse = null) : IMessagingTemplateService
+    {
+        public Task<Result<GetMessageTemplatesResponse>> GetTemplatesAsync(
+            GetMessageTemplatesRequest request,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<GetMessageTemplatesResponse>.Failure("Template service is not configured for this test.", 501));
+
+        public Task<Result<MessageTemplateResponse>> GetTemplateAsync(
+            GetMessageTemplateRequest request,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<MessageTemplateResponse>.Failure("Template service is not configured for this test.", 501));
+
+        public Task<Result<MessageTemplateResponse>> CreateTemplateAsync(
+            CreateMessageTemplateRequest request,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<MessageTemplateResponse>.Failure("Template service is not configured for this test.", 501));
+
+        public Task<Result<MessageTemplateResponse>> UpdateTemplateAsync(
+            UpdateMessageTemplateRequest request,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<MessageTemplateResponse>.Failure("Template service is not configured for this test.", 501));
+
+        public Task<Result<CmdResponse>> DeleteTemplateAsync(
+            DeleteMessageTemplateRequest request,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<CmdResponse>.Failure("Template service is not configured for this test.", 501));
+
+        public Task<Result<MessageTemplateResponse>> CloneTemplateAsync(
+            CloneMessageTemplateRequest request,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result<MessageTemplateResponse>.Failure("Template service is not configured for this test.", 501));
+
+        public Task<Result<RenderMessageTemplateResponse>> RenderTemplateAsync(
+            RenderMessageTemplateRequest request,
+            CancellationToken ct = default) =>
+            Task.FromResult(renderResponse is null
+                ? Result<RenderMessageTemplateResponse>.Failure("Template service is not configured for this test.", 501)
+                : Result<RenderMessageTemplateResponse>.Success(renderResponse));
+    }
 }

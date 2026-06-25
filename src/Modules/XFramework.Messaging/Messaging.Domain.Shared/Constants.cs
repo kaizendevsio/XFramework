@@ -15,6 +15,66 @@ public static class MessageIntents
     public static readonly string Notification = nameof(Notification);
 }
 
+public static class MessageTemplateTypes
+{
+    public const string System = nameof(System);
+    public const string Tenant = nameof(Tenant);
+    public const string User = nameof(User);
+
+    public static readonly string[] All = [System, Tenant, User];
+}
+
+public static class MessageTemplateKeys
+{
+    public const string IdentityOtp = "identity.otp";
+    public const string IdentityPasswordReset = "identity.password-reset";
+    public const string MessagingGeneric = "messaging.generic";
+}
+
+public sealed record SystemMessageTemplateDefinition(
+    Guid SystemReferenceId,
+    string Key,
+    string Name,
+    string Description,
+    string? Subject,
+    string Body,
+    IReadOnlyList<string> RequiredVariables);
+
+public static class MessagingTemplateCatalog
+{
+    public static readonly IReadOnlyList<SystemMessageTemplateDefinition> SystemTemplates =
+    [
+        new(
+            new Guid("2d876ee4-a3a5-4e38-a18f-45c76c3c7801"),
+            MessageTemplateKeys.IdentityOtp,
+            "Identity OTP",
+            "Built-in one-time password template used by Identity verification messages.",
+            null,
+            "Your verification code is |Value|.",
+            ["Value"]),
+        new(
+            new Guid("8df726dc-f12c-4ce6-bdf1-52ef3169223b"),
+            MessageTemplateKeys.IdentityPasswordReset,
+            "Identity Password Reset",
+            "Built-in password reset template used by Identity recovery flows.",
+            "Password reset",
+            "Your password reset token is: |Token|. This token expires in 30 minutes.",
+            ["Token"]),
+        new(
+            new Guid("7ce67e0f-e285-4b4c-a35a-699c0c04ab6a"),
+            MessageTemplateKeys.MessagingGeneric,
+            "Generic Message",
+            "Built-in generic Messaging template for tenant application messages.",
+            null,
+            "|Message|",
+            ["Message"])
+    ];
+
+    public static SystemMessageTemplateDefinition? FindSystemTemplate(string key) =>
+        SystemTemplates.FirstOrDefault(template =>
+            string.Equals(template.Key, key, StringComparison.OrdinalIgnoreCase));
+}
+
 public static class MessageEvents
 {
     public static readonly string SmsReceived = nameof(SmsReceived);

@@ -6,6 +6,7 @@ using Messaging.Domain.Shared.Contracts.Requests.Attachments;
 using Messaging.Domain.Shared.Contracts.Requests.Delete;
 using Messaging.Domain.Shared.Contracts.Requests.Edit;
 using Messaging.Domain.Shared.Contracts.Requests.Reactions;
+using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -15,6 +16,7 @@ namespace Messaging.Api.Services;
 public sealed class ThreadService(
     IDataContext dataContext,
     IMessagingRequestContextResolver requestContextResolver,
+    IMessagingTemplateService templateService,
     ILogger<ThreadService> logger
 ) : IThreadService
 {
@@ -1180,15 +1182,47 @@ public sealed class ThreadService(
                     return Result<CreateThreadMessageResponse>.Failure("Mentioned credentials must be active members of this thread", 400);
             }
 
+            var messageText = request.Text?.Trim();
+            RenderMessageTemplateResponse? renderedTemplate = null;
+            if (HasTemplate(request.TemplateId, request.TemplateKey))
+            {
+                var renderResult = await templateService.RenderTemplateAsync(new RenderMessageTemplateRequest
+                {
+                    Metadata = request.Metadata,
+                    TemplateId = request.TemplateId,
+                    TemplateKey = request.TemplateKey,
+                    TemplateVariables = request.TemplateVariables
+                }, ct);
+
+                if (!renderResult.IsSuccess || renderResult.Data is null)
+                {
+                    return Result<CreateThreadMessageResponse>.Failure(
+                        renderResult.Message ?? "Message template could not be rendered",
+                        renderResult.StatusCode);
+                }
+
+                renderedTemplate = renderResult.Data;
+                messageText = renderedTemplate.Body;
+            }
+
+            if (string.IsNullOrWhiteSpace(messageText))
+                return Result<CreateThreadMessageResponse>.Failure("Message text or template is required", 400);
+
             var message = new Message
             {
                 Id = Guid.NewGuid(),
                 TenantId = thread.TenantId,
                 MessageThreadId = request.ThreadId,
                 MessageThreadMemberId = senderMember.Id,
-                Text = request.Text,
+                Text = messageText,
                 ParentMessageId = request.ParentMessageId,
                 MentionedCredentialIdsJson = JsonSerializer.Serialize(mentionedCredentialIds, OutboxJsonOptions),
+                TemplateId = renderedTemplate?.TemplateId,
+                TemplateKey = renderedTemplate?.TemplateKey,
+                TemplateType = renderedTemplate?.TemplateType,
+                TemplateVariablesJson = JsonSerializer.Serialize(
+                    renderedTemplate?.TemplateVariables ?? new Dictionary<string, string>(),
+                    OutboxJsonOptions),
                 IsEnabled = true,
                 CreatedAt = DateTime.UtcNow,
                 ConcurrencyStamp = Guid.NewGuid()
@@ -2530,6 +2564,9 @@ public sealed class ThreadService(
             return [];
         }
     }
+
+    private static bool HasTemplate(Guid? templateId, string? templateKey) =>
+        templateId is Guid || !string.IsNullOrWhiteSpace(templateKey);
 
     private static bool IsAllowedAttachmentFileType(StorageFile file)
     {
