@@ -11,6 +11,7 @@ public sealed class DesignTimeAppDbContextFactory : IDesignTimeDbContextFactory<
     [
         "XFramework.Domain.Shared",
         "Bolt.Domain.Shared",
+        "Attendance.Domain.Shared",
         "Community.Domain.Shared",
         "IdentityServer.Domain.Shared",
         "Inventario.Domain.Shared",

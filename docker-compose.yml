@@ -143,6 +143,27 @@ services:
       retries: 15
       start_period: 15s
 
+  attendance:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/attendance:${IMAGE_TAG:-develop}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.Attendance/Attendance.Api/Attendance.Api.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${ATTENDANCE_EXPOSE_PORT:-5182}:8080"
+    depends_on:
+      bolt-hub:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
   # ── SMS Gateway ─────────────────────────────────────────────
   smsgateway:
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/smsgateway:${IMAGE_TAG:-develop}
@@ -228,6 +249,8 @@ services:
       identityserver:
         condition: service_healthy
       messaging:
+        condition: service_healthy
+      attendance:
         condition: service_healthy
       inventario:
         condition: service_healthy

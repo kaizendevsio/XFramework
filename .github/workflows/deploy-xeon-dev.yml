@@ -115,6 +115,7 @@ jobs:
             identityserver
             messaging
             notifications
+            attendance
             smsgateway
             wallets
             inventario
@@ -134,6 +135,7 @@ jobs:
             identityserver
             messaging
             notifications
+            attendance
             smsgateway
             wallets
             inventario
@@ -162,6 +164,7 @@ jobs:
             identityserver
             messaging
             notifications
+            attendance
             smsgateway
             wallets
             inventario
@@ -193,6 +196,7 @@ jobs:
             "identityserver=http://localhost:8261/health/ready"
             "messaging=http://localhost:5148/health/ready"
             "notifications=http://localhost:5166/health/ready"
+            "attendance=http://localhost:5182/health/ready"
             "smsgateway=http://localhost:5274/health/ready"
             "wallets=http://localhost:9696/health/ready"
             "inventario=http://localhost:8105/health/ready"
@@ -236,4 +240,4 @@ jobs:
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps" || true
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' logs --tail=200 migrate bolt-hub identityserver messaging notifications smsgateway wallets inventario controlpanel operations-dashboard seq jaeger" || true
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' logs --tail=200 migrate bolt-hub identityserver messaging notifications attendance smsgateway wallets inventario controlpanel operations-dashboard seq jaeger" || true

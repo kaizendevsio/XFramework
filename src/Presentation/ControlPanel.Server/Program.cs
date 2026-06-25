@@ -1,6 +1,7 @@
 using BlazorBlueprint.Components;
 using System.Security.Claims;
 using System.Text.Json;
+using Attendance.Integration.Drivers;
 using Community.Integration.Drivers;
 using ControlPanel.Server.Extensions;
 using ControlPanel.Server.Health;
@@ -66,6 +67,7 @@ builder.Services.AddHealthChecks()
         tags: ["ready"]);
 
 // Service wrappers — auto-generated CRUD + custom operations for each microservice
+builder.Services.AddAttendanceWrapperServices();
 builder.Services.AddCommunityWrapperServices();
 builder.Services.AddIdentityServerWrapperServices();
 builder.Services.AddInventarioWrapperServices();

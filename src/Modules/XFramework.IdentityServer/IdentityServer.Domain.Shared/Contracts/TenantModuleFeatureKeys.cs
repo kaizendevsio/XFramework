@@ -32,6 +32,7 @@ public static class TenantModuleFeatureKeys
     public const string Community = "community";
     public const string Payments = "payments";
     public const string Notifications = "notifications";
+    public const string Attendance = "attendance";
 
     public const string CatalogSubFeature = "catalog";
     public const string TransfersSubFeature = "transfers";
@@ -88,7 +89,8 @@ public static class TenantModuleFeatureKeys
         new(Messaging, AudioVideoSubFeature, "Messaging Audio/Video", "Audio and video communication features.", "video"),
         new(Community, string.Empty, "Community", "Community identities, content, feed, and connections.", "users"),
         new(Payments, string.Empty, "Payments", "Payment gateway and cash-in/cash-out capabilities.", "credit-card"),
-        new(Notifications, string.Empty, "Notifications", "Tenant notifications and read-state workflows.", "bell")
+        new(Notifications, string.Empty, "Notifications", "Tenant notifications and read-state workflows.", "bell"),
+        new(Attendance, string.Empty, "Attendance", "Attendance contexts, sessions, participants, time events, and reports.", "calendar-check")
     ];
 
     public static (string ModuleKey, string SubFeatureKey) Normalize(string moduleKey, string? subFeatureKey = null)

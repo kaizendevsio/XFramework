@@ -47,5 +47,10 @@ public class TestConstants
         public const string InventarioBolt = "http://localhost:17200";
         public const string InventarioServer = "http://localhost:18461";
         public const string InventarioTestClient = "http://localhost:18462";
+
+        // Attendance
+        public const string AttendanceBolt = "http://localhost:17300";
+        public const string AttendanceServer = "http://localhost:18581";
+        public const string AttendanceTestClient = "http://localhost:18582";
     }
 }

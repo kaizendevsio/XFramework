@@ -23,6 +23,643 @@ namespace XFramework.Domain.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "uuid-ossp");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceAdjustment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ActorCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AdjustedCheckInAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("AdjustedCheckOutAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("CredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("NewStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PreviousStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("RecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Attendance_Adjustment");
+
+                    b.HasIndex("RecordId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.HasIndex("TenantId", "ActorCredentialId", "CreatedAt")
+                        .HasDatabaseName("IX_AttendanceAdjustment_Tenant_Actor_Created");
+
+                    b.HasIndex("TenantId", "SessionId", "ParticipantId", "CreatedAt")
+                        .HasDatabaseName("IX_AttendanceAdjustment_Tenant_Session_Participant_Created");
+
+                    b.ToTable("AttendanceAdjustment", "Attendance");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceContext", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("ContextType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("DefaultPolicyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Attendance_Context");
+
+                    b.HasIndex("DefaultPolicyId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AttendanceContext_Tenant_Code_Active")
+                        .HasFilter("\"IsDeleted\" = false AND \"Code\" IS NOT NULL AND \"Code\" <> ''");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.HasIndex("TenantId", "ContextType", "IsActive")
+                        .HasDatabaseName("IX_AttendanceContext_Tenant_Type_Active");
+
+                    b.ToTable("AttendanceContext", "Attendance");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("CredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RecordedByCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceReference")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Attendance_Event");
+
+                    b.HasIndex("ParticipantId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AttendanceEvent_Tenant_IdempotencyKey");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.HasIndex("TenantId", "CredentialId", "OccurredAt")
+                        .HasDatabaseName("IX_AttendanceEvent_Tenant_Credential_Occurred");
+
+                    b.HasIndex("TenantId", "SessionId", "ParticipantId", "OccurredAt")
+                        .HasDatabaseName("IX_AttendanceEvent_Tenant_Session_Participant_Occurred");
+
+                    b.ToTable("AttendanceEvent", "Attendance");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceParticipant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ContextId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("CredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ReferenceCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Attendance_Participant");
+
+                    b.HasIndex("ContextId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.HasIndex("TenantId", "ContextId", "CredentialId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AttendanceParticipant_Tenant_Context_Credential_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "ContextId", "ReferenceCode")
+                        .HasDatabaseName("IX_AttendanceParticipant_Tenant_Context_Reference")
+                        .HasFilter("\"ReferenceCode\" IS NOT NULL AND \"ReferenceCode\" <> ''");
+
+                    b.HasIndex("TenantId", "CredentialId", "IsActive")
+                        .HasDatabaseName("IX_AttendanceParticipant_Tenant_Credential_Active");
+
+                    b.ToTable("AttendanceParticipant", "Attendance");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendancePolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<bool>("CheckoutRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("EarlyCheckoutGraceMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("GracePeriodMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(5);
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Attendance_Policy");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AttendancePolicy_Tenant_Name_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("AttendancePolicy", "Attendance");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("CredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FirstCheckInAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsManual")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastCheckOutAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SourceEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Attendance_Record");
+
+                    b.HasIndex("ParticipantId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.HasIndex("TenantId", "CredentialId", "SessionId")
+                        .HasDatabaseName("IX_AttendanceRecord_Tenant_Credential_Session");
+
+                    b.HasIndex("TenantId", "SessionId", "ParticipantId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AttendanceRecord_Tenant_Session_Participant");
+
+                    b.HasIndex("TenantId", "Status", "SessionId")
+                        .HasDatabaseName("IX_AttendanceRecord_Tenant_Status_Session");
+
+                    b.ToTable("AttendanceRecord", "Attendance");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ContextId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("PolicyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StartsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Attendance_Session");
+
+                    b.HasIndex("ContextId");
+
+                    b.HasIndex("PolicyId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.HasIndex("TenantId", "ContextId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AttendanceSession_Tenant_Context_Code_Active")
+                        .HasFilter("\"IsDeleted\" = false AND \"Code\" IS NOT NULL AND \"Code\" <> ''");
+
+                    b.HasIndex("TenantId", "ContextId", "StartsAt")
+                        .HasDatabaseName("IX_AttendanceSession_Tenant_Context_Start");
+
+                    b.ToTable("AttendanceSession", "Attendance");
+                });
+
             modelBuilder.Entity("Bolt.Domain.Shared.Contracts.ServiceDiscovery.BoltServiceManifestRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8604,6 +9241,102 @@ namespace XFramework.Domain.Migrations
                     b.ToTable("Warehouse", "Inventario");
                 });
 
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceAdjustment", b =>
+                {
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendanceRecord", "Record")
+                        .WithMany("Adjustments")
+                        .HasForeignKey("RecordId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Attendance_Adjustment_Record");
+
+                    b.Navigation("Record");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceContext", b =>
+                {
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendancePolicy", "DefaultPolicy")
+                        .WithMany("Contexts")
+                        .HasForeignKey("DefaultPolicyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Attendance_Context_DefaultPolicy");
+
+                    b.Navigation("DefaultPolicy");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceEvent", b =>
+                {
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendanceParticipant", "Participant")
+                        .WithMany()
+                        .HasForeignKey("ParticipantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Attendance_Event_Participant");
+
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendanceSession", "Session")
+                        .WithMany("Events")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Attendance_Event_Session");
+
+                    b.Navigation("Participant");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceParticipant", b =>
+                {
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendanceContext", "Context")
+                        .WithMany("Participants")
+                        .HasForeignKey("ContextId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Attendance_Participant_Context");
+
+                    b.Navigation("Context");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceRecord", b =>
+                {
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendanceParticipant", "Participant")
+                        .WithMany("Records")
+                        .HasForeignKey("ParticipantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Attendance_Record_Participant");
+
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendanceSession", "Session")
+                        .WithMany("Records")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Attendance_Record_Session");
+
+                    b.Navigation("Participant");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceSession", b =>
+                {
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendanceContext", "Context")
+                        .WithMany("Sessions")
+                        .HasForeignKey("ContextId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Attendance_Session_Context");
+
+                    b.HasOne("Attendance.Domain.Shared.Contracts.AttendancePolicy", "Policy")
+                        .WithMany("Sessions")
+                        .HasForeignKey("PolicyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Attendance_Session_Policy");
+
+                    b.Navigation("Context");
+
+                    b.Navigation("Policy");
+                });
+
             modelBuilder.Entity("Community.Domain.Shared.Contracts.CommunityConnection", b =>
                 {
                     b.HasOne("Community.Domain.Shared.Contracts.CommunityIdentity", "SourceSocialMediaIdentity")
@@ -10418,6 +11151,37 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("ProductVariation");
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceContext", b =>
+                {
+                    b.Navigation("Participants");
+
+                    b.Navigation("Sessions");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceParticipant", b =>
+                {
+                    b.Navigation("Records");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendancePolicy", b =>
+                {
+                    b.Navigation("Contexts");
+
+                    b.Navigation("Sessions");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceRecord", b =>
+                {
+                    b.Navigation("Adjustments");
+                });
+
+            modelBuilder.Entity("Attendance.Domain.Shared.Contracts.AttendanceSession", b =>
+                {
+                    b.Navigation("Events");
+
+                    b.Navigation("Records");
                 });
 
             modelBuilder.Entity("Community.Domain.Shared.Contracts.CommunityConnectionType", b =>
