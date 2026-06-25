@@ -1,7 +1,10 @@
 using System.Net;
+using System.Text.Json;
 using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts.Requests.Create;
+using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Domain.Shared.Contracts.Requests.Update;
+using Messaging.Domain.Shared.Contracts.Responses;
 using SmsGateway.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
@@ -16,6 +19,7 @@ public sealed class MessagingService(
     IDataContext dataContext,
     ITenantResolver tenantService,
     ISmsGatewayServiceWrapper smsGatewayServiceWrapper,
+    IMessagingTemplateService templateService,
     ILogger<MessagingService> logger
 ) : IMessagingService
 {
@@ -45,12 +49,44 @@ public sealed class MessagingService(
                 agentClusterId = configuration.Value;
             }
 
+            var messageText = request.Message?.Trim();
+            RenderMessageTemplateResponse? renderedTemplate = null;
+            if (HasTemplate(request.TemplateId, request.TemplateKey))
+            {
+                var renderResult = await templateService.RenderTemplateAsync(new RenderMessageTemplateRequest
+                {
+                    Metadata = request.Metadata,
+                    TemplateId = request.TemplateId,
+                    TemplateKey = request.TemplateKey,
+                    TemplateVariables = request.TemplateVariables
+                }, ct);
+
+                if (!renderResult.IsSuccess || renderResult.Data is null)
+                {
+                    return Result<CmdResponse>.Failure(
+                        renderResult.Message ?? "Message template could not be rendered",
+                        renderResult.StatusCode);
+                }
+
+                renderedTemplate = renderResult.Data;
+                messageText = renderedTemplate.Body;
+            }
+
+            if (string.IsNullOrWhiteSpace(messageText))
+                return Result<CmdResponse>.Failure("Message text or template is required", 400);
+
             var record = new MessageDirect()
             {
                 TenantId = tenant.Id,
                 MessageTransportType = MessageTransportType.Sms,
                 ExternalRecipient = request.Recipient,
-                Message = request.Message,
+                Subject = renderedTemplate?.Subject ?? request.Subject,
+                Message = messageText,
+                TemplateId = renderedTemplate?.TemplateId,
+                TemplateKey = renderedTemplate?.TemplateKey,
+                TemplateType = renderedTemplate?.TemplateType,
+                TemplateVariablesJson = JsonSerializer.Serialize(
+                    renderedTemplate?.TemplateVariables ?? new Dictionary<string, string>()),
                 AgentClusterId = Guid.Parse(agentClusterId),
                 Status = MessageStatus.Queued
             };
@@ -67,7 +103,7 @@ public sealed class MessagingService(
                         Id = record.Id,
                         AgentClusterId = new Guid(agentClusterId),
                         Recipient = request.Recipient.ValidatePhoneNumber(convertOnly: true),
-                        Message = request.Message
+                        Message = messageText
                     });
 
                     return Result<CmdResponse>.Success(result);
@@ -115,7 +151,11 @@ public sealed class MessagingService(
                 Metadata = request.Metadata,
                 MessageTransportType = transportType.Value,
                 Recipient = request.Contact!,
-                Message = request.VerificationToken!,
+                TemplateKey = MessageTemplateKeys.IdentityOtp,
+                TemplateVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Value"] = request.VerificationToken!
+                },
                 Intent = MessageIntents.Verification
             }, ct);
         }
@@ -172,4 +212,7 @@ public sealed class MessagingService(
             return Result<CmdResponse>.Failure($"Error updating message: {ex.Message}");
         }
     }
+
+    private static bool HasTemplate(Guid? templateId, string? templateKey) =>
+        templateId is Guid || !string.IsNullOrWhiteSpace(templateKey);
 }

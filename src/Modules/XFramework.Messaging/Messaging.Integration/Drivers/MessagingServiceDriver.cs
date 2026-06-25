@@ -2,6 +2,7 @@ using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts.Realtime;
 using Messaging.Domain.Shared.Contracts.Requests.Create;
 using Messaging.Domain.Shared.Contracts.Requests.Settings;
+using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Domain.Shared.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,27 @@ public interface IMessagingServiceWrapper : IServiceWrapper
         CancellationToken ct = default);
     Task<CmdResponse<MessagingSettingsResponse>> UpdateMessagingSettingsAsync(
         UpdateMessagingSettingsRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<GetMessageTemplatesResponse>> GetMessageTemplatesAsync(
+        GetMessageTemplatesRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<MessageTemplateResponse>> GetMessageTemplateAsync(
+        GetMessageTemplateRequest request,
+        CancellationToken ct = default);
+    Task<CmdResponse<MessageTemplateResponse>> CreateMessageTemplateAsync(
+        CreateMessageTemplateRequest request,
+        CancellationToken ct = default);
+    Task<CmdResponse<MessageTemplateResponse>> UpdateMessageTemplateAsync(
+        UpdateMessageTemplateRequest request,
+        CancellationToken ct = default);
+    Task<CmdResponse> DeleteMessageTemplateAsync(
+        DeleteMessageTemplateRequest request,
+        CancellationToken ct = default);
+    Task<CmdResponse<MessageTemplateResponse>> CloneMessageTemplateAsync(
+        CloneMessageTemplateRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<RenderMessageTemplateResponse>> RenderMessageTemplateAsync(
+        RenderMessageTemplateRequest request,
         CancellationToken ct = default);
     Task SubscribeThreadEventsAsync(
         Guid tenantId,
@@ -71,6 +93,62 @@ public sealed record MessagingServiceWrapper(
     {
         ct.ThrowIfCancellationRequested();
         return SendVoidAsync<UpdateMessagingSettingsRequest, MessagingSettingsResponse>(request);
+    }
+
+    public Task<QueryResponse<GetMessageTemplatesResponse>> GetMessageTemplatesAsync(
+        GetMessageTemplatesRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<GetMessageTemplatesRequest, GetMessageTemplatesResponse>(request);
+    }
+
+    public Task<QueryResponse<MessageTemplateResponse>> GetMessageTemplateAsync(
+        GetMessageTemplateRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<GetMessageTemplateRequest, MessageTemplateResponse>(request);
+    }
+
+    public Task<CmdResponse<MessageTemplateResponse>> CreateMessageTemplateAsync(
+        CreateMessageTemplateRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendVoidAsync<CreateMessageTemplateRequest, MessageTemplateResponse>(request);
+    }
+
+    public Task<CmdResponse<MessageTemplateResponse>> UpdateMessageTemplateAsync(
+        UpdateMessageTemplateRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendVoidAsync<UpdateMessageTemplateRequest, MessageTemplateResponse>(request);
+    }
+
+    public Task<CmdResponse> DeleteMessageTemplateAsync(
+        DeleteMessageTemplateRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendVoidAsync(request);
+    }
+
+    public Task<CmdResponse<MessageTemplateResponse>> CloneMessageTemplateAsync(
+        CloneMessageTemplateRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendVoidAsync<CloneMessageTemplateRequest, MessageTemplateResponse>(request);
+    }
+
+    public Task<QueryResponse<RenderMessageTemplateResponse>> RenderMessageTemplateAsync(
+        RenderMessageTemplateRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<RenderMessageTemplateRequest, RenderMessageTemplateResponse>(request);
     }
 
     public Task SubscribeThreadEventsAsync(

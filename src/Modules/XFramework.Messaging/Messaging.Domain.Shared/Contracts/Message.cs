@@ -22,23 +22,35 @@ public partial class Message : BaseModel
     public string MentionedCredentialIdsJson { get; set; } = "[]";
 
     [MemoryPackOrder(5)]
-    public virtual ICollection<MessageDelivery> MessageDeliveries { get; set; } = new List<MessageDelivery>();
+    public Guid? TemplateId { get; set; }
 
     [MemoryPackOrder(6)]
-    public virtual ICollection<MessageFile> MessageFiles { get; set; } = new List<MessageFile>();
+    public string? TemplateKey { get; set; }
 
     [MemoryPackOrder(7)]
-    public virtual ICollection<MessageReaction> MessageReactions { get; set; } = new List<MessageReaction>();
+    public string? TemplateType { get; set; }
 
     [MemoryPackOrder(8)]
-    public virtual MessageThread MessageThread { get; set; } = null!;
+    public string TemplateVariablesJson { get; set; } = "{}";
 
     [MemoryPackOrder(9)]
-    public virtual MessageThreadMember MessageThreadMember { get; set; } = null!;
+    public virtual ICollection<MessageDelivery> MessageDeliveries { get; set; } = new List<MessageDelivery>();
 
     [MemoryPackOrder(10)]
-    public virtual Message? ParentMessage { get; set; }
+    public virtual ICollection<MessageFile> MessageFiles { get; set; } = new List<MessageFile>();
 
     [MemoryPackOrder(11)]
+    public virtual ICollection<MessageReaction> MessageReactions { get; set; } = new List<MessageReaction>();
+
+    [MemoryPackOrder(12)]
+    public virtual MessageThread MessageThread { get; set; } = null!;
+
+    [MemoryPackOrder(13)]
+    public virtual MessageThreadMember MessageThreadMember { get; set; } = null!;
+
+    [MemoryPackOrder(14)]
+    public virtual Message? ParentMessage { get; set; }
+
+    [MemoryPackOrder(15)]
     public virtual ICollection<Message> Replies { get; set; } = new List<Message>();
 }

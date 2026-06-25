@@ -16,6 +16,9 @@ public partial record CreateDirectMessageRequest : RequestBase,
     public required string Recipient { get; set; } = null!;
     public string? Subject { get; set; }
     public string Intent { get; set; } = "Notification";
-    public required string Message { get; set; } = null!;
+    public string? Message { get; set; }
+    public Guid? TemplateId { get; set; }
+    public string? TemplateKey { get; set; }
+    public Dictionary<string, string> TemplateVariables { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool IsScheduled { get; set; }
 }

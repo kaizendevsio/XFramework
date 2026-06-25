@@ -65,9 +65,16 @@ else
                 </aside>
 
                 <section class="messaging-settings-content">
-                    <MessagingSettingsEditor Title="@CurrentSection.Title"
-                                             Description="@CurrentSection.Description"
-                                             SectionKey="@CurrentSection.SectionKey" />
+                    @if (CurrentSection.SectionKey == MessagingSettingsCatalog.TemplatesSectionKey)
+                    {
+                        <MessagingTemplateLibrary />
+                    }
+                    else
+                    {
+                        <MessagingSettingsEditor Title="@CurrentSection.Title"
+                                                 Description="@CurrentSection.Description"
+                                                 SectionKey="@CurrentSection.SectionKey" />
+                    }
                 </section>
             </div>
         </div>
@@ -86,7 +93,7 @@ else
     [
         new(MessagingSettingsCatalog.ChatSectionKey, "Chat Controls", "Thread, direct-message, read-state, typing, and presence defaults.", "message-circle", "/messaging/settings/chat"),
         new(MessagingSettingsCatalog.PolicySectionKey, "Policy", "Retention, attachment, rate-limit, and moderation policy values.", "shield-check", "/messaging/settings/policy"),
-        new(MessagingSettingsCatalog.TemplatesSectionKey, "Templates", "Identity message templates and direct-message transport defaults.", "file-text", "/messaging/settings/templates")
+        new(MessagingSettingsCatalog.TemplatesSectionKey, "Templates", "System, tenant, and user message templates.", "file-text", "/messaging/settings/templates")
     ];
 
     private MessagingControlPanelGuardResult? _guard;
