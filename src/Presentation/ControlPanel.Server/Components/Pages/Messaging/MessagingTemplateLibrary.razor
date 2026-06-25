@@ -14,7 +14,7 @@ else
                 <BbTypographyMuted>System defaults, tenant templates, and user template audit records.</BbTypographyMuted>
             </div>
             <div class="xf-page-actions">
-                <BbButton OnClick="@OpenCreateSheet">
+                <BbButton OnClick="@OpenCreateDialog">
                     <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                     Create Tenant Template
                 </BbButton>
@@ -63,7 +63,7 @@ else
                         <BbDataGrid Items="@_templates"
                                     ShowPagination="true"
                                     InitialPageSize="20"
-                                    OnRowClick="@((MessageTemplateResponse item) => OpenTemplateSheet(item))"
+                                    OnRowClick="@((MessageTemplateResponse item) => OpenTemplateDialog(item))"
                                     Class="cursor-pointer">
                             <Columns>
                                 <BbDataGridTemplateColumn Title="Type" Sortable="true" Filterable="true" FilterBy="@(item => item.TemplateType)">
@@ -116,16 +116,16 @@ else
     </div>
 }
 
-<BbSheet Open="@_sheetOpen" OpenChanged="@OnSheetOpenChanged">
-    <BbSheetContent Side="SheetSide.Right" Class="messaging-template-sheet">
-        <BbSheetHeader>
-            <BbSheetTitle>@SheetTitle</BbSheetTitle>
-            <BbSheetDescription>@SheetDescription</BbSheetDescription>
-        </BbSheetHeader>
+<BbDialog Open="@_dialogOpen" OpenChanged="@OnDialogOpenChanged">
+    <BbDialogContent TrapFocus="false" Class="messaging-template-dialog">
+        <BbDialogHeader>
+            <BbDialogTitle>@DialogTitle</BbDialogTitle>
+            <BbDialogDescription>@DialogDescription</BbDialogDescription>
+        </BbDialogHeader>
 
         @if (_selected is not null || _creating)
         {
-            <div class="messaging-template-sheet-body">
+            <div class="messaging-template-dialog-body">
                 @if (_validationErrors.Count > 0)
                 {
                     <BbAlert Variant="AlertVariant.Warning">
@@ -246,8 +246,8 @@ else
             </div>
         }
 
-        <BbSheetFooter Class="messaging-template-sheet-footer">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@CloseSheet">Close</BbButton>
+        <BbDialogFooter Class="messaging-template-dialog-footer">
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@CloseDialog">Close</BbButton>
             @if (_selected is { TemplateType: MessageTemplateTypes.System })
             {
                 <BbButton OnClick="@CloneSelectedTemplate" Disabled="@_saving">
@@ -273,9 +273,9 @@ else
                     Create
                 </BbButton>
             }
-        </BbSheetFooter>
-    </BbSheetContent>
-</BbSheet>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
 
 @code {
     [Inject] private MessagingControlPanelTemplateService TemplateService { get; set; } = default!;
@@ -292,7 +292,7 @@ else
     private bool _saving;
     private bool _dirty;
     private bool _creating;
-    private bool _sheetOpen;
+    private bool _dialogOpen;
     private string? _error;
 
     private int _systemCount => _templates.Count(x => x.TemplateType == MessageTemplateTypes.System);
@@ -300,8 +300,8 @@ else
     private int _userCount => _templates.Count(x => x.TemplateType == MessageTemplateTypes.User);
     private int _inactiveCount => _templates.Count(x => !x.IsEnabled);
     private bool IsReadOnly => !_creating && _selected?.TemplateType != MessageTemplateTypes.Tenant;
-    private string SheetTitle => _creating ? "Create Tenant Template" : _selected?.Name ?? "Template";
-    private string SheetDescription => _creating
+    private string DialogTitle => _creating ? "Create Tenant Template" : _selected?.Name ?? "Template";
+    private string DialogDescription => _creating
         ? "Create a configurable tenant template for server-side Messaging rendering."
         : _selected?.Key ?? "Review template details.";
     private string ReadOnlyTitle => _selected?.TemplateType == MessageTemplateTypes.System
@@ -321,7 +321,7 @@ else
     {
         _ = InvokeAsync(async () =>
         {
-            CloseSheet();
+            CloseDialog();
             await LoadTemplates();
             StateHasChanged();
         });
@@ -381,29 +381,29 @@ else
         }
     }
 
-    private void OpenCreateSheet()
+    private void OpenCreateDialog()
     {
         _creating = true;
         _selected = null;
         _dirty = false;
         _validationErrors = [];
         _form.SetDefaults();
-        _sheetOpen = true;
+        _dialogOpen = true;
     }
 
-    private void OpenTemplateSheet(MessageTemplateResponse template)
+    private void OpenTemplateDialog(MessageTemplateResponse template)
     {
         _creating = false;
         _selected = template;
         _dirty = false;
         _validationErrors = [];
         _form.Load(template);
-        _sheetOpen = true;
+        _dialogOpen = true;
     }
 
-    private void OnSheetOpenChanged(bool open)
+    private void OnDialogOpenChanged(bool open)
     {
-        _sheetOpen = open;
+        _dialogOpen = open;
         if (!open)
         {
             _validationErrors = [];
@@ -413,7 +413,7 @@ else
         }
     }
 
-    private void CloseSheet() => OnSheetOpenChanged(false);
+    private void CloseDialog() => OnDialogOpenChanged(false);
 
     private async Task SaveTemplate()
     {
@@ -465,11 +465,11 @@ else
 
             if (result.Template is not null)
             {
-                OpenTemplateSheet(result.Template);
+                OpenTemplateDialog(result.Template);
             }
             else
             {
-                CloseSheet();
+                CloseDialog();
             }
         }
         catch
@@ -512,7 +512,7 @@ else
             await LoadTemplates(showFeedback: false);
             if (result.Template is not null)
             {
-                OpenTemplateSheet(result.Template);
+                OpenTemplateDialog(result.Template);
             }
         }
         catch
@@ -551,7 +551,7 @@ else
             }
 
             ToastService.Success(result.Message, "Template Deleted");
-            CloseSheet();
+            CloseDialog();
             await LoadTemplates(showFeedback: false);
         }
         catch
