@@ -6,16 +6,22 @@
 
 <PageTitle>Deposit Requests - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<div class="space-y-6">
+    <div class="xf-page-header">
         <div>
             <BbTypographyH3>Deposit Requests</BbTypographyH3>
             <BbTypographyMuted>Inspect deposit requests and hand off approvals to the Wallets workflow.</BbTypographyMuted>
         </div>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
-            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-            Refresh
-        </BbButton>
+        <div class="xf-page-actions">
+            <BbButton OnClick="@OpenCreateDialog">
+                <LucideIcon Name="circle-plus" class="mr-2 h-4 w-4" />
+                Create Deposit
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
     </div>
 
     @if (_loading)
@@ -32,123 +38,7 @@
     }
     else
     {
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Create Deposit Request</BbCardTitle>
-                <BbCardDescription>Submit cash-in requests through the Wallets deposit workflow.</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <XfEntityPicker TItem="IdentityCredential"
-                                    Label="Credential"
-                                    Value="@_createCredentialId"
-                                    ValueChanged="@(value => _createCredentialId = value ?? "")"
-                                    Items="@_credentials"
-                                    ValueSelector="@GetCredentialPickerValue"
-                                    TextSelector="@BuildCredentialLabel"
-                                    SearchTextSelector="@GetCredentialSearchText"
-                                    AdvancedColumns="@CredentialAdvancedColumns"
-                                    AdvancedFilters="@CredentialAdvancedFilters"
-                                    AdvancedSearchScope="Searches credential username, alias, identity name, verified state, online state, last seen date, and credential id."
-                                    Placeholder="Select credential"
-                                    SearchPlaceholder="Search users or credentials..."
-                                    EmptyMessage="No credentials found."
-                                    AllowClear="true"
-                                    ClearText="Clear credential"
-                                    AdvancedSearchTitle="Find Credential"
-                                    AdvancedSearchDescription="Search credentials for the active tenant." />
-                    <XfEntityPicker TItem="Wallet"
-                                    Label="Existing Wallet"
-                                    Value="@_createWalletId"
-                                    ValueChanged="@OnCreateWalletChanged"
-                                    Items="@_wallets"
-                                    ValueSelector="@GetWalletPickerValue"
-                                    TextSelector="@BuildWalletLabel"
-                                    SearchTextSelector="@GetWalletSearchText"
-                                    AdvancedColumns="@WalletAdvancedColumns"
-                                    AdvancedFilters="@WalletAdvancedFilters"
-                                    AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
-                                    Placeholder="Create or resolve by wallet type"
-                                    SearchPlaceholder="Search wallets..."
-                                    EmptyMessage="No wallets found."
-                                    AllowClear="true"
-                                    ClearText="Create or resolve by wallet type"
-                                    AdvancedSearchTitle="Find Wallet"
-                                    AdvancedSearchDescription="Search active-tenant wallets before creating a deposit request." />
-                    <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.WalletType"
-                                    Label="Wallet Type"
-                                    Value="@_createWalletTypeId"
-                                    ValueChanged="@(value => _createWalletTypeId = value ?? NoSelectionValue)"
-                                    Items="@_walletTypes"
-                                    ValueSelector="@GetWalletTypePickerValue"
-                                    TextSelector="@BuildWalletTypeLabel"
-                                    SearchTextSelector="@GetWalletTypeSearchText"
-                                    AdvancedColumns="@WalletTypeAdvancedColumns"
-                                    AdvancedFilters="@WalletTypeAdvancedFilters"
-                                    AdvancedSearchScope="Searches wallet type code, name, currency, type code, transfer rules, and created date."
-                                    Placeholder="Use selected wallet"
-                                    SearchPlaceholder="Search wallet types..."
-                                    EmptyMessage="No wallet types found."
-                                    AllowClear="true"
-                                    ClearText="Use selected wallet"
-                                    AdvancedSearchTitle="Find Wallet Type"
-                                    AdvancedSearchDescription="Search wallet types when the deposit should resolve or create a wallet." />
-                    <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.CurrencyType"
-                                    Label="Currency"
-                                    Value="@_createCurrencyId"
-                                    ValueChanged="@(value => _createCurrencyId = value ?? NoSelectionValue)"
-                                    Items="@_currencies"
-                                    ValueSelector="@GetCurrencyPickerValue"
-                                    TextSelector="@BuildCurrencyLabel"
-                                    SearchTextSelector="@GetCurrencySearchText"
-                                    AdvancedColumns="@CurrencyAdvancedColumns"
-                                    AdvancedFilters="@CurrencyAdvancedFilters"
-                                    AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
-                                    Placeholder="Default wallet currency"
-                                    SearchPlaceholder="Search currencies..."
-                                    EmptyMessage="No currencies found."
-                                    AllowClear="true"
-                                    ClearText="Default wallet currency"
-                                    AdvancedSearchTitle="Find Currency"
-                                    AdvancedSearchDescription="Search tenant and global currencies available to Wallets." />
-                    <XfEntityPicker TItem="PaymentGateway"
-                                    Label="Gateway"
-                                    Value="@_createGatewayId"
-                                    ValueChanged="@(value => _createGatewayId = value ?? NoSelectionValue)"
-                                    Items="@_gateways"
-                                    ValueSelector="@GetGatewayPickerValue"
-                                    TextSelector="@BuildGatewayLabel"
-                                    SearchTextSelector="@GetGatewaySearchText"
-                                    AdvancedColumns="@GatewayAdvancedColumns"
-                                    AdvancedFilters="@GatewayAdvancedFilters"
-                                    AdvancedSearchScope="Searches gateway name, category/provider, enabled state, service charge, convenience fee, discount, and description."
-                                    Placeholder="Select gateway"
-                                    SearchPlaceholder="Search gateways..."
-                                    EmptyMessage="No gateways found."
-                                    AllowClear="true"
-                                    ClearText="Clear gateway"
-                                    AdvancedSearchTitle="Find Payment Gateway"
-                                    AdvancedSearchDescription="Search configured payment gateways for deposit settlement." />
-                    <BbFormFieldInput TValue="decimal" @bind-Value="_createAmount" Label="Amount" />
-                    <BbFormFieldInput TValue="decimal" @bind-Value="_createRequestedFee" Label="Requested Fee" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_createExternalReference" Label="External Reference" Placeholder="Optional provider/reference id" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_createAddress" Label="Address" Placeholder="Optional source address" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_createRemarks" Label="Remarks" Placeholder="Cash-in note" />
-                </div>
-                <div class="mt-4">
-                    <BbButton OnClick="@CreateDeposit" Disabled="@_acting">
-                        @if (_acting)
-                        {
-                            <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                        }
-                        <LucideIcon Name="circle-plus" class="mr-2 h-4 w-4" />
-                        Create Deposit
-                    </BbButton>
-                </div>
-            </BbCardContent>
-        </BbCard>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div class="xf-summary-grid xf-summary-grid-4">
             <BbCard>
                 <BbCardContent>
                     <div class="space-y-1 pt-4">
@@ -185,28 +75,28 @@
 
         <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
             <Columns>
-                <BbDataGridTemplateColumn Title="Credential">
+                <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(item => GetCredentialLabel(item.CredentialId))">
                     <ChildContent Context="item">
-                        <span class="font-mono text-xs">@ShortId(item.CredentialId)</span>
+                        <span>@GetCredentialLabel(item.CredentialId)</span>
                     </ChildContent>
                 </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.ConvenienceFee)" Title="Convenience Fee" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.SystemFee)" Title="System Fee" Sortable="true" />
-                <BbDataGridTemplateColumn Title="Workflow">
+                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.ConvenienceFee)" Title="Convenience Fee" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.SystemFee)" Title="System Fee" Sortable="true" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Workflow" Filterable="true" FilterBy="@(item => item.WorkflowStatus.ToString())">
                     <ChildContent Context="item">
                         <StatusBadge Text="@item.WorkflowStatus.ToString()" Status="@GetWorkflowStatusCategory(item.WorkflowStatus)" />
                     </ChildContent>
                 </BbDataGridTemplateColumn>
-                <BbDataGridTemplateColumn Title="Status">
+                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => GetDepositStatusText(item.DepositStatus))">
                     <ChildContent Context="item">
                         <StatusBadge Text="@GetDepositStatusText(item.DepositStatus)" Status="@GetDepositStatusCategory(item.DepositStatus)" />
                     </ChildContent>
                 </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNo)" Title="Reference No" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Address)" Title="Address" />
-                <BbDataGridPropertyColumn Property="@(x => x.ExpiryDate)" Title="Expiry Date" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNo)" Title="Reference No" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Address)" Title="Address" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.ExpiryDate)" Title="Expiry Date" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                 <BbDataGridTemplateColumn Title="Actions">
                     <ChildContent Context="item">
                         <div class="flex flex-wrap gap-1">
@@ -229,9 +119,130 @@
                     </ChildContent>
                 </BbDataGridTemplateColumn>
             </Columns>
+            <EmptyTemplate>
+                <BbEmpty Title="No deposit requests found" Description="Create a deposit request to start the workflow." />
+            </EmptyTemplate>
         </BbDataGrid>
     }
 </div>
+
+<BbDialog Open="@_createDialogOpen" OpenChanged="@OnCreateDialogChanged">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogHeader>
+            <BbDialogTitle>Create Deposit</BbDialogTitle>
+            <BbDialogDescription>Submit cash-in requests through the Wallets deposit workflow.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <XfEntityPicker TItem="IdentityCredential"
+                                Label="Credential"
+                                Value="@_createCredentialId"
+                                ValueChanged="@(value => _createCredentialId = value ?? "")"
+                                Items="@_credentials"
+                                ValueSelector="@GetCredentialPickerValue"
+                                TextSelector="@BuildCredentialLabel"
+                                SearchTextSelector="@GetCredentialSearchText"
+                                AdvancedColumns="@CredentialAdvancedColumns"
+                                AdvancedFilters="@CredentialAdvancedFilters"
+                                AdvancedSearchScope="Searches credential username, alias, identity name, verified state, online state, last seen date, and credential id."
+                                Placeholder="Select credential"
+                                SearchPlaceholder="Search users or credentials..."
+                                EmptyMessage="No credentials found."
+                                AllowClear="true"
+                                ClearText="Clear credential"
+                                AdvancedSearchTitle="Find Credential"
+                                AdvancedSearchDescription="Search credentials for the active tenant." />
+                <XfEntityPicker TItem="Wallet"
+                                Label="Existing Wallet"
+                                Value="@_createWalletId"
+                                ValueChanged="@OnCreateWalletChanged"
+                                Items="@_wallets"
+                                ValueSelector="@GetWalletPickerValue"
+                                TextSelector="@BuildWalletLabel"
+                                SearchTextSelector="@GetWalletSearchText"
+                                AdvancedColumns="@WalletAdvancedColumns"
+                                AdvancedFilters="@WalletAdvancedFilters"
+                                AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                Placeholder="Create or resolve by wallet type"
+                                SearchPlaceholder="Search wallets..."
+                                EmptyMessage="No wallets found."
+                                AllowClear="true"
+                                ClearText="Create or resolve by wallet type"
+                                AdvancedSearchTitle="Find Wallet"
+                                AdvancedSearchDescription="Search active-tenant wallets before creating a deposit request." />
+                <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.WalletType"
+                                Label="Wallet Type"
+                                Value="@_createWalletTypeId"
+                                ValueChanged="@(value => _createWalletTypeId = value ?? NoSelectionValue)"
+                                Items="@_walletTypes"
+                                ValueSelector="@GetWalletTypePickerValue"
+                                TextSelector="@BuildWalletTypeLabel"
+                                SearchTextSelector="@GetWalletTypeSearchText"
+                                AdvancedColumns="@WalletTypeAdvancedColumns"
+                                AdvancedFilters="@WalletTypeAdvancedFilters"
+                                AdvancedSearchScope="Searches wallet type code, name, currency, type code, transfer rules, and created date."
+                                Placeholder="Use selected wallet"
+                                SearchPlaceholder="Search wallet types..."
+                                EmptyMessage="No wallet types found."
+                                AllowClear="true"
+                                ClearText="Use selected wallet"
+                                AdvancedSearchTitle="Find Wallet Type"
+                                AdvancedSearchDescription="Search wallet types when the deposit should resolve or create a wallet." />
+                <XfEntityPicker TItem="global::Wallets.Domain.Shared.Contracts.CurrencyType"
+                                Label="Currency"
+                                Value="@_createCurrencyId"
+                                ValueChanged="@(value => _createCurrencyId = value ?? NoSelectionValue)"
+                                Items="@_currencies"
+                                ValueSelector="@GetCurrencyPickerValue"
+                                TextSelector="@BuildCurrencyLabel"
+                                SearchTextSelector="@GetCurrencySearchText"
+                                AdvancedColumns="@CurrencyAdvancedColumns"
+                                AdvancedFilters="@CurrencyAdvancedFilters"
+                                AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
+                                Placeholder="Default wallet currency"
+                                SearchPlaceholder="Search currencies..."
+                                EmptyMessage="No currencies found."
+                                AllowClear="true"
+                                ClearText="Default wallet currency"
+                                AdvancedSearchTitle="Find Currency"
+                                AdvancedSearchDescription="Search tenant and global currencies available to Wallets." />
+                <XfEntityPicker TItem="PaymentGateway"
+                                Label="Gateway"
+                                Value="@_createGatewayId"
+                                ValueChanged="@(value => _createGatewayId = value ?? NoSelectionValue)"
+                                Items="@_gateways"
+                                ValueSelector="@GetGatewayPickerValue"
+                                TextSelector="@BuildGatewayLabel"
+                                SearchTextSelector="@GetGatewaySearchText"
+                                AdvancedColumns="@GatewayAdvancedColumns"
+                                AdvancedFilters="@GatewayAdvancedFilters"
+                                AdvancedSearchScope="Searches gateway name, category/provider, enabled state, service charge, convenience fee, discount, and description."
+                                Placeholder="Select gateway"
+                                SearchPlaceholder="Search gateways..."
+                                EmptyMessage="No gateways found."
+                                AllowClear="true"
+                                ClearText="Clear gateway"
+                                AdvancedSearchTitle="Find Payment Gateway"
+                                AdvancedSearchDescription="Search configured payment gateways for deposit settlement." />
+                <BbFormFieldCurrencyInput @bind-Value="_createAmount" Label="Amount" ShowSymbol="false" Min="0" />
+                <BbFormFieldCurrencyInput @bind-Value="_createRequestedFee" Label="Requested Fee" ShowSymbol="false" Min="0" />
+                <BbFormFieldInput TValue="string" @bind-Value="_createExternalReference" Label="External Reference" Placeholder="Optional provider/reference id" />
+                <BbFormFieldInput TValue="string" @bind-Value="_createAddress" Label="Address" Placeholder="Optional source address" />
+                <BbFormFieldInput TValue="string" @bind-Value="_createRemarks" Label="Remarks" Placeholder="Cash-in note" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@CloseCreateDialog" Disabled="@_acting">Cancel</BbButton>
+            <BbButton OnClick="@CreateDeposit" Disabled="@_acting">
+                @if (_acting)
+                {
+                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                }
+                Create Deposit
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
@@ -239,6 +250,8 @@
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private ILogger<DepositRequests> Logger { get; set; } = default!;
 
     private const string NoSelectionValue = "__none";
 
@@ -251,6 +264,7 @@
     private Dictionary<Guid, string> _credentialLabels = [];
     private bool _loading = true;
     private bool _acting;
+    private bool _createDialogOpen;
     private bool _hasTenant;
     private bool _moduleEnabled;
     private int _pendingCount;
@@ -316,7 +330,8 @@
             _items = [];
             ResetCreateOptions();
             ResetSummary();
-            ToastService.Show($"Failed to load deposit requests: {ex.Message}");
+            Logger.LogError(ex, "Failed to load deposit requests.");
+            ToastService.Error("Could not load deposit requests.", "Wallets");
         }
         finally
         {
@@ -401,19 +416,19 @@
     {
         if (_createAmount <= 0)
         {
-            ToastService.Show("Enter a deposit amount greater than zero.");
+            ToastService.Warning("Enter a deposit amount greater than zero.", "Validation");
             return;
         }
 
         if (_createRequestedFee < 0)
         {
-            ToastService.Show("Requested fee cannot be negative.");
+            ToastService.Warning("Requested fee cannot be negative.", "Validation");
             return;
         }
 
         if (!Guid.TryParse(_createGatewayId, out var gatewayId))
         {
-            ToastService.Show("Select a payment gateway.");
+            ToastService.Warning("Select a payment gateway.", "Validation");
             return;
         }
 
@@ -429,13 +444,13 @@
 
         if (!Guid.TryParse(credentialText, out var credentialId))
         {
-            ToastService.Show("Select a credential for the deposit request.");
+            ToastService.Warning("Select a credential for the deposit request.", "Validation");
             return;
         }
 
         if (wallet is not null && wallet.CredentialId != credentialId)
         {
-            ToastService.Show("Selected wallet does not belong to the selected credential.");
+            ToastService.Warning("Selected wallet does not belong to the selected credential.", "Validation");
             return;
         }
 
@@ -445,7 +460,7 @@
             : wallet?.WalletTypeId;
         if (!walletId.HasValue && !walletTypeId.HasValue)
         {
-            ToastService.Show("Select an existing wallet or wallet type.");
+            ToastService.Warning("Select an existing wallet or wallet type.", "Validation");
             return;
         }
 
@@ -471,12 +486,23 @@
                 IdempotencyKey = $"control-panel-deposit:{Guid.NewGuid():N}"
             });
 
-            ToastService.Show(result.IsSuccess ? "Deposit request created." : result.Message ?? "Deposit request creation failed.");
             if (result.IsSuccess)
             {
+                ToastService.Success("Deposit request created.", "Wallets");
+                _createDialogOpen = false;
                 ResetCreateForm();
                 await LoadData();
             }
+            else
+            {
+                Logger.LogWarning("Deposit request creation failed: {Message}", result.Message);
+                ToastService.Error("Deposit request could not be created.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Deposit request creation failed.");
+            ToastService.Error("Deposit request could not be created.", "Wallets");
         }
         finally
         {
@@ -485,19 +511,59 @@
     }
 
     private async Task ApproveDeposit(DepositRequest item) =>
-        await RunUnsupportedAction(() => WalletsAdminContracts.ApproveDepositAsync(item.Id), "Deposit approval");
+        await ConfirmAndRunAction(
+            () => WalletsAdminContracts.ApproveDepositAsync(item.Id),
+            "Approve Deposit",
+            "Approve this deposit request?",
+            "Deposit approval",
+            false);
 
     private async Task RejectDeposit(DepositRequest item) =>
-        await RunUnsupportedAction(() => WalletsAdminContracts.RejectDepositAsync(item.Id), "Deposit rejection");
+        await ConfirmAndRunAction(
+            () => WalletsAdminContracts.RejectDepositAsync(item.Id),
+            "Reject Deposit",
+            "Reject this deposit request?",
+            "Deposit rejection",
+            true);
 
     private async Task SettleDeposit(DepositRequest item) =>
-        await RunUnsupportedAction(() => WalletsAdminContracts.SettleDepositAsync(item.Id), "Deposit settlement");
+        await ConfirmAndRunAction(
+            () => WalletsAdminContracts.SettleDepositAsync(item.Id),
+            "Settle Deposit",
+            "Settle this deposit request and create the ledger posting?",
+            "Deposit settlement",
+            false);
 
     private async Task FailDeposit(DepositRequest item) =>
-        await RunUnsupportedAction(() => WalletsAdminContracts.FailDepositAsync(item.Id), "Deposit failure");
+        await ConfirmAndRunAction(
+            () => WalletsAdminContracts.FailDepositAsync(item.Id),
+            "Fail Deposit",
+            "Mark this deposit request as failed?",
+            "Deposit failure",
+            true);
 
     private async Task CancelDeposit(DepositRequest item) =>
-        await RunUnsupportedAction(() => WalletsAdminContracts.CancelDepositAsync(item.Id), "Deposit cancellation");
+        await ConfirmAndRunAction(
+            () => WalletsAdminContracts.CancelDepositAsync(item.Id),
+            "Cancel Deposit",
+            "Cancel this deposit request?",
+            "Deposit cancellation",
+            true);
+
+    private async Task ConfirmAndRunAction(
+        Func<Task<CmdResponse>> action,
+        string title,
+        string description,
+        string label,
+        bool destructive)
+    {
+        if (!await DialogService.Confirm(title, description, new ConfirmDialogOptions { Destructive = destructive }))
+        {
+            return;
+        }
+
+        await RunUnsupportedAction(action, label);
+    }
 
     private async Task RunUnsupportedAction(Func<Task<CmdResponse>> action, string label)
     {
@@ -505,13 +571,49 @@
         try
         {
             var result = await action();
-            ToastService.Show(result.IsSuccess ? $"{label} submitted." : result.Message ?? $"{label} is not available.");
-            await LoadData();
+            if (result.IsSuccess)
+            {
+                ToastService.Success($"{label} submitted.", "Wallets");
+                await LoadData();
+            }
+            else
+            {
+                Logger.LogWarning("{Label} failed: {Message}", label, result.Message);
+                ToastService.Error($"{label} could not be completed.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "{Label} failed.", label);
+            ToastService.Error($"{label} could not be completed.", "Wallets");
         }
         finally
         {
             _acting = false;
         }
+    }
+
+    private void OpenCreateDialog()
+    {
+        ResetCreateForm();
+        _createDialogOpen = true;
+    }
+
+    private void CloseCreateDialog()
+    {
+        _createDialogOpen = false;
+        ResetCreateForm();
+    }
+
+    private Task OnCreateDialogChanged(bool open)
+    {
+        _createDialogOpen = open;
+        if (!open)
+        {
+            ResetCreateForm();
+        }
+
+        return Task.CompletedTask;
     }
 
     private void ResetSummary()

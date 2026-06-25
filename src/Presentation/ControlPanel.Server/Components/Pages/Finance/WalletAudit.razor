@@ -4,13 +4,18 @@
 
 <PageTitle>Wallet Audit - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <BbTypographyH3>Wallet Audit</BbTypographyH3>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
-            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-            Refresh
-        </BbButton>
+<div class="space-y-6">
+    <div class="xf-page-header">
+        <div>
+            <BbTypographyH3>Wallet Audit</BbTypographyH3>
+            <BbTypographyMuted>Inspect ledger postings and running balance movement.</BbTypographyMuted>
+        </div>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
     </div>
 
     @if (_loading)
@@ -29,19 +34,26 @@
     {
         <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
             <Columns>
-                <BbDataGridPropertyColumn Property="@(x => x.OperationId)" Title="Operation" />
-                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
-                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                <BbDataGridTemplateColumn Title="Direction">
+                <BbDataGridTemplateColumn Title="Operation" Filterable="true" FilterBy="@(item => GetOperationLabel(item.OperationId))">
+                    <ChildContent Context="item">@GetOperationLabel(item.OperationId)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Wallet" Filterable="true" FilterBy="@(item => GetWalletLabel(item.WalletId))">
+                    <ChildContent Context="item">@GetWalletLabel(item.WalletId)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridTemplateColumn Title="Direction" Filterable="true" FilterBy="@(item => item.Direction.ToString())">
                     <ChildContent Context="item">
                         <BbBadge Variant="BadgeVariant.Outline">@item.Direction</BbBadge>
                     </ChildContent>
                 </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.BalanceBucket)" Title="Bucket" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running Balance" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.BalanceBucket)" Title="Bucket" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running Balance" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
             </Columns>
+            <EmptyTemplate>
+                <BbEmpty Title="No audit entries found" Description="Ledger postings will appear here after wallet operations." />
+            </EmptyTemplate>
         </BbDataGrid>
     }
 </div>
@@ -51,8 +63,12 @@
     [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private WalletsControlPanelDisplayService DisplayService { get; set; } = default!;
+    [Inject] private ILogger<WalletAudit> Logger { get; set; } = default!;
 
     private List<WalletLedgerEntry> _items = [];
+    private IReadOnlyDictionary<Guid, string> _walletLabels = new Dictionary<Guid, string>();
+    private IReadOnlyDictionary<Guid, string> _operationLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
     private bool _hasTenant;
     private bool _moduleEnabled;
@@ -79,6 +95,8 @@
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting);
             _items = [];
+            _walletLabels = new Dictionary<Guid, string>();
+            _operationLabels = new Dictionary<Guid, string>();
 
             if (!_hasTenant || !_moduleEnabled)
             {
@@ -93,11 +111,16 @@
                 .OrderByDescending(x => x.CreatedAt);
 
             _items = await query.Take(200).ToListAsync();
+            _walletLabels = await DisplayService.LoadWalletLabelsAsync(tenantId, _items.Select(x => x.WalletId));
+            _operationLabels = await DisplayService.LoadOperationLabelsAsync(tenantId, _items.Select(x => (Guid?)x.OperationId));
         }
         catch (Exception ex)
         {
             _items = [];
-            ToastService.Show($"Failed to load wallet audit entries: {ex.Message}");
+            _walletLabels = new Dictionary<Guid, string>();
+            _operationLabels = new Dictionary<Guid, string>();
+            Logger.LogError(ex, "Failed to load wallet audit entries.");
+            ToastService.Error("Could not load wallet audit entries.", "Wallets");
         }
         finally
         {
@@ -105,6 +128,12 @@
             StateHasChanged();
         }
     }
+
+    private string GetWalletLabel(Guid? walletId) =>
+        DisplayService.WalletLabel(walletId, _walletLabels);
+
+    private string GetOperationLabel(Guid operationId) =>
+        DisplayService.OperationLabel(operationId, _operationLabels);
 
     public void Dispose()
     {

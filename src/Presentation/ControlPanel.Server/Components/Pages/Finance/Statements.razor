@@ -4,13 +4,13 @@
 
 <PageTitle>Wallet Statements - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<div class="space-y-6">
+    <div class="xf-page-header">
         <div>
             <BbTypographyH3>Statements & Reporting</BbTypographyH3>
             <BbTypographyMuted>Build tenant-level wallet reports from ledger and transaction records.</BbTypographyMuted>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="xf-page-actions">
             <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@GenerateFirstStatement" Disabled="@(_acting || _wallets.Count == 0)">
                 <LucideIcon Name="file-output" class="mr-2 h-4 w-4" />
                 Generate Statement
@@ -36,7 +36,7 @@
     }
     else
     {
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div class="xf-summary-grid xf-summary-grid-4">
             <BbCard>
                 <BbCardContent>
                     <div class="space-y-1 pt-4">
@@ -86,14 +86,16 @@
                     <BbCardContent>
                         <BbDataGrid Items="@_wallets" ShowPagination="true" InitialPageSize="20">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.DebitOnHoldBalance)" Title="Debit Hold" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.CreditOnHoldBalance)" Title="Credit Hold" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(item => GetCredentialLabel(item.CredentialId))">
+                                    <ChildContent Context="item">@GetCredentialLabel(item.CredentialId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DebitOnHoldBalance)" Title="Debit Hold" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreditOnHoldBalance)" Title="Credit Hold" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => GenerateStatement(item.Id))" Disabled="@_acting">
@@ -102,6 +104,9 @@
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No wallet balances found" Description="Wallet balances for the selected tenant will appear here." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
@@ -116,15 +121,20 @@
                     <BbCardContent>
                         <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running Balance" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Wallet" Filterable="true" FilterBy="@(item => GetWalletLabel(item.WalletId))">
+                                    <ChildContent Context="item">@GetWalletLabel(item.WalletId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running Balance" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No statement lines found" Description="Recent wallet transactions will appear here." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
@@ -139,9 +149,13 @@
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private WalletsControlPanelDisplayService DisplayService { get; set; } = default!;
+    [Inject] private ILogger<Statements> Logger { get; set; } = default!;
 
     private List<Wallet> _wallets = [];
     private List<WalletTransaction> _transactions = [];
+    private IReadOnlyDictionary<Guid, string> _walletLabels = new Dictionary<Guid, string>();
+    private IReadOnlyDictionary<Guid, string> _credentialLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
     private bool _acting;
     private bool _hasTenant;
@@ -193,6 +207,13 @@
                 .Take(500)
                 .ToListAsync();
 
+            _walletLabels = await DisplayService.LoadWalletLabelsAsync(
+                tenantId,
+                _wallets.Select(x => (Guid?)x.Id).Concat(_transactions.Select(x => (Guid?)x.WalletId)));
+            _credentialLabels = await DisplayService.LoadCredentialLabelsAsync(
+                tenantId,
+                _wallets.Select(x => (Guid?)x.CredentialId));
+
             _totalBalance = _wallets.Sum(x => x.Balance);
             _creditAmount = _transactions.Where(x => x.TransactionType == TransactionType.Credit).Sum(x => Math.Abs(x.Amount));
             _debitAmount = _transactions.Where(x => x.TransactionType == TransactionType.Debit).Sum(x => Math.Abs(x.Amount));
@@ -201,7 +222,8 @@
         catch (Exception ex)
         {
             ResetData();
-            ToastService.Show($"Failed to load wallet reporting data: {ex.Message}");
+            Logger.LogError(ex, "Failed to load wallet reporting data.");
+            ToastService.Error("Could not load wallet reporting data.", "Wallets");
         }
         finally
         {
@@ -222,7 +244,20 @@
         try
         {
             var result = await WalletsAdminContracts.GenerateStatementAsync(walletId);
-            ToastService.Show(result.IsSuccess ? "Statement generation submitted." : result.Message ?? "Statement generation is not available.");
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Statement generation submitted.", "Wallets");
+            }
+            else
+            {
+                Logger.LogWarning("Statement generation failed: {Message}", result.Message);
+                ToastService.Error("Statement generation could not be submitted.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Statement generation failed.");
+            ToastService.Error("Statement generation could not be submitted.", "Wallets");
         }
         finally
         {
@@ -234,11 +269,19 @@
     {
         _wallets = [];
         _transactions = [];
+        _walletLabels = new Dictionary<Guid, string>();
+        _credentialLabels = new Dictionary<Guid, string>();
         _totalBalance = 0;
         _creditAmount = 0;
         _debitAmount = 0;
         _feeAmount = 0;
     }
+
+    private string GetWalletLabel(Guid walletId) =>
+        DisplayService.WalletLabel(walletId, _walletLabels);
+
+    private string GetCredentialLabel(Guid credentialId) =>
+        DisplayService.CredentialLabel(credentialId, _credentialLabels);
 
     public void Dispose()
     {

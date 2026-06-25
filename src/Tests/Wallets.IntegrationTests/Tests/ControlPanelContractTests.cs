@@ -48,6 +48,41 @@ public sealed class ControlPanelContractTests
         ("OutboxWebhooks.razor", "outbox-messages", ["outbox-messages", "webhook-audit"])
     ];
 
+    private static readonly string[] WalletFinancePagesWithGrids =
+    [
+        "Wallets.razor",
+        "DepositRequests.razor",
+        "WithdrawalRequests.razor",
+        "BatchOperations.razor",
+        "Transfers.razor",
+        "WalletOperations.razor",
+        "Statements.razor",
+        "WalletAudit.razor",
+        "Reconciliation.razor",
+        "OutboxWebhooks.razor",
+        "WalletApprovals.razor",
+        "PolicyDecisions.razor",
+        "RefundsDisputes.razor",
+        "WalletDetail.razor"
+    ];
+
+    private static readonly (string Page, string DialogTitle)[] HeaderDialogMutationPages =
+    [
+        ("DepositRequests.razor", "Create Deposit"),
+        ("WithdrawalRequests.razor", "Create Withdrawal"),
+        ("BatchOperations.razor", "Submit Batch"),
+        ("RefundsDisputes.razor", "Open Case")
+    ];
+
+    private static readonly string[] PickerDialogMutationPages =
+    [
+        "DepositRequests.razor",
+        "WithdrawalRequests.razor",
+        "BatchOperations.razor",
+        "RefundsDisputes.razor",
+        "Wallets.razor"
+    ];
+
     [Test]
     public void WalletsFinancePages_FinancialWorkflowMutations_DoNotUseDirectRemoteDataContextMutation()
     {
@@ -64,6 +99,166 @@ public sealed class ControlPanelContractTests
             .ToArray();
 
         offenders.Should().BeEmpty("Wallets financial workflows must go through Wallets service wrappers or API workflows");
+    }
+
+    [Test]
+    public void WalletsFinancePages_DoNotUseRawTablesNativeSelectsOrSaveChanges()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+        var offenders = Directory.EnumerateFiles(pagesRoot.FullName, "*.razor", SearchOption.TopDirectoryOnly)
+            .Select(path => (Path: Path.GetRelativePath(repositoryRoot.FullName, path), Text: File.ReadAllText(path)))
+            .SelectMany(page =>
+            {
+                var issues = new List<string>();
+                if (Regex.IsMatch(page.Text, @"<table\b", RegexOptions.IgnoreCase))
+                    issues.Add($"{page.Path} uses a raw table");
+                if (Regex.IsMatch(page.Text, @"<select\b", RegexOptions.IgnoreCase))
+                    issues.Add($"{page.Path} uses a native select");
+                if (Regex.IsMatch(page.Text, @"DataContext\.(?:Add|Update|Remove|SaveChangesAsync)\b"))
+                    issues.Add($"{page.Path} uses direct financial DataContext mutation");
+
+                return issues;
+            })
+            .ToArray();
+
+        offenders.Should().BeEmpty("Wallets finance pages should use BlazorBlueprint controls and service-backed mutations");
+    }
+
+    [Test]
+    public void WalletsListReportMutationFlows_LaunchFromHeaderDialogs()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+
+        foreach (var (page, dialogTitle) in HeaderDialogMutationPages)
+        {
+            var text = File.ReadAllText(Path.Combine(pagesRoot.FullName, page));
+
+            text.Should().Contain("<div class=\"xf-page-header\">", $"{page} should use the shared page header");
+            text.Should().Contain("<div class=\"xf-page-actions\">", $"{page} should expose create actions in the header action group");
+            text.Should().Contain("<BbDialog Open=", $"{page} should launch mutation forms from a focused dialog");
+            text.Should().Contain($"<BbDialogTitle>{dialogTitle}</BbDialogTitle>");
+        }
+
+        var policyText = File.ReadAllText(Path.Combine(pagesRoot.FullName, "PolicyDecisions.razor"));
+        policyText.Should().Contain("<BbDialogTitle>New Policy Rule</BbDialogTitle>");
+        policyText.Should().Contain("<BbDialogTitle>New Fee Schedule</BbDialogTitle>");
+    }
+
+    [Test]
+    public void WalletsListReportPages_DoNotKeepInlineMutationCards()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+
+        var forbiddenCards = new[]
+        {
+            ("DepositRequests.razor", "<BbCardTitle>Create Deposit Request</BbCardTitle>"),
+            ("WithdrawalRequests.razor", "<BbCardTitle>Create Withdrawal Request</BbCardTitle>"),
+            ("BatchOperations.razor", "<BbCardTitle>Submit Batch Item</BbCardTitle>"),
+            ("RefundsDisputes.razor", "<BbCardTitle>Open Refund / Dispute Case</BbCardTitle>"),
+            ("PolicyDecisions.razor", "<BbCardTitle>Policy Rule</BbCardTitle>"),
+            ("PolicyDecisions.razor", "<BbCardTitle>Fee Schedule</BbCardTitle>")
+        };
+
+        foreach (var (page, forbidden) in forbiddenCards)
+        {
+            var text = File.ReadAllText(Path.Combine(pagesRoot.FullName, page));
+            text.Should().NotContain(forbidden, $"{page} should not stack inline create/update form cards above grids");
+        }
+    }
+
+    [Test]
+    public void WalletsDialogsWithEntityPickers_DisableFocusTrapForPortaledPickers()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+
+        foreach (var page in PickerDialogMutationPages)
+        {
+            var text = File.ReadAllText(Path.Combine(pagesRoot.FullName, page));
+            var dialogBlocks = Regex.Matches(text, @"<BbDialog[\s\S]*?</BbDialog>")
+                .Cast<Match>()
+                .Where(match => match.Value.Contains("<XfEntityPicker", StringComparison.Ordinal))
+                .ToArray();
+
+            dialogBlocks.Should().NotBeEmpty($"{page} should keep picker-based mutations in dialogs");
+            dialogBlocks.Should().OnlyContain(
+                block => block.Value.Contains("TrapFocus=\"false\"", StringComparison.Ordinal),
+                $"{page} dialogs containing XfEntityPicker must not trap focus around portaled picker popovers/dialogs");
+        }
+    }
+
+    [Test]
+    public void WalletsFinanceGrids_DefineEmptyStatesAndColumnFiltering()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+
+        foreach (var page in WalletFinancePagesWithGrids)
+        {
+            var text = File.ReadAllText(Path.Combine(pagesRoot.FullName, page));
+            var grids = Regex.Matches(text, @"<BbDataGrid\b[\s\S]*?</BbDataGrid>")
+                .Cast<Match>()
+                .Select(match => match.Value)
+                .ToArray();
+
+            grids.Should().NotBeEmpty($"{page} should use BbDataGrid for data-heavy wallet UI");
+            grids.Should().OnlyContain(grid => grid.Contains("<EmptyTemplate>", StringComparison.Ordinal),
+                $"{page} grids should render an explicit BbEmpty state");
+
+            foreach (var grid in grids)
+            {
+                foreach (Match propertyColumn in Regex.Matches(grid, @"<BbDataGridPropertyColumn\b[^>]*>?", RegexOptions.Multiline))
+                {
+                    propertyColumn.Value.Should().Contain("Filterable=\"true\"",
+                        $"{page} property data columns should use native filtering");
+                }
+
+                foreach (Match templateColumn in Regex.Matches(grid, @"<BbDataGridTemplateColumn\b[^>]*Title=""(?<title>[^""]+)""[\s\S]*?</BbDataGridTemplateColumn>"))
+                {
+                    var title = templateColumn.Groups["title"].Value;
+                    if (title.Equals("Actions", StringComparison.OrdinalIgnoreCase))
+                    {
+                        templateColumn.Value.Should().NotContain("Filterable=\"true\"",
+                            $"{page} action columns should remain unfiltered");
+                        continue;
+                    }
+
+                    templateColumn.Value.Should().Contain("Filterable=\"true\"",
+                        $"{page} template data column '{title}' should be filterable");
+                    templateColumn.Value.Should().Contain("FilterBy=",
+                        $"{page} template data column '{title}' should filter by rendered user-facing text");
+                }
+            }
+        }
+    }
+
+    [Test]
+    public void WalletsFinancePages_DoNotRenderRawDiagnosticMessages()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetFinancePagesRoot(repositoryRoot);
+        var offenders = Directory.EnumerateFiles(pagesRoot.FullName, "*.razor", SearchOption.TopDirectoryOnly)
+            .Select(path => (Path: Path.GetRelativePath(repositoryRoot.FullName, path), Text: File.ReadAllText(path)))
+            .SelectMany(page =>
+            {
+                var issues = new List<string>();
+                if (page.Text.Contains("ToastService.Show", StringComparison.Ordinal))
+                    issues.Add($"{page.Path} uses generic/raw ToastService.Show");
+
+                if (Regex.IsMatch(page.Text, @"ToastService\.(?:Success|Info|Warning|Error)\s*\([^;]*(?:ex|result|response)\.Message"))
+                    issues.Add($"{page.Path} renders raw exception or wrapper messages in toasts");
+
+                if (Regex.IsMatch(page.Text, @"<BbDataGridPropertyColumn\b[^>]*Property=""@\([^""]*\.(?:LastError|ProcessingError|FailureMessage|ActorCredentialId|AggregateId)"))
+                    issues.Add($"{page.Path} renders raw diagnostic or technical id property columns");
+
+                return issues;
+            })
+            .ToArray();
+
+        offenders.Should().BeEmpty("diagnostic details should be logged or summarized instead of rendered directly");
     }
 
     [Test]
@@ -190,6 +385,12 @@ public sealed class ControlPanelContractTests
 
         mainLayout.Should().Contain("TryGetWalletDetailRoute", "wallet detail routes should replace the main module nav with the detail sidebar");
         mainLayout.Should().Contain("<WalletDetailSidebar WalletId=\"@walletRouteId\" />");
+        mainLayout.Should().Contain("BuildWalletBreadcrumbs(walletId, section)",
+            "wallet detail breadcrumbs should not humanize raw GUID route segments");
+        mainLayout.Should().Contain("RefreshWalletBreadcrumbLabel(walletId)",
+            "wallet detail breadcrumbs should resolve a read-only wallet label");
+        mainLayout.Should().Contain("WalletsControlPanelDisplayService.BuildWalletLabel(wallet)",
+            "wallet detail breadcrumbs should prefer account and wallet metadata before a short-id fallback");
 
         sidebar.Should().Contain("Wallet List");
         sidebar.Should().Contain("SectionHref(\"summary\")");
