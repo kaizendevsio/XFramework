@@ -1,4 +1,3 @@
-@using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
 <PageTitle>@CurrentSection.Title - Control Panel</PageTitle>
@@ -33,8 +32,8 @@ else
                     <BbTypographyMuted>Communication controls for @(_guard?.TenantName ?? "selected tenant")</BbTypographyMuted>
                 </div>
                 <div class="xf-page-actions">
-                    <BbButton Variant="ButtonVariant.Outline" OnClick="@RefreshOverview" Disabled="@_overviewRefreshing">
-                        @if (_overviewRefreshing)
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@RefreshSettingsShell" Disabled="@_refreshing">
+                        @if (_refreshing)
                         {
                             <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                         }
@@ -45,45 +44,6 @@ else
                         Refresh
                     </BbButton>
                 </div>
-            </div>
-
-            <div class="xf-summary-grid xf-summary-grid-4">
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Threads</BbCardTitle>
-                        <BbCardDescription>Tenant records</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <BbTypographyH2>@_threadCount</BbTypographyH2>
-                    </BbCardContent>
-                </BbCard>
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Users</BbCardTitle>
-                        <BbCardDescription>Chat access</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <BbTypographyH2>@_messagingUserCount</BbTypographyH2>
-                    </BbCardContent>
-                </BbCard>
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Reports</BbCardTitle>
-                        <BbCardDescription>Open items</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <BbTypographyH2>@_openReportCount</BbTypographyH2>
-                    </BbCardContent>
-                </BbCard>
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Outbox</BbCardTitle>
-                        <BbCardDescription>Pending events</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <BbTypographyH2>@_pendingOutboxCount</BbTypographyH2>
-                    </BbCardContent>
-                </BbCard>
             </div>
 
             <div class="messaging-settings-layout">
@@ -117,7 +77,6 @@ else
 @code {
     [Parameter] public string? SectionKey { get; set; }
 
-    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
@@ -132,11 +91,7 @@ else
 
     private MessagingControlPanelGuardResult? _guard;
     private bool _loading = true;
-    private bool _overviewRefreshing;
-    private int _threadCount;
-    private int _messagingUserCount;
-    private int _openReportCount;
-    private int _pendingOutboxCount;
+    private bool _refreshing;
 
     private SettingsSection CurrentSection =>
         Sections.FirstOrDefault(section => string.Equals(section.SectionKey, SectionKey, StringComparison.OrdinalIgnoreCase))
@@ -157,9 +112,9 @@ else
         });
     }
 
-    private async Task RefreshOverview()
+    private async Task RefreshSettingsShell()
     {
-        _overviewRefreshing = true;
+        _refreshing = true;
 
         try
         {
@@ -167,50 +122,17 @@ else
         }
         finally
         {
-            _overviewRefreshing = false;
+            _refreshing = false;
         }
     }
 
     private async Task LoadData(bool showFeedback = false)
     {
         _loading = !showFeedback;
-        ResetCounts();
 
         try
         {
             _guard = await Guard.GetCurrentTenantStateAsync();
-            if (!_guard.IsEnabled || _guard.TenantId is not Guid tenantId)
-            {
-                return;
-            }
-
-            _threadCount = await DataContext.Query<MessageThread>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .CountAsync();
-
-            var members = await DataContext.Query<MessageThreadMember>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .Take(1000)
-                .ToListAsync();
-            _messagingUserCount = members.Select(x => x.CredentialId).Distinct().Count();
-
-            _openReportCount = await DataContext.Query<MessageReport>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .Where(x => x.Status == MessageReportStatuses.Open)
-                .CountAsync();
-
-            _pendingOutboxCount = await DataContext.Query<MessageOutboxEvent>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .Where(x => x.ProcessedAt == null)
-                .CountAsync();
         }
         catch
         {
@@ -223,14 +145,6 @@ else
         {
             _loading = false;
         }
-    }
-
-    private void ResetCounts()
-    {
-        _threadCount = 0;
-        _messagingUserCount = 0;
-        _openReportCount = 0;
-        _pendingOutboxCount = 0;
     }
 
     public void Dispose()
