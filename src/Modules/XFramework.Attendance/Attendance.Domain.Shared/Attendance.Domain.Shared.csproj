@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>XFramework.Attendance.Domain.Shared</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Attendance domain contracts, attendance records, and reporting contracts.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\XFramework.Bolt\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />
+    </ItemGroup>
+
+</Project>
+

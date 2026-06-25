@@ -63,8 +63,13 @@ if command -v ufw &> /dev/null; then
     ufw allow 7000/tcp   comment 'StreamFlow'
     ufw allow 8261/tcp   comment 'IdentityServer'
     ufw allow 5148/tcp   comment 'Messaging'
+    ufw allow 5166/tcp   comment 'Notifications'
+    ufw allow 5182/tcp   comment 'Attendance'
     ufw allow 5274/tcp   comment 'SmsGateway'
     ufw allow 9696/tcp   comment 'Wallets'
+    ufw allow 8105/tcp   comment 'Inventario'
+    ufw allow 5000/tcp   comment 'ControlPanel'
+    ufw allow 5050/tcp   comment 'OperationsDashboard'
     ufw --force enable
     echo "UFW firewall configured."
 else

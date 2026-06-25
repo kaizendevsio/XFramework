@@ -8,6 +8,7 @@ public static class TestCategories
     public const string IdentityServer = "Module:IdentityServer";
     public const string Wallets = "Module:Wallets";
     public const string Inventario = "Module:Inventario";
+    public const string Attendance = "Module:Attendance";
 
     public const string Auth = "Area:Auth";
     public const string DataContext = "Area:DataContext";

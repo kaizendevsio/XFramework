@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>XFramework.Attendance.Integration</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Attendance service wrapper for cross-module Bolt RPC calls.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\SourceGenerators\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+        <ProjectReference Include="..\Attendance.Domain.Shared\Attendance.Domain.Shared.csproj" />
+    </ItemGroup>
+
+</Project>
+

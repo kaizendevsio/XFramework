@@ -43,6 +43,12 @@
     <Project Path="src\Modules\XFramework.Notifications\Notifications.Integration\Notifications.Integration.csproj" />
     <Project Path="src\Modules\XFramework.Notifications\Notifications.Tests\Notifications.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Attendance/">
+    <Project Path="src\Modules\XFramework.Attendance\Attendance.Api\Attendance.Api.csproj" />
+    <Project Path="src\Modules\XFramework.Attendance\Attendance.Domain.Shared\Attendance.Domain.Shared.csproj" />
+    <Project Path="src\Modules\XFramework.Attendance\Attendance.Integration\Attendance.Integration.csproj" />
+    <Project Path="src\Modules\XFramework.Attendance\Attendance.Tests\Attendance.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Payments/">
     <Project Path="src\Modules\XFramework.Payments\Payments.Core\Payments.Core.csproj" />
     <Project Path="src\Modules\XFramework.Payments\Payments.Domain.Shared\Payments.Domain.Shared.csproj" />
@@ -77,6 +83,7 @@
     <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
   </Folder>
   <Folder Name="/Tests/">
+    <Project Path="src\Tests\Attendance.IntegrationTests\Attendance.IntegrationTests.csproj" />
     <Project Path="src\Tests\ControlPanel.E2ETests\ControlPanel.E2ETests.csproj" />
     <Project Path="src\Tests\Inventario.Api.Tests\Inventario.Api.Tests.csproj" />
     <Project Path="src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.csproj" />
