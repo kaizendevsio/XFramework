@@ -10,32 +10,13 @@
 else
 {
     <div class="messaging-settings-editor space-y-6">
-        <div class="xf-page-header">
+        <div class="messaging-settings-editor-heading">
             <div>
                 <BbTypographyH3>@Title</BbTypographyH3>
                 <BbTypographyMuted>@Description</BbTypographyMuted>
             </div>
-            <div class="xf-page-actions">
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@RefreshSettings" Disabled="@_saving">
-                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                    Refresh
-                </BbButton>
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@ResetToDefaults" Disabled="@(_saving || _schema is null)">
-                    <LucideIcon Name="rotate-ccw" class="mr-2 h-4 w-4" />
-                    Defaults
-                </BbButton>
-                <BbButton OnClick="@SaveSettings" Disabled="@(_saving || _schema is null || !_dirty)">
-                    @if (_saving)
-                    {
-                        <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                    }
-                    else
-                    {
-                        <LucideIcon Name="save" class="mr-2 h-4 w-4" />
-                    }
-                    Save
-                </BbButton>
-            </div>
+            <StatusBadge Text="@(_dirty ? "Unsaved" : "Current")"
+                         Status="@(_dirty ? "pending" : "active")" />
         </div>
 
         @if (_error is not null)
@@ -61,16 +42,26 @@ else
             }
             else
             {
+                @if (_templateTokens.Count > 0)
+                {
+                    <BbAlert Variant="AlertVariant.Info">
+                        <BbAlertTitle>Template Tokens</BbAlertTitle>
+                        <BbAlertDescription>
+                            <span class="messaging-settings-token-help">
+                                Use
+                                @foreach (var token in _templateTokens)
+                                {
+                                    <BbBadge Variant="BadgeVariant.Outline">@token</BbBadge>
+                                }
+                                in message templates where those generated values should appear.
+                            </span>
+                        </BbAlertDescription>
+                    </BbAlert>
+                }
+
                 <BbCard>
                     <BbCardHeader>
-                        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <BbCardTitle>@Title</BbCardTitle>
-                                <BbCardDescription>@_settingsSummary</BbCardDescription>
-                            </div>
-                            <StatusBadge Text="@(_dirty ? "Unsaved" : "Current")"
-                                         Status="@(_dirty ? "pending" : "active")" />
-                        </div>
+                        <BbCardDescription>@_settingsSummary</BbCardDescription>
                     </BbCardHeader>
                     <BbCardContent>
                         <BbDynamicForm Schema="@_schema"
@@ -80,37 +71,82 @@ else
                                        Layout="FormLayout.Vertical"
                                        Columns="2"
                                        Disabled="@_saving"
+                                       Class="messaging-settings-form"
                                        ShowSubmitButton="false"
                                        ShowValidationSummary="true" />
                     </BbCardContent>
                 </BbCard>
 
                 <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Setting Sources</BbCardTitle>
-                        <BbCardDescription>Stored values override defaults for the selected tenant.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <BbDataGrid Items="@_visibleSettings" ShowPagination="true" InitialPageSize="10">
-                            <Columns>
-                                <BbDataGridPropertyColumn Property="@(item => item.Label)" Title="Setting" Sortable="true" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(item => item.GroupName)" Title="Group" Sortable="true" Filterable="true" />
-                                <BbDataGridTemplateColumn Title="Source" Sortable="true" Filterable="true" FilterBy="@(item => item.Source)">
-                                    <ChildContent Context="item">
-                                        <StatusBadge Text="@item.Source"
-                                                     Status="@(item.Source == MessagingSettingSources.Stored ? "active" : "pending")" />
-                                    </ChildContent>
-                                </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Value" Filterable="true" FilterBy="@(item => item.Value)">
-                                    <ChildContent Context="item">@FormatPreview(item)</ChildContent>
-                                </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Updated" Sortable="true" Filterable="true" FilterBy="@(item => item.LastUpdated)">
-                                    <ChildContent Context="item">@(item.LastUpdated?.ToString("g") ?? "Default")</ChildContent>
-                                </BbDataGridTemplateColumn>
-                            </Columns>
-                        </BbDataGrid>
-                    </BbCardContent>
+                    <BbCollapsible @key="SectionKey"
+                                   @bind-Open="_sourcesOpen"
+                                   class="messaging-settings-sources">
+                        <div class="messaging-settings-sources-summary">
+                            <div>
+                                <BbCardTitle>Sources &amp; audit</BbCardTitle>
+                                <BbCardDescription>Registry keys, source precedence, stored overrides, and last-updated metadata.</BbCardDescription>
+                            </div>
+                            <BbCollapsibleTrigger>
+                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" class="messaging-settings-sources-button">
+                                    <LucideIcon Name="@(_sourcesOpen ? "chevron-up" : "chevron-down")" class="h-4 w-4" />
+                                    <span>@(_sourcesOpen ? "Hide audit" : "Show audit")</span>
+                                </BbButton>
+                            </BbCollapsibleTrigger>
+                        </div>
+                        <BbCollapsibleContent ForceMount="false">
+                            <BbCardContent>
+                                <BbDataGrid Items="@_visibleSettings" ShowPagination="true" InitialPageSize="10">
+                                    <Columns>
+                                        <BbDataGridPropertyColumn Property="@(item => item.Label)" Title="Setting" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(item => item.GroupName)" Title="Group" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(item => item.Key)" Title="Key" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Source" Sortable="true" Filterable="true" FilterBy="@(item => item.Source)">
+                                            <ChildContent Context="item">
+                                                <StatusBadge Text="@item.Source"
+                                                             Status="@(item.Source == MessagingSettingSources.Stored ? "active" : "pending")" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Value" Filterable="true" FilterBy="@(item => FormatPreview(item))">
+                                            <ChildContent Context="item">@FormatPreview(item)</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Updated" Sortable="true" Filterable="true" FilterBy="@(item => item.LastUpdated)">
+                                            <ChildContent Context="item">@(item.LastUpdated?.ToString("g") ?? "Default")</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                    </Columns>
+                                </BbDataGrid>
+                            </BbCardContent>
+                        </BbCollapsibleContent>
+                    </BbCollapsible>
                 </BbCard>
+
+                <div class="messaging-settings-command-bar">
+                    <div class="messaging-settings-command-state">
+                        <StatusBadge Text="@(_dirty ? "Unsaved" : "Current")"
+                                     Status="@(_dirty ? "pending" : "active")" />
+                        <span>@_settingsSummary</span>
+                    </div>
+                    <div class="xf-page-actions">
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@RefreshSettings" Disabled="@_saving">
+                            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                            Refresh
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@ResetToDefaults" Disabled="@(_saving || _schema is null)">
+                            <LucideIcon Name="rotate-ccw" class="mr-2 h-4 w-4" />
+                            Reset section
+                        </BbButton>
+                        <BbButton OnClick="@SaveSettings" Disabled="@(_saving || _schema is null || !_dirty)">
+                            @if (_saving)
+                            {
+                                <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                            }
+                            else
+                            {
+                                <LucideIcon Name="save" class="mr-2 h-4 w-4" />
+                            }
+                            Save
+                        </BbButton>
+                    </div>
+                </div>
             }
         }
     </div>
@@ -125,15 +161,19 @@ else
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
+    private const decimal BytesPerMegabyte = 1024m * 1024m;
+
     private MessagingSettingsResponse? _settings;
     private FormSchema? _schema;
     private Dictionary<string, object> _formValues = [];
     private List<MessagingSettingValueResponse> _visibleSettings = [];
     private List<string> _validationErrors = [];
+    private List<string> _templateTokens = [];
     private string _settingsSummary = "Tenant-scoped Messaging configuration.";
     private bool _loading = true;
     private bool _saving;
     private bool _dirty;
+    private bool _sourcesOpen;
     private string? _error;
 
     protected override async Task OnInitializedAsync()
@@ -172,6 +212,8 @@ else
         _settings = null;
         _visibleSettings = [];
         _formValues = [];
+        _templateTokens = [];
+        _sourcesOpen = false;
         _dirty = false;
 
         try
@@ -229,10 +271,12 @@ else
             setting => ToFormValue(setting),
             StringComparer.OrdinalIgnoreCase);
 
+        _templateTokens = BuildTemplateTokens(_visibleSettings);
+
         _schema = new FormSchema
         {
-            Title = Title,
-            Description = Description,
+            Title = string.Empty,
+            Description = string.Empty,
             Columns = 2,
             Sections = groups
                 .Select(group => new FormSectionDefinition
@@ -249,6 +293,7 @@ else
 
         var storedCount = _visibleSettings.Count(x => x.Source == MessagingSettingSources.Stored);
         _settingsSummary = $"{storedCount} stored value(s), {_visibleSettings.Count - storedCount} default value(s)";
+        _sourcesOpen = false;
         _dirty = false;
     }
 
@@ -405,14 +450,17 @@ else
         return new FormFieldDefinition
         {
             Name = GetFieldName(setting),
-            Label = setting.Label,
-            Description = $"{setting.Description} Key: {setting.Key}",
+            Label = FormatFieldLabel(setting),
+            Description = BuildFieldDescription(setting),
             Type = ToFieldType(setting.ValueKind),
             Required = validations.Any(x => x.Type == ValidationType.Required),
             ColSpan = setting.ValueKind == MessagingSettingValueKind.Template ? 2 : 1,
+            Placeholder = BuildPlaceholder(setting),
+            DefaultValue = ToFormValue(setting with { Value = setting.DefaultValue }),
             Options = setting.Options
                 .Select(option => new SelectOption<string>(option, option))
                 .ToList(),
+            Metadata = BuildFieldMetadata(setting),
             Validations = validations
         };
     }
@@ -423,6 +471,7 @@ else
             MessagingSettingValueKind.Boolean => FieldType.Switch,
             MessagingSettingValueKind.Number => FieldType.Number,
             MessagingSettingValueKind.Option => FieldType.Select,
+            MessagingSettingValueKind.Csv => FieldType.Tags,
             MessagingSettingValueKind.Template => FieldType.Textarea,
             _ => FieldType.Text
         };
@@ -431,6 +480,8 @@ else
         setting.ValueKind switch
         {
             MessagingSettingValueKind.Boolean => bool.TryParse(setting.Value, out var parsed) && parsed,
+            MessagingSettingValueKind.Csv => SplitCsv(setting.Value),
+            MessagingSettingValueKind.Number when IsBytes(setting) => ToMegabytes(setting.Value),
             MessagingSettingValueKind.Number => long.TryParse(setting.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0,
             _ => setting.Value
         };
@@ -440,6 +491,24 @@ else
         if (!_formValues.TryGetValue(GetFieldName(setting), out var value) || value is null)
         {
             return string.Empty;
+        }
+
+        if (setting.ValueKind == MessagingSettingValueKind.Csv && value is not string)
+        {
+            return value switch
+            {
+                IEnumerable<string> strings => string.Join(',', strings.Select(x => x.Trim()).Where(x => x.Length > 0)),
+                IEnumerable<object> objects => string.Join(',', objects.Select(x => x?.ToString()?.Trim()).Where(x => !string.IsNullOrWhiteSpace(x))),
+                _ => string.Empty
+            };
+        }
+
+        if (IsBytes(setting))
+        {
+            var megabytes = ConvertFormValueToString(value);
+            return decimal.TryParse(megabytes, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed)
+                ? decimal.Round(parsed * BytesPerMegabyte, 0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture)
+                : string.Empty;
         }
 
         return value switch
@@ -454,6 +523,110 @@ else
     private static string GetFieldName(MessagingSettingValueResponse setting) =>
         $"{setting.GroupName}::{setting.Key}";
 
+    private static bool IsBytes(MessagingSettingValueResponse setting) =>
+        string.Equals(setting.Unit, "bytes", StringComparison.OrdinalIgnoreCase);
+
+    private static decimal ToMegabytes(string value)
+    {
+        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var bytes))
+        {
+            return 0m;
+        }
+
+        return decimal.Round(bytes / BytesPerMegabyte, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static List<string> SplitCsv(string value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(x => x.Length > 0)
+                .ToList();
+
+    private static string ConvertFormValueToString(object value) =>
+        value switch
+        {
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
+            _ => value.ToString()?.Trim() ?? string.Empty
+        };
+
+    private static string FormatFieldLabel(MessagingSettingValueResponse setting)
+    {
+        var unit = GetDisplayUnit(setting);
+        return string.IsNullOrWhiteSpace(unit) ? setting.Label : $"{setting.Label} ({unit})";
+    }
+
+    private static string BuildFieldDescription(MessagingSettingValueResponse setting)
+    {
+        var description = setting.Description;
+        return setting.ValueKind switch
+        {
+            MessagingSettingValueKind.Csv => $"{description} Add one value at a time.",
+            MessagingSettingValueKind.Number when IsBytes(setting) => $"{description} Enter the value in megabytes.",
+            MessagingSettingValueKind.Number when string.Equals(setting.Unit, "per-minute", StringComparison.OrdinalIgnoreCase) => $"{description} Enter requests per minute.",
+            MessagingSettingValueKind.Number when string.Equals(setting.Unit, "minutes", StringComparison.OrdinalIgnoreCase) => $"{description} Enter whole minutes.",
+            MessagingSettingValueKind.Number when string.Equals(setting.Unit, "days", StringComparison.OrdinalIgnoreCase) => $"{description} Enter whole days.",
+            _ => description
+        };
+    }
+
+    private static string? BuildPlaceholder(MessagingSettingValueResponse setting) =>
+        setting.ValueKind switch
+        {
+            MessagingSettingValueKind.Csv => "Add value",
+            MessagingSettingValueKind.Template when setting.Description.Contains("|Value|", StringComparison.OrdinalIgnoreCase) => "Use |Value| where the generated code should appear",
+            MessagingSettingValueKind.Template when setting.Description.Contains("|Token|", StringComparison.OrdinalIgnoreCase) => "Use |Token| where the reset token should appear",
+            MessagingSettingValueKind.Text when string.Equals(setting.Unit, "guid", StringComparison.OrdinalIgnoreCase) => "Optional GUID",
+            _ => null
+        };
+
+    private static Dictionary<string, object> BuildFieldMetadata(MessagingSettingValueResponse setting)
+    {
+        var metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        if (setting.ValueKind == MessagingSettingValueKind.Template)
+        {
+            metadata["rows"] = 5;
+        }
+
+        if (setting.ValueKind == MessagingSettingValueKind.Number)
+        {
+            metadata["min"] = 0;
+        }
+
+        return metadata;
+    }
+
+    private static string? GetDisplayUnit(MessagingSettingValueResponse setting) =>
+        setting.Unit?.ToLowerInvariant() switch
+        {
+            "bytes" => "MB",
+            "count" => "count",
+            "minutes" => "minutes",
+            "days" => "days",
+            "per-minute" => "per minute",
+            _ => null
+        };
+
+    private static List<string> BuildTemplateTokens(IEnumerable<MessagingSettingValueResponse> settings)
+    {
+        var tokens = new List<string>();
+        foreach (var setting in settings.Where(x => x.ValueKind == MessagingSettingValueKind.Template))
+        {
+            if (setting.Description.Contains("|Value|", StringComparison.OrdinalIgnoreCase))
+            {
+                tokens.Add("|Value|");
+            }
+
+            if (setting.Description.Contains("|Token|", StringComparison.OrdinalIgnoreCase))
+            {
+                tokens.Add("|Token|");
+            }
+        }
+
+        return tokens.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
     private static string FormatPreview(MessagingSettingValueResponse setting)
     {
         if (string.IsNullOrWhiteSpace(setting.Value))
@@ -461,7 +634,16 @@ else
             return "N/A";
         }
 
-        return setting.Value.Length <= 96 ? setting.Value : $"{setting.Value[..96]}...";
+        var value = setting.ValueKind switch
+        {
+            MessagingSettingValueKind.Boolean when bool.TryParse(setting.Value, out var boolean) => boolean ? "Enabled" : "Disabled",
+            MessagingSettingValueKind.Csv => string.Join(", ", SplitCsv(setting.Value)),
+            MessagingSettingValueKind.Number when IsBytes(setting) => $"{ToMegabytes(setting.Value):0.##} MB",
+            MessagingSettingValueKind.Number when !string.IsNullOrWhiteSpace(GetDisplayUnit(setting)) => $"{setting.Value} {GetDisplayUnit(setting)}",
+            _ => setting.Value
+        };
+
+        return value.Length <= 96 ? value : $"{value[..96]}...";
     }
 
     public void Dispose()
