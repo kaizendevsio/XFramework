@@ -36,8 +36,9 @@ else
     <FadeInContent>
     <div class="space-y-6">
         @* Header *@
-        <div class="flex items-center gap-4">
+        <div class="xf-page-header">
             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                      AriaLabel="Back to wallets"
                       OnClick="@GoBack">
                 <LucideIcon Name="arrow-left" class="h-4 w-4" />
             </BbButton>
@@ -46,10 +47,10 @@ else
                     Wallet: @(_wallet.AccountNumber ?? _wallet.Id.ToString()[..8] + "...")
                 </BbTypographyH3>
                 <BbTypographyMuted>
-                    ID: @_wallet.Id &mdash; Type: @(_wallet.WalletType?.Name ?? "N/A")
+                    Type: @(_wallet.WalletType?.Name ?? "N/A") - @WalletsControlPanelDisplayService.ShortId(_wallet.Id)
                 </BbTypographyMuted>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="xf-page-actions">
                 @if (_wallet.Status == WalletStatus.Active)
                 {
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@FreezeWallet">
@@ -66,7 +67,7 @@ else
                 }
                 @if (_wallet.Status != WalletStatus.Closed)
                 {
-                    <BbButton Variant="ButtonVariant.Destructive" OnClick="@(() => _showCloseDialog = true)">
+                    <BbButton Variant="ButtonVariant.Destructive" OnClick="@CloseWallet">
                         <LucideIcon Name="x" class="mr-2 h-4 w-4" />
                         Request Close
                     </BbButton>
@@ -83,14 +84,14 @@ else
                     <div>
                         <BbCardTitle>Wallet Summary</BbCardTitle>
                         <BbCardDescription>
-                            Credential: <span class="font-mono">@_wallet.CredentialId</span>
+                            Credential: @WalletsControlPanelDisplayService.ShortId(_wallet.CredentialId)
                         </BbCardDescription>
                     </div>
                     <StatusBadge Text="@_wallet.Status.ToString()" Status="@GetStatusKey(_wallet.Status)" />
                 </div>
             </BbCardHeader>
             <BbCardContent>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div class="xf-summary-grid xf-summary-grid-4">
                     <BbCard>
                         <BbCardContent>
                             <div class="space-y-1 pt-4">
@@ -171,11 +172,11 @@ else
 
                     <BbTabsContent Value="add-funds" Class="xf-fade-in">
                         <div class="grid gap-4 py-4 md:grid-cols-2 xl:grid-cols-5">
-                            <BbFormFieldInput TValue="string"
-                                              @bind-Value="_addFundsAmount"
-                                              Label="Amount"
-                                              Placeholder="0.00"
-                                              Required="true" />
+                            <BbFormFieldCurrencyInput @bind-Value="_addFundsAmount"
+                                                      Label="Amount"
+                                                      ShowSymbol="false"
+                                                      Min="0"
+                                                      Required="true" />
                             <XfEntityPicker TItem="PaymentGateway"
                                             Label="Gateway"
                                             Value="@_addFundsGatewayId"
@@ -233,11 +234,11 @@ else
 
                     <BbTabsContent Value="withdraw-funds" Class="xf-fade-in">
                         <div class="grid gap-4 py-4 md:grid-cols-2 xl:grid-cols-5">
-                            <BbFormFieldInput TValue="string"
-                                              @bind-Value="_withdrawAmount"
-                                              Label="Amount"
-                                              Placeholder="0.00"
-                                              Required="true" />
+                            <BbFormFieldCurrencyInput @bind-Value="_withdrawAmount"
+                                                      Label="Amount"
+                                                      ShowSymbol="false"
+                                                      Min="0"
+                                                      Required="true" />
                             <XfEntityPicker TItem="PaymentGateway"
                                             Label="Gateway"
                                             Value="@_withdrawGatewayId"
@@ -301,11 +302,11 @@ else
                             </BbAlertDescription>
                         </BbAlert>
                         <div class="grid gap-4 py-4 md:grid-cols-2">
-                            <BbFormFieldInput TValue="string"
-                                              @bind-Value="_adjustBalance"
-                                              Label="New Balance"
-                                              Placeholder="0.00"
-                                              Required="true" />
+                            <BbFormFieldCurrencyInput @bind-Value="_adjustBalance"
+                                                      Label="New Balance"
+                                                      ShowSymbol="false"
+                                                      Min="0"
+                                                      Required="true" />
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_adjustRemarks"
                                               Label="Remarks"
@@ -336,14 +337,14 @@ else
             <BbCardContent>
                 <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
                     <Columns>
-                        <BbDataGridTemplateColumn Title="Amount" Sortable="true">
+                        <BbDataGridTemplateColumn Title="Amount" Sortable="true" Filterable="true" FilterBy="@(item => item.Amount)">
                             <ChildContent Context="item">
                                 <span class="font-semibold @(item.TransactionType == TransactionType.Credit ? "text-green-600" : "text-red-600")">
                                     @(item.TransactionType == TransactionType.Credit ? "+" : "")@item.Amount.ToString("N2")
                                 </span>
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Type">
+                        <BbDataGridTemplateColumn Title="Type" Filterable="true" FilterBy="@(item => GetTransactionTypeText(item))">
                             <ChildContent Context="item">
                                 @if (item.TransactionType == TransactionType.Credit)
                                 {
@@ -359,7 +360,7 @@ else
                                 }
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Fee" Sortable="true">
+                        <BbDataGridTemplateColumn Title="Fee" Sortable="true" Filterable="true" FilterBy="@(item => item.TransactionFee)">
                             <ChildContent Context="item">
                                 @if (item.TransactionFee > 0)
                                 {
@@ -371,26 +372,26 @@ else
                                 }
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Held">
+                        <BbDataGridTemplateColumn Title="Held" Filterable="true" FilterBy="@(item => item.Held)">
                             <ChildContent Context="item">
                                 <BbBadge Variant="@(item.Held ? BadgeVariant.Outline : BadgeVariant.Secondary)">
                                     @(item.Held ? "Held" : "No")
                                 </BbBadge>
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Released">
+                        <BbDataGridTemplateColumn Title="Released" Filterable="true" FilterBy="@(item => item.Released)">
                             <ChildContent Context="item">
                                 <BbBadge Variant="@(item.Released ? BadgeVariant.Default : BadgeVariant.Secondary)">
                                     @(item.Released ? "Released" : "No")
                                 </BbBadge>
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Reference">
+                        <BbDataGridTemplateColumn Title="Reference" Filterable="true" FilterBy="@(item => item.ReferenceNumber ?? string.Empty)">
                             <ChildContent Context="item">
                                 <span class="font-mono text-xs">@(item.ReferenceNumber ?? "N/A")</span>
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Remarks">
+                        <BbDataGridTemplateColumn Title="Remarks" Filterable="true" FilterBy="@(item => item.Remarks ?? string.Empty)">
                             <ChildContent Context="item">
                                 @if (!string.IsNullOrEmpty(item.Remarks))
                                 {
@@ -404,12 +405,12 @@ else
                                 }
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Running Balance" Sortable="true">
+                        <BbDataGridTemplateColumn Title="Running Balance" Sortable="true" Filterable="true" FilterBy="@(item => item.RunningBalance)">
                             <ChildContent Context="item">
                                 @(item.RunningBalance?.ToString("N2") ?? "N/A")
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                         <BbDataGridTemplateColumn Title="Actions">
                             <ChildContent Context="item">
                                 <div class="flex flex-wrap gap-1">
@@ -426,6 +427,9 @@ else
                             </ChildContent>
                         </BbDataGridTemplateColumn>
                     </Columns>
+                    <EmptyTemplate>
+                        <BbEmpty Title="No transactions found" Description="Wallet transactions will appear here." />
+                    </EmptyTemplate>
                 </BbDataGrid>
             </BbCardContent>
         </BbCard>
@@ -455,22 +459,46 @@ else
                 {
                     <div class="space-y-4">
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <BbFormFieldInput TValue="string"
-                                              @bind-Value="_rulesMinTransfer"
-                                              Label="Min Transfer Rule"
-                                              Placeholder="No minimum" />
-                            <BbFormFieldInput TValue="string"
-                                              @bind-Value="_rulesMaxTransfer"
-                                              Label="Max Transfer Rule"
-                                              Placeholder="No maximum" />
-                            <BbFormFieldInput TValue="string"
-                                              @bind-Value="_rulesBondBalance"
-                                              Label="Bond Balance Rule"
-                                              Placeholder="Not set" />
-                            <BbFormFieldInput TValue="string"
-                                              @bind-Value="_rulesMaintainingBalance"
-                                              Label="Maintaining Balance Rule"
-                                              Placeholder="Not set" />
+                            <div class="space-y-3">
+                                <BbFormFieldSwitch @bind-Value="_rulesMinTransferEnabled" Label="Use Min Transfer Rule" />
+                                @if (_rulesMinTransferEnabled)
+                                {
+                                    <BbFormFieldCurrencyInput @bind-Value="_rulesMinTransfer"
+                                                              Label="Min Transfer Rule"
+                                                              ShowSymbol="false"
+                                                              Min="0" />
+                                }
+                            </div>
+                            <div class="space-y-3">
+                                <BbFormFieldSwitch @bind-Value="_rulesMaxTransferEnabled" Label="Use Max Transfer Rule" />
+                                @if (_rulesMaxTransferEnabled)
+                                {
+                                    <BbFormFieldCurrencyInput @bind-Value="_rulesMaxTransfer"
+                                                              Label="Max Transfer Rule"
+                                                              ShowSymbol="false"
+                                                              Min="0" />
+                                }
+                            </div>
+                            <div class="space-y-3">
+                                <BbFormFieldSwitch @bind-Value="_rulesBondBalanceEnabled" Label="Use Bond Balance Rule" />
+                                @if (_rulesBondBalanceEnabled)
+                                {
+                                    <BbFormFieldCurrencyInput @bind-Value="_rulesBondBalance"
+                                                              Label="Bond Balance Rule"
+                                                              ShowSymbol="false"
+                                                              Min="0" />
+                                }
+                            </div>
+                            <div class="space-y-3">
+                                <BbFormFieldSwitch @bind-Value="_rulesMaintainingBalanceEnabled" Label="Use Maintaining Balance Rule" />
+                                @if (_rulesMaintainingBalanceEnabled)
+                                {
+                                    <BbFormFieldCurrencyInput @bind-Value="_rulesMaintainingBalance"
+                                                              Label="Maintaining Balance Rule"
+                                                              ShowSymbol="false"
+                                                              Min="0" />
+                                }
+                            </div>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-2">
                             <BbButton Variant="ButtonVariant.Outline" OnClick="@CancelEditRules" Disabled="@_savingRules">
@@ -527,30 +555,6 @@ else
     </FadeInContent>
 }
 
-@* Close Wallet Confirmation Dialog *@
-<BbDialog Open="@_showCloseDialog" OpenChanged="@(v => _showCloseDialog = v)">
-    <BbDialogContent>
-        <BbDialogHeader>
-            <BbDialogTitle>Close Wallet</BbDialogTitle>
-            <BbDialogDescription>
-                This creates a maker-checker approval request. Approved closure can then be executed through the wallet workflow.
-                @if (_wallet?.Balance != 0 || _wallet?.DebitOnHoldBalance != 0 || _wallet?.CreditOnHoldBalance != 0)
-                {
-                    <span class="mt-2 block font-semibold text-red-500">
-                        Wallets can only be closed after balance and held funds are zero.
-                    </span>
-                }
-            </BbDialogDescription>
-        </BbDialogHeader>
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showCloseDialog = false)">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" OnClick="@CloseWallet" Disabled="@_isProcessing">
-                Request Close
-            </BbButton>
-        </BbDialogFooter>
-    </BbDialogContent>
-</BbDialog>
-
 @code {
     [Parameter] public Guid Id { get; set; }
     [Parameter] public string? Section { get; set; }
@@ -563,6 +567,8 @@ else
     [Inject] private IWalletsServiceWrapper WalletsService { get; set; } = default!;
     [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private ILogger<WalletDetail> Logger { get; set; } = default!;
 
     private const string NoSelectionValue = "__none";
     private Wallet? _wallet;
@@ -571,34 +577,37 @@ else
     private List<PaymentGateway> _gateways = [];
     private bool _loading = true;
     private bool _isProcessing;
-    private bool _showCloseDialog;
     private bool _outsideTenantContext;
     private bool MoneyOperationsDisabled => _isProcessing || _wallet?.Status == WalletStatus.Closed;
 
     // Add Funds form
-    private string _addFundsAmount = "";
+    private decimal _addFundsAmount;
     private string _addFundsRef = "";
     private string _addFundsRemarks = "";
     private string _addFundsGatewayId = NoSelectionValue;
     private string _addFundsCurrencyId = NoSelectionValue;
 
     // Withdraw Funds form
-    private string _withdrawAmount = "";
+    private decimal _withdrawAmount;
     private string _withdrawRef = "";
     private string _withdrawRemarks = "";
     private string _withdrawGatewayId = NoSelectionValue;
     private string _withdrawCurrencyId = NoSelectionValue;
 
     // Adjust Balance form
-    private string _adjustBalance = "";
+    private decimal _adjustBalance;
     private string _adjustRemarks = "";
     private Guid? _loadedId;
     private bool _editingRules;
     private bool _savingRules;
-    private string _rulesMinTransfer = "";
-    private string _rulesMaxTransfer = "";
-    private string _rulesBondBalance = "";
-    private string _rulesMaintainingBalance = "";
+    private bool _rulesMinTransferEnabled;
+    private bool _rulesMaxTransferEnabled;
+    private bool _rulesBondBalanceEnabled;
+    private bool _rulesMaintainingBalanceEnabled;
+    private decimal _rulesMinTransfer;
+    private decimal _rulesMaxTransfer;
+    private decimal _rulesBondBalance;
+    private decimal _rulesMaintainingBalance;
     private string CurrentSection => NormalizeSection(Section);
 
     private static string NormalizeSection(string? section) =>
@@ -661,7 +670,8 @@ else
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Failed to load wallet: {ex.Message}");
+            Logger.LogError(ex, "Failed to load wallet detail.");
+            ToastService.Error("Could not load wallet details.", "Wallets");
         }
         finally
         {
@@ -739,10 +749,14 @@ else
             return;
         }
 
-        _rulesMinTransfer = FormatRuleInput(_wallet.MinTransferRule);
-        _rulesMaxTransfer = FormatRuleInput(_wallet.MaxTransferRule);
-        _rulesBondBalance = FormatRuleInput(_wallet.BondBalanceRule);
-        _rulesMaintainingBalance = FormatRuleInput(_wallet.MaintainingBalanceRule);
+        _rulesMinTransferEnabled = _wallet.MinTransferRule.HasValue;
+        _rulesMaxTransferEnabled = _wallet.MaxTransferRule.HasValue;
+        _rulesBondBalanceEnabled = _wallet.BondBalanceRule.HasValue;
+        _rulesMaintainingBalanceEnabled = _wallet.MaintainingBalanceRule.HasValue;
+        _rulesMinTransfer = _wallet.MinTransferRule ?? 0;
+        _rulesMaxTransfer = _wallet.MaxTransferRule ?? 0;
+        _rulesBondBalance = _wallet.BondBalanceRule ?? 0;
+        _rulesMaintainingBalance = _wallet.MaintainingBalanceRule ?? 0;
         _editingRules = true;
     }
 
@@ -753,40 +767,43 @@ else
 
     private async Task SaveRules()
     {
-        if (!TryParseRule(_rulesMinTransfer, "Min transfer rule", out var minTransfer, out var error)
-            || !TryParseRule(_rulesMaxTransfer, "Max transfer rule", out var maxTransfer, out error)
-            || !TryParseRule(_rulesBondBalance, "Bond balance rule", out var bondBalance, out error)
-            || !TryParseRule(_rulesMaintainingBalance, "Maintaining balance rule", out var maintainingBalance, out error))
+        var minTransfer = _rulesMinTransferEnabled ? _rulesMinTransfer : (decimal?)null;
+        var maxTransfer = _rulesMaxTransferEnabled ? _rulesMaxTransfer : (decimal?)null;
+        var bondBalance = _rulesBondBalanceEnabled ? _rulesBondBalance : (decimal?)null;
+        var maintainingBalance = _rulesMaintainingBalanceEnabled ? _rulesMaintainingBalance : (decimal?)null;
+
+        if (!ValidateRule(minTransfer, "Min transfer rule", out var error)
+            || !ValidateRule(maxTransfer, "Max transfer rule", out error)
+            || !ValidateRule(bondBalance, "Bond balance rule", out error)
+            || !ValidateRule(maintainingBalance, "Maintaining balance rule", out error))
         {
-            ToastService.Show(error);
+            ToastService.Warning(error, "Validation");
             return;
         }
 
         if (minTransfer is not null && maxTransfer is not null && minTransfer > maxTransfer)
         {
-            ToastService.Show("Min transfer rule cannot be greater than max transfer rule.");
+            ToastService.Warning("Min transfer rule cannot be greater than max transfer rule.", "Validation");
             return;
         }
 
         _savingRules = true;
         try
         {
-            ToastService.Show("Wallet rule changes require the backend policy workflow and were not saved.");
+            ToastService.Info("Wallet rule changes require the backend policy workflow and were not saved.", "Wallets");
             _editingRules = false;
             await Task.CompletedTask;
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error updating wallet rules: {ex.Message}");
+            Logger.LogError(ex, "Wallet rule update failed.");
+            ToastService.Error("Wallet rules could not be updated.", "Wallets");
         }
         finally
         {
             _savingRules = false;
         }
     }
-
-    private static string FormatRuleInput(decimal? value) =>
-        value?.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
 
     private RequestMetadata BuildCommandMetadata(Guid tenantId) => new()
     {
@@ -800,30 +817,21 @@ else
         IpAddress = RequestMetadata.IpAddress
     };
 
-    private static bool TryParseRule(string value, string label, out decimal? parsed, out string error)
+    private static bool ValidateRule(decimal? value, string label, out string error)
     {
-        parsed = null;
         error = "";
 
-        if (string.IsNullOrWhiteSpace(value))
+        if (value is null)
         {
             return true;
         }
 
-        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var rule)
-            && !decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out rule))
-        {
-            error = $"{label} must be a valid number.";
-            return false;
-        }
-
-        if (rule < 0)
+        if (value < 0)
         {
             error = $"{label} cannot be negative.";
             return false;
         }
 
-        parsed = rule;
         return true;
     }
 
@@ -877,15 +885,15 @@ else
 
     private async Task AddFunds()
     {
-        if (!decimal.TryParse(_addFundsAmount, out var amount) || amount <= 0)
+        if (_addFundsAmount <= 0)
         {
-            ToastService.Show("Please enter a valid positive amount.");
+            ToastService.Warning("Please enter a valid positive amount.", "Validation");
             return;
         }
 
         if (!Guid.TryParse(_addFundsGatewayId, out var gatewayId))
         {
-            ToastService.Show("Select a payment gateway for the deposit request.");
+            ToastService.Warning("Select a payment gateway for the deposit request.", "Validation");
             return;
         }
 
@@ -900,7 +908,7 @@ else
 
             if (fresh is null)
             {
-                ToastService.Show("Wallet not found.");
+                ToastService.Warning("Wallet not found.", "Wallets");
                 return;
             }
 
@@ -915,7 +923,7 @@ else
                 WalletId = fresh.Id,
                 CurrencyId = ParseOptionalGuid(_addFundsCurrencyId),
                 GatewayId = gatewayId,
-                Amount = amount,
+                Amount = _addFundsAmount,
                 ExternalReference = string.IsNullOrWhiteSpace(_addFundsRef) ? null : _addFundsRef.Trim(),
                 Remarks = string.IsNullOrWhiteSpace(_addFundsRemarks) ? "Admin credit" : _addFundsRemarks.Trim(),
                 IdempotencyKey = $"controlpanel-deposit-{Guid.NewGuid():N}"
@@ -923,8 +931,8 @@ else
 
             if (response.IsSuccess)
             {
-                ToastService.Show($"Deposit request created for {amount:N2}.");
-                _addFundsAmount = "";
+                ToastService.Success($"Deposit request created for {_addFundsAmount:N2}.", "Wallets");
+                _addFundsAmount = 0;
                 _addFundsRef = "";
                 _addFundsRemarks = "";
                 _addFundsGatewayId = NoSelectionValue;
@@ -933,12 +941,14 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to create deposit request: {response.Message}");
+                Logger.LogWarning("Deposit request creation failed: {Message}", response.Message);
+                ToastService.Error("Deposit request could not be created.", "Wallets");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error creating deposit request: {ex.Message}");
+            Logger.LogError(ex, "Deposit request creation failed.");
+            ToastService.Error("Deposit request could not be created.", "Wallets");
         }
         finally
         {
@@ -948,9 +958,9 @@ else
 
     private async Task WithdrawFunds()
     {
-        if (!decimal.TryParse(_withdrawAmount, out var amount) || amount <= 0)
+        if (_withdrawAmount <= 0)
         {
-            ToastService.Show("Please enter a valid positive amount.");
+            ToastService.Warning("Please enter a valid positive amount.", "Validation");
             return;
         }
 
@@ -965,7 +975,7 @@ else
 
             if (fresh is null)
             {
-                ToastService.Show("Wallet not found.");
+                ToastService.Warning("Wallet not found.", "Wallets");
                 return;
             }
 
@@ -974,9 +984,9 @@ else
                 return;
             }
 
-            if (fresh.AvailableBalance < amount)
+            if (fresh.AvailableBalance < _withdrawAmount)
             {
-                ToastService.Show($"Insufficient balance. Available: {fresh.AvailableBalance:N2}, requested: {amount:N2}");
+                ToastService.Warning($"Insufficient balance. Available: {fresh.AvailableBalance:N2}, requested: {_withdrawAmount:N2}", "Validation");
                 return;
             }
 
@@ -986,7 +996,7 @@ else
                 WalletId = fresh.Id,
                 GatewayId = ParseOptionalGuid(_withdrawGatewayId),
                 CurrencyId = ParseOptionalGuid(_withdrawCurrencyId),
-                Amount = amount,
+                Amount = _withdrawAmount,
                 ExternalReference = string.IsNullOrWhiteSpace(_withdrawRef) ? null : _withdrawRef.Trim(),
                 Remarks = string.IsNullOrWhiteSpace(_withdrawRemarks) ? "Admin debit" : _withdrawRemarks.Trim(),
                 IdempotencyKey = $"controlpanel-withdrawal-{Guid.NewGuid():N}"
@@ -994,8 +1004,8 @@ else
 
             if (response.IsSuccess)
             {
-                ToastService.Show($"Withdrawal request created for {amount:N2}.");
-                _withdrawAmount = "";
+                ToastService.Success($"Withdrawal request created for {_withdrawAmount:N2}.", "Wallets");
+                _withdrawAmount = 0;
                 _withdrawRef = "";
                 _withdrawRemarks = "";
                 _withdrawGatewayId = NoSelectionValue;
@@ -1004,12 +1014,14 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to create withdrawal request: {response.Message}");
+                Logger.LogWarning("Withdrawal request creation failed: {Message}", response.Message);
+                ToastService.Error("Withdrawal request could not be created.", "Wallets");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error creating withdrawal request: {ex.Message}");
+            Logger.LogError(ex, "Withdrawal request creation failed.");
+            ToastService.Error("Withdrawal request could not be created.", "Wallets");
         }
         finally
         {
@@ -1019,9 +1031,9 @@ else
 
     private async Task AdjustBalance()
     {
-        if (!decimal.TryParse(_adjustBalance, out var newBalance))
+        if (_adjustBalance < 0)
         {
-            ToastService.Show("Please enter a valid balance amount.");
+            ToastService.Warning("Please enter a valid balance amount.", "Validation");
             return;
         }
 
@@ -1037,7 +1049,7 @@ else
 
             if (fresh is null)
             {
-                ToastService.Show("Wallet not found.");
+                ToastService.Warning("Wallet not found.", "Wallets");
                 return;
             }
 
@@ -1046,16 +1058,16 @@ else
                 return;
             }
 
-            var difference = newBalance - fresh.Balance;
+            var difference = _adjustBalance - fresh.Balance;
             if (difference == 0)
             {
-                ToastService.Show("Balance is already at the requested amount.");
+                ToastService.Info("Balance is already at the requested amount.", "Wallets");
                 return;
             }
 
             var referenceNumber = $"ADJ-{DateTime.UtcNow:yyyyMMddHHmmss}";
             var remarks = string.IsNullOrWhiteSpace(_adjustRemarks)
-                ? $"Admin balance adjustment: {fresh.Balance:N2} -> {newBalance:N2}"
+                ? $"Admin balance adjustment: {fresh.Balance:N2} -> {_adjustBalance:N2}"
                 : _adjustRemarks.Trim();
 
             var response = await WalletsAdminContracts.CreateWalletApprovalAsync(
@@ -1066,18 +1078,20 @@ else
 
             if (response.IsSuccess)
             {
-                ToastService.Show($"Balance adjustment approval requested for {newBalance:N2}.");
-                _adjustBalance = "";
+                ToastService.Success($"Balance adjustment approval requested for {_adjustBalance:N2}.", "Wallets");
+                _adjustBalance = 0;
                 _adjustRemarks = "";
             }
             else
             {
-                ToastService.Show($"Failed to request balance adjustment: {response.Message}");
+                Logger.LogWarning("Balance adjustment request failed: {Message}", response.Message);
+                ToastService.Error("Balance adjustment could not be requested.", "Wallets");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error adjusting balance: {ex.Message}");
+            Logger.LogError(ex, "Balance adjustment request failed.");
+            ToastService.Error("Balance adjustment could not be requested.", "Wallets");
         }
         finally
         {
@@ -1092,7 +1106,7 @@ else
             return true;
         }
 
-        ToastService.Show("This wallet has no wallet type. Assign a wallet type before submitting money operations.");
+        ToastService.Warning("This wallet has no wallet type. Assign a wallet type before submitting money operations.", "Wallets");
         return false;
     }
 
@@ -1186,11 +1200,29 @@ else
 
     private static string ShortId(Guid id) => id.ToString()[..8];
 
+    private static string GetTransactionTypeText(WalletTransaction transaction) =>
+        transaction.TransactionType?.ToString() ?? "Unknown";
+
+    private static string BuildTransactionApprovalLabel(WalletTransaction transaction)
+    {
+        var type = GetTransactionTypeText(transaction).ToLowerInvariant();
+        var reference = string.IsNullOrWhiteSpace(transaction.ReferenceNumber)
+            ? WalletsControlPanelDisplayService.ShortId(transaction.Id)
+            : transaction.ReferenceNumber;
+
+        return $"{type} transaction {reference}";
+    }
+
     private async Task ReleaseTransaction(WalletTransaction transaction)
     {
         if (_wallet is null)
         {
-            ToastService.Show("Wallet not loaded.");
+            ToastService.Warning("Wallet not loaded.", "Wallets");
+            return;
+        }
+
+        if (!await DialogService.Confirm("Release Held Transaction", "Release this held wallet transaction?", new ConfirmDialogOptions()))
+        {
             return;
         }
 
@@ -1205,14 +1237,20 @@ else
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Held transaction released.");
+                ToastService.Success("Held transaction released.", "Wallets");
                 await LoadWallet();
                 await LoadTransactions();
             }
             else
             {
-                ToastService.Show($"Failed to release transaction: {response.Message}");
+                Logger.LogWarning("Held transaction release failed: {Message}", response.Message);
+                ToastService.Error("Held transaction could not be released.", "Wallets");
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Held transaction release failed.");
+            ToastService.Error("Held transaction could not be released.", "Wallets");
         }
         finally
         {
@@ -1224,7 +1262,15 @@ else
     {
         if (_wallet is null)
         {
-            ToastService.Show("Wallet not loaded.");
+            ToastService.Warning("Wallet not loaded.", "Wallets");
+            return;
+        }
+
+        if (!await DialogService.Confirm(
+                "Request Transaction Reversal",
+                "Create an approval request to reverse this transaction?",
+                new ConfirmDialogOptions { Destructive = true }))
+        {
             return;
         }
 
@@ -1235,16 +1281,22 @@ else
                 WalletOperationType.Reversal,
                 _wallet.Id,
                 transaction.Amount,
-                $"Reverse transaction {transaction.Id} from ControlPanel wallet detail");
+                $"Reverse {BuildTransactionApprovalLabel(transaction)} from ControlPanel wallet detail");
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Transaction reversal approval requested.");
+                ToastService.Success("Transaction reversal approval requested.", "Wallets");
             }
             else
             {
-                ToastService.Show($"Failed to request reversal approval: {response.Message}");
+                Logger.LogWarning("Transaction reversal request failed: {Message}", response.Message);
+                ToastService.Error("Transaction reversal could not be requested.", "Wallets");
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Transaction reversal request failed.");
+            ToastService.Error("Transaction reversal could not be requested.", "Wallets");
         }
         finally
         {
@@ -1264,13 +1316,21 @@ else
 
             if (fresh is null)
             {
-                ToastService.Show("Wallet not found.");
+                ToastService.Warning("Wallet not found.", "Wallets");
                 return;
             }
 
             if (fresh.Status != WalletStatus.Active)
             {
-                ToastService.Show($"Cannot freeze. Wallet status is {fresh.Status}.");
+                ToastService.Warning($"Wallet status is {fresh.Status}; freeze is not available.", "Wallets");
+                return;
+            }
+
+            if (!await DialogService.Confirm(
+                    "Request Wallet Freeze",
+                    "Create an approval request to freeze this wallet?",
+                    new ConfirmDialogOptions { Destructive = true }))
+            {
                 return;
             }
 
@@ -1282,16 +1342,18 @@ else
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Wallet freeze approval requested.");
+                ToastService.Success("Wallet freeze approval requested.", "Wallets");
             }
             else
             {
-                ToastService.Show($"Failed to request wallet freeze: {response.Message}");
+                Logger.LogWarning("Wallet freeze request failed: {Message}", response.Message);
+                ToastService.Error("Wallet freeze could not be requested.", "Wallets");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error freezing wallet: {ex.Message}");
+            Logger.LogError(ex, "Wallet freeze request failed.");
+            ToastService.Error("Wallet freeze could not be requested.", "Wallets");
         }
     }
 
@@ -1307,13 +1369,18 @@ else
 
             if (fresh is null)
             {
-                ToastService.Show("Wallet not found.");
+                ToastService.Warning("Wallet not found.", "Wallets");
                 return;
             }
 
             if (fresh.Status != WalletStatus.Frozen)
             {
-                ToastService.Show($"Cannot unfreeze. Wallet status is {fresh.Status}.");
+                ToastService.Warning($"Wallet status is {fresh.Status}; unfreeze is not available.", "Wallets");
+                return;
+            }
+
+            if (!await DialogService.Confirm("Request Wallet Unfreeze", "Create an approval request to unfreeze this wallet?", new ConfirmDialogOptions()))
+            {
                 return;
             }
 
@@ -1325,16 +1392,18 @@ else
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Wallet unfreeze approval requested.");
+                ToastService.Success("Wallet unfreeze approval requested.", "Wallets");
             }
             else
             {
-                ToastService.Show($"Failed to request wallet unfreeze: {response.Message}");
+                Logger.LogWarning("Wallet unfreeze request failed: {Message}", response.Message);
+                ToastService.Error("Wallet unfreeze could not be requested.", "Wallets");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error unfreezing wallet: {ex.Message}");
+            Logger.LogError(ex, "Wallet unfreeze request failed.");
+            ToastService.Error("Wallet unfreeze could not be requested.", "Wallets");
         }
     }
 
@@ -1350,14 +1419,21 @@ else
 
             if (fresh is null)
             {
-                ToastService.Show("Wallet not found.");
+                ToastService.Warning("Wallet not found.", "Wallets");
                 return;
             }
 
             if (fresh.Status == WalletStatus.Closed)
             {
-                ToastService.Show("Wallet is already closed.");
-                _showCloseDialog = false;
+                ToastService.Info("Wallet is already closed.", "Wallets");
+                return;
+            }
+
+            if (!await DialogService.Confirm(
+                    "Request Wallet Close",
+                    "Create a maker-checker approval request to close this wallet?",
+                    new ConfirmDialogOptions { Destructive = true }))
+            {
                 return;
             }
 
@@ -1370,17 +1446,18 @@ else
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Wallet close approval requested.");
-                _showCloseDialog = false;
+                ToastService.Success("Wallet close approval requested.", "Wallets");
             }
             else
             {
-                ToastService.Show($"Failed to request wallet close: {response.Message}");
+                Logger.LogWarning("Wallet close request failed: {Message}", response.Message);
+                ToastService.Error("Wallet close could not be requested.", "Wallets");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error closing wallet: {ex.Message}");
+            Logger.LogError(ex, "Wallet close request failed.");
+            ToastService.Error("Wallet close could not be requested.", "Wallets");
         }
         finally
         {

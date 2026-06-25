@@ -5,16 +5,22 @@
 
 <PageTitle>Batch Operations - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<div class="space-y-6">
+    <div class="xf-page-header">
         <div>
             <BbTypographyH3>Batch Operations</BbTypographyH3>
             <BbTypographyMuted>Submit ledger-backed batch wallet operations and inspect recent batch activity.</BbTypographyMuted>
         </div>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
-            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-            Refresh
-        </BbButton>
+        <div class="xf-page-actions">
+            <BbButton OnClick="@OpenBatchDialog" Disabled="@(_wallets.Count == 0)">
+                <LucideIcon Name="play" class="mr-2 h-4 w-4" />
+                Submit Batch
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
     </div>
 
     @if (_loading)
@@ -31,83 +37,7 @@
     }
     else
     {
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Submit Batch Item</BbCardTitle>
-                <BbCardDescription>Runs through the Wallets batch ledger API with tenant and actor context.</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <BbFormFieldSelect TValue="string" @bind-Value="_operation" Label="Operation">
-                        <BbSelectItem Value="@BatchIncrement">Increment</BbSelectItem>
-                        <BbSelectItem Value="@BatchDecrement">Decrement</BbSelectItem>
-                        <BbSelectItem Value="@BatchTransfer">Transfer</BbSelectItem>
-                    </BbFormFieldSelect>
-                    <XfEntityPicker TItem="Wallet"
-                                    Label="@SourceWalletLabel"
-                                    Value="@_sourceWalletId"
-                                    ValueChanged="@(value => _sourceWalletId = value ?? NoSelectionValue)"
-                                    Items="@_wallets"
-                                    ValueSelector="@GetWalletPickerValue"
-                                    TextSelector="@BuildWalletLabel"
-                                    SearchTextSelector="@GetWalletSearchText"
-                                    AdvancedColumns="@WalletAdvancedColumns"
-                                    AdvancedFilters="@WalletAdvancedFilters"
-                                    AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
-                                    Placeholder="Select wallet"
-                                    SearchPlaceholder="Search wallets..."
-                                    EmptyMessage="No wallets found."
-                                    AllowClear="true"
-                                    ClearText="Clear wallet"
-                                    AdvancedSearchTitle="Find Source Wallet"
-                                    AdvancedSearchDescription="Search wallets for batch increment, decrement, or transfer source." />
-                    @if (_operation == BatchTransfer)
-                    {
-                        <XfEntityPicker TItem="Wallet"
-                                        Label="Destination Wallet"
-                                        Value="@_destinationWalletId"
-                                        ValueChanged="@(value => _destinationWalletId = value ?? NoSelectionValue)"
-                                        Items="@DestinationWalletOptions"
-                                        ValueSelector="@GetWalletPickerValue"
-                                        TextSelector="@BuildWalletLabel"
-                                        SearchTextSelector="@GetWalletSearchText"
-                                        AdvancedColumns="@WalletAdvancedColumns"
-                                        AdvancedFilters="@WalletAdvancedFilters"
-                                        AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
-                                        Placeholder="Select destination wallet"
-                                        SearchPlaceholder="Search destination wallets..."
-                                        EmptyMessage="No destination wallets found."
-                                        AllowClear="true"
-                                        ClearText="Clear destination wallet"
-                                        AdvancedSearchTitle="Find Destination Wallet"
-                                        AdvancedSearchDescription="Search wallets that can receive this batch transfer." />
-                    }
-                    <BbFormFieldInput TValue="decimal" @bind-Value="_amount" Label="Amount" />
-                    <BbFormFieldInput TValue="decimal" @bind-Value="_fee" Label="Fee" />
-                    <BbFormFieldSelect TValue="string" @bind-Value="_onHold" Label="Hold">
-                        <BbSelectItem Value="false">No</BbSelectItem>
-                        <BbSelectItem Value="true">Yes</BbSelectItem>
-                    </BbFormFieldSelect>
-                    <BbFormFieldInput TValue="string" @bind-Value="_referenceNumber" Label="Reference" Placeholder="Optional batch reference" />
-                </div>
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <BbButton OnClick="@SubmitBatch" Disabled="@(_acting || _wallets.Count == 0)">
-                        @if (_acting)
-                        {
-                            <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                        }
-                        <LucideIcon Name="play" class="mr-2 h-4 w-4" />
-                        Submit
-                    </BbButton>
-                    @if (!string.IsNullOrWhiteSpace(_lastOutcome))
-                    {
-                        <BbBadge Variant="BadgeVariant.Outline">@_lastOutcome</BbBadge>
-                    }
-                </div>
-            </BbCardContent>
-        </BbCard>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div class="xf-summary-grid xf-summary-grid-3">
             <BbCard>
                 <BbCardContent>
                     <div class="space-y-1 pt-4">
@@ -136,15 +66,93 @@
 
         <BbDataGrid Items="@_batchOperations" ShowPagination="true" InitialPageSize="20">
             <Columns>
-                <BbDataGridPropertyColumn Property="@(x => x.Id)" Title="Operation" />
-                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
-                <BbDataGridPropertyColumn Property="@(x => x.ActorCredentialId)" Title="Actor" />
-                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                <BbDataGridTemplateColumn Title="Operation" Filterable="true" FilterBy="@(item => BuildOperationLabel(item))">
+                    <ChildContent Context="item">@BuildOperationLabel(item)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Actor" Filterable="true" FilterBy="@(item => GetCredentialLabel(item.ActorCredentialId))">
+                    <ChildContent Context="item">@GetCredentialLabel(item.ActorCredentialId)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
             </Columns>
+            <EmptyTemplate>
+                <BbEmpty Title="No batch operations found" Description="Submit a batch item to review ledger-backed batch activity." />
+            </EmptyTemplate>
         </BbDataGrid>
     }
 </div>
+
+<BbDialog Open="@_batchDialogOpen" OpenChanged="@OnBatchDialogChanged">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogHeader>
+            <BbDialogTitle>Submit Batch</BbDialogTitle>
+            <BbDialogDescription>Runs through the Wallets batch ledger API with tenant and actor context.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <BbFormFieldSelect TValue="string" @bind-Value="_operation" Label="Operation">
+                    <BbSelectItem Value="@BatchIncrement">Increment</BbSelectItem>
+                    <BbSelectItem Value="@BatchDecrement">Decrement</BbSelectItem>
+                    <BbSelectItem Value="@BatchTransfer">Transfer</BbSelectItem>
+                </BbFormFieldSelect>
+                <XfEntityPicker TItem="Wallet"
+                                Label="@SourceWalletLabel"
+                                Value="@_sourceWalletId"
+                                ValueChanged="@(value => _sourceWalletId = value ?? NoSelectionValue)"
+                                Items="@_wallets"
+                                ValueSelector="@GetWalletPickerValue"
+                                TextSelector="@BuildWalletLabel"
+                                SearchTextSelector="@GetWalletSearchText"
+                                AdvancedColumns="@WalletAdvancedColumns"
+                                AdvancedFilters="@WalletAdvancedFilters"
+                                AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                Placeholder="Select wallet"
+                                SearchPlaceholder="Search wallets..."
+                                EmptyMessage="No wallets found."
+                                AllowClear="true"
+                                ClearText="Clear wallet"
+                                AdvancedSearchTitle="Find Source Wallet"
+                                AdvancedSearchDescription="Search wallets for batch increment, decrement, or transfer source." />
+                @if (_operation == BatchTransfer)
+                {
+                    <XfEntityPicker TItem="Wallet"
+                                    Label="Destination Wallet"
+                                    Value="@_destinationWalletId"
+                                    ValueChanged="@(value => _destinationWalletId = value ?? NoSelectionValue)"
+                                    Items="@DestinationWalletOptions"
+                                    ValueSelector="@GetWalletPickerValue"
+                                    TextSelector="@BuildWalletLabel"
+                                    SearchTextSelector="@GetWalletSearchText"
+                                    AdvancedColumns="@WalletAdvancedColumns"
+                                    AdvancedFilters="@WalletAdvancedFilters"
+                                    AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                    Placeholder="Select destination wallet"
+                                    SearchPlaceholder="Search destination wallets..."
+                                    EmptyMessage="No destination wallets found."
+                                    AllowClear="true"
+                                    ClearText="Clear destination wallet"
+                                    AdvancedSearchTitle="Find Destination Wallet"
+                                    AdvancedSearchDescription="Search wallets that can receive this batch transfer." />
+                }
+                <BbFormFieldCurrencyInput @bind-Value="_amount" Label="Amount" ShowSymbol="false" Min="0" />
+                <BbFormFieldCurrencyInput @bind-Value="_fee" Label="Fee" ShowSymbol="false" Min="0" />
+                <BbFormFieldSwitch Checked="@_onHold" CheckedChanged="@((bool value) => _onHold = value)" Label="Hold" />
+                <BbFormFieldInput TValue="string" @bind-Value="_referenceNumber" Label="Reference" Placeholder="Optional batch reference" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@CloseBatchDialog" Disabled="@_acting">Cancel</BbButton>
+            <BbButton OnClick="@SubmitBatch" Disabled="@(_acting || _wallets.Count == 0)">
+                @if (_acting)
+                {
+                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                }
+                Submit
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
 
 @code {
     private const string NoSelectionValue = "__none__";
@@ -157,19 +165,23 @@
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private WalletsControlPanelDisplayService DisplayService { get; set; } = default!;
+    [Inject] private ILogger<BatchOperations> Logger { get; set; } = default!;
 
     private List<Wallet> _wallets = [];
     private List<WalletOperation> _batchOperations = [];
+    private IReadOnlyDictionary<Guid, string> _credentialLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
     private bool _acting;
     private bool _hasTenant;
     private bool _moduleEnabled;
+    private bool _batchDialogOpen;
     private DateTime? _latest;
     private string? _lastOutcome;
     private string _operation = BatchIncrement;
     private string _sourceWalletId = NoSelectionValue;
     private string _destinationWalletId = NoSelectionValue;
-    private string _onHold = "false";
+    private bool _onHold;
     private string _referenceNumber = "";
     private decimal _amount;
     private decimal _fee;
@@ -200,6 +212,7 @@
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsBatch);
             _wallets = [];
             _batchOperations = [];
+            _credentialLabels = new Dictionary<Guid, string>();
             _latest = null;
 
             if (!_hasTenant || !_moduleEnabled)
@@ -232,6 +245,9 @@
                 .Where(x => x.OperationType == WalletOperationType.Batch)
                 .Take(100)
                 .ToList();
+            _credentialLabels = await DisplayService.LoadCredentialLabelsAsync(
+                tenantId,
+                _batchOperations.Select(x => x.ActorCredentialId));
 
             _latest = _batchOperations.Count == 0 ? null : _batchOperations.Max(x => x.CreatedAt);
         }
@@ -239,8 +255,10 @@
         {
             _wallets = [];
             _batchOperations = [];
+            _credentialLabels = new Dictionary<Guid, string>();
             _latest = null;
-            ToastService.Show($"Failed to load batch operations: {ex.Message}");
+            Logger.LogError(ex, "Failed to load batch operations.");
+            ToastService.Error("Could not load batch operations.", "Wallets");
         }
         finally
         {
@@ -253,20 +271,20 @@
     {
         if (!Guid.TryParse(_sourceWalletId, out var sourceWalletId))
         {
-            ToastService.Show("Select a wallet.");
+            ToastService.Warning("Select a wallet.", "Validation");
             return;
         }
 
         if (_amount <= 0 || _fee < 0)
         {
-            ToastService.Show("Amount must be greater than zero and fee cannot be negative.");
+            ToastService.Warning("Amount must be greater than zero and fee cannot be negative.", "Validation");
             return;
         }
 
         var sourceWallet = _wallets.FirstOrDefault(x => x.Id == sourceWalletId);
         if (sourceWallet is null)
         {
-            ToastService.Show("Selected wallet is not available.");
+            ToastService.Warning("Selected wallet is not available.", "Validation");
             return;
         }
 
@@ -290,7 +308,7 @@
                             CredentialId = sourceWallet.CredentialId,
                             Amount = _amount,
                             Fee = _fee,
-                            OnHold = bool.Parse(_onHold),
+                            OnHold = _onHold,
                             ReferenceNumber = referenceNumber,
                             Remarks = "ControlPanel batch increment"
                         }
@@ -306,7 +324,7 @@
                             CredentialId = sourceWallet.CredentialId,
                             Amount = _amount,
                             Fee = _fee,
-                            OnHold = bool.Parse(_onHold),
+                            OnHold = _onHold,
                             ReferenceNumber = referenceNumber,
                             Remarks = "ControlPanel batch decrement"
                         }
@@ -323,16 +341,19 @@
             if (response.IsSuccess)
             {
                 _lastOutcome = $"{_operation} accepted";
-                ToastService.Show(response.Message ?? $"Batch {_operation} submitted.");
+                ToastService.Success($"Batch {_operation} submitted.", "Wallets");
+                CloseBatchDialog();
                 await LoadData();
                 return;
             }
 
-            ToastService.Show(response.Message ?? "Batch operation failed.");
+            Logger.LogWarning("Batch operation failed: {Message}", response.Message);
+            ToastService.Error("Batch operation could not be completed.", "Wallets");
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Batch operation failed: {ex.Message}");
+            Logger.LogError(ex, "Batch operation failed.");
+            ToastService.Error("Batch operation could not be completed.", "Wallets");
         }
         finally
         {
@@ -380,6 +401,48 @@
         });
     }
 
+    private void OpenBatchDialog()
+    {
+        ResetBatchForm();
+        _batchDialogOpen = true;
+    }
+
+    private void CloseBatchDialog()
+    {
+        _batchDialogOpen = false;
+        ResetBatchForm();
+    }
+
+    private Task OnBatchDialogChanged(bool open)
+    {
+        _batchDialogOpen = open;
+        if (!open)
+        {
+            ResetBatchForm();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void ResetBatchForm()
+    {
+        _operation = BatchIncrement;
+        _sourceWalletId = NoSelectionValue;
+        _destinationWalletId = NoSelectionValue;
+        _onHold = false;
+        _referenceNumber = "";
+        _amount = 0;
+        _fee = 0;
+    }
+
+    private static string BuildOperationLabel(WalletOperation operation)
+    {
+        var reference = string.IsNullOrWhiteSpace(operation.ReferenceNumber)
+            ? $"Operation {operation.Id.ToString()[..8]}"
+            : operation.ReferenceNumber;
+        return $"{reference} - {operation.Status}";
+    }
+
     private static string BuildWalletLabel(Wallet wallet)
     {
         var balance = wallet.Balance.ToString("N2", CultureInfo.InvariantCulture);
@@ -424,6 +487,9 @@
 
         return wallet.CredentialId.ToString()[..8];
     }
+
+    private string GetCredentialLabel(Guid? credentialId) =>
+        DisplayService.CredentialLabel(credentialId, _credentialLabels);
 
     private static IReadOnlyList<XfEntityPickerFilterOption> BuildEnumFilterOptions<TEnum>()
         where TEnum : struct, Enum =>

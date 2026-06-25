@@ -24,19 +24,21 @@ else
 {
 <FadeInContent>
 <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="xf-page-header">
         <div>
             <BbTypographyH3>Wallet Management</BbTypographyH3>
             <BbTypographyMuted>Manage user wallets, balances, and account statuses</BbTypographyMuted>
         </div>
-        <BbButton OnClick="@OpenCreateDialog">
-            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
-            Create Wallet
-        </BbButton>
+        <div class="xf-page-actions">
+            <BbButton OnClick="@OpenCreateDialog">
+                <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                Create Wallet
+            </BbButton>
+        </div>
     </div>
 
     @* Summary Statistics *@
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div class="xf-summary-grid xf-summary-grid-4">
         <BbCard>
             <BbCardHeader>
                 <BbCardTitle>Total Wallets</BbCardTitle>
@@ -88,34 +90,34 @@ else
             <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20"
                         OnRowClick="@((Wallet item) => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))" Class="cursor-pointer">
                 <Columns>
-                    <BbDataGridTemplateColumn Title="Account Number" Sortable="true">
+                    <BbDataGridTemplateColumn Title="Account Number" Sortable="true" Filterable="true" FilterBy="@(item => item.AccountNumber ?? string.Empty)">
                         <ChildContent Context="item">
                             @(item.AccountNumber ?? "N/A")
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridTemplateColumn Title="User / Credential" Sortable="true">
+                    <BbDataGridTemplateColumn Title="User / Credential" Sortable="true" Filterable="true" FilterBy="@(item => GetCredentialDisplay(item.CredentialId))">
                         <ChildContent Context="item">
                             <span class="text-sm">@GetCredentialDisplay(item.CredentialId)</span>
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridTemplateColumn Title="Wallet Type">
+                    <BbDataGridTemplateColumn Title="Wallet Type" Filterable="true" FilterBy="@(item => GetWalletTypeDisplay(item))">
                         <ChildContent Context="item">
                             @(item.WalletType?.Name ?? "N/A")
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridTemplateColumn Title="Balance" Sortable="true">
+                    <BbDataGridTemplateColumn Title="Balance" Sortable="true" Filterable="true" FilterBy="@(item => item.Balance)">
                         <ChildContent Context="item">
                             <span class="font-semibold">@item.Balance.ToString("N2")</span>
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridTemplateColumn Title="Available Balance" Sortable="true">
+                    <BbDataGridTemplateColumn Title="Available Balance" Sortable="true" Filterable="true" FilterBy="@(item => item.AvailableBalance)">
                         <ChildContent Context="item">
                             <span class="@(item.AvailableBalance < 0 ? "text-red-500 font-semibold" : "")">
                                 @item.AvailableBalance.ToString("N2")
                             </span>
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridTemplateColumn Title="Debit On Hold" Sortable="true">
+                    <BbDataGridTemplateColumn Title="Debit On Hold" Sortable="true" Filterable="true" FilterBy="@(item => item.DebitOnHoldBalance)">
                         <ChildContent Context="item">
                             @if (item.DebitOnHoldBalance > 0)
                             {
@@ -127,22 +129,24 @@ else
                             }
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridTemplateColumn Title="Status">
+                    <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
                         <ChildContent Context="item">
                             <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusKey(item.Status)" />
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                     <BbDataGridTemplateColumn Title="Actions">
                         <ChildContent Context="item">
-                            <div class="flex items-center gap-1">
+                            <div class="flex items-center gap-1" @onclick:stopPropagation="true">
                                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                          AriaLabel="View wallet"
                                           OnClick="@(() => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))">
                                     <LucideIcon Name="eye" class="h-4 w-4" />
                                 </BbButton>
                                 @if (item.Status == WalletStatus.Active)
                                 {
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              AriaLabel="Request wallet freeze"
                                               OnClick="@(() => ToggleFreeze(item))">
                                         <LucideIcon Name="lock" class="h-4 w-4" />
                                     </BbButton>
@@ -150,6 +154,7 @@ else
                                 else if (item.Status == WalletStatus.Frozen)
                                 {
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              AriaLabel="Request wallet unfreeze"
                                               OnClick="@(() => ToggleFreeze(item))">
                                         <LucideIcon Name="lock-open" class="h-4 w-4" />
                                     </BbButton>
@@ -158,6 +163,9 @@ else
                         </ChildContent>
                     </BbDataGridTemplateColumn>
                 </Columns>
+                <EmptyTemplate>
+                    <BbEmpty Title="No wallets found" Description="Create a wallet to begin managing balances." />
+                </EmptyTemplate>
             </BbDataGrid>
         </BbCardContent>
     </BbCard>
@@ -167,7 +175,7 @@ else
 
 @* Create Wallet Dialog *@
 <BbDialog Open="@_showCreateDialog" OpenChanged="@(v => _showCreateDialog = v)">
-    <BbDialogContent>
+    <BbDialogContent TrapFocus="false">
         <BbDialogHeader>
             <BbDialogTitle>Create Wallet</BbDialogTitle>
             <BbDialogDescription>Create a new wallet account for a user credential.</BbDialogDescription>
@@ -209,10 +217,10 @@ else
                             ClearText="Clear wallet type"
                             AdvancedSearchTitle="Find Wallet Type"
                             AdvancedSearchDescription="Search wallet types available to the active tenant." />
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_newInitialBalance"
-                              Label="Initial Balance"
-                              Placeholder="0.00" />
+            <BbFormFieldCurrencyInput @bind-Value="_newInitialBalance"
+                                      Label="Initial Balance"
+                                      ShowSymbol="false"
+                                      Min="0" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showCreateDialog = false)">Cancel</BbButton>
@@ -236,6 +244,8 @@ else
     [Inject] private IWalletsServiceWrapper WalletsService { get; set; } = default!;
     [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private ILogger<Wallets> Logger { get; set; } = default!;
 
     private List<Wallet> _items = [];
     private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
@@ -257,7 +267,7 @@ else
     // Create form
     private string _newCredentialId = "";
     private string _newWalletTypeId = "";
-    private string _newInitialBalance = "0";
+    private decimal _newInitialBalance;
 
     protected override void OnInitialized()
     {
@@ -305,7 +315,8 @@ else
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Failed to load wallets: {ex.Message}");
+            Logger.LogError(ex, "Failed to load wallets.");
+            ToastService.Error("Could not load wallets.", "Wallets");
         }
         finally
         {
@@ -387,7 +398,7 @@ else
     {
         _newCredentialId = "";
         _newWalletTypeId = "";
-        _newInitialBalance = "0";
+        _newInitialBalance = 0;
         _showCreateDialog = true;
     }
 
@@ -395,42 +406,32 @@ else
     {
         if (!Guid.TryParse(_newCredentialId, out var credentialId))
         {
-            ToastService.Show("Select a user or credential.");
+            ToastService.Warning("Select a user or credential.", "Validation");
             return;
         }
 
         if (!_credentialTenantIds.TryGetValue(credentialId, out var walletTenantId))
         {
-            ToastService.Show("Selected credential was not found. Refresh and try again.");
+            ToastService.Warning("Selected credential was not found. Refresh and try again.", "Validation");
             return;
         }
 
-        var initialBalanceText = string.IsNullOrWhiteSpace(_newInitialBalance)
-            ? "0"
-            : _newInitialBalance.Trim();
-        if (!decimal.TryParse(initialBalanceText, NumberStyles.Number, CultureInfo.CurrentCulture, out var initialBalance)
-            && !decimal.TryParse(initialBalanceText, NumberStyles.Number, CultureInfo.InvariantCulture, out initialBalance))
+        if (_newInitialBalance < 0)
         {
-            ToastService.Show("Initial balance must be a valid number.");
-            return;
-        }
-
-        if (initialBalance < 0)
-        {
-            ToastService.Show("Initial balance cannot be negative.");
+            ToastService.Warning("Initial balance cannot be negative.", "Validation");
             return;
         }
 
         if (!Guid.TryParse(_newWalletTypeId, out var walletTypeId))
         {
-            ToastService.Show("Select a wallet type.");
+            ToastService.Warning("Select a wallet type.", "Validation");
             return;
         }
 
         var walletType = _walletTypes.FirstOrDefault(x => x.Id == walletTypeId);
         if (walletType is null)
         {
-            ToastService.Show("Selected wallet type was not found. Refresh and try again.");
+            ToastService.Warning("Selected wallet type was not found. Refresh and try again.", "Validation");
             return;
         }
 
@@ -441,24 +442,26 @@ else
             {
                 CredentialId = credentialId,
                 WalletTypeId = walletType.Id,
-                InitialBalance = initialBalance,
+                InitialBalance = _newInitialBalance,
                 Metadata = BuildCommandMetadata(walletTenantId)
             });
 
             if (response.IsSuccess)
             {
-                ToastService.Show("Wallet created successfully.");
+                ToastService.Success("Wallet created successfully.", "Wallets");
                 _showCreateDialog = false;
                 await Reload();
             }
             else
             {
-                ToastService.Show($"Failed to create wallet: {response.Message}");
+                Logger.LogWarning("Wallet creation failed: {Message}", response.Message);
+                ToastService.Error("Wallet could not be created.", "Wallets");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error creating wallet: {ex.Message}");
+            Logger.LogError(ex, "Wallet creation failed.");
+            ToastService.Error("Wallet could not be created.", "Wallets");
         }
         finally
         {
@@ -492,18 +495,26 @@ else
 
             if (fresh is null)
             {
-                ToastService.Show("Wallet not found. It may have been deleted.");
+                ToastService.Warning("Wallet not found. It may have been deleted.", "Wallets");
                 return;
             }
 
             if (fresh.Status is not (WalletStatus.Active or WalletStatus.Frozen))
             {
-                ToastService.Show($"Cannot toggle freeze. Wallet status is {fresh.Status}.");
+                ToastService.Warning($"Wallet status is {fresh.Status}; freeze changes are not available.", "Wallets");
                 return;
             }
 
             var isFreezing = fresh.Status == WalletStatus.Active;
             var operationType = isFreezing ? WalletOperationType.Freeze : WalletOperationType.Unfreeze;
+            if (!await DialogService.Confirm(
+                    isFreezing ? "Request Wallet Freeze" : "Request Wallet Unfreeze",
+                    isFreezing ? "Create an approval request to freeze this wallet?" : "Create an approval request to unfreeze this wallet?",
+                    new ConfirmDialogOptions { Destructive = isFreezing }))
+            {
+                return;
+            }
+
             var result = await WalletsAdminContracts.CreateWalletApprovalAsync(
                 operationType,
                 fresh.Id,
@@ -512,16 +523,18 @@ else
 
             if (result.IsSuccess)
             {
-                ToastService.Show($"Wallet {(isFreezing ? "freeze" : "unfreeze")} approval requested.");
+                ToastService.Success($"Wallet {(isFreezing ? "freeze" : "unfreeze")} approval requested.", "Wallets");
             }
             else
             {
-                ToastService.Show($"Failed to request wallet status change: {result.Message}");
+                Logger.LogWarning("Wallet status change request failed: {Message}", result.Message);
+                ToastService.Error("Wallet status change could not be requested.", "Wallets");
             }
         }
         catch (Exception ex)
         {
-            ToastService.Show($"Error updating wallet: {ex.Message}");
+            Logger.LogError(ex, "Wallet status change request failed.");
+            ToastService.Error("Wallet status change could not be requested.", "Wallets");
         }
     }
 
@@ -529,6 +542,8 @@ else
         _credentialLabels.TryGetValue(credentialId, out var label)
             ? label
             : $"{credentialId.ToString()[..8]}...";
+
+    private static string GetWalletTypeDisplay(Wallet wallet) => wallet.WalletType is null ? "N/A" : wallet.WalletType.Name;
 
     private static string GetCredentialPickerValue(IdentityCredential credential) => credential.Id.ToString();
 

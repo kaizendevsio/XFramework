@@ -1,4 +1,5 @@
 @page "/finance/wallet-approvals"
+@using System.Text.RegularExpressions
 @using global::Wallets.Domain.Shared.Enums
 @using XFramework.Domain.Shared.BusinessObjects
 @using XFramework.Domain.Shared.DataContext
@@ -6,16 +7,18 @@
 
 <PageTitle>Wallet Approvals - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<div class="space-y-6">
+    <div class="xf-page-header">
         <div>
             <BbTypographyH3>Wallet Approvals</BbTypographyH3>
             <BbTypographyMuted>Review maker-checker requests for sensitive wallet operations.</BbTypographyMuted>
         </div>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
-            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-            Refresh
-        </BbButton>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
     </div>
 
     @if (_loading)
@@ -32,7 +35,7 @@
     }
     else
     {
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div class="xf-summary-grid xf-summary-grid-4">
             <BbCard>
                 <BbCardContent>
                     <div class="space-y-1 pt-4">
@@ -75,22 +78,22 @@
             <BbCardContent>
                 <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
                     <Columns>
-                        <BbDataGridTemplateColumn Title="Operation" Sortable="true">
+                        <BbDataGridTemplateColumn Title="Operation" Sortable="true" Filterable="true" FilterBy="@(item => item.OperationType.ToString())">
                             <ChildContent Context="item">
                                 <BbBadge Variant="BadgeVariant.Outline">@item.OperationType</BbBadge>
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Status" Sortable="true">
+                        <BbDataGridTemplateColumn Title="Status" Sortable="true" Filterable="true" FilterBy="@(item => item.Status.ToString())">
                             <ChildContent Context="item">
                                 <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusCategory(item.Status)" />
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Wallet">
+                        <BbDataGridTemplateColumn Title="Wallet" Filterable="true" FilterBy="@(item => GetWalletLabel(item))">
                             <ChildContent Context="item">
                                 @if (item.WalletId is Guid walletId)
                                 {
                                     <BbButton Variant="ButtonVariant.Link" Size="ButtonSize.Small" OnClick="@(() => NavigationManager.NavigateTo($"/finance/wallets/{walletId}"))">
-                                        @(item.Wallet?.AccountNumber ?? walletId.ToString()[..8])
+                                        @GetWalletLabel(item)
                                     </BbButton>
                                 }
                                 else
@@ -99,18 +102,18 @@
                                 }
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Amount" Sortable="true">
+                        <BbDataGridTemplateColumn Title="Amount" Sortable="true" Filterable="true" FilterBy="@(item => item.Amount)">
                             <ChildContent Context="item">
                                 @(item.Amount?.ToString("N2") ?? "-")
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridTemplateColumn Title="Reason">
+                        <BbDataGridTemplateColumn Title="Reason" Filterable="true" FilterBy="@(item => FormatReason(item.Reason, 44))">
                             <ChildContent Context="item">
-                                <span title="@item.Reason">@(Trim(item.Reason, 44))</span>
+                                <span title="@FormatReason(item.Reason, 160)">@(FormatReason(item.Reason, 44))</span>
                             </ChildContent>
                         </BbDataGridTemplateColumn>
-                        <BbDataGridPropertyColumn Property="@(x => x.RequestedAt)" Title="Requested" Sortable="true" />
-                        <BbDataGridPropertyColumn Property="@(x => x.DecidedAt)" Title="Decided" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.RequestedAt)" Title="Requested" Sortable="true" Filterable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.DecidedAt)" Title="Decided" Sortable="true" Filterable="true" />
                         <BbDataGridTemplateColumn Title="Actions">
                             <ChildContent Context="item">
                                 <div class="flex flex-wrap gap-1">
@@ -131,6 +134,9 @@
                             </ChildContent>
                         </BbDataGridTemplateColumn>
                     </Columns>
+                    <EmptyTemplate>
+                        <BbEmpty Title="No approval requests found" Description="Sensitive Wallets workflow approvals will appear here." />
+                    </EmptyTemplate>
                 </BbDataGrid>
             </BbCardContent>
         </BbCard>
@@ -144,6 +150,8 @@
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private ILogger<WalletApprovals> Logger { get; set; } = default!;
 
     private List<WalletApprovalRequest> _items = [];
     private bool _loading = true;
@@ -198,7 +206,8 @@
         {
             _items = [];
             ResetSummary();
-            ToastService.Show($"Failed to load wallet approvals: {ex.Message}");
+            Logger.LogError(ex, "Failed to load wallet approvals.");
+            ToastService.Error("Could not load wallet approvals.", "Wallets");
         }
         finally
         {
@@ -208,10 +217,35 @@
     }
 
     private async Task Approve(WalletApprovalRequest item) =>
-        await RunDecision(() => WalletsAdminContracts.ApproveWalletApprovalAsync(item.Id), "Approval");
+        await ConfirmAndRunDecision(
+            () => WalletsAdminContracts.ApproveWalletApprovalAsync(item.Id),
+            "Approve Wallet Request",
+            "Approve this wallet operation request?",
+            "Approval",
+            false);
 
     private async Task Reject(WalletApprovalRequest item) =>
-        await RunDecision(() => WalletsAdminContracts.RejectWalletApprovalAsync(item.Id), "Rejection");
+        await ConfirmAndRunDecision(
+            () => WalletsAdminContracts.RejectWalletApprovalAsync(item.Id),
+            "Reject Wallet Request",
+            "Reject this wallet operation request?",
+            "Rejection",
+            true);
+
+    private async Task ConfirmAndRunDecision(
+        Func<Task<CmdResponse>> action,
+        string title,
+        string description,
+        string label,
+        bool destructive)
+    {
+        if (!await DialogService.Confirm(title, description, new ConfirmDialogOptions { Destructive = destructive }))
+        {
+            return;
+        }
+
+        await RunDecision(action, label);
+    }
 
     private async Task RunDecision(Func<Task<CmdResponse>> action, string label)
     {
@@ -219,8 +253,21 @@
         try
         {
             var result = await action();
-            ToastService.Show(result.IsSuccess ? $"{label} submitted." : result.Message ?? $"{label} failed.");
-            await LoadData();
+            if (result.IsSuccess)
+            {
+                ToastService.Success($"{label} submitted.", "Wallets");
+                await LoadData();
+            }
+            else
+            {
+                Logger.LogWarning("{Label} failed: {Message}", label, result.Message);
+                ToastService.Error($"{label} could not be completed.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "{Label} failed.", label);
+            ToastService.Error($"{label} could not be completed.", "Wallets");
         }
         finally
         {
@@ -243,6 +290,29 @@
         WalletApprovalStatus.Rejected => "failed",
         _ => "inactive"
     };
+
+    private static string GetWalletLabel(WalletApprovalRequest item) =>
+        item.Wallet is { } wallet
+            ? WalletsControlPanelDisplayService.BuildWalletLabel(wallet)
+            : item.WalletId is Guid walletId ? $"Wallet {WalletsControlPanelDisplayService.ShortId(walletId)}" : "None";
+
+    private static readonly Regex GuidTextPattern = new(
+        @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static string FormatReason(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "-";
+        }
+
+        var sanitized = GuidTextPattern.Replace(
+            value,
+            match => $"record {WalletsControlPanelDisplayService.ShortId(Guid.Parse(match.Value))}");
+
+        return Trim(sanitized, maxLength);
+    }
 
     private static string Trim(string? value, int maxLength)
     {

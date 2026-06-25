@@ -4,13 +4,13 @@
 
 <PageTitle>Wallet Reconciliation - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<div class="space-y-6">
+    <div class="xf-page-header">
         <div>
             <BbTypographyH3>Wallet Reconciliation</BbTypographyH3>
             <BbTypographyMuted>Review reconciliation snapshots and surface drift remediation actions.</BbTypographyMuted>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="xf-page-actions">
             <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@RunTenantReconciliation" Disabled="@_acting">
                 <LucideIcon Name="scan-line" class="mr-2 h-4 w-4" />
                 Run Drift Checks
@@ -36,7 +36,7 @@
     }
     else
     {
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div class="xf-summary-grid xf-summary-grid-4">
             <BbCard>
                 <BbCardContent>
                     <div class="space-y-1 pt-4">
@@ -86,19 +86,21 @@
                     <BbCardContent>
                         <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.TransferableBalance)" Title="Transferable" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.DriftAmount)" Title="Drift" Sortable="true" />
-                                <BbDataGridTemplateColumn Title="State">
+                                <BbDataGridTemplateColumn Title="Wallet" Sortable="true" Filterable="true" FilterBy="@(item => GetWalletLabel(item.WalletId))">
+                                    <ChildContent Context="item">@GetWalletLabel(item.WalletId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransferableBalance)" Title="Transferable" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DriftAmount)" Title="Drift" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="State" Filterable="true" FilterBy="@(item => item.IsReconciled ? "Reconciled" : "Drift")">
                                     <ChildContent Context="item">
                                         <BbBadge Variant="@(item.IsReconciled ? BadgeVariant.Default : BadgeVariant.Destructive)">
                                             @(item.IsReconciled ? "Reconciled" : "Drift")
                                         </BbBadge>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.ReconciledAt)" Title="Checked" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReconciledAt)" Title="Checked" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         @if (!item.IsReconciled)
@@ -110,6 +112,9 @@
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No balance snapshots found" Description="Run drift checks to create reconciliation snapshots." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
@@ -123,20 +128,22 @@
                     <BbCardContent>
                         <BbDataGrid Items="@_reconciliationItems" ShowPagination="true" InitialPageSize="20">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.CheckType)" Title="Check" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                                <BbDataGridTemplateColumn Title="Status">
+                                <BbDataGridPropertyColumn Property="@(x => x.CheckType)" Title="Check" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Wallet" Filterable="true" FilterBy="@(item => GetWalletLabel(item.WalletId))">
+                                    <ChildContent Context="item">@GetWalletLabel(item.WalletId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
                                     <ChildContent Context="item">
                                         <BbBadge Variant="@(item.Status == WalletReconciliationStatus.Drifted ? BadgeVariant.Destructive : BadgeVariant.Default)">
                                             @item.Status
                                         </BbBadge>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridPropertyColumn Property="@(x => x.ExpectedAmount)" Title="Expected" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ActualAmount)" Title="Actual" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.DriftAmount)" Title="Drift" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
-                                <BbDataGridPropertyColumn Property="@(x => x.RepairSuggestion)" Title="Repair Suggestion" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ExpectedAmount)" Title="Expected" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ActualAmount)" Title="Actual" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.DriftAmount)" Title="Drift" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.RepairSuggestion)" Title="Repair Suggestion" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         @if (item.Status == WalletReconciliationStatus.Drifted)
@@ -148,6 +155,9 @@
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No reconciliation items found" Description="Drift details and repair suggestions will appear here." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
@@ -162,9 +172,13 @@
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private WalletsControlPanelDisplayService DisplayService { get; set; } = default!;
+    [Inject] private ILogger<Reconciliation> Logger { get; set; } = default!;
 
     private List<WalletBalanceSnapshot> _items = [];
     private List<WalletReconciliationItem> _reconciliationItems = [];
+    private IReadOnlyDictionary<Guid, string> _walletLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
     private bool _acting;
     private bool _hasTenant;
@@ -196,6 +210,7 @@
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsReconciliation);
             _items = [];
             _reconciliationItems = [];
+            _walletLabels = new Dictionary<Guid, string>();
             ResetSummary();
 
             if (!_hasTenant || !_moduleEnabled)
@@ -225,13 +240,19 @@
                 .OrderByDescending(x => x.CreatedAt)
                 .Take(200)
                 .ToListAsync();
+
+            _walletLabels = await DisplayService.LoadWalletLabelsAsync(
+                tenantId,
+                _items.Select(x => (Guid?)x.WalletId).Concat(_reconciliationItems.Select(x => x.WalletId)));
         }
         catch (Exception ex)
         {
             _items = [];
             _reconciliationItems = [];
+            _walletLabels = new Dictionary<Guid, string>();
             ResetSummary();
-            ToastService.Show($"Failed to load wallet reconciliation: {ex.Message}");
+            Logger.LogError(ex, "Failed to load wallet reconciliation.");
+            ToastService.Error("Could not load wallet reconciliation.", "Wallets");
         }
         finally
         {
@@ -242,17 +263,40 @@
 
     private async Task RunTenantReconciliation()
     {
+        if (!await DialogService.Confirm("Run Drift Checks", "Run reconciliation drift checks for this tenant?", new ConfirmDialogOptions()))
+        {
+            return;
+        }
+
         await RunWalletReconciliation(null);
     }
 
     private async Task RunWalletReconciliation(Guid? walletId)
     {
+        if (walletId.HasValue && !await DialogService.Confirm("Re-run Wallet Reconciliation", "Re-run drift checks for this wallet?", new ConfirmDialogOptions()))
+        {
+            return;
+        }
+
         _acting = true;
         try
         {
             var result = await WalletsAdminContracts.RunReconciliationAsync(walletId);
-            ToastService.Show(result.IsSuccess ? "Reconciliation submitted." : result.Message ?? "Reconciliation is not available.");
-            await LoadData();
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Reconciliation submitted.", "Wallets");
+                await LoadData();
+            }
+            else
+            {
+                Logger.LogWarning("Reconciliation failed: {Message}", result.Message);
+                ToastService.Error("Reconciliation could not be submitted.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Reconciliation failed.");
+            ToastService.Error("Reconciliation could not be submitted.", "Wallets");
         }
         finally
         {
@@ -262,18 +306,39 @@
 
     private async Task MarkReconciled(WalletReconciliationItem item)
     {
+        if (!await DialogService.Confirm("Mark Reconciled", "Mark this reconciliation item as reconciled?", new ConfirmDialogOptions()))
+        {
+            return;
+        }
+
         _acting = true;
         try
         {
             var result = await WalletsAdminContracts.MarkReconciliationItemAsync(item.Id);
-            ToastService.Show(result.IsSuccess ? "Reconciliation item marked." : result.Message ?? "Mark reconciled is not available.");
-            await LoadData();
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Reconciliation item marked.", "Wallets");
+                await LoadData();
+            }
+            else
+            {
+                Logger.LogWarning("Mark reconciliation item failed: {Message}", result.Message);
+                ToastService.Error("Reconciliation item could not be marked.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Mark reconciliation item failed.");
+            ToastService.Error("Reconciliation item could not be marked.", "Wallets");
         }
         finally
         {
             _acting = false;
         }
     }
+
+    private string GetWalletLabel(Guid? walletId) =>
+        DisplayService.WalletLabel(walletId, _walletLabels);
 
     private void ResetSummary()
     {

@@ -193,6 +193,8 @@
     private string _userInitials = "A";
     private Guid? _breadcrumbProductId;
     private string? _breadcrumbProductLabel;
+    private Guid? _breadcrumbWalletId;
+    private string? _breadcrumbWalletLabel;
     private bool _profileMenuOpen;
 
     private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
@@ -224,6 +226,11 @@
             return BuildInventarioProductBreadcrumbs(productId, section);
         }
 
+        if (TryGetWalletDetailRoute(out var walletId, out section))
+        {
+            return BuildWalletBreadcrumbs(walletId, section);
+        }
+
         var path = new Uri(Nav.Uri).AbsolutePath.Trim('/');
         if (string.IsNullOrEmpty(path)) return [];
 
@@ -250,6 +257,24 @@
             ? _breadcrumbProductLabel
             : ShortId(productId);
 
+    private List<string> BuildWalletBreadcrumbs(Guid walletId, string section)
+    {
+        var normalizedSection = NormalizeWalletDetailSection(section);
+
+        return
+        [
+            "Finance",
+            "Wallets",
+            GetWalletBreadcrumbLabel(walletId),
+            WalletSectionLabel(normalizedSection)
+        ];
+    }
+
+    private string GetWalletBreadcrumbLabel(Guid walletId) =>
+        _breadcrumbWalletId == walletId && !string.IsNullOrWhiteSpace(_breadcrumbWalletLabel)
+            ? _breadcrumbWalletLabel
+            : $"Wallet {ShortId(walletId)}";
+
     private static string NormalizeProductDetailSection(string? section) =>
         string.IsNullOrWhiteSpace(section)
             ? "summary"
@@ -270,6 +295,28 @@
         "replenishment" => "Replenishment",
         "variations" => "Variations",
         "transactions" => "Transactions",
+        _ => HumanizeSegment(section)
+    };
+
+    private static string NormalizeWalletDetailSection(string? section) =>
+        string.IsNullOrWhiteSpace(section)
+            ? "summary"
+            : section.ToLowerInvariant() switch
+            {
+                "activity" => "transactions",
+                "history" => "transactions",
+                "operations" => "workflows",
+                "workflow" => "workflows",
+                "limits" => "rules",
+                _ => section.ToLowerInvariant()
+            };
+
+    private static string WalletSectionLabel(string section) => section switch
+    {
+        "summary" => "Summary",
+        "workflows" => "Workflows",
+        "transactions" => "Transactions",
+        "rules" => "Rules",
         _ => HumanizeSegment(section)
     };
 
@@ -666,13 +713,30 @@
 
     private async Task RefreshBreadcrumbEntityLabels()
     {
-        if (!TryGetInventarioProductDetailRoute(out var productId, out _))
+        if (TryGetInventarioProductDetailRoute(out var productId, out _))
         {
-            _breadcrumbProductId = null;
-            _breadcrumbProductLabel = null;
+            _breadcrumbWalletId = null;
+            _breadcrumbWalletLabel = null;
+            await RefreshProductBreadcrumbLabel(productId);
             return;
         }
 
+        if (TryGetWalletDetailRoute(out var walletId, out _))
+        {
+            _breadcrumbProductId = null;
+            _breadcrumbProductLabel = null;
+            await RefreshWalletBreadcrumbLabel(walletId);
+            return;
+        }
+
+        _breadcrumbProductId = null;
+        _breadcrumbProductLabel = null;
+        _breadcrumbWalletId = null;
+        _breadcrumbWalletLabel = null;
+    }
+
+    private async Task RefreshProductBreadcrumbLabel(Guid productId)
+    {
         if (_breadcrumbProductId == productId && !string.IsNullOrWhiteSpace(_breadcrumbProductLabel))
         {
             return;
@@ -702,6 +766,38 @@
         catch
         {
             _breadcrumbProductLabel = ShortId(productId);
+        }
+    }
+
+    private async Task RefreshWalletBreadcrumbLabel(Guid walletId)
+    {
+        if (_breadcrumbWalletId == walletId && !string.IsNullOrWhiteSpace(_breadcrumbWalletLabel))
+        {
+            return;
+        }
+
+        _breadcrumbWalletId = walletId;
+        _breadcrumbWalletLabel = $"Wallet {ShortId(walletId)}";
+
+        try
+        {
+            var wallet = (await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.WalletType)
+                .Include(x => x.Credential)
+                .Where(x => x.Id == walletId && !x.IsDeleted)
+                .Take(1)
+                .ToListAsync())
+                .FirstOrDefault();
+
+            _breadcrumbWalletLabel = wallet is null
+                ? $"Wallet {ShortId(walletId)}"
+                : WalletsControlPanelDisplayService.BuildWalletLabel(wallet);
+        }
+        catch
+        {
+            _breadcrumbWalletLabel = $"Wallet {ShortId(walletId)}";
         }
     }
 

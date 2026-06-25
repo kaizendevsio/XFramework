@@ -4,16 +4,22 @@
 
 <PageTitle>Refunds & Disputes - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<div class="space-y-6">
+    <div class="xf-page-header">
         <div>
             <BbTypographyH3>Refunds & Disputes</BbTypographyH3>
             <BbTypographyMuted>Create refund, dispute, and chargeback cases through Wallets workflow APIs.</BbTypographyMuted>
         </div>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
-            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-            Refresh
-        </BbButton>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="@OpenCaseDialog">
+                <LucideIcon Name="file-warning" class="mr-2 h-4 w-4" />
+                Open Case
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
     </div>
 
     @if (_loading)
@@ -30,68 +36,7 @@
     }
     else
     {
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>Open Refund / Dispute Case</BbCardTitle>
-                <BbCardDescription>Select a transaction or enter wallet details, then submit a case for workflow settlement.</BbCardDescription>
-            </BbCardHeader>
-            <BbCardContent>
-                <div class="grid gap-3 md:grid-cols-5">
-                    <BbFormFieldSelect TValue="string" @bind-Value="_caseType" Label="Case Type">
-                        @foreach (var caseType in Enum.GetValues<WalletCaseType>())
-                        {
-                            <BbSelectItem Value="@caseType.ToString()">@caseType</BbSelectItem>
-                        }
-                    </BbFormFieldSelect>
-                    <XfEntityPicker TItem="Wallet"
-                                    Label="Wallet"
-                                    Value="@_walletId"
-                                    ValueChanged="@(value => _walletId = value ?? "")"
-                                    Items="@_wallets"
-                                    ValueSelector="@GetWalletPickerValue"
-                                    TextSelector="@BuildWalletLabel"
-                                    SearchTextSelector="@GetWalletSearchText"
-                                    AdvancedColumns="@WalletAdvancedColumns"
-                                    AdvancedFilters="@WalletAdvancedFilters"
-                                    AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
-                                    Placeholder="Select wallet"
-                                    SearchPlaceholder="Search wallets..."
-                                    EmptyMessage="No wallets found."
-                                    AllowClear="true"
-                                    ClearText="Clear wallet"
-                                    AdvancedSearchTitle="Find Wallet"
-                                    AdvancedSearchDescription="Search wallets before creating a refund, dispute, or chargeback case." />
-                    <XfEntityPicker TItem="WalletTransaction"
-                                    Label="Original Transaction"
-                                    Value="@_transactionId"
-                                    ValueChanged="@OnTransactionPickerChanged"
-                                    Items="@_transactions"
-                                    ValueSelector="@GetTransactionPickerValue"
-                                    TextSelector="@BuildTransactionLabel"
-                                    SearchTextSelector="@GetTransactionSearchText"
-                                    AdvancedColumns="@TransactionAdvancedColumns"
-                                    AdvancedFilters="@TransactionAdvancedFilters"
-                                    AdvancedSearchScope="Searches transaction id, wallet, type, amount, fee, reference, held/released state, and created date."
-                                    Placeholder="No original transaction"
-                                    SearchPlaceholder="Search transactions..."
-                                    EmptyMessage="No transactions found."
-                                    AllowClear="true"
-                                    ClearText="No original transaction"
-                                    AdvancedSearchTitle="Find Original Transaction"
-                                    AdvancedSearchDescription="Search recent wallet transactions to link the case to its original movement." />
-                    <BbFormFieldInput TValue="decimal" @bind-Value="_amount" Label="Amount" />
-                    <BbFormFieldInput TValue="string" @bind-Value="_reason" Label="Reason" Placeholder="Customer refund or dispute reason" />
-                </div>
-                <div class="mt-4">
-                    <BbButton Variant="ButtonVariant.Destructive" OnClick="@SubmitCase" Disabled="@_acting">
-                        <LucideIcon Name="file-warning" class="mr-2 h-4 w-4" />
-                        Create Case
-                    </BbButton>
-                </div>
-            </BbCardContent>
-        </BbCard>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div class="xf-summary-grid xf-summary-grid-3">
             <BbCard>
                 <BbCardContent>
                     <div class="space-y-1 pt-4">
@@ -134,12 +79,14 @@
                     <BbCardContent>
                         <BbDataGrid Items="@_cases" ShowPagination="true" InitialPageSize="10">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.CaseType)" Title="Type" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReasonCode)" Title="Reason Code" />
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CaseType)" Title="Type" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Wallet" Filterable="true" FilterBy="@(item => GetWalletLabel(item.WalletId))">
+                                    <ChildContent Context="item">@GetWalletLabel(item.WalletId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReasonCode)" Title="Reason Code" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         @if (item.Status is WalletCaseStatus.Open or WalletCaseStatus.OnHold)
@@ -156,6 +103,9 @@
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No open cases found" Description="Open a refund, dispute, or chargeback case to start review." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
@@ -170,13 +120,18 @@
                     <BbCardContent>
                         <BbDataGrid Items="@_refundOperations" ShowPagination="true" InitialPageSize="10">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Type" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
-                                <BbDataGridPropertyColumn Property="@(x => x.FailureMessage)" Title="Failure" />
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.OperationType)" Title="Type" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Failure" Filterable="true" FilterBy="@(item => WalletsControlPanelDisplayService.SafeFailureSummary(item.FailureMessage))">
+                                    <ChildContent Context="item">@WalletsControlPanelDisplayService.SafeFailureSummary(item.FailureMessage)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No refund operations found" Description="Refund, reversal, and dispute operations will appear here." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
@@ -191,13 +146,17 @@
                     <BbCardContent>
                         <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
                             <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.Id)" Title="Transaction" />
-                                <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" />
-                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Transaction" Filterable="true" FilterBy="@(item => BuildTransactionLabel(item))">
+                                    <ChildContent Context="item">@BuildTransactionLabel(item)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Wallet" Filterable="true" FilterBy="@(item => GetWalletLabel(item.WalletId))">
+                                    <ChildContent Context="item">@GetWalletLabel(item.WalletId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransactionType)" Title="Type" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => SelectTransaction(item))">
@@ -206,6 +165,9 @@
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No recent transactions found" Description="Recent transactions available for case linking will appear here." />
+                            </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
@@ -214,12 +176,77 @@
     }
 </div>
 
+<BbDialog Open="@_caseDialogOpen" OpenChanged="@OnCaseDialogChanged">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogHeader>
+            <BbDialogTitle>Open Case</BbDialogTitle>
+            <BbDialogDescription>Select a transaction or wallet details, then submit a case for workflow settlement.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <BbFormFieldSelect TValue="string" @bind-Value="_caseType" Label="Case Type">
+                    @foreach (var caseType in Enum.GetValues<WalletCaseType>())
+                    {
+                        <BbSelectItem Value="@caseType.ToString()">@caseType</BbSelectItem>
+                    }
+                </BbFormFieldSelect>
+                <XfEntityPicker TItem="Wallet"
+                                Label="Wallet"
+                                Value="@_walletId"
+                                ValueChanged="@(value => _walletId = value ?? "")"
+                                Items="@_wallets"
+                                ValueSelector="@GetWalletPickerValue"
+                                TextSelector="@BuildWalletLabel"
+                                SearchTextSelector="@GetWalletSearchText"
+                                AdvancedColumns="@WalletAdvancedColumns"
+                                AdvancedFilters="@WalletAdvancedFilters"
+                                AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                Placeholder="Select wallet"
+                                SearchPlaceholder="Search wallets..."
+                                EmptyMessage="No wallets found."
+                                AllowClear="true"
+                                ClearText="Clear wallet"
+                                AdvancedSearchTitle="Find Wallet"
+                                AdvancedSearchDescription="Search wallets before creating a refund, dispute, or chargeback case." />
+                <XfEntityPicker TItem="WalletTransaction"
+                                Label="Original Transaction"
+                                Value="@_transactionId"
+                                ValueChanged="@OnTransactionPickerChanged"
+                                Items="@_transactions"
+                                ValueSelector="@GetTransactionPickerValue"
+                                TextSelector="@BuildTransactionLabel"
+                                SearchTextSelector="@GetTransactionSearchText"
+                                AdvancedColumns="@TransactionAdvancedColumns"
+                                AdvancedFilters="@TransactionAdvancedFilters"
+                                AdvancedSearchScope="Searches transaction reference, wallet, type, amount, fee, held/released state, and created date."
+                                Placeholder="No original transaction"
+                                SearchPlaceholder="Search transactions..."
+                                EmptyMessage="No transactions found."
+                                AllowClear="true"
+                                ClearText="No original transaction"
+                                AdvancedSearchTitle="Find Original Transaction"
+                                AdvancedSearchDescription="Search recent wallet transactions to link the case to its original movement." />
+                <BbFormFieldCurrencyInput @bind-Value="_amount" Label="Amount" ShowSymbol="false" Min="0" />
+                <BbFormFieldInput TValue="string" @bind-Value="_reason" Label="Reason" Placeholder="Customer refund or dispute reason" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@CloseCaseDialog" Disabled="@_acting">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="@SubmitCase" Disabled="@_acting">
+                Open Case
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private ILogger<RefundsDisputes> Logger { get; set; } = default!;
 
     private List<WalletTransaction> _transactions = [];
     private List<Wallet> _wallets = [];
@@ -229,6 +256,7 @@
     private bool _acting;
     private bool _hasTenant;
     private bool _moduleEnabled;
+    private bool _caseDialogOpen;
     private int _creditCount;
     private int _debitCount;
     private string _caseType = WalletCaseType.Refund.ToString();
@@ -320,7 +348,8 @@
             _wallets = [];
             _refundOperations = [];
             _cases = [];
-            ToastService.Show($"Failed to load refunds and disputes: {ex.Message}");
+            Logger.LogError(ex, "Failed to load refunds and disputes.");
+            ToastService.Error("Could not load refunds and disputes.", "Wallets");
         }
         finally
         {
@@ -331,6 +360,15 @@
 
     private async Task ResolveCase(WalletCase walletCase, bool approve)
     {
+        var title = approve ? "Approve Case" : "Reject Case";
+        var description = approve
+            ? "Approve this wallet case and continue settlement?"
+            : "Reject this wallet case?";
+        if (!await DialogService.Confirm(title, description, new ConfirmDialogOptions { Destructive = !approve }))
+        {
+            return;
+        }
+
         _acting = true;
         try
         {
@@ -339,11 +377,21 @@
                 approve,
                 approve ? "ControlPanel case approval" : "ControlPanel case rejection");
 
-            ToastService.Show(result.IsSuccess ? "Wallet case updated." : result.Message ?? "Wallet case action failed.");
             if (result.IsSuccess)
             {
+                ToastService.Success("Wallet case updated.", "Wallets");
                 await LoadData();
             }
+            else
+            {
+                Logger.LogWarning("Wallet case action failed: {Message}", result.Message);
+                ToastService.Error("Wallet case could not be updated.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Wallet case action failed.");
+            ToastService.Error("Wallet case could not be updated.", "Wallets");
         }
         finally
         {
@@ -376,19 +424,19 @@
     {
         if (!Guid.TryParse(_walletId, out var walletId))
         {
-            ToastService.Show("Enter a valid wallet ID.");
+            ToastService.Warning("Select a wallet.", "Validation");
             return;
         }
 
         if (_amount <= 0)
         {
-            ToastService.Show("Enter an amount greater than zero.");
+            ToastService.Warning("Enter an amount greater than zero.", "Validation");
             return;
         }
 
         if (!Enum.TryParse<WalletCaseType>(_caseType, out var caseType))
         {
-            ToastService.Show("Select a valid case type.");
+            ToastService.Warning("Select a valid case type.", "Validation");
             return;
         }
 
@@ -406,20 +454,60 @@
                 transactionId,
                 string.IsNullOrWhiteSpace(_reason) ? "ControlPanel case" : _reason.Trim());
 
-            ToastService.Show(result.IsSuccess ? "Wallet case created." : $"Failed to create wallet case: {result.Message}");
             if (result.IsSuccess)
             {
-                _walletId = "";
-                _transactionId = "";
-                _amount = 0;
-                _reason = "";
+                ToastService.Success("Wallet case created.", "Wallets");
+                _caseDialogOpen = false;
+                ResetCaseForm();
                 await LoadData();
             }
+            else
+            {
+                Logger.LogWarning("Wallet case creation failed: {Message}", result.Message);
+                ToastService.Error("Wallet case could not be created.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Wallet case creation failed.");
+            ToastService.Error("Wallet case could not be created.", "Wallets");
         }
         finally
         {
             _acting = false;
         }
+    }
+
+    private void OpenCaseDialog()
+    {
+        ResetCaseForm();
+        _caseDialogOpen = true;
+    }
+
+    private void CloseCaseDialog()
+    {
+        _caseDialogOpen = false;
+        ResetCaseForm();
+    }
+
+    private Task OnCaseDialogChanged(bool open)
+    {
+        _caseDialogOpen = open;
+        if (!open)
+        {
+            ResetCaseForm();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void ResetCaseForm()
+    {
+        _caseType = WalletCaseType.Refund.ToString();
+        _walletId = "";
+        _transactionId = "";
+        _amount = 0;
+        _reason = "";
     }
 
     private static string GetWalletPickerValue(Wallet wallet) => wallet.Id.ToString();
@@ -451,7 +539,7 @@
     }
 
     private string GetTransactionSearchText(WalletTransaction transaction) =>
-        $"{transaction.Id} {transaction.WalletId} {GetWalletLabel(transaction.WalletId)} {transaction.TransactionType} {transaction.Amount} {transaction.TransactionFee} {transaction.ReferenceNumber} {transaction.Remarks}";
+        $"{BuildTransactionLabel(transaction)} {WalletsControlPanelDisplayService.ShortId(transaction.Id)} {GetWalletLabel(transaction.WalletId)} {transaction.TransactionType} {transaction.Amount} {transaction.TransactionFee} {transaction.ReferenceNumber} {transaction.Remarks}";
 
     private IReadOnlyList<XfEntityPickerColumn<Wallet>> WalletAdvancedColumns =>
     [
@@ -472,12 +560,11 @@
 
     private IReadOnlyList<XfEntityPickerColumn<WalletTransaction>> TransactionAdvancedColumns =>
     [
-        new("Transaction", x => x.Id.ToString()[..8]),
+        new("Reference", x => string.IsNullOrWhiteSpace(x.ReferenceNumber) ? BuildTransactionLabel(x) : x.ReferenceNumber),
         new("Wallet", x => GetWalletLabel(x.WalletId)),
         new("Type", x => x.TransactionType?.ToString()),
         new("Amount", x => FormatDecimal(x.Amount)),
         new("Fee", x => FormatDecimal(x.TransactionFee)),
-        new("Reference", x => x.ReferenceNumber),
         new("Held", x => FormatBoolean(x.Held)),
         new("Released", x => FormatBoolean(x.Released)),
         new("Created", x => FormatDateTime(x.CreatedAt))

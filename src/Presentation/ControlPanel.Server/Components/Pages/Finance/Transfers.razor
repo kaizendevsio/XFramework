@@ -4,16 +4,18 @@
 
 <PageTitle>Transfers - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<div class="space-y-6">
+    <div class="xf-page-header">
         <div>
             <BbTypographyH3>Transfers</BbTypographyH3>
             <BbTypographyMuted>Inspect paired wallet transfers, fees, and transaction links.</BbTypographyMuted>
         </div>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
-            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-            Refresh
-        </BbButton>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
     </div>
 
     @if (_loading)
@@ -30,7 +32,7 @@
     }
     else
     {
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div class="xf-summary-grid xf-summary-grid-3">
             <BbCard>
                 <BbCardContent>
                     <div class="space-y-1 pt-4">
@@ -59,17 +61,26 @@
 
         <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
             <Columns>
-                <BbDataGridPropertyColumn Property="@(x => x.Id)" Title="Transfer" />
-                <BbDataGridPropertyColumn Property="@(x => x.SenderTransactionId)" Title="Sender Transaction" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.RecipientTransactionId)" Title="Recipient Transaction" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-                <BbDataGridTemplateColumn Title="Purpose">
+                <BbDataGridTemplateColumn Title="Transfer" Filterable="true" FilterBy="@(item => WalletsControlPanelDisplayService.BuildTransferLabel(item))">
+                    <ChildContent Context="item">@WalletsControlPanelDisplayService.BuildTransferLabel(item)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridTemplateColumn Title="Sender Transaction" Sortable="true" Filterable="true" FilterBy="@(item => GetTransactionLabel(item.SenderTransactionId))">
+                    <ChildContent Context="item">@GetTransactionLabel(item.SenderTransactionId)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridTemplateColumn Title="Recipient Transaction" Sortable="true" Filterable="true" FilterBy="@(item => GetTransactionLabel(item.RecipientTransactionId))">
+                    <ChildContent Context="item">@GetTransactionLabel(item.RecipientTransactionId)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Purpose" Filterable="true" FilterBy="@(item => item.TransactionPurpose.ToString())">
                     <ChildContent Context="item">
                         <BbBadge Variant="BadgeVariant.Outline">@item.TransactionPurpose</BbBadge>
                     </ChildContent>
                 </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
             </Columns>
+            <EmptyTemplate>
+                <BbEmpty Title="No transfers found" Description="Wallet transfer records will appear here." />
+            </EmptyTemplate>
         </BbDataGrid>
     }
 </div>
@@ -79,8 +90,11 @@
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private WalletsControlPanelDisplayService DisplayService { get; set; } = default!;
+    [Inject] private ILogger<Transfers> Logger { get; set; } = default!;
 
     private List<WalletTransfer> _items = [];
+    private IReadOnlyDictionary<Guid, string> _transactionLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
     private bool _hasTenant;
     private bool _moduleEnabled;
@@ -106,6 +120,7 @@
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsTransfers);
             _items = [];
+            _transactionLabels = new Dictionary<Guid, string>();
             _totalFees = 0;
             _latest = null;
 
@@ -125,13 +140,18 @@
 
             _totalFees = _items.Sum(x => x.TransactionFee);
             _latest = _items.Count == 0 ? null : _items.Max(x => x.CreatedAt);
+            _transactionLabels = await DisplayService.LoadTransactionLabelsAsync(
+                tenantId,
+                _items.Select(x => (Guid?)x.SenderTransactionId).Concat(_items.Select(x => (Guid?)x.RecipientTransactionId)));
         }
         catch (Exception ex)
         {
             _items = [];
+            _transactionLabels = new Dictionary<Guid, string>();
             _totalFees = 0;
             _latest = null;
-            ToastService.Show($"Failed to load transfers: {ex.Message}");
+            Logger.LogError(ex, "Failed to load transfers.");
+            ToastService.Error("Could not load transfers.", "Wallets");
         }
         finally
         {
@@ -139,6 +159,9 @@
             StateHasChanged();
         }
     }
+
+    private string GetTransactionLabel(Guid transactionId) =>
+        DisplayService.TransactionLabel(transactionId, _transactionLabels);
 
     public void Dispose()
     {

@@ -4,13 +4,18 @@
 
 <PageTitle>Wallet Operations - Control Panel</PageTitle>
 
-<div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <BbTypographyH3>Wallet Operations</BbTypographyH3>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
-            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-            Refresh
-        </BbButton>
+<div class="space-y-6">
+    <div class="xf-page-header">
+        <div>
+            <BbTypographyH3>Wallet Operations</BbTypographyH3>
+            <BbTypographyMuted>Review Wallets ledger operation history and policy output.</BbTypographyMuted>
+        </div>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
     </div>
 
     @if (_loading)
@@ -29,21 +34,26 @@
     {
         <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
             <Columns>
-                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                <BbDataGridTemplateColumn Title="Type">
+                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Type" Filterable="true" FilterBy="@(item => item.OperationType.ToString())">
                     <ChildContent Context="item">
                         <BbBadge Variant="BadgeVariant.Outline">@item.OperationType</BbBadge>
                     </ChildContent>
                 </BbDataGridTemplateColumn>
-                <BbDataGridTemplateColumn Title="Status">
+                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
                     <ChildContent Context="item">
                         <BbBadge Variant="@(item.Status == WalletOperationStatus.Completed ? BadgeVariant.Default : BadgeVariant.Outline)">@item.Status</BbBadge>
                     </ChildContent>
                 </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.IdempotencyKey)" Title="Idempotency Key" />
-                <BbDataGridPropertyColumn Property="@(x => x.ActorCredentialId)" Title="Actor" />
-                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.IdempotencyKey)" Title="Idempotency Key" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Actor" Filterable="true" FilterBy="@(item => GetCredentialLabel(item.ActorCredentialId))">
+                    <ChildContent Context="item">@GetCredentialLabel(item.ActorCredentialId)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
             </Columns>
+            <EmptyTemplate>
+                <BbEmpty Title="No wallet operations found" Description="Ledger operations and policy decisions will appear here." />
+            </EmptyTemplate>
         </BbDataGrid>
     }
 </div>
@@ -53,8 +63,11 @@
     [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private WalletsControlPanelDisplayService DisplayService { get; set; } = default!;
+    [Inject] private ILogger<WalletOperations> Logger { get; set; } = default!;
 
     private List<WalletOperation> _items = [];
+    private IReadOnlyDictionary<Guid, string> _credentialLabels = new Dictionary<Guid, string>();
     private bool _loading = true;
     private bool _hasTenant;
     private bool _moduleEnabled;
@@ -81,6 +94,7 @@
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsReporting);
             _items = [];
+            _credentialLabels = new Dictionary<Guid, string>();
 
             if (!_hasTenant || !_moduleEnabled)
             {
@@ -95,11 +109,16 @@
                 .OrderByDescending(x => x.CreatedAt);
 
             _items = await query.Take(200).ToListAsync();
+            _credentialLabels = await DisplayService.LoadCredentialLabelsAsync(
+                tenantId,
+                _items.Select(x => x.ActorCredentialId));
         }
         catch (Exception ex)
         {
             _items = [];
-            ToastService.Show($"Failed to load wallet operations: {ex.Message}");
+            _credentialLabels = new Dictionary<Guid, string>();
+            Logger.LogError(ex, "Failed to load wallet operations.");
+            ToastService.Error("Could not load wallet operations.", "Wallets");
         }
         finally
         {
@@ -107,6 +126,9 @@
             StateHasChanged();
         }
     }
+
+    private string GetCredentialLabel(Guid? credentialId) =>
+        DisplayService.CredentialLabel(credentialId, _credentialLabels);
 
     public void Dispose()
     {
