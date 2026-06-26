@@ -1,5 +1,4 @@
 @page "/messaging/threads/{Id:guid}"
-@using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
 <PageTitle>Messaging Thread Detail - Control Panel</PageTitle>
@@ -34,19 +33,6 @@ else if (_thread is null)
         </BbAlert>
     </div>
 }
-else if (_outsideTenantContext)
-{
-    <div class="space-y-4">
-        <BbButton Variant="ButtonVariant.Ghost" OnClick="@GoBack">
-            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
-            Back to Threads
-        </BbButton>
-        <BbAlert>
-            <BbAlertTitle>Thread Outside Active Tenant</BbAlertTitle>
-            <BbAlertDescription>Switch to the thread's tenant to view this record.</BbAlertDescription>
-        </BbAlert>
-    </div>
-}
 else
 {
     <FadeInContent>
@@ -58,11 +44,11 @@ else
                     </BbButton>
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <BbTypographyH3>@DisplayThreadName(_thread)</BbTypographyH3>
+                            <BbTypographyH3>@_thread.Name</BbTypographyH3>
                             <StatusBadge Text="@(_thread.IsEnabled ? "Enabled" : "Disabled")"
                                          Status="@(_thread.IsEnabled ? "active" : "inactive")" />
                         </div>
-                        <BbTypographyMuted>ID: @ShortId(_thread.Id) - Type: @(_thread.Type?.Name ?? "N/A")</BbTypographyMuted>
+                        <BbTypographyMuted>ID: @ShortId(_thread.Id) - Type: @_thread.TypeName</BbTypographyMuted>
                     </div>
                 </div>
                 <div class="xf-page-actions">
@@ -92,36 +78,36 @@ else
             <div class="xf-summary-grid xf-summary-grid-4">
                 <BbCard>
                     <BbCardHeader><BbCardTitle>Members</BbCardTitle><BbCardDescription>Active memberships</BbCardDescription></BbCardHeader>
-                    <BbCardContent><BbTypographyH2>@_members.Count</BbTypographyH2></BbCardContent>
+                    <BbCardContent><BbTypographyH2>@_summary.MemberCount</BbTypographyH2></BbCardContent>
                 </BbCard>
                 <BbCard>
                     <BbCardHeader><BbCardTitle>Messages</BbCardTitle><BbCardDescription>Loaded recent messages</BbCardDescription></BbCardHeader>
-                    <BbCardContent><BbTypographyH2>@_messages.Count</BbTypographyH2></BbCardContent>
+                    <BbCardContent><BbTypographyH2>@_summary.MessageCount</BbTypographyH2></BbCardContent>
                 </BbCard>
                 <BbCard>
                     <BbCardHeader><BbCardTitle>Muted</BbCardTitle><BbCardDescription>Muted memberships</BbCardDescription></BbCardHeader>
-                    <BbCardContent><BbTypographyH2>@_members.Count(x => x.IsMuted)</BbTypographyH2></BbCardContent>
+                    <BbCardContent><BbTypographyH2>@_summary.MutedMemberCount</BbTypographyH2></BbCardContent>
                 </BbCard>
                 <BbCard>
                     <BbCardHeader><BbCardTitle>Archived</BbCardTitle><BbCardDescription>Archived memberships</BbCardDescription></BbCardHeader>
-                    <BbCardContent><BbTypographyH2>@_members.Count(x => x.IsArchived)</BbTypographyH2></BbCardContent>
+                    <BbCardContent><BbTypographyH2>@_summary.ArchivedMemberCount</BbTypographyH2></BbCardContent>
                 </BbCard>
             </div>
 
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Thread Context</BbCardTitle>
-                    <BbCardDescription>@(string.IsNullOrWhiteSpace(_thread.Description) ? "No description" : _thread.Description)</BbCardDescription>
+                    <BbCardDescription>@_thread.Description</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
                     <div class="xf-detail-field-grid-wide">
                         <div class="space-y-1">
                             <BbTypographyMuted>Name</BbTypographyMuted>
-                            <BbTypographyLarge>@DisplayThreadName(_thread)</BbTypographyLarge>
+                            <BbTypographyLarge>@_thread.Name</BbTypographyLarge>
                         </div>
                         <div class="space-y-1">
                             <BbTypographyMuted>Type</BbTypographyMuted>
-                            <BbTypographyLarge>@(_thread.Type?.Name ?? _thread.TypeId.ToString()[..8])</BbTypographyLarge>
+                            <BbTypographyLarge>@_thread.TypeName</BbTypographyLarge>
                         </div>
                         <div class="space-y-1">
                             <BbTypographyMuted>Created</BbTypographyMuted>
@@ -133,11 +119,11 @@ else
                         </div>
                         <div class="space-y-1">
                             <BbTypographyMuted>Last Message</BbTypographyMuted>
-                            <BbTypographyLarge>@(_messages.FirstOrDefault()?.CreatedAt.ToString("g") ?? "No loaded messages")</BbTypographyLarge>
+                            <BbTypographyLarge>@(_thread.LastMessageAt?.ToString("g") ?? "No loaded messages")</BbTypographyLarge>
                         </div>
                         <div class="space-y-1">
                             <BbTypographyMuted>Tenant</BbTypographyMuted>
-                            <BbTypographyLarge>@(_guard?.TenantName ?? _thread.TenantId.ToString()[..8])</BbTypographyLarge>
+                            <BbTypographyLarge>@(_guard?.TenantName ?? ShortId(_thread.TenantId))</BbTypographyLarge>
                         </div>
                     </div>
                 </BbCardContent>
@@ -163,7 +149,7 @@ else
                             else
                             {
                                 <BbDataGrid Items="@_memberRows" ShowPagination="true" InitialPageSize="20"
-                                            OnRowClick="@((ThreadMemberRow row) => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))"
+                                            OnRowClick="@((MessagingAdminThreadMemberRow row) => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))"
                                             Class="cursor-pointer">
                                     <Columns>
                                         <BbDataGridTemplateColumn Title="User" Sortable="true" Filterable="true" FilterBy="@(row => row.DisplayName)">
@@ -258,20 +244,18 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
+    [Inject] private MessagingControlPanelReadService ReadService { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private MessagingControlPanelGuardResult? _guard;
-    private MessageThread? _thread;
-    private List<MessageThreadMember> _members = [];
-    private List<Message> _messages = [];
-    private List<ThreadMemberRow> _memberRows = [];
-    private List<ThreadMessageRow> _messageRows = [];
+    private MessagingAdminThreadContext? _thread;
+    private MessagingAdminThreadDetailSummary _summary = new();
+    private List<MessagingAdminThreadMemberRow> _memberRows = [];
+    private List<MessagingAdminThreadMessageRow> _messageRows = [];
     private bool _loading = true;
-    private bool _outsideTenantContext;
     private string? _error;
     private Guid? _loadedId;
 
@@ -305,10 +289,8 @@ else
     {
         _loading = true;
         _error = null;
-        _outsideTenantContext = false;
         _thread = null;
-        _members = [];
-        _messages = [];
+        _summary = new();
         _memberRows = [];
         _messageRows = [];
 
@@ -320,46 +302,16 @@ else
                 return;
             }
 
-            _thread = await DataContext.Query<MessageThread>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.Type)
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
-
-            _outsideTenantContext = _thread is not null && _thread.TenantId != tenantId;
-            if (_thread is null || _outsideTenantContext)
+            var detail = await ReadService.GetThreadDetailAsync(tenantId, Id);
+            if (detail is null)
             {
                 return;
             }
 
-            _members = await DataContext.Query<MessageThreadMember>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.Credential)
-                .Include(x => x.Group)
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => x.MessageThreadId == Id)
-                .Where(x => !x.IsDeleted)
-                .OrderBy(x => x.CreatedAt)
-                .Take(200)
-                .ToListAsync();
-
-            _messages = await DataContext.Query<Message>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => x.MessageThreadId == Id)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(100)
-                .ToListAsync();
-
-            var memberMap = _members.ToDictionary(x => x.Id);
-            _memberRows = _members.Select(CreateMemberRow).ToList();
-            _messageRows = _messages
-                .Select(message => CreateMessageRow(message, memberMap.GetValueOrDefault(message.MessageThreadMemberId)))
-                .ToList();
+            _thread = detail.Thread;
+            _summary = detail.Summary;
+            _memberRows = detail.Members;
+            _messageRows = detail.Messages;
         }
         catch
         {
@@ -372,82 +324,6 @@ else
         }
     }
 
-    private ThreadMemberRow CreateMemberRow(MessageThreadMember member) =>
-        new(
-            member.Id,
-            member.CredentialId,
-            GetCredentialLabel(member.Credential),
-            string.IsNullOrWhiteSpace(member.Alias) ? "N/A" : member.Alias,
-            member.Group is not null && !string.IsNullOrWhiteSpace(member.Group.Alias) ? member.Group.Alias : member.GroupId.ToString()[..8],
-            string.IsNullOrWhiteSpace(member.Role) ? MessageThreadMemberRoles.Member : member.Role,
-            member.IsMuted,
-            member.IsArchived,
-            member.LastSeenAt,
-            member.CreatedAt);
-
-    private ThreadMessageRow CreateMessageRow(Message message, MessageThreadMember? member) =>
-        new(
-            message.Id,
-            message.MessageThreadMemberId,
-            member?.CredentialId ?? Guid.Empty,
-            member is null ? message.MessageThreadMemberId.ToString()[..8] : GetMemberLabel(member),
-            Truncate(message.Text, 160),
-            message.ParentMessageId.HasValue,
-            CountMentions(message.MentionedCredentialIdsJson),
-            message.CreatedAt);
-
-    private static string DisplayThreadName(MessageThread thread) =>
-        string.IsNullOrWhiteSpace(thread.Name) ? ShortId(thread.Id) : thread.Name;
-
-    private static string GetMemberLabel(MessageThreadMember member)
-    {
-        if (!string.IsNullOrWhiteSpace(member.Alias))
-        {
-            return member.Alias;
-        }
-
-        return GetCredentialLabel(member.Credential);
-    }
-
-    private static string GetCredentialLabel(IdentityCredential? credential)
-    {
-        if (credential is null)
-        {
-            return "Unknown credential";
-        }
-
-        return credential.UserName
-            ?? credential.UserAlias
-            ?? credential.Id.ToString()[..8];
-    }
-
-    private static int CountMentions(string? mentionedCredentialIdsJson)
-    {
-        if (string.IsNullOrWhiteSpace(mentionedCredentialIdsJson))
-        {
-            return 0;
-        }
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<Guid>>(mentionedCredentialIdsJson)?.Count ?? 0;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
-    private static string Truncate(string? value, int maxLength)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return "N/A";
-        }
-
-        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
-    }
-
     private static string ShortId(Guid value) => value.ToString()[..8];
 
     private void GoBack() => Navigation.NavigateTo("/messaging/threads");
@@ -456,26 +332,4 @@ else
     {
         TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
-
-    private sealed record ThreadMemberRow(
-        Guid MemberId,
-        Guid CredentialId,
-        string DisplayName,
-        string Alias,
-        string Group,
-        string Role,
-        bool IsMuted,
-        bool IsArchived,
-        DateTime? LastSeenAt,
-        DateTime CreatedAt);
-
-    private sealed record ThreadMessageRow(
-        Guid MessageId,
-        Guid MemberId,
-        Guid CredentialId,
-        string Author,
-        string Preview,
-        bool IsReply,
-        int MentionCount,
-        DateTime CreatedAt);
 }

@@ -1,5 +1,6 @@
 using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts.Realtime;
+using Messaging.Domain.Shared.Contracts.Requests.Admin;
 using Messaging.Domain.Shared.Contracts.Requests.Create;
 using Messaging.Domain.Shared.Contracts.Requests.Settings;
 using Messaging.Domain.Shared.Contracts.Requests.Templates;
@@ -43,6 +44,24 @@ public interface IMessagingServiceWrapper : IServiceWrapper
         CancellationToken ct = default);
     Task<QueryResponse<RenderMessageTemplateResponse>> RenderMessageTemplateAsync(
         RenderMessageTemplateRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<MessagingAdminUsersResponse>> QueryMessagingAdminUsersAsync(
+        QueryMessagingAdminUsersRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<MessagingAdminUserDetailResponse>> GetMessagingAdminUserDetailAsync(
+        GetMessagingAdminUserDetailRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<MessagingAdminThreadsResponse>> QueryMessagingAdminThreadsAsync(
+        QueryMessagingAdminThreadsRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<MessagingAdminThreadDetailResponse>> GetMessagingAdminThreadDetailAsync(
+        GetMessagingAdminThreadDetailRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<MessagingAdminOperationsResponse>> GetMessagingAdminOperationsAsync(
+        GetMessagingAdminOperationsRequest request,
+        CancellationToken ct = default);
+    Task<QueryResponse<MessagingAdminModerationResponse>> GetMessagingAdminModerationAsync(
+        GetMessagingAdminModerationRequest request,
         CancellationToken ct = default);
     Task SubscribeThreadEventsAsync(
         Guid tenantId,
@@ -149,6 +168,54 @@ public sealed record MessagingServiceWrapper(
     {
         ct.ThrowIfCancellationRequested();
         return SendAsync<RenderMessageTemplateRequest, RenderMessageTemplateResponse>(request);
+    }
+
+    public Task<QueryResponse<MessagingAdminUsersResponse>> QueryMessagingAdminUsersAsync(
+        QueryMessagingAdminUsersRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<QueryMessagingAdminUsersRequest, MessagingAdminUsersResponse>(request);
+    }
+
+    public Task<QueryResponse<MessagingAdminUserDetailResponse>> GetMessagingAdminUserDetailAsync(
+        GetMessagingAdminUserDetailRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<GetMessagingAdminUserDetailRequest, MessagingAdminUserDetailResponse>(request);
+    }
+
+    public Task<QueryResponse<MessagingAdminThreadsResponse>> QueryMessagingAdminThreadsAsync(
+        QueryMessagingAdminThreadsRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<QueryMessagingAdminThreadsRequest, MessagingAdminThreadsResponse>(request);
+    }
+
+    public Task<QueryResponse<MessagingAdminThreadDetailResponse>> GetMessagingAdminThreadDetailAsync(
+        GetMessagingAdminThreadDetailRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<GetMessagingAdminThreadDetailRequest, MessagingAdminThreadDetailResponse>(request);
+    }
+
+    public Task<QueryResponse<MessagingAdminOperationsResponse>> GetMessagingAdminOperationsAsync(
+        GetMessagingAdminOperationsRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<GetMessagingAdminOperationsRequest, MessagingAdminOperationsResponse>(request);
+    }
+
+    public Task<QueryResponse<MessagingAdminModerationResponse>> GetMessagingAdminModerationAsync(
+        GetMessagingAdminModerationRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return SendAsync<GetMessagingAdminModerationRequest, MessagingAdminModerationResponse>(request);
     }
 
     public Task SubscribeThreadEventsAsync(

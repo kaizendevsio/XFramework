@@ -92,11 +92,11 @@ else
                     else
                     {
                         <BbDataGrid @key="_gridKey"
-                                    TData="MessagingUserAdminRow"
+                                    TData="MessagingAdminUserRow"
                                     ItemsProvider="@LoadUsers"
                                     ShowPagination="true"
                                     InitialPageSize="20"
-                                    OnRowClick="@((MessagingUserAdminRow row) => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))"
+                                    OnRowClick="@((MessagingAdminUserRow row) => Navigation.NavigateTo($"/messaging/users/{row.CredentialId}"))"
                                     Class="cursor-pointer">
                             <Columns>
                                 <BbDataGridTemplateColumn Title="User" Sortable="true" Filterable="true" FilterBy="@(row => row.DisplayName)">
@@ -218,12 +218,12 @@ else
         }
     }
 
-    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingUserAdminRow>> LoadUsers(
+    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingAdminUserRow>> LoadUsers(
         BlazorBlueprint.Primitives.DataGrid.DataGridRequest request)
     {
         return _guard?.TenantId is Guid tenantId
             ? ReadService.GetUsersAsync(tenantId, request)
-            : ValueTask.FromResult(new BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingUserAdminRow>
+            : ValueTask.FromResult(new BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingAdminUserRow>
             {
                 Items = [],
                 TotalItemCount = 0

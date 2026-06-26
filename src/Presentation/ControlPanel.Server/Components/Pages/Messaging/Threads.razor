@@ -100,11 +100,11 @@ else
                 else
                 {
                     <BbDataGrid @key="_gridKey"
-                                TData="MessagingThreadAdminRow"
+                                TData="MessagingAdminThreadRow"
                                 ItemsProvider="@LoadThreads"
                                 ShowPagination="true"
                                 InitialPageSize="20"
-                                OnRowClick="@((MessagingThreadAdminRow row) => Navigation.NavigateTo($"/messaging/threads/{row.Id}"))"
+                                OnRowClick="@((MessagingAdminThreadRow row) => Navigation.NavigateTo($"/messaging/threads/{row.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
                             <BbDataGridTemplateColumn Title="Thread" Sortable="true" Filterable="true" FilterBy="@(row => row.Name)">
@@ -221,12 +221,12 @@ else
         }
     }
 
-    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingThreadAdminRow>> LoadThreads(
+    private ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingAdminThreadRow>> LoadThreads(
         BlazorBlueprint.Primitives.DataGrid.DataGridRequest request)
     {
         return _guard?.TenantId is Guid tenantId
             ? ReadService.GetThreadsAsync(tenantId, request)
-            : ValueTask.FromResult(new BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingThreadAdminRow>
+            : ValueTask.FromResult(new BlazorBlueprint.Primitives.DataGrid.DataGridResult<MessagingAdminThreadRow>
             {
                 Items = [],
                 TotalItemCount = 0
