@@ -1,5 +1,4 @@
 @page "/messaging/users/{CredentialId:guid}"
-@using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
 <PageTitle>Messaging User Detail - Control Panel</PageTitle>
@@ -48,19 +47,19 @@ else
                     </BbButton>
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <BbTypographyH3>@DisplayName</BbTypographyH3>
+                            <BbTypographyH3>@_credential.DisplayName</BbTypographyH3>
                             <StatusBadge Text="@(_credential.IsOnline ? "Online" : "Offline")"
                                          Status="@(_credential.IsOnline ? "online" : "inactive")" />
                             <StatusBadge Text="@(_credential.IsEnabled ? "Enabled" : "Disabled")"
                                          Status="@(_credential.IsEnabled ? "active" : "inactive")" />
                         </div>
-                        <BbTypographyMuted>@(_credential.UserName ?? "No username") - Credential @ShortId(_credential.Id)</BbTypographyMuted>
+                        <BbTypographyMuted>@_credential.UserName - Credential @ShortId(_credential.Id)</BbTypographyMuted>
                     </div>
                 </div>
                 <div class="xf-page-actions">
-                    @if (_credential.IdentityInfoId != Guid.Empty)
+                    @if (_credential.IdentityInfoId is Guid identityInfoId)
                     {
-                        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/identity/users/{_credential.IdentityInfoId}"))">
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/identity/users/{identityInfoId}"))">
                             <LucideIcon Name="id-card" class="mr-2 h-4 w-4" />
                             Identity
                         </BbButton>
@@ -83,19 +82,19 @@ else
             <div class="xf-summary-grid xf-summary-grid-4">
                 <BbCard>
                     <BbCardHeader><BbCardTitle>Threads</BbCardTitle><BbCardDescription>Memberships</BbCardDescription></BbCardHeader>
-                    <BbCardContent><BbTypographyH2>@_threadRows.Count</BbTypographyH2></BbCardContent>
+                    <BbCardContent><BbTypographyH2>@_summary.ThreadCount</BbTypographyH2></BbCardContent>
                 </BbCard>
                 <BbCard>
-                    <BbCardHeader><BbCardTitle>Messages</BbCardTitle><BbCardDescription>Authored in loaded threads</BbCardDescription></BbCardHeader>
-                    <BbCardContent><BbTypographyH2>@_messageRows.Count</BbTypographyH2></BbCardContent>
+                    <BbCardHeader><BbCardTitle>Messages</BbCardTitle><BbCardDescription>Authored previews</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_summary.MessageCount</BbTypographyH2></BbCardContent>
                 </BbCard>
                 <BbCard>
-                    <BbCardHeader><BbCardTitle>Muted</BbCardTitle><BbCardDescription>Muted thread memberships</BbCardDescription></BbCardHeader>
-                    <BbCardContent><BbTypographyH2>@_threadRows.Count(x => x.IsMuted)</BbTypographyH2></BbCardContent>
+                    <BbCardHeader><BbCardTitle>Muted</BbCardTitle><BbCardDescription>Muted memberships</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_summary.MutedThreadCount</BbTypographyH2></BbCardContent>
                 </BbCard>
                 <BbCard>
                     <BbCardHeader><BbCardTitle>Blocks</BbCardTitle><BbCardDescription>Block relationships</BbCardDescription></BbCardHeader>
-                    <BbCardContent><BbTypographyH2>@_blockRows.Count</BbTypographyH2></BbCardContent>
+                    <BbCardContent><BbTypographyH2>@_summary.BlockRelationshipCount</BbTypographyH2></BbCardContent>
                 </BbCard>
             </div>
 
@@ -108,7 +107,7 @@ else
                     <div class="xf-detail-field-grid-wide">
                         <div class="space-y-1">
                             <BbTypographyMuted>Identity</BbTypographyMuted>
-                            <BbTypographyLarge>@IdentityLabel</BbTypographyLarge>
+                            <BbTypographyLarge>@_credential.IdentityLabel</BbTypographyLarge>
                         </div>
                         <div class="space-y-1">
                             <BbTypographyMuted>Alias</BbTypographyMuted>
@@ -155,7 +154,7 @@ else
                             else
                             {
                                 <BbDataGrid Items="@_threadRows" ShowPagination="true" InitialPageSize="10"
-                                            OnRowClick="@((UserThreadRow row) => Navigation.NavigateTo($"/messaging/threads/{row.ThreadId}"))"
+                                            OnRowClick="@((MessagingAdminUserThreadRow row) => Navigation.NavigateTo($"/messaging/threads/{row.ThreadId}"))"
                                             Class="cursor-pointer">
                                     <Columns>
                                         <BbDataGridTemplateColumn Title="Thread" Sortable="true" Filterable="true" FilterBy="@(row => row.ThreadName)">
@@ -302,26 +301,21 @@ else
 @code {
     [Parameter] public Guid CredentialId { get; set; }
 
-    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
+    [Inject] private MessagingControlPanelReadService ReadService { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private MessagingControlPanelGuardResult? _guard;
-    private IdentityCredential? _credential;
-    private List<UserThreadRow> _threadRows = [];
-    private List<UserMessageRow> _messageRows = [];
-    private List<UserInviteRow> _inviteRows = [];
-    private List<UserBlockRow> _blockRows = [];
-    private Dictionary<Guid, string> _credentialLabels = [];
+    private MessagingAdminCredentialContext? _credential;
+    private MessagingAdminUserDetailSummary _summary = new();
+    private List<MessagingAdminUserThreadRow> _threadRows = [];
+    private List<MessagingAdminUserMessageRow> _messageRows = [];
+    private List<MessagingAdminUserInviteRow> _inviteRows = [];
+    private List<MessagingAdminUserBlockRow> _blockRows = [];
     private bool _loading = true;
     private string? _error;
-
-    private string DisplayName => GetCredentialDisplayName(_credential);
-    private string IdentityLabel => _credential?.IdentityInfo?.FullName
-        ?? _credential?.IdentityInfo?.IdentityName
-        ?? "No identity record";
 
     protected override async Task OnInitializedAsync()
     {
@@ -343,11 +337,11 @@ else
         _loading = true;
         _error = null;
         _credential = null;
+        _summary = new();
         _threadRows = [];
         _messageRows = [];
         _inviteRows = [];
         _blockRows = [];
-        _credentialLabels = [];
 
         try
         {
@@ -357,87 +351,18 @@ else
                 return;
             }
 
-            _credential = await DataContext.Query<IdentityCredential>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.IdentityInfo)
-                .Where(x => x.TenantId == tenantId && x.Id == CredentialId && !x.IsDeleted)
-                .FirstOrDefaultAsync();
-
-            if (_credential is null)
+            var detail = await ReadService.GetUserDetailAsync(tenantId, CredentialId);
+            if (detail is null)
             {
                 return;
             }
 
-            var members = await DataContext.Query<MessageThreadMember>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && x.CredentialId == CredentialId && !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            var threadIds = members.Select(x => x.MessageThreadId).Distinct().ToHashSet();
-            var memberIds = members.Select(x => x.Id).ToHashSet();
-
-            var threads = await DataContext.Query<MessageThread>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.Type)
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(1000)
-                .ToListAsync();
-
-            var messages = await DataContext.Query<Message>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(2000)
-                .ToListAsync();
-
-            var invites = await DataContext.Query<MessageThreadInvite>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            var blocks = await DataContext.Query<MessageBlock>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            await LoadCredentialLabels(tenantId, invites, blocks);
-
-            var threadMap = threads.ToDictionary(x => x.Id);
-            _threadRows = members
-                .Select(member => CreateThreadRow(member, threadMap.GetValueOrDefault(member.MessageThreadId)))
-                .OrderByDescending(row => row.JoinedAt)
-                .ToList();
-
-            _messageRows = messages
-                .Where(message => memberIds.Contains(message.MessageThreadMemberId))
-                .Select(message => CreateMessageRow(message, threadMap.GetValueOrDefault(message.MessageThreadId)))
-                .OrderByDescending(row => row.CreatedAt)
-                .ToList();
-
-            _inviteRows = invites
-                .Where(invite => invite.InvitedCredentialId == CredentialId || invite.InvitedByCredentialId == CredentialId)
-                .Select(invite => CreateInviteRow(invite, threadMap.GetValueOrDefault(invite.MessageThreadId)))
-                .OrderByDescending(row => row.CreatedAt)
-                .ToList();
-
-            _blockRows = blocks
-                .Where(block => block.BlockerCredentialId == CredentialId || block.BlockedCredentialId == CredentialId)
-                .Select(CreateBlockRow)
-                .OrderByDescending(row => row.CreatedAt)
-                .ToList();
+            _credential = detail.Credential;
+            _summary = detail.Summary;
+            _threadRows = detail.Threads;
+            _messageRows = detail.Messages;
+            _inviteRows = detail.Invites;
+            _blockRows = detail.Blocks;
         }
         catch
         {
@@ -450,148 +375,10 @@ else
         }
     }
 
-    private async Task LoadCredentialLabels(
-        Guid tenantId,
-        IEnumerable<MessageThreadInvite> invites,
-        IEnumerable<MessageBlock> blocks)
-    {
-        var relatedCredentialIds = invites
-            .SelectMany(x => new[] { x.InvitedCredentialId, x.InvitedByCredentialId })
-            .Concat(blocks.SelectMany(x => new[] { x.BlockerCredentialId, x.BlockedCredentialId }))
-            .Append(CredentialId)
-            .Distinct()
-            .ToHashSet();
-
-        var credentials = await DataContext.Query<IdentityCredential>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Include(x => x.IdentityInfo)
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .OrderBy(x => x.UserName)
-            .Take(1000)
-            .ToListAsync();
-
-        _credentialLabels = credentials
-            .Where(x => relatedCredentialIds.Contains(x.Id))
-            .ToDictionary(x => x.Id, GetCredentialDisplayName);
-    }
-
-    private UserThreadRow CreateThreadRow(MessageThreadMember member, MessageThread? thread) =>
-        new(
-            member.MessageThreadId,
-            thread?.Name ?? member.MessageThreadId.ToString()[..8],
-            thread?.Type?.Name ?? thread?.TypeId.ToString()[..8] ?? "Unknown",
-            string.IsNullOrWhiteSpace(member.Role) ? MessageThreadMemberRoles.Member : member.Role,
-            member.IsMuted,
-            member.IsArchived,
-            member.LastSeenAt,
-            member.CreatedAt);
-
-    private UserMessageRow CreateMessageRow(Message message, MessageThread? thread) =>
-        new(
-            message.Id,
-            message.MessageThreadId,
-            thread?.Name ?? message.MessageThreadId.ToString()[..8],
-            Truncate(message.Text, 140),
-            message.ParentMessageId.HasValue,
-            CountMentions(message.MentionedCredentialIdsJson),
-            message.CreatedAt);
-
-    private UserInviteRow CreateInviteRow(MessageThreadInvite invite, MessageThread? thread) =>
-        new(
-            invite.Id,
-            thread?.Name ?? invite.MessageThreadId.ToString()[..8],
-            GetInviteStatusText(invite.Status),
-            GetInviteStatusKey(invite.Status),
-            GetCredentialLabel(invite.InvitedByCredentialId),
-            invite.CreatedAt);
-
-    private UserBlockRow CreateBlockRow(MessageBlock block)
-    {
-        var isOutbound = block.BlockerCredentialId == CredentialId;
-        var otherCredentialId = isOutbound ? block.BlockedCredentialId : block.BlockerCredentialId;
-
-        return new UserBlockRow(
-            block.Id,
-            isOutbound ? "Blocked by user" : "Blocked user",
-            GetCredentialLabel(otherCredentialId),
-            block.IsEnabled,
-            block.CreatedAt);
-    }
-
-    private static int CountMentions(string? mentionedCredentialIdsJson)
-    {
-        if (string.IsNullOrWhiteSpace(mentionedCredentialIdsJson))
-        {
-            return 0;
-        }
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<Guid>>(mentionedCredentialIdsJson)?.Count ?? 0;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
-    private string GetCredentialLabel(Guid credentialId) =>
-        _credentialLabels.GetValueOrDefault(credentialId) ?? credentialId.ToString()[..8];
-
-    private static string GetCredentialDisplayName(IdentityCredential? credential)
-    {
-        if (!string.IsNullOrWhiteSpace(credential?.IdentityInfo?.FullName))
-        {
-            return credential.IdentityInfo.FullName;
-        }
-
-        if (!string.IsNullOrWhiteSpace(credential?.IdentityInfo?.IdentityName))
-        {
-            return credential.IdentityInfo.IdentityName;
-        }
-
-        if (!string.IsNullOrWhiteSpace(credential?.UserAlias))
-        {
-            return credential.UserAlias;
-        }
-
-        if (!string.IsNullOrWhiteSpace(credential?.UserName))
-        {
-            return credential.UserName;
-        }
-
-        return credential is null ? "Unknown user" : credential.Id.ToString()[..8];
-    }
-
-    private static string GetInviteStatusText(short status) => status switch
-    {
-        MessageThreadInviteStatuses.Accepted => "Accepted",
-        MessageThreadInviteStatuses.Declined => "Declined",
-        _ => "Pending"
-    };
-
-    private static string GetInviteStatusKey(short status) => status switch
-    {
-        MessageThreadInviteStatuses.Accepted => "active",
-        MessageThreadInviteStatuses.Declined => "inactive",
-        _ => "pending"
-    };
-
     private static string FormatDate(DateTime? value) =>
         value is null || value == default ? "N/A" : value.Value.ToString("g");
 
     private static string ShortId(Guid value) => value.ToString()[..8];
-
-    private static string Truncate(string? value, int maxLength)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return "N/A";
-        }
-
-        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
-    }
 
     private void GoBack() => Navigation.NavigateTo("/messaging/users");
 
@@ -599,38 +386,4 @@ else
     {
         TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
-
-    private sealed record UserThreadRow(
-        Guid ThreadId,
-        string ThreadName,
-        string ThreadType,
-        string Role,
-        bool IsMuted,
-        bool IsArchived,
-        DateTime? LastSeenAt,
-        DateTime JoinedAt);
-
-    private sealed record UserMessageRow(
-        Guid MessageId,
-        Guid ThreadId,
-        string ThreadName,
-        string Preview,
-        bool HasParent,
-        int MentionCount,
-        DateTime CreatedAt);
-
-    private sealed record UserInviteRow(
-        Guid InviteId,
-        string ThreadName,
-        string StatusText,
-        string StatusKey,
-        string InvitedBy,
-        DateTime CreatedAt);
-
-    private sealed record UserBlockRow(
-        Guid BlockId,
-        string Direction,
-        string OtherCredential,
-        bool IsEnabled,
-        DateTime CreatedAt);
 }

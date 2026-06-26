@@ -1,5 +1,4 @@
 @page "/messaging/moderation"
-@using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
 <PageTitle>Messaging Moderation - Control Panel</PageTitle>
@@ -228,23 +227,16 @@ else
 }
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private MessagingControlPanelGuard Guard { get; set; } = default!;
+    [Inject] private MessagingControlPanelReadService ReadService { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private MessagingControlPanelGuardResult? _guard;
-    private List<ReportRow> _reportRows = [];
-    private List<BlockRow> _blockRows = [];
-    private List<PolicyRow> _policyRows = CreatePolicyRows();
-    private List<MessageThread> _threads = [];
-    private List<MessageThreadMember> _members = [];
-    private List<Message> _messages = [];
-    private List<IdentityCredential> _credentials = [];
-    private Dictionary<Guid, string> _threadLabels = [];
-    private Dictionary<Guid, string> _memberLabels = [];
-    private Dictionary<Guid, string> _credentialLabels = [];
+    private List<MessagingAdminReportRow> _reportRows = [];
+    private List<MessagingAdminBlockRow> _blockRows = [];
+    private List<MessagingAdminPolicyRow> _policyRows = [];
     private bool _loading = true;
     private string? _error;
     private string _reportSearch = "";
@@ -256,7 +248,7 @@ else
     private int _dismissedReportCount;
     private int _activeBlockCount;
 
-    private List<ReportRow> FilteredReportRows
+    private List<MessagingAdminReportRow> FilteredReportRows
     {
         get
         {
@@ -285,7 +277,7 @@ else
         }
     }
 
-    private List<BlockRow> FilteredBlockRows
+    private List<MessagingAdminBlockRow> FilteredBlockRows
     {
         get
         {
@@ -339,73 +331,18 @@ else
                 return;
             }
 
-            _threads = await DataContext.Query<MessageThread>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            _members = await DataContext.Query<MessageThreadMember>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Include(x => x.Credential)
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(1500)
-                .ToListAsync();
-
-            _messages = await DataContext.Query<Message>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(1500)
-                .ToListAsync();
-
-            _credentials = await DataContext.Query<IdentityCredential>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .OrderBy(x => x.UserName)
-                .Take(1500)
-                .ToListAsync();
-
-            BuildLookupLabels();
-
-            var reports = await DataContext.Query<MessageReport>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            var blocks = await DataContext.Query<MessageBlock>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId)
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(500)
-                .ToListAsync();
-
-            _reportRows = reports.Select(ToReportRow).ToList();
-            _blockRows = blocks.Select(ToBlockRow).ToList();
-            _openReportCount = reports.Count(x => x.Status == MessageReportStatuses.Open);
-            _reviewedReportCount = reports.Count(x => x.Status == MessageReportStatuses.Reviewed);
-            _dismissedReportCount = reports.Count(x => x.Status == MessageReportStatuses.Dismissed);
-            _activeBlockCount = blocks.Count(x => x.IsEnabled);
+            var data = await ReadService.GetModerationAsync(tenantId);
+            _openReportCount = data.OpenReportCount;
+            _reviewedReportCount = data.ReviewedReportCount;
+            _dismissedReportCount = data.DismissedReportCount;
+            _activeBlockCount = data.ActiveBlockCount;
+            _reportRows = data.Reports;
+            _blockRows = data.Blocks;
+            _policyRows = data.Policies;
         }
         catch
         {
-            _error = "Messaging moderation data could not be loaded. Check service health and data-context access.";
+            _error = "Messaging moderation data could not be loaded. Check service health and tenant access.";
             ToastService.Error("Messaging moderation data could not be loaded.", "Moderation Unavailable");
         }
         finally
@@ -421,140 +358,12 @@ else
     {
         _reportRows = [];
         _blockRows = [];
-        _threads = [];
-        _members = [];
-        _messages = [];
-        _credentials = [];
-        _threadLabels = [];
-        _memberLabels = [];
-        _credentialLabels = [];
+        _policyRows = [];
         _openReportCount = 0;
         _reviewedReportCount = 0;
         _dismissedReportCount = 0;
         _activeBlockCount = 0;
-        _policyRows = CreatePolicyRows();
     }
-
-    private void BuildLookupLabels()
-    {
-        _threadLabels = _threads.ToDictionary(x => x.Id, DisplayThreadName);
-
-        _credentialLabels = _credentials
-            .GroupBy(x => x.Id)
-            .ToDictionary(group => group.Key, group => BuildCredentialLabel(group.First()));
-
-        foreach (var member in _members.Where(x => x.Credential is not null))
-        {
-            _credentialLabels[member.CredentialId] = BuildCredentialLabel(member.Credential);
-        }
-
-        _memberLabels = _members.ToDictionary(x => x.Id, GetMemberLabel);
-    }
-
-    private ReportRow ToReportRow(MessageReport report)
-    {
-        var message = _messages.FirstOrDefault(x => x.Id == report.MessageId);
-        var threadId = message?.MessageThreadId;
-        var status = ReportStatusLabel(report.Status);
-
-        return new ReportRow(
-            report.Id,
-            status,
-            ReportStatusKey(report.Status),
-            string.IsNullOrWhiteSpace(report.Reason) ? "N/A" : report.Reason,
-            report.Details ?? string.Empty,
-            threadId,
-            threadId is Guid id ? GetThreadLabel(id) : "Unknown thread",
-            message is null ? $"{report.MessageId.ToString()[..8]}..." : Truncate(message.Text, 96),
-            GetMemberLabel(report.ReporterMemberId),
-            report.CreatedAt);
-    }
-
-    private BlockRow ToBlockRow(MessageBlock block)
-    {
-        var status = block.IsEnabled ? "Active" : "Inactive";
-        return new BlockRow(
-            block.Id,
-            GetCredentialLabel(block.BlockerCredentialId),
-            GetCredentialLabel(block.BlockedCredentialId),
-            status,
-            block.IsEnabled ? "active" : "inactive",
-            block.CreatedAt);
-    }
-
-    private string GetThreadLabel(Guid threadId) =>
-        _threadLabels.TryGetValue(threadId, out var label) ? label : $"{threadId.ToString()[..8]}...";
-
-    private string GetMemberLabel(Guid memberId) =>
-        _memberLabels.TryGetValue(memberId, out var label) ? label : $"{memberId.ToString()[..8]}...";
-
-    private string GetMemberLabel(MessageThreadMember member)
-    {
-        if (!string.IsNullOrWhiteSpace(member.Alias))
-        {
-            return member.Alias;
-        }
-
-        if (member.Credential is not null)
-        {
-            return BuildCredentialLabel(member.Credential);
-        }
-
-        return GetCredentialLabel(member.CredentialId);
-    }
-
-    private string GetCredentialLabel(Guid credentialId) =>
-        _credentialLabels.TryGetValue(credentialId, out var label) ? label : $"{credentialId.ToString()[..8]}...";
-
-    private static string DisplayThreadName(MessageThread thread) =>
-        string.IsNullOrWhiteSpace(thread.Name) ? $"{thread.Id.ToString()[..8]}..." : thread.Name;
-
-    private static string BuildCredentialLabel(IdentityCredential credential) =>
-        credential.UserName
-        ?? credential.UserAlias
-        ?? $"{credential.Id.ToString()[..8]}...";
-
-    private static string ReportStatusLabel(short status) => status switch
-    {
-        MessageReportStatuses.Reviewed => "Reviewed",
-        MessageReportStatuses.Dismissed => "Dismissed",
-        _ => "Open"
-    };
-
-    private static string ReportStatusKey(short status) => status switch
-    {
-        MessageReportStatuses.Reviewed => "active",
-        MessageReportStatuses.Dismissed => "inactive",
-        _ => "pending"
-    };
-
-    private static List<PolicyRow> CreatePolicyRows() =>
-    [
-        new(
-            "Global API rate limit",
-            "Messaging API",
-            "Active",
-            "active",
-            "100 requests per minute per IP through XFramework rate limiting."),
-        new(
-            "General API policy",
-            "Named policy",
-            "Active",
-            "active",
-            "60 requests per minute per IP where the API policy is applied."),
-        new(
-            "Attachment validation",
-            "Message file links",
-            "Active",
-            "active",
-            "25 MB maximum, tenant-owned StorageFile required, deleted files rejected, executable/script extensions blocked."),
-        new(
-            "DM blocking",
-            "1:1 direct threads",
-            "Active",
-            "active",
-            "Blocked credentials cannot continue direct-message creation or sending with the blocker.")
-    ];
 
     private static string Truncate(string? value, int maxLength)
     {
@@ -573,31 +382,4 @@ else
     {
         TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
-
-    private sealed record ReportRow(
-        Guid Id,
-        string Status,
-        string StatusKey,
-        string Reason,
-        string Details,
-        Guid? ThreadId,
-        string Thread,
-        string MessagePreview,
-        string Reporter,
-        DateTime CreatedAt);
-
-    private sealed record BlockRow(
-        Guid Id,
-        string Blocker,
-        string Blocked,
-        string Status,
-        string StatusKey,
-        DateTime CreatedAt);
-
-    private sealed record PolicyRow(
-        string Policy,
-        string Scope,
-        string Status,
-        string StatusKey,
-        string Details);
 }

@@ -24,6 +24,7 @@ builder.Services.AddScoped<IMessagingRealtimePublisher, MessagingRealtimePublish
 builder.Services.AddScoped<IMessagingNotificationFanout, MessagingNotificationFanout>();
 builder.Services.AddScoped<IMessagingSettingsService, MessagingSettingsService>();
 builder.Services.AddScoped<IMessagingTemplateService, MessagingTemplateService>();
+builder.Services.AddScoped<IMessagingAdminReadService, MessagingAdminReadService>();
 
 // Register validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
