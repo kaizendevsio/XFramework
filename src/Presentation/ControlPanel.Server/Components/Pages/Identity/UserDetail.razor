@@ -410,6 +410,136 @@ else
                 </div>
                 break;
 
+            case "attendance":
+                <div class="xf-fade-in">
+                @if (TenantFilter.SelectedTenantId is not Guid)
+                {
+                    <ModuleUnavailable ModuleName="Attendance" RequiresTenant="true" />
+                }
+                else if (!_attendanceModuleEnabled)
+                {
+                    <ModuleUnavailable ModuleName="Attendance" />
+                }
+                else
+                {
+                    <div class="space-y-6">
+                        <BbCard>
+                            <BbCardHeader>
+                                <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                                    <div>
+                                        <BbCardTitle>Attendance</BbCardTitle>
+                                        <BbCardDescription>Read-only attendance participation and session records across this user's credentials.</BbCardDescription>
+                                    </div>
+                                    <div class="w-full md:w-80">
+                                        <BbFormFieldSelect TValue="string"
+                                                           Value="@_attendanceCredentialFilter"
+                                                           ValueChanged="@OnAttendanceCredentialFilterChanged"
+                                                           Label="Credential">
+                                            <BbSelectItem Value="@AllAttendanceCredentialsValue">All credentials</BbSelectItem>
+                                            @foreach (var credential in _credentials)
+                                            {
+                                                <BbSelectItem Value="@credential.Id.ToString()">@GetCredentialLabel(credential)</BbSelectItem>
+                                            }
+                                        </BbFormFieldSelect>
+                                    </div>
+                                </div>
+                            </BbCardHeader>
+                            <BbCardContent>
+                                <BbDataGrid Items="@_attendanceParticipations"
+                                            ShowPagination="true"
+                                            InitialPageSize="10"
+                                            ShowSearch="true"
+                                            SearchPlaceholder="Search participation...">
+                                    <Columns>
+                                        <BbDataGridPropertyColumn Property="@(x => x.ContextName)" Title="Context" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Type" Sortable="true" Filterable="true" FilterBy="@(item => item.ContextType.ToString())">
+                                            <ChildContent Context="item">@AttendanceControlPanelReadService.FormatEnumLabel(item.ContextType)</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(x => x.CredentialLabel)" Title="Credential" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(x => x.DisplayName)" Title="Display Name" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(x => x.ReferenceCode)" Title="Reference" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsActive ? "Active" : "Inactive")">
+                                            <ChildContent Context="item">
+                                                <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(x => x.StartedAt)" Title="Started" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Ended" Sortable="true" Filterable="true" FilterBy="@(item => FormatNullableDateFilter(item.EndedAt))">
+                                            <ChildContent Context="item">@FormatNullableDateDisplay(item.EndedAt)</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Actions">
+                                            <ChildContent Context="item">
+                                                <BbButton Variant="ButtonVariant.Outline"
+                                                          Size="ButtonSize.Small"
+                                                          OnClick="@(() => Navigation.NavigateTo($"/attendance/sessions?contextId={item.ContextId}"))">
+                                                    <LucideIcon Name="external-link" class="mr-1 h-3 w-3" />
+                                                    Sessions
+                                                </BbButton>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                    </Columns>
+                                    <EmptyTemplate>
+                                        <BbEmpty Title="No attendance participation" Description="This user is not linked to attendance contexts through the selected credentials." />
+                                    </EmptyTemplate>
+                                </BbDataGrid>
+                            </BbCardContent>
+                        </BbCard>
+
+                        <BbCard>
+                            <BbCardHeader>
+                                <BbCardTitle>Attendance Records</BbCardTitle>
+                                <BbCardDescription>@_attendanceRecords.Count record(s) loaded for the selected credential filter.</BbCardDescription>
+                            </BbCardHeader>
+                            <BbCardContent>
+                                <BbDataGrid Items="@_attendanceRecords"
+                                            ShowPagination="true"
+                                            InitialPageSize="20"
+                                            ShowSearch="true"
+                                            SearchPlaceholder="Search attendance records...">
+                                    <Columns>
+                                        <BbDataGridPropertyColumn Property="@(x => x.SessionName)" Title="Session" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(x => x.ContextName)" Title="Context" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(x => x.CredentialLabel)" Title="Credential" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Status" Sortable="true" Filterable="true" FilterBy="@(item => item.Status.ToString())">
+                                            <ChildContent Context="item">
+                                                <StatusBadge Text="@AttendanceControlPanelReadService.FormatEnumLabel(item.Status)"
+                                                             Status="@AttendanceControlPanelReadService.StatusKey(item.Status)" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(x => x.StartsAt)" Title="Starts" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Check In" Sortable="true" Filterable="true" FilterBy="@(item => FormatNullableDateFilter(item.FirstCheckInAt))">
+                                            <ChildContent Context="item">@FormatNullableDateDisplay(item.FirstCheckInAt)</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Check Out" Sortable="true" Filterable="true" FilterBy="@(item => FormatNullableDateFilter(item.LastCheckOutAt))">
+                                            <ChildContent Context="item">@FormatNullableDateDisplay(item.LastCheckOutAt)</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Manual" Filterable="true" FilterBy="@(item => item.IsManual ? "Manual" : "System")">
+                                            <ChildContent Context="item">
+                                                <StatusBadge Text="@(item.IsManual ? "Manual" : "System")" Status="@(item.IsManual ? "manual-adjusted" : "inactive")" />
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridTemplateColumn Title="Actions">
+                                            <ChildContent Context="item">
+                                                <BbButton Variant="ButtonVariant.Outline"
+                                                          Size="ButtonSize.Small"
+                                                          OnClick="@(() => Navigation.NavigateTo($"/attendance/sessions/{item.SessionId}"))">
+                                                    <LucideIcon Name="external-link" class="mr-1 h-3 w-3" />
+                                                    Session
+                                                </BbButton>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                    </Columns>
+                                    <EmptyTemplate>
+                                        <BbEmpty Title="No attendance records" Description="No attendance records are linked to the selected credentials." />
+                                    </EmptyTemplate>
+                                </BbDataGrid>
+                            </BbCardContent>
+                        </BbCard>
+                    </div>
+                }
+                </div>
+                break;
+
             case "wallets":
                 <div class="xf-fade-in">
                 <BbCard>
@@ -713,6 +843,8 @@ else
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private AttendanceControlPanelReadService AttendanceReadService { get; set; } = default!;
     [Inject] private IIdentityServerServiceWrapper IdentityServer { get; set; } = default!;
 
     // Main data
@@ -724,6 +856,8 @@ else
     private List<Session> _sessions = [];
     private List<AuthorizationLog> _authLogs = [];
     private List<Wallet> _wallets = [];
+    private List<AttendanceUserParticipationRow> _attendanceParticipations = [];
+    private List<AttendanceUserRecordRow> _attendanceRecords = [];
 
     // Lookup data
     private List<IdentityRoleType> _roleTypes = [];
@@ -734,7 +868,9 @@ else
     private bool _loading = true;
     private bool _saving;
     private bool _outsideTenantContext;
+    private bool _attendanceModuleEnabled;
     private Guid? _loadedId;
+    private string _attendanceCredentialFilter = AllAttendanceCredentialsValue;
     private string CurrentSection => NormalizeSection(Section);
 
     // Editable form
@@ -758,6 +894,7 @@ else
         _roleTypes.Select(x => new SelectOption<string>(x.Id.ToString(), GetRoleTypeLabel(x))).ToList();
     private List<SelectOption<string>> ContactTypeOptions =>
         _contactTypes.Select(x => new SelectOption<string>(x.Id.ToString(), GetContactTypeLabel(x))).ToList();
+    private const string AllAttendanceCredentialsValue = "all";
     private static readonly DateTime NoRoleExpirationUtc = new(9999, 12, 31, 23, 59, 59, DateTimeKind.Utc);
 
     // Create Credential dialog
@@ -783,6 +920,7 @@ else
     protected override void OnInitialized()
     {
         TenantFilter.OnChanged += OnTenantFilterChanged;
+        ModuleNavigation.OnChanged += OnTenantFilterChanged;
     }
 
     protected override async Task OnParametersSetAsync()
@@ -825,6 +963,7 @@ else
             or "addresses"
             or "sessions"
             or "auth-logs"
+            or "attendance"
             or "wallets"
             ? normalized
             : "summary";
@@ -845,6 +984,8 @@ else
         try
         {
             _outsideTenantContext = false;
+            await ModuleNavigation.EnsureLoadedAsync();
+            _attendanceModuleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Attendance);
             _user = await DataContext.Query<IdentityInformation>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -871,6 +1012,7 @@ else
             await LoadSessions();
             await LoadAuthLogs();
             await LoadWallets();
+            await LoadAttendance();
             await LoadLookups();
         }
         catch
@@ -892,6 +1034,8 @@ else
         _sessions = [];
         _authLogs = [];
         _wallets = [];
+        _attendanceParticipations = [];
+        _attendanceRecords = [];
     }
 
     private async Task LoadCredentials()
@@ -1037,6 +1181,40 @@ else
             _wallets = _wallets.OrderByDescending(x => x.CreatedAt).ToList();
         }
         catch { _wallets = []; }
+    }
+
+    private async Task LoadAttendance()
+    {
+        try
+        {
+            if (_user is null
+                || TenantFilter.SelectedTenantId is not Guid tenantId
+                || !_attendanceModuleEnabled)
+            {
+                _attendanceParticipations = [];
+                _attendanceRecords = [];
+                return;
+            }
+
+            _attendanceParticipations = (await AttendanceReadService.LoadUserParticipationRowsAsync(tenantId, Id)).ToList();
+
+            Guid? credentialId = Guid.TryParse(_attendanceCredentialFilter, out var parsedCredentialId)
+                ? parsedCredentialId
+                : null;
+
+            _attendanceRecords = (await AttendanceReadService.LoadUserRecordRowsAsync(tenantId, Id, credentialId)).ToList();
+        }
+        catch
+        {
+            _attendanceParticipations = [];
+            _attendanceRecords = [];
+        }
+    }
+
+    private async Task OnAttendanceCredentialFilterChanged(string value)
+    {
+        _attendanceCredentialFilter = string.IsNullOrWhiteSpace(value) ? AllAttendanceCredentialsValue : value;
+        await LoadAttendance();
     }
 
     private async Task LoadLookups()
@@ -1651,6 +1829,8 @@ else
 
     private static string FormatBoolean(bool value) => value ? "Yes" : "No";
     private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
+    private static string FormatNullableDateFilter(DateTime? value) => value.HasValue ? value.Value.ToString("g") : string.Empty;
+    private static string FormatNullableDateDisplay(DateTime? value) => value.HasValue ? value.Value.ToString("g") : "N/A";
 
     private static bool TryResolveRoleExpiration(string? value, out DateTime expiration)
     {
@@ -1718,5 +1898,6 @@ else
     public void Dispose()
     {
         TenantFilter.OnChanged -= OnTenantFilterChanged;
+        ModuleNavigation.OnChanged -= OnTenantFilterChanged;
     }
 }

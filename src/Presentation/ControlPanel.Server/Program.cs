@@ -115,6 +115,7 @@ builder.Services.AddScoped<MessagingControlPanelSettingsService>();
 builder.Services.AddScoped<MessagingControlPanelTemplateService>();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddScoped<CommunityControlPanelAccessService>();
+builder.Services.AddScoped<AttendanceControlPanelReadService>();
 builder.Services.AddScoped<WalletsAdminBackendContractService>();
 builder.Services.AddScoped<WalletsControlPanelDisplayService>();
 builder.Services.AddScoped<ControlPanelAuthService>();
