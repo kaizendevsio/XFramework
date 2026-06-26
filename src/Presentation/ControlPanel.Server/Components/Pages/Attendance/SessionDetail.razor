@@ -1,0 +1,655 @@
+@page "/attendance/sessions/{Id:guid}"
+@using XFramework.Domain.Shared.BusinessObjects
+@implements IDisposable
+
+<PageTitle>Attendance Session - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Attendance" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="Attendance" />
+}
+else if (_detail is null)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/attendance/sessions"))">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Sessions
+        </BbButton>
+        <BbAlert Variant="AlertVariant.Warning">
+            <BbAlertTitle>Session Not Found</BbAlertTitle>
+            <BbAlertDescription>The attendance session was not found for the active tenant.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div class="flex items-center gap-4">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="@(() => Navigation.NavigateTo("/attendance/sessions"))">
+                        <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                    </BbButton>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <BbTypographyH3>@_detail.Session.Name</BbTypographyH3>
+                            <StatusBadge Text="@AttendanceControlPanelReadService.FormatEnumLabel(_detail.Session.Status)"
+                                         Status="@AttendanceControlPanelReadService.StatusKey(_detail.Session.Status)" />
+                        </div>
+                        <BbTypographyMuted>@ContextLabel - @_detail.Session.StartsAt.ToLocalTime().ToString("g") to @_detail.Session.EndsAt.ToLocalTime().ToString("g")</BbTypographyMuted>
+                    </div>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton OnClick="@OpenAddParticipantDialog">
+                        <LucideIcon Name="user-plus" class="mr-2 h-4 w-4" />
+                        Add Participant
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            @if (ManualActionsDisabled)
+            {
+                <BbAlert Variant="AlertVariant.Warning">
+                    <BbAlertTitle>Manual Actions Disabled</BbAlertTitle>
+                    <BbAlertDescription>Your operator credential could not be resolved, so manual check-in, check-out, and adjustments are unavailable.</BbAlertDescription>
+                </BbAlert>
+            }
+
+            <div class="xf-summary-grid xf-summary-grid-4">
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Roster</BbCardTitle><BbCardDescription>Active participants</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_detail.Roster.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Present</BbCardTitle><BbCardDescription>Present or late</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_detail.Roster.Count(x => x.Status is AttendanceRecordStatus.Present or AttendanceRecordStatus.Late)</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Absent</BbCardTitle><BbCardDescription>No record yet</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_detail.Roster.Count(x => x.Status == AttendanceRecordStatus.Absent)</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Incomplete</BbCardTitle><BbCardDescription>Check-in without checkout</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_detail.Roster.Count(x => x.Status == AttendanceRecordStatus.Incomplete)</BbTypographyH2></BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Roster Records</BbCardTitle>
+                    <BbCardDescription>Participants without a record display as Absent without creating attendance records.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_detail.Roster" ShowPagination="true" InitialPageSize="20" ShowSearch="true" SearchPlaceholder="Search roster...">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.DisplayName)" Title="Participant" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.CredentialLabel)" Title="Credential" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceCode)" Title="Reference" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Status" Sortable="true" Filterable="true" FilterBy="@(item => item.Status.ToString())">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@AttendanceControlPanelReadService.FormatEnumLabel(item.Status)"
+                                                 Status="@AttendanceControlPanelReadService.StatusKey(item.Status)" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Check In" Sortable="true" Filterable="true" FilterBy="@(item => FormatDateTime(item.FirstCheckInAt))">
+                                <ChildContent Context="item">@FormatDateTime(item.FirstCheckInAt)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Check Out" Sortable="true" Filterable="true" FilterBy="@(item => FormatDateTime(item.LastCheckOutAt))">
+                                <ChildContent Context="item">@FormatDateTime(item.LastCheckOutAt)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Manual" Filterable="true" FilterBy="@(item => item.IsManual ? "Manual" : "System")">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsManual ? "Manual" : "System")" Status="@(item.IsManual ? "manual-adjusted" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <div class="flex items-center gap-1" @onclick:stopPropagation="true">
+                                        <BbButton Variant="ButtonVariant.Ghost"
+                                                  Size="ButtonSize.Icon"
+                                                  AriaLabel="Manual check in"
+                                                  Disabled="@(ManualActionsDisabled || item.FirstCheckInAt.HasValue)"
+                                                  OnClick="@(() => RecordManualEvent(item, AttendanceEventType.CheckIn))">
+                                            <LucideIcon Name="log-in" class="h-4 w-4" />
+                                        </BbButton>
+                                        <BbButton Variant="ButtonVariant.Ghost"
+                                                  Size="ButtonSize.Icon"
+                                                  AriaLabel="Manual check out"
+                                                  Disabled="@(ManualActionsDisabled || !item.FirstCheckInAt.HasValue || item.LastCheckOutAt.HasValue)"
+                                                  OnClick="@(() => RecordManualEvent(item, AttendanceEventType.CheckOut))">
+                                            <LucideIcon Name="log-out" class="h-4 w-4" />
+                                        </BbButton>
+                                        <BbButton Variant="ButtonVariant.Ghost"
+                                                  Size="ButtonSize.Icon"
+                                                  AriaLabel="Create adjustment"
+                                                  Disabled="@ManualActionsDisabled"
+                                                  OnClick="@(() => OpenAdjustmentDialog(item))">
+                                            <LucideIcon Name="clipboard-pen" class="h-4 w-4" />
+                                        </BbButton>
+                                        <BbButton Variant="ButtonVariant.Ghost"
+                                                  Size="ButtonSize.Icon"
+                                                  AriaLabel="Remove participant"
+                                                  Disabled="@_savingParticipant"
+                                                  OnClick="@(() => OpenRemoveParticipantDialog(item))">
+                                            <LucideIcon Name="trash-2" class="h-4 w-4 text-destructive" />
+                                        </BbButton>
+                                    </div>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                        <EmptyTemplate>
+                            <BbEmpty Title="No participants" Description="Add participants to the context before capturing attendance." />
+                        </EmptyTemplate>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Recent Events</BbCardTitle>
+                    <BbCardDescription>@_detail.RecentEvents.Count event(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_detail.RecentEvents" ShowPagination="true" InitialPageSize="10">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Participant" Filterable="true" FilterBy="@(item => GetRosterName(item.ParticipantId))">
+                                <ChildContent Context="item">@GetRosterName(item.ParticipantId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Event" Sortable="true" Filterable="true" FilterBy="@(item => item.EventType.ToString())">
+                                <ChildContent Context="item">@AttendanceControlPanelReadService.FormatEnumLabel(item.EventType)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Source" Sortable="true" Filterable="true" FilterBy="@(item => item.Source.ToString())">
+                                <ChildContent Context="item">@AttendanceControlPanelReadService.FormatEnumLabel(item.Source)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.OccurredAt)" Title="Occurred" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Notes" Filterable="true" FilterBy="@(item => item.Notes ?? string.Empty)">
+                                <ChildContent Context="item">@(item.Notes ?? "N/A")</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                        <EmptyTemplate>
+                            <BbEmpty Title="No events" Description="No check-in or check-out events have been captured for this session." />
+                        </EmptyTemplate>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+<BbDialog Open="@_addParticipantDialogOpen" OpenChanged="@(value => _addParticipantDialogOpen = value)">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogHeader>
+            <BbDialogTitle>Add Participant</BbDialogTitle>
+            <BbDialogDescription>Participants link Identity credentials to this session's context.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <XfEntityPicker TItem="IdentityCredential"
+                            Label="User / Credential"
+                            Value="@_participantCredentialId"
+                            ValueChanged="@(value => _participantCredentialId = value ?? string.Empty)"
+                            Items="@_credentialOptions"
+                            ValueSelector="@(item => item.Id.ToString())"
+                            TextSelector="@AttendanceControlPanelReadService.BuildCredentialLabel"
+                            SearchTextSelector="@AttendanceControlPanelReadService.BuildCredentialSearchText"
+                            AdvancedColumns="@CredentialAdvancedColumns"
+                            AdvancedFilters="@CredentialAdvancedFilters"
+                            AdvancedSearchScope="Searches credential username, alias, identity name, online state, device, location, and credential id."
+                            Placeholder="Select user or credential"
+                            SearchPlaceholder="Search users or credentials..."
+                            EmptyMessage="No credentials found for the active tenant."
+                            ShowCreate="false"
+                            AdvancedSearchTitle="Find Credential"
+                            AdvancedSearchDescription="Select the Identity credential to add to attendance." />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _addParticipantDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@AddParticipant" Disabled="@_savingParticipant">Add Participant</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<ConfirmDeleteDialog Open="@_removeParticipantDialogOpen"
+                     OpenChanged="@(value => _removeParticipantDialogOpen = value)"
+                     Message="@($"Remove \"{_removingParticipant?.DisplayName ?? "this participant"}\" from this attendance context? Existing records remain available for reporting.")"
+                     OnConfirm="@RemoveParticipant" />
+
+<BbDialog Open="@_adjustmentDialogOpen" OpenChanged="@(value => _adjustmentDialogOpen = value)">
+    <BbDialogContent Class="xf-dialog-wide">
+        <BbDialogHeader>
+            <BbDialogTitle>Create Manual Adjustment</BbDialogTitle>
+            <BbDialogDescription>@_adjustmentParticipantLabel</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <BbFormFieldSelect TValue="string" @bind-Value="_adjustmentForm.NewStatus" Label="New Status">
+                @foreach (var status in Enum.GetValues<AttendanceRecordStatus>())
+                {
+                    <BbSelectItem Value="@status.ToString()">@AttendanceControlPanelReadService.FormatEnumLabel(status)</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <div class="grid gap-3 md:grid-cols-2">
+                <div class="xf-form-field">
+                    <BbLabel>Adjusted Check In</BbLabel>
+                    <input type="datetime-local"
+                           class="xf-datetime-input"
+                           value="@_adjustmentForm.CheckInAt"
+                           @oninput="@((ChangeEventArgs e) => _adjustmentForm.CheckInAt = e.Value?.ToString() ?? string.Empty)" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Adjusted Check Out</BbLabel>
+                    <input type="datetime-local"
+                           class="xf-datetime-input"
+                           value="@_adjustmentForm.CheckOutAt"
+                           @oninput="@((ChangeEventArgs e) => _adjustmentForm.CheckOutAt = e.Value?.ToString() ?? string.Empty)" />
+                </div>
+            </div>
+            <BbFormFieldTextarea Value="@_adjustmentForm.Reason"
+                                 ValueChanged="@((string? value) => _adjustmentForm.Reason = value ?? string.Empty)"
+                                 Label="Reason"
+                                 Required="true" />
+            <BbFormFieldTextarea Value="@_adjustmentForm.Notes"
+                                 ValueChanged="@((string? value) => _adjustmentForm.Notes = value ?? string.Empty)"
+                                 Label="Notes" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _adjustmentDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@CreateAdjustment" Disabled="@_savingAdjustment">Create Adjustment</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private AttendanceControlPanelReadService AttendanceReadService { get; set; } = default!;
+    [Inject] private IAttendanceServiceWrapper Attendance { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private ILogger<SessionDetail> Logger { get; set; } = default!;
+
+    private AttendanceSessionDetail? _detail;
+    private List<IdentityCredential> _credentialOptions = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private bool _addParticipantDialogOpen;
+    private bool _removeParticipantDialogOpen;
+    private bool _adjustmentDialogOpen;
+    private bool _savingParticipant;
+    private bool _savingEvent;
+    private bool _savingAdjustment;
+    private string _participantCredentialId = string.Empty;
+    private AttendanceSessionRosterRow? _removingParticipant;
+    private AttendanceSessionRosterRow? _adjustmentRow;
+    private string _adjustmentParticipantLabel = string.Empty;
+    private readonly AdjustmentForm _adjustmentForm = new();
+
+    private bool ManualActionsDisabled => RequestMetadata.CredentialId is null || _savingEvent || _savingAdjustment;
+    private string ContextLabel => _detail?.Context is null
+        ? "Unknown context"
+        : string.IsNullOrWhiteSpace(_detail.Context.Code)
+            ? _detail.Context.Name
+            : $"{_detail.Context.Code} - {_detail.Context.Name}";
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityCredential>> CredentialAdvancedColumns =>
+    [
+        new("Name", x => x.IdentityInfo?.FullName ?? x.IdentityInfo?.IdentityName ?? x.UserName ?? x.UserAlias),
+        new("Username", x => x.UserName ?? x.UserAlias),
+        new("Online", x => x.IsOnline ? "Online" : "Offline"),
+        new("Device", x => x.Device),
+        new("Location", x => x.Location),
+        new("Credential", x => AttendanceControlPanelReadService.ShortId(x.Id))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityCredential>> CredentialAdvancedFilters =>
+    [
+        new("online", "Online", OnlineFilterOptions, x => x.IsOnline ? "true" : "false", "All online states")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> OnlineFilterOptions =
+    [
+        new("true", "Online"),
+        new("false", "Offline")
+    ];
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnParametersSetAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Attendance);
+            _detail = null;
+            _credentialOptions = [];
+
+            if (!_hasTenant || !_moduleEnabled)
+            {
+                return;
+            }
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _detail = await AttendanceReadService.LoadSessionDetailAsync(tenantId, Id);
+            _credentialOptions = (await AttendanceReadService.LoadCredentialOptionsAsync(tenantId)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load attendance session detail.");
+            ToastService.Error("Attendance session could not be loaded.", "Attendance");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenAddParticipantDialog()
+    {
+        _participantCredentialId = string.Empty;
+        _addParticipantDialogOpen = true;
+    }
+
+    private async Task AddParticipant()
+    {
+        if (_detail is null || TenantFilter.SelectedTenantId is not Guid tenantId)
+        {
+            return;
+        }
+
+        if (!Guid.TryParse(_participantCredentialId, out var credentialId))
+        {
+            ToastService.Warning("Select a user or credential.", "Validation");
+            return;
+        }
+
+        var credential = _credentialOptions.FirstOrDefault(x => x.Id == credentialId);
+        if (credential is null)
+        {
+            ToastService.Warning("Selected credential was not found. Refresh and try again.", "Validation");
+            return;
+        }
+
+        _savingParticipant = true;
+        try
+        {
+            var response = await Attendance.AddAttendanceParticipant(new AddAttendanceParticipantRequest
+            {
+                TenantId = tenantId,
+                ContextId = _detail.Session.ContextId,
+                CredentialId = credential.Id,
+                DisplayName = AttendanceControlPanelReadService.BuildCredentialLabel(credential),
+                ReferenceCode = AttendanceControlPanelReadService.BuildCredentialReferenceCode(credential),
+                StartedAt = DateTime.UtcNow,
+                Metadata = BuildMetadata(tenantId)
+            });
+
+            if (response.IsSuccess)
+            {
+                ToastService.Success("Participant added.", "Attendance");
+                _addParticipantDialogOpen = false;
+                await Reload();
+            }
+            else
+            {
+                Logger.LogWarning("Attendance participant add failed with status {StatusCode}", response.HttpStatusCode);
+                ToastService.Error("Participant could not be added.", "Attendance");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Attendance participant add failed.");
+            ToastService.Error("Participant could not be added.", "Attendance");
+        }
+        finally
+        {
+            _savingParticipant = false;
+        }
+    }
+
+    private void OpenRemoveParticipantDialog(AttendanceSessionRosterRow row)
+    {
+        _removingParticipant = row;
+        _removeParticipantDialogOpen = true;
+    }
+
+    private async Task RemoveParticipant()
+    {
+        if (_removingParticipant is null || TenantFilter.SelectedTenantId is not Guid tenantId)
+        {
+            return;
+        }
+
+        _savingParticipant = true;
+        try
+        {
+            var response = await Attendance.RemoveAttendanceParticipant(new RemoveAttendanceParticipantRequest
+            {
+                TenantId = tenantId,
+                ParticipantId = _removingParticipant.ParticipantId,
+                EndedAt = DateTime.UtcNow,
+                Metadata = BuildMetadata(tenantId)
+            });
+
+            if (response.IsSuccess)
+            {
+                ToastService.Success("Participant removed.", "Attendance");
+                _removeParticipantDialogOpen = false;
+                _removingParticipant = null;
+                await Reload();
+            }
+            else
+            {
+                Logger.LogWarning("Attendance participant removal failed with status {StatusCode}", response.HttpStatusCode);
+                ToastService.Error("Participant could not be removed.", "Attendance");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Attendance participant removal failed.");
+            ToastService.Error("Participant could not be removed.", "Attendance");
+        }
+        finally
+        {
+            _savingParticipant = false;
+        }
+    }
+
+    private async Task RecordManualEvent(AttendanceSessionRosterRow row, AttendanceEventType eventType)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId || RequestMetadata.CredentialId is not Guid actorCredentialId)
+        {
+            ToastService.Warning("Manual attendance actions require an operator credential.", "Attendance");
+            return;
+        }
+
+        _savingEvent = true;
+        try
+        {
+            var response = await Attendance.RecordAttendanceEvent(new RecordAttendanceEventRequest
+            {
+                TenantId = tenantId,
+                SessionId = Id,
+                ParticipantId = row.ParticipantId,
+                EventType = eventType,
+                Source = AttendanceEventSource.Manual,
+                OccurredAt = DateTime.UtcNow,
+                RecordedByCredentialId = actorCredentialId,
+                IdempotencyKey = $"controlpanel:{eventType}:{Id:N}:{row.ParticipantId:N}:{Guid.NewGuid():N}",
+                Notes = $"Manual {AttendanceControlPanelReadService.FormatEnumLabel(eventType).ToLowerInvariant()} from ControlPanel",
+                Metadata = BuildMetadata(tenantId)
+            });
+
+            if (response.IsSuccess)
+            {
+                ToastService.Success($"{AttendanceControlPanelReadService.FormatEnumLabel(eventType)} recorded.", "Attendance");
+                await Reload();
+            }
+            else
+            {
+                Logger.LogWarning("Manual attendance event failed with status {StatusCode}", response.HttpStatusCode);
+                ToastService.Error("Attendance event could not be recorded.", "Attendance");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Manual attendance event failed.");
+            ToastService.Error("Attendance event could not be recorded.", "Attendance");
+        }
+        finally
+        {
+            _savingEvent = false;
+        }
+    }
+
+    private void OpenAdjustmentDialog(AttendanceSessionRosterRow row)
+    {
+        _adjustmentRow = row;
+        _adjustmentParticipantLabel = $"{row.DisplayName} - {row.CredentialLabel}";
+        _adjustmentForm.Reset();
+        _adjustmentForm.NewStatus = AttendanceRecordStatus.ManualAdjusted.ToString();
+        _adjustmentForm.CheckInAt = row.FirstCheckInAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+        _adjustmentForm.CheckOutAt = row.LastCheckOutAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+        _adjustmentDialogOpen = true;
+    }
+
+    private async Task CreateAdjustment()
+    {
+        if (_adjustmentRow is null || TenantFilter.SelectedTenantId is not Guid tenantId)
+        {
+            return;
+        }
+
+        if (RequestMetadata.CredentialId is not Guid actorCredentialId)
+        {
+            ToastService.Warning("Manual adjustments require an operator credential.", "Attendance");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_adjustmentForm.Reason))
+        {
+            ToastService.Warning("Adjustment reason is required.", "Validation");
+            return;
+        }
+
+        if (!Enum.TryParse<AttendanceRecordStatus>(_adjustmentForm.NewStatus, out var newStatus))
+        {
+            ToastService.Warning("Select a valid adjustment status.", "Validation");
+            return;
+        }
+
+        _savingAdjustment = true;
+        try
+        {
+            var response = await Attendance.CreateAttendanceAdjustment(new CreateAttendanceAdjustmentRequest
+            {
+                TenantId = tenantId,
+                SessionId = Id,
+                ParticipantId = _adjustmentRow.ParticipantId,
+                NewStatus = newStatus,
+                AdjustedCheckInAt = ParseOptionalLocalDateTime(_adjustmentForm.CheckInAt),
+                AdjustedCheckOutAt = ParseOptionalLocalDateTime(_adjustmentForm.CheckOutAt),
+                ActorCredentialId = actorCredentialId,
+                Reason = _adjustmentForm.Reason.Trim(),
+                Notes = NullIfEmpty(_adjustmentForm.Notes),
+                Metadata = BuildMetadata(tenantId)
+            });
+
+            if (response.IsSuccess)
+            {
+                ToastService.Success("Attendance adjustment created.", "Attendance");
+                _adjustmentDialogOpen = false;
+                await Reload();
+            }
+            else
+            {
+                Logger.LogWarning("Attendance adjustment failed with status {StatusCode}", response.HttpStatusCode);
+                ToastService.Error("Attendance adjustment could not be created.", "Attendance");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Attendance adjustment failed.");
+            ToastService.Error("Attendance adjustment could not be created.", "Attendance");
+        }
+        finally
+        {
+            _savingAdjustment = false;
+        }
+    }
+
+    private string GetRosterName(Guid participantId) =>
+        _detail?.Roster.FirstOrDefault(x => x.ParticipantId == participantId)?.DisplayName
+        ?? $"Participant {AttendanceControlPanelReadService.ShortId(participantId)}";
+
+    private RequestMetadata BuildMetadata(Guid tenantId) => new()
+    {
+        TenantId = tenantId,
+        CredentialId = RequestMetadata.CredentialId,
+        SessionId = RequestMetadata.SessionId,
+        RequestId = Guid.NewGuid(),
+        Name = RequestMetadata.Name ?? "ControlPanel",
+        DeviceName = RequestMetadata.DeviceName,
+        DeviceAgent = RequestMetadata.DeviceAgent,
+        IpAddress = RequestMetadata.IpAddress
+    };
+
+    private static DateTime? ParseOptionalLocalDateTime(string value) =>
+        DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsed)
+            ? parsed.ToUniversalTime()
+            : null;
+
+    private static string FormatDateTime(DateTime? value) =>
+        value is DateTime dateTime ? dateTime.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) : "N/A";
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class AdjustmentForm
+    {
+        public string NewStatus { get; set; } = AttendanceRecordStatus.ManualAdjusted.ToString();
+        public string CheckInAt { get; set; } = string.Empty;
+        public string CheckOutAt { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+
+        public void Reset()
+        {
+            NewStatus = AttendanceRecordStatus.ManualAdjusted.ToString();
+            CheckInAt = string.Empty;
+            CheckOutAt = string.Empty;
+            Reason = string.Empty;
+            Notes = string.Empty;
+        }
+    }
+}

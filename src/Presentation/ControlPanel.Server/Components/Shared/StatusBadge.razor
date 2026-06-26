@@ -13,10 +13,10 @@
     {
         _variant = (Status?.ToLowerInvariant()) switch
         {
-            "active" or "approved" or "success" or "online" or "true" => BadgeVariant.Default,
-            "inactive" or "expired" or "closed" or "false" => BadgeVariant.Secondary,
-            "pending" or "suspended" or "frozen" => BadgeVariant.Outline,
-            "failed" or "error" or "cancelled" => BadgeVariant.Destructive,
+            "active" or "approved" or "success" or "online" or "true" or "open" or "present" => BadgeVariant.Default,
+            "inactive" or "expired" or "closed" or "false" or "scheduled" => BadgeVariant.Secondary,
+            "pending" or "suspended" or "frozen" or "late" or "incomplete" or "manual-adjusted" or "excused" => BadgeVariant.Outline,
+            "failed" or "error" or "cancelled" or "absent" => BadgeVariant.Destructive,
             _ => BadgeVariant.Secondary
         };
     }
