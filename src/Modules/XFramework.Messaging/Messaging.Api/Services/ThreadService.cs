@@ -6,6 +6,7 @@ using Messaging.Domain.Shared.Contracts.Requests.Attachments;
 using Messaging.Domain.Shared.Contracts.Requests.Delete;
 using Messaging.Domain.Shared.Contracts.Requests.Edit;
 using Messaging.Domain.Shared.Contracts.Requests.Reactions;
+using Messaging.Domain.Shared.Contracts.Requests.Realtime;
 using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
@@ -13,6 +14,7 @@ using Storage.Domain.Shared.Contracts.Requests;
 using Storage.Domain.Shared.Contracts.Responses;
 using Storage.Integration.Drivers;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.DataContext;
 
 namespace Messaging.Api.Services;
@@ -21,10 +23,13 @@ public sealed class ThreadService(
     IMessagingRequestContextResolver requestContextResolver,
     IMessagingTemplateService templateService,
     IStorageServiceWrapper storageServiceWrapper,
+    IMessagingPolicyService policyService,
+    IMessagingActionRateLimiter rateLimiter,
+    IMessagingModerationService moderationService,
+    IMessagingTransientRealtimePublisher transientRealtimePublisher,
     ILogger<ThreadService> logger
 ) : IThreadService
 {
-    private const decimal MaxAttachmentSizeBytes = 25 * 1024 * 1024;
     private static readonly JsonSerializerOptions OutboxJsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<Result<CreateThreadResponse>> CreateThreadAsync(CreateThreadRequest request, CancellationToken ct = default)
@@ -40,6 +45,13 @@ public sealed class ThreadService(
                 .Append(caller.CredentialId)
                 .Distinct()
                 .ToList();
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+
+            if (!policy.GroupThreadsEnabled)
+                return Result<CreateThreadResponse>.Forbidden("Group chat threads are disabled for this tenant");
+
+            if (allMemberIds.Count > policy.GroupMaxMembers)
+                return Result<CreateThreadResponse>.Failure($"Group chat threads are limited to {policy.GroupMaxMembers} members", 400);
 
             var threadTypeExists = await dataContext.Query<MessageThreadType>()
                 .Where(t => t.Id == request.TypeId)
@@ -57,6 +69,15 @@ public sealed class ThreadService(
 
             if (existingMembers.Count != allMemberIds.Count)
                 return Result<CreateThreadResponse>.NotFound("One or more initial member credentials were not found");
+
+            var blockedPairExists = await dataContext.Query<MessageBlock>()
+                .Where(b => b.TenantId == caller.TenantId)
+                .Where(b => allMemberIds.Contains(b.BlockerCredentialId))
+                .Where(b => allMemberIds.Contains(b.BlockedCredentialId))
+                .Where(b => !b.IsDeleted && b.IsEnabled)
+                .AnyAsync(ct);
+            if (blockedPairExists)
+                return Result<CreateThreadResponse>.Forbidden("Group thread cannot include blocked credential relationships");
 
             var thread = new MessageThread
             {
@@ -139,6 +160,10 @@ public sealed class ThreadService(
                 return CallerFailure<CreateThreadResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            if (!policy.DirectThreadsEnabled)
+                return Result<CreateThreadResponse>.Forbidden("Direct chat threads are disabled for this tenant");
+
             if (request.OtherCredentialId == caller.CredentialId)
                 return Result<CreateThreadResponse>.Failure("Direct thread requires another credential", 400);
 
@@ -154,6 +179,7 @@ public sealed class ThreadService(
             if (!otherCredentialExists)
                 return Result<CreateThreadResponse>.NotFound("Credential not found");
 
+            var directPair = NormalizeDirectPair(caller.CredentialId, request.OtherCredentialId);
             var existingThreadId = await FindDirectThreadAsync(caller.TenantId, caller.CredentialId, request.OtherCredentialId, ct);
             if (existingThreadId is Guid existing)
                 return Result<CreateThreadResponse>.Success(new CreateThreadResponse { ThreadId = existing });
@@ -202,6 +228,18 @@ public sealed class ThreadService(
                 });
             }
 
+            dataContext.Add(new MessageDirectThread
+            {
+                Id = Guid.NewGuid(),
+                TenantId = caller.TenantId,
+                MessageThreadId = thread.Id,
+                FirstCredentialId = directPair.FirstCredentialId,
+                SecondCredentialId = directPair.SecondCredentialId,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
+            });
+
             AddOutboxEvent(
                 MessageRealtimeEvents.ThreadCreated,
                 caller.TenantId,
@@ -217,7 +255,27 @@ public sealed class ThreadService(
                     MemberCredentialIds = new[] { caller.CredentialId, request.OtherCredentialId }
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            try
+            {
+                var saveResult = await dataContext.SaveChangesAsync(ct);
+                if (!saveResult.IsSuccess)
+                {
+                    var racedThreadId = await FindDirectThreadAsync(caller.TenantId, caller.CredentialId, request.OtherCredentialId, ct);
+                    if (racedThreadId is Guid raced)
+                        return Result<CreateThreadResponse>.Success(new CreateThreadResponse { ThreadId = raced });
+
+                    return Result<CreateThreadResponse>.Failure(saveResult.Message ?? "Direct thread could not be created", saveResult.StatusCode);
+                }
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+            {
+                var racedThreadId = await FindDirectThreadAsync(caller.TenantId, caller.CredentialId, request.OtherCredentialId, ct);
+                if (racedThreadId is Guid raced)
+                    return Result<CreateThreadResponse>.Success(new CreateThreadResponse { ThreadId = raced });
+
+                throw;
+            }
+
             return Result<CreateThreadResponse>.Success(new CreateThreadResponse { ThreadId = thread.Id }, 201);
         }
         catch (Exception ex)
@@ -243,7 +301,7 @@ public sealed class ThreadService(
             var memberships = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.CredentialId == caller.CredentialId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .ToListAsync(ct);
 
             var memberThreadIds = memberships.Select(m => m.MessageThreadId).Distinct().ToList();
@@ -259,12 +317,28 @@ public sealed class ThreadService(
                 .ToListAsync(ct);
 
             var threadIds = threads.Select(t => t.Id).ToList();
+            var blockedCredentialIds = await GetBlockedCredentialIdsForAsync(caller.TenantId, caller.CredentialId, ct);
+            var blockedSenderMemberIds = await GetBlockedThreadMemberIdsAsync(
+                caller.TenantId,
+                threadIds,
+                blockedCredentialIds,
+                ct);
+            var visibleMemberIds = memberships
+                .Where(m => threadIds.Contains(m.MessageThreadId))
+                .Select(m => m.Id)
+                .ToList();
+            var hiddenRows = await dataContext.Query<MessageHidden>()
+                .Where(h => visibleMemberIds.Contains(h.MessageThreadMemberId))
+                .Where(h => h.TenantId == caller.TenantId)
+                .Where(h => !h.IsDeleted && h.IsEnabled)
+                .ToListAsync(ct);
+            var hiddenMessageIds = hiddenRows.Select(h => h.MessageId).ToList();
 
             // Get member counts per thread using GroupByAsync
             var memberGroups = await dataContext.Query<MessageThreadMember>()
                 .Where(m => threadIds.Contains(m.MessageThreadId))
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .GroupByAsync(m => m.MessageThreadId, ct);
 
             var memberCountMap = memberGroups.ToDictionary(g => g.Key, g => g.Items.Count);
@@ -273,9 +347,17 @@ public sealed class ThreadService(
             var threadMessages = await dataContext.Query<Message>()
                 .Where(m => threadIds.Contains(m.MessageThreadId))
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .OrderByDescending(m => m.CreatedAt)
                 .ToListAsync(ct);
+            if (blockedSenderMemberIds.Count > 0)
+                threadMessages = threadMessages
+                    .Where(m => !blockedSenderMemberIds.Contains(m.MessageThreadMemberId))
+                    .ToList();
+            if (hiddenMessageIds.Count > 0)
+                threadMessages = threadMessages
+                    .Where(m => !hiddenMessageIds.Contains(m.Id))
+                    .ToList();
 
             var lastMessageMap = threadMessages
                 .GroupBy(m => m.MessageThreadId)
@@ -360,7 +442,7 @@ public sealed class ThreadService(
             var members = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == thread.Id)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .ToListAsync(ct);
 
             return Result<GetThreadResponse>.Success(new GetThreadResponse
@@ -685,6 +767,32 @@ public sealed class ThreadService(
             if (!await CanManageThreadAsync(actorMember, ct))
                 return Result<CmdResponse>.Forbidden("Only thread admins can add members");
 
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var rateLimit = rateLimiter.Check(
+                caller.TenantId,
+                caller.CredentialId,
+                MessagingRateLimitActions.InviteCreate,
+                policy.InviteCreatePerMinute);
+            if (!rateLimit.IsSuccess)
+                return RateLimitFailure<CmdResponse>(rateLimit);
+
+            if (!policy.GroupThreadsEnabled)
+                return Result<CmdResponse>.Forbidden("Group chat threads are disabled for this tenant");
+
+            var activeMemberCount = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .CountAsync(ct);
+            if (activeMemberCount + 1 > policy.GroupMaxMembers)
+                return Result<CmdResponse>.Failure($"Group chat threads are limited to {policy.GroupMaxMembers} members", 400);
+
+            if (await IsBlockedAsync(caller.TenantId, caller.CredentialId, request.CredentialId, ct))
+                return Result<CmdResponse>.Forbidden("Blocked credentials cannot be added to this thread");
+
+            if (await IsBlockedByAnyActiveThreadMemberAsync(caller.TenantId, request.ThreadId, request.CredentialId, ct))
+                return Result<CmdResponse>.Forbidden("Blocked credentials cannot be added to this thread");
+
             // Validate credential exists
             var credential = await dataContext.Query<IdentityCredential>()
                 .Where(c => c.Id == request.CredentialId)
@@ -702,7 +810,7 @@ public sealed class ThreadService(
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.CredentialId == request.CredentialId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (existingMember is not null)
@@ -788,7 +896,7 @@ public sealed class ThreadService(
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.CredentialId == request.CredentialId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (member is null)
@@ -803,7 +911,7 @@ public sealed class ThreadService(
             var memberCount = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .CountAsync(ct);
 
             if (memberCount <= 1)
@@ -860,6 +968,32 @@ public sealed class ThreadService(
 
             if (!await CanManageThreadAsync(actorMember, ct))
                 return Result<CmdResponse>.Forbidden("Only thread admins can invite members");
+
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var rateLimit = rateLimiter.Check(
+                caller.TenantId,
+                caller.CredentialId,
+                MessagingRateLimitActions.InviteCreate,
+                policy.InviteCreatePerMinute);
+            if (!rateLimit.IsSuccess)
+                return RateLimitFailure<CmdResponse>(rateLimit);
+
+            if (!policy.GroupThreadsEnabled)
+                return Result<CmdResponse>.Forbidden("Group chat threads are disabled for this tenant");
+
+            var activeMemberCount = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .CountAsync(ct);
+            if (activeMemberCount + 1 > policy.GroupMaxMembers)
+                return Result<CmdResponse>.Failure($"Group chat threads are limited to {policy.GroupMaxMembers} members", 400);
+
+            if (await IsBlockedAsync(caller.TenantId, caller.CredentialId, request.CredentialId, ct))
+                return Result<CmdResponse>.Forbidden("Blocked credentials cannot be invited to this thread");
+
+            if (await IsBlockedByAnyActiveThreadMemberAsync(caller.TenantId, request.ThreadId, request.CredentialId, ct))
+                return Result<CmdResponse>.Forbidden("Blocked credentials cannot be invited to this thread");
 
             var credentialExists = await dataContext.Query<IdentityCredential>()
                 .Where(c => c.Id == request.CredentialId)
@@ -966,6 +1100,25 @@ public sealed class ThreadService(
                 member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
                 if (member is null)
                 {
+                    var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+                    var activeMemberCount = await dataContext.Query<MessageThreadMember>()
+                        .Where(m => m.MessageThreadId == request.ThreadId)
+                        .Where(m => m.TenantId == caller.TenantId)
+                        .Where(m => !m.IsDeleted && m.IsEnabled)
+                        .CountAsync(ct);
+
+                    if (!policy.GroupThreadsEnabled)
+                        return Result<CmdResponse>.Forbidden("Group chat threads are disabled for this tenant");
+
+                    if (activeMemberCount + 1 > policy.GroupMaxMembers)
+                        return Result<CmdResponse>.Failure($"Group chat threads are limited to {policy.GroupMaxMembers} members", 400);
+
+                    if (await IsBlockedAsync(caller.TenantId, caller.CredentialId, invite.InvitedByCredentialId, ct))
+                        return Result<CmdResponse>.Forbidden("Blocked credentials cannot join this thread");
+
+                    if (await IsBlockedByAnyActiveThreadMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct))
+                        return Result<CmdResponse>.Forbidden("Blocked credentials cannot join this thread");
+
                     var group = await dataContext.Query<MessageThreadMemberGroup>()
                         .Where(g => g.MessageThreadId == request.ThreadId)
                         .Where(g => g.TenantId == caller.TenantId)
@@ -1121,6 +1274,14 @@ public sealed class ThreadService(
                 return CallerFailure<CreateThreadMessageResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var rateLimit = rateLimiter.Check(
+                caller.TenantId,
+                caller.CredentialId,
+                MessagingRateLimitActions.MessageCreate,
+                policy.MessageCreatePerMinute);
+            if (!rateLimit.IsSuccess)
+                return RateLimitFailure<CreateThreadMessageResponse>(rateLimit);
 
             // Validate thread exists
             var thread = await dataContext.Query<MessageThread>()
@@ -1169,7 +1330,7 @@ public sealed class ThreadService(
                     .Where(m => m.Id == parentMessageId)
                     .Where(m => m.MessageThreadId == request.ThreadId)
                     .Where(m => m.TenantId == caller.TenantId)
-                    .Where(m => !m.IsDeleted)
+                    .Where(m => !m.IsDeleted && m.IsEnabled)
                     .AnyAsync(ct);
                 if (!parentExists)
                     return Result<CreateThreadMessageResponse>.NotFound("Parent message not found in this thread");
@@ -1212,6 +1373,12 @@ public sealed class ThreadService(
             if (string.IsNullOrWhiteSpace(messageText))
                 return Result<CreateThreadMessageResponse>.Failure("Message text or template is required", 400);
 
+            var moderationMatches = await moderationService.EvaluateAsync(caller.TenantId, messageText, ct);
+            var blockingRule = moderationMatches.FirstOrDefault(match =>
+                match.Action == MessageModerationRuleActions.BlockBeforeSend);
+            if (blockingRule is not null)
+                return Result<CreateThreadMessageResponse>.Forbidden($"Message was blocked by moderation rule: {blockingRule.RuleName}");
+
             var message = new Message
             {
                 Id = Guid.NewGuid(),
@@ -1249,6 +1416,54 @@ public sealed class ThreadService(
                     MentionedCredentialIds = mentionedCredentialIds
                 });
 
+            foreach (var match in moderationMatches.Where(match => match.Action != MessageModerationRuleActions.BlockBeforeSend))
+            {
+                var report = new MessageReport
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = caller.TenantId,
+                    MessageId = message.Id,
+                    ReporterMemberId = senderMember.Id,
+                    Reason = $"Matched moderation rule: {match.RuleName}",
+                    Details = $"Rule action: {match.Action}",
+                    Status = MessageReportStatuses.Open,
+                    IsEnabled = true,
+                    CreatedAt = DateTime.UtcNow,
+                    ConcurrencyStamp = Guid.NewGuid()
+                };
+
+                dataContext.Add(report);
+                dataContext.Add(new MessageReportAudit
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = caller.TenantId,
+                    ReportId = report.Id,
+                    Action = MessageReportAuditActions.AutoReported,
+                    ActorCredentialId = caller.CredentialId,
+                    ToStatus = report.Status,
+                    Note = report.Reason,
+                    IsEnabled = true,
+                    CreatedAt = DateTime.UtcNow,
+                    ConcurrencyStamp = Guid.NewGuid()
+                });
+
+                AddOutboxEvent(
+                    MessageRealtimeEvents.MessageReported,
+                    caller.TenantId,
+                    request.ThreadId,
+                    report.Id,
+                    nameof(MessageReport),
+                    caller.CredentialId,
+                    new
+                    {
+                        request.ThreadId,
+                        MessageId = message.Id,
+                        ReportId = report.Id,
+                        RuleId = match.RuleId,
+                        RuleName = match.RuleName
+                    });
+            }
+
             await dataContext.SaveChangesAsync(ct);
 
             return Result<CreateThreadMessageResponse>.Success(new CreateThreadMessageResponse
@@ -1280,7 +1495,7 @@ public sealed class ThreadService(
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.CredentialId == caller.CredentialId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (requesterMember is null)
@@ -1288,16 +1503,28 @@ public sealed class ThreadService(
                 return Result<GetThreadMessagesResponse>.Failure("Requester is not a member of this thread", 403);
             }
 
-            var totalCount = await dataContext.Query<Message>()
-                .Where(m => m.MessageThreadId == request.ThreadId)
-                .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
-                .CountAsync(ct);
+            var blockedCredentialIds = await GetBlockedCredentialIdsForAsync(caller.TenantId, caller.CredentialId, ct);
+            var blockedSenderMemberIds = await GetBlockedThreadMemberIdsAsync(caller.TenantId, [request.ThreadId], blockedCredentialIds, ct);
+            var hiddenRows = await dataContext.Query<MessageHidden>()
+                .Where(h => h.MessageThreadMemberId == requesterMember.Id)
+                .Where(h => h.TenantId == caller.TenantId)
+                .Where(h => !h.IsDeleted && h.IsEnabled)
+                .ToListAsync(ct);
+            var hiddenMessageIds = hiddenRows.Select(h => h.MessageId).ToList();
 
-            var messages = await dataContext.Query<Message>()
+            var messageQuery = dataContext.Query<Message>()
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled);
+
+            if (blockedSenderMemberIds.Count > 0)
+                messageQuery = messageQuery.Where(m => !blockedSenderMemberIds.Contains(m.MessageThreadMemberId));
+            if (hiddenMessageIds.Count > 0)
+                messageQuery = messageQuery.Where(m => !hiddenMessageIds.Contains(m.Id));
+
+            var totalCount = await messageQuery.CountAsync(ct);
+
+            var messages = await messageQuery
                 .OrderByDescending(m => m.CreatedAt)
                 .Skip(pageIndex * pageSize)
                 .Take(pageSize)
@@ -1422,12 +1649,25 @@ public sealed class ThreadService(
             var pageIndex = request.PageIndex < 0 ? 0 : request.PageIndex;
             var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
             var normalizedQuery = queryText.ToLowerInvariant();
+            var blockedCredentialIds = await GetBlockedCredentialIdsForAsync(caller.TenantId, caller.CredentialId, ct);
+            var blockedSenderMemberIds = await GetBlockedThreadMemberIdsAsync(caller.TenantId, allowedThreadIds, blockedCredentialIds, ct);
+            var memberIdsForHidden = memberships.Select(m => m.Id).ToList();
+            var hiddenRows = await dataContext.Query<MessageHidden>()
+                .Where(h => memberIdsForHidden.Contains(h.MessageThreadMemberId))
+                .Where(h => h.TenantId == caller.TenantId)
+                .Where(h => !h.IsDeleted && h.IsEnabled)
+                .ToListAsync(ct);
+            var hiddenMessageIds = hiddenRows.Select(h => h.MessageId).ToList();
 
             var baseQuery = dataContext.Query<Message>()
                 .Where(m => allowedThreadIds.Contains(m.MessageThreadId))
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .Where(m => m.Text.ToLower().Contains(normalizedQuery));
+            if (blockedSenderMemberIds.Count > 0)
+                baseQuery = baseQuery.Where(m => !blockedSenderMemberIds.Contains(m.MessageThreadMemberId));
+            if (hiddenMessageIds.Count > 0)
+                baseQuery = baseQuery.Where(m => !hiddenMessageIds.Contains(m.Id));
 
             var totalCount = await baseQuery.CountAsync(ct);
             var messages = await baseQuery
@@ -1493,13 +1733,51 @@ public sealed class ThreadService(
                 .Where(m => m.Id == request.MessageId)
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (message is null)
                 return Result<CmdResponse>.NotFound("Message not found");
 
-            if (message.MessageThreadMemberId != member.Id && !await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct))
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var deleteMode = policy.DeleteMode.Trim().ToLowerInvariant();
+            if (deleteMode == "disabled")
+                return Result<CmdResponse>.Forbidden("Message deletion is disabled for this tenant");
+
+            var isThreadAdmin = await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct);
+            if (deleteMode == "delete-for-me")
+            {
+                var existingHidden = await dataContext.Query<MessageHidden>()
+                    .Where(h => h.MessageId == message.Id)
+                    .Where(h => h.MessageThreadMemberId == member.Id)
+                    .Where(h => h.TenantId == caller.TenantId)
+                    .Where(h => !h.IsDeleted && h.IsEnabled)
+                    .AnyAsync(ct);
+
+                if (!existingHidden)
+                {
+                    dataContext.Add(new MessageHidden
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = caller.TenantId,
+                        MessageId = message.Id,
+                        MessageThreadMemberId = member.Id,
+                        IsEnabled = true,
+                        CreatedAt = DateTime.UtcNow,
+                        ConcurrencyStamp = Guid.NewGuid()
+                    });
+
+                    await dataContext.SaveChangesAsync(ct);
+                }
+
+                return Result<CmdResponse>.Success(new CmdResponse
+                {
+                    HttpStatusCode = HttpStatusCode.OK,
+                    Message = "Message hidden successfully"
+                });
+            }
+
+            if (message.MessageThreadMemberId != member.Id && !isThreadAdmin)
                 return Result<CmdResponse>.Failure("You can only delete your own messages", 403);
 
             message.IsDeleted = true;
@@ -1559,14 +1837,26 @@ public sealed class ThreadService(
                 .Where(m => m.Id == request.MessageId)
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (message is null)
                 return Result<CmdResponse>.NotFound("Message not found");
 
-            if (message.MessageThreadMemberId != member.Id && !await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct))
+            var canEditAsAdmin = await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct);
+            if (message.MessageThreadMemberId != member.Id && !canEditAsAdmin)
                 return Result<CmdResponse>.Failure("You can only edit your own messages", 403);
+
+            if (!canEditAsAdmin)
+            {
+                var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+                if (policy.MessageEditWindowMinutes <= 0)
+                    return Result<CmdResponse>.Forbidden("Message editing is disabled for this tenant");
+
+                var editDeadline = message.CreatedAt.AddMinutes(policy.MessageEditWindowMinutes);
+                if (DateTime.UtcNow > editDeadline)
+                    return Result<CmdResponse>.Forbidden("Message edit window has expired");
+            }
 
             message.Text = request.Text;
             message.ModifiedAt = DateTime.UtcNow;
@@ -1620,7 +1910,7 @@ public sealed class ThreadService(
                 .Where(m => m.Id == request.MessageId)
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .AnyAsync(ct);
             if (!messageExists)
                 return Result<CmdResponse>.NotFound("Message not found");
@@ -1710,7 +2000,7 @@ public sealed class ThreadService(
                 .Where(m => m.Id == request.MessageId)
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .AnyAsync(ct);
             if (!messageExists)
                 return Result<CmdResponse>.NotFound("Message not found");
@@ -1791,6 +2081,15 @@ public sealed class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var rateLimit = rateLimiter.Check(
+                caller.TenantId,
+                caller.CredentialId,
+                MessagingRateLimitActions.ReportCreate,
+                policy.ReportCreatePerMinute);
+            if (!rateLimit.IsSuccess)
+                return RateLimitFailure<CmdResponse>(rateLimit);
+
             var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
             if (member is null)
                 return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
@@ -1799,7 +2098,7 @@ public sealed class ThreadService(
                 .Where(m => m.Id == request.MessageId)
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .AnyAsync(ct);
             if (!messageExists)
                 return Result<CmdResponse>.NotFound("Message not found");
@@ -1986,6 +2285,15 @@ public sealed class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var rateLimit = rateLimiter.Check(
+                caller.TenantId,
+                caller.CredentialId,
+                MessagingRateLimitActions.AttachmentLink,
+                policy.AttachmentLinkPerMinute);
+            if (!rateLimit.IsSuccess)
+                return RateLimitFailure<CmdResponse>(rateLimit);
+
             var member = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.CredentialId == caller.CredentialId)
@@ -2000,11 +2308,16 @@ public sealed class ThreadService(
                 .Where(m => m.Id == request.MessageId)
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (message is null)
                 return Result<CmdResponse>.NotFound("Message not found");
+
+            var canAttach = message.MessageThreadMemberId == member.Id ||
+                            await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct);
+            if (!canAttach)
+                return Result<CmdResponse>.Forbidden("Only the message sender or a thread admin can attach files to this message");
 
             var storageFileResult = await storageServiceWrapper.ValidateStorageFileReference(new ValidateStorageFileReferenceRequest
             {
@@ -2020,11 +2333,22 @@ public sealed class ThreadService(
             if (!storageFile.IsValid)
                 return Result<CmdResponse>.Failure(storageFile.Message ?? "Storage file is not available", 400);
 
-            if (storageFile.ContentLengthBytes is long fileSize && fileSize > (long)MaxAttachmentSizeBytes)
+            if (policy.AttachmentMaxSizeBytes > 0 &&
+                storageFile.ContentLengthBytes is long fileSize &&
+                fileSize > policy.AttachmentMaxSizeBytes)
                 return Result<CmdResponse>.Failure("Storage file exceeds the Messaging attachment size policy", 400);
 
-            if (!IsAllowedAttachmentFileType(storageFile))
+            if (!IsAllowedAttachmentFileType(storageFile, policy))
                 return Result<CmdResponse>.Failure("Storage file type is not allowed for Messaging attachments", 400);
+
+            var duplicateExists = await dataContext.Query<MessageFile>()
+                .Where(f => f.MessageId == request.MessageId)
+                .Where(f => f.StorageId == request.StorageFileId)
+                .Where(f => f.TenantId == caller.TenantId)
+                .Where(f => !f.IsDeleted && f.IsEnabled)
+                .AnyAsync(ct);
+            if (duplicateExists)
+                return Result<CmdResponse>.Conflict("Storage file is already attached to this message");
 
             var file = new MessageFile
             {
@@ -2038,6 +2362,21 @@ public sealed class ThreadService(
             };
 
             dataContext.Add(file);
+            AddOutboxEvent(
+                MessageRealtimeEvents.MessageFileAttached,
+                message.TenantId,
+                message.MessageThreadId,
+                file.Id,
+                nameof(MessageFile),
+                caller.CredentialId,
+                new
+                {
+                    ThreadId = request.ThreadId,
+                    MessageId = message.Id,
+                    FileId = file.Id,
+                    StorageFileId = file.StorageId
+                });
+
             await dataContext.SaveChangesAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
@@ -2053,13 +2392,13 @@ public sealed class ThreadService(
         }
     }
 
-    public async Task<Result<List<MessageFileResponse>>> GetMessageFilesAsync(GetMessageFilesRequest request, CancellationToken ct = default)
+    public async Task<Result<PaginatedResult<MessageFileResponse>>> GetMessageFilesAsync(GetMessageFilesRequest request, CancellationToken ct = default)
     {
         try
         {
             var callerResult = ResolveCaller(request.Metadata);
             if (!callerResult.IsSuccess)
-                return CallerFailure<List<MessageFileResponse>>(callerResult);
+                return CallerFailure<PaginatedResult<MessageFileResponse>>(callerResult);
 
             var caller = callerResult.Data!;
             var member = await dataContext.Query<MessageThreadMember>()
@@ -2070,22 +2409,51 @@ public sealed class ThreadService(
                 .FirstOrDefaultAsync(ct);
 
             if (member is null)
-                return Result<List<MessageFileResponse>>.Failure("Requester is not a member of this thread", 403);
+                return Result<PaginatedResult<MessageFileResponse>>.Failure("Requester is not a member of this thread", 403);
 
-            var messageExists = await dataContext.Query<Message>()
+            var message = await dataContext.Query<Message>()
                 .Where(m => m.Id == request.MessageId)
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+
+            if (message is null)
+                return Result<PaginatedResult<MessageFileResponse>>.NotFound("Message not found");
+
+            var hidden = await dataContext.Query<MessageHidden>()
+                .Where(h => h.MessageId == message.Id)
+                .Where(h => h.MessageThreadMemberId == member.Id)
+                .Where(h => h.TenantId == caller.TenantId)
+                .Where(h => !h.IsDeleted && h.IsEnabled)
                 .AnyAsync(ct);
+            if (hidden)
+                return Result<PaginatedResult<MessageFileResponse>>.NotFound("Message not found");
 
-            if (!messageExists)
-                return Result<List<MessageFileResponse>>.NotFound("Message not found");
+            var senderMember = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.Id == message.MessageThreadMemberId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+            if (senderMember is null)
+                return Result<PaginatedResult<MessageFileResponse>>.NotFound("Message not found");
 
-            var fileEntities = await dataContext.Query<MessageFile>()
+            if (await IsBlockedAsync(caller.TenantId, caller.CredentialId, senderMember.CredentialId, ct))
+                return Result<PaginatedResult<MessageFileResponse>>.NotFound("Message not found");
+
+            var pageIndex = request.PageIndex < 0 ? 0 : request.PageIndex;
+            var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
+
+            var query = dataContext.Query<MessageFile>()
                 .Where(f => f.MessageId == request.MessageId)
                 .Where(f => f.TenantId == caller.TenantId)
-                .Where(f => !f.IsDeleted && f.IsEnabled)
+                .Where(f => !f.IsDeleted && f.IsEnabled);
+
+            var totalItems = await query.CountAsync(ct);
+            var fileEntities = await query
+                .OrderByDescending(f => f.CreatedAt)
+                .Skip(pageIndex * pageSize)
+                .Take(pageSize)
                 .ToListAsync(ct);
 
             var files = fileEntities.Select(f => new MessageFileResponse
@@ -2096,16 +2464,20 @@ public sealed class ThreadService(
                 CreatedAt = f.CreatedAt
             }).ToList();
 
-            return Result<List<MessageFileResponse>>.Success(files);
+            return Result<PaginatedResult<MessageFileResponse>>.Success(new PaginatedResult<MessageFileResponse>(
+                totalItems,
+                pageIndex,
+                pageSize,
+                files));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error retrieving files for message {MessageId}", request.MessageId);
-            return Result<List<MessageFileResponse>>.Failure($"Error retrieving message files: {ex.Message}");
+            return Result<PaginatedResult<MessageFileResponse>>.Failure($"Error retrieving message files: {ex.Message}");
         }
     }
 
-    public async Task<Result<CmdResponse>> CreateMessageReactionAsync(CreateMessageReactionRequest request, CancellationToken ct = default)
+    public async Task<Result<CmdResponse>> DeleteMessageFileAsync(DeleteMessageFileRequest request, CancellationToken ct = default)
     {
         try
         {
@@ -2114,6 +2486,15 @@ public sealed class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var rateLimit = rateLimiter.Check(
+                caller.TenantId,
+                caller.CredentialId,
+                MessagingRateLimitActions.AttachmentLink,
+                policy.AttachmentLinkPerMinute);
+            if (!rateLimit.IsSuccess)
+                return RateLimitFailure<CmdResponse>(rateLimit);
+
             var member = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.CredentialId == caller.CredentialId)
@@ -2128,10 +2509,101 @@ public sealed class ThreadService(
                 .Where(m => m.Id == request.MessageId)
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (message is null)
+                return Result<CmdResponse>.NotFound("Message not found");
+
+            var canManage = message.MessageThreadMemberId == member.Id || await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct);
+            if (!canManage)
+                return Result<CmdResponse>.Forbidden("Only the message sender or a thread admin can detach files");
+
+            var file = await dataContext.Query<MessageFile>()
+                .Where(f => f.Id == request.FileId)
+                .Where(f => f.MessageId == request.MessageId)
+                .Where(f => f.TenantId == caller.TenantId)
+                .Where(f => !f.IsDeleted && f.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+
+            if (file is null)
+                return Result<CmdResponse>.NotFound("Message file not found");
+
+            file.IsDeleted = true;
+            file.IsEnabled = false;
+            file.DeletedAt = DateTime.UtcNow;
+            file.ModifiedAt = DateTime.UtcNow;
+            dataContext.Update(file);
+
+            AddOutboxEvent(
+                MessageRealtimeEvents.MessageFileDetached,
+                message.TenantId,
+                message.MessageThreadId,
+                file.Id,
+                nameof(MessageFile),
+                caller.CredentialId,
+                new
+                {
+                    ThreadId = request.ThreadId,
+                    MessageId = message.Id,
+                    FileId = file.Id,
+                    StorageFileId = file.StorageId
+                });
+
+            await dataContext.SaveChangesAsync(ct);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "File attachment detached successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error detaching file {FileId} from message {MessageId}", request.FileId, request.MessageId);
+            return Result<CmdResponse>.Failure($"Error detaching message file: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> CreateMessageReactionAsync(CreateMessageReactionRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            var rateLimit = rateLimiter.Check(
+                caller.TenantId,
+                caller.CredentialId,
+                MessagingRateLimitActions.ReactionCreate,
+                policy.ReactionCreatePerMinute);
+            if (!rateLimit.IsSuccess)
+                return RateLimitFailure<CmdResponse>(rateLimit);
+
+            var member = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.CredentialId == caller.CredentialId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+
+            if (member is null)
+                return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
+
+            var message = await dataContext.Query<Message>()
+                .Where(m => m.Id == request.MessageId)
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.TenantId == caller.TenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+
+            if (message is null)
+                return Result<CmdResponse>.NotFound("Message not found");
+
+            if (!await CanAccessMessageAsync(caller.TenantId, member, message, ct))
                 return Result<CmdResponse>.NotFound("Message not found");
 
             // Check for duplicate reaction of the same type by this thread member.
@@ -2193,6 +2665,9 @@ public sealed class ThreadService(
     {
         try
         {
+            if (request.ThreadId == Guid.Empty || request.MessageId == Guid.Empty)
+                return Result<CmdResponse>.Failure("Thread ID and message ID are required to delete a reaction.", 400);
+
             var callerResult = ResolveCaller(request.Metadata);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
@@ -2207,15 +2682,21 @@ public sealed class ThreadService(
             if (reaction is null)
                 return Result<CmdResponse>.NotFound("Reaction not found");
 
+            if (reaction.MessageId != request.MessageId)
+                return Result<CmdResponse>.NotFound("Reaction not found for this message");
+
             // Verify requester is a member of the thread through the reaction's message
             var message = await dataContext.Query<Message>()
                 .Where(m => m.Id == reaction.MessageId)
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (message is null)
                 return Result<CmdResponse>.NotFound("Message not found");
+
+            if (message.MessageThreadId != request.ThreadId)
+                return Result<CmdResponse>.NotFound("Message not found for this thread");
 
             var member = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == message.MessageThreadId)
@@ -2226,6 +2707,9 @@ public sealed class ThreadService(
 
             if (member is null)
                 return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
+
+            if (!await CanAccessMessageAsync(caller.TenantId, member, message, ct))
+                return Result<CmdResponse>.NotFound("Message not found");
 
             if (reaction.MessageThreadMemberId != member.Id && !await MemberHasAdminRoleAsync(member.TenantId, member.Id, ct))
                 return Result<CmdResponse>.Forbidden("You can only delete your own reactions");
@@ -2274,6 +2758,10 @@ public sealed class ThreadService(
                 return CallerFailure<CmdResponse>(callerResult);
 
             var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            if (!policy.ReadReceiptsEnabled)
+                return Result<CmdResponse>.Forbidden("Read receipts are disabled for this tenant");
+
             var member = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => m.CredentialId == caller.CredentialId)
@@ -2289,11 +2777,17 @@ public sealed class ThreadService(
                 .Where(m => m.MessageThreadId == request.ThreadId)
                 .Where(m => requestedMessageIds.Contains(m.Id))
                 .Where(m => m.TenantId == caller.TenantId)
-                .Where(m => !m.IsDeleted)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
                 .ToListAsync(ct);
 
             if (threadMessages.Count != requestedMessageIds.Count)
                 return Result<CmdResponse>.NotFound("One or more messages were not found in this thread");
+
+            foreach (var message in threadMessages)
+            {
+                if (!await CanAccessMessageAsync(caller.TenantId, member, message, ct))
+                    return Result<CmdResponse>.NotFound("One or more messages were not found in this thread");
+            }
 
             var existingDeliveries = await dataContext.Query<MessageDelivery>()
                 .Where(d => d.MessageThreadMemberId == member.Id)
@@ -2373,6 +2867,88 @@ public sealed class ThreadService(
         }
     }
 
+    public async Task<Result<CmdResponse>> PublishTypingAsync(PublishMessagingTypingRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            if (!policy.TypingIndicatorsEnabled)
+                return Result<CmdResponse>.Forbidden("Typing indicators are disabled for this tenant");
+
+            var member = await GetActiveMemberAsync(caller.TenantId, request.ThreadId, caller.CredentialId, ct);
+            if (member is null)
+                return Result<CmdResponse>.Forbidden("Requester is not a member of this thread");
+
+            await transientRealtimePublisher.PublishTypingAsync(new()
+            {
+                TenantId = caller.TenantId,
+                ThreadId = request.ThreadId,
+                CredentialId = caller.CredentialId,
+                IsTyping = request.IsTyping,
+                OccurredAt = DateTime.UtcNow
+            }, ct);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.Accepted,
+                Message = "Typing state published"
+            }, 202);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error publishing typing state for thread {ThreadId}", request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error publishing typing state: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> PublishPresenceAsync(PublishMessagingPresenceRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var callerResult = ResolveCaller(request.Metadata);
+            if (!callerResult.IsSuccess)
+                return CallerFailure<CmdResponse>(callerResult);
+
+            var caller = callerResult.Data!;
+            var policy = await policyService.GetPolicyAsync(caller.TenantId, ct);
+            if (!policy.PresenceEnabled)
+                return Result<CmdResponse>.Forbidden("Presence is disabled for this tenant");
+
+            var credentialExists = await dataContext.Query<IdentityCredential>()
+                .Where(c => c.Id == caller.CredentialId)
+                .Where(c => c.TenantId == caller.TenantId)
+                .Where(c => !c.IsDeleted && c.IsEnabled)
+                .AnyAsync(ct);
+
+            if (!credentialExists)
+                return Result<CmdResponse>.Unauthorized("Authenticated credential could not be resolved");
+
+            await transientRealtimePublisher.PublishPresenceAsync(new()
+            {
+                TenantId = caller.TenantId,
+                CredentialId = caller.CredentialId,
+                IsOnline = request.IsOnline,
+                LastActiveAt = DateTime.UtcNow
+            }, ct);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.Accepted,
+                Message = "Presence state published"
+            }, 202);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error publishing presence state");
+            return Result<CmdResponse>.Failure($"Error publishing presence state: {ex.Message}");
+        }
+    }
+
     private Result<MessagingRequestContext> ResolveCaller(RequestMetadata? metadata) =>
         requestContextResolver.Resolve(metadata);
 
@@ -2383,6 +2959,9 @@ public sealed class ThreadService(
             403 => Result<T>.Forbidden(caller.Message),
             _ => Result<T>.Failure(caller.Message ?? "Caller context could not be resolved", caller.StatusCode)
         };
+
+    private static Result<T> RateLimitFailure<T>(Result rateLimit) =>
+        Result<T>.Failure(rateLimit.Message ?? "Messaging rate limit exceeded", rateLimit.StatusCode);
 
     private async Task<MessageThreadMember?> GetActiveMemberAsync(
         Guid tenantId,
@@ -2463,35 +3042,20 @@ public sealed class ThreadService(
         Guid otherCredentialId,
         CancellationToken ct)
     {
-        var participantIds = new[] { credentialId, otherCredentialId };
-        var participantMemberships = await dataContext.Query<MessageThreadMember>()
-            .Where(m => participantIds.Contains(m.CredentialId))
-            .Where(m => m.TenantId == tenantId)
-            .Where(m => !m.IsDeleted && m.IsEnabled)
-            .ToListAsync(ct);
-
-        var candidateThreadIds = participantMemberships
-            .GroupBy(m => m.MessageThreadId)
-            .Where(g => g.Select(m => m.CredentialId).Distinct().Count() == 2)
-            .Select(g => g.Key)
-            .ToList();
-        if (candidateThreadIds.Count == 0)
-            return null;
-
-        var allCandidateMembers = await dataContext.Query<MessageThreadMember>()
-            .Where(m => candidateThreadIds.Contains(m.MessageThreadId))
-            .Where(m => m.TenantId == tenantId)
-            .Where(m => !m.IsDeleted && m.IsEnabled)
-            .ToListAsync(ct);
-
-        return allCandidateMembers
-            .GroupBy(m => m.MessageThreadId)
-            .FirstOrDefault(g =>
-                g.Count() == 2 &&
-                g.Select(m => m.CredentialId).OrderBy(id => id)
-                    .SequenceEqual(participantIds.OrderBy(id => id)))
-            ?.Key;
+        var directPair = NormalizeDirectPair(credentialId, otherCredentialId);
+        var indexedThread = await dataContext.Query<MessageDirectThread>()
+            .Where(x => x.TenantId == tenantId)
+            .Where(x => x.FirstCredentialId == directPair.FirstCredentialId)
+            .Where(x => x.SecondCredentialId == directPair.SecondCredentialId)
+            .Where(x => !x.IsDeleted && x.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+        return indexedThread?.MessageThreadId;
     }
+
+    private static (Guid FirstCredentialId, Guid SecondCredentialId) NormalizeDirectPair(Guid credentialId, Guid otherCredentialId) =>
+        credentialId.CompareTo(otherCredentialId) <= 0
+            ? (credentialId, otherCredentialId)
+            : (otherCredentialId, credentialId);
 
     private async Task<Dictionary<Guid, int>> GetUnreadCountMapAsync(
         Guid tenantId,
@@ -2515,8 +3079,25 @@ public sealed class ThreadService(
         var messages = await dataContext.Query<Message>()
             .Where(m => threadIds.Contains(m.MessageThreadId))
             .Where(m => m.TenantId == tenantId)
-            .Where(m => !m.IsDeleted)
+            .Where(m => !m.IsDeleted && m.IsEnabled)
             .ToListAsync(ct);
+
+        var hiddenRows = await dataContext.Query<MessageHidden>()
+            .Where(h => memberIds.Contains(h.MessageThreadMemberId))
+            .Where(h => h.TenantId == tenantId)
+            .Where(h => !h.IsDeleted && h.IsEnabled)
+            .ToListAsync(ct);
+        var hiddenMessageIds = hiddenRows.Select(h => h.MessageId).ToList();
+        if (hiddenMessageIds.Count > 0)
+            messages = messages.Where(m => !hiddenMessageIds.Contains(m.Id)).ToList();
+
+        var blockedCredentialIds = await GetBlockedCredentialIdsForAsync(tenantId, credentialId, ct);
+        if (blockedCredentialIds.Count > 0)
+        {
+            var blockedSenderMemberIds = await GetBlockedThreadMemberIdsAsync(tenantId, threadIds, blockedCredentialIds, ct);
+            if (blockedSenderMemberIds.Count > 0)
+                messages = messages.Where(m => !blockedSenderMemberIds.Contains(m.MessageThreadMemberId)).ToList();
+        }
 
         var readDeliveries = await dataContext.Query<MessageDelivery>()
             .Where(d => memberIds.Contains(d.MessageThreadMemberId))
@@ -2555,6 +3136,90 @@ public sealed class ThreadService(
                 (b.BlockerCredentialId == secondCredentialId && b.BlockedCredentialId == firstCredentialId))
             .AnyAsync(ct);
 
+    private async Task<bool> CanAccessMessageAsync(
+        Guid tenantId,
+        MessageThreadMember requester,
+        Message message,
+        CancellationToken ct)
+    {
+        var hidden = await dataContext.Query<MessageHidden>()
+            .Where(h => h.TenantId == tenantId)
+            .Where(h => h.MessageId == message.Id)
+            .Where(h => h.MessageThreadMemberId == requester.Id)
+            .Where(h => !h.IsDeleted && h.IsEnabled)
+            .AnyAsync(ct);
+        if (hidden)
+            return false;
+
+        var senderMember = await dataContext.Query<MessageThreadMember>()
+            .Where(m => m.TenantId == tenantId)
+            .Where(m => m.Id == message.MessageThreadMemberId)
+            .Where(m => !m.IsDeleted && m.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+        if (senderMember is null)
+            return false;
+
+        return !await IsBlockedAsync(tenantId, requester.CredentialId, senderMember.CredentialId, ct);
+    }
+
+    private async Task<bool> IsBlockedByAnyActiveThreadMemberAsync(
+        Guid tenantId,
+        Guid threadId,
+        Guid targetCredentialId,
+        CancellationToken ct)
+    {
+        var activeMembers = await dataContext.Query<MessageThreadMember>()
+            .Where(m => m.TenantId == tenantId)
+            .Where(m => m.MessageThreadId == threadId)
+            .Where(m => !m.IsDeleted && m.IsEnabled)
+            .ToListAsync(ct);
+        var activeCredentialIds = activeMembers.Select(m => m.CredentialId).ToList();
+
+        if (activeCredentialIds.Count == 0)
+            return false;
+
+        return await dataContext.Query<MessageBlock>()
+            .Where(b => b.TenantId == tenantId)
+            .Where(b => !b.IsDeleted && b.IsEnabled)
+            .Where(b =>
+                (b.BlockerCredentialId == targetCredentialId && activeCredentialIds.Contains(b.BlockedCredentialId)) ||
+                (b.BlockedCredentialId == targetCredentialId && activeCredentialIds.Contains(b.BlockerCredentialId)))
+            .AnyAsync(ct);
+    }
+
+    private async Task<HashSet<Guid>> GetBlockedCredentialIdsForAsync(Guid tenantId, Guid credentialId, CancellationToken ct)
+    {
+        var blocks = await dataContext.Query<MessageBlock>()
+            .Where(b => b.TenantId == tenantId)
+            .Where(b => !b.IsDeleted && b.IsEnabled)
+            .Where(b => b.BlockerCredentialId == credentialId || b.BlockedCredentialId == credentialId)
+            .ToListAsync(ct);
+
+        return blocks
+            .Select(b => b.BlockerCredentialId == credentialId ? b.BlockedCredentialId : b.BlockerCredentialId)
+            .Where(id => id != Guid.Empty)
+            .ToHashSet();
+    }
+
+    private async Task<HashSet<Guid>> GetBlockedThreadMemberIdsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> threadIds,
+        IReadOnlySet<Guid> blockedCredentialIds,
+        CancellationToken ct)
+    {
+        if (threadIds.Count == 0 || blockedCredentialIds.Count == 0)
+            return [];
+
+        var blockedMembers = await dataContext.Query<MessageThreadMember>()
+                .Where(m => threadIds.Contains(m.MessageThreadId))
+                .Where(m => blockedCredentialIds.Contains(m.CredentialId))
+                .Where(m => m.TenantId == tenantId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .ToListAsync(ct);
+
+        return blockedMembers.Select(m => m.Id).ToHashSet();
+    }
+
     private static string NormalizeRole(string role) =>
         role.Trim() switch
         {
@@ -2578,38 +3243,32 @@ public sealed class ThreadService(
     private static bool HasTemplate(Guid? templateId, string? templateKey) =>
         templateId is Guid || !string.IsNullOrWhiteSpace(templateKey);
 
-    private static bool IsAllowedAttachmentFileType(StorageFileValidationResponse file)
+    private static bool IsAllowedAttachmentFileType(StorageFileValidationResponse file, MessagingPolicySnapshot policy)
     {
-        var blockedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ".bat",
-            ".cmd",
-            ".com",
-            ".dll",
-            ".exe",
-            ".js",
-            ".msi",
-            ".ps1",
-            ".scr",
-            ".sh",
-            ".vbs"
-        };
-
         var extension = Path.GetExtension(file.Name);
-        if (!string.IsNullOrWhiteSpace(extension) && blockedExtensions.Contains(extension))
+        if (!string.IsNullOrWhiteSpace(extension) && policy.AttachmentBlockedExtensions.Contains(extension))
             return false;
 
         if (string.IsNullOrWhiteSpace(file.ContentType))
             return true;
 
-        return file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
-               file.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ||
-               file.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ||
-               file.ContentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase) ||
-               file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) ||
-               file.ContentType.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
-               file.ContentType.Equals("application/zip", StringComparison.OrdinalIgnoreCase) ||
-               file.ContentType.StartsWith("application/vnd.", StringComparison.OrdinalIgnoreCase);
+        var family = GetAttachmentContentFamily(file.ContentType);
+        return policy.AttachmentAllowedContentFamilies.Count == 0 ||
+               policy.AttachmentAllowedContentFamilies.Contains(family);
+    }
+
+    private static string GetAttachmentContentFamily(string contentType)
+    {
+        if (contentType.StartsWith("application/vnd.", StringComparison.OrdinalIgnoreCase))
+            return "vnd";
+
+        return contentType.ToLowerInvariant() switch
+        {
+            "application/pdf" => "pdf",
+            "application/json" => "json",
+            "application/zip" => "zip",
+            _ => contentType.Split('/', 2)[0].ToLowerInvariant()
+        };
     }
 
     private async Task AddAdminRoleBindingsAsync(

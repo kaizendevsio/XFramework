@@ -30,7 +30,7 @@ public sealed class BoltTransportNegotiator
                 IBoltConnection? conn = transport switch
                 {
                     BoltTransport.WebTransport => await TryWebTransportAsync(serverUri, attemptCts.Token),
-                    BoltTransport.WebSocket => await TryWebSocketAsync(serverUri, attemptCts.Token),
+                    BoltTransport.WebSocket => await TryWebSocketAsync(serverUri, options, attemptCts.Token),
                     _ => null
                 };
 
@@ -62,7 +62,7 @@ public sealed class BoltTransportNegotiator
         return Task.FromResult<IBoltConnection?>(null);
     }
 
-    private static async Task<IBoltConnection?> TryWebSocketAsync(Uri serverUri, CancellationToken ct)
+    private static async Task<IBoltConnection?> TryWebSocketAsync(Uri serverUri, BoltClientOptions options, CancellationToken ct)
     {
         var wsScheme = serverUri.Scheme switch
         {
@@ -70,9 +70,42 @@ public sealed class BoltTransportNegotiator
             _ => "ws"
         };
         var wsUri = new UriBuilder(serverUri) { Scheme = wsScheme }.Uri;
+        var accessToken = await ResolveAccessTokenAsync(options, ct);
 
         var ws = new ClientWebSocket();
+        if (!string.IsNullOrWhiteSpace(accessToken))
+        {
+            if (options.SendAccessTokenAsQueryString || OperatingSystem.IsBrowser())
+            {
+                wsUri = AppendQueryParameter(wsUri, "access_token", accessToken);
+            }
+            else
+            {
+                ws.Options.SetRequestHeader("Authorization", $"Bearer {accessToken}");
+            }
+        }
+
         await ws.ConnectAsync(wsUri, ct);
         return new WebSocketBoltConnection(ws);
+    }
+
+    private static async ValueTask<string?> ResolveAccessTokenAsync(BoltClientOptions options, CancellationToken ct)
+    {
+        if (options.AccessTokenProvider is not null)
+            return await options.AccessTokenProvider(ct);
+
+        return options.AccessToken;
+    }
+
+    private static Uri AppendQueryParameter(Uri uri, string name, string value)
+    {
+        var builder = new UriBuilder(uri);
+        var existingQuery = builder.Query;
+        var prefix = string.IsNullOrWhiteSpace(existingQuery)
+            ? string.Empty
+            : existingQuery.TrimStart('?') + "&";
+
+        builder.Query = prefix + $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
+        return builder.Uri;
     }
 }

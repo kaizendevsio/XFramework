@@ -21,5 +21,6 @@ public sealed class DurableMessage<T>
     }
 
     /// <summary>Acknowledge this message (and all earlier ones from the same subscriber).</summary>
-    public ValueTask AckAsync(CancellationToken ct = default) => _ackCallback(Sequence, ct);
+    public ValueTask AckAsync(CancellationToken ct = default) =>
+        Sequence <= 0 ? ValueTask.CompletedTask : _ackCallback(Sequence, ct);
 }

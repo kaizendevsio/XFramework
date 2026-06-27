@@ -5,7 +5,11 @@ using Messaging.Domain.Shared.Contracts.Requests.Create;
 using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Domain.Shared.Contracts.Requests.Update;
 using Messaging.Domain.Shared.Contracts.Responses;
-using SmsGateway.Integration.Drivers;
+using Notifications.Domain.Shared.Contracts;
+using Notifications.Domain.Shared.Contracts.Requests;
+using Notifications.Domain.Shared.Contracts.Responses;
+using Notifications.Domain.Shared.Enums;
+using Notifications.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.DataContext;
@@ -18,8 +22,11 @@ namespace Messaging.Api.Services;
 public sealed class MessagingService(
     IDataContext dataContext,
     ITenantResolver tenantService,
-    ISmsGatewayServiceWrapper smsGatewayServiceWrapper,
+    INotificationsServiceWrapper notificationsServiceWrapper,
     IMessagingTemplateService templateService,
+    IMessagingRequestContextResolver requestContextResolver,
+    IMessagingPolicyService policyService,
+    IMessagingActionRateLimiter rateLimiter,
     ILogger<MessagingService> logger
 ) : IMessagingService
 {
@@ -27,26 +34,41 @@ public sealed class MessagingService(
     {
         try
         {
-            var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
-
-            var configuration = await dataContext.Query<RegistryConfiguration>()
-                .Where(x => x.TenantId == tenant.Id)
-                .Where(x => x.Key == "Settings:Messaging:Sms:AgentClusterId")
-                .FirstOrDefaultAsync(ct);
-
-            var agentClusterId = string.Empty;
-            if (request.AgentClusterId != Guid.Empty)
+            var tenantContext = requestContextResolver.ResolveTrustedInternal(
+                request.Metadata,
+                "ControlPanel",
+                "IdentityServer");
+            if (!tenantContext.IsSuccess)
             {
-                agentClusterId = request.AgentClusterId.ToString();
+                return Result<CmdResponse>.Failure(
+                    tenantContext.Message ?? "Trusted Messaging direct transport context could not be resolved",
+                    tenantContext.StatusCode);
             }
-            else
+
+            var tenant = await tenantService.GetTenant(tenantContext.Data!.TenantId);
+            var policy = await policyService.GetPolicyAsync(tenant.Id, ct);
+            var rateLimit = rateLimiter.Check(
+                tenant.Id,
+                tenantContext.Data.CredentialId ?? Guid.Empty,
+                MessagingRateLimitActions.DirectExternalTransport,
+                policy.DirectExternalTransportPerMinute);
+            if (!rateLimit.IsSuccess)
+                return Result<CmdResponse>.Failure(
+                    rateLimit.Message ?? "Messaging direct transport rate limit exceeded",
+                    rateLimit.StatusCode);
+
+            if (!Enum.IsDefined(request.MessageTransportType))
             {
-                if (configuration?.Value == null)
-                {
-                    logger.MessagingAgentClusterNotFound(tenant.Id);
-                    return Result<CmdResponse>.Failure("Agent cluster id not found");
-                }
-                agentClusterId = configuration.Value;
+                logger.MessagingUnknownTransportType(request.MessageTransportType.ToString());
+                return Result<CmdResponse>.Failure($"Unknown message transport type: {request.MessageTransportType}", 400);
+            }
+
+            if (!TryMapDeliveryChannel(request.MessageTransportType, out var deliveryChannel))
+            {
+                logger.MessagingTransportNotImplemented(request.MessageTransportType.ToString());
+                return Result<CmdResponse>.Failure(
+                    $"Message transport type {request.MessageTransportType} is not yet supported by Messaging direct transport",
+                    501);
             }
 
             var messageText = request.Message?.Trim();
@@ -78,7 +100,7 @@ public sealed class MessagingService(
             var record = new MessageDirect()
             {
                 TenantId = tenant.Id,
-                MessageTransportType = MessageTransportType.Sms,
+                MessageTransportType = request.MessageTransportType,
                 ExternalRecipient = request.Recipient,
                 Subject = renderedTemplate?.Subject ?? request.Subject,
                 Message = messageText,
@@ -87,37 +109,68 @@ public sealed class MessagingService(
                 TemplateType = renderedTemplate?.TemplateType,
                 TemplateVariablesJson = JsonSerializer.Serialize(
                     renderedTemplate?.TemplateVariables ?? new Dictionary<string, string>()),
-                AgentClusterId = Guid.Parse(agentClusterId),
+                AgentClusterId = request.AgentClusterId,
                 Status = MessageStatus.Queued
             };
 
             dataContext.Add(record);
-            await dataContext.SaveChangesAsync(ct);
+            var saveResult = await dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<CmdResponse>.Failure(saveResult.Message ?? "Direct message could not be queued", saveResult.StatusCode);
 
-            switch (request.MessageTransportType)
+            QueryResponse<NotificationInboxItemResponse> result;
+            try
             {
-                case MessageTransportType.Sms:
+                result = await notificationsServiceWrapper.CreateNotification(new CreateNotificationRequest
                 {
-                    var result = await smsGatewayServiceWrapper.CreateSmsMessage(new()
+                    TenantId = tenant.Id,
+                    RecipientCredentialId = tenantContext.Data.CredentialId ?? Guid.Empty,
+                    TemplateKey = renderedTemplate?.TemplateKey ?? request.TemplateKey ?? NotificationTemplateKeys.SystemGeneric,
+                    Title = renderedTemplate?.Subject ?? request.Subject ?? request.Intent,
+                    Body = messageText,
+                    DeliveryChannels = deliveryChannel,
+                    DeliveryAddress = NormalizeDeliveryAddress(request.MessageTransportType, request.Recipient),
+                    CorrelationId = $"messaging-direct:{record.Id:N}",
+                    Data = new Dictionary<string, string>
                     {
-                        Id = record.Id,
-                        AgentClusterId = new Guid(agentClusterId),
-                        Recipient = request.Recipient.ValidatePhoneNumber(convertOnly: true),
-                        Message = messageText
-                    });
-
-                    return Result<CmdResponse>.Success(result);
-                }
-                case MessageTransportType.Email:
-                case MessageTransportType.Push:
-                case MessageTransportType.Webhook:
-                    logger.MessagingTransportNotImplemented(request.MessageTransportType.ToString());
-                    return Result<CmdResponse>.Failure($"Message transport type {request.MessageTransportType} not implemented");
-
-                default:
-                    logger.MessagingUnknownTransportType(request.MessageTransportType.ToString());
-                    return Result<CmdResponse>.Failure($"Unknown message transport type: {request.MessageTransportType}");
+                        ["MessageDirectId"] = record.Id.ToString(),
+                        ["Transport"] = request.MessageTransportType.ToString(),
+                        ["Intent"] = request.Intent
+                    },
+                    Metadata = request.Metadata
+                }, ct);
             }
+            catch (Exception ex)
+            {
+                record.Status = MessageStatus.Failed;
+                record.ModifiedAt = DateTime.UtcNow;
+                dataContext.Update(record);
+                await dataContext.SaveChangesAsync(ct);
+                logger.MessagingCreateDirectError(request.Recipient, ex);
+                return Result<CmdResponse>.Failure("Direct message could not be queued with the SMS gateway", 502);
+            }
+
+            if (!result.IsSuccess)
+            {
+                record.Status = MessageStatus.Failed;
+                record.ModifiedAt = DateTime.UtcNow;
+                dataContext.Update(record);
+                await dataContext.SaveChangesAsync(ct);
+
+                var statusCode = result.HttpStatusCode == 0
+                    ? 502
+                    : (int)result.HttpStatusCode;
+
+                return Result<CmdResponse>.Failure(
+                    result.Message ?? "Direct message could not be queued with the SMS gateway",
+                    statusCode);
+            }
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.Accepted,
+                Message = "Direct message delivery queued"
+            });
         }
         catch (Exception ex)
         {
@@ -170,9 +223,20 @@ public sealed class MessagingService(
     {
         try
         {
+            var tenantContext = requestContextResolver.ResolveTrustedInternal(
+                request.Metadata,
+                "XFramework.SmsGateway");
+            if (!tenantContext.IsSuccess)
+            {
+                return Result<CmdResponse>.Failure(
+                    tenantContext.Message ?? "Trusted Messaging direct transport context could not be resolved",
+                    tenantContext.StatusCode);
+            }
+
             var agent = await dataContext.Query<RegistryConfiguration>()
                 .Where(x => x.Key == "Settings:Messaging:Sms:AgentClusterId")
                 .Where(x => x.Value == request.AgentClusterId.ToString())
+                .Where(x => x.TenantId == tenantContext.Data!.TenantId)
                 .FirstOrDefaultAsync(ct);
 
             if (agent is null)
@@ -215,4 +279,24 @@ public sealed class MessagingService(
 
     private static bool HasTemplate(Guid? templateId, string? templateKey) =>
         templateId is Guid || !string.IsNullOrWhiteSpace(templateKey);
+
+    private static bool TryMapDeliveryChannel(
+        MessageTransportType transportType,
+        out NotificationDeliveryChannel channel)
+    {
+        channel = transportType switch
+        {
+            MessageTransportType.Email => NotificationDeliveryChannel.Email,
+            MessageTransportType.Sms => NotificationDeliveryChannel.Sms,
+            MessageTransportType.Webhook => NotificationDeliveryChannel.Webhook,
+            _ => NotificationDeliveryChannel.None
+        };
+
+        return channel != NotificationDeliveryChannel.None;
+    }
+
+    private static string NormalizeDeliveryAddress(MessageTransportType transportType, string recipient) =>
+        transportType == MessageTransportType.Sms
+            ? recipient.ValidatePhoneNumber(convertOnly: true)
+            : recipient.Trim();
 }

@@ -302,6 +302,7 @@ public partial record MessagingAdminModerationResponse
     public List<MessagingAdminReportRow> Reports { get; set; } = [];
     public List<MessagingAdminBlockRow> Blocks { get; set; } = [];
     public List<MessagingAdminPolicyRow> Policies { get; set; } = [];
+    public List<MessagingModerationRuleResponse> Rules { get; set; } = [];
 }
 
 [MemoryPackable]
@@ -338,4 +339,46 @@ public partial record MessagingAdminPolicyRow
     public string Status { get; set; } = string.Empty;
     public string StatusKey { get; set; } = string.Empty;
     public string Details { get; set; } = string.Empty;
+}
+
+[MemoryPackable]
+public partial record GetMessagingModerationRulesResponse
+{
+    public List<MessagingModerationRuleResponse> Items { get; set; } = [];
+}
+
+[MemoryPackable]
+public partial record MessagingModerationRuleResponse
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string MatchType { get; set; } = string.Empty;
+    public string Pattern { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsEnabled { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ModifiedAt { get; set; }
+}
+
+[MemoryPackable]
+public partial record MessagingReportWorkflowResponse
+{
+    public Guid ReportId { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
+    public List<MessagingReportAuditResponse> Audit { get; set; } = [];
+}
+
+[MemoryPackable]
+public partial record MessagingReportAuditResponse
+{
+    public Guid Id { get; set; }
+    public string Action { get; set; } = string.Empty;
+    public Guid? ActorCredentialId { get; set; }
+    public Guid? AssignedCredentialId { get; set; }
+    public short? FromStatus { get; set; }
+    public short? ToStatus { get; set; }
+    public string? Note { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

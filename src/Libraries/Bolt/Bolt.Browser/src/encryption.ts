@@ -50,7 +50,7 @@ export class MediaCrypto {
     // Import remote public key
     const remoteKey = await crypto.subtle.importKey(
       'spki',
-      remotePublicKeyDer,
+      toArrayBuffer(remotePublicKeyDer),
       { name: 'ECDH', namedCurve: 'P-256' },
       false,
       []
@@ -77,7 +77,7 @@ export class MediaCrypto {
     const info = new TextEncoder().encode('bolt-media-e2e');
 
     this.aesKey = await crypto.subtle.deriveKey(
-      { name: 'HKDF', hash: 'SHA-256', salt, info },
+      { name: 'HKDF', hash: 'SHA-256', salt: toArrayBuffer(salt), info: toArrayBuffer(info) },
       hkdfKey,
       { name: 'AES-GCM', length: 256 },
       false,
@@ -95,9 +95,9 @@ export class MediaCrypto {
 
     const iv = buildNonce(streamId, sequenceNumber);
     const encrypted = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv, tagLength: 128 },
+      { name: 'AES-GCM', iv: toArrayBuffer(iv), tagLength: 128 },
       this.aesKey,
-      plaintext
+      toArrayBuffer(plaintext)
     );
 
     return new Uint8Array(encrypted);
@@ -111,9 +111,9 @@ export class MediaCrypto {
 
     const iv = buildNonce(streamId, sequenceNumber);
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv, tagLength: 128 },
+      { name: 'AES-GCM', iv: toArrayBuffer(iv), tagLength: 128 },
       this.aesKey,
-      ciphertextWithTag
+      toArrayBuffer(ciphertextWithTag)
     );
 
     return new Uint8Array(decrypted);
@@ -130,4 +130,9 @@ function buildNonce(streamId: string, sequenceNumber: number): Uint8Array {
   nonce.set(guidBytes.subarray(0, 8), 0);
   new DataView(nonce.buffer).setUint32(8, sequenceNumber >>> 0, true);
   return nonce;
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = bytes.slice();
+  return copy.buffer as ArrayBuffer;
 }

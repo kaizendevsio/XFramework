@@ -4,6 +4,9 @@ using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts.Requests.Settings;
 using Messaging.Domain.Shared.Contracts.Responses;
 using Messaging.Tests.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -12,6 +15,8 @@ namespace Messaging.Tests.Services;
 
 public sealed class MessagingSettingsServiceTests
 {
+    private const string TrustedMetadataSecret = "messaging-settings-test-secret";
+
     [Test]
     public async Task GetSettingsAsync_WhenNoRegistryRowsExist_ReturnsDefaults()
     {
@@ -130,14 +135,15 @@ public sealed class MessagingSettingsServiceTests
     private static MessagingSettingsService CreateService(
         InMemoryDataContext dataContext,
         params Guid[] tenantIds) =>
-        new(dataContext, new FakeTenantResolver(tenantIds));
+        new(
+            dataContext,
+            new FakeTenantResolver(tenantIds),
+            new MessagingRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            new MessagingPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())));
 
     private static GetMessagingSettingsRequest Request(Guid tenantId) => new()
     {
-        Metadata = new RequestMetadata
-        {
-            TenantId = tenantId
-        }
+        Metadata = Metadata(tenantId)
     };
 
     private static UpdateMessagingSettingsRequest UpdateRequest(
@@ -146,10 +152,7 @@ public sealed class MessagingSettingsServiceTests
         string key,
         string value) => new()
     {
-        Metadata = new RequestMetadata
-        {
-            TenantId = tenantId
-        },
+        Metadata = Metadata(tenantId),
         Values =
         [
             new UpdateMessagingSettingValueRequest
@@ -160,6 +163,25 @@ public sealed class MessagingSettingsServiceTests
             }
         ]
     };
+
+    private static RequestMetadata Metadata(Guid tenantId)
+    {
+        var metadata = new RequestMetadata
+        {
+            TenantId = tenantId,
+            Name = "ControlPanel"
+        };
+        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
+        return metadata;
+    }
+
+    private static IConfiguration TestConfiguration() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Messaging:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
+            })
+            .Build();
 
     private static MessagingSettingValueResponse FindSetting(
         MessagingSettingsResponse response,

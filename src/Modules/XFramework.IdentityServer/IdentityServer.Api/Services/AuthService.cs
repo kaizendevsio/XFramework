@@ -378,7 +378,8 @@ public sealed class AuthService : IAuthService
                 token = await _jwtService.GenerateToken(
                     request.UserName,
                     credential.Id,
-                    roleList.Select(i => i.TypeId ?? Guid.Empty).ToList());
+                    roleList.Select(i => i.TypeId ?? Guid.Empty).ToList(),
+                    tenant.Id);
             }
 
             // Determine session type based on authorization type
@@ -523,7 +524,7 @@ public sealed class AuthService : IAuthService
                     await _dataContext.SaveChangesAsync(ct);
 
                     // Send SMS with OTP
-                    await _messagingServiceWrapper.CreateDirectMessage(new()
+                    var smsResult = await _messagingServiceWrapper.CreateDirectMessageAsync(new()
                     {
                         MessageTransportType = MessageTransportType.Sms,
                         Sender = GenericSender.System,
@@ -533,7 +534,15 @@ public sealed class AuthService : IAuthService
                         Message = message,
                         IsScheduled = false,
                         Metadata = request.Metadata
-                    });
+                    }, ct);
+
+                    if (!smsResult.IsSuccess)
+                    {
+                        var statusCode = smsResult.HttpStatusCode == 0 ? 502 : (int)smsResult.HttpStatusCode;
+                        return Result<IdentityVerification>.Failure(
+                            smsResult.Message ?? "SMS verification message could not be queued",
+                            statusCode);
+                    }
 
                     _logger.LogInformation(
                         "Verification created and SMS sent. VerificationId: {VerificationId}, CredentialId: {CredentialId}",
@@ -587,7 +596,7 @@ public sealed class AuthService : IAuthService
                     await _dataContext.SaveChangesAsync(ct);
 
                     // Send Email with OTP
-                    await _messagingServiceWrapper.CreateDirectMessage(new()
+                    var emailResult = await _messagingServiceWrapper.CreateDirectMessageAsync(new()
                     {
                         MessageTransportType = MessageTransportType.Email,
                         Sender = GenericSender.System,
@@ -597,7 +606,15 @@ public sealed class AuthService : IAuthService
                         Message = emailMessage,
                         IsScheduled = false,
                         Metadata = request.Metadata
-                    });
+                    }, ct);
+
+                    if (!emailResult.IsSuccess)
+                    {
+                        var statusCode = emailResult.HttpStatusCode == 0 ? 502 : (int)emailResult.HttpStatusCode;
+                        return Result<IdentityVerification>.Failure(
+                            emailResult.Message ?? "Email verification message could not be queued",
+                            statusCode);
+                    }
 
                     _logger.LogInformation(
                         "Verification created and email sent. VerificationId: {VerificationId}, CredentialId: {CredentialId}",
@@ -1291,7 +1308,7 @@ public sealed class AuthService : IAuthService
                 ?? $"Your password reset token is: {resetToken}. This token expires in {PasswordResetTokenExpirationMinutes} minutes.";
 
             // Send reset token via appropriate transport
-            await _messagingServiceWrapper.CreateDirectMessage(new()
+            var deliveryResult = await _messagingServiceWrapper.CreateDirectMessageAsync(new()
             {
                 MessageTransportType = transportType,
                 Sender = GenericSender.System,
@@ -1301,7 +1318,19 @@ public sealed class AuthService : IAuthService
                 Message = message,
                 IsScheduled = false,
                 Metadata = request.Metadata
-            });
+            }, ct);
+
+            if (!deliveryResult.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Password reset token delivery failed. CredentialId: {CredentialId}, Transport: {Transport}, StatusCode: {StatusCode}, Message: {Message}",
+                    credential.Id,
+                    transportType,
+                    deliveryResult.HttpStatusCode,
+                    deliveryResult.Message);
+
+                return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
+            }
 
             _logger.LogInformation(
                 "Password reset token generated and sent. CredentialId: {CredentialId}, Transport: {Transport}",

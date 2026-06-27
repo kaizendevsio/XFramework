@@ -11,9 +11,13 @@ public static class ApplicationBuilderExtension
         var app = appBuilder as WebApplication
             ?? throw new InvalidOperationException("Bolt Hub service mapping requires WebApplication.");
 
+        app.UseRouting();
+        app.UseAuthentication();
+        app.UseAuthorization();
+
         // Bolt thin-protocol WebSocket endpoint
         app.UseWebSockets();
-        app.MapBolt("/bolt/ws");
+        app.MapBolt("/bolt/ws").RequireAuthorization();
 
         if (app.Configuration.GetValue<bool>("BoltServiceDiscovery:ExposeHttpEndpoints"))
         {

@@ -12,11 +12,11 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task<bool> Connect();
     public Task StartClientEventListener(string topic);
 
-    public Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient)
+    public Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer;
-    public Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient)
+    public Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer;
-    public Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient)
+    public Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer;
     public Task PublishAsync<TModel>(string eventName, string topic, TModel? data)
         where TModel : class, IHasRequestServer;
@@ -25,7 +25,35 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task PublishAsync(string eventName, string topic);
     public Task Subscribe<TResponse>(BoltSubscriptionRequest<TResponse> request)
         where TResponse : class;
+    public Task SubscribeAsync<TResponse>(string topic, Func<TResponse, Task> handler, CancellationToken ct = default)
+        where TResponse : class;
+    public Task SubscribeAsync<TResponse>(
+        string topic,
+        Func<TResponse, Task> handler,
+        string? actorAccessToken,
+        CancellationToken ct = default)
+        where TResponse : class;
+    public Task SubscribeAsync<TResponse>(
+        string topic,
+        Func<TResponse, Task> handler,
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider,
+        CancellationToken ct = default)
+        where TResponse : class;
     public Task Unsubscribe(BoltSubscriptionRequest request);
     public Task SubscribeDurableAsync<TResponse>(string topic, string subscriberId, Func<TResponse, Task> handler, CancellationToken ct = default)
+        where TResponse : class;
+    public Task SubscribeDurableAsync<TResponse>(
+        string topic,
+        string subscriberId,
+        Func<TResponse, Task> handler,
+        string? actorAccessToken,
+        CancellationToken ct = default)
+        where TResponse : class;
+    public Task SubscribeDurableAsync<TResponse>(
+        string topic,
+        string subscriberId,
+        Func<TResponse, Task> handler,
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider,
+        CancellationToken ct = default)
         where TResponse : class;
 }

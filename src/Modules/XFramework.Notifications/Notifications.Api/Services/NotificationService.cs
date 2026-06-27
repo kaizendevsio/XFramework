@@ -15,6 +15,20 @@ public sealed class NotificationService(AppDbContext db, ILogger<NotificationSer
         if (!TryResolveTenantId(request.TenantId, request.Metadata, out var tenantId))
             return Result<NotificationInboxItemResponse>.Failure("Tenant ID is required", 400);
 
+        if (!string.IsNullOrWhiteSpace(request.CorrelationId))
+        {
+            var normalizedCorrelationId = request.CorrelationId.Trim();
+            var existing = await db.Set<NotificationInboxItem>()
+                .AsNoTracking()
+                .Where(item => item.TenantId == tenantId)
+                .Where(item => item.CorrelationId == normalizedCorrelationId)
+                .Where(item => !item.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (existing is not null)
+                return Result<NotificationInboxItemResponse>.Success(ToInboxResponse(existing), 200, "Notification already exists");
+        }
+
         var preferences = await GetPreferenceEntityAsync(tenantId, request.RecipientCredentialId, ct);
         var enabledChannels = preferences?.EnabledChannels ?? NotificationPreferenceDefaults.EnabledChannels;
         var requestedChannels = NotificationPreferenceDefaults.Normalize(request.DeliveryChannels);
@@ -51,7 +65,26 @@ public sealed class NotificationService(AppDbContext db, ILogger<NotificationSer
         };
 
         db.Set<NotificationInboxItem>().Add(item);
-        await db.SaveChangesAsync(ct);
+        AddDeliveryRows(item, effectiveChannels, request.DeliveryAddress);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(item.CorrelationId))
+        {
+            db.Entry(item).State = EntityState.Detached;
+            var existing = await db.Set<NotificationInboxItem>()
+                .AsNoTracking()
+                .Where(existingItem => existingItem.TenantId == tenantId)
+                .Where(existingItem => existingItem.CorrelationId == item.CorrelationId)
+                .Where(existingItem => !existingItem.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (existing is not null)
+                return Result<NotificationInboxItemResponse>.Success(ToInboxResponse(existing), 200, "Notification already exists");
+
+            throw;
+        }
 
         logger.LogInformation(
             "Notification {NotificationId} created for credential {CredentialId} in tenant {TenantId}",
@@ -345,6 +378,78 @@ public sealed class NotificationService(AppDbContext db, ILogger<NotificationSer
             ErrorMessage = status.ErrorMessage,
             AttemptNumber = status.AttemptNumber,
             RecordedAt = status.RecordedAt
+        };
+
+    private void AddDeliveryRows(
+        NotificationInboxItem item,
+        NotificationDeliveryChannel effectiveChannels,
+        string? deliveryAddress)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var channel in EnumerateExternalChannels(effectiveChannels))
+        {
+            var correlationId = string.IsNullOrWhiteSpace(item.CorrelationId)
+                ? $"notification:{item.Id:N}:{channel}"
+                : $"{item.CorrelationId}:{channel}";
+
+            db.Set<NotificationDeliveryStatusRecord>().Add(new NotificationDeliveryStatusRecord
+            {
+                Id = Guid.NewGuid(),
+                TenantId = item.TenantId,
+                NotificationInboxItemId = item.Id,
+                Channel = channel,
+                Status = NotificationDeliveryStatus.Queued,
+                AttemptNumber = 0,
+                RecordedAt = now,
+                CreatedAt = now,
+                ModifiedAt = now,
+                ConcurrencyStamp = Guid.NewGuid(),
+                IsEnabled = true
+            });
+
+            db.Set<NotificationDeliveryJob>().Add(new NotificationDeliveryJob
+            {
+                Id = Guid.NewGuid(),
+                TenantId = item.TenantId,
+                NotificationInboxItemId = item.Id,
+                Channel = channel,
+                Status = NotificationDeliveryStatus.Queued,
+                ProviderKey = ResolveDefaultProviderKey(channel),
+                RecipientAddress = string.IsNullOrWhiteSpace(deliveryAddress) ? null : deliveryAddress.Trim(),
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    item.Title,
+                    item.Body,
+                    item.TemplateKey,
+                    item.DataJson
+                }),
+                CorrelationId = correlationId,
+                NextAttemptAt = now,
+                CreatedAt = now,
+                ModifiedAt = now,
+                ConcurrencyStamp = Guid.NewGuid(),
+                IsEnabled = true
+            });
+        }
+    }
+
+    private static IEnumerable<NotificationDeliveryChannel> EnumerateExternalChannels(NotificationDeliveryChannel channels)
+    {
+        if (channels.HasFlag(NotificationDeliveryChannel.Email))
+            yield return NotificationDeliveryChannel.Email;
+        if (channels.HasFlag(NotificationDeliveryChannel.Sms))
+            yield return NotificationDeliveryChannel.Sms;
+        if (channels.HasFlag(NotificationDeliveryChannel.Webhook))
+            yield return NotificationDeliveryChannel.Webhook;
+    }
+
+    private static string ResolveDefaultProviderKey(NotificationDeliveryChannel channel) =>
+        channel switch
+        {
+            NotificationDeliveryChannel.Email => "smtp",
+            NotificationDeliveryChannel.Sms => "sms-gateway",
+            NotificationDeliveryChannel.Webhook => "webhook",
+            _ => channel.ToString().ToLowerInvariant()
         };
 
     private static bool CanTransition(NotificationDeliveryStatus current, NotificationDeliveryStatus next) =>

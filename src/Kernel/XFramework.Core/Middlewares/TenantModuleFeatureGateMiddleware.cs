@@ -93,7 +93,7 @@ public sealed class TenantModuleFeatureGateMiddleware(
 
     private static Guid? ResolveTenantIdFromClaims(HttpContext context)
     {
-        foreach (var claimName in new[] { "tenantId", "TenantId", "tid" })
+        foreach (var claimName in new[] { "tenant_id", "tenantId", "TenantId", "tid", "tenant" })
         {
             var claimValue = context.User.FindFirst(claimName)?.Value;
             if (Guid.TryParse(claimValue, out var claimTenantId))

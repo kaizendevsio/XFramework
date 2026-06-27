@@ -56,6 +56,27 @@ public class BoltClientBuilder
     /// <summary>Set the RPC timeout in seconds. Default: 30.</summary>
     public BoltClientBuilder WithTimeout(int seconds) { Options.RpcTimeoutSeconds = seconds; return this; }
 
+    /// <summary>Use a static bearer token for Bolt handshakes.</summary>
+    public BoltClientBuilder WithAccessToken(string? accessToken)
+    {
+        Options.AccessToken = accessToken;
+        return this;
+    }
+
+    /// <summary>Use a per-connection bearer token provider for Bolt handshakes.</summary>
+    public BoltClientBuilder WithAccessTokenProvider(Func<CancellationToken, ValueTask<string?>> provider)
+    {
+        Options.AccessTokenProvider = provider;
+        return this;
+    }
+
+    /// <summary>Send the bearer token as ?access_token= for browser WebSocket clients.</summary>
+    public BoltClientBuilder UseAccessTokenQueryString(bool enabled = true)
+    {
+        Options.SendAccessTokenAsQueryString = enabled;
+        return this;
+    }
+
     /// <summary>Register an RPC handler for incoming requests.</summary>
     public BoltClientBuilder HandleRpc(string commandName,
         Func<ReadOnlyMemory<byte>, Guid, Task<(System.Net.HttpStatusCode, ReadOnlyMemory<byte>)>> handler)

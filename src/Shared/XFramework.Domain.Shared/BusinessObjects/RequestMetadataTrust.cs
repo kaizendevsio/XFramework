@@ -58,7 +58,8 @@ public static class RequestMetadataTrust
         var sessionId = metadata.SessionId?.ToString("D") ?? string.Empty;
         var requestId = metadata.RequestId?.ToString("D") ?? string.Empty;
         var trustedAt = NormalizeUtc(metadata.TrustedAtUtc ?? DateTime.MinValue).ToString("O");
-        return string.Join('|', tenantId, credentialId, sessionId, requestId, trustedAt);
+        var name = metadata.Name?.Trim() ?? string.Empty;
+        return string.Join('|', tenantId, credentialId, sessionId, requestId, trustedAt, name);
     }
 
     private static DateTime NormalizeUtc(DateTime value) =>

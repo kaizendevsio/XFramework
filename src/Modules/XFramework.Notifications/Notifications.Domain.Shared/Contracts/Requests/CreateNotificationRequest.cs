@@ -14,5 +14,6 @@ public partial record CreateNotificationRequest : RequestBase,
     public NotificationDeliveryChannel DeliveryChannels { get; set; } =
         Notifications.Domain.Shared.Contracts.NotificationPreferenceDefaults.EnabledChannels;
     public string? CorrelationId { get; set; }
+    public string? DeliveryAddress { get; set; }
     public Dictionary<string, string>? Data { get; set; }
 }

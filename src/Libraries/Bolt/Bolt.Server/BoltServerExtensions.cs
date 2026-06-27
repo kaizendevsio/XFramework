@@ -65,9 +65,9 @@ public static class BoltServerExtensions
     ///   app.MapBolt();                    // defaults to "/bolt"
     ///   app.MapBolt("/custom/path");
     /// </summary>
-    public static IEndpointRouteBuilder MapBolt(this IEndpointRouteBuilder endpoints, string path = "/bolt")
+    public static IEndpointConventionBuilder MapBolt(this IEndpointRouteBuilder endpoints, string path = "/bolt")
     {
-        endpoints.Map(path, async (HttpContext context) =>
+        return endpoints.Map(path, async (HttpContext context) =>
         {
             if (!context.WebSockets.IsWebSocketRequest)
             {
@@ -81,7 +81,5 @@ public static class BoltServerExtensions
             var transport = new WebSocketBoltConnection(webSocket);
             await server.HandleConnectionAsync(transport, context.User, context.RequestAborted);
         });
-
-        return endpoints;
     }
 }

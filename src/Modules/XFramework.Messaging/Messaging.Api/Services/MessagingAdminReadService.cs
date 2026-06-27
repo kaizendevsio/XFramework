@@ -9,13 +9,16 @@ using XFramework.Domain.Shared.DataContext;
 
 namespace Messaging.Api.Services;
 
-public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessagingAdminReadService
+public sealed class MessagingAdminReadService(
+    IDataContext dataContext,
+    IMessagingRequestContextResolver requestContextResolver,
+    IMessagingPolicyService policyService) : IMessagingAdminReadService
 {
     public async Task<Result<MessagingAdminUsersResponse>> QueryUsersAsync(
         QueryMessagingAdminUsersRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = RequireTenantId(request.Metadata.TenantId);
+        var tenantResult = ResolveAdminTenantId(request.Metadata);
         if (!tenantResult.IsSuccess)
         {
             return Failure<MessagingAdminUsersResponse>(tenantResult);
@@ -43,7 +46,7 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
         GetMessagingAdminUserDetailRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = RequireTenantId(request.Metadata.TenantId);
+        var tenantResult = ResolveAdminTenantId(request.Metadata);
         if (!tenantResult.IsSuccess)
         {
             return Failure<MessagingAdminUserDetailResponse>(tenantResult);
@@ -151,7 +154,7 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
         QueryMessagingAdminThreadsRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = RequireTenantId(request.Metadata.TenantId);
+        var tenantResult = ResolveAdminTenantId(request.Metadata);
         if (!tenantResult.IsSuccess)
         {
             return Failure<MessagingAdminThreadsResponse>(tenantResult);
@@ -172,7 +175,7 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
                     .IgnoreQueryFilters()
                     .NoCache()
                     .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-                    .Where(x => x.ProcessedAt == null)
+                    .Where(x => x.ProcessedAt == null && x.DeadLetteredAt == null)
                     .CountAsync(ct)
             },
             Items = page.Items,
@@ -184,7 +187,7 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
         GetMessagingAdminThreadDetailRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = RequireTenantId(request.Metadata.TenantId);
+        var tenantResult = ResolveAdminTenantId(request.Metadata);
         if (!tenantResult.IsSuccess)
         {
             return Failure<MessagingAdminThreadDetailResponse>(tenantResult);
@@ -258,7 +261,7 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
         GetMessagingAdminOperationsRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = RequireTenantId(request.Metadata.TenantId);
+        var tenantResult = ResolveAdminTenantId(request.Metadata);
         if (!tenantResult.IsSuccess)
         {
             return Failure<MessagingAdminOperationsResponse>(tenantResult);
@@ -300,8 +303,8 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
 
         return Result<MessagingAdminOperationsResponse>.Success(new MessagingAdminOperationsResponse
         {
-            PendingOutboxCount = outbox.Count(x => x.ProcessedAt is null),
-            FailedOutboxCount = outbox.Count(x => x.ProcessedAt is null && !string.IsNullOrWhiteSpace(x.LastError)),
+            PendingOutboxCount = outbox.Count(x => x.ProcessedAt is null && x.DeadLetteredAt is null),
+            FailedOutboxCount = outbox.Count(x => x.ProcessedAt is null && x.DeadLetteredAt is not null),
             PendingInviteCount = invites.Count(x => x.Status == MessageThreadInviteStatuses.Pending),
             NotificationsEnabled = await IsNotificationsEnabledAsync(tenantId, ct),
             Outbox = outbox.Select(item => ToOutboxRow(item, context)).ToList(),
@@ -315,13 +318,22 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
         GetMessagingAdminModerationRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = RequireTenantId(request.Metadata.TenantId);
+        var tenantResult = ResolveAdminTenantId(request.Metadata);
         if (!tenantResult.IsSuccess)
         {
             return Failure<MessagingAdminModerationResponse>(tenantResult);
         }
 
         var tenantId = tenantResult.Data;
+        var policy = await policyService.GetPolicyAsync(tenantId, ct);
+        if (!policy.ModerationAdminAuditVisible)
+        {
+            return Result<MessagingAdminModerationResponse>.Success(new MessagingAdminModerationResponse
+            {
+                Policies = CreatePolicyRows()
+            });
+        }
+
         var context = await LoadOperationsContextAsync(tenantId, ct);
         var reports = await dataContext.Query<MessageReport>()
             .IgnoreQueryFilters()
@@ -339,15 +351,27 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
             .Take(300)
             .ToListAsync(ct);
 
+        var rules = await dataContext.Query<MessageModerationRule>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Take(300)
+            .ToListAsync(ct);
+
         return Result<MessagingAdminModerationResponse>.Success(new MessagingAdminModerationResponse
         {
             OpenReportCount = reports.Count(x => x.Status == MessageReportStatuses.Open),
-            ReviewedReportCount = reports.Count(x => x.Status == MessageReportStatuses.Reviewed),
+            ReviewedReportCount = reports.Count(x =>
+                x.Status is MessageReportStatuses.Reviewed or
+                    MessageReportStatuses.Resolved or
+                    MessageReportStatuses.Escalated),
             DismissedReportCount = reports.Count(x => x.Status == MessageReportStatuses.Dismissed),
             ActiveBlockCount = blocks.Count(x => x.IsEnabled),
             Reports = reports.Select(item => ToReportRow(item, context)).ToList(),
             Blocks = blocks.Select(item => ToModerationBlockRow(item, context)).ToList(),
-            Policies = CreatePolicyRows()
+            Policies = CreatePolicyRows(),
+            Rules = rules.Select(ToModerationRuleRow).ToList()
         });
     }
 
@@ -732,8 +756,8 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
             ThreadId = item.ThreadId,
             Thread = item.ThreadId is Guid threadId ? GetThreadLabel(threadId, context.Threads) : "Tenant event",
             Actor = item.ActorCredentialId is Guid actorId ? GetCredentialLabel(actorId, context.Credentials) : "System",
-            Status = item.ProcessedAt is null ? "Pending" : "Processed",
-            StatusKey = item.ProcessedAt is null ? "warning" : "active",
+            Status = OutboxStatusText(item),
+            StatusKey = OutboxStatusKey(item),
             Attempts = item.Attempts,
             OccurredAt = item.OccurredAt,
             ProcessedDisplay = item.ProcessedAt?.ToString("g") ?? "Not processed",
@@ -755,6 +779,37 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
             RespondedDisplay = item.RespondedAt?.ToString("g") ?? "Waiting",
             CreatedAt = item.CreatedAt
         };
+
+    private static string OutboxStatusText(MessageOutboxEvent item)
+    {
+        if (item.ProcessedAt is not null)
+            return "Processed";
+
+        if (item.DeadLetteredAt is not null)
+            return "Dead-lettered";
+
+        if (item.LeaseExpiresAt is not null && item.LeaseExpiresAt > DateTime.UtcNow)
+            return "Processing";
+
+        if (item.NextAttemptAt is not null && item.NextAttemptAt > DateTime.UtcNow)
+            return "Retry scheduled";
+
+        return string.IsNullOrWhiteSpace(item.LastError) ? "Pending" : "Retry pending";
+    }
+
+    private static string OutboxStatusKey(MessageOutboxEvent item)
+    {
+        if (item.ProcessedAt is not null)
+            return "active";
+
+        if (item.DeadLetteredAt is not null)
+            return "danger";
+
+        if (item.LeaseExpiresAt is not null && item.LeaseExpiresAt > DateTime.UtcNow)
+            return "info";
+
+        return string.IsNullOrWhiteSpace(item.LastError) ? "warning" : "danger";
+    }
 
     private static MessagingAdminPinRow ToPinRow(
         MessagePin item,
@@ -824,6 +879,19 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
             StatusKey = item.IsEnabled ? "active" : "inactive",
             CreatedAt = item.CreatedAt
         };
+
+    private static MessagingModerationRuleResponse ToModerationRuleRow(MessageModerationRule item) => new()
+    {
+        Id = item.Id,
+        Name = item.Name,
+        MatchType = item.MatchType,
+        Pattern = item.Pattern,
+        Action = item.Action,
+        Description = item.Description,
+        IsEnabled = item.IsEnabled,
+        CreatedAt = item.CreatedAt,
+        ModifiedAt = item.ModifiedAt
+    };
 
     private static List<MessagingAdminPolicyRow> CreatePolicyRows() =>
     [
@@ -980,14 +1048,15 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
     private static Result<T> Failure<T>(Result<Guid> result) =>
         Result<T>.Failure(result.Message ?? "Tenant could not be resolved.", result.StatusCode);
 
-    private static Result<Guid> RequireTenantId(Guid? tenantId)
+    private Result<Guid> ResolveAdminTenantId(RequestMetadata? metadata)
     {
-        if (tenantId is null || tenantId == Guid.Empty)
-        {
-            return Result<Guid>.Failure("Tenant id is required.", 400);
-        }
+        var adminContext = requestContextResolver.ResolveAdmin(metadata);
+        if (!adminContext.IsSuccess)
+            return Result<Guid>.Failure(
+                adminContext.Message ?? "Messaging administration requires an admin context.",
+                adminContext.StatusCode);
 
-        return Result<Guid>.Success(tenantId.Value);
+        return Result<Guid>.Success(adminContext.Data!.TenantId);
     }
 
     private static string GetDisplayName(IdentityCredential? credential)
@@ -1085,6 +1154,8 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
     {
         MessageReportStatuses.Reviewed => "Reviewed",
         MessageReportStatuses.Dismissed => "Dismissed",
+        MessageReportStatuses.Resolved => "Resolved",
+        MessageReportStatuses.Escalated => "Escalated",
         _ => "Open"
     };
 
@@ -1092,6 +1163,8 @@ public sealed class MessagingAdminReadService(IDataContext dataContext) : IMessa
     {
         MessageReportStatuses.Reviewed => "active",
         MessageReportStatuses.Dismissed => "inactive",
+        MessageReportStatuses.Resolved => "active",
+        MessageReportStatuses.Escalated => "warning",
         _ => "warning"
     };
 

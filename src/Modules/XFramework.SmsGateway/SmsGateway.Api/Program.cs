@@ -17,8 +17,6 @@ builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
     builder.Configuration,
     "SmsGateway");
 
-// Register services - CachingService MUST be Singleton (uses in-memory ConcurrentDictionary)
-builder.Services.AddSingleton<ICachingService, CachingService>();
 builder.Services.AddScoped<ISmsService, SmsService>();
 
 // Register FluentValidation validators from this assembly

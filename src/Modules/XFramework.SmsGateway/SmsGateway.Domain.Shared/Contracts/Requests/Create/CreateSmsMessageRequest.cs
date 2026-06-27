@@ -17,4 +17,6 @@ public partial record CreateSmsMessageRequest : RequestBase,
     public string? Message { get; set; }
     public DateTime? SendSchedule { get; set; }
     public bool IsScheduled { get; set; }
+    public string? CorrelationId { get; set; }
+    public Guid? NotificationDeliveryJobId { get; set; }
 }

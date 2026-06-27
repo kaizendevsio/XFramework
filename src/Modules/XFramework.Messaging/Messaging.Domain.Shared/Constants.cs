@@ -106,6 +106,8 @@ public static class MessageRealtimeEvents
     public static readonly string MessageUnpinned = nameof(MessageUnpinned);
     public static readonly string MessageSaved = nameof(MessageSaved);
     public static readonly string MessageUnsaved = nameof(MessageUnsaved);
+    public static readonly string MessageFileAttached = nameof(MessageFileAttached);
+    public static readonly string MessageFileDetached = nameof(MessageFileDetached);
     public static readonly string MessageReported = nameof(MessageReported);
     public static readonly string CredentialBlocked = nameof(CredentialBlocked);
     public static readonly string CredentialUnblocked = nameof(CredentialUnblocked);
@@ -160,4 +162,30 @@ public static class MessageReportStatuses
     public const short Open = 0;
     public const short Reviewed = 1;
     public const short Dismissed = 2;
+    public const short Resolved = 3;
+    public const short Escalated = 4;
+}
+
+public static class MessageModerationRuleMatchTypes
+{
+    public const string Keyword = "keyword";
+    public const string Regex = "regex";
+}
+
+public static class MessageModerationRuleActions
+{
+    public const string Flag = "flag";
+    public const string AutoReport = "auto-report";
+    public const string BlockBeforeSend = "block-before-send";
+}
+
+public static class MessageReportAuditActions
+{
+    public const string Reviewed = "reviewed";
+    public const string Assigned = "assigned";
+    public const string Dismissed = "dismissed";
+    public const string Resolved = "resolved";
+    public const string Escalated = "escalated";
+    public const string NoteAdded = "note-added";
+    public const string AutoReported = "auto-reported";
 }

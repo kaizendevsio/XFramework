@@ -11,16 +11,23 @@ namespace XFramework.Integration.Services;
 
 public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
 {
-    public async Task<JwtToken> GenerateToken(string username, Guid id, List<Guid> Type)
+    public async Task<JwtToken> GenerateToken(string username, Guid id, List<Guid> Type, Guid? tenantId = null)
     {
         List<Claim> authClaims =
         [
             new(ClaimTypes.GivenName, username),
             new(ClaimTypes.Role, JsonSerializer.Serialize(Type, new JsonSerializerOptions { ReferenceHandler = ReferenceHandler.IgnoreCycles })),
             new(ClaimTypes.Name, id.ToString()),
+            new("credential_id", id.ToString("D")),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(JwtRegisteredClaimNames.AuthTime, DateTime.UtcNow.ToString())
         ];
+
+        if (tenantId is Guid resolvedTenantId && resolvedTenantId != Guid.Empty)
+        {
+            authClaims.Add(new("tenant_id", resolvedTenantId.ToString("D")));
+            authClaims.Add(new("tenantId", resolvedTenantId.ToString("D")));
+        }
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret));
 

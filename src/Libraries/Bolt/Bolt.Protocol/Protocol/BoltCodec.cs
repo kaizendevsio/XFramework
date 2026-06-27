@@ -33,12 +33,12 @@ public static class BoltCodec
     public const int FecFrameHeaderSize = 1 + 16 + 4 + 1 + 4;            // 26 bytes
     public const int NackRequestHeaderSize = 1 + 16 + 2;                  // 19 bytes (+ nackCount * 4)
 
-    // Pub/sub header sizes (variable for Subscribe/Unsubscribe/Ack due to subscriberId)
-    public const int PublishHeaderSize = 1 + 4 + 1 + 4;            // 10 bytes + payload
-    public const int EventHeaderSize = 1 + 4 + 8 + 1 + 4;          // 18 bytes + payload
+    // Pub/sub header sizes (variable for Subscribe/Unsubscribe/Publish/Ack due to string fields)
+    public const int PublishHeaderSize = 1 + 4 + 1 + 4 + 4;        // 14 bytes + topic + payload
+    public const int EventHeaderSize = 1 + 4 + 8 + 1 + 4 + 4;      // 22 bytes + subscriberId + payload
     // Subscribe header is variable: 1 + 4 + 1 + 4 + N + 4 + M (10 + subscriberId + topic)
-    // Unsubscribe header is variable: 1 + 4 + 4 + N (9 + subscriberId)
-    // Ack header is variable: 1 + 4 + 4 + N + 8 (17 + subscriberId)
+    // Unsubscribe header is variable: 1 + 4 + 4 + N + 4 + M (13 + topic + subscriberId)
+    // Ack header is variable: 1 + 4 + 4 + N + 4 + M + 8 (21 + topic + subscriberId)
 
     #region Encoding
 
@@ -136,13 +136,22 @@ public static class BoltCodec
     }
 
     /// <summary>
-    /// Encode a Subscribe frame: [1:type=0x06] [4:topicHash] [1:flags] [4:subscriberIdLen] [subscriberId UTF-8] [4:topicLen] [topic UTF-8]
+    /// Encode a Subscribe frame:
+    /// [1:type=0x06] [4:topicHash] [1:flags] [4:subscriberIdLen] [subscriberId UTF-8]
+    /// [4:topicLen] [topic UTF-8] [4:actorTokenLen] [actorToken UTF-8]
     /// </summary>
-    public static int WriteSubscribe(IBufferWriter<byte> writer, string topic, string subscriberId, bool durable)
+    public static int WriteSubscribe(
+        IBufferWriter<byte> writer,
+        string topic,
+        string subscriberId,
+        bool durable,
+        string? actorAccessToken = null)
     {
+        actorAccessToken ??= string.Empty;
         var topicBytes = Encoding.UTF8.GetByteCount(topic);
         var idBytes = Encoding.UTF8.GetByteCount(subscriberId);
-        var totalSize = 1 + 4 + 1 + 4 + idBytes + 4 + topicBytes;
+        var tokenBytes = Encoding.UTF8.GetByteCount(actorAccessToken);
+        var totalSize = 1 + 4 + 1 + 4 + idBytes + 4 + topicBytes + 4 + tokenBytes;
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Subscribe;
@@ -152,82 +161,133 @@ public static class BoltCodec
         Encoding.UTF8.GetBytes(subscriberId, span.Slice(10));
         BinaryPrimitives.WriteInt32LittleEndian(span.Slice(10 + idBytes), topicBytes);
         Encoding.UTF8.GetBytes(topic, span.Slice(14 + idBytes));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(14 + idBytes + topicBytes), tokenBytes);
+        Encoding.UTF8.GetBytes(actorAccessToken, span.Slice(18 + idBytes + topicBytes));
 
         writer.Advance(totalSize);
         return totalSize;
     }
 
     /// <summary>
-    /// Encode an Unsubscribe frame: [1:type=0x07] [4:topicHash] [4:subscriberIdLen] [subscriberId UTF-8]
+    /// Encode an Unsubscribe frame:
+    /// [1:type=0x07] [4:topicHash] [4:topicLen] [topic UTF-8] [4:subscriberIdLen]
+    /// [subscriberId UTF-8] [1:permanent] [4:actorTokenLen] [actorToken UTF-8]
     /// </summary>
-    public static int WriteUnsubscribe(IBufferWriter<byte> writer, string topic, string subscriberId)
+    public static int WriteUnsubscribe(
+        IBufferWriter<byte> writer,
+        string topic,
+        string subscriberId,
+        bool permanent = true,
+        string? actorAccessToken = null)
     {
+        actorAccessToken ??= string.Empty;
+        var topicBytes = Encoding.UTF8.GetByteCount(topic);
         var idBytes = Encoding.UTF8.GetByteCount(subscriberId);
-        var totalSize = 1 + 4 + 4 + idBytes;
+        var tokenBytes = Encoding.UTF8.GetByteCount(actorAccessToken);
+        var totalSize = 1 + 4 + 4 + topicBytes + 4 + idBytes + 1 + 4 + tokenBytes;
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Unsubscribe;
         BinaryPrimitives.WriteInt32LittleEndian(span.Slice(1), Fnv1aHash(topic));
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(5), idBytes);
-        Encoding.UTF8.GetBytes(subscriberId, span.Slice(9));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(5), topicBytes);
+        Encoding.UTF8.GetBytes(topic, span.Slice(9));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(9 + topicBytes), idBytes);
+        Encoding.UTF8.GetBytes(subscriberId, span.Slice(13 + topicBytes));
+        span[13 + topicBytes + idBytes] = permanent ? (byte)0x01 : (byte)0x00;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(14 + topicBytes + idBytes), tokenBytes);
+        Encoding.UTF8.GetBytes(actorAccessToken, span.Slice(18 + topicBytes + idBytes));
 
         writer.Advance(totalSize);
         return totalSize;
     }
 
     /// <summary>
-    /// Encode a Publish frame: [1:type=0x08] [4:topicHash] [1:flags] [4:payloadLen] [payload]
+    /// Encode a Publish frame: [1:type=0x08] [4:topicHash] [1:flags] [4:topicLen] [topic UTF-8] [4:payloadLen] [payload]
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WritePublish(IBufferWriter<byte> writer, string topic, bool durableEligible, ReadOnlySpan<byte> payload)
     {
-        var totalSize = PublishHeaderSize + payload.Length;
+        var topicBytes = Encoding.UTF8.GetByteCount(topic);
+        var totalSize = PublishHeaderSize + topicBytes + payload.Length;
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Publish;
         BinaryPrimitives.WriteInt32LittleEndian(span.Slice(1), Fnv1aHash(topic));
         span[5] = (byte)(durableEligible ? 0x01 : 0x00);
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(6), payload.Length);
-        payload.CopyTo(span.Slice(10));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(6), topicBytes);
+        Encoding.UTF8.GetBytes(topic, span.Slice(10));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(10 + topicBytes), payload.Length);
+        payload.CopyTo(span.Slice(14 + topicBytes));
 
         writer.Advance(totalSize);
         return totalSize;
     }
 
     /// <summary>
-    /// Encode an Event frame: [1:type=0x09] [4:topicHash] [8:sequenceNumber] [1:flags] [4:payloadLen] [payload]
+    /// Encode an Event frame: [1:type=0x09] [4:topicHash] [8:sequenceNumber] [1:flags] [4:subscriberIdLen] [subscriberId UTF-8] [4:payloadLen] [payload]
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteEvent(IBufferWriter<byte> writer, int topicHash, long sequenceNumber, bool isReplay, ReadOnlySpan<byte> payload)
+        => WriteEvent(writer, topicHash, subscriberId: string.Empty, sequenceNumber, isReplay, payload);
+
+    /// <summary>
+    /// Encode an Event frame with a durable subscriber identity. Transient events use an empty subscriber id.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteEvent(
+        IBufferWriter<byte> writer,
+        int topicHash,
+        string? subscriberId,
+        long sequenceNumber,
+        bool isReplay,
+        ReadOnlySpan<byte> payload)
     {
-        var totalSize = EventHeaderSize + payload.Length;
+        subscriberId ??= string.Empty;
+        var idBytes = Encoding.UTF8.GetByteCount(subscriberId);
+        var totalSize = EventHeaderSize + idBytes + payload.Length;
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Event;
         BinaryPrimitives.WriteInt32LittleEndian(span.Slice(1), topicHash);
         BinaryPrimitives.WriteInt64LittleEndian(span.Slice(5), sequenceNumber);
         span[13] = (byte)(isReplay ? 0x01 : 0x00);
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(14), payload.Length);
-        payload.CopyTo(span.Slice(18));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(14), idBytes);
+        Encoding.UTF8.GetBytes(subscriberId, span.Slice(18));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(18 + idBytes), payload.Length);
+        payload.CopyTo(span.Slice(22 + idBytes));
 
         writer.Advance(totalSize);
         return totalSize;
     }
 
     /// <summary>
-    /// Encode an Ack frame: [1:type=0x0A] [4:topicHash] [4:subscriberIdLen] [subscriberId UTF-8] [8:upToSequenceNumber]
+    /// Encode an Ack frame:
+    /// [1:type=0x0A] [4:topicHash] [4:topicLen] [topic UTF-8] [4:subscriberIdLen]
+    /// [subscriberId UTF-8] [8:upToSequenceNumber] [4:actorTokenLen] [actorToken UTF-8]
     /// </summary>
-    public static int WriteAck(IBufferWriter<byte> writer, int topicHash, string subscriberId, long upToSequenceNumber)
+    public static int WriteAck(
+        IBufferWriter<byte> writer,
+        string topic,
+        string subscriberId,
+        long upToSequenceNumber,
+        string? actorAccessToken = null)
     {
+        actorAccessToken ??= string.Empty;
+        var topicBytes = Encoding.UTF8.GetByteCount(topic);
         var idBytes = Encoding.UTF8.GetByteCount(subscriberId);
-        var totalSize = 1 + 4 + 4 + idBytes + 8;
+        var tokenBytes = Encoding.UTF8.GetByteCount(actorAccessToken);
+        var totalSize = 1 + 4 + 4 + topicBytes + 4 + idBytes + 8 + 4 + tokenBytes;
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Ack;
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(1), topicHash);
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(5), idBytes);
-        Encoding.UTF8.GetBytes(subscriberId, span.Slice(9));
-        BinaryPrimitives.WriteInt64LittleEndian(span.Slice(9 + idBytes), upToSequenceNumber);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(1), Fnv1aHash(topic));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(5), topicBytes);
+        Encoding.UTF8.GetBytes(topic, span.Slice(9));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(9 + topicBytes), idBytes);
+        Encoding.UTF8.GetBytes(subscriberId, span.Slice(13 + topicBytes));
+        BinaryPrimitives.WriteInt64LittleEndian(span.Slice(13 + topicBytes + idBytes), upToSequenceNumber);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(21 + topicBytes + idBytes), tokenBytes);
+        Encoding.UTF8.GetBytes(actorAccessToken, span.Slice(25 + topicBytes + idBytes));
 
         writer.Advance(totalSize);
         return totalSize;
@@ -731,12 +791,36 @@ public static class BoltCodec
     /// <summary>
     /// Decode a Subscribe frame.
     /// </summary>
-    public static bool TryReadSubscribe(ReadOnlySpan<byte> buffer, out int topicHash, out bool durable, out string subscriberId, out string topic, out int bytesConsumed)
+    public static bool TryReadSubscribe(
+        ReadOnlySpan<byte> buffer,
+        out int topicHash,
+        out bool durable,
+        out string subscriberId,
+        out string topic,
+        out int bytesConsumed) =>
+        TryReadSubscribe(
+            buffer,
+            out topicHash,
+            out durable,
+            out subscriberId,
+            out topic,
+            out _,
+            out bytesConsumed);
+
+    public static bool TryReadSubscribe(
+        ReadOnlySpan<byte> buffer,
+        out int topicHash,
+        out bool durable,
+        out string subscriberId,
+        out string topic,
+        out string actorAccessToken,
+        out int bytesConsumed)
     {
         topicHash = 0;
         durable = false;
         subscriberId = string.Empty;
         topic = string.Empty;
+        actorAccessToken = string.Empty;
         bytesConsumed = 0;
 
         if (buffer.Length < 14) return false;
@@ -754,38 +838,113 @@ public static class BoltCodec
         if (buffer.Length < 14 + idLen + topicLen) return false;
 
         topic = Encoding.UTF8.GetString(buffer.Slice(14 + idLen, topicLen));
+        if (Fnv1aHash(topic) != topicHash) return false;
+
         bytesConsumed = 14 + idLen + topicLen;
+
+        if (buffer.Length >= bytesConsumed + 4)
+        {
+            var tokenLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(bytesConsumed));
+            if (tokenLen < 0 || tokenLen > 8192) return false;
+            if (buffer.Length < bytesConsumed + 4 + tokenLen) return false;
+
+            actorAccessToken = Encoding.UTF8.GetString(buffer.Slice(bytesConsumed + 4, tokenLen));
+            bytesConsumed += 4 + tokenLen;
+        }
+
         return true;
     }
 
     /// <summary>
     /// Decode an Unsubscribe frame.
     /// </summary>
-    public static bool TryReadUnsubscribe(ReadOnlySpan<byte> buffer, out int topicHash, out string subscriberId, out int bytesConsumed)
+    public static bool TryReadUnsubscribe(ReadOnlySpan<byte> buffer, out int topicHash, out string topic, out string subscriberId, out int bytesConsumed) =>
+        TryReadUnsubscribe(buffer, out topicHash, out topic, out subscriberId, out _, out bytesConsumed);
+
+    /// <summary>
+    /// Decode an Unsubscribe frame.
+    /// </summary>
+    public static bool TryReadUnsubscribe(
+        ReadOnlySpan<byte> buffer,
+        out int topicHash,
+        out string topic,
+        out string subscriberId,
+        out bool permanent,
+        out int bytesConsumed) =>
+        TryReadUnsubscribe(
+            buffer,
+            out topicHash,
+            out topic,
+            out subscriberId,
+            out permanent,
+            out _,
+            out bytesConsumed);
+
+    public static bool TryReadUnsubscribe(
+        ReadOnlySpan<byte> buffer,
+        out int topicHash,
+        out string topic,
+        out string subscriberId,
+        out bool permanent,
+        out string actorAccessToken,
+        out int bytesConsumed)
     {
         topicHash = 0;
+        topic = string.Empty;
         subscriberId = string.Empty;
+        permanent = true;
+        actorAccessToken = string.Empty;
         bytesConsumed = 0;
 
-        if (buffer.Length < 9) return false;
+        if (buffer.Length < 13) return false;
         if (buffer[0] != (byte)FrameType.Unsubscribe) return false;
 
         topicHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(1));
-        var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(5));
-        if (idLen < 0 || idLen > 4096) return false;
-        if (buffer.Length < 9 + idLen) return false;
+        var topicLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(5));
+        if (topicLen <= 0 || topicLen > 4096) return false;
+        if (buffer.Length < 9 + topicLen + 4) return false;
 
-        subscriberId = Encoding.UTF8.GetString(buffer.Slice(9, idLen));
-        bytesConsumed = 9 + idLen;
+        topic = Encoding.UTF8.GetString(buffer.Slice(9, topicLen));
+        if (Fnv1aHash(topic) != topicHash) return false;
+
+        var idOffset = 9 + topicLen;
+        var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(idOffset));
+        if (idLen < 0 || idLen > 4096) return false;
+        if (buffer.Length < idOffset + 4 + idLen) return false;
+
+        subscriberId = Encoding.UTF8.GetString(buffer.Slice(idOffset + 4, idLen));
+        var permanentOffset = idOffset + 4 + idLen;
+        if (buffer.Length > permanentOffset)
+        {
+            permanent = buffer[permanentOffset] != 0;
+            bytesConsumed = permanentOffset + 1;
+        }
+        else
+        {
+            // Backward-compatible old unsubscribe frames permanently unregister.
+            permanent = true;
+            bytesConsumed = permanentOffset;
+        }
+
+        if (buffer.Length >= bytesConsumed + 4)
+        {
+            var tokenLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(bytesConsumed));
+            if (tokenLen < 0 || tokenLen > 8192) return false;
+            if (buffer.Length < bytesConsumed + 4 + tokenLen) return false;
+
+            actorAccessToken = Encoding.UTF8.GetString(buffer.Slice(bytesConsumed + 4, tokenLen));
+            bytesConsumed += 4 + tokenLen;
+        }
         return true;
     }
 
     /// <summary>
     /// Decode a Publish frame. Returns offset/length into the source buffer (zero-copy).
     /// </summary>
-    public static bool TryReadPublish(ReadOnlySpan<byte> buffer, out int topicHash, out bool durableEligible, out int payloadOffset, out int payloadLength, out int totalSize)
+    public static bool TryReadPublish(ReadOnlySpan<byte> buffer, out int topicHash, out string topic, out bool durableEligible, out int payloadOffset, out int payloadLength, out int totalSize)
     {
         topicHash = 0;
+        topic = string.Empty;
         durableEligible = false;
         payloadOffset = 0;
         payloadLength = 0;
@@ -796,11 +955,18 @@ public static class BoltCodec
 
         topicHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(1));
         durableEligible = (buffer[5] & 0x01) != 0;
-        payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(6));
+        var topicLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(6));
+        if (topicLen <= 0 || topicLen > 4096) return false;
+        if (buffer.Length < 10 + topicLen + 4) return false;
+
+        topic = Encoding.UTF8.GetString(buffer.Slice(10, topicLen));
+        if (Fnv1aHash(topic) != topicHash) return false;
+
+        payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(10 + topicLen));
         if (payloadLength < 0 || payloadLength > 100 * 1024 * 1024) return false;
 
-        payloadOffset = PublishHeaderSize;
-        totalSize = PublishHeaderSize + payloadLength;
+        payloadOffset = 14 + topicLen;
+        totalSize = payloadOffset + payloadLength;
         return buffer.Length >= totalSize;
     }
 
@@ -808,10 +974,25 @@ public static class BoltCodec
     /// Decode an Event frame. Returns offset/length into the source buffer (zero-copy).
     /// </summary>
     public static bool TryReadEvent(ReadOnlySpan<byte> buffer, out int topicHash, out long sequenceNumber, out bool isReplay, out int payloadOffset, out int payloadLength, out int totalSize)
+        => TryReadEvent(buffer, out topicHash, out sequenceNumber, out isReplay, out _, out payloadOffset, out payloadLength, out totalSize);
+
+    /// <summary>
+    /// Decode an Event frame including the durable subscriber identity when present.
+    /// </summary>
+    public static bool TryReadEvent(
+        ReadOnlySpan<byte> buffer,
+        out int topicHash,
+        out long sequenceNumber,
+        out bool isReplay,
+        out string subscriberId,
+        out int payloadOffset,
+        out int payloadLength,
+        out int totalSize)
     {
         topicHash = 0;
         sequenceNumber = 0;
         isReplay = false;
+        subscriberId = string.Empty;
         payloadOffset = 0;
         payloadLength = 0;
         totalSize = 0;
@@ -822,35 +1003,84 @@ public static class BoltCodec
         topicHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(1));
         sequenceNumber = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(5));
         isReplay = (buffer[13] & 0x01) != 0;
-        payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(14));
+        var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(14));
+        if (idLen < 0 || idLen > 4096) return false;
+        if (buffer.Length < 18 + idLen + 4) return false;
+
+        subscriberId = Encoding.UTF8.GetString(buffer.Slice(18, idLen));
+        payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(18 + idLen));
         if (payloadLength < 0 || payloadLength > 100 * 1024 * 1024) return false;
 
-        payloadOffset = EventHeaderSize;
-        totalSize = EventHeaderSize + payloadLength;
+        payloadOffset = EventHeaderSize + idLen;
+        totalSize = payloadOffset + payloadLength;
         return buffer.Length >= totalSize;
     }
 
     /// <summary>
     /// Decode an Ack frame.
     /// </summary>
-    public static bool TryReadAck(ReadOnlySpan<byte> buffer, out int topicHash, out string subscriberId, out long upToSequenceNumber, out int bytesConsumed)
+    public static bool TryReadAck(
+        ReadOnlySpan<byte> buffer,
+        out int topicHash,
+        out string topic,
+        out string subscriberId,
+        out long upToSequenceNumber,
+        out int bytesConsumed) =>
+        TryReadAck(
+            buffer,
+            out topicHash,
+            out topic,
+            out subscriberId,
+            out upToSequenceNumber,
+            out _,
+            out bytesConsumed);
+
+    public static bool TryReadAck(
+        ReadOnlySpan<byte> buffer,
+        out int topicHash,
+        out string topic,
+        out string subscriberId,
+        out long upToSequenceNumber,
+        out string actorAccessToken,
+        out int bytesConsumed)
     {
         topicHash = 0;
+        topic = string.Empty;
         subscriberId = string.Empty;
         upToSequenceNumber = 0;
+        actorAccessToken = string.Empty;
         bytesConsumed = 0;
 
-        if (buffer.Length < 9) return false;
+        if (buffer.Length < 13) return false;
         if (buffer[0] != (byte)FrameType.Ack) return false;
 
         topicHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(1));
-        var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(5));
-        if (idLen < 0 || idLen > 4096) return false;
-        if (buffer.Length < 9 + idLen + 8) return false;
+        var topicLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(5));
+        if (topicLen <= 0 || topicLen > 4096) return false;
+        if (buffer.Length < 9 + topicLen + 4) return false;
 
-        subscriberId = Encoding.UTF8.GetString(buffer.Slice(9, idLen));
-        upToSequenceNumber = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(9 + idLen));
-        bytesConsumed = 9 + idLen + 8;
+        topic = Encoding.UTF8.GetString(buffer.Slice(9, topicLen));
+        if (Fnv1aHash(topic) != topicHash) return false;
+
+        var idOffset = 9 + topicLen;
+        var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(idOffset));
+        if (idLen < 0 || idLen > 4096) return false;
+        if (buffer.Length < idOffset + 4 + idLen + 8) return false;
+
+        subscriberId = Encoding.UTF8.GetString(buffer.Slice(idOffset + 4, idLen));
+        upToSequenceNumber = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(idOffset + 4 + idLen));
+        bytesConsumed = idOffset + 4 + idLen + 8;
+
+        if (buffer.Length >= bytesConsumed + 4)
+        {
+            var tokenLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(bytesConsumed));
+            if (tokenLen < 0 || tokenLen > 8192) return false;
+            if (buffer.Length < bytesConsumed + 4 + tokenLen) return false;
+
+            actorAccessToken = Encoding.UTF8.GetString(buffer.Slice(bytesConsumed + 4, tokenLen));
+            bytesConsumed += 4 + tokenLen;
+        }
+
         return true;
     }
 

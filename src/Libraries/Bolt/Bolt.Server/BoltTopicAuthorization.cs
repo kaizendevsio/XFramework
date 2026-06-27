@@ -5,7 +5,9 @@ namespace Bolt.Server;
 public enum BoltTopicOperation
 {
     Subscribe,
-    Publish
+    Publish,
+    Unsubscribe,
+    Ack
 }
 
 public sealed record BoltTopicAuthorizationContext(
@@ -14,6 +16,7 @@ public sealed record BoltTopicAuthorizationContext(
     int TopicHash,
     bool Durable,
     string? SubscriberId,
+    string? ActorAccessToken,
     string ConnectionId,
     string? ClientId,
     string? ClientName,

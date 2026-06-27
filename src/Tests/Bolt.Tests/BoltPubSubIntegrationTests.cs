@@ -305,4 +305,46 @@ public class BoltPubSubIntegrationTests
         received.Should().BeEmpty("non-durable publishes should not be queued");
         await sub2.DisposeAsync();
     }
+
+    [Test]
+    public async Task NonDurablePublish_LiveDurableSubscriberReceivesWithoutAck()
+    {
+        var subscriber = CreateClient("sub-nondurable-live", "NonDurableLiveSub");
+        var publisher = CreateClient("pub-nondurable-live", "NonDurableLivePub");
+        await subscriber.ConnectAsync();
+        await publisher.ConnectAsync();
+
+        var received = new List<DurableMessage<TestPubSubMessage>>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        var subTask = Task.Run(async () =>
+        {
+            await foreach (var msg in subscriber.SubscribeDurableAsync<TestPubSubMessage>(
+                               "test.topic.nondurable.live",
+                               "nondurable-live-sub-id",
+                               cts.Token))
+            {
+                received.Add(msg);
+                if (received.Count >= 1)
+                    break;
+            }
+        });
+
+        await Task.Delay(300);
+        await publisher.PublishAsync(
+            "test.topic.nondurable.live",
+            new TestPubSubMessage(7, "live-only"),
+            durable: false);
+
+        await subTask;
+
+        received.Should().ContainSingle();
+        received[0].Payload.Id.Should().Be(7);
+        received[0].IsReplay.Should().BeFalse();
+        received[0].Sequence.Should().Be(0);
+        await received[0].AckAsync(cts.Token);
+
+        await publisher.DisposeAsync();
+        await subscriber.DisposeAsync();
+    }
 }

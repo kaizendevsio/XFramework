@@ -21,6 +21,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Notifications.Api\Notifications.Api.csproj" />
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
     </ItemGroup>
 
 </Project>

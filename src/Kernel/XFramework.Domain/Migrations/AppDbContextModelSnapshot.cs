@@ -3609,6 +3609,66 @@ namespace XFramework.Domain.Migrations
                     b.ToTable("MessageDirect", "Messaging");
                 });
 
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageDirectThread", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FirstCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<Guid>("MessageThreadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("SecondCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messagedirectthread_pk");
+
+                    b.HasIndex("MessageThreadId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageDirectThread_Thread_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "FirstCredentialId", "SecondCredentialId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageDirectThread_Tenant_Pair_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("MessageDirectThread", "Messaging");
+                });
+
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageFile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3653,11 +3713,134 @@ namespace XFramework.Domain.Migrations
                     b.HasKey("Id")
                         .HasName("messagefiles_pk");
 
-                    b.HasIndex("MessageId");
-
                     b.HasIndex("StorageId");
 
+                    b.HasIndex("MessageId", "StorageId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageFiles_Message_Storage_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "MessageId", "CreatedAt")
+                        .HasDatabaseName("IX_MessageFiles_Tenant_Message_Created");
+
                     b.ToTable("MessageFiles", "Messaging");
+                });
+
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageHidden", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MessageThreadMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messagehidden_pk");
+
+                    b.HasIndex("MessageId", "MessageThreadMemberId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageHidden_Message_Member_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("MessageHidden", "Messaging");
+                });
+
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageModerationRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("character varying");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<string>("MatchType")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("Pattern")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("messagemoderationrule_pk");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageModerationRule_Tenant_Name_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("MessageModerationRule", "Messaging");
                 });
 
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageOutboxEvent", b =>
@@ -3690,6 +3873,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeadLetteredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -3706,13 +3892,33 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("LastError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
                         .HasColumnType("character varying");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("NotificationAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("NotificationProcessedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("OccurredAt")
                         .ValueGeneratedOnAdd()
@@ -3724,6 +3930,12 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("jsonb");
 
                     b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RealtimeAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RealtimeProcessedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("TenantId")
@@ -3743,6 +3955,9 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "ProcessedAt", "OccurredAt")
                         .HasDatabaseName("IX_MessageOutboxEvent_Tenant_Processed_Occurred");
+
+                    b.HasIndex("TenantId", "DeadLetteredAt", "NextAttemptAt", "LeaseExpiresAt")
+                        .HasDatabaseName("IX_MessageOutboxEvent_Tenant_Retry_Lease");
 
                     b.ToTable("MessageOutboxEvent", "Messaging");
                 });
@@ -3972,6 +4187,72 @@ namespace XFramework.Domain.Migrations
                         .HasDatabaseName("IX_MessageReport_Tenant_Status_CreatedAt");
 
                     b.ToTable("MessageReport", "Messaging");
+                });
+
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageReportAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid?>("ActorCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<short?>("FromStatus")
+                        .HasColumnType("smallint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<short?>("ToStatus")
+                        .HasColumnType("smallint");
+
+                    b.HasKey("Id")
+                        .HasName("messagereportaudit_pk");
+
+                    b.HasIndex("ReportId", "CreatedAt")
+                        .HasDatabaseName("IX_MessageReportAudit_Report_CreatedAt");
+
+                    b.ToTable("MessageReportAudit", "Messaging");
                 });
 
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageSaved", b =>
@@ -4556,6 +4837,709 @@ namespace XFramework.Domain.Migrations
                         .HasName("messagetype_pk");
 
                     b.ToTable("MessageType", "Messaging");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationDeliveryAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("NotificationDeliveryJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("notificationdeliveryattempt_pk");
+
+                    b.HasIndex("NotificationDeliveryJobId");
+
+                    b.HasIndex("TenantId", "NotificationDeliveryJobId", "AttemptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notificationdeliveryattempt_tenant_job_attempt");
+
+                    b.ToTable("NotificationDeliveryAttempt", "Notifications");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationDeliveryJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("LeasedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("NotificationInboxItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProviderKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("RecipientAddress")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("notificationdeliveryjob_pk");
+
+                    b.HasIndex("NotificationInboxItemId");
+
+                    b.HasIndex("TenantId", "CorrelationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notificationdeliveryjob_tenant_correlation")
+                        .HasFilter("\"CorrelationId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "NotificationInboxItemId", "Channel")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notificationdeliveryjob_tenant_item_channel");
+
+                    b.HasIndex("TenantId", "Status", "NextAttemptAt")
+                        .HasDatabaseName("ix_notificationdeliveryjob_tenant_status_nextattempt");
+
+                    b.ToTable("NotificationDeliveryJob", "Notifications");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationDeliveryStatusRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("NotificationInboxItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("notificationdeliverystatus_pk");
+
+                    b.HasIndex("NotificationInboxItemId");
+
+                    b.HasIndex("TenantId", "NotificationInboxItemId", "Channel")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notificationdeliverystatus_tenant_item_channel");
+
+                    b.ToTable("NotificationDeliveryStatus", "Notifications");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationInboxItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("DataJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DeliveryChannels")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SourceCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplateKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id")
+                        .HasName("notificationinboxitem_pk");
+
+                    b.HasIndex("TenantId", "CorrelationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_notificationinboxitem_tenant_correlation")
+                        .HasFilter("\"CorrelationId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "TemplateKey")
+                        .HasDatabaseName("ix_notificationinboxitem_tenant_template");
+
+                    b.HasIndex("TenantId", "RecipientCredentialId", "IsRead", "CreatedAt")
+                        .HasDatabaseName("ix_notificationinboxitem_tenant_recipient_read_created");
+
+                    b.ToTable("NotificationInboxItem", "Notifications");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationPreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("CredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("DigestEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("DisabledTemplateKeys")
+                        .HasColumnType("text");
+
+                    b.Property<int>("EnabledChannels")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("notificationpreference_pk");
+
+                    b.HasIndex("TenantId", "CredentialId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notificationpreference_tenant_credential");
+
+                    b.ToTable("NotificationPreference", "Notifications");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationProviderSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("LastHealthCheckAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastHealthStatus")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ProviderKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("SettingsJson")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("notificationprovidersetting_pk");
+
+                    b.HasIndex("TenantId", "Channel", "ProviderKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notificationprovidersetting_tenant_channel_key");
+
+                    b.ToTable("NotificationProviderSetting", "Notifications");
+                });
+
+            modelBuilder.Entity("SmsGateway.Domain.Shared.Contracts.SmsDeliveryAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("SmsOutboundJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StartedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("smsdeliveryattempt_pk");
+
+                    b.HasIndex("SmsOutboundJobId");
+
+                    b.HasIndex("TenantId", "SmsOutboundJobId", "AttemptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_smsdeliveryattempt_tenant_job_attempt");
+
+                    b.ToTable("SmsDeliveryAttempt", "SmsGateway");
+                });
+
+            modelBuilder.Entity("SmsGateway.Domain.Shared.Contracts.SmsOutboundJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("AgentClusterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeadLetteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Intent")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("LeasedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("NotificationDeliveryJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("ScheduledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Sender")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("smsoutboundjob_pk");
+
+                    b.HasIndex("TenantId", "CorrelationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_smsoutboundjob_tenant_correlation")
+                        .HasFilter("\"CorrelationId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "NotificationDeliveryJobId")
+                        .HasDatabaseName("ix_smsoutboundjob_tenant_notification_delivery_job");
+
+                    b.HasIndex("TenantId", "AgentClusterId", "Status", "NextAttemptAt")
+                        .HasDatabaseName("ix_smsoutboundjob_tenant_cluster_status_nextattempt");
+
+                    b.ToTable("SmsOutboundJob", "SmsGateway");
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.CurrencyType", b =>
@@ -10379,6 +11363,17 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Type");
                 });
 
+            modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageDirectThread", b =>
+                {
+                    b.HasOne("Messaging.Domain.Shared.Contracts.MessageThread", "MessageThread")
+                        .WithMany()
+                        .HasForeignKey("MessageThreadId")
+                        .IsRequired()
+                        .HasConstraintName("messagedirectthread_messagethread_id_fk");
+
+                    b.Navigation("MessageThread");
+                });
+
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.MessageFile", b =>
                 {
                     b.HasOne("Messaging.Domain.Shared.Contracts.Message", "Message")
@@ -10512,6 +11507,54 @@ namespace XFramework.Domain.Migrations
                         .HasConstraintName("messagethreadentity_messagetype_id_fk");
 
                     b.Navigation("MessageType");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationDeliveryAttempt", b =>
+                {
+                    b.HasOne("Notifications.Domain.Shared.Contracts.NotificationDeliveryJob", "NotificationDeliveryJob")
+                        .WithMany("Attempts")
+                        .HasForeignKey("NotificationDeliveryJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("notificationdeliveryattempt_job_id_fk");
+
+                    b.Navigation("NotificationDeliveryJob");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationDeliveryJob", b =>
+                {
+                    b.HasOne("Notifications.Domain.Shared.Contracts.NotificationInboxItem", "NotificationInboxItem")
+                        .WithMany()
+                        .HasForeignKey("NotificationInboxItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("notificationdeliveryjob_inboxitem_id_fk");
+
+                    b.Navigation("NotificationInboxItem");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationDeliveryStatusRecord", b =>
+                {
+                    b.HasOne("Notifications.Domain.Shared.Contracts.NotificationInboxItem", "NotificationInboxItem")
+                        .WithMany("DeliveryStatuses")
+                        .HasForeignKey("NotificationInboxItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("notificationdeliverystatus_inboxitem_id_fk");
+
+                    b.Navigation("NotificationInboxItem");
+                });
+
+            modelBuilder.Entity("SmsGateway.Domain.Shared.Contracts.SmsDeliveryAttempt", b =>
+                {
+                    b.HasOne("SmsGateway.Domain.Shared.Contracts.SmsOutboundJob", "SmsOutboundJob")
+                        .WithMany("Attempts")
+                        .HasForeignKey("SmsOutboundJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("smsdeliveryattempt_outboundjob_id_fk");
+
+                    b.Navigation("SmsOutboundJob");
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.DepositRequest", b =>
@@ -11894,6 +12937,21 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("MessageDirects");
 
                     b.Navigation("MessageThreadTypes");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationDeliveryJob", b =>
+                {
+                    b.Navigation("Attempts");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationInboxItem", b =>
+                {
+                    b.Navigation("DeliveryStatuses");
+                });
+
+            modelBuilder.Entity("SmsGateway.Domain.Shared.Contracts.SmsOutboundJob", b =>
+                {
+                    b.Navigation("Attempts");
                 });
 
             modelBuilder.Entity("Wallets.Domain.Shared.Contracts.CurrencyType", b =>

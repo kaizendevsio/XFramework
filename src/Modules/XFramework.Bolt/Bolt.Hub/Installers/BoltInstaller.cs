@@ -1,5 +1,6 @@
 using Bolt.Hub.Services;
 using Bolt.Server;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Interfaces;
@@ -25,7 +26,7 @@ public sealed class BoltInstaller : IInstaller
         services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         services.AddHostedService<BoltServiceDiscoveryHostedService>();
 
-        // Durable queue store (Redis if configured, in-memory fallback)
+        // Durable queue store (Redis required outside Development)
         services.Configure<Bolt.Server.Durable.DurableQueueOptions>(configuration.GetSection("BoltConfiguration:Durable"));
         var redisConn = configuration["BoltConfiguration:Durable:RedisConnectionString"];
         if (!string.IsNullOrWhiteSpace(redisConn))
@@ -33,9 +34,17 @@ public sealed class BoltInstaller : IInstaller
             services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(_ =>
                 StackExchange.Redis.ConnectionMultiplexer.Connect(redisConn));
             services.AddSingleton<Bolt.Server.Durable.IDurableQueueStore, Bolt.Server.Durable.RedisDurableQueueStore>();
+            services.AddHealthChecks().AddRedis(
+                redisConn,
+                name: "Bolt-durable-redis",
+                failureStatus: HealthStatus.Unhealthy,
+                tags: ["durable", "redis", "ready"]);
         }
         else
         {
+            if (!hostEnvironment.IsDevelopment())
+                throw new InvalidOperationException("BoltConfiguration:Durable:RedisConnectionString is required outside Development for durable Bolt subscriptions.");
+
             services.AddSingleton<Bolt.Server.Durable.IDurableQueueStore, Bolt.Server.Durable.InMemoryDurableQueueStore>();
         }
 

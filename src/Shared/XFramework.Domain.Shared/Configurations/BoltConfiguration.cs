@@ -12,6 +12,9 @@ public class BoltConfiguration
     public int QueueDepth { get; set; }
     public bool QueueMessages { get; set; }
     public bool Anonymous { get; set; }
+    public string? AccessToken { get; set; }
+    public bool SendAccessTokenAsQueryString { get; set; }
+    public bool GenerateServiceAccessToken { get; set; } = true;
     public int RpcTimeoutSeconds { get; set; } = 30;
     public int MaxPendingRpcCalls { get; set; } = 1000;
     public int DeadLetterQueueCapacity { get; set; } = 100_000;

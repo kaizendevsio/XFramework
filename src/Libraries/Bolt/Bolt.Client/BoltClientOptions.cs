@@ -21,6 +21,23 @@ public class BoltClientOptions
     /// <summary>RPC call timeout in seconds. Default: 30.</summary>
     public int RpcTimeoutSeconds { get; set; } = 30;
 
+    /// <summary>
+    /// Static bearer token sent during the Bolt WebSocket handshake.
+    /// Prefer AccessTokenProvider for long-running clients.
+    /// </summary>
+    public string? AccessToken { get; set; }
+
+    /// <summary>
+    /// Optional per-connection bearer token provider. Used before AccessToken when configured.
+    /// </summary>
+    public Func<CancellationToken, ValueTask<string?>>? AccessTokenProvider { get; set; }
+
+    /// <summary>
+    /// Sends the access token as ?access_token= instead of an Authorization header.
+    /// This is required by browser WebSocket clients that cannot set custom headers.
+    /// </summary>
+    public bool SendAccessTokenAsQueryString { get; set; }
+
     /// <summary>Minimum WebSocket connections to maintain. Default: 1.</summary>
     public int MinConnections { get; set; } = 1;
 

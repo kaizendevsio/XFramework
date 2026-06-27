@@ -21,8 +21,12 @@ builder.Services.AddScoped<IMessagingService, MessagingService>();
 builder.Services.AddScoped<IThreadService, ThreadService>();
 builder.Services.AddScoped<IMessagingRequestContextResolver, MessagingRequestContextResolver>();
 builder.Services.AddScoped<IMessagingRealtimePublisher, MessagingRealtimePublisher>();
+builder.Services.AddScoped<IMessagingTransientRealtimePublisher, MessagingTransientRealtimePublisher>();
 builder.Services.AddScoped<IMessagingNotificationFanout, MessagingNotificationFanout>();
 builder.Services.AddScoped<IMessagingSettingsService, MessagingSettingsService>();
+builder.Services.AddScoped<IMessagingPolicyService, MessagingPolicyService>();
+builder.Services.AddSingleton<IMessagingActionRateLimiter, MessagingActionRateLimiter>();
+builder.Services.AddScoped<IMessagingModerationService, MessagingModerationService>();
 builder.Services.AddScoped<IMessagingTemplateService, MessagingTemplateService>();
 builder.Services.AddScoped<IMessagingAdminReadService, MessagingAdminReadService>();
 
@@ -41,6 +45,9 @@ app.UseTenantModuleFeatureGate(options =>
 {
     options.RequireFeature(TenantModuleFeatureKeys.MessagingChat, "/api/threads");
     options.RequireFeature(TenantModuleFeatureKeys.MessagingChat, "/api/messages");
+    options.RequireFeature(TenantModuleFeatureKeys.Messaging, "/api/messaging/admin");
+    options.RequireFeature(TenantModuleFeatureKeys.Messaging, "/api/messaging/settings");
+    options.RequireFeature(TenantModuleFeatureKeys.Messaging, "/api/messaging/templates");
     options.RequireFeature(TenantModuleFeatureKeys.MessagingChat, "/api/messaging");
 });
 
