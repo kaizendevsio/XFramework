@@ -104,9 +104,9 @@ public sealed class ServiceWrapperGeneratorTests
     public void GenerateWrapper_ProjectWithManualWrapperDeclaration_SkipsGeneratedWrapper()
     {
         var domainReference = CreateReference(
-            "Messaging.Domain.Shared",
+            "Communications.Domain.Shared",
             """
-            namespace Messaging.Domain.Shared.Contracts.Requests.Create
+            namespace Communications.Domain.Shared.Contracts.Requests.Create
             {
                 using Bolt.Domain.Shared.Contracts.Requests;
                 using XFramework.Domain.Shared.BusinessObjects;
@@ -119,15 +119,15 @@ public sealed class ServiceWrapperGeneratorTests
             """);
 
         var generatedSources = RunGeneratorSources(
-            "Messaging.Integration",
+            "Communications.Integration",
             domainReference,
             new Dictionary<string, string>(),
             """
-            namespace Messaging.Integration.Drivers
+            namespace Communications.Integration.Drivers
             {
-                public interface IMessagingServiceWrapper { }
-                public sealed record MessagingServiceWrapper { }
-                public static class MessagingServiceWrapperExtensions { }
+                public interface ICommunicationsServiceWrapper { }
+                public sealed record CommunicationsServiceWrapper { }
+                public static class CommunicationsServiceWrapperExtensions { }
             }
             """);
 

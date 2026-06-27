@@ -10,7 +10,7 @@ string[] domainAssemblyNames =
     "Community.Domain.Shared",
     "IdentityServer.Domain.Shared",
     "Inventario.Domain.Shared",
-    "Messaging.Domain.Shared",
+    "Communications.Domain.Shared",
     "Storage.Domain.Shared",
     "Wallets.Domain.Shared"
 ];

@@ -11,8 +11,8 @@ on:
       - src/Modules/XFramework.IdentityServer/IdentityServer.Integration/**
       - src/Modules/XFramework.Inventario/Inventario.Domain.Shared/**
       - src/Modules/XFramework.Inventario/Inventario.Integration/**
-      - src/Modules/XFramework.Messaging/Messaging.Domain.Shared/**
-      - src/Modules/XFramework.Messaging/Messaging.Integration/**
+      - src/Modules/XFramework.Communications/Communications.Domain.Shared/**
+      - src/Modules/XFramework.Communications/Communications.Integration/**
       - src/Modules/XFramework.Wallets/Wallets.Domain.Shared/**
       - src/Modules/XFramework.Wallets/Wallets.Integration/**
   workflow_dispatch:
@@ -43,5 +43,5 @@ jobs:
     with:
       service: controlpanel
       health_url: http://localhost:5000/health/ready
-      diagnostics_services: bolt-hub identityserver messaging wallets inventario controlpanel
+      diagnostics_services: bolt-hub identityserver communications wallets inventario controlpanel
     secrets: inherit

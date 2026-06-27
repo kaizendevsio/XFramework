@@ -167,7 +167,7 @@ Evidence:
 - IdentityServer registers `IAuthService` directly in `Program.cs:13-17` and also in `Installers/ServicesInstaller.cs:13-15`.
 - Wallets uses generated endpoints plus manual endpoints in `src/Modules/XFramework.Wallets/Wallets.Api/Program.cs:50-60`.
 - Inventario uses generated entity endpoints and generated feature endpoints in `src/Modules/XFramework.Inventario/Inventario.Api/Program.cs:44-48`.
-- SmsGateway registers `AppDbContext` and health checks, but `Program.cs` does not call `EnsureDatabase`, unlike IdentityServer, Wallets, Messaging, Community, and Inventario.
+- SmsGateway registers `AppDbContext` and health checks, but `Program.cs` does not call `EnsureDatabase`, unlike IdentityServer, Wallets, Communications, Community, and Inventario.
 
 Recommended change:
 
@@ -183,8 +183,8 @@ Why it matters: VSA endpoints are thin, but some services have become large proc
 
 Evidence:
 
-- `AuthService` handles credentials, authentication, lockout, session, verification, messaging, password reset, and files. It spans 1416 lines: `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Services/AuthService.cs:1-1416`.
-- `AuthService` depends directly on `IMessagingServiceWrapper` and sends SMS/email OTPs in `AuthService.cs:524-599`.
+- `AuthService` handles credentials, authentication, lockout, session, verification, communications, password reset, and files. It spans 1416 lines: `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Services/AuthService.cs:1-1416`.
+- `AuthService` depends directly on `ICommunicationsServiceWrapper` and sends SMS/email OTPs in `AuthService.cs:524-599`.
 - `WalletOperationsService` spans 1521 lines and includes lifecycle, balance mutation, transfer, hold/release/reversal, freeze/unfreeze, and event publication in `src/Modules/XFramework.Wallets/Wallets.Api/Services/WalletOperationsService.cs:1-1521`.
 
 Recommended change:
@@ -236,7 +236,7 @@ Why it matters: shared contracts should remain stable boundaries. Referencing an
 Evidence:
 
 - `Wallets.Domain.Shared` references `IdentityServer.Domain.Shared` in `src/Modules/XFramework.Wallets/Wallets.Domain.Shared/Wallets.Domain.Shared.csproj:19-21`.
-- `Messaging.Domain.Shared` references `IdentityServer.Domain.Shared` in `src/Modules/XFramework.Messaging/Messaging.Domain.Shared/Messaging.Domain.Shared.csproj:19-21`.
+- `Communications.Domain.Shared` references `IdentityServer.Domain.Shared` in `src/Modules/XFramework.Communications/Communications.Domain.Shared/Communications.Domain.Shared.csproj:19-21`.
 - `Community.Domain.Shared` references `IdentityServer.Domain.Shared` in `src/Modules/XFramework.Community/Community.Domain.Shared/Community.Domain.Shared.csproj:21-23`.
 
 Recommended change:

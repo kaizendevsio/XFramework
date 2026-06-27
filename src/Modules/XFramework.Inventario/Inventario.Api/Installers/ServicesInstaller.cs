@@ -1,5 +1,5 @@
 using FluentValidation;
-using Messaging.Integration.Drivers;
+using Communications.Integration.Drivers;
 using XFramework.Inventario.Api.Services;
 using XFramework.Core.Extensions;
 using XFramework.Domain.Shared.Interfaces;
@@ -10,7 +10,7 @@ public class ServicesInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddMessagingWrapperServices();
+        services.AddCommunicationsWrapperServices();
         services.AddTenantResolver();
         services.AddTenantModuleFeatures();
 

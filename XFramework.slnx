@@ -32,11 +32,11 @@
     <Project Path="src\Modules\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
     <Project Path="src\Modules\XFramework.Inventario\Inventario.Integration\Inventario.Integration.csproj" />
   </Folder>
-  <Folder Name="/Services/Messaging/">
-    <Project Path="src\Modules\XFramework.Messaging\Messaging.Api\Messaging.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Messaging\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-    <Project Path="src\Modules\XFramework.Messaging\Messaging.Tests\Messaging.Tests.csproj" />
+  <Folder Name="/Services/Communications/">
+    <Project Path="src\Modules\XFramework.Communications\Communications.Api\Communications.Api.csproj" />
+    <Project Path="src\Modules\XFramework.Communications\Communications.Domain.Shared\Communications.Domain.Shared.csproj" />
+    <Project Path="src\Modules\XFramework.Communications\Communications.Integration\Communications.Integration.csproj" />
+    <Project Path="src\Modules\XFramework.Communications\Communications.Tests\Communications.Tests.csproj" />
   </Folder>
   <Folder Name="/Services/Notifications/">
     <Project Path="src\Modules\XFramework.Notifications\Notifications.Api\Notifications.Api.csproj" />

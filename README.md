@@ -164,7 +164,7 @@ public static class HealthCheckEndpoint
 |--------|-------------|
 | **IdentityServer** | Authentication, authorization, credentials, sessions |
 | **Wallets** | Financial operations, transfers, transaction reversal |
-| **Messaging** | Message delivery, templates, contacts |
+| **Communications** | Message delivery, templates, contacts |
 | **Community** | Social features, connections, content |
 | **Inventario** | Product/inventory management |
 | **Bolt Hub** | Bolt protocol hub + message routing |

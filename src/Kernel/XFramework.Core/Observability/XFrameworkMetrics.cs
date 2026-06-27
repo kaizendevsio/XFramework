@@ -143,7 +143,7 @@ public static class XFrameworkMetrics
     
     #endregion
     
-    #region Messaging Metrics
+    #region Communications Metrics
     
     /// <summary>
     /// Counts the number of messages sent

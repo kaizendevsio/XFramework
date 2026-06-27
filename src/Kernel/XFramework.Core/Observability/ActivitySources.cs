@@ -36,7 +36,7 @@ public static class ActivitySources
     public static readonly ActivitySource Auth = new($"{ServiceName}.Auth", Version);
     
     /// <summary>
-    /// ActivitySource for Bolt messaging operations
+    /// ActivitySource for Bolt communications operations
     /// </summary>
     public static readonly ActivitySource Bolt = new($"{ServiceName}.Bolt", Version);
     
@@ -46,9 +46,9 @@ public static class ActivitySources
     public static readonly ActivitySource Sms = new($"{ServiceName}.Sms", Version);
     
     /// <summary>
-    /// ActivitySource for messaging operations
+    /// ActivitySource for communications operations
     /// </summary>
-    public static readonly ActivitySource Messaging = new($"{ServiceName}.Messaging", Version);
+    public static readonly ActivitySource Communications = new($"{ServiceName}.Communications", Version);
     
     /// <summary>
     /// ActivitySource for community/social operations

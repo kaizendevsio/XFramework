@@ -587,7 +587,7 @@ public async ValueTask<Product?> GetProductAsync(Guid id)
 
 ## 3. Module-Specific Improvements
 
-### 3.1 StreamFlow Module (Real-time Messaging)
+### 3.1 StreamFlow Module (Real-time Communications)
 
 **Current Issues**:
 - Uses `ConcurrentDictionary` for in-memory state (doesn't scale)

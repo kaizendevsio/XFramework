@@ -67,7 +67,7 @@ public sealed class NotificationServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
-        var correlationId = $"messaging:{Guid.NewGuid():N}";
+        var correlationId = $"communications:{Guid.NewGuid():N}";
         var service = CreateService(database.Context);
 
         var request = new CreateNotificationRequest

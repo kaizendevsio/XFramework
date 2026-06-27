@@ -21,7 +21,7 @@ public sealed class BoltInstaller : IInstaller
 
         // Bolt thin protocol server
         services.AddBoltServer();
-        services.AddSingleton<IBoltTopicAuthorizer, MessagingBoltTopicAuthorizer>();
+        services.AddSingleton<IBoltTopicAuthorizer, CommunicationsBoltTopicAuthorizer>();
         services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         services.AddHostedService<BoltServiceDiscoveryHostedService>();

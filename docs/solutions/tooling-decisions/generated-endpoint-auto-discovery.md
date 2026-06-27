@@ -148,12 +148,12 @@ Current module `Program.cs` files typically call `app.MapGeneratedEndpoints()` a
 Representative current modules:
 - `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Program.cs`
 - `src/Modules/XFramework.Wallets/Wallets.Api/Program.cs`
-- `src/Modules/XFramework.Messaging/Messaging.Api/Program.cs`
+- `src/Modules/XFramework.Communications/Communications.Api/Program.cs`
 
 ### Basic Usage
 
 ```csharp
-// Default: Scans XFramework.*, Inventario.*, Wallets.*, Messaging.* assemblies
+// Default: Scans XFramework.*, Inventario.*, Wallets.*, Communications.* assemblies
 app.MapGeneratedEndpoints();
 ```
 

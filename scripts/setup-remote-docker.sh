@@ -62,7 +62,7 @@ if command -v ufw &> /dev/null; then
     ufw allow 5432/tcp   comment 'Postgres'
     ufw allow 7000/tcp   comment 'StreamFlow'
     ufw allow 8261/tcp   comment 'IdentityServer'
-    ufw allow 5148/tcp   comment 'Messaging'
+    ufw allow 5148/tcp   comment 'Communications'
     ufw allow 5166/tcp   comment 'Notifications'
     ufw allow 5182/tcp   comment 'Attendance'
     ufw allow 5274/tcp   comment 'SmsGateway'

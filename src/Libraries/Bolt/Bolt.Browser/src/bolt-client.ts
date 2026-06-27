@@ -42,7 +42,7 @@ export interface BoltBrowserStream {
  * Browser WebSocket client for the Bolt protocol.
  *
  * Full-featured client supporting:
- * - RPC messaging (invoke/respond for text chat, delivery confirmation)
+ * - RPC request/response frames for service calls and delivery confirmation
  * - Push (fire-and-forget for typing indicators, presence)
  * - Bidirectional streaming (file/media sharing)
  * - Voice/video calls with E2E encryption, ABR, FEC, NACK
@@ -94,7 +94,7 @@ export class BoltBrowserClient {
   public onDisconnected?: () => void;
   public onReconnecting?: (attempt: number) => void;
 
-  // Events — messaging
+  // Events — push frames
   public onPush?: (commandHash: number, payload: Uint8Array) => void;
 
   get isConnected(): boolean { return this.connected; }
@@ -208,7 +208,7 @@ export class BoltBrowserClient {
     this.activeStreams.clear();
   }
 
-  // ── RPC Messaging ──────────────────────────────────────────
+  // ── RPC request/response ───────────────────────────────────
 
   /**
    * Invoke a method on a remote service and wait for the response.

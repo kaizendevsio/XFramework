@@ -4,7 +4,7 @@ using FluentValidation;
 using Inventario.Api.Features.Products.Update;
 using Inventario.Api.Infrastructure;
 using Inventario.Integration.Drivers;
-using Messaging.Integration.Drivers;
+using Communications.Integration.Drivers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -119,7 +119,7 @@ public sealed class InventarioIntegrationTestFixture
         builder.Services.AddMemoryCaching();
         builder.Services.AddSingleton<IDistributedCache>(_ => null!);
         builder.Services.AddSingleton<IConnectionMultiplexer>(_ => null!);
-        builder.Services.AddMessagingWrapperServices();
+        builder.Services.AddCommunicationsWrapperServices();
         builder.Services.AddTenantResolver();
         builder.Services.AddTenantModuleFeatures();
         builder.Services.AddScoped<ProductService>();

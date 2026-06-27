@@ -1,5 +1,5 @@
 using IdentityServer.Integration.Drivers;
-using Messaging.Integration.Drivers;
+using Communications.Integration.Drivers;
 using Storage.Integration.Drivers;
 using Wallets.Integration.Drivers;
 
@@ -12,6 +12,6 @@ public class ServicesInstaller : IInstaller
         services.AddIdentityServerWrapperServices();
         services.AddStorageWrapperServices();
         services.AddWalletsWrapperServices();
-        services.AddMessagingWrapperServices();
+        services.AddCommunicationsWrapperServices();
     }
 }

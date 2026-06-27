@@ -17,7 +17,7 @@
 | Wallets | ✅ Complete | 1 (High) | Senior Dev | 2025-11-26 | 2025-11-27 |
 | IdentityServer | ✅ Complete | 2 (High) | Senior Dev | 2025-11-27 | 2025-11-27 |
 | Community | ✅ Complete | 3 | Senior Dev | 2025-11-27 | 2025-11-27 |
-| Messaging | ✅ Complete | 4 | Senior Dev | 2025-11-27 | 2025-11-27 |
+| Communications | ✅ Complete | 4 | Senior Dev | 2025-11-27 | 2025-11-27 |
 | SmsGateway | ✅ Complete | 5 | Senior Dev | 2025-11-27 | 2025-11-27 |
 | StreamFlow | ⏳ Pending | 6 | - | - | - |
 | Coins | ⏳ Pending | 7 (Low) | - | - | - |
@@ -137,7 +137,7 @@ Features/
 **Completed:** 2025-11-27
 **Priority:** High - Core authentication infrastructure
 **Complexity:** Medium-High (complex authentication logic)
-**Dependencies:** XFramework.Core, Messaging.Integration
+**Dependencies:** XFramework.Core, Communications.Integration
 
 #### Pre-existing State
 - [x] Service Layer: `AuthService.cs` (935 lines) - uses Result<T> pattern ✅
@@ -146,7 +146,7 @@ Features/
 - [x] Source generator commented out in `Endpoints/Endpoints.cs`
 - [x] Legacy `IdentityServer.Core/Commands/`, `Query/` folders exist (cleanup pending Phase B)
 - [x] Legacy `IdentityServer.Integration/` folder exists (cleanup pending Phase B)
-- [x] AuthService integrates with: JWT, BCrypt, Azure Blob Storage, Messaging
+- [x] AuthService integrates with: JWT, BCrypt, Azure Blob Storage, Communications
 
 #### AuthService Methods Exposed as Endpoints
 | Method | Description | Input Type | Output Type |
@@ -338,8 +338,8 @@ Features/
 
 ---
 
-### Milestone 4: Messaging Module Migration
-**Target:** Complete Feature-Centric VSA for Messaging module
+### Milestone 4: Communications Module Migration
+**Target:** Complete Feature-Centric VSA for Communications module
 **Status:** ✅ Complete (Full migration with cleanup)
 **Assigned:** Senior Developer
 **Started:** 2025-11-27
@@ -349,41 +349,41 @@ Features/
 **Dependencies:** XFramework.Core, XFramework.Domain, XFramework.Integration, SmsGateway.Integration
 
 #### Pre-existing State
-- [x] Service Layer: `MessagingService.cs` (143 lines) - uses Result<T> pattern ✅
-- [x] Interface: `IMessagingService.cs` (14 lines)
+- [x] Service Layer: `CommunicationsService.cs` (143 lines) - uses Result<T> pattern ✅
+- [x] Interface: `ICommunicationsService.cs` (14 lines)
 - [x] No Features folder exists (created during migration)
 - [x] Source generator commented out in `Endpoints/Endpoints.cs`
-- [x] Legacy `Messaging.Core/` directory existed (deleted during cleanup)
-- [x] Legacy `Messaging.Integration/` directory existed (deleted during cleanup)
+- [x] Legacy `Communications.Core/` directory existed (deleted during cleanup)
+- [x] Legacy `Communications.Integration/` directory existed (deleted during cleanup)
 - [x] Service uses `ISmsGatewayServiceWrapper` - dependency retained
 
-#### MessagingService Methods Exposed as Endpoints
+#### CommunicationsService Methods Exposed as Endpoints
 | Method | Description | Input Type | Output Type |
 |--------|-------------|------------|-------------|
 | CreateDirectMessageAsync | Create and send direct message (SMS/Email) | CreateDirectMessageRequest | Result<CmdResponse> |
 | UpdateMessageDirectAsync | Update message status and delivery timestamps | UpdateMessageDirectRequest | Result<CmdResponse> |
 
 #### Phase A: Create Feature Endpoints ✅
-- [x] Copy `MessagingService.cs` and `IMessagingService.cs` from `Messaging.Core/Services/` to `Messaging.Api/Services/`
-- [x] Update namespaces in copied service files to `Messaging.Api.Services`
+- [x] Copy `CommunicationsService.cs` and `ICommunicationsService.cs` from `Communications.Core/Services/` to `Communications.Api/Services/`
+- [x] Update namespaces in copied service files to `Communications.Api.Services`
 - [x] Create `Features/Messages/` folder structure
 - [x] Create `Features/Messages/MessageEndpoints.cs` aggregator
 - [x] Create `Features/Messages/CreateDirect/Endpoint.cs` (POST /api/messages/direct)
 - [x] Create `Features/Messages/CreateDirect/CreateDirectMessageValidator.cs`
 - [x] Create `Features/Messages/UpdateDirect/Endpoint.cs` (PATCH /api/messages/direct/{id})
 - [x] Create `Features/Messages/UpdateDirect/UpdateDirectMessageValidator.cs`
-- [x] Update `Messaging.Api.csproj` with direct kernel project references
-- [x] Remove `Messaging.Core` and `Messaging.Integration` project references from csproj
+- [x] Update `Communications.Api.csproj` with direct kernel project references
+- [x] Remove `Communications.Core` and `Communications.Integration` project references from csproj
 - [x] Keep `SmsGateway.Integration` project reference (required for ISmsGatewayServiceWrapper)
-- [x] Update `Program.cs` to register MessagingService and endpoints
+- [x] Update `Program.cs` to register CommunicationsService and endpoints
 - [x] Update `ServicesInstaller.cs` to remove legacy references
 - [x] Update `WrapperInstaller.cs` to remove legacy references
 - [x] Build and test ✅ (0 errors)
 
 #### Phase B: Legacy Cleanup ✅
-- [x] Delete `src/Modules/XFramework.Messaging/Messaging.Core/` directory
-- [x] Delete `src/Modules/XFramework.Messaging/Messaging.Integration/` directory
-- [x] Update `XFramework.slnx` to remove Messaging.Core and Messaging.Integration project references
+- [x] Delete `src/Modules/XFramework.Communications/Communications.Core/` directory
+- [x] Delete `src/Modules/XFramework.Communications/Communications.Integration/` directory
+- [x] Update `XFramework.slnx` to remove Communications.Core and Communications.Integration project references
 - [x] Build verification complete - 0 errors
 
 #### API Endpoints Implemented
@@ -396,13 +396,13 @@ Features/
 ✅ Build succeeds with 0 errors and 105 warnings (pre-existing nullable reference warnings, not introduced by migration)
 
 **Issues Fixed:**
-1. Removed orphaned `Messaging.Core` references from `ServicesInstaller.cs`
-2. Removed orphaned `Messaging.Integration.Drivers` reference from `WrapperInstaller.cs`
+1. Removed orphaned `Communications.Core` references from `ServicesInstaller.cs`
+2. Removed orphaned `Communications.Integration.Drivers` reference from `WrapperInstaller.cs`
 3. Fixed `CmdResponse.Guid` property access error in Create endpoint (property doesn't exist)
 4. Added FluentValidation package references to csproj
 
 #### Files Created (8 total)
-- Service Layer: `MessagingService.cs` (143 lines), `IMessagingService.cs` (19 lines) in `Messaging.Api/Services/`
+- Service Layer: `CommunicationsService.cs` (143 lines), `ICommunicationsService.cs` (19 lines) in `Communications.Api/Services/`
 - Feature Endpoints (2): Messages/CreateDirect, Messages/UpdateDirect
 - Validators (2): CreateDirectMessageValidator, UpdateDirectMessageValidator
 - Aggregators (1): MessageEndpoints
@@ -411,19 +411,19 @@ Features/
 | Date | Time | Change Description | Files Modified |
 |------|------|-------------------|----------------|
 | 2025-11-27 | 17:28 | Migration started | - |
-| 2025-11-27 | 17:29 | Copied service files to Messaging.Api/Services/ | `Services/MessagingService.cs`, `Services/IMessagingService.cs` |
+| 2025-11-27 | 17:29 | Copied service files to Communications.Api/Services/ | `Services/CommunicationsService.cs`, `Services/ICommunicationsService.cs` |
 | 2025-11-27 | 17:30 | Created Features folder structure | `Features/Messages/` |
 | 2025-11-27 | 17:30 | Created MessageEndpoints.cs aggregator | `Features/Messages/MessageEndpoints.cs` |
 | 2025-11-27 | 17:30 | Created CreateDirect endpoint and validator | `Features/Messages/CreateDirect/*` |
 | 2025-11-27 | 17:30 | Created UpdateDirect endpoint and validator | `Features/Messages/UpdateDirect/*` |
-| 2025-11-27 | 17:31 | Updated Messaging.Api.csproj | `Messaging.Api.csproj` |
+| 2025-11-27 | 17:31 | Updated Communications.Api.csproj | `Communications.Api.csproj` |
 | 2025-11-27 | 17:31 | Updated Program.cs | `Program.cs` |
 | 2025-11-27 | 17:31 | Updated GlobalUsings.cs | `GlobalUsings.cs` |
 | 2025-11-27 | 17:32 | Fixed ServicesInstaller.cs - removed legacy references | `Installers/ServicesInstaller.cs` |
 | 2025-11-27 | 17:32 | Fixed WrapperInstaller.cs - removed legacy references | `Installers/WrapperInstaller.cs` |
 | 2025-11-27 | 17:33 | Phase A build verification - 0 errors | - |
-| 2025-11-27 | 17:33 | Deleted Messaging.Core directory | - |
-| 2025-11-27 | 17:33 | Deleted Messaging.Integration directory | - |
+| 2025-11-27 | 17:33 | Deleted Communications.Core directory | - |
+| 2025-11-27 | 17:33 | Deleted Communications.Integration directory | - |
 | 2025-11-27 | 17:33 | Updated XFramework.slnx | `XFramework.slnx` |
 | 2025-11-27 | 17:34 | Final build verification - 0 errors | - |
 
@@ -484,7 +484,7 @@ Features/
 
 #### Phase B: Legacy Cleanup ✅
 - [x] Delete `src/Modules/XFramework.SmsGateway/SmsGateway.Core/` directory
-- [x] Keep `SmsGateway.Integration/` (used by Messaging module for ISmsGatewayServiceWrapper)
+- [x] Keep `SmsGateway.Integration/` (used by Communications module for ISmsGatewayServiceWrapper)
 - [x] Update `XFramework.slnx` to remove SmsGateway.Core project reference
 - [x] Build verification complete - 0 errors
 
@@ -502,8 +502,8 @@ Features/
 ✅ Build succeeds with 0 errors and 179 warnings (pre-existing nullable reference warnings from source generators, not introduced by migration)
 
 **Issues Fixed:**
-1. Created missing `Messaging.Integration.csproj` file (referenced but didn't exist)
-2. Simplified `SmsService` to work standalone without `IMessagingServiceWrapper` dependency
+1. Created missing `Communications.Integration.csproj` file (referenced but didn't exist)
+2. Simplified `SmsService` to work standalone without `ICommunicationsServiceWrapper` dependency
 3. Added new method `GetPendingWithStatusUpdateAsync` to replace legacy controller logic
 4. Registered `CachingService` as **Singleton** (uses ConcurrentDictionary for thread-safe in-memory storage)
 5. Updated namespace imports in installers for new service locations
@@ -531,7 +531,7 @@ Features/
 | 2025-11-27 | 17:42 | Deleted legacy controller | `Controllers/V1/SmsGatewayNodeController.cs` |
 | 2025-11-27 | 17:43 | Updated Program.cs with service registration | `Program.cs` |
 | 2025-11-27 | 17:44 | Updated installers | `Installers/*.cs` |
-| 2025-11-27 | 17:45 | Created missing Messaging.Integration.csproj | `Messaging.Integration.csproj` |
+| 2025-11-27 | 17:45 | Created missing Communications.Integration.csproj | `Communications.Integration.csproj` |
 | 2025-11-27 | 17:46 | Deleted SmsGateway.Core directory | - |
 | 2025-11-27 | 17:49 | Updated XFramework.slnx | `XFramework.slnx` |
 | 2025-11-27 | 17:50 | Final build verification - 0 errors | - |

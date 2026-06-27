@@ -15,7 +15,7 @@ x-common-env: &common-env
   JwtOptions__ValidAudience: ${JWT_AUDIENCE:-xframework}
   JwtOptions__ValidIssuer: ${JWT_ISSUER:-xframework}
   BoltConfiguration__Signature: ${BOLT_SIGNATURE:?Set BOLT_SIGNATURE in .env}
-  Messaging__TrustedMetadata__SharedSecret: ${MESSAGING_TRUSTED_METADATA_SECRET:?Set MESSAGING_TRUSTED_METADATA_SECRET in .env}
+  Communications__TrustedMetadata__SharedSecret: ${COMMUNICATIONS_TRUSTED_METADATA_SECRET:?Set COMMUNICATIONS_TRUSTED_METADATA_SECRET in .env}
   Seq__ApiKey: ${SEQ_API_KEY:-}
   OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
   OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-true}
@@ -136,18 +136,18 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── Messaging Server ────────────────────────────────────────
-  messaging:
-    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/messaging:${IMAGE_TAG:-develop}
+  # ── Communications Server ────────────────────────────────────────
+  communications:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/communications:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        PROJECT_PATH: src/Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj
+        PROJECT_PATH: src/Modules/XFramework.Communications/Communications.Api/Communications.Api.csproj
     environment:
       <<: *common-env
     ports:
-      - "${MESSAGING_EXPOSE_PORT:-5148}:8080"
+      - "${COMMUNICATIONS_EXPOSE_PORT:-5148}:8080"
     depends_on:
       bolt-hub:
         condition: service_healthy
@@ -322,7 +322,7 @@ services:
         condition: service_healthy
       identityserver:
         condition: service_healthy
-      messaging:
+      communications:
         condition: service_healthy
       storage:
         condition: service_healthy

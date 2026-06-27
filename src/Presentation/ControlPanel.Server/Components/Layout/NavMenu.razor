@@ -53,14 +53,14 @@
     </SidebarSection>
 }
 
-@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.MessagingChat))
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Communications))
 {
-    <SidebarSection GroupId="messaging" Title="Messaging" Icon="messages-square">
-        <SidebarNavItem Href="/messaging/users" Label="Users" Icon="users" />
-        <SidebarNavItem Href="/messaging/threads" Label="Threads" Icon="messages-square" />
-        <SidebarNavItem Href="/messaging/operations" Label="Operations" Icon="radio-tower" />
-        <SidebarNavItem Href="/messaging/moderation" Label="Moderation" Icon="shield-alert" />
-        <SidebarNavItem Href="/messaging/settings" Label="Settings" Icon="settings" />
+    <SidebarSection GroupId="communications" Title="Communications" Icon="messages-square">
+        <SidebarNavItem Href="/communications/users" Label="Users" Icon="users" />
+        <SidebarNavItem Href="/communications/threads" Label="Threads" Icon="messages-square" />
+        <SidebarNavItem Href="/communications/operations" Label="Operations" Icon="radio-tower" />
+        <SidebarNavItem Href="/communications/moderation" Label="Moderation" Icon="shield-alert" />
+        <SidebarNavItem Href="/communications/settings" Label="Settings" Icon="settings" />
     </SidebarSection>
 }
 

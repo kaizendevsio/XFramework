@@ -25,7 +25,7 @@ We have successfully completed Phase 2.1 (Source Generator Proof of Concept) and
 
 Production entities across all modules are currently located in Domain.Shared projects. These projects are lightweight shared libraries with minimal dependencies, but the source generators require heavier dependencies that conflict with Domain.Shared's clean architecture principles.
 
-Affected modules include Inventario, Wallets, IdentityServer, Community, Messaging, SmsGateway, Payments, and StreamFlow.
+Affected modules include Inventario, Wallets, IdentityServer, Community, Communications, SmsGateway, Payments, and StreamFlow.
 
 ## Constraints
 
@@ -85,7 +85,7 @@ Domain.Shared -> Core -> Api/Entities -> generated services/endpoints
 ## Migration Strategy
 
 - Phase 1: Pilot with Inventario. Create ProductEntity, apply attributes, implement mappings, verify generation, test endpoints, and document learnings.
-- Phase 2: Apply the established pattern to standard modules such as Wallets and Messaging.
+- Phase 2: Apply the established pattern to standard modules such as Wallets and Communications.
 - Phase 3: Handle complex modules such as IdentityServer and Community with relationship-heavy models.
 - Phase 4: Remove old manual CRUD code, update documentation, and monitor performance.
 

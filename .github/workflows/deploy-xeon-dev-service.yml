@@ -44,6 +44,8 @@ jobs:
       XFRAMEWORK_ENV_FILE: /opt/xframework/xeon-dev.env
       DB_PASSWORD: compose-validation-placeholder
       JWT_SECRET: compose-validation-placeholder
+      BOLT_SIGNATURE: compose-validation-placeholder
+      COMMUNICATIONS_TRUSTED_METADATA_SECRET: compose-validation-placeholder
       SERVICE_NAME: ${{ inputs.service }}
       HEALTH_URL: ${{ inputs.health_url }}
       DIAGNOSTICS_SERVICES: ${{ inputs.diagnostics_services }}

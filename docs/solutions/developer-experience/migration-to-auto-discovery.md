@@ -576,11 +576,11 @@ public static class InventarioModule
 // In Program.cs:
 builder.Services.AddInventarioServices();
 builder.Services.AddWalletsServices();
-builder.Services.AddMessagingServices();
+builder.Services.AddCommunicationsServices();
 
 app.MapInventarioEndpoints();
 app.MapWalletsEndpoints();
-app.MapMessagingEndpoints();
+app.MapCommunicationsEndpoints();
 ```
 
 ### Scenario 7: Gradual Migration

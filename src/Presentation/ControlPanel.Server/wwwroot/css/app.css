@@ -401,46 +401,46 @@
     gap: 1rem;
 }
 
-.messaging-settings-layout {
+.communications-settings-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 1.5rem;
     width: 100%;
 }
 
-.messaging-settings-section-nav,
-.messaging-settings-content,
-.messaging-settings-editor {
+.communications-settings-section-nav,
+.communications-settings-content,
+.communications-settings-editor {
     min-width: 0;
     width: 100%;
 }
 
-.messaging-settings-section-links {
+.communications-settings-section-links {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
 }
 
-.messaging-settings-section-links .sidebar-nav-item {
+.communications-settings-section-links .sidebar-nav-item {
     width: auto;
     min-width: 12rem;
 }
 
-.messaging-settings-editor-heading {
+.communications-settings-editor-heading {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
 }
 
-.messaging-settings-token-help {
+.communications-settings-token-help {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.375rem;
 }
 
-.messaging-settings-sources-summary {
+.communications-settings-sources-summary {
     display: flex;
     width: 100%;
     align-items: flex-start;
@@ -449,12 +449,12 @@
     padding: 1.5rem;
 }
 
-.messaging-settings-sources-button {
+.communications-settings-sources-button {
     flex: 0 0 auto;
     white-space: nowrap;
 }
 
-.messaging-settings-command-bar {
+.communications-settings-command-bar {
     position: sticky;
     bottom: 0;
     z-index: 15;
@@ -468,7 +468,7 @@
     box-shadow: 0 -10px 28px color-mix(in oklab, var(--background) 70%, transparent);
 }
 
-.messaging-settings-command-state {
+.communications-settings-command-state {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -477,15 +477,15 @@
     font-size: 0.875rem;
 }
 
-.messaging-settings-form .grid-cols-1.md\:grid-cols-2 {
+.communications-settings-form .grid-cols-1.md\:grid-cols-2 {
     grid-template-columns: minmax(0, 1fr) !important;
 }
 
-.messaging-settings-form textarea {
+.communications-settings-form textarea {
     min-height: 8rem;
 }
 
-.messaging-template-metrics {
+.communications-template-metrics {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem 1rem;
@@ -493,31 +493,31 @@
     font-size: 0.875rem;
 }
 
-.messaging-template-metrics span {
+.communications-template-metrics span {
     display: inline-flex;
     align-items: baseline;
     gap: 0.35rem;
 }
 
-.messaging-template-name-cell {
+.communications-template-name-cell {
     display: flex;
     min-width: 0;
     flex-direction: column;
     gap: 0.125rem;
 }
 
-.messaging-template-name-cell span,
-.messaging-template-preview {
+.communications-template-name-cell span,
+.communications-template-preview {
     color: var(--muted-foreground);
     font-size: 0.875rem;
 }
 
-.messaging-template-dialog {
+.communications-template-dialog {
     width: min(64rem, calc(100vw - 2rem));
     max-width: min(64rem, calc(100vw - 2rem));
 }
 
-.messaging-template-dialog-body {
+.communications-template-dialog-body {
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -526,27 +526,27 @@
     padding: 1rem 0.25rem 1rem 0;
 }
 
-.messaging-template-editor-grid {
+.communications-template-editor-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
 }
 
-.messaging-template-editor-full {
+.communications-template-editor-full {
     min-width: 0;
 }
 
-.messaging-template-switches {
+.communications-template-switches {
     display: grid;
     gap: 0.75rem;
     align-content: start;
 }
 
-.messaging-template-body-input {
+.communications-template-body-input {
     min-height: 12rem;
 }
 
-.messaging-template-token-help {
+.communications-template-token-help {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -556,7 +556,7 @@
     font-size: 0.875rem;
 }
 
-.messaging-template-dialog-footer {
+.communications-template-dialog-footer {
     flex-wrap: wrap;
     gap: 0.5rem;
 }
@@ -633,40 +633,40 @@
 }
 
 @media (min-width: 1280px) {
-    .messaging-settings-layout {
+    .communications-settings-layout {
         grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
         align-items: start;
     }
 
-    .messaging-settings-section-nav {
+    .communications-settings-section-nav {
         position: sticky;
         top: 1.5rem;
     }
 
-    .messaging-settings-section-links {
+    .communications-settings-section-links {
         flex-direction: column;
     }
 
-    .messaging-settings-section-links .sidebar-nav-item {
+    .communications-settings-section-links .sidebar-nav-item {
         width: 100%;
         min-width: 0;
     }
 
-    .messaging-settings-form .grid-cols-1.md\:grid-cols-2 {
+    .communications-settings-form .grid-cols-1.md\:grid-cols-2 {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 
-    .messaging-settings-command-bar {
+    .communications-settings-command-bar {
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
     }
 
-    .messaging-template-editor-grid {
+    .communications-template-editor-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .messaging-template-editor-full {
+    .communications-template-editor-full {
         grid-column: 1 / -1;
     }
 

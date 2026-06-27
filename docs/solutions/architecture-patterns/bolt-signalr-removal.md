@@ -430,7 +430,7 @@ Docker before: "http://bolt-hub:8080/stream-flow/queue"
 Docker after:  "ws://bolt-hub:8080/bolt/ws"
 ```
 
-Affected services: IdentityServer, Wallets, Messaging, Community, SmsGateway, Inventario, Coins, Gateway, ControlPanel.Server.
+Affected services: IdentityServer, Wallets, Communications, Community, SmsGateway, Inventario, Coins, Gateway, ControlPanel.Server.
 
 ## Testing
 
@@ -493,7 +493,7 @@ The migration must happen in a specific order to avoid breaking existing service
 8. **Add `ExecuteQuery`/`ExecuteChanges` shim handlers to `BoltServer`** — non-breaking
 9. **Create new `BoltDriver` (alongside `BoltDriverSignalR`)** — non-breaking, doesn't replace yet
 10. **Switch DI registration in one service** (IdentityServer) — verify it works end-to-end
-11. **Switch remaining services one by one** — Wallets, Messaging, Community, SmsGateway, Inventario, ControlPanel.Server, Gateway, Coins
+11. **Switch remaining services one by one** — Wallets, Communications, Community, SmsGateway, Inventario, ControlPanel.Server, Gateway, Coins
 12. **Delete `BoltDriverSignalR`, `SignalRService`, `ConnectionPool`, `PooledRpcCall`, `BaseSignalRHandler`, `ISignalRService`, `ISignalREventHandler`**
 13. **Delete `MessageQueueHub`** and remove SignalR registration from `Bolt.Hub`
 14. **Remove SignalR package references** from `Bolt.Hub.csproj` and `XFramework.Integration.csproj`

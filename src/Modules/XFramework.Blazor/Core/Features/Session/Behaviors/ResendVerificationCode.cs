@@ -1,5 +1,5 @@
-﻿using IdentityServer.Integration.Drivers;
-using Messaging.Integration.Drivers;
+using IdentityServer.Integration.Drivers;
+using Communications.Integration.Drivers;
 
 namespace XFramework.Blazor.Core.Features.Session;
 
@@ -11,7 +11,7 @@ public partial class SessionState
         public Guid VerificationTypeId { get; set; }
     }
     
-    protected class ResendVerificationCodeHandler(IMessagingServiceWrapper messagingServiceWrapper,
+    protected class ResendVerificationCodeHandler(ICommunicationsServiceWrapper communicationsServiceWrapper,
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)

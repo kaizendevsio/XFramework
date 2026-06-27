@@ -1,0 +1,16 @@
+global using System;
+global using System.Collections.Generic;
+global using Microsoft.Extensions.Configuration;
+global using XFramework.Domain.Shared.BusinessObjects;
+global using XFramework.Domain.Shared.Contracts.Responses;
+global using Microsoft.AspNetCore.Mvc;
+global using Microsoft.EntityFrameworkCore;
+global using Communications.Api.Services;
+global using IdentityServer.Domain.Shared.Contracts;
+global using Communications.Domain.Shared.Contracts;
+global using Communications.Domain.Shared.Contracts.Requests;
+global using XFramework.Domain.Shared.Contracts;
+global using XFramework.Integration.Abstractions;
+global using XFramework.Core.Attributes;
+global using XFramework.Domain.Contexts;
+global using XFramework.Extensions;

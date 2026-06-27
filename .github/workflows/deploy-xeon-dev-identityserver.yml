@@ -6,8 +6,8 @@ on:
     paths:
       - src/Modules/XFramework.IdentityServer/IdentityServer.Api/**
       - src/Modules/XFramework.IdentityServer/IdentityServer.Domain.Shared/**
-      - src/Modules/XFramework.Messaging/Messaging.Domain.Shared/**
-      - src/Modules/XFramework.Messaging/Messaging.Integration/**
+      - src/Modules/XFramework.Communications/Communications.Domain.Shared/**
+      - src/Modules/XFramework.Communications/Communications.Integration/**
   workflow_dispatch:
 
 permissions:

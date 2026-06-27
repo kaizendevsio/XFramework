@@ -66,8 +66,8 @@ public sealed class OperationsRegistryMapperTests
         var service = new BoltServiceRegistryItem
         {
             ClientId = "client-a",
-            ClientName = "Messaging",
-            ServiceName = "Messaging",
+            ClientName = "Communications",
+            ServiceName = "Communications",
             Status = BoltRegistryStatus.Online,
             ConnectionCount = 1,
             LastSeenAt = DateTime.UtcNow,

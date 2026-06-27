@@ -223,7 +223,7 @@ public static class ServiceDiscoveryExtensions
         return name.StartsWith("XFramework", StringComparison.OrdinalIgnoreCase) ||
                name.StartsWith("Inventario", StringComparison.OrdinalIgnoreCase) ||
                name.StartsWith("Wallets", StringComparison.OrdinalIgnoreCase) ||
-               name.StartsWith("Messaging", StringComparison.OrdinalIgnoreCase);
+               name.StartsWith("Communications", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -18,7 +18,7 @@ Historical compatibility note: moved `StorageFile*` entity namespaces currently 
 
 ## Integration Rules
 
-- Use `IStorageServiceWrapper` for cross-module Storage behavior. Messaging, Community, ControlPanel, Blazor, and future modules should call the wrapper for validation, upload sessions, upload parts, completion, URLs, delete, restore, and retention operations.
+- Use `IStorageServiceWrapper` for cross-module Storage behavior. Communications, Community, ControlPanel, Blazor, and future modules should call the wrapper for validation, upload sessions, upload parts, completion, URLs, delete, restore, and retention operations.
 - Do not query or write Storage tables directly from another module to validate file references. Use `ValidateStorageFileReference` through the wrapper.
 - Direct `IDataContext.Query<StorageFile>()` is acceptable only for intentional read-only metadata display paths. Do not use remote data context to bypass Storage workflow rules.
 - Do not add client-provided `TenantId` fields to Storage request contracts. Storage derives tenant identity from authenticated context or trusted signed request metadata.
@@ -72,7 +72,7 @@ Historical compatibility note: moved `StorageFile*` entity namespaces currently 
 - Put Storage integration tests under `src/Tests/Storage.IntegrationTests`.
 - Follow the existing PostgreSQL/Testcontainers integration pattern. Tests may skip only when Docker/Testcontainers is unavailable.
 - Cover wrapper/Bolt flows, REST binary upload binding, tenant isolation, part idempotency/conflict, completion hash validation, signed/private URLs, public/CDN URLs, soft delete, restore, and retention cleanup.
-- When changing Messaging or Community file integration, update their tests to prove they call `IStorageServiceWrapper` and reject missing, deleted, or wrong-tenant files.
+- When changing Communications or Community file integration, update their tests to prove they call `IStorageServiceWrapper` and reject missing, deleted, or wrong-tenant files.
 
 Useful verification commands:
 

@@ -269,7 +269,7 @@ public partial record WalletsServiceWrapper : IWalletsServiceWrapper
 | Wallets | ❌ | 0% | Full CQRS |
 | IdentityServer | ⚠️ | 30% | AuthService exists, mixed CQRS |
 | PaymentGateways | ❌ | 0% | Full CQRS |
-| Messaging | ❌ | 0% | Full CQRS |
+| Communications | ❌ | 0% | Full CQRS |
 | Community | ❌ | 0% | Full CQRS |
 | Inventario | ❌ | 0% | Full CQRS |
 | SmsGateway | ❌ | 0% | Full CQRS |
@@ -342,7 +342,7 @@ public partial record WalletsServiceWrapper : IWalletsServiceWrapper
 
 8. **Migrate Remaining Modules**
    - IdentityServer (finish)
-   - Messaging
+   - Communications
    - Community
    - Others
 
