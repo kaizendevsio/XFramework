@@ -105,7 +105,26 @@ public sealed class AttendanceControlPanelContractTests
         service.Should().Contain("x.TenantId == tenantId");
         service.Should().Contain("BuildCredentialLabel");
         service.Should().Contain("AttendanceRecordStatus.Absent");
+        service.Should().Contain("NormalizeUtc(fromUtc)");
+        service.Should().NotContain("x.StartsAt >= fromUtc");
         service.Should().NotContain("SaveChangesAsync(");
+    }
+
+    [Test]
+    public void AttendanceApi_RegistersGeneratedBoltHandlersAtStartup()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var programPath = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.Attendance",
+            "Attendance.Api",
+            "Program.cs");
+        var program = File.ReadAllText(programPath);
+
+        program.Should().Contain("BoltHandlerRegistry.RegisterAll");
+        program.Should().Contain("CreateLogger(\"Attendance.GeneratedBoltHandlers\")");
     }
 
     private static string ReadAttendancePageSource()

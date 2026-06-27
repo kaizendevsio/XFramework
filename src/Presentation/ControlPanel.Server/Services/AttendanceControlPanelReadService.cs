@@ -61,8 +61,7 @@ public sealed class AttendanceControlPanelReadService(IDataContext dataContext)
         var query = dataContext.Query<AttendanceSession>()
             .IgnoreQueryFilters()
             .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .Where(x => x.StartsAt >= fromUtc && x.StartsAt <= toUtc);
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (contextId is Guid selectedContextId)
         {
@@ -76,10 +75,19 @@ public sealed class AttendanceControlPanelReadService(IDataContext dataContext)
 
         var sessions = await query
             .OrderByDescending(x => x.StartsAt)
-            .Take(500)
+            .Take(2000)
             .ToListAsync(cancellationToken);
 
+        var from = NormalizeUtc(fromUtc);
+        var to = NormalizeUtc(toUtc);
+
         return sessions
+            .Where(session =>
+            {
+                var startsAt = NormalizeUtc(session.StartsAt);
+                return startsAt >= from && startsAt <= to;
+            })
+            .Take(500)
             .Select(session =>
                 new AttendanceSessionRow(
                     session.Id,
@@ -88,8 +96,8 @@ public sealed class AttendanceControlPanelReadService(IDataContext dataContext)
                     LabelOrFallback(session.ContextId, contexts, "Context"),
                     session.Name,
                     session.Code,
-                    session.StartsAt,
-                    session.EndsAt,
+                    NormalizeUtc(session.StartsAt),
+                    NormalizeUtc(session.EndsAt),
                     session.TimeZoneId,
                     session.Status))
             .ToList();
@@ -489,6 +497,13 @@ public sealed class AttendanceControlPanelReadService(IDataContext dataContext)
         ?? Normalize(credential.UserName)
         ?? Normalize(credential.UserAlias)
         ?? credential.Id.ToString();
+
+    private static DateTime NormalizeUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
 
     private static Guid[] NormalizeIds(IEnumerable<Guid?> ids) =>
         ids.Where(x => x.HasValue)
