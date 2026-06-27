@@ -16,6 +16,7 @@
         <ProjectReference Include="..\..\..\SourceGenerators\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
         <ProjectReference Include="..\Community.Domain.Shared\Community.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
     </ItemGroup>
     
     <ItemGroup>

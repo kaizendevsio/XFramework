@@ -24,6 +24,10 @@ public class TestConstants
     // ── Inventario ──
     public static readonly Guid ProductCategoryId = Guid.Parse("f1f2f3f4-e5f6-7890-abcd-ef1234567890");
 
+    public static readonly Guid StorageFileTypeId = Guid.Parse("9f0643d5-5287-4489-81ca-d9971c7278f4");
+    public static readonly Guid StorageFileIdentifierGroupId = Guid.Parse("8f0643d5-5287-4489-81ca-d9971c7278f4");
+    public static readonly Guid StorageFileIdentifierId = Guid.Parse("7f0643d5-5287-4489-81ca-d9971c7278f4");
+
     // ── Verification ──
     public static readonly Guid ContactGroupId = Guid.Parse("d1d2d3d4-e5f6-7890-abcd-ef1234567890");
 
@@ -52,5 +56,10 @@ public class TestConstants
         public const string AttendanceBolt = "http://localhost:17300";
         public const string AttendanceServer = "http://localhost:18581";
         public const string AttendanceTestClient = "http://localhost:18582";
+
+        // Storage
+        public const string StorageBolt = "http://localhost:17400";
+        public const string StorageServer = "http://localhost:18690";
+        public const string StorageTestClient = "http://localhost:18691";
     }
 }

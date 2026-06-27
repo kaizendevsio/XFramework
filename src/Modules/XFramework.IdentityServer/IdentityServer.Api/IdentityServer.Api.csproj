@@ -38,9 +38,6 @@
         <PackageReference Include="OpenTelemetry.Exporter.Console" />
         <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
         
-        <!-- Azure Storage -->
-        <PackageReference Include="Azure.Storage.Blobs" />
-        
         <!-- BCrypt for password hashing -->
         <PackageReference Include="BCrypt.Net-Next" />
 
@@ -49,10 +46,6 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        
-        <!-- ByteSize for file size calculations -->
-        <PackageReference Include="ByteSize" />
     </ItemGroup>
 
 </Project>
-

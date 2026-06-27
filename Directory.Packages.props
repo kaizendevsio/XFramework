@@ -133,6 +133,7 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
 
     <!-- Azure & Cloud -->
+    <PackageVersion Include="AWSSDK.S3" Version="3.7.414.1" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.23.0" />
 
     <!-- Utilities -->

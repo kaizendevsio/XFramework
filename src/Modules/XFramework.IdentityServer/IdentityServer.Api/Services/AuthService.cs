@@ -1,9 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Json;
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
-using ByteSizeLib;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using Messaging.Domain.Shared;
@@ -745,95 +742,6 @@ public sealed class AuthService : IAuthService
             _logger.OperationFailed("CheckVerification", "IdentityVerification", Guid.Empty, ex.Message, ex);
             return Result<CheckVerificationResponse>.Failure(
                 "An error occurred while checking verification", 500);
-        }
-    }
-
-    #endregion
-
-    #region File Storage
-
-    /// <inheritdoc />
-    public async Task<Result<StorageFile>> CreateFileAsync(
-        Create<StorageFile> request,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            if (request.Model.FileBytes is null)
-            {
-                return Result<StorageFile>.Failure("Cannot upload empty file", 400);
-            }
-
-            var storageFileType = await _dataContext.Query<StorageFileType>()
-                .Where(i => i.Id == request.Model.TypeId)
-                .FirstOrDefaultAsync(ct);
-
-            if (storageFileType == null)
-            {
-                return Result<StorageFile>.NotFound(
-                    $"File type with id {request.Model.TypeId} not found");
-            }
-
-            var fileIdentifier = await _dataContext.Query<StorageFileIdentifier>()
-                .Where(i => i.Id == request.Model.StorageFileIdentifierId)
-                .FirstOrDefaultAsync(ct);
-
-            if (fileIdentifier == null)
-            {
-                return Result<StorageFile>.NotFound(
-                    $"File identifier with id {request.Model.StorageFileIdentifierId} not found");
-            }
-
-            // Get Azure Blob Storage connection string
-            var connectionConfig = await _dataContext.Query<RegistryConfigurationGroup>()
-                .Include(i => i.RegistryConfigurations)
-                .Where(i => i.Name == "AzureBlobStorage")
-                .Where(i => i.TenantId == request.Metadata.TenantId)
-                .FirstOrDefaultAsync(ct);
-
-            var connectionString = connectionConfig?.RegistryConfigurations
-                .FirstOrDefault(i => i.Key == "ConnectionString")?.Value;
-
-            if (string.IsNullOrEmpty(connectionString))
-            {
-                return Result<StorageFile>.Failure(
-                    "Azure blob storage connection string not found", 500);
-            }
-
-            // Upload file to Azure Blob Storage
-            var blobServiceClient = new BlobServiceClient(connectionString);
-            var client = blobServiceClient.GetBlobContainerClient(request.Model.BlobContainer);
-            var blob = client.GetBlobClient(
-                request.Model.ContentPath.Replace($"{request.Model.BlobContainer}/", ""));
-
-            await blob.UploadAsync(
-                content: BinaryData.FromBytes(request.Model.FileBytes),
-                options: new BlobUploadOptions
-                {
-                    HttpHeaders = new()
-                    {
-                        ContentType = request.Model.ContentType
-                    }
-                },
-                cancellationToken: ct);
-
-            request.Model.Type = storageFileType;
-            request.Model.StorageFileIdentifier = fileIdentifier;
-            request.Model.FileSize = (decimal?)ByteSize.FromBytes(request.Model.FileBytes.Length).KiloBytes;
-
-            // Save file entity to database
-            _dataContext.Add(request.Model);
-            await _dataContext.SaveChangesAsync(ct);
-
-            _logger.EntityCreated("StorageFile", request.Model.Id);
-
-            return Result<StorageFile>.Success(request.Model);
-        }
-        catch (Exception ex)
-        {
-            _logger.OperationFailed("UploadFile", "StorageFile", Guid.Empty, ex.Message, ex);
-            return Result<StorageFile>.Failure(
-                "An error occurred while uploading the file", 500);
         }
     }
 

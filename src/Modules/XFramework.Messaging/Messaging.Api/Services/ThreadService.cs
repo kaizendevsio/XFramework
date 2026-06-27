@@ -10,6 +10,9 @@ using Messaging.Domain.Shared.Contracts.Requests.Realtime;
 using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
+using Storage.Domain.Shared.Contracts.Requests;
+using Storage.Domain.Shared.Contracts.Responses;
+using Storage.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.DataContext;
@@ -19,6 +22,7 @@ public sealed class ThreadService(
     IDataContext dataContext,
     IMessagingRequestContextResolver requestContextResolver,
     IMessagingTemplateService templateService,
+    IStorageServiceWrapper storageServiceWrapper,
     IMessagingPolicyService policyService,
     IMessagingActionRateLimiter rateLimiter,
     IMessagingModerationService moderationService,
@@ -2315,17 +2319,23 @@ public sealed class ThreadService(
             if (!canAttach)
                 return Result<CmdResponse>.Forbidden("Only the message sender or a thread admin can attach files to this message");
 
-            var storageFile = await dataContext.Query<StorageFile>()
-                .Where(f => f.Id == request.StorageFileId)
-                .Where(f => f.TenantId == caller.TenantId)
-                .Where(f => !f.IsDeleted && f.IsEnabled)
-                .FirstOrDefaultAsync(ct);
-            if (storageFile is null)
+            var storageFileResult = await storageServiceWrapper.ValidateStorageFileReference(new ValidateStorageFileReferenceRequest
+            {
+                Metadata = request.Metadata,
+                StorageFileId = request.StorageFileId,
+                RequireAvailable = true
+            });
+
+            if (!storageFileResult.IsSuccess || storageFileResult.Response is null)
                 return Result<CmdResponse>.NotFound("Storage file not found");
 
+            var storageFile = storageFileResult.Response;
+            if (!storageFile.IsValid)
+                return Result<CmdResponse>.Failure(storageFile.Message ?? "Storage file is not available", 400);
+
             if (policy.AttachmentMaxSizeBytes > 0 &&
-                storageFile.FileSize is decimal fileSizeKilobytes &&
-                Convert.ToInt64(Math.Ceiling(fileSizeKilobytes * 1024m)) > policy.AttachmentMaxSizeBytes)
+                storageFile.ContentLengthBytes is long fileSize &&
+                fileSize > policy.AttachmentMaxSizeBytes)
                 return Result<CmdResponse>.Failure("Storage file exceeds the Messaging attachment size policy", 400);
 
             if (!IsAllowedAttachmentFileType(storageFile, policy))
@@ -3233,9 +3243,9 @@ public sealed class ThreadService(
     private static bool HasTemplate(Guid? templateId, string? templateKey) =>
         templateId is Guid || !string.IsNullOrWhiteSpace(templateKey);
 
-    private static bool IsAllowedAttachmentFileType(StorageFile file, MessagingPolicySnapshot policy)
+    private static bool IsAllowedAttachmentFileType(StorageFileValidationResponse file, MessagingPolicySnapshot policy)
     {
-        var extension = Path.GetExtension(file.Name ?? file.ContentPath);
+        var extension = Path.GetExtension(file.Name);
         if (!string.IsNullOrWhiteSpace(extension) && policy.AttachmentBlockedExtensions.Contains(extension))
             return false;
 

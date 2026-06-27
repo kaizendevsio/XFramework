@@ -1,6 +1,8 @@
 using Community.Domain.Shared;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Core.Loggers;
+using Storage.Domain.Shared.Contracts.Requests;
+using Storage.Integration.Drivers;
 
 namespace Community.Api.Services;
 
@@ -12,15 +14,18 @@ public sealed class CommunityService : ICommunityService
 {
     private readonly IDataContext _dataContext;
     private readonly ICommunityRequestContext _requestContext;
+    private readonly IStorageServiceWrapper _storageServiceWrapper;
     private readonly ILogger<CommunityService> _logger;
 
     public CommunityService(
         IDataContext dataContext,
         ICommunityRequestContext requestContext,
+        IStorageServiceWrapper storageServiceWrapper,
         ILogger<CommunityService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _requestContext = requestContext ?? throw new ArgumentNullException(nameof(requestContext));
+        _storageServiceWrapper = storageServiceWrapper ?? throw new ArgumentNullException(nameof(storageServiceWrapper));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -75,17 +80,14 @@ public sealed class CommunityService : ICommunityService
 
             // Fetch file types
             var identityFileTypes = await _dataContext.Query<CommunityIdentityFileType>().ToListAsync(cancellationToken);
-            var storageFileTypes = await _dataContext.Query<StorageFileType>().ToListAsync(cancellationToken);
 
-            var pngType = storageFileTypes.FirstOrDefault(i => i.Id == CommunityStorageFileTypes.Png);
             var profilePhotoType = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.ProfilePhoto);
             var coverPhotoType = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.CoverPhoto);
 
-            if (pngType is null || profilePhotoType is null || coverPhotoType is null)
+            if (profilePhotoType is null || coverPhotoType is null)
             {
                 _logger.LogError(
-                    "Required community identity file seed data is missing. PngTypeFound={PngTypeFound}, ProfilePhotoTypeFound={ProfilePhotoTypeFound}, CoverPhotoTypeFound={CoverPhotoTypeFound}",
-                    pngType is not null,
+                    "Required community identity file seed data is missing. ProfilePhotoTypeFound={ProfilePhotoTypeFound}, CoverPhotoTypeFound={CoverPhotoTypeFound}",
                     profilePhotoType is not null,
                     coverPhotoType is not null);
 
@@ -109,34 +111,7 @@ public sealed class CommunityService : ICommunityService
                 Alias = request.Alias,
                 Status = (int)CommunityIdentityStatus.Active,
                 LastActive = DateTime.UtcNow,
-                Type = communityIdentityType,
-                CommunityIdentityFiles =
-                {
-                    // Profile Photo
-                    new()
-                    {
-                        TenantId = requester.TenantId,
-                        Type = profilePhotoType,
-                        Storage = new()
-                        {
-                            TenantId = requester.TenantId,
-                            ContentPath = "",
-                            Type = pngType
-                        }
-                    },
-                    // Cover Photo
-                    new()
-                    {
-                        TenantId = requester.TenantId,
-                        Type = coverPhotoType,
-                        Storage = new()
-                        {
-                            TenantId = requester.TenantId,
-                            ContentPath = "",
-                            Type = pngType
-                        }
-                    }
-                }
+                Type = communityIdentityType
             };
 
             _dataContext.Add(entity);
@@ -315,12 +290,18 @@ public sealed class CommunityService : ICommunityService
                 return Result<CmdResponse>.Forbidden("You can only update your own identity files");
             }
 
-            var storageFileExists = await _dataContext.Query<StorageFile>()
-                .Where(f => f.TenantId == requester.TenantId)
-                .AnyAsync(f => f.Id == request.StorageFileId, cancellationToken);
+            var storageFileResult = await _storageServiceWrapper.ValidateStorageFileReference(new ValidateStorageFileReferenceRequest
+            {
+                Metadata = request.Metadata,
+                StorageFileId = request.StorageFileId,
+                RequireAvailable = true
+            });
 
-            if (!storageFileExists)
+            if (!storageFileResult.IsSuccess || storageFileResult.Response is null)
                 return Result<CmdResponse>.NotFound($"Storage file with Id {request.StorageFileId} does not exist");
+
+            if (!storageFileResult.Response.IsValid)
+                return Result<CmdResponse>.Failure(storageFileResult.Response.Message ?? "Storage file is not available", 400);
 
             var file = await _dataContext.Query<CommunityIdentityFile>()
                 .Where(f => f.TenantId == requester.TenantId)

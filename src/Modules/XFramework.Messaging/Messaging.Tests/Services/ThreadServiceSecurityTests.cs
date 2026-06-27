@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
 using IdentityServer.Domain.Shared;
@@ -19,6 +20,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using Storage.Domain.Shared.Contracts.Requests;
+using Storage.Domain.Shared.Contracts.Responses;
+using Storage.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
@@ -615,6 +619,7 @@ public sealed class ThreadServiceSecurityTests
             dataContext,
             resolver,
             templateService ?? new TestMessagingTemplateService(),
+            new TestStorageServiceWrapper(),
             new MessagingPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new MessagingActionRateLimiter(),
             new MessagingModerationService(dataContext, resolver),
@@ -632,6 +637,74 @@ public sealed class ThreadServiceSecurityTests
         };
         RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
         return metadata;
+    }
+
+    private sealed class TestStorageServiceWrapper : IStorageServiceWrapper
+    {
+        public IStorageFileCrudService StorageFile { get; init; } = null!;
+        public IStorageFileTypeCrudService StorageFileType { get; init; } = null!;
+
+        public Task<byte[]> ExecuteQueryAsync(byte[] queryDescriptorBytes, CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage queries are not used by these tests.");
+
+        public Task<byte[]> ExecuteChangesAsync(byte[] saveChangesRequestBytes, CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage changes are not used by these tests.");
+
+        public IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(byte[] queryDescriptorBytes, CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage query streams are not used by these tests.");
+
+        public Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(CreateStorageUploadSessionRequest request) =>
+            throw new NotSupportedException("Storage upload sessions are not used by these tests.");
+
+        public Task<QueryResponse<StorageUploadPartResponse>> UploadStorageFilePart(UploadStorageFilePartRequest request) =>
+            throw new NotSupportedException("Storage upload parts are not used by these tests.");
+
+        public Task<QueryResponse<StorageUploadPartListResponse>> ListStorageUploadParts(ListStorageUploadPartsRequest request) =>
+            throw new NotSupportedException("Storage upload parts are not used by these tests.");
+
+        public Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(CompleteStorageUploadSessionRequest request) =>
+            throw new NotSupportedException("Storage upload completion is not used by these tests.");
+
+        public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request) =>
+            throw new NotSupportedException("Storage upload abort is not used by these tests.");
+
+        public Task<QueryResponse<StorageFileResponse>> GetStorageFile(GetStorageFileRequest request) =>
+            throw new NotSupportedException("Storage file reads are not used by these tests.");
+
+        public Task<QueryResponse<StorageFileListResponse>> GetStorageFiles(GetStorageFilesRequest request) =>
+            throw new NotSupportedException("Storage file listing is not used by these tests.");
+
+        public Task<QueryResponse<StorageDownloadUrlResponse>> GetStorageDownloadUrl(GetStorageDownloadUrlRequest request) =>
+            throw new NotSupportedException("Storage download URLs are not used by these tests.");
+
+        public Task<QueryResponse<StoragePublicUrlResponse>> GetStoragePublicUrl(GetStoragePublicUrlRequest request) =>
+            throw new NotSupportedException("Storage public URLs are not used by these tests.");
+
+        public Task<CmdResponse> DeleteStorageFile(DeleteStorageFileRequest request) =>
+            throw new NotSupportedException("Storage deletes are not used by these tests.");
+
+        public Task<QueryResponse<StorageFileResponse>> RestoreStorageFile(RestoreStorageFileRequest request) =>
+            throw new NotSupportedException("Storage restores are not used by these tests.");
+
+        public Task<QueryResponse<StorageRetentionCleanupResponse>> CleanupStorageRetention(CleanupStorageRetentionRequest request) =>
+            throw new NotSupportedException("Storage cleanup is not used by these tests.");
+
+        public Task<QueryResponse<StorageFileValidationResponse>> ValidateStorageFileReference(ValidateStorageFileReferenceRequest request) =>
+            Task.FromResult(new QueryResponse<StorageFileValidationResponse>
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Response = new StorageFileValidationResponse
+                {
+                    StorageFileId = request.StorageFileId,
+                    TenantId = request.Metadata.TenantId ?? Guid.Empty,
+                    IsValid = true,
+                    Status = StorageFileStatus.Available,
+                    Visibility = StorageFileVisibility.Private,
+                    Name = "attachment.png",
+                    ContentType = "image/png",
+                    ContentLengthBytes = 1024
+                }
+            });
     }
 
     private sealed class TestJwtService : IJwtService

@@ -18,6 +18,7 @@ public sealed class DesignTimeAppDbContextFactory : IDesignTimeDbContextFactory<
         "Messaging.Domain.Shared",
         "Notifications.Domain.Shared",
         "SmsGateway.Domain.Shared",
+        "Storage.Domain.Shared",
         "Wallets.Domain.Shared"
     ];
 

@@ -13,6 +13,7 @@ using Inventario.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Storage.Integration.Drivers;
 using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
 
@@ -72,6 +73,7 @@ builder.Services.AddCommunityWrapperServices();
 builder.Services.AddIdentityServerWrapperServices();
 builder.Services.AddInventarioWrapperServices();
 builder.Services.AddMessagingWrapperServices();
+builder.Services.AddStorageWrapperServices();
 builder.Services.AddWalletsWrapperServices();
 builder.Services.AddTenantModuleFeatureDefinitions(builder.Configuration);
 
@@ -115,6 +117,7 @@ builder.Services.AddScoped<MessagingControlPanelSettingsService>();
 builder.Services.AddScoped<MessagingControlPanelTemplateService>();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddScoped<CommunityControlPanelAccessService>();
+builder.Services.AddScoped<AttendanceControlPanelReadService>();
 builder.Services.AddScoped<WalletsAdminBackendContractService>();
 builder.Services.AddScoped<WalletsControlPanelDisplayService>();
 builder.Services.AddScoped<ControlPanelAuthService>();

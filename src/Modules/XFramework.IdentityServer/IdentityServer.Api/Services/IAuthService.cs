@@ -93,16 +93,6 @@ public interface IAuthService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Uploads a file to Azure Blob Storage.
-    /// </summary>
-    /// <param name="request">File creation request with file bytes and metadata</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Result containing the created storage file entity</returns>
-    Task<Result<StorageFile>> CreateFileAsync(
-        Create<StorageFile> request,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// Logs out a user by marking their session as Inactive.
     /// Creates an authorization log entry for audit trail.
     /// </summary>

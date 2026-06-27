@@ -1,5 +1,27 @@
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
 using XFramework.Domain.Contexts;
+
+string[] domainAssemblyNames =
+[
+    "XFramework.Domain.Shared",
+    "Bolt.Domain.Shared",
+    "Attendance.Domain.Shared",
+    "Community.Domain.Shared",
+    "IdentityServer.Domain.Shared",
+    "Inventario.Domain.Shared",
+    "Messaging.Domain.Shared",
+    "Storage.Domain.Shared",
+    "Wallets.Domain.Shared"
+];
+
+foreach (var assemblyName in domainAssemblyNames)
+{
+    if (AppDomain.CurrentDomain.GetAssemblies().Any(assembly => assembly.GetName().Name == assemblyName))
+        continue;
+
+    Assembly.Load(new AssemblyName(assemblyName));
+}
 
 var connectionString = Environment.GetEnvironmentVariable("DefaultDatabaseConnection")
     ?? throw new InvalidOperationException(

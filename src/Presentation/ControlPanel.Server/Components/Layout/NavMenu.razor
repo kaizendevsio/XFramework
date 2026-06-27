@@ -75,6 +75,22 @@
     </SidebarSection>
 }
 
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Attendance))
+{
+    <SidebarSection GroupId="attendance" Title="Attendance" Icon="calendar-check">
+        <SidebarNavItem Href="/attendance/contexts" Label="Contexts" Icon="layout-list" />
+        <SidebarNavItem Href="/attendance/sessions" Label="Sessions" Icon="calendar-clock" />
+        <SidebarNavItem Href="/attendance/reports" Label="Reports" Icon="file-chart-column" />
+    </SidebarSection>
+}
+
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Storage))
+{
+    <SidebarSection GroupId="storage" Title="Storage" Icon="hard-drive">
+        <SidebarNavItem Href="/storage/files" Label="Files" Icon="hard-drive" />
+    </SidebarSection>
+}
+
 @if (AnyWalletFinanceFeatureEnabled())
 {
     <SidebarSection GroupId="finance" Title="Finance" Icon="wallet">

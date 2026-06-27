@@ -23,6 +23,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Messaging.Api\Messaging.Api.csproj" />
       <ProjectReference Include="..\Messaging.Integration\Messaging.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
     </ItemGroup>
 
 </Project>

@@ -13,13 +13,14 @@ public class RemoteDataContextRoutingTests
     public void GetServiceWrapperMap_MergesGeneratedRegistrationMapsFromLoadedIntegrationAssemblies()
     {
         Assembly.Load("IdentityServer.Integration");
+        Assembly.Load("Storage.Integration");
         Assembly.Load("Wallets.Integration");
         ClearWrapperMapCache();
 
         var wrapperMap = GetServiceWrapperMap();
 
         wrapperMap["Tenant"].Should().Be("IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper");
-        wrapperMap["StorageFile"].Should().Be("IdentityServer.Integration.Drivers.IIdentityServerServiceWrapper");
+        wrapperMap["StorageFile"].Should().Be("Storage.Integration.Drivers.IStorageServiceWrapper");
         wrapperMap["Wallet"].Should().Be("Wallets.Integration.Drivers.IWalletsServiceWrapper");
         wrapperMap["WalletTransaction"].Should().Be("Wallets.Integration.Drivers.IWalletsServiceWrapper");
     }
