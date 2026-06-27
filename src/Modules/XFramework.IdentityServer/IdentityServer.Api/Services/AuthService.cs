@@ -3,8 +3,8 @@ using System.Security.Claims;
 using System.Text.Json;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts.Responses;
-using Messaging.Domain.Shared;
-using Messaging.Integration.Drivers;
+using Communications.Domain.Shared;
+using Communications.Integration.Drivers;
 using XFramework.Core.Loggers;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.DataContext;
@@ -43,7 +43,7 @@ public sealed class AuthService : IAuthService
     private readonly IJwtService _jwtService;
     private readonly IHelperService _helperService;
     private readonly CacheManager _cache;
-    private readonly IMessagingServiceWrapper _messagingServiceWrapper;
+    private readonly ICommunicationsServiceWrapper _communicationsServiceWrapper;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -52,7 +52,7 @@ public sealed class AuthService : IAuthService
         IJwtService jwtService,
         IHelperService helperService,
         CacheManager cache,
-        IMessagingServiceWrapper messagingServiceWrapper,
+        ICommunicationsServiceWrapper communicationsServiceWrapper,
         ILogger<AuthService> logger)
     {
         _dataContext = dataContext;
@@ -60,7 +60,7 @@ public sealed class AuthService : IAuthService
         _jwtService = jwtService;
         _helperService = helperService;
         _cache = cache;
-        _messagingServiceWrapper = messagingServiceWrapper;
+        _communicationsServiceWrapper = communicationsServiceWrapper;
         _logger = logger;
     }
 
@@ -481,7 +481,7 @@ public sealed class AuthService : IAuthService
                 case var id when id == IdentityConstants.VerificationType.Sms:
                     var messageTemplate = await _dataContext.Query<RegistryConfiguration>()
                         .Where(i => i.TenantId == tenant.Id)
-                        .Where(i => i.Group != null && i.Group.Name == "MessagingService_Otp")
+                        .Where(i => i.Group != null && i.Group.Name == "CommunicationsService_Otp")
                         .FirstOrDefaultAsync(ct);
 
                     if (string.IsNullOrEmpty(messageTemplate?.Value))
@@ -524,7 +524,7 @@ public sealed class AuthService : IAuthService
                     await _dataContext.SaveChangesAsync(ct);
 
                     // Send SMS with OTP
-                    var smsResult = await _messagingServiceWrapper.CreateDirectMessageAsync(new()
+                    var smsResult = await _communicationsServiceWrapper.CreateDirectMessageAsync(new()
                     {
                         MessageTransportType = MessageTransportType.Sms,
                         Sender = GenericSender.System,
@@ -553,7 +553,7 @@ public sealed class AuthService : IAuthService
                 case var id when id == IdentityConstants.VerificationType.Email:
                     var emailMessageTemplate = await _dataContext.Query<RegistryConfiguration>()
                         .Where(i => i.TenantId == tenant.Id)
-                        .Where(i => i.Group != null && i.Group.Name == "MessagingService_Otp")
+                        .Where(i => i.Group != null && i.Group.Name == "CommunicationsService_Otp")
                         .FirstOrDefaultAsync(ct);
 
                     if (string.IsNullOrEmpty(emailMessageTemplate?.Value))
@@ -596,7 +596,7 @@ public sealed class AuthService : IAuthService
                     await _dataContext.SaveChangesAsync(ct);
 
                     // Send Email with OTP
-                    var emailResult = await _messagingServiceWrapper.CreateDirectMessageAsync(new()
+                    var emailResult = await _communicationsServiceWrapper.CreateDirectMessageAsync(new()
                     {
                         MessageTransportType = MessageTransportType.Email,
                         Sender = GenericSender.System,
@@ -1301,14 +1301,14 @@ public sealed class AuthService : IAuthService
             // Get message template for password reset
             var messageTemplate = await _dataContext.Query<RegistryConfiguration>()
                 .Where(i => i.TenantId == tenant.Id)
-                .Where(i => i.Group != null && i.Group.Name == "MessagingService_PasswordReset")
+                .Where(i => i.Group != null && i.Group.Name == "CommunicationsService_PasswordReset")
                 .FirstOrDefaultAsync(ct);
 
             var message = messageTemplate?.Value?.Replace("|Token|", resetToken)
                 ?? $"Your password reset token is: {resetToken}. This token expires in {PasswordResetTokenExpirationMinutes} minutes.";
 
             // Send reset token via appropriate transport
-            var deliveryResult = await _messagingServiceWrapper.CreateDirectMessageAsync(new()
+            var deliveryResult = await _communicationsServiceWrapper.CreateDirectMessageAsync(new()
             {
                 MessageTransportType = transportType,
                 Sender = GenericSender.System,

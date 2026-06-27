@@ -128,7 +128,7 @@ XFramework/
 │   │   ├── XFramework.Community/
 │   │   ├── XFramework.IdentityServer/
 │   │   ├── XFramework.Inventario/
-│   │   ├── XFramework.Messaging/
+│   │   ├── XFramework.Communications/
 │   │   ├── XFramework.PaymentGateways/
 │   │   ├── XFramework.Payments/
 │   │   ├── XFramework.SmsGateway/
@@ -239,8 +239,8 @@ ModuleName/
    - Content management
    - Community moderation
 
-3. **XFramework.Messaging**
-   - Internal messaging system
+3. **XFramework.Communications**
+   - Internal communications system
    - Notification management
    - Communication workflows
 

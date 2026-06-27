@@ -55,13 +55,13 @@ public sealed class TenantModuleFeatureServiceTests
         await using var db = CreateDbContext();
         var enabledTenantId = Guid.NewGuid();
         var disabledTenantId = Guid.NewGuid();
-        SeedFeature(db, enabledTenantId, TenantModuleFeatureKeys.Messaging, TenantModuleFeatureKeys.ChatSubFeature, enabled: true);
+        SeedFeature(db, enabledTenantId, TenantModuleFeatureKeys.Communications, TenantModuleFeatureKeys.ChatSubFeature, enabled: true);
         await db.SaveChangesAsync();
 
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var service = CreateService(db, cache);
 
-        var result = await service.IsEnabledAsync(disabledTenantId, TenantModuleFeatureKeys.MessagingChat);
+        var result = await service.IsEnabledAsync(disabledTenantId, TenantModuleFeatureKeys.CommunicationsChat);
 
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().BeFalse();

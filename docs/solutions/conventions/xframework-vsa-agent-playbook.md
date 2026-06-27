@@ -386,7 +386,7 @@ dotnet build /t:Rebuild
 
 ## 💡 Pro Tips
 
-- **Start From Existing Modules**: IdentityServer, Wallets, Messaging, Community, and Inventario show current patterns
+- **Start From Existing Modules**: IdentityServer, Wallets, Communications, Community, and Inventario show current patterns
 - **Test Often**: Each service method needs tests
 - **Use Partials**: Never modify generated `.g.cs` files
 - **Log Everything**: Use ILogger, not Console.WriteLine

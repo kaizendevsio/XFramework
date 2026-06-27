@@ -66,7 +66,7 @@ Each service's `appsettings.json`, `appsettings.Development.json`, and `appsetti
 ```
 src/Modules/XFramework.IdentityServer/IdentityServer.Api/
 src/Modules/XFramework.Wallets/Wallets.Api/
-src/Modules/XFramework.Messaging/Messaging.Api/
+src/Modules/XFramework.Communications/Communications.Api/
 src/Modules/XFramework.Community/Community.Api/
 src/Modules/XFramework.SmsGateway/SmsGateway.Api/
 src/Modules/XFramework.Inventario/Inventario.Api/
@@ -2418,7 +2418,7 @@ Repeat Task 10 for each remaining service. For each: replace the old registratio
 Services to migrate (one commit per service):
 
 1. Wallets — `src/Modules/XFramework.Wallets/Wallets.Api/`
-2. Messaging — `src/Modules/XFramework.Messaging/Messaging.Api/`
+2. Communications — `src/Modules/XFramework.Communications/Communications.Api/`
 3. Community — `src/Modules/XFramework.Community/Community.Api/`
 4. SmsGateway — `src/Modules/XFramework.SmsGateway/SmsGateway.Api/`
 5. Inventario — `src/Modules/XFramework.Inventario/Inventario.Api/`

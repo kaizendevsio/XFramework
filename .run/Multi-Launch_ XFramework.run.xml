@@ -54,7 +54,7 @@
         </option>
         <option name="executable">
           <ExecutableSnapshot>
-            <option name="id" value="runConfig:.NET Launch Settings Profile.Messaging.Api" />
+            <option name="id" value="runConfig:.NET Launch Settings Profile.Communications.Api" />
           </ExecutableSnapshot>
         </option>
       </ExecutableRowSnapshot>

@@ -48,13 +48,13 @@
             }
         },
         {
-            "name": "Run All & Debug Messaging",
+            "name": "Run All & Debug Communications",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "Run Messaging Task",
-            "program": "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api/bin/Debug/net8.0/Messaging.Api.dll",
+            "preLaunchTask": "Run Communications Task",
+            "program": "${workspaceFolder}/src/Modules/XFramework.Communications/Communications.Api/bin/Debug/net10.0/Communications.Api.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api",
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.Communications/Communications.Api",
             "stopAtEntry": false,
             "console": "internalConsole",
             "serverReadyAction": {
@@ -141,12 +141,12 @@
             }
         },
         {
-            "name": "Launch Messaging for Debug",
+            "name": "Launch Communications for Debug",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api/bin/Debug/net8.0/Messaging.Api.dll",
+            "program": "${workspaceFolder}/src/Modules/XFramework.Communications/Communications.Api/bin/Debug/net10.0/Communications.Api.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api",
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.Communications/Communications.Api",
             "stopAtEntry": false,
             "console": "internalConsole",
             "serverReadyAction": {
@@ -193,7 +193,7 @@
                 "Launch StreamFlow for Debug",
                 "Launch IdentityServer for Debug",
                 "Launch Wallets for Debug",
-                "Launch Messaging for Debug",
+                "Launch Communications for Debug",
                 "Launch SmsGateway for Debug",
                 "Launch Community for Debug"
             ],

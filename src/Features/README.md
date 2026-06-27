@@ -1,6 +1,6 @@
 # Features Directory - Vertical Slice Architecture
 
-This root-level directory is historical guidance. Current API features live under module projects, for example `src/Modules/XFramework.Wallets/Wallets.Api/Features/` and `src/Modules/XFramework.Messaging/Messaging.Api/Features/`.
+This root-level directory is historical guidance. Current API features live under module projects, for example `src/Modules/XFramework.Wallets/Wallets.Api/Features/` and `src/Modules/XFramework.Communications/Communications.Api/Features/`.
 
 Use this file only as a lightweight VSA orientation. For current implementation rules, use `docs/solutions/conventions/xframework-vsa-agent-playbook.md` and `docs/solutions/conventions/xframework-best-practices.md`.
 

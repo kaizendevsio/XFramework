@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>XFramework.Communications.Domain.Shared</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Communications domain contracts — message entities, thread types, delivery types.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Bolt\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj"/>
+        <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Storage\Storage.Domain.Shared\Storage.Domain.Shared.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Folder Include="Enums\"/>
+    </ItemGroup>
+</Project>

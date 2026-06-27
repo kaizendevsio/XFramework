@@ -146,7 +146,7 @@ public static class ActivitySources
     public static readonly ActivitySource Auth = new("XFramework.Auth");
     public static readonly ActivitySource Bolt = new("XFramework.Bolt");
     public static readonly ActivitySource Sms = new("XFramework.Sms");
-    public static readonly ActivitySource Messaging = new("XFramework.Messaging");
+    public static readonly ActivitySource Communications = new("XFramework.Communications");
     public static readonly ActivitySource Community = new("XFramework.Community");
     public static readonly ActivitySource Blockchain = new("XFramework.Blockchain");
     public static readonly ActivitySource Payment = new("XFramework.Payment");

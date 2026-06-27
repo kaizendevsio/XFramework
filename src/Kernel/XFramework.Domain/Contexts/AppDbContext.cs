@@ -48,7 +48,7 @@ public partial class AppDbContext : XDbContext
     public virtual DbSet<PaymentGatewayResponseStatusType> PaymentGatewayResponseStatusTypes { get; set; }
     public virtual DbSet<PaymentGatewayResponseType> PaymentGatewayResponseTypes { get; set; }
 
-    // Module-specific DbSets (Identity, Wallets, Messaging, Community) are discovered
+    // Module-specific DbSets (Identity, Wallets, Communications, Community) are discovered
     // automatically via IEntityTypeConfiguration<T> in each module's Domain.Shared assembly.
     // Access them via context.Set<T>() in service code.
 

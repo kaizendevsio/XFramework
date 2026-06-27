@@ -49,6 +49,8 @@ jobs:
       XFRAMEWORK_ENV_FILE: /opt/xframework/xeon-dev.env
       DB_PASSWORD: compose-validation-placeholder
       JWT_SECRET: compose-validation-placeholder
+      BOLT_SIGNATURE: compose-validation-placeholder
+      COMMUNICATIONS_TRUSTED_METADATA_SECRET: compose-validation-placeholder
 
     steps:
       - name: Checkout
@@ -113,7 +115,7 @@ jobs:
             migrate
             bolt-hub
             identityserver
-            messaging
+            communications
             notifications
             storage
             attendance
@@ -134,7 +136,7 @@ jobs:
             migrate
             bolt-hub
             identityserver
-            messaging
+            communications
             notifications
             storage
             attendance
@@ -165,7 +167,7 @@ jobs:
             migrate
             bolt-hub
             identityserver
-            messaging
+            communications
             notifications
             storage
             attendance
@@ -198,7 +200,7 @@ jobs:
           checks=(
             "bolt-hub=http://localhost:7000/health/ready"
             "identityserver=http://localhost:8261/health/ready"
-            "messaging=http://localhost:5148/health/ready"
+            "communications=http://localhost:5148/health/ready"
             "notifications=http://localhost:5166/health/ready"
             "storage=http://localhost:5190/health/ready"
             "attendance=http://localhost:5182/health/ready"
@@ -245,4 +247,4 @@ jobs:
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps" || true
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' logs --tail=200 migrate bolt-hub identityserver messaging notifications storage attendance smsgateway wallets inventario controlpanel operations-dashboard minio seq jaeger" || true
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' logs --tail=200 migrate bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario controlpanel operations-dashboard minio seq jaeger" || true

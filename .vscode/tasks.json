@@ -70,13 +70,13 @@
             "presentation": {"reveal": "always","panel": "dedicated","group": "wallets"}
         },
         {
-            "label": "Run Messaging Task",
+            "label": "Run Communications Task",
             "type": "shell",
             "command": "dotnet",
             "args": [
                 "run",
                 "--project",
-                "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj"
+                "${workspaceFolder}/src/Modules/XFramework.Communications/Communications.Api/Communications.Api.csproj"
             ],
             "isBackground": true,
             "dependsOn": ["Run Wallets Task"],
@@ -86,7 +86,7 @@
                 "pattern": {"regexp": "^.*\\bNow listening on:\\s+(https?://\\S+)","file": 1,"message": 1},
                 "background": {"activeOnStart": true,"beginsPattern": "^.*\\bApplication started\\. Press Ctrl\\+C to shut down\\.\\b.*$","endsPattern": "^.*\\bApplication is shutting down\\.\\.\\.\\b.*$"}
             },
-            "presentation": {"reveal": "always","panel": "dedicated","group": "messaging"}
+            "presentation": {"reveal": "always","panel": "dedicated","group": "communications"}
         },
         {
             "label": "Run SmsGateway Task",
@@ -98,7 +98,7 @@
                 "${workspaceFolder}/src/Modules/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj"
             ],
             "isBackground": true,
-            "dependsOn": ["Run Messaging Task"],
+            "dependsOn": ["Run Communications Task"],
             "problemMatcher": {
                 "owner": "csharp",
                 "fileLocation": "absolute",

@@ -26,7 +26,7 @@ Current source code still wins if a document conflicts with implementation.
 
 ## Module And Schema Ownership
 
-- Each module owns its schema and the tables/configurations inside it, such as `Identity`, `Wallet`, `Messaging`, `Inventario`, `Notifications`, and `Bolt`.
+- Each module owns its schema and the tables/configurations inside it, such as `Identity`, `Wallet`, `Communications`, `Inventario`, `Notifications`, and `Bolt`.
 - A service may read another module's data only through an approved query path, wrapper, or deliberate read model.
 - A service must not write another module's schema directly unless an existing documented contract explicitly allows it.
 - Business workflows must go through the owning module's endpoint/service wrapper when validation, tenant derivation, feature gates, idempotency, ledger posting, allocation, audit, or status transitions are involved.

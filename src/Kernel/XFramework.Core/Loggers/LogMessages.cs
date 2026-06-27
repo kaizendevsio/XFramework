@@ -14,7 +14,7 @@ namespace XFramework.Core.Loggers;
 /// - 4000-4999: Security Events
 /// - 5000-5999: Errors/Exceptions
 /// - 6000-6999: Wallet/Financial Operations
-/// - 7000-7999: Messaging Operations
+/// - 7000-7999: Communications Operations
 /// - 8000-8999: Integration/External Service Operations
 /// </remarks>
 public static partial class LogMessages
@@ -366,7 +366,7 @@ public static partial class LogMessages
 
     #endregion
 
-    #region Messaging Operations (7000-7999)
+    #region Communications Operations (7000-7999)
 
     [LoggerMessage(
         EventId = 7001,
@@ -706,55 +706,55 @@ public static partial class LogMessages
 
     #endregion
 
-    #region Messaging Service Operations (11000-11999)
+    #region Communications Service Operations (11000-11999)
 
     [LoggerMessage(
         EventId = 11001,
         Level = LogLevel.Error,
         Message = "Agent cluster id not found for tenant {TenantId}")]
-    public static partial void MessagingAgentClusterNotFound(
+    public static partial void CommunicationsAgentClusterNotFound(
         this Microsoft.Extensions.Logging.ILogger logger, Guid tenantId);
 
     [LoggerMessage(
         EventId = 11002,
         Level = LogLevel.Warning,
         Message = "Message transport type {Type} not implemented")]
-    public static partial void MessagingTransportNotImplemented(
+    public static partial void CommunicationsTransportNotImplemented(
         this Microsoft.Extensions.Logging.ILogger logger, string type);
 
     [LoggerMessage(
         EventId = 11003,
         Level = LogLevel.Error,
         Message = "Unknown message transport type: {Type}")]
-    public static partial void MessagingUnknownTransportType(
+    public static partial void CommunicationsUnknownTransportType(
         this Microsoft.Extensions.Logging.ILogger logger, string type);
 
     [LoggerMessage(
         EventId = 11004,
         Level = LogLevel.Error,
         Message = "Error creating direct message for recipient {Recipient}")]
-    public static partial void MessagingCreateDirectError(
+    public static partial void CommunicationsCreateDirectError(
         this Microsoft.Extensions.Logging.ILogger logger, string recipient, Exception exception);
 
     [LoggerMessage(
         EventId = 11005,
         Level = LogLevel.Warning,
         Message = "Agent cluster id {AgentClusterId} not found")]
-    public static partial void MessagingAgentClusterIdNotFound(
+    public static partial void CommunicationsAgentClusterIdNotFound(
         this Microsoft.Extensions.Logging.ILogger logger, Guid agentClusterId);
 
     [LoggerMessage(
         EventId = 11006,
         Level = LogLevel.Warning,
         Message = "Message {MessageId} not found for agent {AgentClusterId}")]
-    public static partial void MessagingMessageNotFound(
+    public static partial void CommunicationsMessageNotFound(
         this Microsoft.Extensions.Logging.ILogger logger, Guid messageId, Guid agentClusterId);
 
     [LoggerMessage(
         EventId = 11007,
         Level = LogLevel.Error,
         Message = "Error updating message {MessageId}")]
-    public static partial void MessagingUpdateError(
+    public static partial void CommunicationsUpdateError(
         this Microsoft.Extensions.Logging.ILogger logger, Guid messageId, Exception exception);
 
     #endregion

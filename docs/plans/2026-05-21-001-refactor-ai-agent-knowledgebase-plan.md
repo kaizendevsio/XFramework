@@ -58,7 +58,7 @@ The plan deliberately treats this as documentation architecture work, not code i
 
 - `XFramework.slnx` organizes the repo into Shared, Kernel, Infrastructure, SourceGenerators, Services, Presentation, Libraries/Bolt, Tests, and Tools.
 - `global.json`, `Directory.Packages.props`, `Directory.Build.props`, and `Version.props` establish .NET 10/C# 14 and package/version assumptions.
-- `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Features/Auth/Authenticate/Endpoint.cs`, `src/Modules/XFramework.Wallets/Wallets.Api/Features/Wallets/Transfer/Endpoint.cs`, `src/Modules/XFramework.Messaging/Messaging.Api/Features/Messages/CreateMessage/Endpoint.cs`, `src/Modules/XFramework.Community/Community.Api/Features/Content/Create/Endpoint.cs`, and `src/Modules/XFramework.Inventario/Inventario.Api/Features/Products/Create/Endpoint.cs` are representative VSA endpoint examples.
+- `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Features/Auth/Authenticate/Endpoint.cs`, `src/Modules/XFramework.Wallets/Wallets.Api/Features/Wallets/Transfer/Endpoint.cs`, `src/Modules/XFramework.Communications/Communications.Api/Features/Messages/CreateMessage/Endpoint.cs`, `src/Modules/XFramework.Community/Community.Api/Features/Content/Create/Endpoint.cs`, and `src/Modules/XFramework.Inventario/Inventario.Api/Features/Products/Create/Endpoint.cs` are representative VSA endpoint examples.
 - `src/SourceGenerators/XFramework.SourceGenerators/BoltHandlerGenerator.cs`, `src/SourceGenerators/XFramework.SourceGenerators/EntityEndpointGenerator.cs`, `src/SourceGenerators/XFramework.SourceGenerators/EntityServiceGenerator.cs`, `src/SourceGenerators/XFramework.SourceGenerators/ServiceWrapperGenerator.cs`, and `src/SourceGenerators/XFramework.SourceGenerators/DataContextRegistrationGenerator.cs` are the source-generation surfaces that docs must describe accurately.
 - `src/Infrastructure/XFramework.Integration/Attributes/MapEndpointAttributes.cs`, `src/Shared/XFramework.Domain.Shared/Attributes/GenerateEndpointsAttribute.cs`, and `src/Kernel/XFramework.Core/Extensions/EndpointDiscoveryExtensions.cs` anchor generated endpoint discovery.
 - `src/Libraries/Bolt/Bolt.Protocol/Protocol/BoltCodec.cs`, `src/Libraries/Bolt/Bolt.Client/BoltClient.cs`, `src/Libraries/Bolt/Bolt.Server/BoltServer.cs`, `src/Modules/XFramework.Bolt/Bolt.Hub/Services/BoltHubService.cs`, `src/Libraries/Bolt/Bolt.Media/BoltMediaClient.cs`, and `src/Libraries/Bolt/Bolt.Media.Browser/BoltMediaService.cs` anchor Bolt protocol, server, client, hub, media, and browser guidance.
@@ -239,7 +239,7 @@ flowchart TB
 - Inspect: `src/Libraries/Bolt/Bolt.Protocol/Bolt.Protocol.csproj`
 - Inspect: `src/Modules/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj`
 - Inspect: `src/Modules/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj`
-- Inspect: `src/Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj`
+- Inspect: `src/Modules/XFramework.Communications/Communications.Api/Communications.Api.csproj`
 - Inspect: `src/Modules/XFramework.Community/Community.Api/Community.Api.csproj`
 - Inspect: `src/Modules/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj`
 - Inspect: `src/Modules/XFramework.Inventario/Inventario.Api/Inventario.Api.csproj`
@@ -286,7 +286,7 @@ flowchart TB
 
 **Verification:**
 - The architecture map covers Shared, Kernel, Infrastructure, SourceGenerators, Libraries/Bolt, Modules, Presentation, Tests, Tools, docs, build, deployment, and config surfaces.
-- The feature surface map covers IdentityServer, Wallets, Messaging, Community, SmsGateway, Inventario, Payments, Coins, Blazor, Bolt Hub, and Presentation apps at an orientation level.
+- The feature surface map covers IdentityServer, Wallets, Communications, Community, SmsGateway, Inventario, Payments, Coins, Blazor, Bolt Hub, and Presentation apps at an orientation level.
 - Every representative path listed in the maps exists or is explicitly marked as historical/deferred.
 - The maps link to existing canonical docs instead of creating a second competing standard.
 
@@ -319,7 +319,7 @@ flowchart TB
 - Inspect: `src/SourceGenerators/XFramework.SourceGenerators/BaseSourceGenerator.cs`
 - Inspect: `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Program.cs`
 - Inspect: `src/Modules/XFramework.Wallets/Wallets.Api/Program.cs`
-- Inspect: `src/Modules/XFramework.Messaging/Messaging.Api/Program.cs`
+- Inspect: `src/Modules/XFramework.Communications/Communications.Api/Program.cs`
 
 **Approach:**
 - Replace active StreamFlow/SignalR implementation guidance with Bolt terminology where code supports it.
@@ -331,7 +331,7 @@ flowchart TB
 - Cross-link cache-related generated endpoint options to U4-owned caching docs instead of explaining cache semantics here.
 
 **Patterns to follow:**
-- Current module endpoints under `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Features/`, `src/Modules/XFramework.Wallets/Wallets.Api/Features/`, `src/Modules/XFramework.Messaging/Messaging.Api/Features/`, and `src/Modules/XFramework.Community/Community.Api/Features/`.
+- Current module endpoints under `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Features/`, `src/Modules/XFramework.Wallets/Wallets.Api/Features/`, `src/Modules/XFramework.Communications/Communications.Api/Features/`, and `src/Modules/XFramework.Community/Community.Api/Features/`.
 - `docs/solutions/tooling-decisions/generated-endpoint-auto-discovery.md` for discovery and registration concepts.
 - `docs/solutions/tooling-decisions/generate-endpoints-attribute-usage.md` for entity-level generation options.
 

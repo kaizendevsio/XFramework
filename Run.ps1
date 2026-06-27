@@ -23,24 +23,23 @@ function Start-Services {
     }
 
     $projects = @(
-	"src${pathSeparator}Modules${pathSeparator}XFramework.IdentityServer${pathSeparator}IdentityServer.Api${pathSeparator}IdentityServer.Api.csproj",
-    	"src${pathSeparator}Modules${pathSeparator}XFramework.Wallets${pathSeparator}Wallets.Api${pathSeparator}Wallets.Api.csproj",
-    	"src${pathSeparator}Modules${pathSeparator}XFramework.Messaging${pathSeparator}Messaging.Api${pathSeparator}Messaging.Api.csproj",
-    	"src${pathSeparator}Modules${pathSeparator}XFramework.SmsGateway${pathSeparator}SmsGateway.Api${pathSeparator}SmsGateway.Api.csproj",
-    	"src${pathSeparator}Modules${pathSeparator}XFramework.Community${pathSeparator}Community.Api${pathSeparator}Community.Api.csproj",
-    	"src${pathSeparator}Modules${pathSeparator}XFramework.StreamFlow${pathSeparator}StreamFlow.Stream${pathSeparator}StreamFlow.Stream.csproj"
+        "src${pathSeparator}Modules${pathSeparator}XFramework.IdentityServer${pathSeparator}IdentityServer.Api${pathSeparator}IdentityServer.Api.csproj",
+        "src${pathSeparator}Modules${pathSeparator}XFramework.Wallets${pathSeparator}Wallets.Api${pathSeparator}Wallets.Api.csproj",
+        "src${pathSeparator}Modules${pathSeparator}XFramework.Communications${pathSeparator}Communications.Api${pathSeparator}Communications.Api.csproj",
+        "src${pathSeparator}Modules${pathSeparator}XFramework.SmsGateway${pathSeparator}SmsGateway.Api${pathSeparator}SmsGateway.Api.csproj",
+        "src${pathSeparator}Modules${pathSeparator}XFramework.Community${pathSeparator}Community.Api${pathSeparator}Community.Api.csproj",
+        "src${pathSeparator}Modules${pathSeparator}XFramework.StreamFlow${pathSeparator}StreamFlow.Stream${pathSeparator}StreamFlow.Stream.csproj"
     	# Add or remove projects as necessary
     )
 
     foreach ($project in $projects) {
         $logPath = Join-Path $logDir "$($project.Replace($pathSeparator, '_')).log"
         $scriptBlock = {
-	    param($projectPath, $logFilePath)
-	    "Starting project at $(Get-Date): $projectPath" | Out-File $logFilePath -Append
-	    dotnet run --project $projectPath >> $logFilePath 2>&1
-	    "Project ended at $(Get-Date): $projectPath" | Out-File $logFilePath -Append
- 
-	   }
+            param($projectPath, $logFilePath)
+            "Starting project at $(Get-Date): $projectPath" | Out-File $logFilePath -Append
+            dotnet run --project $projectPath >> $logFilePath 2>&1
+            "Project ended at $(Get-Date): $projectPath" | Out-File $logFilePath -Append
+        }
         Start-Job -ScriptBlock $scriptBlock -ArgumentList $project, $logPath -Name $project.Replace($pathSeparator, '_')
     }
 

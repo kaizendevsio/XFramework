@@ -39,7 +39,7 @@ All log messages are categorized by EventId ranges for easy filtering and analys
 | 4000-4999 | Security Events | Information/Warning | User authenticated, login failed, unauthorized access, token validation |
 | 5000-5999 | Errors/Exceptions | Error/Critical | Operation failed, validation failed, database error, critical error |
 | 6000-6999 | Wallet/Financial | Information/Warning | Balance increment, decrement, transfer, insufficient balance |
-| 7000-7999 | Messaging | Information/Warning | Message sent, delivered, delivery failed, SMS sent |
+| 7000-7999 | Communications | Information/Warning | Message sent, delivered, delivery failed, SMS sent |
 | 8000-8999 | Integration/External | Information/Warning/Error | API calls, retries, blockchain transactions, WebSocket events |
 
 ## Log Levels

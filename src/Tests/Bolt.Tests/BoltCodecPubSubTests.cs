@@ -39,7 +39,7 @@ public class BoltCodecPubSubTests
     public void Subscribe_RoundTrip_WithActorAccessToken()
     {
         var writer = new RentedBufferWriter(256);
-        BoltCodec.WriteSubscribe(writer, "messaging.tenant.user", "user-sub", durable: true, actorAccessToken: "actor-token");
+        BoltCodec.WriteSubscribe(writer, "communications.tenant.user", "user-sub", durable: true, actorAccessToken: "actor-token");
 
         var ok = BoltCodec.TryReadSubscribe(
             writer.WrittenSpan,
@@ -53,7 +53,7 @@ public class BoltCodecPubSubTests
         ok.Should().BeTrue();
         durable.Should().BeTrue();
         subscriberId.Should().Be("user-sub");
-        topic.Should().Be("messaging.tenant.user");
+        topic.Should().Be("communications.tenant.user");
         actorAccessToken.Should().Be("actor-token");
         consumed.Should().Be(writer.WrittenCount);
     }
@@ -62,9 +62,9 @@ public class BoltCodecPubSubTests
     public void Subscribe_WithForgedTopicHash_IsRejected()
     {
         var writer = new RentedBufferWriter(256);
-        BoltCodec.WriteSubscribe(writer, "messaging.tenant.allowed", "user-sub", durable: true);
+        BoltCodec.WriteSubscribe(writer, "communications.tenant.allowed", "user-sub", durable: true);
         var bytes = writer.WrittenSpan.ToArray();
-        BitConverter.GetBytes(BoltCodec.Fnv1aHash("messaging.tenant.other")).CopyTo(bytes, 1);
+        BitConverter.GetBytes(BoltCodec.Fnv1aHash("communications.tenant.other")).CopyTo(bytes, 1);
 
         var ok = BoltCodec.TryReadSubscribe(
             bytes,

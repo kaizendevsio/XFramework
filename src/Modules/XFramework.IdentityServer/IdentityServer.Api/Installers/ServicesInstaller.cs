@@ -1,4 +1,4 @@
-using Messaging.Integration.Drivers;
+using Communications.Integration.Drivers;
 using XFramework.Core.Extensions;
 
 namespace IdentityServer.Api.Installers;
@@ -7,7 +7,7 @@ public class ServicesInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddMessagingWrapperServices();
+        services.AddCommunicationsWrapperServices();
         services.AddTenantResolver();
         services.AddTenantModuleFeatures();
 

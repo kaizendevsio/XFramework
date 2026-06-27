@@ -1,0 +1,22 @@
+using Communications.Domain.Shared.Contracts.Requests.Attachments;
+using Communications.Domain.Shared.Contracts.Responses;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.Contracts.Responses;
+using XFramework.Integration.Attributes;
+
+namespace Communications.Api.Features.Messages.Attachments.GetList;
+
+public static class GetMessageFilesEndpoint
+{
+    [BoltHandler]
+    [MapGet("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/files", Tags = ["Messages"],
+        Summary = "List files attached to a message",
+        Description = "Returns all file attachments for a given message in a thread.")]
+    public static async Task<Result<PaginatedResult<MessageFileResponse>>> Handle(
+        GetMessageFilesRequest request,
+        IThreadService threadService,
+        CancellationToken ct)
+    {
+        return await threadService.GetMessageFilesAsync(request, ct);
+    }
+}

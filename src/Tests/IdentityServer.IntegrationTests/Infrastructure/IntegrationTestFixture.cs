@@ -4,7 +4,7 @@ using IdentityServer.Api.Features.Verification.Confirm;
 using IdentityServer.Api.Generated;
 using IdentityServer.Api.Services;
 using IdentityServer.Integration.Drivers;
-using Messaging.Integration.Drivers;
+using Communications.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json.Serialization;
@@ -151,7 +151,7 @@ public class IntegrationTestFixture
             options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
         builder.Services.AddTenantResolver();
         builder.Services.AddTenantModuleFeatures();
-        builder.Services.AddMessagingWrapperServices();
+        builder.Services.AddCommunicationsWrapperServices();
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration);

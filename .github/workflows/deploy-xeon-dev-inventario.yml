@@ -6,8 +6,8 @@ on:
     paths:
       - src/Modules/XFramework.Inventario/Inventario.Api/**
       - src/Modules/XFramework.Inventario/Inventario.Domain.Shared/**
-      - src/Modules/XFramework.Messaging/Messaging.Domain.Shared/**
-      - src/Modules/XFramework.Messaging/Messaging.Integration/**
+      - src/Modules/XFramework.Communications/Communications.Domain.Shared/**
+      - src/Modules/XFramework.Communications/Communications.Integration/**
   workflow_dispatch:
 
 permissions:
@@ -36,5 +36,5 @@ jobs:
     with:
       service: inventario
       health_url: http://localhost:8105/health/ready
-      diagnostics_services: bolt-hub messaging inventario
+      diagnostics_services: bolt-hub communications inventario
     secrets: inherit

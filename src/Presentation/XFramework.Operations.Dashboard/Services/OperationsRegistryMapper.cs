@@ -8,11 +8,11 @@ public static class OperationsRegistryMapper
     [
         "IdentityServer",
         "Inventario",
-        "Messaging",
+        "Communications",
         "Notifications",
         "SmsGateway",
         "Wallets",
-        "XFramework.Messaging",
+        "XFramework.Communications",
         "XFramework.Notifications",
         "XFramework.SmsGateway"
     ];

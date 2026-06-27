@@ -1,6 +1,6 @@
-﻿using IdentityServer.Domain.Shared;
+using IdentityServer.Domain.Shared;
 using IdentityServer.Integration.Drivers;
-using Messaging.Integration.Drivers;
+using Communications.Integration.Drivers;
 using XFramework.Blazor.Entity.Models.Requests.Common;
 using XFramework.Blazor.Entity.Models.Requests.Session;
 
@@ -21,7 +21,7 @@ public partial class SessionState
     
     protected class InitiateVerificationCodeHandler
     (
-        IMessagingServiceWrapper messagingServiceWrapper,
+        ICommunicationsServiceWrapper communicationsServiceWrapper,
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
@@ -33,7 +33,7 @@ public partial class SessionState
         {
             if (action.LocalVerification is true)
             {
-                await messagingServiceWrapper.CreateVerificationMessage(new()
+                await communicationsServiceWrapper.CreateVerificationMessage(new()
                 {
                     VerificationToken = action.LocalToken,
                     ContactType = action.ContactType,

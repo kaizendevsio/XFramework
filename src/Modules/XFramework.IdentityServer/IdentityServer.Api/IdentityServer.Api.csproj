@@ -15,7 +15,7 @@
         <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
         <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
         <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
-        <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+        <ProjectReference Include="..\..\XFramework.Communications\Communications.Integration\Communications.Integration.csproj" />
         <ProjectReference Include="..\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
     </ItemGroup>
 

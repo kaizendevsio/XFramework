@@ -111,7 +111,7 @@ Features/
 | **Wallets** | ✅ COMPLETE | ✅ WalletService | ✅ 8 endpoints implemented | ❌ Removed | ✅ Clean |
 | **IdentityServer** | ✅ COMPLETE | ✅ AuthService | ✅ 9 endpoints implemented | ❌ Removed | ✅ Clean |
 | **Community** | ✅ COMPLETE | ✅ CommunityService | ✅ 3 endpoints implemented | ❌ Removed | ✅ Clean |
-| **Messaging** | ✅ COMPLETE | ✅ MessagingService | ✅ 2 endpoints implemented | ❌ Removed | ✅ Clean |
+| **Communications** | ✅ COMPLETE | ✅ CommunicationsService | ✅ 2 endpoints implemented | ❌ Removed | ✅ Clean |
 | **SmsGateway** | ✅ COMPLETE | ✅ SmsService | ✅ 6 endpoints implemented | ❌ Removed | ✅ Clean |
 | **StreamFlow** | ✅ COMPLETE | ✅ StreamFlowService | ✅ SignalR Hub (appropriate) | ❌ Removed | ✅ Clean |
 | **Payments** | ⏸️ DEFERRED | ❓ Integration only | ❌ None | ⚠️ Integration only | N/A |
@@ -182,16 +182,16 @@ Features/
   - Solution file updated
 - **Build Status:** ✅ 0 errors
 
-#### ✅ Messaging (COMPLETE - 2025-11-27)
+#### ✅ Communications (COMPLETE - 2025-11-27)
 - **Features folder:** ✅ Complete with all endpoint files
 - **Endpoints implemented:**
   - `POST /api/messages` - Send message
   - `GET /api/messages/thread/{threadId}` - Get message thread
 - **Validators:** ✅ 2 FluentValidation validators created
-- **Service Layer:** ✅ MessagingService (uses Result<T>)
+- **Service Layer:** ✅ CommunicationsService (uses Result<T>)
 - **Legacy Code Cleanup:** ✅ Complete
-  - Messaging.Core/ removed
-  - Messaging.Integration/ kept (external consumers)
+  - Communications.Core/ removed
+  - Communications.Integration/ kept (external consumers)
   - Solution file updated
 - **Build Status:** ✅ 0 errors
 
@@ -214,7 +214,7 @@ Features/
 - **Build Status:** ✅ 0 errors, 179 warnings
 
 #### ✅ StreamFlow (COMPLETE - 2025-11-27)
-- **Architecture:** SignalR Hub retained (appropriate for real-time messaging)
+- **Architecture:** SignalR Hub retained (appropriate for real-time communications)
 - **Service Consolidation:** ✅ Core services moved to Stream project
   - ICachingService, CachingService
   - IStreamFlowService, StreamFlowService
@@ -337,7 +337,7 @@ Features/
 | Wallets | 8 | 5 | ✅ 0 errors |
 | IdentityServer | 9 | 7 | ✅ 0 errors |
 | Community | 3 | 2 | ✅ 0 errors |
-| Messaging | 2 | 2 | ✅ 0 errors |
+| Communications | 2 | 2 | ✅ 0 errors |
 | SmsGateway | 6 | 2 | ✅ 0 errors |
 | StreamFlow | SignalR Hub | N/A | ✅ 0 errors |
 | Coins | 1 | 1 | ✅ 0 errors |
@@ -355,7 +355,7 @@ Features/
 1. ~~**Complete Wallets Feature Endpoints**~~ ✅ DONE (2025-11-26)
 2. ~~**Migrate IdentityServer**~~ ✅ DONE (2025-11-26) - 9 endpoints, full cleanup
 3. ~~**Migrate Community**~~ ✅ DONE (2025-11-27) - 3 endpoints, full cleanup
-4. ~~**Migrate Messaging**~~ ✅ DONE (2025-11-27) - 2 endpoints, full cleanup
+4. ~~**Migrate Communications**~~ ✅ DONE (2025-11-27) - 2 endpoints, full cleanup
 5. ~~**Migrate SmsGateway**~~ ✅ DONE (2025-11-27) - 6 endpoints, legacy controller removed
 6. ~~**Migrate StreamFlow**~~ ✅ DONE (2025-11-27) - Service consolidation, SignalR kept
 7. ~~**Migrate Coins**~~ ✅ DONE (2025-11-27) - Full modernization, standalone solution

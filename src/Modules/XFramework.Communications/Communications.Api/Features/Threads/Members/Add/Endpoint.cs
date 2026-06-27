@@ -1,0 +1,20 @@
+using Communications.Domain.Shared.Contracts.Requests.Threads;
+using XFramework.Core.Patterns;
+using XFramework.Integration.Attributes;
+
+namespace Communications.Api.Features.Threads.Members.Add;
+
+public static class AddThreadMemberEndpoint
+{
+    [BoltHandler]
+    [MapPost("/api/communications/threads/{threadId:guid}/members", Tags = ["Thread Members"],
+        Summary = "Add a member to a thread",
+        Description = "Adds a credential as a member of the specified thread. Validates that the thread and credential exist, and that the credential is not already a member.")]
+    public static async Task<Result<CmdResponse>> Handle(
+        AddThreadMemberRequest request,
+        IThreadService threadService,
+        CancellationToken ct)
+    {
+        return await threadService.AddThreadMemberAsync(request, ct);
+    }
+}

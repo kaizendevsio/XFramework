@@ -553,7 +553,7 @@ git commit -m "refactor(blazor): migrate from Serilog static Log to ILogger<T>"
 **Files:**
 - Modify: `src/Modules/XFramework.IdentityServer/IdentityServer.Api/appsettings.json` — remove Serilog block (lines 9-34)
 - Modify: `src/Modules/XFramework.Wallets/Wallets.Api/appsettings.json` — remove Serilog block (lines 9-34)
-- Modify: `src/Modules/XFramework.Messaging/Messaging.Api/appsettings.json` — remove Serilog block (lines 9-34)
+- Modify: `src/Modules/XFramework.Communications/Communications.Api/appsettings.json` — remove Serilog block (lines 9-34)
 - Modify: `src/Modules/XFramework.SmsGateway/SmsGateway.Api/appsettings.json` — remove Serilog block (lines 9-34)
 - Modify: `src/Modules/XFramework.Community/Community.Api/appsettings.json` — remove Serilog block (lines 9-34)
 - Modify: `src/Modules/XFramework.Inventario/Inventario.Api/appsettings.json` — remove Serilog block (lines 9-34)
@@ -578,7 +578,7 @@ Add the following to each service's `appsettings.Development.json` (if not alrea
 Services to update:
 1. `src/Modules/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json`
 2. `src/Modules/XFramework.Wallets/Wallets.Api/appsettings.Development.json`
-3. `src/Modules/XFramework.Messaging/Messaging.Api/appsettings.Development.json`
+3. `src/Modules/XFramework.Communications/Communications.Api/appsettings.Development.json`
 4. `src/Modules/XFramework.SmsGateway/SmsGateway.Api/appsettings.Development.json`
 5. `src/Modules/XFramework.Community/Community.Api/appsettings.Development.json`
 6. `src/Modules/XFramework.Inventario/Inventario.Api/appsettings.Development.json`

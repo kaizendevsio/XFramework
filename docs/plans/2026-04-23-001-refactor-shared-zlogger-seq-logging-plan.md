@@ -79,7 +79,7 @@ builder.Logging.AddXFrameworkLogging(builder.Configuration);
 **Services to update:**
 - `IdentityServer.Api/Program.cs`
 - `Wallets.Api/Program.cs`
-- `Messaging.Api/Program.cs`
+- `Communications.Api/Program.cs`
 - `SmsGateway.Api/Program.cs`
 - `Bolt.Hub/Program.cs`
 - `ControlPanel.Server/Program.cs` (simplify — already has the pattern)
