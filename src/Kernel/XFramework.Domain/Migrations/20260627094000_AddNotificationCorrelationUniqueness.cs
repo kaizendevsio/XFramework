@@ -1,9 +1,13 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using XFramework.Domain.Contexts;
 
 #nullable disable
 
 namespace XFramework.Domain.Migrations;
 
+[DbContext(typeof(AppDbContext))]
+[Migration("20260627094000_AddNotificationCorrelationUniqueness")]
 public partial class AddNotificationCorrelationUniqueness : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
