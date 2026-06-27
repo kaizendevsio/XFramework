@@ -12,5 +12,11 @@ public sealed class GetMessageFilesValidator : AbstractValidator<GetMessageFiles
 
         RuleFor(x => x.MessageId)
             .NotEmpty().WithMessage("Message ID is required");
+
+        RuleFor(x => x.PageIndex)
+            .GreaterThanOrEqualTo(0).WithMessage("Page index cannot be negative");
+
+        RuleFor(x => x.PageSize)
+            .InclusiveBetween(1, 100).WithMessage("Page size must be between 1 and 100");
     }
 }

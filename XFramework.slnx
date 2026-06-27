@@ -36,6 +36,7 @@
     <Project Path="src\Modules\XFramework.Messaging\Messaging.Api\Messaging.Api.csproj" />
     <Project Path="src\Modules\XFramework.Messaging\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />
     <Project Path="src\Modules\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+    <Project Path="src\Modules\XFramework.Messaging\Messaging.Tests\Messaging.Tests.csproj" />
   </Folder>
   <Folder Name="/Services/Notifications/">
     <Project Path="src\Modules\XFramework.Notifications\Notifications.Api\Notifications.Api.csproj" />

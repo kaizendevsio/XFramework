@@ -57,6 +57,24 @@ public sealed class MessageSavedConfiguration : IEntityTypeConfiguration<Message
     }
 }
 
+public sealed class MessageHiddenConfiguration : IEntityTypeConfiguration<MessageHidden>
+{
+    public void Configure(EntityTypeBuilder<MessageHidden> entity)
+    {
+        entity.HasKey(e => e.Id).HasName("messagehidden_pk");
+        entity.ToTable("MessageHidden", "Messaging");
+        entity.Property(e => e.Id).HasColumnName("ID").HasDefaultValueSql("(uuid_generate_v4())");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+        entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValueSql("true");
+        entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+        entity.HasIndex(e => new { e.MessageId, e.MessageThreadMemberId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("UX_MessageHidden_Message_Member_Active");
+    }
+}
+
 public sealed class MessageReportConfiguration : IEntityTypeConfiguration<MessageReport>
 {
     public void Configure(EntityTypeBuilder<MessageReport> entity)
@@ -72,6 +90,47 @@ public sealed class MessageReportConfiguration : IEntityTypeConfiguration<Messag
 
         entity.HasIndex(e => new { e.TenantId, e.Status, e.CreatedAt })
             .HasDatabaseName("IX_MessageReport_Tenant_Status_CreatedAt");
+    }
+}
+
+public sealed class MessageReportAuditConfiguration : IEntityTypeConfiguration<MessageReportAudit>
+{
+    public void Configure(EntityTypeBuilder<MessageReportAudit> entity)
+    {
+        entity.HasKey(e => e.Id).HasName("messagereportaudit_pk");
+        entity.ToTable("MessageReportAudit", "Messaging");
+        entity.Property(e => e.Id).HasColumnName("ID").HasDefaultValueSql("(uuid_generate_v4())");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+        entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValueSql("true");
+        entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+        entity.Property(e => e.Action).HasColumnType("character varying");
+        entity.Property(e => e.Note).HasColumnType("character varying");
+
+        entity.HasIndex(e => new { e.ReportId, e.CreatedAt })
+            .HasDatabaseName("IX_MessageReportAudit_Report_CreatedAt");
+    }
+}
+
+public sealed class MessageModerationRuleConfiguration : IEntityTypeConfiguration<MessageModerationRule>
+{
+    public void Configure(EntityTypeBuilder<MessageModerationRule> entity)
+    {
+        entity.HasKey(e => e.Id).HasName("messagemoderationrule_pk");
+        entity.ToTable("MessageModerationRule", "Messaging");
+        entity.Property(e => e.Id).HasColumnName("ID").HasDefaultValueSql("(uuid_generate_v4())");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+        entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValueSql("true");
+        entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+        entity.Property(e => e.Name).HasColumnType("character varying");
+        entity.Property(e => e.MatchType).HasColumnType("character varying");
+        entity.Property(e => e.Pattern).HasColumnType("character varying");
+        entity.Property(e => e.Action).HasColumnType("character varying");
+        entity.Property(e => e.Description).HasColumnType("character varying");
+
+        entity.HasIndex(e => new { e.TenantId, e.Name })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("UX_MessageModerationRule_Tenant_Name_Active");
     }
 }
 

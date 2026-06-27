@@ -22,7 +22,12 @@ public sealed class MessageOutboxEventConfiguration : IEntityTypeConfiguration<M
             .HasColumnType("character varying")
             .HasMaxLength(128);
         entity.Property(e => e.PayloadJson).HasColumnType("jsonb");
-        entity.Property(e => e.LastError).HasColumnType("character varying");
+        entity.Property(e => e.LastError)
+            .HasColumnType("character varying")
+            .HasMaxLength(4000);
+        entity.Property(e => e.LeaseOwner)
+            .HasColumnType("character varying")
+            .HasMaxLength(128);
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.OccurredAt).HasDefaultValueSql("now()");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
@@ -32,6 +37,9 @@ public sealed class MessageOutboxEventConfiguration : IEntityTypeConfiguration<M
 
         entity.HasIndex(e => new { e.TenantId, e.ProcessedAt, e.OccurredAt })
             .HasDatabaseName("IX_MessageOutboxEvent_Tenant_Processed_Occurred");
+
+        entity.HasIndex(e => new { e.TenantId, e.DeadLetteredAt, e.NextAttemptAt, e.LeaseExpiresAt })
+            .HasDatabaseName("IX_MessageOutboxEvent_Tenant_Retry_Lease");
 
         entity.HasIndex(e => new { e.ThreadId, e.OccurredAt })
             .HasDatabaseName("IX_MessageOutboxEvent_Thread_Occurred");

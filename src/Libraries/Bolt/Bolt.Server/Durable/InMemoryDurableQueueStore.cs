@@ -86,6 +86,15 @@ public sealed class InMemoryDurableQueueStore : IDurableQueueStore
         return Task.CompletedTask;
     }
 
+    public Task UnregisterDurableSubscriberAsync(int topicHash, string subscriberId, CancellationToken ct = default)
+    {
+        if (_subscribers.TryGetValue(topicHash, out var set))
+            set.TryRemove(subscriberId, out _);
+
+        _queues.TryRemove((topicHash, subscriberId), out _);
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<string>> GetDurableSubscribersAsync(int topicHash, CancellationToken ct = default)
     {
         if (_subscribers.TryGetValue(topicHash, out var set))

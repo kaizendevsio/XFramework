@@ -1,10 +1,14 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
+using System.Security.Claims;
+using System.Text;
 using Bolt.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.DataContext;
@@ -58,7 +62,22 @@ public static class ServiceCollectionExtensions
                 .WithServer(boltConfig.ServerUrls[0])
                 .WithClientId(clientId)
                 .WithClientName(clientName)
-                .WithTimeout(boltConfig.RpcTimeoutSeconds);
+                .WithTimeout(boltConfig.RpcTimeoutSeconds)
+                .UseAccessTokenQueryString(boltConfig.SendAccessTokenAsQueryString)
+                .WithOptions(options =>
+                {
+                    if (!string.IsNullOrWhiteSpace(boltConfig.AccessToken))
+                    {
+                        options.AccessToken = boltConfig.AccessToken;
+                        return;
+                    }
+
+                    if (!boltConfig.Anonymous && boltConfig.GenerateServiceAccessToken)
+                    {
+                        options.AccessTokenProvider = _ =>
+                            new ValueTask<string?>(GenerateBoltServiceAccessToken(configuration, clientName));
+                    }
+                });
 
             if (!autoConnect)
                 builder.DisableAutoConnect();
@@ -69,6 +88,45 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMessageBusWrapper, BoltDriver>();
 
         return services;
+    }
+
+    private static string GenerateBoltServiceAccessToken(IConfiguration configuration, string clientName)
+    {
+        var jwtOptions = configuration.GetSection(nameof(JwtOptions)).Get<JwtOptions>()
+            ?? throw new InvalidOperationException("JwtOptions is required to generate Bolt service access tokens.");
+
+        if (string.IsNullOrWhiteSpace(jwtOptions.Secret)
+            || string.IsNullOrWhiteSpace(jwtOptions.ValidAudience)
+            || string.IsNullOrWhiteSpace(jwtOptions.ValidIssuer))
+        {
+            throw new InvalidOperationException("JwtOptions Secret, ValidAudience, and ValidIssuer are required to generate Bolt service access tokens.");
+        }
+
+        var lifetime = TimeSpan.TryParse(jwtOptions.AccessTokenLifespan, out var parsedLifetime)
+            ? parsedLifetime
+            : TimeSpan.FromMinutes(30);
+
+        List<Claim> claims =
+        [
+            new("client_id", clientName),
+            new("service", clientName),
+            new("scope", "bolt.service"),
+            new(ClaimTypes.Name, clientName),
+            new(JwtRegisteredClaimNames.Sub, clientName),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new(JwtRegisteredClaimNames.AuthTime, DateTime.UtcNow.ToString("O"))
+        ];
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret));
+        var token = new JwtSecurityToken(
+            issuer: jwtOptions.ValidIssuer,
+            audience: jwtOptions.ValidAudience,
+            claims: claims,
+            notBefore: DateTime.UtcNow,
+            expires: DateTime.UtcNow.Add(lifetime),
+            signingCredentials: new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512));
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     public static IServiceCollection AddBoltServiceManifestProvider<TProvider>(this IServiceCollection services)

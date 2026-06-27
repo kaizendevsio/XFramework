@@ -1,67 +1,79 @@
+using SmsGateway.Domain.Shared.Contracts;
 using SmsGateway.Domain.Shared.Contracts.Requests.Create;
 using SmsGateway.Domain.Shared.Contracts.Requests.Get;
 using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
-using XFramework.Core.Patterns;
+using SmsGateway.Domain.Shared.Enums;
 using XFramework.Core.Loggers;
+using XFramework.Core.Patterns;
 
 namespace SmsGateway.Api.Services;
 
-/// <summary>
-/// Service for managing SMS gateway operations including sending, receiving, and tracking SMS messages.
-/// This is the SMS Gateway Node service that manages local message queues.
-/// </summary>
-public sealed class SmsService : ISmsService
+public sealed class SmsService(
+    AppDbContext db,
+    ILogger<SmsService> logger,
+    IConfiguration configuration) : ISmsService
 {
-    private readonly ILogger<SmsService> _logger;
-    private readonly ICachingService _cachingService;
+    private readonly TimeSpan _leaseDuration = TimeSpan.FromSeconds(
+        Math.Max(30, configuration.GetValue("SmsGateway:LeaseSeconds", 120)));
+    private readonly int _maxAttempts = Math.Max(1, configuration.GetValue("SmsGateway:MaxAttempts", 5));
 
-    public SmsService(
-        ILogger<SmsService> logger,
-        ICachingService cachingService)
-    {
-        _logger = logger;
-        _cachingService = cachingService;
-    }
-
-    /// <summary>
-    /// Confirms that an SMS message has been sent successfully by removing it from the pending list
-    /// </summary>
-    public Task<Result<CmdResponse>> ConfirmMessageSentAsync(Guid id, CancellationToken ct = default)
+    public async Task<Result<CmdResponse>> ConfirmMessageSentAsync(Guid id, CancellationToken ct = default)
     {
         try
         {
-            var item = _cachingService.PendingMessageList
-                .FirstOrDefault(i => i.Value.Id == id);
+            var job = await db.Set<SmsOutboundJob>()
+                .AsTracking()
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
 
-            if (item.Value is null)
+            if (job is null)
+                return Result<CmdResponse>.Failure("Message not found in pending list", 404);
+
+            if (job.Status is SmsOutboundJobStatus.Sent)
+                return Result<CmdResponse>.Success(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+
+            var now = DateTime.UtcNow;
+            job.Status = SmsOutboundJobStatus.Sent;
+            job.SentAt = now;
+            job.LeasedUntil = null;
+            job.LeaseOwner = null;
+            job.ModifiedAt = now;
+
+            var attempt = await db.Set<SmsDeliveryAttempt>()
+                .AsTracking()
+                .Where(x => x.SmsOutboundJobId == job.Id)
+                .OrderByDescending(x => x.AttemptNumber)
+                .FirstOrDefaultAsync(ct);
+
+            if (attempt is not null && attempt.CompletedAt is null)
             {
-                return Task.FromResult(Result<CmdResponse>.Failure("Message not found in pending list", 404));
+                attempt.Status = SmsOutboundJobStatus.Sent;
+                attempt.CompletedAt = now;
+                attempt.ModifiedAt = now;
             }
 
-            // Remove from pending list - message has been sent
-            _cachingService.PendingMessageList.Remove(item.Key, out _);
+            await db.SaveChangesAsync(ct);
 
-            _logger.LogInformation("SMS message {MessageId} confirmed as sent for agent cluster {AgentClusterId}",
-                id, item.Value.AgentClusterId);
+            logger.LogInformation(
+                "SMS message {MessageId} confirmed as sent for agent cluster {AgentClusterId}",
+                id,
+                job.AgentClusterId);
 
-            return Task.FromResult(Result<CmdResponse>.Success(new CmdResponse { HttpStatusCode = HttpStatusCode.OK }));
+            return Result<CmdResponse>.Success(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
         }
         catch (Exception ex)
         {
-            _logger.SmsConfirmationError(id, ex);
-            return Task.FromResult(Result<CmdResponse>.Failure($"Error confirming message: {ex.Message}", 500));
+            logger.SmsConfirmationError(id, ex);
+            return Result<CmdResponse>.Failure($"Error confirming message: {ex.Message}", 500);
         }
     }
 
-    /// <summary>
-    /// Creates a record of a received SMS message (logs the receipt for now)
-    /// </summary>
-    public Task<Result<CmdResponse>> CreateMessageReceivedAsync(CreateMessageReceivedRequest request, CancellationToken ct = default)
+    public Task<Result<CmdResponse>> CreateMessageReceivedAsync(
+        CreateMessageReceivedRequest request,
+        CancellationToken ct = default)
     {
         try
         {
-            // Log the received message
-            _logger.LogInformation(
+            logger.LogInformation(
                 "SMS message received from {Sender} for agent cluster {AgentClusterId}: {Message}",
                 request.Sender,
                 request.AgentClusterId,
@@ -75,110 +87,213 @@ public sealed class SmsService : ISmsService
         }
         catch (Exception ex)
         {
-            _logger.SmsCreateMessageReceivedError(request.AgentClusterId, ex);
+            logger.SmsCreateMessageReceivedError(request.AgentClusterId, ex);
             return Task.FromResult(Result<CmdResponse>.Failure($"Error creating message received: {ex.Message}", 500));
         }
     }
 
-    /// <summary>
-    /// Creates a new SMS message to be sent
-    /// </summary>
-    public Task<Result<CmdResponse>> CreateSmsMessageAsync(CreateSmsMessageRequest request, CancellationToken ct = default)
+    public async Task<Result<CmdResponse>> CreateSmsMessageAsync(
+        CreateSmsMessageRequest request,
+        CancellationToken ct = default)
     {
         try
         {
-            var data = new SmsNodeJob()
+            var tenantId = request.Metadata.TenantId ?? Guid.Empty;
+            if (tenantId == Guid.Empty)
+                return Result<CmdResponse>.Failure("Tenant ID is required", 400);
+
+            if (request.AgentClusterId == Guid.Empty)
+                return Result<CmdResponse>.Failure("Agent cluster ID is required", 400);
+
+            if (string.IsNullOrWhiteSpace(request.Recipient))
+                return Result<CmdResponse>.Failure("Recipient is required", 400);
+
+            if (string.IsNullOrWhiteSpace(request.Message))
+                return Result<CmdResponse>.Failure("Message is required", 400);
+
+            var now = DateTime.UtcNow;
+            var jobId = request.Id == Guid.Empty ? Guid.NewGuid() : request.Id;
+            var existing = await db.Set<SmsOutboundJob>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == jobId, ct);
+
+            if (existing is not null)
+                return Result<CmdResponse>.Success(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+
+            var scheduledAt = request.IsScheduled
+                ? request.SendSchedule ?? now
+                : request.SendSchedule;
+
+            var job = new SmsOutboundJob
             {
-                Id = request.Id,
-                CreatedAt = DateTime.UtcNow,
-                ModifiedAt = DateTime.UtcNow,
-                IsDeleted = false,
+                Id = jobId,
+                TenantId = tenantId,
                 AgentClusterId = request.AgentClusterId,
-                Recipient = request.Recipient,
-                Message = request.Message
+                Sender = request.Sender?.Trim(),
+                Recipient = request.Recipient.Trim(),
+                Subject = request.Subject?.Trim(),
+                Intent = request.Intent?.Trim(),
+                Message = request.Message.Trim(),
+                Status = scheduledAt is not null && scheduledAt > now
+                    ? SmsOutboundJobStatus.RetryScheduled
+                    : SmsOutboundJobStatus.Queued,
+                ScheduledAt = scheduledAt,
+                NextAttemptAt = scheduledAt is not null && scheduledAt > now ? scheduledAt : now,
+                MaxAttempts = _maxAttempts,
+                CorrelationId = string.IsNullOrWhiteSpace(request.CorrelationId) ? null : request.CorrelationId.Trim(),
+                NotificationDeliveryJobId = request.NotificationDeliveryJobId,
+                CreatedAt = now,
+                ModifiedAt = now,
+                ConcurrencyStamp = Guid.NewGuid(),
+                IsEnabled = true
             };
 
-            // ConcurrentDictionary.TryAdd with a new GUID key will virtually always succeed,
-            // but loop defensively in case of the astronomically unlikely GUID collision
-            while (!_cachingService.PendingMessageList.TryAdd(Guid.NewGuid(), data))
+            db.Set<SmsOutboundJob>().Add(job);
+            await db.SaveChangesAsync(ct);
+
+            return Result<CmdResponse>.Success(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        }
+        catch (DbUpdateException ex)
+        {
+            logger.SmsCreateMessageError(request.AgentClusterId, ex);
+            return Result<CmdResponse>.Failure($"Error creating SMS message: {ex.Message}", 500);
+        }
+        catch (Exception ex)
+        {
+            logger.SmsCreateMessageError(request.AgentClusterId, ex);
+            return Result<CmdResponse>.Failure($"Error creating SMS message: {ex.Message}", 500);
+        }
+    }
+
+    public async Task<Result<List<SmsNodeJob>>> GetPendingSmsMessagesAsync(
+        GetPendingSmsMessageListRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var jobs = await ReadyJobs(request.AgentClusterId, now)
+                .AsNoTracking()
+                .OrderBy(x => x.NextAttemptAt)
+                .ThenBy(x => x.CreatedAt)
+                .Take(100)
+                .Select(x => ToNodeJob(x))
+                .ToListAsync(ct);
+
+            return Result<List<SmsNodeJob>>.Success(jobs);
+        }
+        catch (Exception ex)
+        {
+            logger.SmsGetPendingError(request.AgentClusterId, ex);
+            return Result<List<SmsNodeJob>>.Failure($"Error getting pending SMS messages: {ex.Message}", 500);
+        }
+    }
+
+    public async Task<Result<List<SmsNodeJob>>> GetScheduledSmsMessagesAsync(
+        GetScheduledSmsMessageListRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var jobs = await db.Set<SmsOutboundJob>()
+                .AsNoTracking()
+                .Where(x => x.AgentClusterId == request.AgentClusterId)
+                .Where(x => !x.IsDeleted)
+                .Where(x => x.Status == SmsOutboundJobStatus.RetryScheduled)
+                .OrderBy(x => x.NextAttemptAt)
+                .Take(100)
+                .Select(x => ToNodeJob(x))
+                .ToListAsync(ct);
+
+            return Result<List<SmsNodeJob>>.Success(jobs);
+        }
+        catch (Exception ex)
+        {
+            logger.SmsGetScheduledError(request.AgentClusterId, ex);
+            return Result<List<SmsNodeJob>>.Failure($"Error getting scheduled SMS messages: {ex.Message}", 500);
+        }
+    }
+
+    public async Task<Result<List<SmsNodeJob>>> GetPendingWithStatusUpdateAsync(
+        Guid agentClusterId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var leaseOwner = $"sms-node:{agentClusterId:N}";
+            var jobs = await ReadyJobs(agentClusterId, now)
+                .AsTracking()
+                .OrderBy(x => x.NextAttemptAt)
+                .ThenBy(x => x.CreatedAt)
+                .Take(25)
+                .ToListAsync(ct);
+
+            foreach (var job in jobs)
             {
+                job.Status = SmsOutboundJobStatus.Leased;
+                job.LeasedUntil = now.Add(_leaseDuration);
+                job.LeaseOwner = leaseOwner;
+                job.AttemptCount += 1;
+                job.ModifiedAt = now;
+
+                db.Set<SmsDeliveryAttempt>().Add(new SmsDeliveryAttempt
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = job.TenantId,
+                    SmsOutboundJobId = job.Id,
+                    AttemptNumber = job.AttemptCount,
+                    Status = SmsOutboundJobStatus.Leased,
+                    LeaseOwner = leaseOwner,
+                    StartedAt = now,
+                    CreatedAt = now,
+                    ModifiedAt = now,
+                    ConcurrencyStamp = Guid.NewGuid(),
+                    IsEnabled = true
+                });
             }
 
-            return Task.FromResult(Result<CmdResponse>.Success(new CmdResponse { HttpStatusCode = HttpStatusCode.OK }));
+            if (jobs.Count > 0)
+                await db.SaveChangesAsync(ct);
+
+            return Result<List<SmsNodeJob>>.Success(jobs.Select(ToNodeJob).ToList());
         }
         catch (Exception ex)
         {
-            _logger.SmsCreateMessageError(request.AgentClusterId, ex);
-            return Task.FromResult(Result<CmdResponse>.Failure($"Error creating SMS message: {ex.Message}", 500));
+            logger.SmsGetPendingError(agentClusterId, ex);
+            return Result<List<SmsNodeJob>>.Failure($"Error getting pending SMS messages with status update: {ex.Message}", 500);
         }
     }
 
-    /// <summary>
-    /// Gets a list of pending SMS messages for a specific agent cluster
-    /// </summary>
-    public Task<Result<List<SmsNodeJob>>> GetPendingSmsMessagesAsync(GetPendingSmsMessageListRequest request, CancellationToken ct = default)
+    private IQueryable<SmsOutboundJob> ReadyJobs(Guid agentClusterId, DateTime now) =>
+        db.Set<SmsOutboundJob>()
+            .Where(x => x.AgentClusterId == agentClusterId)
+            .Where(x => !x.IsDeleted)
+            .Where(x => x.NextAttemptAt == null || x.NextAttemptAt <= now)
+            .Where(x =>
+                x.Status == SmsOutboundJobStatus.Queued ||
+                x.Status == SmsOutboundJobStatus.RetryScheduled ||
+                (x.Status == SmsOutboundJobStatus.Leased && x.LeasedUntil < now));
+
+    private static SmsNodeJob ToNodeJob(SmsOutboundJob job) => new()
     {
-        try
+        Id = job.Id,
+        TenantId = job.TenantId,
+        CreatedAt = job.CreatedAt,
+        ModifiedAt = job.ModifiedAt,
+        IsDeleted = job.IsDeleted,
+        IsEnabled = job.IsEnabled,
+        AgentClusterId = job.AgentClusterId,
+        Recipient = job.Recipient,
+        Message = job.Message,
+        Status = job.Status switch
         {
-            var messageDirectResponses = _cachingService.PendingMessageList
-                .Where(x => x.Value.AgentClusterId == request.AgentClusterId)
-                .Select(x => x.Value)
-                .ToList();
-
-            return Task.FromResult(Result<List<SmsNodeJob>>.Success(messageDirectResponses));
+            SmsOutboundJobStatus.Sent => MessageStatus.Sent,
+            SmsOutboundJobStatus.Failed or SmsOutboundJobStatus.DeadLettered => MessageStatus.Failed,
+            SmsOutboundJobStatus.RetryScheduled => MessageStatus.Scheduled,
+            SmsOutboundJobStatus.Leased or SmsOutboundJobStatus.Sending => MessageStatus.Processing,
+            SmsOutboundJobStatus.Cancelled => MessageStatus.Blocked,
+            _ => MessageStatus.Queued
         }
-        catch (Exception ex)
-        {
-            _logger.SmsGetPendingError(request.AgentClusterId, ex);
-            return Task.FromResult(Result<List<SmsNodeJob>>.Failure($"Error getting pending SMS messages: {ex.Message}", 500));
-        }
-    }
-
-    /// <summary>
-    /// Gets a list of scheduled SMS messages for a specific agent cluster
-    /// </summary>
-    public Task<Result<List<SmsNodeJob>>> GetScheduledSmsMessagesAsync(GetScheduledSmsMessageListRequest request, CancellationToken ct = default)
-    {
-        try
-        {
-            var messageDirectResponses = _cachingService.ScheduledMessageList
-                .Where(x => x.Value.AgentClusterId == request.AgentClusterId)
-                .Select(x => x.Value)
-                .ToList();
-
-            return Task.FromResult(Result<List<SmsNodeJob>>.Success(messageDirectResponses));
-        }
-        catch (Exception ex)
-        {
-            _logger.SmsGetScheduledError(request.AgentClusterId, ex);
-            return Task.FromResult(Result<List<SmsNodeJob>>.Failure($"Error getting scheduled SMS messages: {ex.Message}", 500));
-        }
-    }
-
-    /// <summary>
-    /// Gets pending SMS messages and updates their status to Processing (replaces legacy controller List endpoint)
-    /// </summary>
-    public Task<Result<List<SmsNodeJob>>> GetPendingWithStatusUpdateAsync(Guid agentClusterId, CancellationToken ct = default)
-    {
-        try
-        {
-            var itemList = _cachingService.PendingMessageList
-                .Where(x => x.Value.AgentClusterId == agentClusterId)
-                .Where(x => x.Value.Status is MessageStatus.Queued)
-                .Select(i => i.Value)
-                .ToList();
-
-            foreach (var current in itemList)
-            {
-                current.Status = MessageStatus.Processing;
-            }
-
-            return Task.FromResult(Result<List<SmsNodeJob>>.Success(itemList));
-        }
-        catch (Exception ex)
-        {
-            _logger.SmsGetPendingError(agentClusterId, ex);
-            return Task.FromResult(Result<List<SmsNodeJob>>.Failure($"Error getting pending SMS messages with status update: {ex.Message}", 500));
-        }
-    }
+    };
 }

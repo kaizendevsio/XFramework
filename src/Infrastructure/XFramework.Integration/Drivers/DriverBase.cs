@@ -20,22 +20,22 @@ public record DriverBase(IMessageBusWrapper? MessageBusDriver, IConfiguration? C
 
     public string? TargetClient { get; set; }
 
-    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request)
+    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        return await GetMessageBusDriver().SendVoidAsync(request, GetTargetClient());
+        return await GetMessageBusDriver().SendVoidAsync(request, GetTargetClient(), ct);
     }
 
-    public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request)
+    public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        return await GetMessageBusDriver().SendVoidAsync<TRequest, TResponse>(request, GetTargetClient());
+        return await GetMessageBusDriver().SendVoidAsync<TRequest, TResponse>(request, GetTargetClient(), ct);
     }
 
-    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request)
+    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        return await GetMessageBusDriver().SendAsync<TRequest, TResponse>(request, GetTargetClient());
+        return await GetMessageBusDriver().SendAsync<TRequest, TResponse>(request, GetTargetClient(), ct);
     }
 
     private IMessageBusWrapper GetMessageBusDriver() =>

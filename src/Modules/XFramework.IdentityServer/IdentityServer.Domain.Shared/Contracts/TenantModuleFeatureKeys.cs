@@ -85,6 +85,7 @@ public static class TenantModuleFeatureKeys
         new(Inventario, PlanningSubFeature, "Planning", "Demand planning, reorder planning, and replenishment forecasting.", "calendar-clock", false),
         new(Inventario, InventarioReportingSubFeature, "Reporting", "Inventory analytics, valuation, audit, and operational reports.", "bar-chart-3", false),
         new(Inventario, NegativeStockSubFeature, "Negative Stock", "Controls for allowing or blocking negative stock positions.", "minus-circle", false),
+        new(Messaging, string.Empty, "Messaging", "Tenant messaging settings, administration, moderation, and chat platform controls.", "messages-square"),
         new(Messaging, ChatSubFeature, "Messaging Chat", "Threads, direct messages, reactions, and attachments.", "message-circle"),
         new(Messaging, AudioVideoSubFeature, "Messaging Audio/Video", "Audio and video communication features.", "video"),
         new(Community, string.Empty, "Community", "Community identities, content, feed, and connections.", "users"),

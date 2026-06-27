@@ -11,12 +11,25 @@ namespace Notifications.Integration.Drivers;
 
 public interface INotificationsServiceWrapper : IServiceWrapper
 {
-    Task<QueryResponse<NotificationInboxItemResponse>> CreateNotification(CreateNotificationRequest request);
-    Task<QueryResponse<GetNotificationInboxResponse>> GetNotificationInbox(GetNotificationInboxRequest request);
-    Task<CmdResponse> MarkNotificationRead(MarkNotificationReadRequest request);
-    Task<QueryResponse<NotificationPreferencesResponse>> UpdateNotificationPreferences(UpdateNotificationPreferencesRequest request);
+    Task<QueryResponse<NotificationInboxItemResponse>> CreateNotification(
+        CreateNotificationRequest request,
+        CancellationToken ct = default);
+
+    Task<QueryResponse<GetNotificationInboxResponse>> GetNotificationInbox(
+        GetNotificationInboxRequest request,
+        CancellationToken ct = default);
+
+    Task<CmdResponse> MarkNotificationRead(
+        MarkNotificationReadRequest request,
+        CancellationToken ct = default);
+
+    Task<QueryResponse<NotificationPreferencesResponse>> UpdateNotificationPreferences(
+        UpdateNotificationPreferencesRequest request,
+        CancellationToken ct = default);
+
     Task<QueryResponse<NotificationDeliveryStatusResponse>> RecordNotificationDeliveryStatus(
-        RecordNotificationDeliveryStatusRequest request);
+        RecordNotificationDeliveryStatusRequest request,
+        CancellationToken ct = default);
 }
 
 public sealed record NotificationsServiceWrapper(
@@ -29,22 +42,30 @@ public sealed record NotificationsServiceWrapper(
         TargetClient = "Notifications".ToSha256();
     }
 
-    public Task<QueryResponse<NotificationInboxItemResponse>> CreateNotification(CreateNotificationRequest request) =>
-        SendAsync<CreateNotificationRequest, NotificationInboxItemResponse>(request);
+    public Task<QueryResponse<NotificationInboxItemResponse>> CreateNotification(
+        CreateNotificationRequest request,
+        CancellationToken ct = default) =>
+        SendAsync<CreateNotificationRequest, NotificationInboxItemResponse>(request, ct);
 
-    public Task<QueryResponse<GetNotificationInboxResponse>> GetNotificationInbox(GetNotificationInboxRequest request) =>
-        SendAsync<GetNotificationInboxRequest, GetNotificationInboxResponse>(request);
+    public Task<QueryResponse<GetNotificationInboxResponse>> GetNotificationInbox(
+        GetNotificationInboxRequest request,
+        CancellationToken ct = default) =>
+        SendAsync<GetNotificationInboxRequest, GetNotificationInboxResponse>(request, ct);
 
-    public Task<CmdResponse> MarkNotificationRead(MarkNotificationReadRequest request) =>
-        SendVoidAsync(request);
+    public Task<CmdResponse> MarkNotificationRead(
+        MarkNotificationReadRequest request,
+        CancellationToken ct = default) =>
+        SendVoidAsync(request, ct);
 
     public Task<QueryResponse<NotificationPreferencesResponse>> UpdateNotificationPreferences(
-        UpdateNotificationPreferencesRequest request) =>
-        SendAsync<UpdateNotificationPreferencesRequest, NotificationPreferencesResponse>(request);
+        UpdateNotificationPreferencesRequest request,
+        CancellationToken ct = default) =>
+        SendAsync<UpdateNotificationPreferencesRequest, NotificationPreferencesResponse>(request, ct);
 
     public Task<QueryResponse<NotificationDeliveryStatusResponse>> RecordNotificationDeliveryStatus(
-        RecordNotificationDeliveryStatusRequest request) =>
-        SendAsync<RecordNotificationDeliveryStatusRequest, NotificationDeliveryStatusResponse>(request);
+        RecordNotificationDeliveryStatusRequest request,
+        CancellationToken ct = default) =>
+        SendAsync<RecordNotificationDeliveryStatusRequest, NotificationDeliveryStatusResponse>(request, ct);
 }
 
 public static class NotificationsServiceWrapperExtensions

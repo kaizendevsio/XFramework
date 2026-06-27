@@ -1,4 +1,4 @@
-using SmsGateway.Integration.Drivers;
+using Notifications.Integration.Drivers;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Extensions;
@@ -10,6 +10,6 @@ public sealed class WrapperInstaller : IInstaller
     public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         services.AddXFrameworkBoltClient(configuration);
-        services.AddSingleton<ISmsGatewayServiceWrapper, SmsGatewayServiceWrapper>();
+        services.AddSingleton<INotificationsServiceWrapper, NotificationsServiceWrapper>();
     }
 }

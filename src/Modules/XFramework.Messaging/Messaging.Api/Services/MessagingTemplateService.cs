@@ -14,8 +14,11 @@ namespace Messaging.Api.Services;
 public sealed class MessagingTemplateService(
     IDataContext dataContext,
     ITenantResolver tenantResolver,
+    IMessagingRequestContextResolver requestContextResolver,
     ILogger<MessagingTemplateService> logger) : IMessagingTemplateService
 {
+    private sealed record TemplateAccessContext(Guid TenantId, Guid? CredentialId, bool IsAdmin);
+
     private const int MaxKeyLength = 128;
     private const int MaxNameLength = 160;
     private const int MaxDescriptionLength = 1000;
@@ -28,16 +31,30 @@ public sealed class MessagingTemplateService(
         GetMessageTemplatesRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
-        if (!tenantResult.IsSuccess)
-            return Result<GetMessageTemplatesResponse>.Failure(tenantResult.Message ?? "Tenant could not be resolved", tenantResult.StatusCode);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        if (!accessResult.IsSuccess)
+            return Result<GetMessageTemplatesResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
-        var tenantId = tenantResult.Data;
+        var access = accessResult.Data!;
+        var tenantId = access.TenantId;
         await EnsureTenantTemplatesAsync(tenantId, ct);
 
         var pageIndex = Math.Max(request.PageIndex, 0);
         var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 500);
-        var rows = await LoadTemplatesAsync(tenantId, includeInactive: request.IncludeInactive, ct);
+        var rows = await LoadTemplatesAsync(tenantId, includeInactive: access.IsAdmin && request.IncludeInactive, ct);
+
+        if (!access.IsAdmin)
+        {
+            if (request.OwnerCredentialId is Guid requestedOwner &&
+                requestedOwner != access.CredentialId)
+            {
+                return Result<GetMessageTemplatesResponse>.Forbidden("User templates can only be listed for the current credential.");
+            }
+
+            rows = rows
+                .Where(template => CanUserAccessTemplate(template, access.CredentialId))
+                .ToList();
+        }
 
         if (!string.IsNullOrWhiteSpace(request.TemplateType))
         {
@@ -87,16 +104,20 @@ public sealed class MessagingTemplateService(
         GetMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
-        if (!tenantResult.IsSuccess)
-            return Result<MessageTemplateResponse>.Failure(tenantResult.Message ?? "Tenant could not be resolved", tenantResult.StatusCode);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        if (!accessResult.IsSuccess)
+            return Result<MessageTemplateResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
-        var tenantId = tenantResult.Data;
+        var access = accessResult.Data!;
+        var tenantId = access.TenantId;
         await EnsureTenantTemplatesAsync(tenantId, ct);
 
-        var template = await FindTemplateByIdAsync(tenantId, request.TemplateId, includeInactive: true, ct);
+        var template = await FindTemplateByIdAsync(tenantId, request.TemplateId, includeInactive: access.IsAdmin, ct);
         if (template is null)
             return Result<MessageTemplateResponse>.NotFound("Message template not found.");
+
+        if (!access.IsAdmin && !CanUserAccessTemplate(template, access.CredentialId))
+            return Result<MessageTemplateResponse>.Forbidden("Message template is not available to this credential.");
 
         var ownerLabels = await LoadOwnerLabelsAsync(tenantId, [template.OwnerCredentialId], ct);
         return Result<MessageTemplateResponse>.Success(ToResponse(template, ownerLabels));
@@ -106,12 +127,23 @@ public sealed class MessagingTemplateService(
         CreateMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
-        if (!tenantResult.IsSuccess)
-            return Result<MessageTemplateResponse>.Failure(tenantResult.Message ?? "Tenant could not be resolved", tenantResult.StatusCode);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        if (!accessResult.IsSuccess)
+            return Result<MessageTemplateResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
-        var tenantId = tenantResult.Data;
+        var access = accessResult.Data!;
+        var tenantId = access.TenantId;
         await EnsureTenantTemplatesAsync(tenantId, ct);
+
+        var requestedType = NormalizeTemplateType(request.TemplateType);
+        if (!access.IsAdmin)
+        {
+            if (requestedType != MessageTemplateTypes.User)
+                return Result<MessageTemplateResponse>.Forbidden("Tenant and system templates require an admin context.");
+
+            request.OwnerCredentialId = access.CredentialId;
+            request.TemplateType = MessageTemplateTypes.User;
+        }
 
         var validation = await ValidateCreateAsync(tenantId, request, ct);
         if (validation.Count > 0)
@@ -153,19 +185,23 @@ public sealed class MessagingTemplateService(
         UpdateMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
-        if (!tenantResult.IsSuccess)
-            return Result<MessageTemplateResponse>.Failure(tenantResult.Message ?? "Tenant could not be resolved", tenantResult.StatusCode);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        if (!accessResult.IsSuccess)
+            return Result<MessageTemplateResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
-        var tenantId = tenantResult.Data;
+        var access = accessResult.Data!;
+        var tenantId = access.TenantId;
         await EnsureTenantTemplatesAsync(tenantId, ct);
 
-        var template = await FindTemplateByIdAsync(tenantId, request.TemplateId, includeInactive: true, ct);
+        var template = await FindTemplateByIdAsync(tenantId, request.TemplateId, includeInactive: access.IsAdmin, ct);
         if (template is null)
             return Result<MessageTemplateResponse>.NotFound("Message template not found.");
 
         if (IsSystemTemplate(template))
             return Result<MessageTemplateResponse>.Forbidden("System templates cannot be edited. Clone the template first.");
+
+        if (!CanMutateTemplate(template, access))
+            return Result<MessageTemplateResponse>.Forbidden("Only the owner can edit this user template.");
 
         var validation = await ValidateUpdateAsync(tenantId, template, request, ct);
         if (validation.Count > 0)
@@ -211,19 +247,23 @@ public sealed class MessagingTemplateService(
         DeleteMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
-        if (!tenantResult.IsSuccess)
-            return Result<CmdResponse>.Failure(tenantResult.Message ?? "Tenant could not be resolved", tenantResult.StatusCode);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        if (!accessResult.IsSuccess)
+            return Result<CmdResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
-        var tenantId = tenantResult.Data;
+        var access = accessResult.Data!;
+        var tenantId = access.TenantId;
         await EnsureTenantTemplatesAsync(tenantId, ct);
 
-        var template = await FindTemplateByIdAsync(tenantId, request.TemplateId, includeInactive: true, ct);
+        var template = await FindTemplateByIdAsync(tenantId, request.TemplateId, includeInactive: access.IsAdmin, ct);
         if (template is null)
             return Result<CmdResponse>.NotFound("Message template not found.");
 
         if (IsSystemTemplate(template))
             return Result<CmdResponse>.Forbidden("System templates cannot be deleted.");
+
+        if (!CanMutateTemplate(template, access))
+            return Result<CmdResponse>.Forbidden("Only the owner can delete this user template.");
 
         template.IsEnabled = false;
         template.IsDeleted = true;
@@ -247,18 +287,28 @@ public sealed class MessagingTemplateService(
         CloneMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
-        if (!tenantResult.IsSuccess)
-            return Result<MessageTemplateResponse>.Failure(tenantResult.Message ?? "Tenant could not be resolved", tenantResult.StatusCode);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        if (!accessResult.IsSuccess)
+            return Result<MessageTemplateResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
-        var tenantId = tenantResult.Data;
+        var access = accessResult.Data!;
+        var tenantId = access.TenantId;
         await EnsureTenantTemplatesAsync(tenantId, ct);
 
-        var source = await FindTemplateByIdAsync(tenantId, request.TemplateId, includeInactive: true, ct);
+        var source = await FindTemplateByIdAsync(tenantId, request.TemplateId, includeInactive: access.IsAdmin, ct);
         if (source is null)
             return Result<MessageTemplateResponse>.NotFound("Message template not found.");
 
+        if (!access.IsAdmin && !CanUserAccessTemplate(source, access.CredentialId))
+            return Result<MessageTemplateResponse>.Forbidden("Message template is not available to this credential.");
+
         var targetType = NormalizeTemplateType(request.TemplateType);
+        if (!access.IsAdmin)
+        {
+            targetType = MessageTemplateTypes.User;
+            request.OwnerCredentialId = access.CredentialId;
+        }
+
         var key = NormalizeKey(request.Key ?? $"{source.Key}.copy");
         var createRequest = new CreateMessageTemplateRequest
         {
@@ -282,7 +332,13 @@ public sealed class MessagingTemplateService(
         RenderMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
+        var tenantContext = requestContextResolver.ResolveTenant(request.Metadata);
+        if (!tenantContext.IsSuccess)
+            return Result<RenderMessageTemplateResponse>.Failure(
+                tenantContext.Message ?? "Tenant could not be resolved",
+                tenantContext.StatusCode);
+
+        var tenantResult = await ResolveTenantIdAsync(tenantContext.Data!.TenantId);
         if (!tenantResult.IsSuccess)
             return Result<RenderMessageTemplateResponse>.Failure(tenantResult.Message ?? "Tenant could not be resolved", tenantResult.StatusCode);
 
@@ -291,14 +347,14 @@ public sealed class MessagingTemplateService(
 
         var template = request.TemplateId is Guid templateId
             ? await FindTemplateByIdAsync(tenantId, templateId, includeInactive: false, ct)
-            : await ResolveTemplateByKeyAsync(tenantId, request.Metadata.CredentialId, request.TemplateKey, ct);
+            : await ResolveTemplateByKeyAsync(tenantId, tenantContext.Data.CredentialId, request.TemplateKey, ct);
 
         if (template is null)
             return Result<RenderMessageTemplateResponse>.NotFound("Message template not found.");
 
         if (template.TemplateType == MessageTemplateTypes.User &&
             template.OwnerCredentialId is Guid ownerCredentialId &&
-            request.Metadata.CredentialId != ownerCredentialId)
+            tenantContext.Data.CredentialId != ownerCredentialId)
         {
             return Result<RenderMessageTemplateResponse>.Forbidden("User template is not available to this credential.");
         }
@@ -828,6 +884,42 @@ public sealed class MessagingTemplateService(
         }
     }
 
+    private async Task<Result<TemplateAccessContext>> ResolveTemplateAccessAsync(RequestMetadata? metadata)
+    {
+        var adminContext = requestContextResolver.ResolveAdmin(metadata);
+        if (adminContext.IsSuccess)
+        {
+            var tenant = await ResolveTenantIdAsync(adminContext.Data!.TenantId);
+            return tenant.IsSuccess
+                ? Result<TemplateAccessContext>.Success(new(tenant.Data, adminContext.Data.CredentialId, IsAdmin: true))
+                : Result<TemplateAccessContext>.Failure(tenant.Message ?? "Tenant could not be resolved", tenant.StatusCode);
+        }
+
+        var userContext = requestContextResolver.Resolve(metadata);
+        if (!userContext.IsSuccess)
+        {
+            return Result<TemplateAccessContext>.Failure(
+                userContext.Message ?? adminContext.Message ?? "Messaging templates require an authenticated context",
+                userContext.StatusCode);
+        }
+
+        var userTenant = await ResolveTenantIdAsync(userContext.Data!.TenantId);
+        return userTenant.IsSuccess
+            ? Result<TemplateAccessContext>.Success(new(userTenant.Data, userContext.Data.CredentialId, IsAdmin: false))
+            : Result<TemplateAccessContext>.Failure(userTenant.Message ?? "Tenant could not be resolved", userTenant.StatusCode);
+    }
+
+    private async Task<Result<Guid>> ResolveAdminTenantIdAsync(RequestMetadata? metadata)
+    {
+        var adminContext = requestContextResolver.ResolveAdmin(metadata);
+        if (!adminContext.IsSuccess)
+            return Result<Guid>.Failure(
+                adminContext.Message ?? "Messaging templates require an admin context",
+                adminContext.StatusCode);
+
+        return await ResolveTenantIdAsync(adminContext.Data!.TenantId);
+    }
+
     private static string NormalizeTemplateType(string? templateType)
     {
         if (string.Equals(templateType, MessageTemplateTypes.System, StringComparison.OrdinalIgnoreCase))
@@ -850,6 +942,16 @@ public sealed class MessagingTemplateService(
 
     private static bool IsSystemTemplate(MessageTemplate template) =>
         template.IsLocked || template.TemplateType == MessageTemplateTypes.System;
+
+    private static bool CanUserAccessTemplate(MessageTemplate template, Guid? credentialId) =>
+        template.TemplateType != MessageTemplateTypes.User ||
+        (credentialId is Guid id && template.OwnerCredentialId == id);
+
+    private static bool CanMutateTemplate(MessageTemplate template, TemplateAccessContext access) =>
+        access.IsAdmin ||
+        (template.TemplateType == MessageTemplateTypes.User &&
+         access.CredentialId is Guid credentialId &&
+         template.OwnerCredentialId == credentialId);
 
     private static int TemplateTypeRank(string templateType) =>
         templateType switch

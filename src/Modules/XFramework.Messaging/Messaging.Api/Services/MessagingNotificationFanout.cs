@@ -2,7 +2,9 @@ using System.Text.Json;
 using IdentityServer.Domain.Shared.Contracts;
 using Messaging.Domain.Shared;
 using Notifications.Domain.Shared.Contracts;
+using Notifications.Domain.Shared.Contracts.Requests;
 using Notifications.Domain.Shared.Enums;
+using Notifications.Integration.Drivers;
 using XFramework.Core.Services.FeatureGates;
 
 namespace Messaging.Api.Services;
@@ -10,10 +12,9 @@ namespace Messaging.Api.Services;
 public sealed class MessagingNotificationFanout(
     AppDbContext db,
     ITenantModuleFeatureService featureService,
+    INotificationsServiceWrapper notificationsWrapper,
     ILogger<MessagingNotificationFanout> logger) : IMessagingNotificationFanout
 {
-    private const char TemplateKeySeparator = '\n';
-
     public async Task CreateNotificationsAsync(MessageOutboxEvent outboxEvent, CancellationToken ct = default)
     {
         if (!await NotificationsEnabledAsync(outboxEvent.TenantId, ct))
@@ -39,10 +40,11 @@ public sealed class MessagingNotificationFanout(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(
+            logger.LogError(
                 ex,
-                "Messaging notification fanout skipped for outbox event {OutboxEventId}",
+                "Messaging notification fanout failed for outbox event {OutboxEventId}",
                 outboxEvent.Id);
+            throw;
         }
     }
 
@@ -59,12 +61,24 @@ public sealed class MessagingNotificationFanout(
         if (message is null)
             return;
 
+        var senderMember = await db.Set<MessageThreadMember>()
+            .AsNoTracking()
+            .Where(m => m.Id == message.MessageThreadMemberId)
+            .Where(m => m.TenantId == outboxEvent.TenantId)
+            .Where(m => !m.IsDeleted && m.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+        if (senderMember is null)
+            return;
+
         var members = await ActiveMembersAsync(outboxEvent.TenantId, threadId, ct);
         var mentionIds = DeserializeMentionedCredentialIds(message.MentionedCredentialIdsJson).ToHashSet();
 
         foreach (var member in members)
         {
             if (member.CredentialId == outboxEvent.ActorCredentialId || member.IsMuted || member.IsArchived)
+                continue;
+
+            if (await IsBlockedAsync(outboxEvent.TenantId, member.CredentialId, senderMember.CredentialId, ct))
                 continue;
 
             var isMention = mentionIds.Contains(member.CredentialId);
@@ -134,6 +148,17 @@ public sealed class MessagingNotificationFanout(
         if (author is null || author.CredentialId == outboxEvent.ActorCredentialId || author.IsMuted || author.IsArchived)
             return;
 
+        var reactor = await db.Set<MessageThreadMember>()
+            .AsNoTracking()
+            .Where(m => m.Id == reaction.MessageThreadMemberId)
+            .Where(m => m.TenantId == outboxEvent.TenantId)
+            .FirstOrDefaultAsync(ct);
+        if (reactor is null)
+            return;
+
+        if (await IsBlockedAsync(outboxEvent.TenantId, author.CredentialId, reactor.CredentialId, ct))
+            return;
+
         await AddNotificationAsync(
             outboxEvent,
             author.CredentialId,
@@ -189,45 +214,36 @@ public sealed class MessagingNotificationFanout(
         CancellationToken ct)
     {
         var correlationId = $"messaging:{outboxEvent.Id:N}:{recipientCredentialId:N}:{templateKey}";
-        var exists = await db.Set<NotificationInboxItem>()
-            .AnyAsync(item =>
-                item.TenantId == outboxEvent.TenantId &&
-                item.CorrelationId == correlationId,
-                ct);
-        if (exists)
-            return;
-
-        var preferences = await db.Set<NotificationPreference>()
-            .AsNoTracking()
-            .Where(p => p.TenantId == outboxEvent.TenantId)
-            .Where(p => p.CredentialId == recipientCredentialId)
-            .Where(p => !p.IsDeleted && p.IsEnabled)
-            .FirstOrDefaultAsync(ct);
-
-        if (IsTemplateDisabled(preferences, templateKey))
-            return;
-
-        var enabledChannels = preferences?.EnabledChannels ?? NotificationPreferenceDefaults.EnabledChannels;
-        var effectiveChannels = NotificationPreferenceDefaults.EnabledChannels & enabledChannels;
-        if (effectiveChannels == NotificationDeliveryChannel.None)
-            return;
-
-        db.Set<NotificationInboxItem>().Add(new NotificationInboxItem
+        var response = await notificationsWrapper.CreateNotification(new CreateNotificationRequest
         {
-            Id = Guid.NewGuid(),
             TenantId = outboxEvent.TenantId,
+            Metadata = new RequestMetadata { TenantId = outboxEvent.TenantId },
             RecipientCredentialId = recipientCredentialId,
             SourceCredentialId = outboxEvent.ActorCredentialId,
             TemplateKey = templateKey,
             Title = title,
             Body = body,
-            DeliveryChannels = effectiveChannels,
+            DeliveryChannels = NotificationPreferenceDefaults.EnabledChannels,
             CorrelationId = correlationId,
-            DataJson = JsonSerializer.Serialize(data),
-            IsEnabled = true,
-            CreatedAt = DateTime.UtcNow,
-            ConcurrencyStamp = Guid.NewGuid()
-        });
+            Data = ToNotificationData(data)
+        }, ct);
+
+        if (response.IsSuccess)
+            return;
+
+        if (response.HttpStatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            logger.LogDebug(
+                "Notification suppressed by Notifications module. OutboxEventId={OutboxEventId} RecipientCredentialId={CredentialId} TemplateKey={TemplateKey}: {Message}",
+                outboxEvent.Id,
+                recipientCredentialId,
+                templateKey,
+                response.Message);
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Notifications module rejected Messaging fanout for {recipientCredentialId}: {response.HttpStatusCode} {response.Message}");
     }
 
     private async Task<bool> NotificationsEnabledAsync(Guid tenantId, CancellationToken ct)
@@ -252,10 +268,19 @@ public sealed class MessagingNotificationFanout(
             .Where(m => !m.IsDeleted && m.IsEnabled)
             .ToListAsync(ct);
 
-    private static bool IsTemplateDisabled(NotificationPreference? preference, string templateKey) =>
-        preference?.DisabledTemplateKeys?
-            .Split(TemplateKeySeparator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Contains(templateKey, StringComparer.OrdinalIgnoreCase) == true;
+    private async Task<bool> IsBlockedAsync(
+        Guid tenantId,
+        Guid firstCredentialId,
+        Guid secondCredentialId,
+        CancellationToken ct) =>
+        await db.Set<MessageBlock>()
+            .AsNoTracking()
+            .Where(b => b.TenantId == tenantId)
+            .Where(b => !b.IsDeleted && b.IsEnabled)
+            .Where(b =>
+                (b.BlockerCredentialId == firstCredentialId && b.BlockedCredentialId == secondCredentialId) ||
+                (b.BlockerCredentialId == secondCredentialId && b.BlockedCredentialId == firstCredentialId))
+            .AnyAsync(ct);
 
     private static List<Guid> DeserializeMentionedCredentialIds(string json)
     {
@@ -271,4 +296,25 @@ public sealed class MessagingNotificationFanout(
 
     private static string TrimPreview(string text) =>
         text.Length <= 160 ? text : text[..160] + "...";
+
+    private static Dictionary<string, string> ToNotificationData(object data)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(data));
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            return result;
+
+        foreach (var property in document.RootElement.EnumerateObject())
+        {
+            result[property.Name] = property.Value.ValueKind switch
+            {
+                JsonValueKind.String => property.Value.GetString() ?? string.Empty,
+                JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => property.Value.GetRawText(),
+                JsonValueKind.Null or JsonValueKind.Undefined => string.Empty,
+                _ => property.Value.GetRawText()
+            };
+        }
+
+        return result;
+    }
 }

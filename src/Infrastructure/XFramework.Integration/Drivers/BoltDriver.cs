@@ -55,30 +55,30 @@ public sealed class BoltDriver : IMessageBusWrapper
 
     public Task StartClientEventListener(string topic) => Task.CompletedTask;
 
-    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient)
+    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
         EnrichMetadata(request);
         var payload = MemoryPackSerializer.Serialize(request);
-        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
+        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
         return DeserializeCmdResponse(status, responsePayload);
     }
 
-    public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient)
+    public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
         EnrichMetadata(request);
         var payload = MemoryPackSerializer.Serialize(request);
-        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
+        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
         return DeserializeCmdResponse<TResponse>(status, responsePayload);
     }
 
-    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient)
+    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
         EnrichMetadata(request);
         var payload = MemoryPackSerializer.Serialize(request);
-        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
+        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
         return DeserializeQueryResponse<TResponse>(status, responsePayload);
     }
 
@@ -116,6 +116,54 @@ public sealed class BoltDriver : IMessageBusWrapper
         return Task.CompletedTask;
     }
 
+    public Task SubscribeAsync<TResponse>(string topic, Func<TResponse, Task> handler, CancellationToken ct = default)
+        where TResponse : class
+        => SubscribeAsync(topic, handler, actorAccessToken: null, ct);
+
+    public Task SubscribeAsync<TResponse>(
+        string topic,
+        Func<TResponse, Task> handler,
+        string? actorAccessToken,
+        CancellationToken ct = default)
+        where TResponse : class =>
+        SubscribeAsync(
+            topic,
+            handler,
+            _ => ValueTask.FromResult(actorAccessToken),
+            ct);
+
+    public Task SubscribeAsync<TResponse>(
+        string topic,
+        Func<TResponse, Task> handler,
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider,
+        CancellationToken ct = default)
+        where TResponse : class
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var item in _client.SubscribeAsync<TResponse>(topic, ct, actorAccessTokenProvider))
+                {
+                    try
+                    {
+                        await handler(item);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Transient handler threw. topic={Topic}", topic);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Transient subscription error: topic={Topic}", topic);
+            }
+        }, ct);
+        return Task.CompletedTask;
+    }
+
     public Task Unsubscribe(BoltSubscriptionRequest request)
     {
         // BoltClient's SubscribeAsync handles unsubscribe via CancellationToken cancellation.
@@ -127,12 +175,35 @@ public sealed class BoltDriver : IMessageBusWrapper
 
     public Task SubscribeDurableAsync<TResponse>(string topic, string subscriberId, Func<TResponse, Task> handler, CancellationToken ct = default)
         where TResponse : class
+        => SubscribeDurableAsync(topic, subscriberId, handler, actorAccessToken: null, ct);
+
+    public Task SubscribeDurableAsync<TResponse>(
+        string topic,
+        string subscriberId,
+        Func<TResponse, Task> handler,
+        string? actorAccessToken,
+        CancellationToken ct = default)
+        where TResponse : class =>
+        SubscribeDurableAsync(
+            topic,
+            subscriberId,
+            handler,
+            _ => ValueTask.FromResult(actorAccessToken),
+            ct);
+
+    public Task SubscribeDurableAsync<TResponse>(
+        string topic,
+        string subscriberId,
+        Func<TResponse, Task> handler,
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider,
+        CancellationToken ct = default)
+        where TResponse : class
     {
         _ = Task.Run(async () =>
         {
             try
             {
-                await foreach (var msg in _client.SubscribeDurableAsync<TResponse>(topic, subscriberId, ct))
+                await foreach (var msg in _client.SubscribeDurableAsync<TResponse>(topic, subscriberId, ct, actorAccessTokenProvider))
                 {
                     try
                     {

@@ -14,5 +14,7 @@ public sealed class ServicesInstaller : IInstaller
         services.AddTenantResolver();
         services.AddTenantModuleFeatures();
         services.AddScoped<NotificationService>();
+        services.AddScoped<NotificationDeliveryDispatcher>();
+        services.AddHostedService<NotificationDeliveryDispatcherHostedService>();
     }
 }

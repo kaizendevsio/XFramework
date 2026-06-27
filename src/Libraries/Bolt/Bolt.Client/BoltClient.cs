@@ -532,20 +532,35 @@ public sealed class BoltClient : IAsyncDisposable
 
     private void HandleEventFrame(BoltConnection conn, byte[] buffer, int length)
     {
-        if (!BoltCodec.TryReadEvent(buffer.AsSpan(0, length), out var topicHash, out var sequence, out var isReplay, out var payloadOffset, out var payloadLength, out _))
+        if (!BoltCodec.TryReadEvent(
+                buffer.AsSpan(0, length),
+                out var topicHash,
+                out var sequence,
+                out var isReplay,
+                out var subscriberId,
+                out var payloadOffset,
+                out var payloadLength,
+                out _))
             return;
 
         var payload = new byte[payloadLength];
         buffer.AsSpan(payloadOffset, payloadLength).CopyTo(payload);
 
         // Try transient first
-        if (_transientSubscriptions.TryGetValue(topicHash, out var transient))
+        if (string.IsNullOrEmpty(subscriberId) && _transientSubscriptions.TryGetValue(topicHash, out var transient))
         {
             transient.Channel.Writer.TryWrite(payload);
             return;
         }
 
-        // Try durable: there may be multiple durable subscriptions for the same topic with different subscriberIds
+        if (!string.IsNullOrEmpty(subscriberId))
+        {
+            if (_durableSubscriptions.TryGetValue((topicHash, subscriberId), out var durable))
+                durable.Channel.Writer.TryWrite((sequence, isReplay, payload));
+            return;
+        }
+
+        // Backward-compatible fallback for frames from older hubs without a subscriber id.
         foreach (var kvp in _durableSubscriptions)
         {
             if (kvp.Key.TopicHash == topicHash)
@@ -557,11 +572,33 @@ public sealed class BoltClient : IAsyncDisposable
     /// Subscribe to a topic. Receives published messages as they arrive (transient — no persistence, no replay).
     /// Cancelling the cancellation token unsubscribes.
     /// </summary>
-    public async IAsyncEnumerable<T> SubscribeAsync<T>(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<T> SubscribeAsync<T>(
+        string topic,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default,
+        string? actorAccessToken = null)
+    {
+        await foreach (var item in SubscribeAsync<T>(
+                           topic,
+                           ct,
+                           _ => ValueTask.FromResult(actorAccessToken)))
+        {
+            yield return item;
+        }
+    }
+
+    public async IAsyncEnumerable<T> SubscribeAsync<T>(
+        string topic,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct,
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider)
     {
         var topicHash = BoltCodec.Fnv1aHash(topic);
         var channel = Channel.CreateUnbounded<byte[]>();
-        var sub = new TransientSubscription { Topic = topic, Channel = channel };
+        var sub = new TransientSubscription
+        {
+            Topic = topic,
+            Channel = channel,
+            ActorAccessTokenProvider = actorAccessTokenProvider
+        };
 
         if (!_transientSubscriptions.TryAdd(topicHash, sub))
             throw new InvalidOperationException($"Already subscribed to topic '{topic}'");
@@ -569,7 +606,8 @@ public sealed class BoltClient : IAsyncDisposable
         // Send Subscribe frame
         var conn = GetPrimaryConnection();
         var writer = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteSubscribe(writer, topic, _clientId, durable: false);
+        var actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, ct);
+        BoltCodec.WriteSubscribe(writer, topic, _clientId, durable: false, actorAccessToken);
         await conn.SendAsync(writer.WrittenMemory, ct);
         writer.Reset();
 
@@ -590,7 +628,8 @@ public sealed class BoltClient : IAsyncDisposable
             try
             {
                 var w = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteUnsubscribe(w, topic, _clientId);
+                actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, CancellationToken.None);
+                BoltCodec.WriteUnsubscribe(w, topic, _clientId, actorAccessToken: actorAccessToken);
                 await conn.SendAsync(w.WrittenMemory, CancellationToken.None);
                 w.Reset();
             }
@@ -602,19 +641,46 @@ public sealed class BoltClient : IAsyncDisposable
     /// Subscribe to a topic durably. On reconnect, queued messages are replayed.
     /// Each message must be acked via DurableMessage.AckAsync to prevent re-delivery.
     /// </summary>
-    public async IAsyncEnumerable<DurableMessage<T>> SubscribeDurableAsync<T>(string topic, string subscriberId, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<DurableMessage<T>> SubscribeDurableAsync<T>(
+        string topic,
+        string subscriberId,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default,
+        string? actorAccessToken = null)
+    {
+        await foreach (var item in SubscribeDurableAsync<T>(
+                           topic,
+                           subscriberId,
+                           ct,
+                           _ => ValueTask.FromResult(actorAccessToken)))
+        {
+            yield return item;
+        }
+    }
+
+    public async IAsyncEnumerable<DurableMessage<T>> SubscribeDurableAsync<T>(
+        string topic,
+        string subscriberId,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct,
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider)
     {
         var topicHash = BoltCodec.Fnv1aHash(topic);
         var key = (topicHash, subscriberId);
         var channel = Channel.CreateUnbounded<(long, bool, byte[])>();
-        var sub = new DurableSubscription { Topic = topic, SubscriberId = subscriberId, Channel = channel };
+        var sub = new DurableSubscription
+        {
+            Topic = topic,
+            SubscriberId = subscriberId,
+            Channel = channel,
+            ActorAccessTokenProvider = actorAccessTokenProvider
+        };
 
         if (!_durableSubscriptions.TryAdd(key, sub))
             throw new InvalidOperationException($"Already subscribed to topic '{topic}' with subscriberId '{subscriberId}'");
 
         var conn = GetPrimaryConnection();
         var writer = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteSubscribe(writer, topic, subscriberId, durable: true);
+        var actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, ct);
+        BoltCodec.WriteSubscribe(writer, topic, subscriberId, durable: true, actorAccessToken);
         await conn.SendAsync(writer.WrittenMemory, ct);
         writer.Reset();
 
@@ -630,7 +696,8 @@ public sealed class BoltClient : IAsyncDisposable
 
                     yield return new DurableMessage<T>(item, seq, isReplay, async (s, c) =>
                     {
-                        await AckAsync(topic, subscriberId, s, c);
+                        var freshActorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, c);
+                        await AckAsync(topic, subscriberId, s, c, freshActorAccessToken);
                     });
                 }
             }
@@ -638,15 +705,50 @@ public sealed class BoltClient : IAsyncDisposable
         finally
         {
             _durableSubscriptions.TryRemove(key, out _);
+            // Durable cancellation/disconnect is a live detach, not a permanent unregister.
+            // The hub must keep the durable subscriber registered so offline messages can
+            // queue and replay when the same subscriber id reconnects.
             try
             {
                 var w = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteUnsubscribe(w, topic, subscriberId);
+                actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, CancellationToken.None);
+                BoltCodec.WriteUnsubscribe(w, topic, subscriberId, permanent: false, actorAccessToken);
                 await conn.SendAsync(w.WrittenMemory, CancellationToken.None);
                 w.Reset();
             }
             catch { /* best-effort */ }
         }
+    }
+
+    /// <summary>
+    /// Permanently unregister a durable subscriber from a topic.
+    /// Normal durable subscription cancellation only detaches the live connection.
+    /// </summary>
+    public async ValueTask UnregisterDurableSubscriptionAsync(string topic, string subscriberId, CancellationToken ct = default)
+    {
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        _durableSubscriptions.TryRemove((topicHash, subscriberId), out _);
+
+        var conn = GetPrimaryConnection();
+        var w = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteUnsubscribe(w, topic, subscriberId);
+        await conn.SendAsync(w.WrittenMemory, ct);
+        w.Reset();
+    }
+
+    /// <summary>
+    /// Permanently unregister a transient subscriber from a topic.
+    /// </summary>
+    public async ValueTask UnsubscribeAsync(string topic, CancellationToken ct = default)
+    {
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        _transientSubscriptions.TryRemove(topicHash, out _);
+
+        var conn = GetPrimaryConnection();
+        var w = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteUnsubscribe(w, topic, _clientId);
+        await conn.SendAsync(w.WrittenMemory, ct);
+        w.Reset();
     }
 
     /// <summary>
@@ -667,12 +769,16 @@ public sealed class BoltClient : IAsyncDisposable
     /// <summary>
     /// Acknowledge durable messages up to and including upToSequence for a (topic, subscriber) pair.
     /// </summary>
-    public async ValueTask AckAsync(string topic, string subscriberId, long upToSequence, CancellationToken ct = default)
+    public async ValueTask AckAsync(
+        string topic,
+        string subscriberId,
+        long upToSequence,
+        CancellationToken ct = default,
+        string? actorAccessToken = null)
     {
-        var topicHash = BoltCodec.Fnv1aHash(topic);
         var conn = GetPrimaryConnection();
         var writer = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteAck(writer, topicHash, subscriberId, upToSequence);
+        BoltCodec.WriteAck(writer, topic, subscriberId, upToSequence, actorAccessToken);
         await conn.SendAsync(writer.WrittenMemory, ct);
         writer.Reset();
     }
@@ -1023,7 +1129,8 @@ public sealed class BoltClient : IAsyncDisposable
                 try
                 {
                     var w = RentedBufferWriter.GetThreadLocal();
-                    BoltCodec.WriteSubscribe(w, sub.Topic, _clientId, durable: false);
+                    var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, CancellationToken.None);
+                    BoltCodec.WriteSubscribe(w, sub.Topic, _clientId, durable: false, actorAccessToken);
                     await GetPrimaryConnection().SendAsync(w.WrittenMemory, CancellationToken.None);
                     w.Reset();
                 }
@@ -1038,7 +1145,8 @@ public sealed class BoltClient : IAsyncDisposable
                 try
                 {
                     var w = RentedBufferWriter.GetThreadLocal();
-                    BoltCodec.WriteSubscribe(w, sub.Topic, sub.SubscriberId, durable: true);
+                    var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, CancellationToken.None);
+                    BoltCodec.WriteSubscribe(w, sub.Topic, sub.SubscriberId, durable: true, actorAccessToken);
                     await GetPrimaryConnection().SendAsync(w.WrittenMemory, CancellationToken.None);
                     w.Reset();
                 }
@@ -1101,6 +1209,7 @@ public sealed class BoltClient : IAsyncDisposable
     private sealed class TransientSubscription
     {
         public required string Topic { get; init; }
+        public required Func<CancellationToken, ValueTask<string?>> ActorAccessTokenProvider { get; init; }
         public required Channel<byte[]> Channel { get; init; }
     }
 
@@ -1108,7 +1217,16 @@ public sealed class BoltClient : IAsyncDisposable
     {
         public required string Topic { get; init; }
         public required string SubscriberId { get; init; }
+        public required Func<CancellationToken, ValueTask<string?>> ActorAccessTokenProvider { get; init; }
         public required Channel<(long Sequence, bool IsReplay, byte[] Payload)> Channel { get; init; }
+    }
+
+    private static async ValueTask<string?> ResolveActorAccessTokenAsync(
+        Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider,
+        CancellationToken ct)
+    {
+        var token = await actorAccessTokenProvider(ct);
+        return string.IsNullOrWhiteSpace(token) ? null : token;
     }
 }
 

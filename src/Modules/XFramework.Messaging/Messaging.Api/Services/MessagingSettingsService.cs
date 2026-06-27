@@ -10,13 +10,23 @@ namespace Messaging.Api.Services;
 
 public sealed class MessagingSettingsService(
     IDataContext dataContext,
-    ITenantResolver tenantResolver) : IMessagingSettingsService
+    ITenantResolver tenantResolver,
+    IMessagingRequestContextResolver requestContextResolver,
+    IMessagingPolicyService policyService) : IMessagingSettingsService
 {
     public async Task<Result<MessagingSettingsResponse>> GetSettingsAsync(
         GetMessagingSettingsRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
+        var adminContext = requestContextResolver.ResolveAdmin(request.Metadata);
+        if (!adminContext.IsSuccess)
+        {
+            return Result<MessagingSettingsResponse>.Failure(
+                adminContext.Message ?? "Messaging settings require an admin context",
+                adminContext.StatusCode);
+        }
+
+        var tenantResult = await ResolveTenantIdAsync(adminContext.Data!.TenantId);
         if (!tenantResult.IsSuccess)
         {
             return Result<MessagingSettingsResponse>.Failure(
@@ -32,7 +42,15 @@ public sealed class MessagingSettingsService(
         UpdateMessagingSettingsRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = await ResolveTenantIdAsync(request.Metadata.TenantId);
+        var adminContext = requestContextResolver.ResolveAdmin(request.Metadata);
+        if (!adminContext.IsSuccess)
+        {
+            return Result<MessagingSettingsResponse>.Failure(
+                adminContext.Message ?? "Messaging settings require an admin context",
+                adminContext.StatusCode);
+        }
+
+        var tenantResult = await ResolveTenantIdAsync(adminContext.Data!.TenantId);
         if (!tenantResult.IsSuccess)
         {
             return Result<MessagingSettingsResponse>.Failure(
@@ -100,6 +118,7 @@ public sealed class MessagingSettingsService(
                 saveResult.StatusCode);
         }
 
+        policyService.Invalidate(tenantId);
         var response = await BuildResponseAsync(tenantId, ct);
         return Result<MessagingSettingsResponse>.Success(response, "Messaging settings saved.");
     }

@@ -4,6 +4,9 @@ using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts;
 using Messaging.Domain.Shared.Contracts.Requests.Admin;
 using Messaging.Tests.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using XFramework.Domain.Shared.BusinessObjects;
 
@@ -11,6 +14,8 @@ namespace Messaging.Tests.Services;
 
 public sealed class MessagingAdminReadServiceTests
 {
+    private const string TrustedMetadataSecret = "messaging-admin-read-test-secret";
+
     [Test]
     public async Task QueryUsersAsync_ReturnsOnlyRowsForRequestedTenant()
     {
@@ -38,7 +43,7 @@ public sealed class MessagingAdminReadServiceTests
             otherMember,
             Message(Guid.NewGuid(), tenantId, thread, member, "tenant message"),
             Message(Guid.NewGuid(), otherTenantId, otherThread, otherMember, "other message"));
-        var service = new MessagingAdminReadService(dataContext);
+        var service = CreateService(dataContext);
 
         var result = await service.QueryUsersAsync(new QueryMessagingAdminUsersRequest
         {
@@ -74,7 +79,7 @@ public sealed class MessagingAdminReadServiceTests
             generalMember,
             Message(Guid.NewGuid(), tenantId, supportThread, supportMember, new string('x', 150)),
             Message(Guid.NewGuid(), tenantId, generalThread, generalMember, "short text"));
-        var service = new MessagingAdminReadService(dataContext);
+        var service = CreateService(dataContext);
 
         var result = await service.QueryThreadsAsync(new QueryMessagingAdminThreadsRequest
         {
@@ -101,7 +106,7 @@ public sealed class MessagingAdminReadServiceTests
         var otherCredential = Credential(Guid.NewGuid(), otherTenantId, "other-user");
         var dataContext = new InMemoryDataContext();
         dataContext.Seed(otherCredential.IdentityInfo!, otherCredential);
-        var service = new MessagingAdminReadService(dataContext);
+        var service = CreateService(dataContext);
 
         var result = await service.GetUserDetailAsync(new GetMessagingAdminUserDetailRequest
         {
@@ -144,7 +149,7 @@ public sealed class MessagingAdminReadServiceTests
             otherMessage,
             Report(Guid.NewGuid(), tenantId, message, member),
             Report(Guid.NewGuid(), otherTenantId, otherMessage, otherMember));
-        var service = new MessagingAdminReadService(dataContext);
+        var service = CreateService(dataContext);
 
         var result = await service.GetModerationAsync(new GetMessagingAdminModerationRequest
         {
@@ -157,9 +162,61 @@ public sealed class MessagingAdminReadServiceTests
         Assert.That(result.Data.Reports[0].Thread, Is.EqualTo("Tenant Thread"));
     }
 
-    private static RequestMetadata Metadata(Guid tenantId) => new()
+    [Test]
+    public async Task GetModerationAsync_WhenAdminAuditHidden_ReturnsOnlyPolicies()
     {
-        TenantId = tenantId
+        var tenantId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(PolicySetting(tenantId, "Moderation.AdminAuditVisible", "false"));
+        var service = CreateService(dataContext);
+
+        var result = await service.GetModerationAsync(new GetMessagingAdminModerationRequest
+        {
+            Metadata = Metadata(tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.OpenReportCount, Is.EqualTo(0));
+        Assert.That(result.Data.Reports, Is.Empty);
+        Assert.That(result.Data.Blocks, Is.Empty);
+        Assert.That(result.Data.Policies, Is.Not.Empty);
+    }
+
+    private static MessagingAdminReadService CreateService(InMemoryDataContext dataContext) =>
+        new(
+            dataContext,
+            new MessagingRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            new MessagingPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())));
+
+    private static RequestMetadata Metadata(Guid tenantId)
+    {
+        var metadata = new RequestMetadata
+        {
+            TenantId = tenantId,
+            Name = "ControlPanel"
+        };
+        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
+        return metadata;
+    }
+
+    private static IConfiguration TestConfiguration() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Messaging:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
+            })
+            .Build();
+
+    private static RegistryConfiguration PolicySetting(Guid tenantId, string key, string value) => new()
+    {
+        Id = Guid.NewGuid(),
+        TenantId = tenantId,
+        Key = key,
+        Value = value,
+        Unit = "policy",
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
     };
 
     private static MessageThreadType ThreadType(Guid id, Guid tenantId) => new()

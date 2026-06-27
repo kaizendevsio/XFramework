@@ -2,9 +2,11 @@ using Messaging.Domain.Shared.Contracts.Requests.Attachments;
 using Messaging.Domain.Shared.Contracts.Requests.Delete;
 using Messaging.Domain.Shared.Contracts.Requests.Edit;
 using Messaging.Domain.Shared.Contracts.Requests.Reactions;
+using Messaging.Domain.Shared.Contracts.Requests.Realtime;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.Contracts.Responses;
 
 namespace Messaging.Api.Services;
 
@@ -38,10 +40,13 @@ public interface IThreadService
     Task<Result<CmdResponse>> BlockCredentialAsync(BlockCredentialRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> DeleteCredentialBlockAsync(DeleteCredentialBlockRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> CreateMessageFileAsync(CreateMessageFileRequest request, CancellationToken ct = default);
-    Task<Result<List<MessageFileResponse>>> GetMessageFilesAsync(GetMessageFilesRequest request, CancellationToken ct = default);
+    Task<Result<PaginatedResult<MessageFileResponse>>> GetMessageFilesAsync(GetMessageFilesRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> DeleteMessageFileAsync(DeleteMessageFileRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> CreateMessageReactionAsync(CreateMessageReactionRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> DeleteMessageReactionAsync(DeleteMessageReactionRequest request, CancellationToken ct = default);
 
     // Round 3: Read Receipts
     Task<Result<CmdResponse>> MarkMessagesReadAsync(MarkMessagesReadRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> PublishTypingAsync(PublishMessagingTypingRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> PublishPresenceAsync(PublishMessagingPresenceRequest request, CancellationToken ct = default);
 }

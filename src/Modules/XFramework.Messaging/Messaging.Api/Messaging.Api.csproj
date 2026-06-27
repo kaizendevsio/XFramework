@@ -18,8 +18,7 @@
         <!-- Infrastructure -->
         <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
         
-        <!-- SmsGateway Integration (required for ISmsGatewayServiceWrapper) -->
-        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
+        <ProjectReference Include="..\..\XFramework.Notifications\Notifications.Integration\Notifications.Integration.csproj" />
         
         <!-- Domain Shared (contracts and DTOs) -->
         <ProjectReference Include="..\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />

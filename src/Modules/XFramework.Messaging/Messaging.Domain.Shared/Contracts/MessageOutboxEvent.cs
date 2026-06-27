@@ -32,4 +32,31 @@ public partial class MessageOutboxEvent : BaseModel
 
     [MemoryPackOrder(9)]
     public string? LastError { get; set; }
+
+    [MemoryPackOrder(10)]
+    public DateTime? NextAttemptAt { get; set; }
+
+    [MemoryPackOrder(11)]
+    public DateTime? LastAttemptAt { get; set; }
+
+    [MemoryPackOrder(12)]
+    public DateTime? DeadLetteredAt { get; set; }
+
+    [MemoryPackOrder(13)]
+    public string? LeaseOwner { get; set; }
+
+    [MemoryPackOrder(14)]
+    public DateTime? LeaseExpiresAt { get; set; }
+
+    [MemoryPackOrder(15)]
+    public DateTime? RealtimeProcessedAt { get; set; }
+
+    [MemoryPackOrder(16)]
+    public DateTime? NotificationProcessedAt { get; set; }
+
+    [MemoryPackOrder(17)]
+    public int RealtimeAttempts { get; set; }
+
+    [MemoryPackOrder(18)]
+    public int NotificationAttempts { get; set; }
 }

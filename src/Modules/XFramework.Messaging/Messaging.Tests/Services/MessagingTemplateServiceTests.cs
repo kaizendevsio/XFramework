@@ -4,6 +4,8 @@ using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts;
 using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Tests.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using XFramework.Core.Services;
@@ -13,6 +15,8 @@ namespace Messaging.Tests.Services;
 
 public sealed class MessagingTemplateServiceTests
 {
+    private const string TrustedMetadataSecret = "messaging-template-test-secret";
+
     [Test]
     public async Task GetTemplatesAsync_WhenNoRowsExist_SeedsSystemTemplatesOnce()
     {
@@ -206,7 +210,11 @@ public sealed class MessagingTemplateServiceTests
     private static MessagingTemplateService CreateService(
         InMemoryDataContext dataContext,
         params Guid[] tenantIds) =>
-        new(dataContext, new FakeTenantResolver(tenantIds), NullLogger<MessagingTemplateService>.Instance);
+        new(
+            dataContext,
+            new FakeTenantResolver(tenantIds),
+            new MessagingRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            NullLogger<MessagingTemplateService>.Instance);
 
     private static GetMessageTemplatesRequest ListRequest(Guid tenantId) => new()
     {
@@ -225,11 +233,25 @@ public sealed class MessagingTemplateServiceTests
         Metadata = Metadata(tenantId)
     };
 
-    private static RequestMetadata Metadata(Guid tenantId, Guid? credentialId = null) => new()
+    private static RequestMetadata Metadata(Guid tenantId, Guid? credentialId = null)
     {
-        TenantId = tenantId,
-        CredentialId = credentialId
-    };
+        var metadata = new RequestMetadata
+        {
+            TenantId = tenantId,
+            CredentialId = credentialId,
+            Name = "ControlPanel"
+        };
+        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
+        return metadata;
+    }
+
+    private static IConfiguration TestConfiguration() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Messaging:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
+            })
+            .Build();
 
     private static IdentityCredential Credential(Guid id, Guid tenantId) => new()
     {

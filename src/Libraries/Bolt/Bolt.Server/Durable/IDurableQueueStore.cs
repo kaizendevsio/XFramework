@@ -30,6 +30,12 @@ public interface IDurableQueueStore
     Task RegisterDurableSubscriberAsync(int topicHash, string subscriberId, CancellationToken ct = default);
 
     /// <summary>
+    /// Remove a durable subscriber registration for this topic.
+    /// Existing unacked messages may be discarded by the store.
+    /// </summary>
+    Task UnregisterDurableSubscriberAsync(int topicHash, string subscriberId, CancellationToken ct = default);
+
+    /// <summary>
     /// Get all subscriberIds currently registered as durable for the given topic.
     /// Used by publish to know which queues to enqueue into.
     /// </summary>

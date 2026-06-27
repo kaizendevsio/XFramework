@@ -14,4 +14,5 @@ public partial class RequestMetadata
     public Guid? RequestId { get; set; }
     public DateTime? TrustedAtUtc { get; set; }
     public string? TrustedSignature { get; set; }
+    public string? ActorAccessToken { get; set; }
 }

@@ -28,6 +28,8 @@ public sealed class NotificationInboxItemConfiguration : IEntityTypeConfiguratio
         entity.HasIndex(e => new { e.TenantId, e.RecipientCredentialId, e.IsRead, e.CreatedAt })
             .HasDatabaseName("ix_notificationinboxitem_tenant_recipient_read_created");
         entity.HasIndex(e => new { e.TenantId, e.CorrelationId })
+            .IsUnique()
+            .HasFilter("\"CorrelationId\" IS NOT NULL")
             .HasDatabaseName("ix_notificationinboxitem_tenant_correlation");
         entity.HasIndex(e => new { e.TenantId, e.TemplateKey })
             .HasDatabaseName("ix_notificationinboxitem_tenant_template");

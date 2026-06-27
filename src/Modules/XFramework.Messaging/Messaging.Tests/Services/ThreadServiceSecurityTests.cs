@@ -1,23 +1,172 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text.Json;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts;
 using Messaging.Api.Services;
 using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts;
+using Messaging.Domain.Shared.Contracts.Requests.Attachments;
+using Messaging.Domain.Shared.Contracts.Requests.Delete;
+using Messaging.Domain.Shared.Contracts.Requests.Reactions;
+using Messaging.Domain.Shared.Contracts.Realtime;
 using Messaging.Domain.Shared.Contracts.Requests.Templates;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
 using Messaging.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.Contracts;
+using XFramework.Integration.Abstractions;
 
 namespace Messaging.Tests.Services;
 
 public sealed class ThreadServiceSecurityTests
 {
+    private const string TrustedMetadataSecret = "messaging-test-secret";
+
+    [Test]
+    public async Task DeleteMessageReactionAsync_MissingThreadOrMessageId_ReturnsBadRequest()
+    {
+        var dataContext = new InMemoryDataContext();
+        var service = CreateService(dataContext);
+
+        var result = await service.DeleteMessageReactionAsync(new DeleteMessageReactionRequest
+        {
+            ReactionId = Guid.NewGuid()
+        });
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(400));
+    }
+
+    [Test]
+    public async Task CreateDirectThreadAsync_WhenDirectThreadsDisabled_ReturnsForbidden()
+    {
+        var tenantId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(PolicySetting(tenantId, "DirectThreads.Enabled", "false"));
+        var service = CreateService(dataContext);
+
+        var result = await service.CreateDirectThreadAsync(new CreateDirectThreadRequest
+        {
+            OtherCredentialId = Guid.NewGuid(),
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(403));
+    }
+
+    [Test]
+    public async Task CreateDirectThreadAsync_WhenCreated_PersistsNormalizedDirectThreadIndex()
+    {
+        var tenantId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var otherCredentialId = Guid.NewGuid();
+        var typeId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            ThreadType(typeId, tenantId),
+            Credential(otherCredentialId, tenantId));
+        var service = CreateService(dataContext);
+
+        var result = await service.CreateDirectThreadAsync(new CreateDirectThreadRequest
+        {
+            TypeId = typeId,
+            OtherCredentialId = otherCredentialId,
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        var index = dataContext.Set<MessageDirectThread>().Single();
+        Assert.That(index.MessageThreadId, Is.EqualTo(result.Data!.ThreadId));
+        Assert.That(new[] { index.FirstCredentialId, index.SecondCredentialId }, Is.Ordered);
+        Assert.That(new[] { index.FirstCredentialId, index.SecondCredentialId }, Is.EquivalentTo(new[] { callerCredentialId, otherCredentialId }));
+    }
+
+    [Test]
+    public async Task CreateThreadAsync_WhenInitialMembersHaveBlockRelationship_ReturnsForbidden()
+    {
+        var tenantId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var blockedCredentialId = Guid.NewGuid();
+        var typeId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            ThreadType(typeId, tenantId),
+            Credential(callerCredentialId, tenantId),
+            Credential(blockedCredentialId, tenantId),
+            Block(Guid.NewGuid(), callerCredentialId, blockedCredentialId, tenantId));
+        var service = CreateService(dataContext);
+
+        var result = await service.CreateThreadAsync(new CreateThreadRequest
+        {
+            TypeId = typeId,
+            Name = "Blocked group",
+            InitialMemberCredentialIds = [blockedCredentialId],
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(403));
+        Assert.That(dataContext.Set<MessageThread>(), Is.Empty);
+    }
+
+    [Test]
+    public async Task MarkMessagesReadAsync_WhenReadReceiptsDisabled_ReturnsForbidden()
+    {
+        var tenantId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(PolicySetting(tenantId, "ReadReceipts.Enabled", "false"));
+        var service = CreateService(dataContext);
+
+        var result = await service.MarkMessagesReadAsync(new MarkMessagesReadRequest
+        {
+            ThreadId = Guid.NewGuid(),
+            MessageIds = [Guid.NewGuid()],
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(403));
+    }
+
+    [Test]
+    public async Task DeleteThreadMessageAsync_WhenDeleteModeDisabled_ReturnsForbidden()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            PolicySetting(tenantId, "Messages.DeleteMode", "disabled"),
+            Thread(threadId, tenantId),
+            Member(memberId, threadId, callerCredentialId, tenantId),
+            Message(messageId, threadId, memberId, tenantId, "hello"));
+        var service = CreateService(dataContext);
+
+        var result = await service.DeleteThreadMessageAsync(new DeleteThreadMessageRequest
+        {
+            ThreadId = threadId,
+            MessageId = messageId,
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(403));
+        Assert.That(dataContext.Set<Message>().Single().IsDeleted, Is.False);
+    }
+
     [Test]
     public async Task CreateThreadMessageAsync_SpoofedSenderCredential_UsesAuthenticatedCaller()
     {
@@ -156,12 +305,24 @@ public sealed class ThreadServiceSecurityTests
         var threadId = Guid.NewGuid();
         var callerCredentialId = Guid.NewGuid();
         var otherCredentialId = Guid.NewGuid();
+        var directPair = new[] { callerCredentialId, otherCredentialId }.OrderBy(id => id).ToArray();
 
         var dataContext = new InMemoryDataContext();
         dataContext.Seed(
             Thread(threadId, tenantId),
             Member(Guid.NewGuid(), threadId, callerCredentialId, tenantId),
             Member(Guid.NewGuid(), threadId, otherCredentialId, tenantId),
+            new MessageDirectThread
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                MessageThreadId = threadId,
+                FirstCredentialId = directPair[0],
+                SecondCredentialId = directPair[1],
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
+            },
             Credential(callerCredentialId, tenantId),
             Credential(otherCredentialId, tenantId));
 
@@ -319,19 +480,214 @@ public sealed class ThreadServiceSecurityTests
         Assert.That(message.TemplateVariablesJson, Does.Contain("Ava"));
     }
 
+    [Test]
+    public async Task CreateMessageFileAsync_WhenValid_AddsOutboxEvent()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var storageFileId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(memberId, threadId, callerCredentialId, tenantId),
+            Message(messageId, threadId, memberId, tenantId, "hello"),
+            StorageFile(storageFileId, tenantId, "notes.txt", "text/plain", 4m));
+        var service = CreateService(dataContext);
+
+        var result = await service.CreateMessageFileAsync(new CreateMessageFileRequest
+        {
+            ThreadId = threadId,
+            MessageId = messageId,
+            StorageFileId = storageFileId,
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(dataContext.Set<MessageFile>().Single().StorageId, Is.EqualTo(storageFileId));
+        Assert.That(dataContext.Set<MessageOutboxEvent>().Single().EventType, Is.EqualTo(MessageRealtimeEvents.MessageFileAttached));
+    }
+
+    [Test]
+    public async Task CreateMessageFileAsync_WhenDuplicateActiveLink_ReturnsConflict()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var storageFileId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(memberId, threadId, callerCredentialId, tenantId),
+            Message(messageId, threadId, memberId, tenantId, "hello"),
+            StorageFile(storageFileId, tenantId, "notes.txt", "text/plain", 4m),
+            MessageFile(Guid.NewGuid(), messageId, storageFileId, tenantId));
+        var service = CreateService(dataContext);
+
+        var result = await service.CreateMessageFileAsync(new CreateMessageFileRequest
+        {
+            ThreadId = threadId,
+            MessageId = messageId,
+            StorageFileId = storageFileId,
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(409));
+    }
+
+    [Test]
+    public async Task GetMessageFilesAsync_ReturnsPaginatedAttachments()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var oldFileId = Guid.NewGuid();
+        var newestFileId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(memberId, threadId, callerCredentialId, tenantId),
+            Message(messageId, threadId, memberId, tenantId, "hello"),
+            MessageFile(oldFileId, messageId, Guid.NewGuid(), tenantId, DateTime.UtcNow.AddMinutes(-5)),
+            MessageFile(newestFileId, messageId, Guid.NewGuid(), tenantId, DateTime.UtcNow));
+        var service = CreateService(dataContext);
+
+        var result = await service.GetMessageFilesAsync(new GetMessageFilesRequest
+        {
+            ThreadId = threadId,
+            MessageId = messageId,
+            PageIndex = 0,
+            PageSize = 1,
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.TotalItems, Is.EqualTo(2));
+        Assert.That(result.Data.PageSize, Is.EqualTo(1));
+        Assert.That(result.Data.Items.Single().Id, Is.EqualTo(newestFileId));
+    }
+
+    [Test]
+    public async Task DeleteMessageFileAsync_WhenSender_DetachesLinkAndAddsOutboxEvent()
+    {
+        var tenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, tenantId),
+            Member(memberId, threadId, callerCredentialId, tenantId),
+            Message(messageId, threadId, memberId, tenantId, "hello"),
+            MessageFile(fileId, messageId, Guid.NewGuid(), tenantId));
+        var service = CreateService(dataContext);
+
+        var result = await service.DeleteMessageFileAsync(new DeleteMessageFileRequest
+        {
+            ThreadId = threadId,
+            MessageId = messageId,
+            FileId = fileId,
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        var file = dataContext.Set<MessageFile>().Single();
+        Assert.That(file.IsDeleted, Is.True);
+        Assert.That(file.IsEnabled, Is.False);
+        Assert.That(dataContext.Set<MessageOutboxEvent>().Single().EventType, Is.EqualTo(MessageRealtimeEvents.MessageFileDetached));
+    }
+
     private static ThreadService CreateService(
         InMemoryDataContext dataContext,
-        IMessagingTemplateService? templateService = null) =>
-        new(
-            dataContext,
-            new MessagingRequestContextResolver(new HttpContextAccessor()),
-            templateService ?? new TestMessagingTemplateService(),
-            NullLogger<ThreadService>.Instance);
-
-    private static RequestMetadata Metadata(Guid credentialId, Guid tenantId) => new()
+        IMessagingTemplateService? templateService = null)
     {
-        CredentialId = credentialId,
-        TenantId = tenantId
+        var resolver = new MessagingRequestContextResolver(new HttpContextAccessor(), TestConfiguration(), new TestJwtService());
+        return new(
+            dataContext,
+            resolver,
+            templateService ?? new TestMessagingTemplateService(),
+            new MessagingPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
+            new MessagingActionRateLimiter(),
+            new MessagingModerationService(dataContext, resolver),
+            new TestTransientRealtimePublisher(),
+            NullLogger<ThreadService>.Instance);
+    }
+
+    private static RequestMetadata Metadata(Guid credentialId, Guid tenantId)
+    {
+        var metadata = new RequestMetadata
+        {
+            CredentialId = credentialId,
+            TenantId = tenantId,
+            ActorAccessToken = $"{tenantId:D}:{credentialId:D}"
+        };
+        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
+        return metadata;
+    }
+
+    private sealed class TestJwtService : IJwtService
+    {
+        public Task<JwtToken> GenerateToken(string username, Guid id, List<Guid> roleTypes, Guid? tenantId = null) =>
+            throw new NotSupportedException();
+
+        public Task<JwtToken> GenerateToken(List<Claim> claims) =>
+            throw new NotSupportedException();
+
+        public Task<JwtToken> Refresh(string refreshToken, string accessToken, DateTime now) =>
+            throw new NotSupportedException();
+
+        public Task<(ClaimsPrincipal, JwtSecurityToken)> DecodeJwtToken(string token)
+        {
+            var parts = token.Split(':', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2 ||
+                !Guid.TryParse(parts[0], out var tenantId) ||
+                !Guid.TryParse(parts[1], out var credentialId))
+            {
+                throw new InvalidOperationException("Invalid test token");
+            }
+
+            var principal = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim("tenant_id", tenantId.ToString("D")),
+                    new Claim("credential_id", credentialId.ToString("D")),
+                    new Claim(ClaimTypes.Name, credentialId.ToString("D"))
+                ],
+                "TestJwt"));
+
+            return Task.FromResult((principal, new JwtSecurityToken()));
+        }
+
+        public Task<(ClaimsPrincipal, JwtSecurityToken)> DecodeExpiredToken(string token) =>
+            DecodeJwtToken(token);
+    }
+
+    private static IConfiguration TestConfiguration() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Messaging:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
+            })
+            .Build();
+
+    private static RegistryConfiguration PolicySetting(Guid tenantId, string key, string value) => new()
+    {
+        Id = Guid.NewGuid(),
+        TenantId = tenantId,
+        Key = key,
+        Value = value,
+        Unit = "policy",
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
     };
 
     private static MessageThread Thread(Guid id, Guid tenantId) => new()
@@ -397,6 +753,55 @@ public sealed class ThreadServiceSecurityTests
         MessageThreadMemberId = memberId,
         MessageId = messageId,
         TypeId = typeId,
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
+    };
+
+    private static MessageThreadType ThreadType(Guid id, Guid tenantId) => new()
+    {
+        Id = id,
+        TenantId = tenantId,
+        MessageTypeId = MessageTypes.Chat,
+        Name = "Chat",
+        SystemReferenceId = MessageTypes.Chat,
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
+    };
+
+    private static MessageFile MessageFile(
+        Guid id,
+        Guid messageId,
+        Guid storageFileId,
+        Guid tenantId,
+        DateTime? createdAt = null) => new()
+    {
+        Id = id,
+        TenantId = tenantId,
+        MessageId = messageId,
+        StorageId = storageFileId,
+        IsEnabled = true,
+        CreatedAt = createdAt ?? DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
+    };
+
+    private static StorageFile StorageFile(
+        Guid id,
+        Guid tenantId,
+        string name,
+        string contentType,
+        decimal fileSizeKilobytes) => new()
+    {
+        Id = id,
+        TenantId = tenantId,
+        Name = name,
+        ContentType = contentType,
+        FileSize = fileSizeKilobytes,
+        ContentPath = name,
+        TypeId = Guid.NewGuid(),
+        Identifier = Guid.NewGuid(),
+        StorageFileIdentifierId = Guid.NewGuid(),
         IsEnabled = true,
         CreatedAt = DateTime.UtcNow,
         ConcurrencyStamp = Guid.NewGuid()
@@ -488,5 +893,12 @@ public sealed class ThreadServiceSecurityTests
             Task.FromResult(renderResponse is null
                 ? Result<RenderMessageTemplateResponse>.Failure("Template service is not configured for this test.", 501)
                 : Result<RenderMessageTemplateResponse>.Success(renderResponse));
+    }
+
+    private sealed class TestTransientRealtimePublisher : IMessagingTransientRealtimePublisher
+    {
+        public Task PublishTypingAsync(MessagingTypingState state, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task PublishPresenceAsync(MessagingPresenceState state, CancellationToken ct = default) => Task.CompletedTask;
     }
 }

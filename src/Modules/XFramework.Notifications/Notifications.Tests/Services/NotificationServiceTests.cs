@@ -7,8 +7,13 @@ using Notifications.Api.Services;
 using Notifications.Domain.Shared.Contracts;
 using Notifications.Domain.Shared.Contracts.Requests;
 using Notifications.Domain.Shared.Enums;
+using SmsGateway.Domain.Shared.Contracts.Requests.Create;
+using SmsGateway.Domain.Shared.Contracts.Requests.Get;
+using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
+using SmsGateway.Integration.Drivers;
 using NUnit.Framework;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Shared.BusinessObjects;
 
 namespace Notifications.Tests.Services;
 
@@ -55,6 +60,121 @@ public sealed class NotificationServiceTests
         result.Data.Items.Should().ContainSingle();
         result.Data.Items[0].Title.Should().Be("Current tenant");
         result.Data.Items[0].TenantId.Should().Be(database.TenantId);
+    }
+
+    [Test]
+    public async Task CreateNotificationAsync_SameCorrelationId_ReturnsExistingNotification()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var credentialId = Guid.NewGuid();
+        var correlationId = $"messaging:{Guid.NewGuid():N}";
+        var service = CreateService(database.Context);
+
+        var request = new CreateNotificationRequest
+        {
+            TenantId = database.TenantId,
+            RecipientCredentialId = credentialId,
+            TemplateKey = NotificationTemplateKeys.SystemGeneric,
+            Title = "First title",
+            Body = "First body",
+            DeliveryChannels = NotificationDeliveryChannel.InApp,
+            CorrelationId = correlationId
+        };
+
+        var first = await service.CreateNotificationAsync(request, CancellationToken.None);
+        request.Title = "Updated title";
+        var second = await service.CreateNotificationAsync(request, CancellationToken.None);
+
+        first.IsSuccess.Should().BeTrue();
+        second.IsSuccess.Should().BeTrue();
+        second.Data!.Id.Should().Be(first.Data!.Id);
+        second.Data.Title.Should().Be("First title");
+
+        var rowCount = await database.Context.Set<NotificationInboxItem>()
+            .CountAsync(item => item.TenantId == database.TenantId && item.CorrelationId == correlationId);
+        rowCount.Should().Be(1);
+    }
+
+    [Test]
+    public async Task CreateNotificationAsync_ExternalChannel_CreatesDeliveryJobAndStatus()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var credentialId = Guid.NewGuid();
+        EnableChannels(database.Context, database.TenantId, credentialId, NotificationDeliveryChannel.Email);
+        var service = CreateService(database.Context);
+
+        var result = await service.CreateNotificationAsync(new CreateNotificationRequest
+        {
+            TenantId = database.TenantId,
+            RecipientCredentialId = credentialId,
+            TemplateKey = NotificationTemplateKeys.SystemGeneric,
+            Title = "Email title",
+            Body = "Email body",
+            DeliveryChannels = NotificationDeliveryChannel.Email,
+            DeliveryAddress = "person@example.test",
+            CorrelationId = "email-test"
+        }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var job = await database.Context.Set<NotificationDeliveryJob>().SingleAsync();
+        job.Channel.Should().Be(NotificationDeliveryChannel.Email);
+        job.Status.Should().Be(NotificationDeliveryStatus.Queued);
+        job.RecipientAddress.Should().Be("person@example.test");
+        job.CorrelationId.Should().Be("email-test:Email");
+
+        var status = await database.Context.Set<NotificationDeliveryStatusRecord>().SingleAsync();
+        status.Status.Should().Be(NotificationDeliveryStatus.Queued);
+        status.Channel.Should().Be(NotificationDeliveryChannel.Email);
+    }
+
+    [Test]
+    public async Task DispatchDueAsync_SmsJob_EnqueuesSmsGatewayMessage()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var credentialId = Guid.NewGuid();
+        EnableChannels(database.Context, database.TenantId, credentialId, NotificationDeliveryChannel.Sms);
+        var smsGateway = new TestSmsGatewayServiceWrapper();
+        var agentClusterId = Guid.NewGuid();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Notifications:Delivery:Sms:AgentClusterId"] = agentClusterId.ToString()
+            })
+            .Build();
+
+        var service = CreateService(database.Context);
+        var create = await service.CreateNotificationAsync(new CreateNotificationRequest
+        {
+            TenantId = database.TenantId,
+            RecipientCredentialId = credentialId,
+            TemplateKey = NotificationTemplateKeys.SystemGeneric,
+            Title = "SMS title",
+            Body = "SMS body",
+            DeliveryChannels = NotificationDeliveryChannel.Sms,
+            DeliveryAddress = "+15555550123",
+            CorrelationId = "sms-test"
+        }, CancellationToken.None);
+
+        create.IsSuccess.Should().BeTrue();
+
+        var dispatcher = new NotificationDeliveryDispatcher(
+            database.Context,
+            smsGateway,
+            NullLogger<NotificationDeliveryDispatcher>.Instance,
+            configuration);
+
+        var processed = await dispatcher.DispatchDueAsync(CancellationToken.None);
+
+        processed.Should().Be(1);
+        smsGateway.CreatedRequests.Should().ContainSingle();
+        smsGateway.CreatedRequests[0].AgentClusterId.Should().Be(agentClusterId);
+        smsGateway.CreatedRequests[0].Recipient.Should().Be("+15555550123");
+        smsGateway.CreatedRequests[0].CorrelationId.Should().Be("sms-test:Sms");
+        smsGateway.CreatedRequests[0].Metadata.TenantId.Should().Be(database.TenantId);
+
+        var job = await database.Context.Set<NotificationDeliveryJob>().SingleAsync();
+        job.Status.Should().Be(NotificationDeliveryStatus.Sent);
     }
 
     [Test]
@@ -158,6 +278,42 @@ public sealed class NotificationServiceTests
 
     private static NotificationService CreateService(AppDbContext db) =>
         new(db, NullLogger<NotificationService>.Instance);
+
+    private static void EnableChannels(
+        AppDbContext db,
+        Guid tenantId,
+        Guid credentialId,
+        NotificationDeliveryChannel channels)
+    {
+        db.Set<NotificationPreference>().Add(new NotificationPreference
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            CredentialId = credentialId,
+            EnabledChannels = channels,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid(),
+            IsEnabled = true
+        });
+        db.SaveChanges();
+    }
+
+    private sealed class TestSmsGatewayServiceWrapper : ISmsGatewayServiceWrapper
+    {
+        public List<CreateSmsMessageRequest> CreatedRequests { get; } = [];
+
+        public Task<CmdResponse> CreateSmsMessage(CreateSmsMessageRequest request)
+        {
+            CreatedRequests.Add(request);
+            return Task.FromResult(new CmdResponse { HttpStatusCode = System.Net.HttpStatusCode.OK });
+        }
+
+        public Task<QueryResponse<List<SmsNodeJob>>> GetPendingSmsMessageList(GetPendingSmsMessageListRequest request) =>
+            throw new NotSupportedException();
+
+        public Task<QueryResponse<List<SmsNodeJob>>> GetScheduledSmsMessageList(GetScheduledSmsMessageListRequest request) =>
+            throw new NotSupportedException();
+    }
 
     private static NotificationInboxItem CreateInboxItem(Guid tenantId, Guid credentialId, string title) => new()
     {
