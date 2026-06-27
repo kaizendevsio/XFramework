@@ -1,5 +1,6 @@
 using IdentityServer.Integration.Drivers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Storage.Integration.Drivers;
 using Wallets.Integration.Drivers;
 using XFramework.Integration.Extensions;
 
@@ -13,6 +14,7 @@ public class ServiceWrapperInstaller : IInstaller
 
         // Service wrappers are auto-generated from [GenerateEndpoints] entities
         services.AddIdentityServerWrapperServices();
+        services.AddStorageWrapperServices();
         services.AddWalletsWrapperServices();
 
         services.TryAddSingleton<IHelperService, HelperService>();

@@ -9,10 +9,12 @@ public static class TestCategories
     public const string Wallets = "Module:Wallets";
     public const string Inventario = "Module:Inventario";
     public const string Attendance = "Module:Attendance";
+    public const string Storage = "Module:Storage";
 
     public const string Auth = "Area:Auth";
     public const string DataContext = "Area:DataContext";
     public const string Wrappers = "Area:Wrappers";
+    public const string StorageProvider = "Area:StorageProvider";
     public const string ControlPanelContract = "Area:ControlPanelContract";
     public const string FeatureGates = "Area:FeatureGates";
     public const string Catalog = "Area:Catalog";

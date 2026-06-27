@@ -7295,8 +7295,21 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("BlobContainer")
                         .HasColumnType("text");
 
+                    b.Property<string>("BucketName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("CdnBaseUrl")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
+
+                    b.Property<long?>("ContentLengthBytes")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("ContentPath")
                         .IsRequired()
@@ -7313,6 +7326,13 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("DownloadUrlExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ETag")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<DateTime?>("ExpireAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -7326,7 +7346,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
 
                     b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
@@ -7341,7 +7363,39 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Name")
                         .HasColumnType("character varying");
 
+                    b.Property<string>("ObjectKey")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<DateTime?>("ObjectDeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ProviderProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderProfileName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PublicUrl")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("RetentionUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Sha256Hash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<Guid>("StorageFileIdentifierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantBucketId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
@@ -7350,12 +7404,39 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("UploadStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Visibility")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.HasKey("Id")
                         .HasName("storagefile_pk");
 
+                    b.HasIndex("ProviderProfileId");
+
                     b.HasIndex("StorageFileIdentifierId");
 
+                    b.HasIndex("TenantBucketId");
+
                     b.HasIndex("TypeId");
+
+                    b.HasIndex("TenantId", "Identifier")
+                        .HasDatabaseName("ix_storagefile_tenant_identifier");
+
+                    b.HasIndex("TenantId", "RetentionUntil", "ObjectDeletedAt")
+                        .HasDatabaseName("ix_storagefile_tenant_retention_objectdeleted");
+
+                    b.HasIndex("TenantId", "BucketName", "ObjectKey")
+                        .HasDatabaseName("ix_storagefile_tenant_bucket_object");
+
+                    b.HasIndex("TenantId", "Status", "Visibility")
+                        .HasDatabaseName("ix_storagefile_tenant_status_visibility");
 
                     b.ToTable("StorageFile", "Storage");
                 });
@@ -7386,7 +7467,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
 
                     b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
@@ -7433,7 +7516,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
 
                     b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
@@ -7450,7 +7535,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("character varying");
 
                     b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"));
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -7481,7 +7568,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
 
                     b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
@@ -7498,7 +7587,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("character varying");
 
                     b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"));
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -7507,6 +7598,345 @@ namespace XFramework.Domain.Migrations
                         .HasName("storagefileentity_pk");
 
                     b.ToTable("StorageFileType", "Storage");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageProviderProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("AccessKeyId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AccessKeyIdSecretName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("AutoCreateBuckets")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("BucketPrefix")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CdnBaseUrl")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConnectionString")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ConnectionStringSecretName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Endpoint")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PublicBaseUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("SecretAccessKey")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SecretAccessKeySecretName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("UsePathStyle")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id")
+                        .HasName("storageproviderprofile_pk");
+
+                    b.HasIndex("TenantId", "IsDefault")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\" = true AND \"IsDeleted\" = false")
+                        .HasDatabaseName("ix_storageproviderprofile_tenant_default");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false")
+                        .HasDatabaseName("ix_storageproviderprofile_tenant_name");
+
+                    b.ToTable("StorageProviderProfile", "Storage");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageTenantBucket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("BucketName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("CdnBaseUrl")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("LastEnsuredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("ProviderProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PublicBaseUrl")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("storagetenantbucket_pk");
+
+                    b.HasIndex("BucketName")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false")
+                        .HasDatabaseName("ix_storagetenantbucket_bucket");
+
+                    b.HasIndex("ProviderProfileId");
+
+                    b.HasIndex("TenantId", "ProviderProfileId")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false")
+                        .HasDatabaseName("ix_storagetenantbucket_tenant_provider");
+
+                    b.ToTable("StorageTenantBucket", "Storage");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageUploadPart", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("OffsetBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("PartNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProviderPartId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Sha256Hash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UploadSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id")
+                        .HasName("storageuploadpart_pk");
+
+                    b.HasIndex("UploadSessionId", "PartNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_storageuploadpart_session_part");
+
+                    b.ToTable("StorageUploadPart", "Storage");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageUploadSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<DateTime?>("AbortedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ChunkSizeBytes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExpectedSha256Hash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ProviderUploadId")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StorageFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TotalParts")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("TotalSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("UploadId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id")
+                        .HasName("storageuploadsession_pk");
+
+                    b.HasIndex("StorageFileId");
+
+                    b.HasIndex("UploadId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_storageuploadsession_uploadid");
+
+                    b.HasIndex("TenantId", "Status", "ExpiresAt")
+                        .HasDatabaseName("ix_storageuploadsession_tenant_status_expires");
+
+                    b.ToTable("StorageUploadSession", "Storage");
                 });
 
             modelBuilder.Entity("XFramework.Inventario.Domain.Shared.Contracts.InventoryLocation", b =>
@@ -10643,6 +11073,12 @@ namespace XFramework.Domain.Migrations
 
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageFile", b =>
                 {
+                    b.HasOne("XFramework.Domain.Shared.Contracts.StorageProviderProfile", "ProviderProfile")
+                        .WithMany("Files")
+                        .HasForeignKey("ProviderProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("storagefile_storageproviderprofile_id_fk");
+
                     b.HasOne("XFramework.Domain.Shared.Contracts.StorageFileIdentifier", "StorageFileIdentifier")
                         .WithMany("StorageFiles")
                         .HasForeignKey("StorageFileIdentifierId")
@@ -10650,13 +11086,23 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("storagefile_storagefileidentifier_id_fk");
 
+                    b.HasOne("XFramework.Domain.Shared.Contracts.StorageTenantBucket", "TenantBucket")
+                        .WithMany("Files")
+                        .HasForeignKey("TenantBucketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("storagefile_storagetenantbucket_id_fk");
+
                     b.HasOne("XFramework.Domain.Shared.Contracts.StorageFileType", "Type")
                         .WithMany("StorageFiles")
                         .HasForeignKey("TypeId")
                         .IsRequired()
                         .HasConstraintName("storagefile_storagefileentity_id_fk");
 
+                    b.Navigation("ProviderProfile");
+
                     b.Navigation("StorageFileIdentifier");
+
+                    b.Navigation("TenantBucket");
 
                     b.Navigation("Type");
                 });
@@ -10670,6 +11116,42 @@ namespace XFramework.Domain.Migrations
                         .HasConstraintName("storagefileidentifier_storagefileidentifiergroup_id_fk");
 
                     b.Navigation("Group");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageTenantBucket", b =>
+                {
+                    b.HasOne("XFramework.Domain.Shared.Contracts.StorageProviderProfile", "ProviderProfile")
+                        .WithMany("TenantBuckets")
+                        .HasForeignKey("ProviderProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("storagetenantbucket_storageproviderprofile_id_fk");
+
+                    b.Navigation("ProviderProfile");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageUploadPart", b =>
+                {
+                    b.HasOne("XFramework.Domain.Shared.Contracts.StorageUploadSession", "UploadSession")
+                        .WithMany("Parts")
+                        .HasForeignKey("UploadSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("storageuploadpart_storageuploadsession_id_fk");
+
+                    b.Navigation("UploadSession");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageUploadSession", b =>
+                {
+                    b.HasOne("XFramework.Domain.Shared.Contracts.StorageFile", "StorageFile")
+                        .WithMany("UploadSessions")
+                        .HasForeignKey("StorageFileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("storageuploadsession_storagefile_id_fk");
+
+                    b.Navigation("StorageFile");
                 });
 
             modelBuilder.Entity("XFramework.Inventario.Domain.Shared.Contracts.InventoryLocation", b =>
@@ -11511,6 +11993,11 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("GatewayResponseTypes");
                 });
 
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageFile", b =>
+                {
+                    b.Navigation("UploadSessions");
+                });
+
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageFileIdentifier", b =>
                 {
                     b.Navigation("StorageFiles");
@@ -11524,6 +12011,23 @@ namespace XFramework.Domain.Migrations
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageFileType", b =>
                 {
                     b.Navigation("StorageFiles");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageProviderProfile", b =>
+                {
+                    b.Navigation("Files");
+
+                    b.Navigation("TenantBuckets");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageTenantBucket", b =>
+                {
+                    b.Navigation("Files");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.StorageUploadSession", b =>
+                {
+                    b.Navigation("Parts");
                 });
 
             modelBuilder.Entity("XFramework.Inventario.Domain.Shared.Contracts.InventoryLocation", b =>

@@ -84,6 +84,13 @@
     </SidebarSection>
 }
 
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Storage))
+{
+    <SidebarSection GroupId="storage" Title="Storage" Icon="hard-drive">
+        <SidebarNavItem Href="/storage/files" Label="Files" Icon="hard-drive" />
+    </SidebarSection>
+}
+
 @if (AnyWalletFinanceFeatureEnabled())
 {
     <SidebarSection GroupId="finance" Title="Finance" Icon="wallet">

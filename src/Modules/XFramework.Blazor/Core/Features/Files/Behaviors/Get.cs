@@ -1,4 +1,4 @@
-﻿using IdentityServer.Integration.Drivers;
+using Storage.Integration.Drivers;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Responses;
 
@@ -9,7 +9,7 @@ public class FilesState
     public record Get(Guid Identifier) : StateAction<PaginatedResult<StorageFile>?>;
 
     protected class GetHandler(
-        IIdentityServerServiceWrapper identityServerServiceWrapper,
+        IStorageServiceWrapper storageServiceWrapper,
         HandlerServices handlerServices,
         IStore store
     )
@@ -27,7 +27,7 @@ public class FilesState
                 }
             };
 
-            var response = await identityServerServiceWrapper.StorageFile.GetList(
+            var response = await storageServiceWrapper.StorageFile.GetList(
                 pageSize: 100,
                 pageNumber: 1,
                 filter: filters,
