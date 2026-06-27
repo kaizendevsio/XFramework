@@ -39,10 +39,6 @@ public partial class AppDbContext : XDbContext
     public virtual DbSet<MetaData> MetaData { get; set; }
     public virtual DbSet<MetaDataType> MetaDataTypes { get; set; }
     public virtual DbSet<MetaDataTypeGroup> MetaDataTypeGroups { get; set; }
-    public virtual DbSet<StorageFile> StorageFiles { get; set; }
-    public virtual DbSet<StorageFileType> StorageFileTypes { get; set; }
-    public virtual DbSet<StorageFileIdentifier> StorageFileIdentifiers { get; set; }
-    public virtual DbSet<StorageFileIdentifierGroup> StorageFileIdentifierGroups { get; set; }
     public virtual DbSet<PaymentGateway> PaymentGateways { get; set; }
     public virtual DbSet<PaymentGatewayCategory> PaymentGatewayCategories { get; set; }
     public virtual DbSet<PaymentGatewayEndpoint> PaymentGatewayEndpoints { get; set; }

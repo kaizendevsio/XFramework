@@ -43,6 +43,11 @@
     <Project Path="src\Modules\XFramework.Notifications\Notifications.Integration\Notifications.Integration.csproj" />
     <Project Path="src\Modules\XFramework.Notifications\Notifications.Tests\Notifications.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Storage/">
+    <Project Path="src\Modules\XFramework.Storage\Storage.Api\Storage.Api.csproj" />
+    <Project Path="src\Modules\XFramework.Storage\Storage.Domain.Shared\Storage.Domain.Shared.csproj" />
+    <Project Path="src\Modules\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
+  </Folder>
   <Folder Name="/Services/Attendance/">
     <Project Path="src\Modules\XFramework.Attendance\Attendance.Api\Attendance.Api.csproj" />
     <Project Path="src\Modules\XFramework.Attendance\Attendance.Domain.Shared\Attendance.Domain.Shared.csproj" />
@@ -88,6 +93,7 @@
     <Project Path="src\Tests\Inventario.Api.Tests\Inventario.Api.Tests.csproj" />
     <Project Path="src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.csproj" />
     <Project Path="src\Tests\OperationsDashboard.Tests\OperationsDashboard.Tests.csproj" />
+    <Project Path="src\Tests\Storage.IntegrationTests\Storage.IntegrationTests.csproj" />
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
     <Project Path="src\Tests\XFramework.SourceGenerators.Tests\XFramework.SourceGenerators.Tests.csproj" />
     <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />

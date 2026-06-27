@@ -1,5 +1,7 @@
 using XFramework.Core.Loggers;
 using XFramework.Domain.Shared.DataContext;
+using Storage.Domain.Shared.Contracts.Requests;
+using Storage.Integration.Drivers;
 
 namespace Community.Api.Services;
 
@@ -11,17 +13,20 @@ public sealed class ContentService : IContentService
     private readonly IDataContext _dataContext;
     private readonly IConnectionService _connectionService;
     private readonly ICommunityRequestContext _requestContext;
+    private readonly IStorageServiceWrapper _storageServiceWrapper;
     private readonly ILogger<ContentService> _logger;
 
     public ContentService(
         IDataContext dataContext,
         IConnectionService connectionService,
         ICommunityRequestContext requestContext,
+        IStorageServiceWrapper storageServiceWrapper,
         ILogger<ContentService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _connectionService = connectionService ?? throw new ArgumentNullException(nameof(connectionService));
         _requestContext = requestContext ?? throw new ArgumentNullException(nameof(requestContext));
+        _storageServiceWrapper = storageServiceWrapper ?? throw new ArgumentNullException(nameof(storageServiceWrapper));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -666,12 +671,18 @@ public sealed class ContentService : IContentService
             if (content.SocialMediaIdentityId != requester.IdentityId)
                 return Result<CmdResponse>.Forbidden("You do not have permission to attach files to this content");
 
-            var storageFileExists = await _dataContext.Query<StorageFile>()
-                .Where(f => f.TenantId == requester.TenantId)
-                .AnyAsync(f => f.Id == request.StorageFileId, cancellationToken);
+            var storageFileResult = await _storageServiceWrapper.ValidateStorageFileReference(new ValidateStorageFileReferenceRequest
+            {
+                Metadata = request.Metadata,
+                StorageFileId = request.StorageFileId,
+                RequireAvailable = true
+            });
 
-            if (!storageFileExists)
+            if (!storageFileResult.IsSuccess || storageFileResult.Response is null)
                 return Result<CmdResponse>.NotFound($"Storage file with Id {request.StorageFileId} does not exist");
+
+            if (!storageFileResult.Response.IsValid)
+                return Result<CmdResponse>.Failure(storageFileResult.Response.Message ?? "Storage file is not available", 400);
 
             var entity = new CommunityContentFile
             {

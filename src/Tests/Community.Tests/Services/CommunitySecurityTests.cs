@@ -13,6 +13,9 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using Storage.Domain.Shared.Contracts.Requests;
+using Storage.Domain.Shared.Contracts.Responses;
+using Storage.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
@@ -156,6 +159,7 @@ public sealed class CommunitySecurityTests
         var service = new CommunityService(
             dataContext,
             requesterContext,
+            StorageWrapper(),
             NullLogger<CommunityService>.Instance);
 
         var result = await service.UpdateCommunityIdentityAsync(new UpdateCommunityIdentityRequest
@@ -314,7 +318,64 @@ public sealed class CommunitySecurityTests
             dataContext,
             new StubConnectionService(blocked),
             RequesterContext(),
+            StorageWrapper(),
             NullLogger<ContentService>.Instance);
+
+    private static IStorageServiceWrapper StorageWrapper() => new ThrowingStorageServiceWrapper();
+
+    private sealed class ThrowingStorageServiceWrapper : IStorageServiceWrapper
+    {
+        public IStorageFileCrudService StorageFile { get; init; } = null!;
+        public IStorageFileTypeCrudService StorageFileType { get; init; } = null!;
+
+        public Task<byte[]> ExecuteQueryAsync(byte[] queryDescriptorBytes, CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage queries should not be called by these security tests.");
+
+        public Task<byte[]> ExecuteChangesAsync(byte[] saveChangesRequestBytes, CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage changes should not be called by these security tests.");
+
+        public IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(byte[] queryDescriptorBytes, CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage query streams should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(CreateStorageUploadSessionRequest request) =>
+            throw new NotSupportedException("Storage upload sessions should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageUploadPartResponse>> UploadStorageFilePart(UploadStorageFilePartRequest request) =>
+            throw new NotSupportedException("Storage upload parts should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageUploadPartListResponse>> ListStorageUploadParts(ListStorageUploadPartsRequest request) =>
+            throw new NotSupportedException("Storage upload part listing should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(CompleteStorageUploadSessionRequest request) =>
+            throw new NotSupportedException("Storage upload completion should not be called by these security tests.");
+
+        public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request) =>
+            throw new NotSupportedException("Storage upload abort should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageFileResponse>> GetStorageFile(GetStorageFileRequest request) =>
+            throw new NotSupportedException("Storage file reads should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageFileListResponse>> GetStorageFiles(GetStorageFilesRequest request) =>
+            throw new NotSupportedException("Storage file listing should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageDownloadUrlResponse>> GetStorageDownloadUrl(GetStorageDownloadUrlRequest request) =>
+            throw new NotSupportedException("Storage download URLs should not be called by these security tests.");
+
+        public Task<QueryResponse<StoragePublicUrlResponse>> GetStoragePublicUrl(GetStoragePublicUrlRequest request) =>
+            throw new NotSupportedException("Storage public URLs should not be called by these security tests.");
+
+        public Task<CmdResponse> DeleteStorageFile(DeleteStorageFileRequest request) =>
+            throw new NotSupportedException("Storage deletes should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageFileResponse>> RestoreStorageFile(RestoreStorageFileRequest request) =>
+            throw new NotSupportedException("Storage restores should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageRetentionCleanupResponse>> CleanupStorageRetention(CleanupStorageRetentionRequest request) =>
+            throw new NotSupportedException("Storage cleanup should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageFileValidationResponse>> ValidateStorageFileReference(ValidateStorageFileReferenceRequest request) =>
+            throw new NotSupportedException("Storage validation should not be called by these security tests.");
+    }
 
     private static StubCommunityRequestContext RequesterContext() =>
         new(new CommunityRequester(CredentialId, TenantId, CurrentIdentity()));
@@ -521,6 +582,8 @@ public sealed class CommunitySecurityTests
         }
 
         public IRemoteQuery<T> NoCache() => this;
+
+        public IRemoteQuery<T> IgnoreQueryFilters() => this;
 
         public Task<List<T>> ToListAsync(CancellationToken ct = default) =>
             Task.FromResult(_queryable.ToList());
