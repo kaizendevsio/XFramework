@@ -1,6 +1,7 @@
 using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts;
 using Attendance.Api.Generated;
+using Bolt.Client;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -22,6 +23,8 @@ builder.Services.AddXFrameworkRateLimiting();
 
 var app = (WebApplication)builder.Build();
 
+RegisterGeneratedBoltHandlers(app);
+
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
 app.UseTenantModuleFeatureGate(options =>
@@ -34,5 +37,14 @@ app.MapApiDocumentation();
 
 app.Run();
 
-public partial class Program;
+static void RegisterGeneratedBoltHandlers(WebApplication app)
+{
+    var client = app.Services.GetRequiredService<BoltClient>();
+    var logger = app.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Attendance.GeneratedBoltHandlers");
+    var scopeFactory = app.Services.GetRequiredService<IServiceScopeFactory>();
 
+    BoltHandlerRegistry.RegisterAll(client, logger, scopeFactory);
+}
+
+public partial class Program;
