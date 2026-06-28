@@ -271,7 +271,14 @@ public sealed class AttendanceService(AppDbContext db, ILogger<AttendanceService
             .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == request.ContextId && item.IsActive, ct);
 
         if (context is null)
+        {
+            logger.LogWarning(
+                "Attendance context {ContextId} was not found for tenant {TenantId} while creating session {SessionName}.",
+                request.ContextId,
+                tenantId,
+                request.Name);
             return Result<AttendanceSessionResponse>.NotFound("Attendance context was not found");
+        }
 
         if (request.PolicyId.HasValue && !await PolicyExistsAsync(tenantId, request.PolicyId.Value, ct))
             return Result<AttendanceSessionResponse>.NotFound("Attendance policy was not found");

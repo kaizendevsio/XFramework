@@ -352,9 +352,20 @@ else
             return;
         }
 
-        if (!Guid.TryParse(_form.ContextId, out var contextId))
+        if (!Guid.TryParse(_form.ContextId, out var contextId) || contextId == Guid.Empty)
         {
             ToastService.Warning("Select an attendance context.", "Validation");
+            return;
+        }
+
+        var selectedContext = _contextOptions.FirstOrDefault(context => context.Id == contextId);
+        if (selectedContext is null)
+        {
+            Logger.LogWarning(
+                "Attendance session creation blocked because context {ContextId} is not available for tenant {TenantId}.",
+                contextId,
+                tenantId);
+            ToastService.Warning("Select a valid attendance context for the active tenant.", "Validation");
             return;
         }
 
@@ -407,8 +418,17 @@ else
             }
             else
             {
-                Logger.LogWarning("Attendance session creation failed with status {StatusCode}", response.HttpStatusCode);
-                ToastService.Error("Attendance session could not be created.", "Attendance");
+                var message = string.IsNullOrWhiteSpace(response.Message)
+                    ? "Attendance session could not be created."
+                    : response.Message;
+
+                Logger.LogWarning(
+                    "Attendance session creation failed with status {StatusCode}: {Message}. TenantId: {TenantId}. ContextId: {ContextId}.",
+                    response.HttpStatusCode,
+                    response.Message,
+                    tenantId,
+                    contextId);
+                ToastService.Error(message, "Attendance");
             }
         }
         catch (Exception ex)

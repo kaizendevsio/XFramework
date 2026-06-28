@@ -97,6 +97,8 @@ public sealed class AttendanceControlPanelContractTests
         var service = File.ReadAllText(servicePath);
 
         service.Should().Contain("IDataContext dataContext");
+        service.Should().Contain("IAttendanceServiceWrapper attendance");
+        service.Should().Contain("attendance.GetAttendanceContexts(new GetAttendanceContextsRequest");
         service.Should().Contain("dataContext.Query<AttendanceContext>()");
         service.Should().Contain("dataContext.Query<AttendanceSession>()");
         service.Should().Contain("dataContext.Query<AttendanceParticipant>()");
@@ -106,6 +108,7 @@ public sealed class AttendanceControlPanelContractTests
         service.Should().Contain("BuildCredentialLabel");
         service.Should().Contain("AttendanceRecordStatus.Absent");
         service.Should().Contain("NormalizeUtc(fromUtc)");
+        service.Should().Contain("context.Id != Guid.Empty");
         service.Should().NotContain("x.StartsAt >= fromUtc");
         service.Should().NotContain("SaveChangesAsync(");
     }
