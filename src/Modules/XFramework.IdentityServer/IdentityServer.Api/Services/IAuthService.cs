@@ -9,6 +9,16 @@ namespace IdentityServer.Api.Services;
 public interface IAuthService
 {
     /// <summary>
+    /// Creates a tenant through the IdentityServer admin workflow.
+    /// </summary>
+    /// <param name="request">Tenant creation request</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Result containing the created tenant</returns>
+    Task<Result<Tenant>> CreateTenantAsync(
+        CreateTenantRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Creates a new identity credential with BCrypt password hashing (workFactor 11).
     /// </summary>
     /// <param name="request">The credential creation request containing username, password, and identity info</param>

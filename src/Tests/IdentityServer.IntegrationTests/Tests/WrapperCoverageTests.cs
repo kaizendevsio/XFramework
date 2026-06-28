@@ -21,6 +21,38 @@ namespace IdentityServer.IntegrationTests.Tests;
 public sealed class WrapperCoverageTests : IntegrationTestBase
 {
     [Test]
+    public async Task CreateTenant_WithValidData_CreatesTenantWithServerGeneratedIdentity()
+    {
+        var tenantName = $"Wrapper Tenant {Guid.NewGuid():N}";
+
+        var result = await IntegrationTestFixture.ServiceWrapper.CreateTenant(new CreateTenantRequest
+        {
+            Name = tenantName,
+            Description = "Created through direct wrapper coverage",
+            Version = 1.25m,
+            Status = 1,
+            ParentTenantId = IntegrationTestFixture.TestTenantId,
+            Metadata = CreateMetadata()
+        });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        result.IsSuccess.Should().BeTrue();
+
+        await using var db = CreateDbContext();
+        var tenant = await db.Set<Tenant>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Name == tenantName);
+
+        tenant.Should().NotBeNull();
+        tenant!.Id.Should().NotBeEmpty();
+        tenant.TenantId.Should().Be(tenant.Id);
+        tenant.ParentTenantId.Should().Be(IntegrationTestFixture.TestTenantId);
+        tenant.Version.Should().Be(1.25m);
+        tenant.Status.Should().Be(1);
+        tenant.IsEnabled.Should().BeTrue();
+    }
+
+    [Test]
     public async Task CreateCredential_WithValidData_HashesPasswordAndCreatesCredential()
     {
         var info = await SeedIdentityInfo();

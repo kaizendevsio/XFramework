@@ -161,6 +161,7 @@ public sealed class IdentityServerControlPanelContractTests
         var pagesRoot = GetIdentityPagesRoot();
         var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
         var credentials = File.ReadAllText(Path.Combine(pagesRoot, "Credentials.razor"));
+        var tenants = File.ReadAllText(Path.Combine(pagesRoot, "Tenants.razor"));
 
         userDetail.Should().Contain("[Inject] private IIdentityServerServiceWrapper IdentityServer");
         userDetail.Should().Contain("IdentityServer.CreateCredential(new CreateCredentialRequest");
@@ -170,6 +171,11 @@ public sealed class IdentityServerControlPanelContractTests
         credentials.Should().Contain("[Inject] private IIdentityServerServiceWrapper IdentityServer");
         credentials.Should().Contain("IdentityServer.UploadCredentialAvatar(new UploadCredentialAvatarRequest");
         credentials.Should().Contain("IdentityServer.RemoveCredentialAvatar(new RemoveCredentialAvatarRequest");
+        tenants.Should().Contain("[Inject] private IIdentityServerServiceWrapper IdentityServer");
+        tenants.Should().Contain("new CreateTenantRequest");
+        tenants.Should().Contain("IdentityServer.CreateTenant(request)");
+        tenants.Should().NotContain("DataContext.Add(tenant)");
+        tenants.Should().NotContain("TenantId = tenantId");
         userDetail.Should().NotContain("BCrypt.Net.BCrypt.HashPassword");
         userDetail.Should().NotContain("DataContext.Add(credential)");
         userDetail.Should().NotContain("DataContext.Update(session)");
