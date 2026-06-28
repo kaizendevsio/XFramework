@@ -1,12 +1,20 @@
 using Attendance.Domain.Shared.Contracts;
+using Attendance.Domain.Shared.Contracts.Requests;
+using Attendance.Domain.Shared.Contracts.Responses;
 using Attendance.Domain.Shared.Enums;
+using Attendance.Integration.Drivers;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 
 namespace ControlPanel.Server.Services;
 
-public sealed class AttendanceControlPanelReadService(IDataContext dataContext)
+public sealed class AttendanceControlPanelReadService(
+    IDataContext dataContext,
+    IAttendanceServiceWrapper attendance,
+    RequestMetadata requestMetadata,
+    ILogger<AttendanceControlPanelReadService> logger)
 {
     public async Task<IReadOnlyList<AttendanceContextRow>> LoadContextRowsAsync(
         Guid tenantId,
@@ -355,17 +363,41 @@ public sealed class AttendanceControlPanelReadService(IDataContext dataContext)
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var contexts = await dataContext.Query<AttendanceContext>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IsActive)
-            .OrderBy(x => x.Name)
-            .Take(500)
-            .ToListAsync(cancellationToken);
+        var response = await attendance.GetAttendanceContexts(new GetAttendanceContextsRequest
+        {
+            TenantId = tenantId,
+            IsActive = true,
+            Page = 1,
+            PageSize = 500,
+            Metadata = BuildMetadata(tenantId)
+        });
 
-        return contexts
+        if (!response.IsSuccess || response.Response is null)
+        {
+            logger.LogWarning(
+                "Attendance context options could not be loaded for tenant {TenantId}. Status: {StatusCode}. Message: {Message}",
+                tenantId,
+                response.HttpStatusCode,
+                response.Message);
+            return [];
+        }
+
+        var options = response.Response.Items
+            .Where(context => context.Id != Guid.Empty)
+            .OrderBy(context => context.Name)
             .Select(context => new AttendanceContextOption(context.Id, ContextLabel(context), context.ContextType, context.IsActive))
             .ToList();
+
+        var emptyIdCount = response.Response.Items.Count - options.Count;
+        if (emptyIdCount > 0)
+        {
+            logger.LogWarning(
+                "Attendance context options response for tenant {TenantId} contained {EmptyIdCount} context(s) with an empty ID.",
+                tenantId,
+                emptyIdCount);
+        }
+
+        return options;
     }
 
     public async Task<IReadOnlyDictionary<Guid, string>> LoadCredentialLabelsAsync(
@@ -473,8 +505,24 @@ public sealed class AttendanceControlPanelReadService(IDataContext dataContext)
 
     public static string ShortId(Guid? id) => id is Guid value ? value.ToString("N")[..8] : "N/A";
 
-    private static string ContextLabel(AttendanceContext context) =>
-        string.IsNullOrWhiteSpace(context.Code) ? context.Name : $"{context.Code} - {context.Name}";
+    private RequestMetadata BuildMetadata(Guid tenantId) => new()
+    {
+        TenantId = tenantId,
+        CredentialId = requestMetadata.CredentialId,
+        SessionId = requestMetadata.SessionId,
+        RequestId = Guid.NewGuid(),
+        Name = requestMetadata.Name ?? "ControlPanel",
+        DeviceName = requestMetadata.DeviceName,
+        DeviceAgent = requestMetadata.DeviceAgent,
+        IpAddress = requestMetadata.IpAddress
+    };
+
+    private static string ContextLabel(AttendanceContext context) => ContextLabel(context.Name, context.Code);
+
+    private static string ContextLabel(AttendanceContextResponse context) => ContextLabel(context.Name, context.Code);
+
+    private static string ContextLabel(string name, string? code) =>
+        string.IsNullOrWhiteSpace(code) ? name : $"{code} - {name}";
 
     private static string DisplayNameForParticipant(AttendanceParticipant participant) =>
         Normalize(participant.DisplayName) ?? $"Credential {ShortId(participant.CredentialId)}";
