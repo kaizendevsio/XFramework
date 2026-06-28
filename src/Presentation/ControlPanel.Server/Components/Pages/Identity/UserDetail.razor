@@ -113,6 +113,17 @@ else
                     <BbCardContent>
                         <BbDataGrid Items="@_credentials" ShowPagination="true" InitialPageSize="10" ShowSearch="true" SearchPlaceholder="Search credentials...">
                             <Columns>
+                                <BbDataGridTemplateColumn Title="Avatar" Filterable="true" FilterBy="@(cred => GetAvatarFilter(cred))">
+                                    <ChildContent Context="cred">
+                                        <BbAvatar class="h-8 w-8">
+                                            @if (!string.IsNullOrWhiteSpace(cred.AvatarUrl))
+                                            {
+                                                <BbAvatarImage Src="@cred.AvatarUrl" Alt="@($"{GetCredentialLabel(cred)} avatar")" />
+                                            }
+                                            <BbAvatarFallback>@GetCredentialInitials(cred)</BbAvatarFallback>
+                                        </BbAvatar>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
                                 <BbDataGridPropertyColumn Property="@(x => x.UserName)" Title="Username" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.UserAlias)" Title="Alias" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Online" Filterable="true" FilterBy="@(cred => GetCredentialOnlineFilter(cred))">
@@ -135,6 +146,24 @@ else
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                                 <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="cred">
+                                        <div class="flex items-center gap-1">
+                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                      OnClick="@(() => OpenCredentialAvatarDialog(cred))">
+                                                <LucideIcon Name="image-up" class="h-4 w-4" />
+                                            </BbButton>
+                                            @if (HasAvatar(cred))
+                                            {
+                                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                          Disabled="@_saving"
+                                                          OnClick="@(() => RemoveCredentialAvatar(cred))">
+                                                    <LucideIcon Name="image-off" class="h-4 w-4 text-destructive" />
+                                                </BbButton>
+                                            }
+                                        </div>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
                             </Columns>
                             <EmptyTemplate>
                                 <BbEmpty Title="No credentials" Description="No credentials are linked to this user." />
@@ -651,6 +680,52 @@ else
     </BbDialogContent>
 </BbDialog>
 
+<!-- Credential Avatar Dialog -->
+<BbDialog Open="@_credentialAvatarDialogOpen" OpenChanged="@(v => _credentialAvatarDialogOpen = v)">
+    <BbDialogContent TrapFocus="false">
+        <BbDialogHeader>
+            <BbDialogTitle>Credential Avatar</BbDialogTitle>
+            <BbDialogDescription>Upload a PNG, JPEG, or WebP image for this credential.</BbDialogDescription>
+        </BbDialogHeader>
+        @if (_avatarCredential is not null)
+        {
+            <div class="grid gap-4 py-4">
+                <div class="flex items-center gap-3">
+                    <BbAvatar class="h-10 w-10">
+                        @if (!string.IsNullOrWhiteSpace(_avatarCredential.AvatarUrl))
+                        {
+                            <BbAvatarImage Src="@_avatarCredential.AvatarUrl" Alt="@($"{GetCredentialLabel(_avatarCredential)} avatar")" />
+                        }
+                        <BbAvatarFallback>@GetCredentialInitials(_avatarCredential)</BbAvatarFallback>
+                    </BbAvatar>
+                    <div>
+                        <BbTypographySmall>@GetCredentialLabel(_avatarCredential)</BbTypographySmall>
+                        <BbTypographyMuted>@(_user?.FullName ?? _user?.IdentityName ?? "Identity credential")</BbTypographyMuted>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <BbLabel>Avatar image</BbLabel>
+                    <BbFileUpload Files="@_credentialAvatarFiles"
+                                  FilesChanged="@OnCredentialAvatarFilesChanged"
+                                  Multiple="false"
+                                  Accept="@AvatarAccept"
+                                  MaxFileSize="@CredentialAvatarPolicy.MaxFileSizeBytes"
+                                  MaxFileCount="1"
+                                  ShowPreview="false"
+                                  Disabled="@_saving" />
+                    <BbTypographyMuted>PNG, JPEG, or WebP. Maximum size is 5 MB.</BbTypographyMuted>
+                </div>
+            </div>
+        }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@CloseCredentialAvatarDialog">Cancel</BbButton>
+            <BbButton OnClick="@UploadCredentialAvatar" Disabled="@_saving">
+                @(_saving ? "Uploading..." : "Upload")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 <!-- Assign Role Dialog -->
 <BbDialog Open="@_assignRoleDialogOpen" OpenChanged="@(v => _assignRoleDialogOpen = v)">
     <BbDialogContent TrapFocus="false">
@@ -900,6 +975,10 @@ else
     // Create Credential dialog
     private bool _createCredDialogOpen;
     private CredentialForm _credForm = new();
+    private bool _credentialAvatarDialogOpen;
+    private IdentityCredential? _avatarCredential;
+    private List<FileUploadItem> _credentialAvatarFiles = [];
+    private const string AvatarAccept = "image/png,image/jpeg,image/webp";
 
     // Assign Role dialog
     private bool _assignRoleDialogOpen;
@@ -1380,6 +1459,118 @@ else
 
     // ─── Roles ────────────────────────────────────────────────────────
 
+    private void OpenCredentialAvatarDialog(IdentityCredential credential)
+    {
+        _avatarCredential = credential;
+        _credentialAvatarFiles = [];
+        _credentialAvatarDialogOpen = true;
+    }
+
+    private void CloseCredentialAvatarDialog()
+    {
+        _credentialAvatarDialogOpen = false;
+        _avatarCredential = null;
+        _credentialAvatarFiles = [];
+    }
+
+    private void OnCredentialAvatarFilesChanged()
+    {
+        StateHasChanged();
+    }
+
+    private async Task UploadCredentialAvatar()
+    {
+        if (_avatarCredential is null)
+            return;
+
+        var uploadItem = _credentialAvatarFiles.FirstOrDefault();
+        var file = uploadItem?.File;
+        if (file is null)
+        {
+            ToastService.Warning("Choose an image file.", "Missing image");
+            return;
+        }
+
+        if (!CredentialAvatarPolicy.IsAllowedContentType(file.ContentType))
+        {
+            ToastService.Warning("Use a PNG, JPEG, or WebP image.", "Unsupported image");
+            return;
+        }
+
+        if (file.Size > CredentialAvatarPolicy.MaxFileSizeBytes)
+        {
+            ToastService.Warning("Avatar image must be 5 MB or smaller.", "Image too large");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            await using var stream = file.OpenReadStream(CredentialAvatarPolicy.MaxFileSizeBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+
+            var result = await IdentityServer.UploadCredentialAvatar(new UploadCredentialAvatarRequest
+            {
+                CredentialId = _avatarCredential.Id,
+                FileName = file.Name,
+                ContentType = file.ContentType,
+                FileBytes = buffer.ToArray(),
+                Metadata = CreateMetadata(_avatarCredential.TenantId)
+            });
+
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Credential avatar uploaded.", "Avatar saved");
+                CloseCredentialAvatarDialog();
+                await LoadCredentials();
+            }
+            else
+            {
+                ToastService.Error("Credential avatar could not be uploaded.", "Upload failed");
+            }
+        }
+        catch
+        {
+            ToastService.Error("Credential avatar could not be uploaded.", "Upload failed");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task RemoveCredentialAvatar(IdentityCredential credential)
+    {
+        _saving = true;
+        try
+        {
+            var result = await IdentityServer.RemoveCredentialAvatar(new RemoveCredentialAvatarRequest
+            {
+                CredentialId = credential.Id,
+                Metadata = CreateMetadata(credential.TenantId)
+            });
+
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Credential avatar removed.", "Avatar removed");
+                await LoadCredentials();
+            }
+            else
+            {
+                ToastService.Error("Credential avatar could not be removed.", "Remove failed");
+            }
+        }
+        catch
+        {
+            ToastService.Error("Credential avatar could not be removed.", "Remove failed");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
     private void OpenAssignRoleDialog()
     {
         _roleForm = new RoleForm();
@@ -1637,6 +1828,28 @@ else
 
         return credential.Id.ToString()[..8];
     }
+
+    private static string GetCredentialInitials(IdentityCredential credential)
+    {
+        var label = GetCredentialLabel(credential);
+        var parts = label
+            .Split([' ', '.', '_', '-'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (parts.Length >= 2)
+        {
+            return $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant();
+        }
+
+        return label.Length >= 2
+            ? label[..2].ToUpperInvariant()
+            : label.ToUpperInvariant();
+    }
+
+    private static bool HasAvatar(IdentityCredential credential) =>
+        credential.AvatarStorageFileId.HasValue || !string.IsNullOrWhiteSpace(credential.AvatarUrl);
+
+    private static string GetAvatarFilter(IdentityCredential credential) =>
+        HasAvatar(credential) ? "Has avatar" : "No avatar";
 
     private string GetCredentialLabelById(Guid credentialId) =>
         _credentials.FirstOrDefault(c => c.Id == credentialId) is { } credential

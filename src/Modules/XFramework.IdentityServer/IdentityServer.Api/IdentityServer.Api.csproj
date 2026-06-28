@@ -16,6 +16,7 @@
         <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
         <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
         <ProjectReference Include="..\..\XFramework.Communications\Communications.Integration\Communications.Integration.csproj" />
+        <ProjectReference Include="..\..\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
         <ProjectReference Include="..\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
     </ItemGroup>
 

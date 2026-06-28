@@ -92,6 +92,18 @@ public interface IAuthService
         CheckVerificationRequest request,
         CancellationToken ct = default);
 
+    Task<Result<CredentialAvatarResponse>> UploadCredentialAvatarAsync(
+        UploadCredentialAvatarRequest request,
+        CancellationToken ct = default);
+
+    Task<Result<CredentialAvatarResponse>> SetCredentialAvatarAsync(
+        SetCredentialAvatarRequest request,
+        CancellationToken ct = default);
+
+    Task<Result<CredentialAvatarResponse>> RemoveCredentialAvatarAsync(
+        RemoveCredentialAvatarRequest request,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Logs out a user by marking their session as Inactive.
     /// Creates an authorization log entry for audit trail.
