@@ -71,6 +71,73 @@ public sealed class AuthService : IAuthService
         _logger = logger;
     }
 
+    #region Tenant Administration
+
+    /// <inheritdoc />
+    public async Task<Result<Tenant>> CreateTenantAsync(
+        CreateTenantRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var name = request.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return Result<Tenant>.Failure("Tenant name is required", 400);
+            }
+
+            if (request.ParentTenantId is { } parentTenantId)
+            {
+                var parentExists = await _dataContext.Query<Tenant>()
+                    .IgnoreQueryFilters()
+                    .Where(tenant => tenant.Id == parentTenantId)
+                    .Where(tenant => !tenant.IsDeleted)
+                    .AnyAsync(ct);
+
+                if (!parentExists)
+                {
+                    return Result<Tenant>.NotFound("Parent tenant not found");
+                }
+            }
+
+            var tenantId = Guid.NewGuid();
+            var tenant = new Tenant
+            {
+                Id = tenantId,
+                TenantId = tenantId,
+                Name = name,
+                Description = request.Description,
+                Version = request.Version > 0 ? request.Version : 1.0m,
+                Status = request.Status ?? 1,
+                Expiration = request.Expiration,
+                AvailabilityDate = request.AvailabilityDate,
+                ParentTenantId = request.ParentTenantId,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
+
+            _dataContext.Add(tenant);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+            {
+                _logger.OperationFailed("CreateTenant", "Tenant", tenant.Id, saveResult.Message ?? string.Empty, null);
+                return Result<Tenant>.Failure("Tenant could not be created", saveResult.StatusCode);
+            }
+
+            _logger.EntityCreated("Tenant", tenant.Id);
+
+            return Result<Tenant>.Success(tenant);
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("CreateTenant", "Tenant", Guid.Empty, ex.Message, ex);
+            return Result<Tenant>.Failure("Tenant could not be created", 500);
+        }
+    }
+
+    #endregion
+
     #region Credential Management
 
     /// <inheritdoc />

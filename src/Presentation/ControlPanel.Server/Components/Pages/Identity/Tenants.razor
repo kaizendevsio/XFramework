@@ -189,6 +189,7 @@
 
 @code {
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityServer { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
@@ -260,39 +261,21 @@
 
         try
         {
-            var tenantId = Guid.NewGuid();
-            var tenant = new Tenant
+            var request = new CreateTenantRequest
             {
-                Id = tenantId,
-                TenantId = tenantId,
                 Name = _tenantForm.Name,
                 Description = _tenantForm.Description,
                 Version = decimal.TryParse(_tenantForm.VersionString, out var v) ? v : 1.0m,
                 Status = short.TryParse(_tenantForm.StatusString, out var s) ? s : (short)1,
                 Expiration = DateTime.TryParse(_tenantForm.ExpirationString, out var exp) ? exp : null,
                 AvailabilityDate = DateTime.TryParse(_tenantForm.AvailabilityString, out var avail) ? avail : null,
-                ParentTenantId = Guid.TryParse(_tenantForm.ParentTenantIdString, out var pid) ? pid : null,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
+                ParentTenantId = Guid.TryParse(_tenantForm.ParentTenantIdString, out var pid) ? pid : null
             };
 
-            DataContext.Add(tenant);
-            var result = await DataContext.SaveChangesAsync();
+            var result = await IdentityServer.CreateTenant(request);
 
             if (result.IsSuccess)
             {
-                var createdTenant = await DataContext.Query<Tenant>()
-                    .IgnoreQueryFilters()
-                    .NoCache()
-                    .Where(x => x.Id == tenantId)
-                    .FirstOrDefaultAsync();
-
-                if (createdTenant is null || createdTenant.IsDeleted)
-                {
-                    ToastService.Warning("Tenant save completed, but the tenant could not be reloaded.", "Reload needed");
-                    return;
-                }
-
                 ToastService.Success("Tenant created successfully.", "Tenant saved");
                 _tenantDialogOpen = false;
                 await LoadTenants();
