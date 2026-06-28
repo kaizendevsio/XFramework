@@ -108,113 +108,200 @@ else
             </BbTabsContent>
 
             <BbTabsContent Value="modules" Class="xf-fade-in">
-                <BbCard>
-                    <BbCardHeader>
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <BbCardTitle>Tenant Modules</BbCardTitle>
-                                <BbTypographyMuted>Enable or disable tenant access to backend modules and planned module flags.</BbTypographyMuted>
-                            </div>
+                <div class="tenant-modules-workspace">
+                    <div class="tenant-modules-toolbar">
+                        <div>
+                            <BbTypographyH3>Tenant Modules</BbTypographyH3>
+                            <BbTypographyMuted>Enable or disable tenant access to backend modules and feature flags.</BbTypographyMuted>
+                        </div>
+                        <div class="tenant-modules-toolbar-actions">
+                            <StatusBadge Text="@($"{EnabledModuleFeatureCount} enabled")" Status="active" />
+                            <span class="tenant-modules-count">@RootModuleCount modules / @ChildFeatureCount features</span>
                             <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadModuleFeatures">
                                 <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
                                 Refresh
                             </BbButton>
                         </div>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        @if (_moduleFeaturesLoading)
-                        {
-                            <CenteredSpinner />
-                        }
-                        else if (_moduleFeatureRows.Count == 0)
-                        {
-                            <BbAlert Variant="AlertVariant.Info">No module features found for this tenant.</BbAlert>
-                        }
-                        else
-                        {
-                            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                @foreach (var row in _rootModuleFeatureRows)
-                                {
-                                    <div class="@GetModuleFeatureCardClass(row)">
-                                        <div class="flex items-start justify-between gap-3">
-                                            <div class="flex min-w-0 gap-3">
-                                                <div class="tenant-module-icon">
-                                                    <LucideIcon Name="@row.Icon" class="h-5 w-5" />
-                                                </div>
-                                                <div class="min-w-0">
-                                                    <div class="flex flex-wrap items-center gap-2">
-                                                        <div class="font-semibold">@row.DisplayName</div>
-                                                        <StatusBadge Text="@GetModuleFeatureCoverageText(row)" Status="@GetModuleFeatureCoverageStatus(row)" />
-                                                    </div>
-                                                    <div class="mt-1 text-sm text-muted-foreground">@row.Description</div>
-                                                    <div class="mt-2 font-mono text-xs text-muted-foreground">@row.Key</div>
-                                                    @if (!string.IsNullOrWhiteSpace(row.DependencySummary))
-                                                    {
-                                                        <div class="mt-2 text-xs text-amber-600 dark:text-amber-400">@row.DependencySummary</div>
-                                                    }
-                                                </div>
-                                            </div>
-                                            <StatusBadge Text="@(row.IsEnabled ? "Enabled" : "Disabled")"
-                                                         Status="@(row.IsEnabled ? "active" : "inactive")" />
-                                        </div>
-                                        <div class="mt-4 border-t pt-3">
-                                            <BbFormFieldSwitch Checked="@row.IsEnabled"
-                                                               CheckedChanged="@((bool enabled) => ToggleModuleFeature(row, enabled))"
-                                                               Disabled="@(_savingModuleFeatureIds.Contains(row.Id) || (!row.IsEnabled && row.IsBlocked))"
-                                                               Label="Module enabled" />
-                                        </div>
-                                        @if (IsInventarioRootFeature(row) && _inventarioSubFeatureRows.Count > 0)
+                    </div>
+
+                    @if (_moduleFeaturesLoading)
+                    {
+                        <CenteredSpinner />
+                    }
+                    else if (_moduleFeatureRows.Count == 0)
+                    {
+                        <BbAlert Variant="AlertVariant.Info">No module features found for this tenant.</BbAlert>
+                    }
+                    else
+                    {
+                        <div class="tenant-modules-grid">
+                            <BbCard class="tenant-modules-tree-card">
+                                <BbCardHeader>
+                                    <BbCardTitle>Module Access</BbCardTitle>
+                                    <BbCardDescription>Use the tree to toggle modules and nested features.</BbCardDescription>
+                                </BbCardHeader>
+                                <BbCardContent>
+                                    <BbTreeView TItem="ModuleFeatureTreeNode"
+                                                Checkable="true"
+                                                CheckStrictly="true"
+                                                ShowIcons="true"
+                                                ShowLines="true"
+                                                ShowSearch="true"
+                                                SearchPlaceholder="Search modules..."
+                                                ExpandOnClick="true"
+                                                SelectionMode="TreeSelectionMode.Single"
+                                                SelectedValue="@_selectedModuleFeatureKey"
+                                                SelectedValueChanged="@OnModuleTreeSelectedValueChanged"
+                                                CheckedValues="@_moduleFeatureCheckedKeys"
+                                                CheckedValuesChanged="@OnModuleTreeCheckedValuesChanged"
+                                                ExpandedValues="@_expandedModuleFeatureKeys"
+                                                ExpandedValuesChanged="@OnModuleTreeExpandedValuesChanged"
+                                                AriaLabel="Tenant module access tree"
+                                                Class="tenant-module-tree">
+                                        @foreach (var node in _moduleFeatureTreeNodes)
                                         {
-                                            <div class="mt-4 border-t pt-4">
-                                                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                                                    <div>
-                                                        <div class="text-sm font-semibold">Inventario sub-features</div>
-                                                        <div class="text-xs text-muted-foreground">The root Inventario toggle remains the parent access gate.</div>
+                                            <BbTreeItem Value="@node.Row.Key"
+                                                        Label="@node.Row.DisplayName"
+                                                        Icon="@node.Row.Icon"
+                                                        Badge="@GetModuleTreeNodeBadge(node)"
+                                                        Checkable="@CanToggleModuleFeature(node.Row)"
+                                                        Class="@GetModuleTreeItemClass(node.Row)">
+                                                <LabelTemplate>
+                                                    <div class="tenant-module-tree-label">
+                                                        <span class="tenant-module-tree-label-main">@node.Row.DisplayName</span>
+                                                        <span class="tenant-module-tree-label-sub">@GetModuleTreeCaption(node)</span>
                                                     </div>
-                                                    <StatusBadge Text="@($"{_inventarioSubFeatureRows.Count(child => child.IsEnabled)} enabled")" Status="active" />
-                                                </div>
-                                                <div class="grid gap-2 lg:grid-cols-2">
-                                                    @foreach (var childRow in _inventarioSubFeatureRows)
+                                                </LabelTemplate>
+                                                <ChildContent>
+                                                    @foreach (var childNode in node.Children)
                                                     {
-                                                        <div class="rounded-md border bg-muted/30 p-3">
-                                                            <div class="flex items-start justify-between gap-3">
-                                                                <div class="flex min-w-0 gap-3">
-                                                                    <div class="tenant-module-icon h-10 w-10 flex-[0_0_2.5rem]">
-                                                                        <LucideIcon Name="@childRow.Icon" class="h-4 w-4" />
-                                                                    </div>
-                                                                    <div class="min-w-0">
-                                                                        <div class="flex flex-wrap items-center gap-2">
-                                                                            <div class="font-medium">@childRow.DisplayName</div>
-                                                                            <StatusBadge Text="@GetModuleFeatureCoverageText(childRow)" Status="@GetModuleFeatureCoverageStatus(childRow)" />
-                                                                        </div>
-                                                                        <div class="mt-1 text-sm text-muted-foreground">@childRow.Description</div>
-                                                                        <div class="mt-2 font-mono text-xs text-muted-foreground">@childRow.Key</div>
-                                                                        @if (!string.IsNullOrWhiteSpace(childRow.DependencySummary))
-                                                                        {
-                                                                            <div class="mt-2 text-xs text-amber-600 dark:text-amber-400">@childRow.DependencySummary</div>
-                                                                        }
-                                                                    </div>
+                                                        <BbTreeItem Value="@childNode.Row.Key"
+                                                                    Label="@childNode.Row.DisplayName"
+                                                                    Icon="@childNode.Row.Icon"
+                                                                    Badge="@GetModuleFeatureCoverageText(childNode.Row)"
+                                                                    Checkable="@CanToggleModuleFeature(childNode.Row)"
+                                                                    IsLeaf="true"
+                                                                    Class="@GetModuleTreeItemClass(childNode.Row)">
+                                                            <LabelTemplate>
+                                                                <div class="tenant-module-tree-label tenant-module-tree-label-child">
+                                                                    <span class="tenant-module-tree-label-main">@childNode.Row.DisplayName</span>
+                                                                    <span class="tenant-module-tree-label-sub">@childNode.Row.Description</span>
                                                                 </div>
-                                                                <StatusBadge Text="@(childRow.IsEnabled ? "Enabled" : "Disabled")"
-                                                                             Status="@(childRow.IsEnabled ? "active" : "inactive")" />
-                                                            </div>
-                                                            <div class="mt-3 border-t pt-3">
-                                                                <BbFormFieldSwitch Checked="@childRow.IsEnabled"
-                                                                                   CheckedChanged="@((bool enabled) => ToggleModuleFeature(childRow, enabled))"
-                                                                                   Disabled="@(_savingModuleFeatureIds.Contains(childRow.Id) || (!childRow.IsEnabled && childRow.IsBlocked))"
-                                                                                   Label="Feature enabled" />
-                                                            </div>
-                                                        </div>
+                                                            </LabelTemplate>
+                                                        </BbTreeItem>
                                                     }
-                                                </div>
-                                            </div>
+                                                </ChildContent>
+                                            </BbTreeItem>
+                                        }
+                                    </BbTreeView>
+                                </BbCardContent>
+                            </BbCard>
+
+                            <BbCard class="tenant-module-preview-card">
+                                <BbCardHeader>
+                                    <div class="tenant-module-preview-title-row">
+                                        <div>
+                                            <BbCardTitle>Preview</BbCardTitle>
+                                            <BbCardDescription>Selected module configuration and rollout state.</BbCardDescription>
+                                        </div>
+                                        @if (SelectedModuleFeatureRow is { } selectedStatusRow)
+                                        {
+                                            <StatusBadge Text="@(selectedStatusRow.IsEnabled ? "Enabled" : "Disabled")"
+                                                         Status="@(selectedStatusRow.IsEnabled ? "active" : "inactive")" />
                                         }
                                     </div>
-                                }
-                            </div>
-                        }
-                    </BbCardContent>
-                </BbCard>
+                                </BbCardHeader>
+                                <BbCardContent>
+                                    @if (SelectedModuleFeatureRow is not { } selectedRow)
+                                    {
+                                        <BbAlert Variant="AlertVariant.Info">Select a module to inspect its settings.</BbAlert>
+                                    }
+                                    else
+                                    {
+                                        var selectedChildren = GetChildRows(selectedRow).ToList();
+
+                                        <div class="tenant-module-preview">
+                                            <div class="tenant-module-preview-header">
+                                                <div class="tenant-module-icon tenant-module-preview-icon">
+                                                    <LucideIcon Name="@selectedRow.Icon" class="h-5 w-5" />
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div class="tenant-module-preview-name">@selectedRow.DisplayName</div>
+                                                    <div class="tenant-module-preview-description">@selectedRow.Description</div>
+                                                </div>
+                                            </div>
+
+                                            <div class="tenant-module-preview-toggle">
+                                                <BbFormFieldSwitch Checked="@selectedRow.IsEnabled"
+                                                                   CheckedChanged="@((bool enabled) => ToggleSelectedModuleFeature(selectedRow, enabled))"
+                                                                   Disabled="@(!CanToggleModuleFeature(selectedRow))"
+                                                                   Label="@GetModuleFeatureSwitchLabel(selectedRow)" />
+                                            </div>
+
+                                            <div class="tenant-module-preview-meta">
+                                                <div>
+                                                    <span>Key</span>
+                                                    <code>@selectedRow.Key</code>
+                                                </div>
+                                                <div>
+                                                    <span>Coverage</span>
+                                                    <StatusBadge Text="@GetModuleFeatureCoverageText(selectedRow)" Status="@GetModuleFeatureCoverageStatus(selectedRow)" />
+                                                </div>
+                                                <div>
+                                                    <span>Type</span>
+                                                    <strong>@GetModuleFeatureTypeText(selectedRow)</strong>
+                                                </div>
+                                                <div>
+                                                    <span>Module</span>
+                                                    <code>@selectedRow.ModuleKey</code>
+                                                </div>
+                                            </div>
+
+                                            @if (!string.IsNullOrWhiteSpace(selectedRow.SubFeatureKey))
+                                            {
+                                                <div class="tenant-module-preview-note">
+                                                    <LucideIcon Name="corner-down-right" class="h-4 w-4" />
+                                                    <span>This feature is controlled independently under the @selectedRow.ModuleKey module.</span>
+                                                </div>
+                                            }
+
+                                            @if (!string.IsNullOrWhiteSpace(selectedRow.DependencySummary))
+                                            {
+                                                <div class="tenant-module-preview-warning">
+                                                    <LucideIcon Name="triangle-alert" class="h-4 w-4" />
+                                                    <span>@selectedRow.DependencySummary</span>
+                                                </div>
+                                            }
+
+                                            @if (selectedChildren.Count > 0)
+                                            {
+                                                <div class="tenant-module-preview-children">
+                                                    <div class="tenant-module-preview-section-heading">
+                                                        <span>Included Features</span>
+                                                        <StatusBadge Text="@($"{selectedChildren.Count(child => child.IsEnabled)} of {selectedChildren.Count}")" Status="active" />
+                                                    </div>
+                                                    <div class="tenant-module-preview-child-list">
+                                                        @foreach (var childRow in selectedChildren)
+                                                        {
+                                                            <button type="button"
+                                                                    class="@GetModulePreviewChildButtonClass(childRow)"
+                                                                    @onclick="@(() => SelectModuleFeature(childRow))">
+                                                                <LucideIcon Name="@childRow.Icon" class="h-4 w-4" />
+                                                                <span>@childRow.DisplayName</span>
+                                                                <StatusBadge Text="@(childRow.IsEnabled ? "On" : "Off")"
+                                                                             Status="@(childRow.IsEnabled ? "active" : "inactive")" />
+                                                            </button>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </BbCardContent>
+                            </BbCard>
+                        </div>
+                    }
+                </div>
             </BbTabsContent>
 
             <BbTabsContent Value="users" Class="xf-fade-in">
@@ -469,11 +556,19 @@ else
     private List<TenantModuleFeature> _detailModuleFeatures = [];
     private List<Tenant> _tenantOptions = [];
     private List<ModuleFeatureRow> _moduleFeatureRows = [];
-    private List<ModuleFeatureRow> _rootModuleFeatureRows = [];
-    private List<ModuleFeatureRow> _inventarioSubFeatureRows = [];
+    private List<ModuleFeatureTreeNode> _moduleFeatureTreeNodes = [];
+    private HashSet<string> _moduleFeatureCheckedKeys = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _expandedModuleFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<Guid> _savingModuleFeatureIds = [];
     private bool _moduleFeaturesLoading;
+    private string _selectedModuleFeatureKey = "";
     private string CurrentSection => NormalizeSection(Section);
+    private ModuleFeatureRow? SelectedModuleFeatureRow =>
+        _moduleFeatureRows.FirstOrDefault(row =>
+            string.Equals(row.Key, _selectedModuleFeatureKey, StringComparison.OrdinalIgnoreCase));
+    private int EnabledModuleFeatureCount => _moduleFeatureRows.Count(row => row.IsEnabled);
+    private int RootModuleCount => _moduleFeatureRows.Count(row => string.IsNullOrWhiteSpace(row.SubFeatureKey));
+    private int ChildFeatureCount => _moduleFeatureRows.Count(row => !string.IsNullOrWhiteSpace(row.SubFeatureKey));
 
     // -- Config dialog --
     private bool _configDialogOpen;
@@ -557,8 +652,10 @@ else
         _detailModuleFeatures = [];
         _tenantOptions = [];
         _moduleFeatureRows = [];
-        _rootModuleFeatureRows = [];
-        _inventarioSubFeatureRows = [];
+        _moduleFeatureTreeNodes = [];
+        _moduleFeatureCheckedKeys = new(StringComparer.OrdinalIgnoreCase);
+        _expandedModuleFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
+        _selectedModuleFeatureKey = "";
     }
 
     private void SyncEditFields()
@@ -718,13 +815,158 @@ else
 
     private void ApplyModuleFeatureGrouping()
     {
-        _inventarioSubFeatureRows = _moduleFeatureRows
-            .Where(IsInventarioSubFeature)
+        var childRowsByModule = _moduleFeatureRows
+            .Where(row => !string.IsNullOrWhiteSpace(row.SubFeatureKey))
+            .GroupBy(row => row.ModuleKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(row => row.DisplayName).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+
+        var rootRows = _moduleFeatureRows
+            .Where(row => string.IsNullOrWhiteSpace(row.SubFeatureKey))
+            .OrderBy(row => row.DisplayName)
             .ToList();
 
-        _rootModuleFeatureRows = _moduleFeatureRows
-            .Where(row => !IsInventarioSubFeature(row))
+        _moduleFeatureTreeNodes = rootRows
+            .Select(row =>
+            {
+                childRowsByModule.TryGetValue(row.ModuleKey, out var childRows);
+                return new ModuleFeatureTreeNode(
+                    row,
+                    (childRows ?? []).Select(childRow => new ModuleFeatureTreeNode(childRow, [])).ToList());
+            })
             .ToList();
+
+        var rootModuleKeys = rootRows
+            .Select(row => row.ModuleKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var orphanChildRow in childRowsByModule
+                     .Where(group => !rootModuleKeys.Contains(group.Key))
+                     .SelectMany(group => group.Value)
+                     .OrderBy(row => row.DisplayName))
+        {
+            _moduleFeatureTreeNodes.Add(new ModuleFeatureTreeNode(orphanChildRow, []));
+        }
+
+        SyncModuleTreeCheckedState();
+        SyncModuleTreeExpandedState();
+        EnsureSelectedModuleFeature();
+    }
+
+    private void SyncModuleTreeCheckedState()
+    {
+        _moduleFeatureCheckedKeys = _moduleFeatureRows
+            .Where(row => row.IsEnabled)
+            .Select(row => row.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void SyncModuleTreeExpandedState()
+    {
+        var expandableKeys = _moduleFeatureTreeNodes
+            .Where(node => node.Children.Count > 0)
+            .Select(node => node.Row.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        _expandedModuleFeatureKeys = _expandedModuleFeatureKeys.Count == 0
+            ? expandableKeys
+            : _expandedModuleFeatureKeys
+                .Where(expandableKeys.Contains)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void EnsureSelectedModuleFeature()
+    {
+        if (_moduleFeatureRows.Count == 0)
+        {
+            _selectedModuleFeatureKey = "";
+            return;
+        }
+
+        if (_moduleFeatureRows.Any(row =>
+                string.Equals(row.Key, _selectedModuleFeatureKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        _selectedModuleFeatureKey = _moduleFeatureTreeNodes.FirstOrDefault()?.Row.Key
+            ?? _moduleFeatureRows.First().Key;
+    }
+
+    private Task OnModuleTreeSelectedValueChanged(string selectedValue)
+    {
+        _selectedModuleFeatureKey = selectedValue ?? "";
+        return Task.CompletedTask;
+    }
+
+    private Task OnModuleTreeExpandedValuesChanged(HashSet<string> expandedValues)
+    {
+        _expandedModuleFeatureKeys = new HashSet<string>(
+            expandedValues ?? [],
+            StringComparer.OrdinalIgnoreCase);
+
+        return Task.CompletedTask;
+    }
+
+    private async Task OnModuleTreeCheckedValuesChanged(HashSet<string> checkedValues)
+    {
+        var desiredKeys = new HashSet<string>(checkedValues ?? [], StringComparer.OrdinalIgnoreCase);
+        var previousKeys = new HashSet<string>(_moduleFeatureCheckedKeys, StringComparer.OrdinalIgnoreCase);
+        var enabledKeys = desiredKeys
+            .Where(key => !previousKeys.Contains(key))
+            .ToList();
+        var disabledKeys = previousKeys
+            .Where(key => !desiredKeys.Contains(key))
+            .ToList();
+
+        foreach (var key in disabledKeys)
+        {
+            if (FindModuleFeatureRow(key) is { } row)
+            {
+                await ToggleModuleFeature(row, enabled: false);
+            }
+        }
+
+        foreach (var key in enabledKeys)
+        {
+            if (FindModuleFeatureRow(key) is { } row)
+            {
+                await ToggleModuleFeature(row, enabled: true);
+            }
+        }
+
+        SyncModuleTreeCheckedState();
+    }
+
+    private async Task ToggleSelectedModuleFeature(ModuleFeatureRow row, bool enabled)
+    {
+        await ToggleModuleFeature(row, enabled);
+        SyncModuleTreeCheckedState();
+    }
+
+    private void SelectModuleFeature(ModuleFeatureRow row)
+    {
+        _selectedModuleFeatureKey = row.Key;
+        ExpandModuleFeatureParent(row);
+    }
+
+    private void ExpandModuleFeatureParent(ModuleFeatureRow row)
+    {
+        if (string.IsNullOrWhiteSpace(row.SubFeatureKey))
+        {
+            return;
+        }
+
+        var parentRow = _moduleFeatureRows.FirstOrDefault(candidate =>
+            string.Equals(candidate.ModuleKey, row.ModuleKey, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(candidate.SubFeatureKey));
+
+        if (parentRow is not null)
+        {
+            _expandedModuleFeatureKeys.Add(parentRow.Key);
+        }
     }
 
     private async Task ToggleModuleFeature(ModuleFeatureRow row, bool enabled)
@@ -772,6 +1014,7 @@ else
                     cachedFeature.ModifiedAt = feature.ModifiedAt;
                 }
 
+                SyncModuleTreeCheckedState();
                 ToastService.Success($"{row.DisplayName} {(enabled ? "enabled" : "disabled")}.", "Module updated");
             }
             else
@@ -788,6 +1031,7 @@ else
         finally
         {
             _savingModuleFeatureIds.Remove(row.Id);
+            SyncModuleTreeCheckedState();
         }
     }
 
@@ -960,18 +1204,76 @@ else
             _ => "inactive"
         };
 
-    private static bool IsInventarioRootFeature(ModuleFeatureRow row) =>
-        string.Equals(row.ModuleKey, TenantModuleFeatureKeys.Inventario, StringComparison.OrdinalIgnoreCase) &&
-        string.IsNullOrWhiteSpace(row.SubFeatureKey);
+    private static string GetModuleFeatureTypeText(ModuleFeatureRow row) =>
+        string.IsNullOrWhiteSpace(row.SubFeatureKey)
+            ? "Module"
+            : "Feature";
 
-    private static bool IsInventarioSubFeature(ModuleFeatureRow row) =>
-        string.Equals(row.ModuleKey, TenantModuleFeatureKeys.Inventario, StringComparison.OrdinalIgnoreCase) &&
-        !string.IsNullOrWhiteSpace(row.SubFeatureKey);
+    private string GetModuleTreeNodeBadge(ModuleFeatureTreeNode node)
+    {
+        if (node.Children.Count == 0)
+        {
+            return GetModuleFeatureCoverageText(node.Row);
+        }
 
-    private static string GetModuleFeatureCardClass(ModuleFeatureRow row) =>
-        IsInventarioRootFeature(row)
-            ? "rounded-lg border bg-card p-4 shadow-sm md:col-span-2 xl:col-span-3"
-            : "rounded-lg border bg-card p-4 shadow-sm";
+        return $"{node.Children.Count(child => child.Row.IsEnabled)}/{node.Children.Count}";
+    }
+
+    private static string GetModuleTreeCaption(ModuleFeatureTreeNode node) =>
+        node.Children.Count == 0
+            ? node.Row.Description
+            : $"{node.Children.Count(child => child.Row.IsEnabled)} of {node.Children.Count} features enabled";
+
+    private string GetModuleTreeItemClass(ModuleFeatureRow row)
+    {
+        var classes = new List<string> { "tenant-module-tree-item" };
+
+        if (string.Equals(row.Key, _selectedModuleFeatureKey, StringComparison.OrdinalIgnoreCase))
+        {
+            classes.Add("tenant-module-tree-item-selected");
+        }
+
+        if (!CanToggleModuleFeature(row))
+        {
+            classes.Add("tenant-module-tree-item-blocked");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetModulePreviewChildButtonClass(ModuleFeatureRow row)
+    {
+        var classes = new List<string> { "tenant-module-preview-child-button" };
+
+        if (string.Equals(row.Key, _selectedModuleFeatureKey, StringComparison.OrdinalIgnoreCase))
+        {
+            classes.Add("tenant-module-preview-child-button-selected");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetModuleFeatureSwitchLabel(ModuleFeatureRow row) =>
+        string.IsNullOrWhiteSpace(row.SubFeatureKey)
+            ? "Module enabled"
+            : "Feature enabled";
+
+    private bool CanToggleModuleFeature(ModuleFeatureRow row) =>
+        !_savingModuleFeatureIds.Contains(row.Id) &&
+        (row.IsEnabled || !row.IsBlocked);
+
+    private ModuleFeatureRow? FindModuleFeatureRow(string key) =>
+        _moduleFeatureRows.FirstOrDefault(row =>
+            string.Equals(row.Key, key, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<ModuleFeatureRow> GetChildRows(ModuleFeatureRow row) =>
+        string.IsNullOrWhiteSpace(row.SubFeatureKey)
+            ? _moduleFeatureRows
+                .Where(candidate =>
+                    !string.IsNullOrWhiteSpace(candidate.SubFeatureKey) &&
+                    string.Equals(candidate.ModuleKey, row.ModuleKey, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(candidate => candidate.DisplayName)
+            : [];
 
     private static string NormalizeSection(string? section)
     {
@@ -1141,6 +1443,12 @@ else
 
     private static string FormatBoolean(bool value) => value ? "Yes" : "No";
     private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
+
+    private sealed class ModuleFeatureTreeNode(ModuleFeatureRow row, IReadOnlyList<ModuleFeatureTreeNode> children)
+    {
+        public ModuleFeatureRow Row { get; } = row;
+        public IReadOnlyList<ModuleFeatureTreeNode> Children { get; } = children;
+    }
 
     private sealed class ModuleFeatureRow(
         Guid id,
