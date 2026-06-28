@@ -25,3 +25,4 @@ global using IdentityServer.Api.Endpoints;
 global using IdentityServer.Api.Services;
 global using IdentityServer.Domain.Shared.Contracts;
 global using IdentityServer.Domain.Shared.Contracts.Requests;
+global using IdentityServer.Domain.Shared.Contracts.Responses;

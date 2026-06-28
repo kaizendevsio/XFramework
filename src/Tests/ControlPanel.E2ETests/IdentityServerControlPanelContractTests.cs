@@ -160,14 +160,41 @@ public sealed class IdentityServerControlPanelContractTests
     {
         var pagesRoot = GetIdentityPagesRoot();
         var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+        var credentials = File.ReadAllText(Path.Combine(pagesRoot, "Credentials.razor"));
 
         userDetail.Should().Contain("[Inject] private IIdentityServerServiceWrapper IdentityServer");
         userDetail.Should().Contain("IdentityServer.CreateCredential(new CreateCredentialRequest");
         userDetail.Should().Contain("IdentityServer.Logout(new LogoutRequest");
+        userDetail.Should().Contain("IdentityServer.UploadCredentialAvatar(new UploadCredentialAvatarRequest");
+        userDetail.Should().Contain("IdentityServer.RemoveCredentialAvatar(new RemoveCredentialAvatarRequest");
+        credentials.Should().Contain("[Inject] private IIdentityServerServiceWrapper IdentityServer");
+        credentials.Should().Contain("IdentityServer.UploadCredentialAvatar(new UploadCredentialAvatarRequest");
+        credentials.Should().Contain("IdentityServer.RemoveCredentialAvatar(new RemoveCredentialAvatarRequest");
         userDetail.Should().NotContain("BCrypt.Net.BCrypt.HashPassword");
         userDetail.Should().NotContain("DataContext.Add(credential)");
         userDetail.Should().NotContain("DataContext.Update(session)");
         userDetail.Should().NotContain("fresh.Status = CurrentSessionState.Inactive");
+    }
+
+    [Test]
+    public void IdentityServerCredentialAvatarUi_UsesSafeAvatarDisplayAndNoInlineBlobRendering()
+    {
+        var pagesRoot = GetIdentityPagesRoot();
+        var credentials = File.ReadAllText(Path.Combine(pagesRoot, "Credentials.razor"));
+        var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+        var source = credentials + Environment.NewLine + userDetail;
+
+        credentials.Should().Contain("<BbAvatar");
+        credentials.Should().Contain("<BbAvatarImage Src=\"@item.AvatarUrl\"");
+        credentials.Should().Contain("GetCredentialInitials(item)");
+        userDetail.Should().Contain("<BbAvatar");
+        userDetail.Should().Contain("<BbAvatarImage Src=\"@cred.AvatarUrl\"");
+        userDetail.Should().Contain("GetCredentialInitials(cred)");
+        source.Should().Contain("<BbFileUpload");
+        source.Should().Contain("ShowPreview=\"false\"");
+        source.Should().NotContain("Convert.ToBase64String");
+        source.Should().NotContain("data:image");
+        source.Should().NotContain("PreviewUrl");
     }
 
     [Test]

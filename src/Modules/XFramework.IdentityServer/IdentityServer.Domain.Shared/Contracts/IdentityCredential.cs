@@ -62,6 +62,15 @@ public partial class IdentityCredential : BaseModel, IHasOnlineStatus
     
     [MemoryPackOrder(13)]
     public string? Location { get; set; }
+
+    [MemoryPackOrder(28)]
+    public Guid? AvatarStorageFileId { get; set; }
+
+    [MemoryPackOrder(29)]
+    public string? AvatarUrl { get; set; }
+
+    [MemoryPackOrder(30)]
+    public DateTime? AvatarUpdatedAt { get; set; }
     
     
     [MemoryPackOrder(14)]
@@ -90,6 +99,9 @@ public partial class IdentityCredential : BaseModel, IHasOnlineStatus
 
     [MemoryPackOrder(27)]
     public virtual ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
+
+    [MemoryPackOrder(31)]
+    public virtual StorageFile? AvatarStorageFile { get; set; }
 
 }
 

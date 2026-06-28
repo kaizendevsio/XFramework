@@ -1,10 +1,14 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text.Json;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using Communications.Domain.Shared;
 using Communications.Integration.Drivers;
+using Storage.Domain.Shared.Contracts.Requests;
+using Storage.Domain.Shared.Contracts.Responses;
+using Storage.Integration.Drivers;
 using XFramework.Core.Loggers;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.DataContext;
@@ -44,6 +48,7 @@ public sealed class AuthService : IAuthService
     private readonly IHelperService _helperService;
     private readonly CacheManager _cache;
     private readonly ICommunicationsServiceWrapper _communicationsServiceWrapper;
+    private readonly IStorageServiceWrapper _storageServiceWrapper;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -53,6 +58,7 @@ public sealed class AuthService : IAuthService
         IHelperService helperService,
         CacheManager cache,
         ICommunicationsServiceWrapper communicationsServiceWrapper,
+        IStorageServiceWrapper storageServiceWrapper,
         ILogger<AuthService> logger)
     {
         _dataContext = dataContext;
@@ -61,6 +67,7 @@ public sealed class AuthService : IAuthService
         _helperService = helperService;
         _cache = cache;
         _communicationsServiceWrapper = communicationsServiceWrapper;
+        _storageServiceWrapper = storageServiceWrapper;
         _logger = logger;
     }
 
@@ -747,7 +754,435 @@ public sealed class AuthService : IAuthService
 
     #endregion
 
+    #region Credential Avatars
+
+    public async Task<Result<CredentialAvatarResponse>> UploadCredentialAvatarAsync(
+        UploadCredentialAvatarRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var validation = ValidateCredentialAvatarRequest(request);
+            if (!validation.IsSuccess)
+            {
+                return Result<CredentialAvatarResponse>.Failure(
+                    validation.Message ?? "Avatar upload request is invalid",
+                    validation.StatusCode);
+            }
+
+            var tenantId = request.Metadata.TenantId!.Value;
+            var credential = await FindCredentialForTenant(request.CredentialId, tenantId, ct);
+            if (credential is null)
+            {
+                return Result<CredentialAvatarResponse>.NotFound("Credential not found");
+            }
+
+            var contentType = CredentialAvatarPolicy.NormalizeContentType(request.ContentType)!;
+            var metadata = await EnsureAvatarStorageMetadata(tenantId, contentType, ct);
+            if (!metadata.IsSuccess)
+            {
+                return Result<CredentialAvatarResponse>.Failure(
+                    metadata.Message ?? "Avatar storage metadata could not be prepared",
+                    metadata.StatusCode);
+            }
+
+            var uploadResult = await UploadCredentialAvatarToStorageAsync(
+                request,
+                credential,
+                metadata.Data!,
+                contentType,
+                ct);
+
+            if (!uploadResult.IsSuccess || uploadResult.Data is null)
+            {
+                return Result<CredentialAvatarResponse>.Failure(
+                    uploadResult.Message ?? "Avatar upload failed",
+                    uploadResult.StatusCode);
+            }
+
+            var now = DateTime.UtcNow;
+            credential.AvatarStorageFileId = uploadResult.Data.Id;
+            credential.AvatarUrl = ResolveAvatarUrl(uploadResult.Data);
+            credential.AvatarUpdatedAt = now;
+
+            _dataContext.Update(credential);
+            await _dataContext.SaveChangesAsync(ct);
+
+            return Result<CredentialAvatarResponse>.Success(
+                CreateCredentialAvatarResponse(credential, uploadResult.Data));
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("UploadCredentialAvatar", "IdentityCredential", request.CredentialId, ex.Message, ex);
+            return Result<CredentialAvatarResponse>.Failure(
+                "Credential avatar could not be uploaded",
+                500);
+        }
+    }
+
+    public async Task<Result<CredentialAvatarResponse>> SetCredentialAvatarAsync(
+        SetCredentialAvatarRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            {
+                return Result<CredentialAvatarResponse>.Failure("Tenant context is required", 400);
+            }
+
+            var credential = await FindCredentialForTenant(request.CredentialId, tenantId, ct);
+            if (credential is null)
+            {
+                return Result<CredentialAvatarResponse>.NotFound("Credential not found");
+            }
+
+            var storageFile = await _dataContext.Query<StorageFile>()
+                .IgnoreQueryFilters()
+                .Where(file => file.Id == request.StorageFileId)
+                .Where(file => file.TenantId == tenantId)
+                .FirstOrDefaultAsync(ct);
+
+            if (storageFile is null)
+            {
+                return Result<CredentialAvatarResponse>.NotFound("Storage file not found");
+            }
+
+            if (storageFile.Identifier != credential.Id)
+            {
+                return Result<CredentialAvatarResponse>.Forbidden(
+                    "Storage file is not available for this credential");
+            }
+
+            if (!CredentialAvatarPolicy.IsAllowedContentType(storageFile.ContentType))
+            {
+                return Result<CredentialAvatarResponse>.Failure(
+                    "Storage file must be a PNG, JPEG, or WebP image",
+                    400);
+            }
+
+            credential.AvatarStorageFileId = storageFile.Id;
+            credential.AvatarUrl = storageFile.ContentPath;
+            credential.AvatarUpdatedAt = DateTime.UtcNow;
+
+            _dataContext.Update(credential);
+            await _dataContext.SaveChangesAsync(ct);
+
+            return Result<CredentialAvatarResponse>.Success(
+                CreateCredentialAvatarResponse(credential, storageFile));
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("SetCredentialAvatar", "IdentityCredential", request.CredentialId, ex.Message, ex);
+            return Result<CredentialAvatarResponse>.Failure(
+                "Credential avatar could not be updated",
+                500);
+        }
+    }
+
+    public async Task<Result<CredentialAvatarResponse>> RemoveCredentialAvatarAsync(
+        RemoveCredentialAvatarRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            {
+                return Result<CredentialAvatarResponse>.Failure("Tenant context is required", 400);
+            }
+
+            var credential = await FindCredentialForTenant(request.CredentialId, tenantId, ct);
+            if (credential is null)
+            {
+                return Result<CredentialAvatarResponse>.NotFound("Credential not found");
+            }
+
+            credential.AvatarStorageFileId = null;
+            credential.AvatarUrl = null;
+            credential.AvatarUpdatedAt = null;
+
+            _dataContext.Update(credential);
+            await _dataContext.SaveChangesAsync(ct);
+
+            return Result<CredentialAvatarResponse>.Success(
+                CreateCredentialAvatarResponse(credential, (StorageFile?)null));
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("RemoveCredentialAvatar", "IdentityCredential", request.CredentialId, ex.Message, ex);
+            return Result<CredentialAvatarResponse>.Failure(
+                "Credential avatar could not be removed",
+                500);
+        }
+    }
+
+    #endregion
     #region Helper Methods
+
+    private async Task<IdentityCredential?> FindCredentialForTenant(
+        Guid credentialId,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        return await _dataContext.Query<IdentityCredential>()
+            .IgnoreQueryFilters()
+            .Where(credential => credential.Id == credentialId)
+            .Where(credential => credential.TenantId == tenantId)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    private static Result ValidateCredentialAvatarRequest(UploadCredentialAvatarRequest request)
+    {
+        if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+        {
+            return Result.Failure("Tenant context is required", 400);
+        }
+
+        if (request.CredentialId == Guid.Empty)
+        {
+            return Result.Failure("Credential is required", 400);
+        }
+
+        if (request.FileBytes is null || request.FileBytes.Length == 0)
+        {
+            return Result.Failure("Avatar image is required", 400);
+        }
+
+        if (request.FileBytes.Length > CredentialAvatarPolicy.MaxFileSizeBytes)
+        {
+            return Result.Failure("Avatar image must be 5 MB or smaller", 400);
+        }
+
+        if (!CredentialAvatarPolicy.IsAllowedContentType(request.ContentType))
+        {
+            return Result.Failure("Avatar image must be PNG, JPEG, or WebP", 400);
+        }
+
+        return Result.Success();
+    }
+
+    private async Task<Result<AvatarStorageMetadata>> EnsureAvatarStorageMetadata(
+        Guid tenantId,
+        string contentType,
+        CancellationToken ct)
+    {
+        var storageFileType = await _dataContext.Query<StorageFileType>()
+            .IgnoreQueryFilters()
+            .Where(type => type.TenantId == tenantId)
+            .Where(type => type.Name == contentType)
+            .FirstOrDefaultAsync(ct);
+
+        var group = await _dataContext.Query<StorageFileIdentifierGroup>()
+            .IgnoreQueryFilters()
+            .Where(identifierGroup => identifierGroup.TenantId == tenantId)
+            .Where(identifierGroup => identifierGroup.Name == CredentialAvatarPolicy.StorageIdentifierGroupName)
+            .FirstOrDefaultAsync(ct);
+
+        if (storageFileType is null)
+        {
+            storageFileType = new StorageFileType
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = contentType,
+                SystemReferenceId = Guid.NewGuid(),
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            _dataContext.Add(storageFileType);
+        }
+
+        if (group is null)
+        {
+            group = new StorageFileIdentifierGroup
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = CredentialAvatarPolicy.StorageIdentifierGroupName,
+                SystemReferenceId = Guid.NewGuid(),
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            _dataContext.Add(group);
+        }
+
+        var identifier = await _dataContext.Query<StorageFileIdentifier>()
+            .IgnoreQueryFilters()
+            .Where(storageIdentifier => storageIdentifier.TenantId == tenantId)
+            .Where(storageIdentifier => storageIdentifier.Name == CredentialAvatarPolicy.StorageFileIdentifierName)
+            .FirstOrDefaultAsync(ct);
+
+        if (identifier is null)
+        {
+            identifier = new StorageFileIdentifier
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = CredentialAvatarPolicy.StorageFileIdentifierName,
+                Description = "Identity credential avatar image",
+                GroupId = group.Id,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            _dataContext.Add(identifier);
+        }
+
+        var saveResult = await _dataContext.SaveChangesAsync(ct);
+        if (!saveResult.IsSuccess)
+        {
+            return Result<AvatarStorageMetadata>.Failure(
+                "Avatar storage metadata could not be saved",
+                saveResult.StatusCode);
+        }
+
+        return Result<AvatarStorageMetadata>.Success(new(storageFileType, identifier));
+    }
+
+    private async Task<Result<StorageFileResponse>> UploadCredentialAvatarToStorageAsync(
+        UploadCredentialAvatarRequest request,
+        IdentityCredential credential,
+        AvatarStorageMetadata metadata,
+        string contentType,
+        CancellationToken ct)
+    {
+        var fileBytes = request.FileBytes!;
+        var extension = CredentialAvatarPolicy.GetFileExtension(contentType);
+        var fileName = NormalizeAvatarFileName(request.FileName, extension);
+        var sha256Hash = ComputeSha256(fileBytes);
+        var session = await _storageServiceWrapper.CreateStorageUploadSession(
+            new CreateStorageUploadSessionRequest
+            {
+                Metadata = request.Metadata,
+                FileName = fileName,
+                ContentType = contentType,
+                TypeId = metadata.Type.Id,
+                Identifier = credential.Id,
+                StorageFileIdentifierId = metadata.Identifier.Id,
+                TotalSizeBytes = fileBytes.LongLength,
+                ExpectedSha256Hash = sha256Hash,
+                ChunkSizeBytes = fileBytes.Length,
+                Visibility = StorageFileVisibility.Public
+            });
+
+        if (!session.IsSuccess || session.Response is null)
+        {
+            return Result<StorageFileResponse>.Failure(
+                session.Message ?? "Avatar upload session could not be created",
+                ToStatusCode(session.HttpStatusCode));
+        }
+
+        var uploadPart = await _storageServiceWrapper.UploadStorageFilePart(
+            new UploadStorageFilePartRequest
+            {
+                Metadata = request.Metadata,
+                UploadSessionId = session.Response.Id,
+                PartNumber = 1,
+                OffsetBytes = 0,
+                PartSha256Hash = sha256Hash,
+                ChunkBytes = fileBytes
+            });
+
+        if (!uploadPart.IsSuccess)
+        {
+            return Result<StorageFileResponse>.Failure(
+                uploadPart.Message ?? "Avatar image could not be uploaded",
+                ToStatusCode(uploadPart.HttpStatusCode));
+        }
+
+        var complete = await _storageServiceWrapper.CompleteStorageUploadSession(
+            new CompleteStorageUploadSessionRequest
+            {
+                Metadata = request.Metadata,
+                UploadSessionId = session.Response.Id,
+                ExpectedSha256Hash = sha256Hash
+            });
+
+        if (!complete.IsSuccess || complete.Response is null)
+        {
+            return Result<StorageFileResponse>.Failure(
+                complete.Message ?? "Avatar upload could not be completed",
+                ToStatusCode(complete.HttpStatusCode));
+        }
+
+        return Result<StorageFileResponse>.Success(complete.Response);
+    }
+
+    private static string NormalizeAvatarFileName(string? fileName, string extension)
+    {
+        var safeName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(safeName))
+        {
+            return $"avatar{extension}";
+        }
+
+        var nameWithoutExtension = Path.GetFileNameWithoutExtension(safeName);
+        if (string.IsNullOrWhiteSpace(nameWithoutExtension))
+        {
+            return $"avatar{extension}";
+        }
+
+        if (nameWithoutExtension.Length > 120)
+        {
+            nameWithoutExtension = nameWithoutExtension[..120];
+        }
+
+        return $"{nameWithoutExtension}{extension}";
+    }
+
+    private static string ComputeSha256(byte[] bytes) =>
+        Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+    private static int ToStatusCode(HttpStatusCode statusCode) =>
+        statusCode == 0 ? 500 : (int)statusCode;
+
+    private static string? ResolveAvatarUrl(StorageFileResponse storageFile)
+    {
+        if (!string.IsNullOrWhiteSpace(storageFile.CdnBaseUrl))
+        {
+            return storageFile.CdnBaseUrl;
+        }
+
+        if (!string.IsNullOrWhiteSpace(storageFile.PublicUrl))
+        {
+            return storageFile.PublicUrl;
+        }
+
+        return storageFile.ObjectKey;
+    }
+
+    private static CredentialAvatarResponse CreateCredentialAvatarResponse(
+        IdentityCredential credential,
+        StorageFile? storageFile)
+    {
+        return new CredentialAvatarResponse
+        {
+            CredentialId = credential.Id,
+            StorageFileId = credential.AvatarStorageFileId,
+            AvatarUrl = credential.AvatarUrl,
+            ContentType = storageFile?.ContentType,
+            FileName = storageFile?.Name,
+            AvatarUpdatedAt = credential.AvatarUpdatedAt
+        };
+    }
+
+    private static CredentialAvatarResponse CreateCredentialAvatarResponse(
+        IdentityCredential credential,
+        StorageFileResponse storageFile)
+    {
+        return new CredentialAvatarResponse
+        {
+            CredentialId = credential.Id,
+            StorageFileId = credential.AvatarStorageFileId,
+            AvatarUrl = credential.AvatarUrl,
+            ContentType = storageFile.ContentType,
+            FileName = storageFile.Name,
+            AvatarUpdatedAt = credential.AvatarUpdatedAt
+        };
+    }
+
+    private sealed record AvatarStorageMetadata(
+        StorageFileType Type,
+        StorageFileIdentifier Identifier);
 
     /// <summary>
     /// Validates user authorization with multi-type authentication support.
