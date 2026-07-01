@@ -277,7 +277,7 @@ public sealed class NotificationServiceTests
     }
 
     private static NotificationService CreateService(AppDbContext db) =>
-        new(db, NullLogger<NotificationService>.Instance);
+        new(db, NullLogger<NotificationService>.Instance, new ConfigurationBuilder().Build());
 
     private static void EnableChannels(
         AppDbContext db,
