@@ -21,10 +21,23 @@ namespace XFramework.Inventario.Api.Services;
 public class ProductService
 {
     private readonly IDataContext _dataContext;
-    private readonly AppDbContext _db;
+    private readonly AppDbContext? _db;
     private readonly ICacheService _cacheService;
     private readonly ILogger<ProductService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public ProductService(
+        IDataContext dataContext,
+        ICacheService cacheService,
+        ILogger<ProductService> logger,
+        IHttpContextAccessor httpContextAccessor)
+    {
+        _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
+        _db = null;
+        _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+    }
 
     public ProductService(
         IDataContext dataContext,
@@ -612,7 +625,7 @@ public class ProductService
         Guid? categoryId,
         bool? isAvailable)
     {
-        var query = _db.Set<Product>()
+        var query = CatalogDb.Set<Product>()
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(p => p.TenantId == tenantId && !p.IsDeleted && p.IsEnabled);
@@ -648,11 +661,11 @@ public class ProductService
         IQueryable<Product> products,
         Guid tenantId)
     {
-        var variations = _db.Set<ProductVariation>()
+        var variations = CatalogDb.Set<ProductVariation>()
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(v => v.TenantId == tenantId && !v.IsDeleted && v.IsEnabled);
-        var variationTypes = _db.Set<ProductVariationType>()
+        var variationTypes = CatalogDb.Set<ProductVariationType>()
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(t => t.TenantId == tenantId && !t.IsDeleted);
@@ -686,11 +699,11 @@ public class ProductService
     {
         var products = BuildSellableProductQuery(tenantId, categoryId: null, isAvailable: null)
             .Where(p => p.Id == productId);
-        var variations = _db.Set<ProductVariation>()
+        var variations = CatalogDb.Set<ProductVariation>()
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(v => v.TenantId == tenantId && !v.IsDeleted && v.IsEnabled);
-        var variationTypes = _db.Set<ProductVariationType>()
+        var variationTypes = CatalogDb.Set<ProductVariationType>()
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(t => t.TenantId == tenantId && !t.IsDeleted);
@@ -717,6 +730,10 @@ public class ProductService
 
     private static string? NormalizeSearch(string? search) =>
         string.IsNullOrWhiteSpace(search) ? null : search.Trim().ToLowerInvariant();
+
+    private AppDbContext CatalogDb => _db
+        ?? throw new InvalidOperationException(
+            "AppDbContext is required for sellable catalog read operations.");
 }
 
 /// <summary>
