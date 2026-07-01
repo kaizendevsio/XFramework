@@ -7,6 +7,7 @@ using XFramework.Inventario.Domain.Shared.Contracts.Requests.Purchasing;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Variations;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses;
 using XFramework.Inventario.Domain.Shared.Enums;
 using XFramework.TestInfrastructure;
@@ -72,6 +73,197 @@ public sealed class WrapperContractCoverageTests : InventarioTestBase
         updated.Brand.Should().Be("Updated Wrapper Brand");
         updated.Description.Should().Be("Updated through wrapper coverage");
         updated.IsAvailable.Should().BeFalse();
+    }
+
+    [Test]
+    [Category(TestCategories.Catalog)]
+    public async Task SellableCatalogWrappers_SearchGetAndVariations_ReturnPosCatalogRows()
+    {
+        await using var db = CreateDbContext();
+        var category = await TestInventarioSeed.SeedCategory(db);
+        var otherCategory = await TestInventarioSeed.SeedCategory(db);
+        var sku = UniqueCode("POS");
+        var product = await TestInventarioSeed.SeedProduct(
+            db,
+            categoryId: category.Id,
+            sku: sku,
+            name: $"POS Wrapper Product {sku}");
+        product.Brand = $"POS Brand {sku}";
+        product.Price = 42m;
+        product.Image = "pos-wrapper-product.png";
+
+        var unavailableSku = UniqueCode("OFF");
+        var unavailable = await TestInventarioSeed.SeedProduct(
+            db,
+            categoryId: category.Id,
+            sku: unavailableSku,
+            name: $"Unavailable POS Product {unavailableSku}");
+        unavailable.IsAvailable = false;
+
+        var otherProduct = await TestInventarioSeed.SeedProduct(
+            db,
+            categoryId: otherCategory.Id,
+            sku: UniqueCode("OTHER"),
+            name: "Other category POS product");
+        var otherTenantId = Guid.NewGuid();
+        var otherTenantCategory = await TestInventarioSeed.SeedCategory(db, otherTenantId);
+        var otherTenantProduct = await TestInventarioSeed.SeedProduct(
+            db,
+            otherTenantId,
+            otherTenantCategory.Id,
+            sku: UniqueCode("XTPOS"),
+            name: "Other tenant POS product");
+
+        db.Set<Product>().UpdateRange(product, unavailable);
+        await db.SaveChangesAsync();
+
+        var typeName = $"POS Flavor {Guid.NewGuid():N}";
+        var createType = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProductVariationType(
+            new CreateProductVariationTypeRequest
+            {
+                Metadata = CreateMetadata(),
+                Name = typeName
+            });
+        createType.IsSuccess.Should().BeTrue(createType.Message);
+
+        await using var typeDb = CreateDbContext();
+        var persistedType = await typeDb.Set<ProductVariationType>()
+            .IgnoreQueryFilters()
+            .FirstAsync(x => x.Name == typeName);
+
+        var variantName = $"Vanilla {Guid.NewGuid():N}";
+        var createVariant = await InventarioIntegrationTestFixture.ServiceWrapper.CreateProductVariation(
+            new CreateProductVariationRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductId = product.Id,
+                ProductVariationTypeId = persistedType.Id,
+                Name = variantName,
+                Price = 49.75m
+            });
+        createVariant.IsSuccess.Should().BeTrue(createVariant.Message);
+
+        await using var variationDb = CreateDbContext();
+        var variation = await variationDb.Set<ProductVariation>()
+            .IgnoreQueryFilters()
+            .FirstAsync(x => x.ProductId == product.Id && x.Name == variantName);
+
+        var searchBySku = await InventarioIntegrationTestFixture.ServiceWrapper.SearchSellableProducts(
+            new SearchSellableProductsRequest
+            {
+                Metadata = CreateMetadata(),
+                Search = sku,
+                IncludeVariants = false
+            });
+        searchBySku.IsSuccess.Should().BeTrue(searchBySku.Message);
+        searchBySku.Response.Should().ContainSingle(x =>
+            x.ProductId == product.Id &&
+            x.ProductVariationId == null &&
+            x.SKU == sku &&
+            x.Price == product.Price);
+
+        var searchByBrand = await InventarioIntegrationTestFixture.ServiceWrapper.SearchSellableProducts(
+            new SearchSellableProductsRequest
+            {
+                Metadata = CreateMetadata(),
+                Search = product.Brand,
+                IncludeVariants = false
+            });
+        searchByBrand.IsSuccess.Should().BeTrue(searchByBrand.Message);
+        searchByBrand.Response.Should().Contain(x => x.ProductId == product.Id);
+
+        var searchByVariant = await InventarioIntegrationTestFixture.ServiceWrapper.SearchSellableProducts(
+            new SearchSellableProductsRequest
+            {
+                Metadata = CreateMetadata(),
+                Search = variantName,
+                IncludeBaseProducts = false
+            });
+        searchByVariant.IsSuccess.Should().BeTrue(searchByVariant.Message);
+        searchByVariant.Response.Should().ContainSingle(x =>
+            x.ProductId == product.Id &&
+            x.ProductVariationId == variation.Id &&
+            x.VariantTypeName == typeName &&
+            x.Price == variation.Price);
+
+        var searchByVariantType = await InventarioIntegrationTestFixture.ServiceWrapper.SearchSellableProducts(
+            new SearchSellableProductsRequest
+            {
+                Metadata = CreateMetadata(),
+                Search = typeName,
+                IncludeBaseProducts = false
+            });
+        searchByVariantType.IsSuccess.Should().BeTrue(searchByVariantType.Message);
+        searchByVariantType.Response.Should().ContainSingle(x => x.ProductVariationId == variation.Id);
+
+        var categorySearch = await InventarioIntegrationTestFixture.ServiceWrapper.SearchSellableProducts(
+            new SearchSellableProductsRequest
+            {
+                Metadata = CreateMetadata(),
+                CategoryId = category.Id,
+                IncludeVariants = false,
+                PageSize = 100
+            });
+        categorySearch.IsSuccess.Should().BeTrue(categorySearch.Message);
+        categorySearch.Response.Should().Contain(x => x.ProductId == product.Id);
+        categorySearch.Response.Should().NotContain(x => x.ProductId == otherProduct.Id);
+
+        var otherTenantSearch = await InventarioIntegrationTestFixture.ServiceWrapper.SearchSellableProducts(
+            new SearchSellableProductsRequest
+            {
+                Metadata = CreateMetadata(),
+                Search = otherTenantProduct.SKU,
+                IncludeVariants = false
+            });
+        otherTenantSearch.IsSuccess.Should().BeTrue(otherTenantSearch.Message);
+        otherTenantSearch.Response.Should().BeEmpty();
+
+        var unavailableDefault = await InventarioIntegrationTestFixture.ServiceWrapper.SearchSellableProducts(
+            new SearchSellableProductsRequest
+            {
+                Metadata = CreateMetadata(),
+                Search = unavailableSku,
+                IncludeVariants = false
+            });
+        unavailableDefault.IsSuccess.Should().BeTrue(unavailableDefault.Message);
+        unavailableDefault.Response.Should().BeEmpty();
+
+        var unavailableExplicit = await InventarioIntegrationTestFixture.ServiceWrapper.SearchSellableProducts(
+            new SearchSellableProductsRequest
+            {
+                Metadata = CreateMetadata(),
+                Search = unavailableSku,
+                IsAvailable = false,
+                IncludeVariants = false
+            });
+        unavailableExplicit.IsSuccess.Should().BeTrue(unavailableExplicit.Message);
+        unavailableExplicit.Response.Should().ContainSingle(x =>
+            x.ProductId == unavailable.Id &&
+            x.IsAvailable == false);
+
+        var detail = await InventarioIntegrationTestFixture.ServiceWrapper.GetSellableProduct(
+            new GetSellableProductRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductId = product.Id
+            });
+        detail.IsSuccess.Should().BeTrue(detail.Message);
+        detail.Response.Should().NotBeNull();
+        detail.Response!.ProductId.Should().Be(product.Id);
+        detail.Response.Variations.Should().ContainSingle(x =>
+            x.ProductVariationId == variation.Id &&
+            x.Price == variation.Price &&
+            x.BaseProductPrice == product.Price);
+
+        var variations = await InventarioIntegrationTestFixture.ServiceWrapper.GetProductVariations(
+            new GetProductVariationsRequest
+            {
+                Metadata = CreateMetadata(),
+                ProductId = product.Id
+            });
+        variations.IsSuccess.Should().BeTrue(variations.Message);
+        variations.Response.Should().ContainSingle(x => x.ProductVariationId == variation.Id);
+        variations.Response.Should().NotContain(x => x.ProductId == otherProduct.Id);
     }
 
     [Test]
