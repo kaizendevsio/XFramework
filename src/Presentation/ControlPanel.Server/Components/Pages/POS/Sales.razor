@@ -1,0 +1,217 @@
+@page "/pos/sales"
+@using XFramework.Domain.Shared.DataContext
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>POS Sales - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="POS" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="POS Sales" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <BbTypographyH3>Sales</BbTypographyH3>
+                    <BbTypographyMuted>Lookup receipts, monitor recovery states, and start returns.</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Sale List</BbCardTitle>
+                    <BbCardDescription>@_sales.Count sale(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_sales" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.SaleNumber)" Title="Receipt" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Register" Filterable="true" FilterBy="@(item => GetRegisterName(item.RegisterId))">
+                                <ChildContent Context="item">@GetRegisterName(item.RegisterId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Total" Sortable="true" Filterable="true" FilterBy="@(item => item.TotalAmount)">
+                                <ChildContent Context="item">@item.TotalAmount.ToString("N2")</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@item.Status.ToString()" Status="@GetSaleStatusBadge(item.Status)" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.CompletedAt)" Title="Completed" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <div class="flex flex-wrap gap-1">
+                                        @if (item.Status == PosSaleStatus.InventoryFulfillmentFailed)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => RetryFulfillment(item.Id))" Disabled="@_acting">
+                                                Retry
+                                            </BbButton>
+                                        }
+                                        @if (item.Status is PosSaleStatus.Draft or PosSaleStatus.InventoryReserved or PosSaleStatus.PaymentFailed or PosSaleStatus.InventoryReservationFailed)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelSale(item.Id))" Disabled="@_acting">
+                                                Cancel
+                                            </BbButton>
+                                        }
+                                        @if (item.Status == PosSaleStatus.Completed)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/pos/returns?saleId={item.Id}"))">
+                                                Return
+                                            </BbButton>
+                                        }
+                                    </div>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IPOSServiceWrapper POS { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+
+    private List<PosSale> _sales = [];
+    private List<PosRegister> _registers = [];
+    private bool _loading = true;
+    private bool _acting;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales")
+                || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos);
+            _sales = [];
+            _registers = [];
+
+            if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
+                return;
+
+            _registers = await DataContext.Query<PosRegister>().IgnoreQueryFilters().NoCache()
+                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
+                .Take(200)
+                .ToListAsync();
+            _sales = await DataContext.Query<PosSale>().IgnoreQueryFilters().NoCache()
+                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
+                .OrderByDescending(item => item.CreatedAt)
+                .Take(250)
+                .ToListAsync();
+        }
+        catch
+        {
+            ToastService.Show("Could not load POS sales.");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CancelSale(Guid saleId)
+    {
+        _acting = true;
+        try
+        {
+            var response = await POS.CancelPosSale(new CancelPosSaleRequest
+            {
+                Metadata = BuildMetadata(),
+                SaleId = saleId,
+                Reason = "Cancelled from ControlPanel"
+            });
+            ToastService.Show(response.IsSuccess ? "Sale cancelled." : response.Message ?? "Could not cancel sale.");
+            await Reload();
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private async Task RetryFulfillment(Guid saleId)
+    {
+        _acting = true;
+        try
+        {
+            var response = await POS.RetryPosSaleFulfillment(new RetryPosSaleFulfillmentRequest
+            {
+                Metadata = BuildMetadata(),
+                SaleId = saleId
+            });
+            ToastService.Show(response.IsSuccess ? "Fulfillment retry submitted." : response.Message ?? "Could not retry fulfillment.");
+            await Reload();
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        CredentialId = RequestMetadata.CredentialId,
+        SessionId = RequestMetadata.SessionId,
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel"
+    };
+
+    private string GetRegisterName(Guid registerId) =>
+        _registers.FirstOrDefault(item => item.Id == registerId)?.Name ?? registerId.ToString()[..8];
+
+    private static string GetSaleStatusBadge(PosSaleStatus status) =>
+        status switch
+        {
+            PosSaleStatus.Completed => "active",
+            PosSaleStatus.PaymentFailed or PosSaleStatus.InventoryFulfillmentFailed or PosSaleStatus.InventoryReservationFailed => "warning",
+            PosSaleStatus.Cancelled => "inactive",
+            _ => "pending"
+        };
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

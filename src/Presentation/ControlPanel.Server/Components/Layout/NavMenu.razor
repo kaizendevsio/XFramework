@@ -53,6 +53,25 @@
     </SidebarSection>
 }
 
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos))
+{
+    <SidebarSection GroupId="pos" Title="POS" Icon="scan-barcode">
+        <SidebarNavItem Href="/pos/cashier" Label="Cashier" Icon="shopping-cart" />
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers"))
+        {
+            <SidebarNavItem Href="/pos/registers" Label="Registers" Icon="store" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales"))
+        {
+            <SidebarNavItem Href="/pos/sales" Label="Sales" Icon="receipt" />
+        }
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "returns"))
+        {
+            <SidebarNavItem Href="/pos/returns" Label="Returns" Icon="undo-2" />
+        }
+    </SidebarSection>
+}
+
 @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Communications))
 {
     <SidebarSection GroupId="communications" Title="Communications" Icon="messages-square">

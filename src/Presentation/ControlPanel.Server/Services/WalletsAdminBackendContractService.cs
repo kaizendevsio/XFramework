@@ -178,28 +178,31 @@ public sealed class WalletsAdminBackendContractService(
     public async Task<CmdResponse> BatchIncrementAsync(BatchIncrementWalletRequest request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return await wallets.BatchIncrementWallet(request with
+        var response = await wallets.BatchIncrementWallet(request with
         {
             Metadata = Metadata()
         });
+        return ToCommandResponse(response);
     }
 
     public async Task<CmdResponse> BatchDecrementAsync(BatchDecrementWalletRequest request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return await wallets.BatchDecrementWallet(request with
+        var response = await wallets.BatchDecrementWallet(request with
         {
             Metadata = Metadata()
         });
+        return ToCommandResponse(response);
     }
 
     public async Task<CmdResponse> BatchTransferAsync(BatchTransferWalletRequest request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return await wallets.BatchTransferWallet(request with
+        var response = await wallets.BatchTransferWallet(request with
         {
             Metadata = Metadata()
         });
+        return ToCommandResponse(response);
     }
 
     public async Task<CmdResponse> RetryOutboxMessageAsync(Guid id, CancellationToken ct = default)

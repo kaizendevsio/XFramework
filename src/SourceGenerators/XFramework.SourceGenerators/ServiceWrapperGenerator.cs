@@ -614,6 +614,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
                 var isQueryResponse = tResponse.Name == "QueryResponse" &&
                                       tResponse is INamedTypeSymbol { IsGenericType: true };
+                var isTypedCommandResponse = tResponse.Name == "CmdResponse" &&
+                                             tResponse is INamedTypeSymbol { IsGenericType: true };
 
                 string interfaceSig, implMethod;
 
@@ -622,6 +624,12 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                     var innerType = ((INamedTypeSymbol)tResponse).TypeArguments[0].ToDisplayString();
                     interfaceSig = $"Task<QueryResponse<{innerType}>> {methodName}({requestFullName} request);";
                     implMethod = $"public Task<QueryResponse<{innerType}>> {methodName}({requestFullName} request) => SendAsync<{requestFullName}, {innerType}>(request);";
+                }
+                else if (isTypedCommandResponse)
+                {
+                    var innerType = ((INamedTypeSymbol)tResponse).TypeArguments[0].ToDisplayString();
+                    interfaceSig = $"Task<CmdResponse<{innerType}>> {methodName}({requestFullName} request);";
+                    implMethod = $"public Task<CmdResponse<{innerType}>> {methodName}({requestFullName} request) => SendVoidAsync<{requestFullName}, {innerType}>(request);";
                 }
                 else
                 {

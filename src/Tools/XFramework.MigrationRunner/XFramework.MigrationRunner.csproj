@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\Modules\XFramework.Notifications\Notifications.Domain.Shared\Notifications.Domain.Shared.csproj" />
     <ProjectReference Include="..\..\Modules\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
     <ProjectReference Include="..\..\Modules\XFramework.Storage\Storage.Domain.Shared\Storage.Domain.Shared.csproj" />
+    <ProjectReference Include="..\..\Modules\XFramework.POS\POS.Domain.Shared\POS.Domain.Shared.csproj" />
     <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
   </ItemGroup>
 

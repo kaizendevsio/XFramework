@@ -103,6 +103,40 @@ public sealed class ServiceWrapperGeneratorTests
     }
 
     [Test]
+    public void GenerateWrapper_TypedCommandResponse_PreservesTypedPayload()
+    {
+        var domainReference = CreateReference(
+            "POS.Domain.Shared",
+            """
+            namespace POS.Domain.Shared.Contracts.Responses
+            {
+                public sealed record PosSaleReceiptResponse;
+            }
+
+            namespace POS.Domain.Shared.Contracts.Requests
+            {
+                using Bolt.Domain.Shared.Contracts.Requests;
+                using POS.Domain.Shared.Contracts.Responses;
+                using XFramework.Domain.Shared.BusinessObjects;
+                using XFramework.Domain.Shared.Contracts.Requests;
+
+                public partial record CheckoutPosSaleRequest : RequestBase,
+                    ICommand<CmdResponse<PosSaleReceiptResponse>>,
+                    IBoltRequest<CheckoutPosSaleRequest, CmdResponse<PosSaleReceiptResponse>>;
+            }
+            """);
+
+        var generatedSource = RunGenerator(
+            "POS.Integration",
+            domainReference,
+            new Dictionary<string, string>());
+
+        generatedSource.Should().Contain("public partial interface IPOSServiceWrapper");
+        generatedSource.Should().Contain("Task<CmdResponse<POS.Domain.Shared.Contracts.Responses.PosSaleReceiptResponse>> CheckoutPosSale(POS.Domain.Shared.Contracts.Requests.CheckoutPosSaleRequest request);");
+        generatedSource.Should().Contain("SendVoidAsync<POS.Domain.Shared.Contracts.Requests.CheckoutPosSaleRequest, POS.Domain.Shared.Contracts.Responses.PosSaleReceiptResponse>(request);");
+    }
+
+    [Test]
     public void GenerateWrapper_ProjectWithManualWrapperDeclaration_SkipsGeneratedWrapper()
     {
         var domainReference = CreateReference(

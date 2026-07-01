@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <RootNamespace>POS.IntegrationTests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="NUnit" />
+        <PackageReference Include="NUnit3TestAdapter" />
+        <PackageReference Include="coverlet.collector" />
+        <PackageReference Include="FluentAssertions" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Modules\XFramework.POS\POS.Domain.Shared\POS.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.POS\POS.Integration\POS.Integration.csproj" />
+        <ProjectReference Include="..\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
+    </ItemGroup>
+
+</Project>
