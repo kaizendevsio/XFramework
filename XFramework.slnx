@@ -32,6 +32,11 @@
     <Project Path="src\Modules\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
     <Project Path="src\Modules\XFramework.Inventario\Inventario.Integration\Inventario.Integration.csproj" />
   </Folder>
+  <Folder Name="/Services/POS/">
+    <Project Path="src\Modules\XFramework.POS\POS.Api\POS.Api.csproj" />
+    <Project Path="src\Modules\XFramework.POS\POS.Domain.Shared\POS.Domain.Shared.csproj" />
+    <Project Path="src\Modules\XFramework.POS\POS.Integration\POS.Integration.csproj" />
+  </Folder>
   <Folder Name="/Services/Communications/">
     <Project Path="src\Modules\XFramework.Communications\Communications.Api\Communications.Api.csproj" />
     <Project Path="src\Modules\XFramework.Communications\Communications.Domain.Shared\Communications.Domain.Shared.csproj" />
@@ -93,6 +98,8 @@
     <Project Path="src\Tests\ControlPanel.E2ETests\ControlPanel.E2ETests.csproj" />
     <Project Path="src\Tests\Inventario.Api.Tests\Inventario.Api.Tests.csproj" />
     <Project Path="src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.csproj" />
+    <Project Path="src\Tests\POS.Api.Tests\POS.Api.Tests.csproj" />
+    <Project Path="src\Tests\POS.IntegrationTests\POS.IntegrationTests.csproj" />
     <Project Path="src\Tests\OperationsDashboard.Tests\OperationsDashboard.Tests.csproj" />
     <Project Path="src\Tests\Storage.IntegrationTests\Storage.IntegrationTests.csproj" />
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />

@@ -97,6 +97,76 @@ public sealed class ProductService;
         generatedSource.Should().NotContain("request.Search =");
     }
 
+    [Test]
+    public void GenerateBoltHandler_BareCommandResponse_DoesNotAssignResponsePayload()
+    {
+        const string source = """
+
+namespace Sample.Features.Messages.Archive;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+
+public static class ArchiveThreadEndpoint
+{
+    [BoltHandler]
+    public static Task<Result> Handle(
+        ArchiveThreadRequest request,
+        CancellationToken ct)
+    {
+        return Task.FromResult(new Result());
+    }
+}
+
+public sealed record ArchiveThreadRequest : IBoltRequest<ArchiveThreadRequest, CmdResponse>;
+""";
+
+        var generatedSource = RunGenerator(source, "ArchiveThreadEndpoint_Handle_BoltHandler.g.cs");
+
+        generatedSource.Should().Contain("var sfResponse = new global::XFramework.Domain.Shared.BusinessObjects.CmdResponse();");
+        generatedSource.Should().NotContain("sfResponse.Response = result.Data;");
+    }
+
+    [Test]
+    public void GenerateBoltHandler_TypedCommandResponse_AssignsResponsePayload()
+    {
+        const string source = """
+
+namespace Sample.Features.Sales.Checkout;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+
+public static class CheckoutSaleEndpoint
+{
+    [BoltHandler]
+    public static Task<Result<SaleReceipt>> Handle(
+        CheckoutSaleRequest request,
+        CancellationToken ct)
+    {
+        return Task.FromResult(Result<SaleReceipt>.Success(new SaleReceipt()));
+    }
+}
+
+public sealed record CheckoutSaleRequest : IBoltRequest<CheckoutSaleRequest, CmdResponse<SaleReceipt>>;
+
+public sealed record SaleReceipt;
+""";
+
+        var generatedSource = RunGenerator(source, "CheckoutSaleEndpoint_Handle_BoltHandler.g.cs");
+
+        generatedSource.Should().Contain("var sfResponse = new global::XFramework.Domain.Shared.BusinessObjects.CmdResponse<global::Sample.Features.Sales.Checkout.SaleReceipt>();");
+        generatedSource.Should().Contain("sfResponse.Response = result.Data;");
+    }
+
     private static string RunGenerator(string source, string generatedHintName)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -159,6 +229,9 @@ using System.Collections.Generic;
 namespace XFramework.Integration.Attributes
 {
     [AttributeUsage(AttributeTargets.Method)]
+    public sealed class BoltHandlerAttribute : Attribute;
+
+    [AttributeUsage(AttributeTargets.Method)]
     public sealed class MapGetAttribute(string route) : Attribute
     {
         public string Route { get; } = route;
@@ -179,6 +252,81 @@ namespace XFramework.Integration.Attributes
     }
 }
 
+namespace XFramework.Integration.Abstractions
+{
+    public interface IBoltHandler
+    {
+        void Register(
+            Bolt.Client.BoltClient client,
+            Microsoft.Extensions.Logging.ILogger logger,
+            Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory);
+    }
+}
+
+namespace Bolt.Client
+{
+    public sealed class BoltClient
+    {
+        public void RegisterHandler(
+            string requestType,
+            Func<ReadOnlyMemory<byte>, Guid, System.Threading.CancellationToken, Task<(System.Net.HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
+        {
+        }
+    }
+}
+
+namespace Bolt.Domain.Shared.Contracts.Requests
+{
+    public interface IBoltRequest<TRequest, TResponse>;
+}
+
+namespace MemoryPack
+{
+    public static class MemoryPackSerializer
+    {
+        public static T? Deserialize<T>(ReadOnlySpan<byte> span) => default;
+
+        public static byte[] Serialize<T>(T value) => [];
+    }
+}
+
+namespace Microsoft.Extensions.DependencyInjection
+{
+    public interface IServiceScopeFactory
+    {
+        IServiceScope CreateScope();
+
+        AsyncServiceScope CreateAsyncScope();
+    }
+
+    public interface IServiceScope : IDisposable
+    {
+        IServiceProvider ServiceProvider { get; }
+    }
+
+    public readonly struct AsyncServiceScope : IAsyncDisposable
+    {
+        public IServiceProvider ServiceProvider => default!;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    public static class ServiceProviderServiceExtensions
+    {
+        public static T GetRequiredService<T>(this IServiceProvider provider) => default!;
+    }
+}
+
+namespace Microsoft.Extensions.Logging
+{
+    public interface ILogger
+    {
+        void LogInformation(string message, params object[] args);
+
+        void LogError(Exception exception, string message, params object[] args);
+    }
+}
+
 namespace XFramework.Core.Patterns
 {
     public class Result
@@ -196,6 +344,20 @@ namespace XFramework.Core.Patterns
         {
             return new Result<T> { Data = data };
         }
+    }
+}
+
+namespace XFramework.Domain.Shared.BusinessObjects
+{
+    public class CmdResponse
+    {
+        public System.Net.HttpStatusCode HttpStatusCode { get; set; }
+        public string? Message { get; set; }
+    }
+
+    public class CmdResponse<T> : CmdResponse
+    {
+        public T? Response { get; set; }
     }
 }
 

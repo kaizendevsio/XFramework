@@ -26,6 +26,12 @@ public static class TenantModuleFeatureKeys
     public const string InventarioPlanning = "inventario.planning";
     public const string InventarioReporting = "inventario.reporting";
     public const string InventarioNegativeStock = "inventario.negative_stock";
+    public const string Pos = "pos";
+    public const string PosRegisters = "pos.registers";
+    public const string PosSales = "pos.sales";
+    public const string PosCarts = "pos.carts";
+    public const string PosReturns = "pos.returns";
+    public const string PosReporting = "pos.reporting";
     public const string Communications = "communications";
     public const string CommunicationsChat = "communications.chat";
     public const string CommunicationsAudioVideo = "communications.audio_video";
@@ -57,6 +63,11 @@ public static class TenantModuleFeatureKeys
     public const string PlanningSubFeature = "planning";
     public const string InventarioReportingSubFeature = "reporting";
     public const string NegativeStockSubFeature = "negative_stock";
+    public const string RegistersSubFeature = "registers";
+    public const string SalesSubFeature = "sales";
+    public const string CartsSubFeature = "carts";
+    public const string ReturnsSubFeature = "returns";
+    public const string PosReportingSubFeature = "reporting";
     public const string ChatSubFeature = "chat";
     public const string AudioVideoSubFeature = "audio_video";
 
@@ -86,6 +97,12 @@ public static class TenantModuleFeatureKeys
         new(Inventario, PlanningSubFeature, "Planning", "Demand planning, reorder planning, and replenishment forecasting.", "calendar-clock", false),
         new(Inventario, InventarioReportingSubFeature, "Reporting", "Inventory analytics, valuation, audit, and operational reports.", "bar-chart-3", false),
         new(Inventario, NegativeStockSubFeature, "Negative Stock", "Controls for allowing or blocking negative stock positions.", "minus-circle", false),
+        new(Pos, string.Empty, "POS", "Point of sale checkout, payment capture, returns, and receipts.", "scan-barcode"),
+        new(Pos, RegistersSubFeature, "POS Registers", "Register setup, default warehouse/location, cash drawer wallet, and merchant credentials.", "store"),
+        new(Pos, SalesSubFeature, "POS Sales", "Cashier checkout, receipts, inventory reservation, and sale recovery.", "receipt"),
+        new(Pos, CartsSubFeature, "POS Carts", "Suspended cashier carts for queue recovery and later checkout.", "shopping-cart"),
+        new(Pos, ReturnsSubFeature, "POS Returns", "Partial and full returns with inventory restock and Wallets refunds.", "undo-2"),
+        new(Pos, PosReportingSubFeature, "POS Reporting", "POS sales, return, and cash drawer reporting views.", "bar-chart-3", false),
         new(Communications, string.Empty, "Communications", "Tenant communications settings, administration, moderation, and chat platform controls.", "messages-square"),
         new(Communications, ChatSubFeature, "Communications Chat", "Threads, direct messages, reactions, and attachments.", "message-circle"),
         new(Communications, AudioVideoSubFeature, "Communications Audio/Video", "Audio and video communication features.", "video"),

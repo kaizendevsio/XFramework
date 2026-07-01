@@ -556,8 +556,9 @@ public class BoltHandlerGenerator : ISourceGenerator
             callArgs.Append(", ct");
 
         var isQueryResponse = h.SfResponseTypeFullName?.Contains("QueryResponse") == true;
+        var isTypedCommandResponse = h.SfResponseTypeFullName?.Contains("CmdResponse<") == true;
         string resultBuild;
-        if (isQueryResponse && h.IsGenericResult && h.ResultDataTypeFullName != null)
+        if ((isQueryResponse || isTypedCommandResponse) && h.IsGenericResult && h.ResultDataTypeFullName != null)
         {
             resultBuild = $@"                    var sfResponse = new {h.SfResponseTypeFullName}();
                     sfResponse.HttpStatusCode = (System.Net.HttpStatusCode)result.StatusCode;

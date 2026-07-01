@@ -307,6 +307,31 @@ services:
       start_period: 15s
 
   # ── Control Panel ───────────────────────────────────────────
+  pos:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/pos:${IMAGE_TAG:-develop}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.POS/POS.Api/POS.Api.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${POS_EXPOSE_PORT:-8115}:8080"
+    depends_on:
+      bolt-hub:
+        condition: service_healthy
+      inventario:
+        condition: service_healthy
+      wallets:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
   controlpanel:
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/controlpanel:${IMAGE_TAG:-develop}
     build:
@@ -331,6 +356,8 @@ services:
       attendance:
         condition: service_healthy
       inventario:
+        condition: service_healthy
+      pos:
         condition: service_healthy
       wallets:
         condition: service_healthy
