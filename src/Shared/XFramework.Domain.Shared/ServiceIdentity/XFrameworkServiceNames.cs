@@ -14,6 +14,7 @@ public static class XFrameworkServiceNames
     public const string Notifications = "XFramework.Notifications";
     public const string OperationsDashboard = "XFramework.Operations.Dashboard";
     public const string Payments = "XFramework.Payments";
+    public const string Pos = "XFramework.POS";
     public const string SmsGateway = "XFramework.SmsGateway";
     public const string Storage = "XFramework.Storage";
     public const string Wallets = "XFramework.Wallets";
@@ -32,6 +33,7 @@ public static class XFrameworkServiceNames
         Notifications,
         OperationsDashboard,
         Payments,
+        Pos,
         SmsGateway,
         Storage,
         Wallets
