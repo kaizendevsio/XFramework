@@ -1,13 +1,16 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using XFramework.Core.Loggers;
 using XFramework.Core.Observability;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.Caching;
+using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
+using XFramework.Inventario.Domain.Shared.Contracts.Responses.Products;
 using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Inventario.Api.Services;
@@ -18,17 +21,20 @@ namespace XFramework.Inventario.Api.Services;
 public class ProductService
 {
     private readonly IDataContext _dataContext;
+    private readonly AppDbContext _db;
     private readonly ICacheService _cacheService;
     private readonly ILogger<ProductService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public ProductService(
         IDataContext dataContext,
+        AppDbContext db,
         ICacheService cacheService,
         ILogger<ProductService> logger,
         IHttpContextAccessor httpContextAccessor)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
+        _db = db ?? throw new ArgumentNullException(nameof(db));
         _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
@@ -283,6 +289,168 @@ public class ProductService
         }
     }
 
+    public async Task<Result<List<SellableProductCatalogItem>>> SearchSellableProductsAsync(
+        SearchSellableProductsRequest request,
+        CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<List<SellableProductCatalogItem>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var tenantId = tenantResult.Data;
+
+        try
+        {
+            if (!request.IncludeBaseProducts && !request.IncludeVariants)
+                return Result<List<SellableProductCatalogItem>>.Success([]);
+
+            var page = request.Page <= 0 ? 1 : request.Page;
+            var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
+            var productQuery = BuildSellableProductQuery(tenantId, request.CategoryId, request.IsAvailable);
+            IQueryable<SellableProductCatalogItem>? rows = null;
+
+            if (request.IncludeBaseProducts)
+                rows = BuildBaseCatalogRows(productQuery);
+
+            if (request.IncludeVariants)
+            {
+                var variantRows = BuildVariantCatalogRows(productQuery, tenantId);
+                rows = rows is null ? variantRows : rows.Concat(variantRows);
+            }
+
+            if (rows is null)
+                return Result<List<SellableProductCatalogItem>>.Success([]);
+
+            var search = NormalizeSearch(request.Search);
+            if (search is not null)
+            {
+                rows = rows.Where(x =>
+                    x.ProductName.ToLower().Contains(search) ||
+                    (x.SKU != null && x.SKU.ToLower().Contains(search)) ||
+                    (x.Brand != null && x.Brand.ToLower().Contains(search)) ||
+                    (x.VariantName != null && x.VariantName.ToLower().Contains(search)) ||
+                    (x.VariantTypeName != null && x.VariantTypeName.ToLower().Contains(search)));
+            }
+
+            var items = await rows
+                .OrderBy(x => x.ProductName)
+                .ThenBy(x => x.ProductVariationId.HasValue)
+                .ThenBy(x => x.VariantTypeName)
+                .ThenBy(x => x.VariantName)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(ct);
+
+            _logger.EntityQueryCompleted(items.Count, "SellableProductCatalog");
+            return Result<List<SellableProductCatalogItem>>.Success(items);
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("Search", "SellableProductCatalog", Guid.Empty, ex.Message, ex);
+            return Result<List<SellableProductCatalogItem>>.Failure(
+                "An error occurred searching sellable products",
+                500);
+        }
+    }
+
+    public async Task<Result<SellableProductDetail>> GetSellableProductAsync(
+        GetSellableProductRequest request,
+        CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<SellableProductDetail>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var tenantId = tenantResult.Data;
+
+        try
+        {
+            var product = await BuildSellableProductQuery(tenantId, categoryId: null, isAvailable: null)
+                .Where(p => p.Id == request.ProductId)
+                .Select(p => new
+                {
+                    p.Id,
+                    Name = p.Name ?? string.Empty,
+                    p.Description,
+                    p.SKU,
+                    p.Brand,
+                    p.Image,
+                    p.CategoryId,
+                    CategoryName = p.Category != null ? p.Category.Name : null,
+                    p.IsAvailable,
+                    p.Price
+                })
+                .FirstOrDefaultAsync(ct);
+
+            if (product is null)
+            {
+                _logger.EntityNotFound("Product", request.ProductId);
+                return Result<SellableProductDetail>.NotFound("Product not found");
+            }
+
+            var variations = await BuildSellableVariationItemsQuery(tenantId, request.ProductId)
+                .OrderBy(x => x.VariantTypeName)
+                .ThenBy(x => x.VariantName)
+                .ToListAsync(ct);
+
+            return Result<SellableProductDetail>.Success(new SellableProductDetail(
+                product.Id,
+                product.Name,
+                product.Description,
+                product.SKU,
+                product.Brand,
+                product.Image,
+                product.CategoryId,
+                product.CategoryName,
+                product.IsAvailable,
+                product.Price,
+                variations));
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("Retrieve", "SellableProduct", request.ProductId, ex.Message, ex);
+            return Result<SellableProductDetail>.Failure(
+                "An error occurred retrieving the sellable product",
+                500);
+        }
+    }
+
+    public async Task<Result<List<SellableProductVariationItem>>> GetProductVariationsAsync(
+        GetProductVariationsRequest request,
+        CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<List<SellableProductVariationItem>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var tenantId = tenantResult.Data;
+
+        try
+        {
+            var productExists = await BuildSellableProductQuery(tenantId, categoryId: null, isAvailable: null)
+                .AnyAsync(p => p.Id == request.ProductId, ct);
+            if (!productExists)
+            {
+                _logger.EntityNotFound("Product", request.ProductId);
+                return Result<List<SellableProductVariationItem>>.NotFound("Product not found");
+            }
+
+            var variations = await BuildSellableVariationItemsQuery(tenantId, request.ProductId)
+                .OrderBy(x => x.VariantTypeName)
+                .ThenBy(x => x.VariantName)
+                .ToListAsync(ct);
+
+            return Result<List<SellableProductVariationItem>>.Success(variations);
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("List", "ProductVariation", request.ProductId, ex.Message, ex);
+            return Result<List<SellableProductVariationItem>>.Failure(
+                "An error occurred retrieving product variations",
+                500);
+        }
+    }
+
     /// <summary>
     /// Updates an existing product
     /// </summary>
@@ -439,8 +607,116 @@ public class ProductService
     private static string BuildProductListCachePrefix(Guid tenantId) =>
         $"products:list:{tenantId}:";
 
+    private IQueryable<Product> BuildSellableProductQuery(
+        Guid tenantId,
+        Guid? categoryId,
+        bool? isAvailable)
+    {
+        var query = _db.Set<Product>()
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(p => p.TenantId == tenantId && !p.IsDeleted && p.IsEnabled);
+
+        if (categoryId.HasValue)
+            query = query.Where(p => p.CategoryId == categoryId.Value);
+
+        if (isAvailable.HasValue)
+            query = query.Where(p => p.IsAvailable == isAvailable.Value);
+
+        return query;
+    }
+
+    private static IQueryable<SellableProductCatalogItem> BuildBaseCatalogRows(
+        IQueryable<Product> products) =>
+        products.Select(product => new SellableProductCatalogItem(
+            product.Id,
+            null,
+            product.Name ?? string.Empty,
+            product.Name ?? string.Empty,
+            null,
+            null,
+            null,
+            product.SKU,
+            product.Brand,
+            product.Image,
+            product.CategoryId,
+            product.Category != null ? product.Category.Name : null,
+            product.IsAvailable,
+            product.Price));
+
+    private IQueryable<SellableProductCatalogItem> BuildVariantCatalogRows(
+        IQueryable<Product> products,
+        Guid tenantId)
+    {
+        var variations = _db.Set<ProductVariation>()
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(v => v.TenantId == tenantId && !v.IsDeleted && v.IsEnabled);
+        var variationTypes = _db.Set<ProductVariationType>()
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(t => t.TenantId == tenantId && !t.IsDeleted);
+
+        return
+            from product in products
+            join variation in variations on product.Id equals variation.ProductId
+            join variationType in variationTypes
+                on variation.ProductVariationTypeId equals (Guid?)variationType.Id into variationTypeJoin
+            from variationType in variationTypeJoin.DefaultIfEmpty()
+            select new SellableProductCatalogItem(
+                product.Id,
+                variation.Id,
+                (product.Name ?? string.Empty) + " - " + (variation.Name ?? string.Empty),
+                product.Name ?? string.Empty,
+                variation.Name,
+                variation.ProductVariationTypeId,
+                variationType != null ? variationType.Name : variation.VariationType,
+                product.SKU,
+                product.Brand,
+                product.Image,
+                product.CategoryId,
+                product.Category != null ? product.Category.Name : null,
+                product.IsAvailable,
+                variation.Price);
+    }
+
+    private IQueryable<SellableProductVariationItem> BuildSellableVariationItemsQuery(
+        Guid tenantId,
+        Guid productId)
+    {
+        var products = BuildSellableProductQuery(tenantId, categoryId: null, isAvailable: null)
+            .Where(p => p.Id == productId);
+        var variations = _db.Set<ProductVariation>()
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(v => v.TenantId == tenantId && !v.IsDeleted && v.IsEnabled);
+        var variationTypes = _db.Set<ProductVariationType>()
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(t => t.TenantId == tenantId && !t.IsDeleted);
+
+        return
+            from product in products
+            join variation in variations on product.Id equals variation.ProductId
+            join variationType in variationTypes
+                on variation.ProductVariationTypeId equals (Guid?)variationType.Id into variationTypeJoin
+            from variationType in variationTypeJoin.DefaultIfEmpty()
+            select new SellableProductVariationItem(
+                variation.Id,
+                product.Id,
+                variation.ProductVariationTypeId,
+                variationType != null ? variationType.Name : variation.VariationType,
+                variation.Name ?? string.Empty,
+                variation.Price,
+                product.Price,
+                variation.Price - product.Price);
+    }
+
     private static string? NormalizeSku(string? sku) =>
         string.IsNullOrWhiteSpace(sku) ? null : sku.Trim();
+
+    private static string? NormalizeSearch(string? search) =>
+        string.IsNullOrWhiteSpace(search) ? null : search.Trim().ToLowerInvariant();
 }
 
 /// <summary>
