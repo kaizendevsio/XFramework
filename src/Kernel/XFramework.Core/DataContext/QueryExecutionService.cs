@@ -2,17 +2,22 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace XFramework.Core.DataContext;
 
 public sealed class QueryExecutionService(
     IServiceProvider serviceProvider,
-    ILogger<QueryExecutionService> logger)
+    ILogger<QueryExecutionService> logger,
+    IConfiguration? configuration = null,
+    ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
     : IQueryExecutionService
 {
     private readonly ConcurrentDictionary<string, Type> _entityTypes = new(StringComparer.OrdinalIgnoreCase);
@@ -39,6 +44,14 @@ public sealed class QueryExecutionService(
 
         if (!_entityTypes.TryGetValue(descriptor.EntityTypeName, out var entityType))
             return SerializeError($"Entity type '{descriptor.EntityTypeName}' is not registered. Query rejected.");
+
+        var trustError = await ValidateTrustedDataContextAsync(
+            descriptor.Metadata,
+            XFrameworkServiceScopes.DataContextQuery,
+            requireTenant: RequiresTenantMetadata(entityType),
+            ct);
+        if (trustError is not null)
+            return SerializeError(trustError);
 
         if (!HasRequiredQueryTenantMetadata(entityType, descriptor.Metadata))
             return SerializeError($"Entity type '{descriptor.EntityTypeName}' requires tenant metadata for remote DataContext query.");
@@ -85,6 +98,14 @@ public sealed class QueryExecutionService(
         if (!_entityTypes.TryGetValue(descriptor.EntityTypeName, out var entityType))
             yield break;
 
+        var trustError = await ValidateTrustedDataContextAsync(
+            descriptor.Metadata,
+            XFrameworkServiceScopes.DataContextQuery,
+            requireTenant: RequiresTenantMetadata(entityType),
+            ct);
+        if (trustError is not null)
+            yield break;
+
         if (!HasRequiredQueryTenantMetadata(entityType, descriptor.Metadata))
             yield break;
 
@@ -116,6 +137,14 @@ public sealed class QueryExecutionService(
 
                 if (!_mutableEntityTypes.TryGetValue(change.EntityTypeName, out var canMutate) || !canMutate)
                     return SerializeError($"Entity type '{change.EntityTypeName}' is not registered for remote mutation.");
+
+                var trustError = await ValidateTrustedDataContextAsync(
+                    request.Metadata,
+                    XFrameworkServiceScopes.DataContextMutate,
+                    requireTenant: RequiresTenantMetadata(entityType),
+                    ct);
+                if (trustError is not null)
+                    return SerializeError(trustError);
 
                 // For Update operations, try FieldPatch first before deserializing as entity
                 if (change.Operation == ChangeOperation.Update)
@@ -243,9 +272,35 @@ public sealed class QueryExecutionService(
         entityType == typeof(TenantModuleFeature);
 
     private static bool HasRequiredQueryTenantMetadata(Type entityType, RequestMetadata? metadata) =>
-        !typeof(IHasTenantId).IsAssignableFrom(entityType) ||
-        IsControlPlaneTenantRecord(entityType) ||
+        !RequiresTenantMetadata(entityType) ||
         metadata?.TenantId is { } tenantId && tenantId != Guid.Empty;
+
+    private static bool RequiresTenantMetadata(Type entityType) =>
+        typeof(IHasTenantId).IsAssignableFrom(entityType) &&
+        !IsControlPlaneTenantRecord(entityType);
+
+    private async Task<string?> ValidateTrustedDataContextAsync(
+        RequestMetadata? metadata,
+        string scope,
+        bool requireTenant,
+        CancellationToken ct)
+    {
+        if (serviceInvocationResolver is null)
+            return null;
+
+        var expectedAudience = configuration?["BoltConfiguration:ClientName"];
+        if (string.IsNullOrWhiteSpace(expectedAudience))
+            return "BoltConfiguration:ClientName is required for remote DataContext trust validation.";
+
+        var result = await serviceInvocationResolver.ResolveAsync(
+            metadata,
+            expectedAudience,
+            [scope],
+            requireTenant: requireTenant,
+            ct: ct);
+
+        return result.IsSuccess ? null : result.Error;
+    }
 
     private static void InvalidateTenantModuleFeatureCache(
         IServiceProvider scopedServices,

@@ -1,9 +1,13 @@
 using System.Security.Claims;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
+using XFramework.Domain.Shared.Configurations;
 using XFramework.Integration.Abstractions;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.FeatureGates;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Communications.Api.Services;
 
@@ -31,17 +35,20 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
     private readonly IConfiguration configuration;
     private readonly IJwtService? jwtService;
     private readonly ITenantModuleFeatureService? featureService;
+    private readonly ITrustedServiceInvocationResolver? serviceInvocationResolver;
 
     public CommunicationsRequestContextResolver(
         IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
         IJwtService? jwtService = null,
-        ITenantModuleFeatureService? featureService = null)
+        ITenantModuleFeatureService? featureService = null,
+        ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
     {
         this.httpContextAccessor = httpContextAccessor;
         this.configuration = configuration;
         this.jwtService = jwtService;
         this.featureService = featureService;
+        this.serviceInvocationResolver = serviceInvocationResolver;
     }
 
     public Result<CommunicationsRequestContext> Resolve(RequestMetadata? metadata)
@@ -58,8 +65,9 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         var httpContext = httpContextAccessor.HttpContext;
         var user = httpContext?.User;
         var userContext = ResolveUserContext(metadata, enforceChatFeature: false);
-        var isTrustedInternalRequest = IsTrustedServerMetadata(metadata);
-        var trustedServiceName = isTrustedInternalRequest ? metadata?.Name?.Trim() : null;
+        var trustedInvocation = ResolveTrustedServerMetadata(metadata);
+        var isTrustedInternalRequest = trustedInvocation is not null;
+        var trustedServiceName = trustedInvocation?.CallerClientId;
         var tenantId = ResolveTenantId(user)
             ?? TryGetItemGuid(httpContext, "TenantId")
             ?? (userContext.IsSuccess ? (Guid?)userContext.Data!.TenantId : null)
@@ -143,24 +151,24 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         return contextResult;
     }
 
-    private bool IsTrustedServerMetadata(RequestMetadata? metadata)
+    private TrustedServiceInvocation? ResolveTrustedServerMetadata(RequestMetadata? metadata)
     {
-        var secret = GetTrustedMetadataSecret();
-        if (IsPlaceholderSecret(secret))
-            return false;
+        if (serviceInvocationResolver is null)
+            return null;
 
-        var maxAgeMinutes = configuration.GetValue("Communications:TrustedMetadata:MaxAgeMinutes", 10);
-        var maxAge = TimeSpan.FromMinutes(Math.Clamp(maxAgeMinutes, 1, 60));
-        return RequestMetadataTrust.IsValid(metadata, secret, maxAge);
+        var result = serviceInvocationResolver.ResolveAsync(
+                metadata,
+                GetExpectedAudience(),
+                [XFrameworkServiceScopes.BoltService],
+                requireTenant: true)
+            .GetAwaiter()
+            .GetResult();
+
+        return result.IsSuccess ? result.Invocation : null;
     }
 
-    private string? GetTrustedMetadataSecret()
-    {
-        var secret = configuration["Communications:TrustedMetadata:SharedSecret"];
-        return IsPlaceholderSecret(secret)
-            ? configuration["BoltConfiguration:Signature"]
-            : secret;
-    }
+    private string GetExpectedAudience() =>
+        configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Communications;
 
     private Result<CommunicationsRequestContext> ResolveUserContext(RequestMetadata? metadata, bool enforceChatFeature)
     {
@@ -310,16 +318,13 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         if (string.IsNullOrWhiteSpace(serviceName))
             return false;
 
-        var configured = configuration["Communications:TrustedMetadata:AdminServiceNames"];
+        var configured = configuration["Communications:TrustedAdminServiceNames"];
         var allowed = string.IsNullOrWhiteSpace(configured)
-            ? ["ControlPanel"]
+            ? [XFrameworkServiceNames.ControlPanel]
             : configured
                 .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         return allowed.Any(name => string.Equals(name, serviceName, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool IsPlaceholderSecret(string? secret) =>
-        string.IsNullOrWhiteSpace(secret) ||
-        secret.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase);
 }

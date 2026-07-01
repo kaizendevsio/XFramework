@@ -21,6 +21,7 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 - Use `ICommunicationsServiceWrapper` or `ICommunicationsChatClient` for tenant/chat app integration.
 - ControlPanel must use Communications wrapper-backed admin/settings/template APIs for Communications business behavior. Do not use direct `IDataContext` mutation from ControlPanel for Communications settings, moderation, templates, messages, threads, or delivery actions.
 - Communications API services must resolve trusted tenant/credential context through `ICommunicationsRequestContextResolver`; do not trust client-supplied tenant IDs on protected paths.
+- Communications trusted internal/admin calls use the shared trusted metadata infrastructure. Bolt signs service-to-service metadata with a shared secret and target audience; Communications validates the expected Communications Bolt audience and allowed trusted service name. Do not add page-level/manual metadata signatures.
 - Chat APIs must enforce Communications feature gates, membership checks, block policy, tenant isolation, policy settings, and rate limits in service logic.
 - External direct-message transports must be queued through Notifications. Do not inject or call `ISmsGatewayServiceWrapper` from Communications business services.
 - Notifications owns provider dispatch and delivery state for SMS/email/webhook/push. Communications may store audit/correlation fields but must not duplicate provider send logic.

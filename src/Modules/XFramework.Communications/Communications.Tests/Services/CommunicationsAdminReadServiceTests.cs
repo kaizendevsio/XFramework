@@ -14,8 +14,6 @@ namespace Communications.Tests.Services;
 
 public sealed class CommunicationsAdminReadServiceTests
 {
-    private const string TrustedMetadataSecret = "communications-admin-read-test-secret";
-
     [Test]
     public async Task QueryUsersAsync_ReturnsOnlyRowsForRequestedTenant()
     {
@@ -185,7 +183,10 @@ public sealed class CommunicationsAdminReadServiceTests
     private static CommunicationsAdminReadService CreateService(InMemoryDataContext dataContext) =>
         new(
             dataContext,
-            new CommunicationsRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            new CommunicationsRequestContextResolver(
+                new HttpContextAccessor(),
+                TestConfiguration(),
+                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver()),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())));
 
     private static RequestMetadata Metadata(Guid tenantId)
@@ -193,18 +194,14 @@ public sealed class CommunicationsAdminReadServiceTests
         var metadata = new RequestMetadata
         {
             TenantId = tenantId,
-            Name = "ControlPanel"
+            Name = "XFramework.ControlPanel",
+            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidControlPanelToken
         };
-        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
         return metadata;
     }
 
     private static IConfiguration TestConfiguration() =>
         new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Communications:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
-            })
             .Build();
 
     private static RegistryConfiguration PolicySetting(Guid tenantId, string key, string value) => new()

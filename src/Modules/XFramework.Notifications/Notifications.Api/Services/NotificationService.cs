@@ -1,10 +1,16 @@
 using System.Text.Json;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Notifications.Api.Services;
 
-public sealed class NotificationService(AppDbContext db, ILogger<NotificationService> logger)
+public sealed class NotificationService(
+    AppDbContext db,
+    ILogger<NotificationService> logger,
+    IConfiguration configuration,
+    ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
 {
     private const char TemplateKeySeparator = '\n';
 
@@ -308,9 +314,34 @@ public sealed class NotificationService(AppDbContext db, ILogger<NotificationSer
                 pref => pref.TenantId == tenantId && pref.CredentialId == credentialId,
                 ct);
 
-    private static bool TryResolveTenantId(Guid? requestTenantId, RequestMetadata metadata, out Guid tenantId)
+    private bool TryResolveTenantId(Guid? requestTenantId, RequestMetadata metadata, out Guid tenantId)
     {
-        tenantId = requestTenantId ?? metadata.TenantId ?? Guid.Empty;
+        tenantId = Guid.Empty;
+
+        if (requestTenantId is { } suppliedTenantId &&
+            metadata.TenantId is { } metadataTenantId &&
+            suppliedTenantId != Guid.Empty &&
+            metadataTenantId != Guid.Empty &&
+            suppliedTenantId != metadataTenantId)
+        {
+            return false;
+        }
+
+        if (serviceInvocationResolver is not null)
+        {
+            var trusted = serviceInvocationResolver.ResolveAsync(
+                    metadata,
+                    configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Notifications,
+                    [XFrameworkServiceScopes.BoltService],
+                    requireTenant: true)
+                .GetAwaiter()
+                .GetResult();
+
+            if (!trusted.IsSuccess)
+                return false;
+        }
+
+        tenantId = metadata.TenantId ?? requestTenantId ?? Guid.Empty;
         return tenantId != Guid.Empty;
     }
 

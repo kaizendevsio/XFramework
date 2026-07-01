@@ -31,12 +31,13 @@ public interface IAttendanceServiceWrapper : IServiceWrapper, IDataContextServic
 public sealed record AttendanceServiceWrapper(
     IMessageBusWrapper messageBusDriver,
     IConfiguration configuration,
-    BoltClient boltClient
+    BoltClient boltClient,
+    IServiceTokenProvider serviceTokenProvider
 ) : DriverBase(messageBusDriver, configuration), IAttendanceServiceWrapper
 {
     public override void Initialize()
     {
-        TargetClient = "Attendance".ToSha256();
+        TargetClient = "XFramework.Attendance".ToSha256();
     }
 
     public Task<QueryResponse<AttendanceContextResponse>> CreateAttendanceContext(CreateAttendanceContextRequest request) =>
@@ -79,7 +80,13 @@ public sealed record AttendanceServiceWrapper(
     {
         if (string.IsNullOrEmpty(TargetClient)) Initialize();
         var targetClient = TargetClient ?? throw new InvalidOperationException("Target client was not initialized.");
-        var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", queryDescriptorBytes, ct);
+        var descriptor = MemoryPackSerializer.Deserialize<QueryDescriptor>((ReadOnlySpan<byte>)queryDescriptorBytes)
+            ?? throw new InvalidOperationException("Query descriptor could not be deserialized.");
+        await descriptor.AttachServiceTokenAsync(
+            serviceTokenProvider,
+            ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient),
+            ct);
+        var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", MemoryPackSerializer.Serialize(descriptor), ct);
         if ((int)status < 200 || (int)status >= 300)
         {
             throw new InvalidOperationException(
@@ -93,7 +100,13 @@ public sealed record AttendanceServiceWrapper(
     {
         if (string.IsNullOrEmpty(TargetClient)) Initialize();
         var targetClient = TargetClient ?? throw new InvalidOperationException("Target client was not initialized.");
-        var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", saveChangesRequestBytes, ct);
+        var request = MemoryPackSerializer.Deserialize<SaveChangesRequest>((ReadOnlySpan<byte>)saveChangesRequestBytes)
+            ?? throw new InvalidOperationException("SaveChanges request could not be deserialized.");
+        await request.AttachServiceTokenAsync(
+            serviceTokenProvider,
+            ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient),
+            ct);
+        var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", MemoryPackSerializer.Serialize(request), ct);
         if ((int)status < 200 || (int)status >= 300)
         {
             var failure = DataContextResult.Failure(
@@ -111,10 +124,16 @@ public sealed record AttendanceServiceWrapper(
     {
         if (string.IsNullOrEmpty(TargetClient)) Initialize();
         var targetClient = TargetClient ?? throw new InvalidOperationException("Target client was not initialized.");
+        var descriptor = MemoryPackSerializer.Deserialize<QueryDescriptor>((ReadOnlySpan<byte>)queryDescriptorBytes)
+            ?? throw new InvalidOperationException("Query descriptor could not be deserialized.");
+        await descriptor.AttachServiceTokenAsync(
+            serviceTokenProvider,
+            ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient),
+            ct);
         var stream = await boltClient.OpenStreamAsync(targetClient, "__db_query_stream__", ct);
         try
         {
-            await stream.SendAsync((ReadOnlyMemory<byte>)queryDescriptorBytes, ct);
+            await stream.SendAsync((ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(descriptor), ct);
             await foreach (var chunk in stream.ReadAllAsync(ct))
             {
                 yield return chunk.ToArray();

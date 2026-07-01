@@ -2,6 +2,8 @@ using System.Security.Claims;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Wallets.Api.Services;
 
@@ -21,13 +23,15 @@ public interface IWalletRequestContextResolver
 
 public sealed class WalletRequestContextResolver(
     IHttpContextAccessor httpContextAccessor,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
     : IWalletRequestContextResolver
 {
     public Result<WalletRequestContext> Resolve(RequestBase request, Guid? requestCredentialId = null)
     {
         var httpContext = httpContextAccessor.HttpContext;
-        var isSignedInternalRequest = httpContext is null && IsTrustedServerMetadata(request.Metadata);
+        var trustedInvocation = httpContext is null ? ResolveTrustedServerMetadata(request.Metadata) : null;
+        var isSignedInternalRequest = trustedInvocation is not null;
         var trustedTenantId = TryGetClaimGuid(httpContext?.User, "tenant_id", "tenantId", "TenantId", "tenant")
             ?? TryGetItemGuid(httpContext, "TenantId")
             ?? (isSignedInternalRequest ? request.Metadata.TenantId : null);
@@ -96,13 +100,20 @@ public sealed class WalletRequestContextResolver(
             isSystemActor));
     }
 
-    private bool IsTrustedServerMetadata(RequestMetadata? metadata)
+    private TrustedServiceInvocation? ResolveTrustedServerMetadata(RequestMetadata? metadata)
     {
-        var secret = configuration["Wallets:TrustedMetadata:SharedSecret"]
-            ?? configuration["BoltConfiguration:Signature"];
-        var maxAgeMinutes = configuration.GetValue("Wallets:TrustedMetadata:MaxAgeMinutes", 10);
-        var maxAge = TimeSpan.FromMinutes(Math.Clamp(maxAgeMinutes, 1, 60));
-        return RequestMetadataTrust.IsValid(metadata, secret, maxAge);
+        if (serviceInvocationResolver is null)
+            return null;
+
+        var result = serviceInvocationResolver.ResolveAsync(
+                metadata,
+                configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Wallets,
+                [XFrameworkServiceScopes.BoltService],
+                requireTenant: true)
+            .GetAwaiter()
+            .GetResult();
+
+        return result.IsSuccess ? result.Invocation : null;
     }
 
     private static bool IsAdmin(ClaimsPrincipal? user) =>

@@ -84,6 +84,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         var targetClientName = GetGlobalOption(analyzerConfigOptions, TargetClientNameProperty);
         if (string.IsNullOrWhiteSpace(targetClientName))
             targetClientName = wrapperName;
+        targetClientName = CanonicalizeClientName(targetClientName);
 
         var discoveryPrefixes = ParseDiscoveryPrefixes(
             GetGlobalOption(analyzerConfigOptions, DiscoveryPrefixesProperty));
@@ -91,6 +92,19 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             discoveryPrefixes.Add(wrapperName);
 
         return new WrapperGenerationOptions(wrapperName, targetClientName, discoveryPrefixes);
+    }
+
+    private static string CanonicalizeClientName(string clientName)
+    {
+        if (clientName.StartsWith("XFramework.", StringComparison.Ordinal))
+            return clientName;
+
+        return clientName switch
+        {
+            "ControlPanel" => "XFramework.ControlPanel",
+            "OperationsDashboard" => "XFramework.Operations.Dashboard",
+            _ => $"XFramework.{clientName}"
+        };
     }
 
     private static string GetGlobalOption(
@@ -153,6 +167,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             using XFramework.Integration.Drivers;
             using XFramework.Integration.Abstractions;
             using XFramework.Integration.Abstractions.Wrappers;
+            using XFramework.Integration.Security;
             using Microsoft.Extensions.DependencyInjection;
             using Microsoft.Extensions.Configuration;
             using Bolt.Client;
@@ -201,7 +216,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             .Concat([
                 "IMessageBusWrapper messageBusDriver",
                 "IConfiguration configuration",
-                "BoltClient boltClient"
+                "BoltClient boltClient",
+                "XFramework.Integration.Security.IServiceTokenProvider serviceTokenProvider"
             ])
             .ToList();
         for (int i = 0; i < constructorParameters.Count; i++)
@@ -217,7 +233,10 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                             {
                                 if (string.IsNullOrEmpty(TargetClient)) Initialize();
                                 var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
-                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", queryDescriptorBytes, ct);
+                                var descriptor = MemoryPack.MemoryPackSerializer.Deserialize<QueryDescriptor>((System.ReadOnlySpan<byte>)queryDescriptorBytes)
+                                    ?? throw new System.InvalidOperationException("Query descriptor could not be deserialized.");
+                                await descriptor.AttachServiceTokenAsync(serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient), ct);
+                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor), ct);
                                 if ((int)status < 200 || (int)status >= 300)
                                     throw new System.InvalidOperationException($"DataContext query request failed with status {(int)status} ({status}).");
 
@@ -228,7 +247,10 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                             {
                                 if (string.IsNullOrEmpty(TargetClient)) Initialize();
                                 var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
-                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", saveChangesRequestBytes, ct);
+                                var request = MemoryPack.MemoryPackSerializer.Deserialize<SaveChangesRequest>((System.ReadOnlySpan<byte>)saveChangesRequestBytes)
+                                    ?? throw new System.InvalidOperationException("SaveChanges request could not be deserialized.");
+                                await request.AttachServiceTokenAsync(serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient), ct);
+                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", MemoryPack.MemoryPackSerializer.Serialize(request), ct);
                                 if ((int)status < 200 || (int)status >= 300)
                                 {
                                     var failure = DataContextResult.Failure($"DataContext change request failed with status {(int)status} ({status}).", (int)status);
@@ -244,10 +266,13 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                             {
                                 if (string.IsNullOrEmpty(TargetClient)) Initialize();
                                 var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
+                                var descriptor = MemoryPack.MemoryPackSerializer.Deserialize<QueryDescriptor>((System.ReadOnlySpan<byte>)queryDescriptorBytes)
+                                    ?? throw new System.InvalidOperationException("Query descriptor could not be deserialized.");
+                                await descriptor.AttachServiceTokenAsync(serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient), ct);
                                 var stream = await boltClient.OpenStreamAsync(targetClient, "__db_query_stream__", ct);
                                 try
                                 {
-                                    await stream.SendAsync((System.ReadOnlyMemory<byte>)queryDescriptorBytes, ct);
+                                    await stream.SendAsync((System.ReadOnlyMemory<byte>)MemoryPack.MemoryPackSerializer.Serialize(descriptor), ct);
                                     await foreach (var chunk in stream.ReadAllAsync(ct))
                                     {
                                         yield return chunk.ToArray();
@@ -279,6 +304,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                       private readonly BoltClient _boltClient;
                       private readonly ILogger _logger;
                       private readonly string _targetClient = "{{serviceId}}";
+                      private readonly XFramework.Integration.Security.IServiceTokenProvider _serviceTokenProvider;
 
                       private static readonly JsonSerializerOptions _jsonOpts = new()
                       {
@@ -294,10 +320,11 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                           catch { return default; }
                       }
 
-                      public {{model}}CrudService(BoltClient boltClient, ILoggerFactory loggerFactory)
+                      public {{model}}CrudService(BoltClient boltClient, ILoggerFactory loggerFactory, XFramework.Integration.Security.IServiceTokenProvider serviceTokenProvider)
                       {
                           _boltClient = boltClient;
                           _logger = loggerFactory.CreateLogger("Bolt.Crud.{{model}}");
+                          _serviceTokenProvider = serviceTokenProvider;
                       }
 
                       public async Task<CmdResponse<{{model}}>> Create({{model}} entity)
@@ -356,6 +383,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               Filters = filter ?? new List<QueryFilter>(),
                               Metadata = new RequestMetadata { TenantId = tenantId }
                           };
+                          await descriptor.AttachServiceTokenAsync(_serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(_targetClient));
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
                           var items = data.IsEmpty ? new List<{{model}}>() : MemoryPack.MemoryPackSerializer.Deserialize<List<{{model}}>>(data.Span) ?? new List<{{model}}>();
 
@@ -382,6 +410,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               Filters = new List<QueryFilter> { new() { PropertyName = "Id", Operation = global::XFramework.Domain.Shared.Enums.QueryFilterOperation.Equal, Value = id } },
                               Metadata = new RequestMetadata { TenantId = tenantId }
                           };
+                          await descriptor.AttachServiceTokenAsync(_serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(_targetClient));
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
                           var entity = data.IsEmpty ? default : MemoryPack.MemoryPackSerializer.Deserialize<{{model}}>(data.Span);
 
@@ -407,6 +436,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               },
                               Metadata = BuildRequestMetadata(entityForLog)
                           };
+                          await request.AttachServiceTokenAsync(_serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(_targetClient));
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_changes__", MemoryPack.MemoryPackSerializer.Serialize(request));
                           var result = data.IsEmpty
                               ? DataContextResult.Failure("Empty response", (int)status)
@@ -446,7 +476,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                          """);
         foreach (var model in models)
         {
-            sb.AppendLine($"        services.AddSingleton<I{model}CrudService>(sp => new {model}CrudService(sp.GetRequiredService<BoltClient>(), sp.GetRequiredService<ILoggerFactory>()));");
+            sb.AppendLine($"        services.AddSingleton<I{model}CrudService>(sp => new {model}CrudService(sp.GetRequiredService<BoltClient>(), sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<XFramework.Integration.Security.IServiceTokenProvider>()));");
         }
         sb.AppendLine("    }");
         sb.AppendLine("}");

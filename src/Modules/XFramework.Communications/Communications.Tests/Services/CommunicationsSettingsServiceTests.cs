@@ -15,8 +15,6 @@ namespace Communications.Tests.Services;
 
 public sealed class CommunicationsSettingsServiceTests
 {
-    private const string TrustedMetadataSecret = "communications-settings-test-secret";
-
     [Test]
     public async Task GetSettingsAsync_WhenNoRegistryRowsExist_ReturnsDefaults()
     {
@@ -138,7 +136,10 @@ public sealed class CommunicationsSettingsServiceTests
         new(
             dataContext,
             new FakeTenantResolver(tenantIds),
-            new CommunicationsRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            new CommunicationsRequestContextResolver(
+                new HttpContextAccessor(),
+                TestConfiguration(),
+                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver()),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())));
 
     private static GetCommunicationsSettingsRequest Request(Guid tenantId) => new()
@@ -169,18 +170,14 @@ public sealed class CommunicationsSettingsServiceTests
         var metadata = new RequestMetadata
         {
             TenantId = tenantId,
-            Name = "ControlPanel"
+            Name = "XFramework.ControlPanel",
+            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidControlPanelToken
         };
-        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
         return metadata;
     }
 
     private static IConfiguration TestConfiguration() =>
         new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Communications:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
-            })
             .Build();
 
     private static CommunicationsSettingValueResponse FindSetting(

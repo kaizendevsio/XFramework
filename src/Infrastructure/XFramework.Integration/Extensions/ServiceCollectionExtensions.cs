@@ -12,10 +12,12 @@ using Microsoft.IdentityModel.Tokens;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.DataContext;
 using XFramework.Integration.Drivers;
+using XFramework.Integration.Security;
 using XFramework.Integration.ServiceDiscovery;
 
 namespace XFramework.Integration.Extensions;
@@ -36,6 +38,16 @@ public static class ServiceCollectionExtensions
         bool autoConnect = true)
     {
         services.Configure<BoltConfiguration>(configuration.GetSection("BoltConfiguration"));
+        services.Configure<ServiceIdentityOptions>(options =>
+        {
+            configuration.GetSection(ServiceIdentityOptions.SectionName).Bind(options);
+            options.ClientId = string.IsNullOrWhiteSpace(options.ClientId)
+                ? configuration["BoltConfiguration:ClientName"]
+                : options.ClientId;
+
+            if (options.DefaultScopes.Count == 0)
+                options.DefaultScopes = XFrameworkServiceScopes.AdminDefaults.ToList();
+        });
         services.Configure<BoltServiceDiscoveryOptions>(
             configuration.GetSection(BoltServiceDiscoveryOptions.SectionName));
 
@@ -85,6 +97,10 @@ public static class ServiceCollectionExtensions
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IBoltServiceManifestProvider, ConfigurationBoltServiceManifestProvider>());
         services.AddHostedService<BoltServiceManifestAdvertisementHostedService>();
+        services.TryAddSingleton<IServiceTokenProvider, IdentityServerServiceTokenProvider>();
+        services.TryAddSingleton<IIdentitySigningKeyProvider, IdentityServerSigningKeyProvider>();
+        services.TryAddSingleton<IServiceTokenValidator, ServiceTokenValidator>();
+        services.TryAddSingleton<ITrustedServiceInvocationResolver, TrustedServiceInvocationResolver>();
         services.AddSingleton<IMessageBusWrapper, BoltDriver>();
 
         return services;

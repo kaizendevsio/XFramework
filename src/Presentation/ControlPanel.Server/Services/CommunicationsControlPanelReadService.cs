@@ -153,7 +153,7 @@ public sealed class CommunicationsControlPanelReadService(
         CredentialId = metadata.CredentialId,
         SessionId = metadata.SessionId,
         RequestId = Guid.NewGuid(),
-        Name = metadata.Name,
+        Name = "ControlPanel",
         DeviceName = metadata.DeviceName,
         DeviceAgent = metadata.DeviceAgent,
         IpAddress = metadata.IpAddress

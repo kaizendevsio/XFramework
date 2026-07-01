@@ -32,8 +32,6 @@ namespace Communications.Tests.Services;
 
 public sealed class ThreadServiceSecurityTests
 {
-    private const string TrustedMetadataSecret = "communications-test-secret";
-
     [Test]
     public async Task DeleteMessageReactionAsync_MissingThreadOrMessageId_ReturnsBadRequest()
     {
@@ -635,7 +633,6 @@ public sealed class ThreadServiceSecurityTests
             TenantId = tenantId,
             ActorAccessToken = $"{tenantId:D}:{credentialId:D}"
         };
-        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
         return metadata;
     }
 
@@ -745,10 +742,6 @@ public sealed class ThreadServiceSecurityTests
 
     private static IConfiguration TestConfiguration() =>
         new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Communications:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
-            })
             .Build();
 
     private static RegistryConfiguration PolicySetting(Guid tenantId, string key, string value) => new()

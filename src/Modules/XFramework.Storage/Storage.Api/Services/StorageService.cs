@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 using Storage.Api.Services.Providers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Storage.Api.Services;
 
@@ -15,6 +17,7 @@ public sealed partial class StorageService(
     IOptions<StorageOptions> options,
     IHttpContextAccessor httpContextAccessor,
     IConfiguration configuration,
+    ITrustedServiceInvocationResolver? serviceInvocationResolver,
     ILogger<StorageService> logger)
 {
     private readonly StorageOptions storageOptions = options.Value;
@@ -942,7 +945,8 @@ public sealed partial class StorageService(
     private Result<Guid> ResolveTenantId(RequestMetadata? metadata)
     {
         var httpContext = httpContextAccessor.HttpContext;
-        var isSignedInternalRequest = httpContext is null && IsTrustedServerMetadata(metadata);
+        var trustedInvocation = httpContext is null ? ResolveTrustedServerMetadata(metadata) : null;
+        var isSignedInternalRequest = trustedInvocation is not null;
         var trustedTenantId = TryGetClaimGuid(httpContext?.User, "tenant_id", "tenantId", "TenantId", "tenant", "tid")
             ?? TryGetItemGuid(httpContext, "TenantId")
             ?? (isSignedInternalRequest ? metadata?.TenantId : null);
@@ -967,13 +971,20 @@ public sealed partial class StorageService(
         return Result<Guid>.Success(trustedTenantId.Value);
     }
 
-    private bool IsTrustedServerMetadata(RequestMetadata? metadata)
+    private TrustedServiceInvocation? ResolveTrustedServerMetadata(RequestMetadata? metadata)
     {
-        var secret = configuration["Storage:TrustedMetadata:SharedSecret"]
-            ?? configuration["BoltConfiguration:Signature"];
-        var maxAgeMinutes = configuration.GetValue("Storage:TrustedMetadata:MaxAgeMinutes", 10);
-        var maxAge = TimeSpan.FromMinutes(Math.Clamp(maxAgeMinutes, 1, 60));
-        return RequestMetadataTrust.IsValid(metadata, secret, maxAge);
+        if (serviceInvocationResolver is null)
+            return null;
+
+        var result = serviceInvocationResolver.ResolveAsync(
+                metadata,
+                configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Storage,
+                [XFrameworkServiceScopes.BoltService],
+                requireTenant: true)
+            .GetAwaiter()
+            .GetResult();
+
+        return result.IsSuccess ? result.Invocation : null;
     }
 
     private static Result<T> TenantFailure<T>(Result<Guid> tenantResult) =>

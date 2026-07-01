@@ -5,13 +5,17 @@ using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 using SmsGateway.Domain.Shared.Enums;
 using XFramework.Core.Loggers;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace SmsGateway.Api.Services;
 
 public sealed class SmsService(
     AppDbContext db,
     ILogger<SmsService> logger,
-    IConfiguration configuration) : ISmsService
+    IConfiguration configuration,
+    ITrustedServiceInvocationResolver? serviceInvocationResolver = null) : ISmsService
 {
     private readonly TimeSpan _leaseDuration = TimeSpan.FromSeconds(
         Math.Max(30, configuration.GetValue("SmsGateway:LeaseSeconds", 120)));
@@ -98,7 +102,7 @@ public sealed class SmsService(
     {
         try
         {
-            var tenantId = request.Metadata.TenantId ?? Guid.Empty;
+            var tenantId = ResolveTrustedTenantId(request.Metadata);
             if (tenantId == Guid.Empty)
                 return Result<CmdResponse>.Failure("Tenant ID is required", 400);
 
@@ -296,4 +300,23 @@ public sealed class SmsService(
             _ => MessageStatus.Queued
         }
     };
+
+    private Guid ResolveTrustedTenantId(RequestMetadata metadata)
+    {
+        if (serviceInvocationResolver is not null)
+        {
+            var trusted = serviceInvocationResolver.ResolveAsync(
+                    metadata,
+                    configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.SmsGateway,
+                    [XFrameworkServiceScopes.BoltService],
+                    requireTenant: true)
+                .GetAwaiter()
+                .GetResult();
+
+            if (!trusted.IsSuccess)
+                return Guid.Empty;
+        }
+
+        return metadata.TenantId ?? Guid.Empty;
+    }
 }

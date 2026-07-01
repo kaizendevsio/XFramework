@@ -7,12 +7,15 @@ using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
 using XFramework.Core.RateLimiting;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Security;
 
 var builder = XApplication.Configure<Program>();
 builder.Logging.AddXFrameworkLogging(builder.Configuration);
 
 // Register AuthService
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IServiceIdentityService, ServiceIdentityService>();
+builder.Services.AddSingleton<IIdentitySigningKeyProvider, IdentityServerLocalSigningKeyProvider>();
 
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
