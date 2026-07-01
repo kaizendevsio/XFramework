@@ -45,6 +45,7 @@ jobs:
       DB_PASSWORD: compose-validation-placeholder
       JWT_SECRET: compose-validation-placeholder
       BOLT_SIGNATURE: compose-validation-placeholder
+      SERVICE_IDENTITY_DEVELOPMENT_SECRET: compose-validation-placeholder
       COMMUNICATIONS_TRUSTED_METADATA_SECRET: compose-validation-placeholder
       SERVICE_NAME: ${{ inputs.service }}
       HEALTH_URL: ${{ inputs.health_url }}
