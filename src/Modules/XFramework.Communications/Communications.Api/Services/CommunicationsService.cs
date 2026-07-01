@@ -14,6 +14,7 @@ using XFramework.Core.Patterns;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Core.Loggers;
 using XFramework.Integration.Services.Helpers;
 
@@ -36,8 +37,8 @@ public sealed class CommunicationsService(
         {
             var tenantContext = requestContextResolver.ResolveTrustedInternal(
                 request.Metadata,
-                "ControlPanel",
-                "IdentityServer");
+                XFrameworkServiceNames.ControlPanel,
+                XFrameworkServiceNames.IdentityServer);
             if (!tenantContext.IsSuccess)
             {
                 return Result<CmdResponse>.Failure(
@@ -225,7 +226,7 @@ public sealed class CommunicationsService(
         {
             var tenantContext = requestContextResolver.ResolveTrustedInternal(
                 request.Metadata,
-                "XFramework.SmsGateway");
+                XFrameworkServiceNames.SmsGateway);
             if (!tenantContext.IsSuccess)
             {
                 return Result<CmdResponse>.Failure(

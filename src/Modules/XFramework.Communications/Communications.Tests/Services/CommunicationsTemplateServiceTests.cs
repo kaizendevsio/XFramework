@@ -15,8 +15,6 @@ namespace Communications.Tests.Services;
 
 public sealed class CommunicationsTemplateServiceTests
 {
-    private const string TrustedMetadataSecret = "communications-template-test-secret";
-
     [Test]
     public async Task GetTemplatesAsync_WhenNoRowsExist_SeedsSystemTemplatesOnce()
     {
@@ -213,7 +211,10 @@ public sealed class CommunicationsTemplateServiceTests
         new(
             dataContext,
             new FakeTenantResolver(tenantIds),
-            new CommunicationsRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            new CommunicationsRequestContextResolver(
+                new HttpContextAccessor(),
+                TestConfiguration(),
+                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver()),
             NullLogger<CommunicationsTemplateService>.Instance);
 
     private static GetMessageTemplatesRequest ListRequest(Guid tenantId) => new()
@@ -239,18 +240,14 @@ public sealed class CommunicationsTemplateServiceTests
         {
             TenantId = tenantId,
             CredentialId = credentialId,
-            Name = "ControlPanel"
+            Name = "XFramework.ControlPanel",
+            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidControlPanelToken
         };
-        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
         return metadata;
     }
 
     private static IConfiguration TestConfiguration() =>
         new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Communications:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
-            })
             .Build();
 
     private static IdentityCredential Credential(Guid id, Guid tenantId) => new()

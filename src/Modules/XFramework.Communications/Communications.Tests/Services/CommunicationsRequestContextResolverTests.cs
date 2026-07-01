@@ -1,23 +1,25 @@
 using System.Security.Claims;
 using Communications.Api.Services;
+using Communications.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Security;
 
 namespace Communications.Tests.Services;
 
 public sealed class CommunicationsRequestContextResolverTests
 {
-    private const string TrustedMetadataSecret = "communications-context-test-secret";
+    private const string CommunicationsClientName = "XFramework.Communications";
 
     [Test]
-    public void Resolve_SignedInternalMetadata_ReturnsUnauthorized()
+    public void Resolve_ServiceTokenMetadata_ReturnsUnauthorized()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
-        var metadata = Metadata(tenantId, credentialId, sign: true);
-        var resolver = new CommunicationsRequestContextResolver(new HttpContextAccessor(), Configuration());
+        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidControlPanelToken);
+        var resolver = Resolver();
 
         var result = resolver.Resolve(metadata);
 
@@ -26,12 +28,12 @@ public sealed class CommunicationsRequestContextResolverTests
     }
 
     [Test]
-    public void ResolveTrustedInternal_SignedInternalMetadata_ReturnsContext()
+    public void ResolveTrustedInternal_ServiceTokenMetadata_ReturnsContext()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
-        var metadata = Metadata(tenantId, credentialId, sign: true);
-        var resolver = new CommunicationsRequestContextResolver(new HttpContextAccessor(), Configuration());
+        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidControlPanelToken);
+        var resolver = Resolver();
 
         var result = resolver.ResolveTrustedInternal(metadata);
 
@@ -42,10 +44,54 @@ public sealed class CommunicationsRequestContextResolverTests
     }
 
     [Test]
+    public void ResolveAdmin_ControlPanelServiceTokenMetadata_ReturnsAdminContext()
+    {
+        var tenantId = Guid.NewGuid();
+        var credentialId = Guid.NewGuid();
+        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidControlPanelToken);
+        var resolver = Resolver();
+
+        var result = resolver.ResolveAdmin(metadata);
+
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.TenantId, Is.EqualTo(tenantId));
+        Assert.That(result.Data.CredentialId, Is.EqualTo(credentialId));
+        Assert.That(result.Data.IsTrustedInternal, Is.True);
+        Assert.That(result.Data.TrustedServiceName, Is.EqualTo("XFramework.ControlPanel"));
+    }
+
+    [Test]
+    public void ResolveTrustedInternal_ServiceTokenWithWrongAudience_ReturnsUnauthorized()
+    {
+        var metadata = Metadata(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            token: FakeTrustedServiceInvocationResolver.WrongAudienceToken);
+        var resolver = Resolver();
+
+        var result = resolver.ResolveTrustedInternal(metadata);
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(401));
+    }
+
+    [Test]
+    public void ResolveAdmin_ServiceTokenWithWrongServiceName_ReturnsForbidden()
+    {
+        var metadata = Metadata(Guid.NewGuid(), Guid.NewGuid(), token: FakeTrustedServiceInvocationResolver.OtherServiceToken);
+        var resolver = Resolver();
+
+        var result = resolver.ResolveAdmin(metadata);
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(403));
+    }
+
+    [Test]
     public void Resolve_UnsignedInternalMetadata_ReturnsUnauthorized()
     {
-        var metadata = Metadata(Guid.NewGuid(), Guid.NewGuid(), sign: false);
-        var resolver = new CommunicationsRequestContextResolver(new HttpContextAccessor(), Configuration());
+        var metadata = Metadata(Guid.NewGuid(), Guid.NewGuid());
+        var resolver = Resolver();
 
         var result = resolver.Resolve(metadata);
 
@@ -65,8 +111,8 @@ public sealed class CommunicationsRequestContextResolverTests
                 User = Principal(tenantId, credentialId)
             }
         };
-        var metadata = Metadata(Guid.NewGuid(), credentialId, sign: false);
-        var resolver = new CommunicationsRequestContextResolver(accessor, Configuration());
+        var metadata = Metadata(Guid.NewGuid(), credentialId);
+        var resolver = Resolver(accessor);
 
         var result = resolver.Resolve(metadata);
 
@@ -85,8 +131,8 @@ public sealed class CommunicationsRequestContextResolverTests
                 User = Principal(tenantId, Guid.NewGuid())
             }
         };
-        var metadata = Metadata(tenantId, Guid.NewGuid(), sign: false);
-        var resolver = new CommunicationsRequestContextResolver(accessor, Configuration());
+        var metadata = Metadata(tenantId, Guid.NewGuid());
+        var resolver = Resolver(accessor);
 
         var result = resolver.Resolve(metadata);
 
@@ -94,18 +140,21 @@ public sealed class CommunicationsRequestContextResolverTests
         Assert.That(result.StatusCode, Is.EqualTo(403));
     }
 
-    private static RequestMetadata Metadata(Guid tenantId, Guid credentialId, bool sign)
+    private static CommunicationsRequestContextResolver Resolver(HttpContextAccessor? accessor = null) =>
+        new(
+            accessor ?? new HttpContextAccessor(),
+            Configuration(),
+            serviceInvocationResolver: new FakeTrustedServiceInvocationResolver());
+
+    private static RequestMetadata Metadata(Guid tenantId, Guid credentialId, string? token = null)
     {
-        var metadata = new RequestMetadata
+        return new RequestMetadata
         {
             TenantId = tenantId,
-            CredentialId = credentialId
+            CredentialId = credentialId,
+            Name = "XFramework.ControlPanel",
+            ServiceAccessToken = token
         };
-
-        if (sign)
-            RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
-
-        return metadata;
     }
 
     private static ClaimsPrincipal Principal(Guid tenantId, Guid credentialId) =>
@@ -120,7 +169,7 @@ public sealed class CommunicationsRequestContextResolverTests
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Communications:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
+                ["BoltConfiguration:ClientName"] = CommunicationsClientName
             })
             .Build();
 }

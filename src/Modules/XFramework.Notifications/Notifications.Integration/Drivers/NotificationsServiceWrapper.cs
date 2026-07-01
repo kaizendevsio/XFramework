@@ -39,7 +39,7 @@ public sealed record NotificationsServiceWrapper(
 {
     public override void Initialize()
     {
-        TargetClient = "Notifications".ToSha256();
+        TargetClient = "XFramework.Notifications".ToSha256();
     }
 
     public Task<QueryResponse<NotificationInboxItemResponse>> CreateNotification(

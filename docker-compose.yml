@@ -15,7 +15,9 @@ x-common-env: &common-env
   JwtOptions__ValidAudience: ${JWT_AUDIENCE:-xframework}
   JwtOptions__ValidIssuer: ${JWT_ISSUER:-xframework}
   BoltConfiguration__Signature: ${BOLT_SIGNATURE:?Set BOLT_SIGNATURE in .env}
-  Communications__TrustedMetadata__SharedSecret: ${COMMUNICATIONS_TRUSTED_METADATA_SECRET:?Set COMMUNICATIONS_TRUSTED_METADATA_SECRET in .env}
+  ServiceIdentity__Issuer: XFramework.IdentityServer
+  ServiceIdentity__DevelopmentClientSecret: ${SERVICE_IDENTITY_DEVELOPMENT_SECRET:?Set SERVICE_IDENTITY_DEVELOPMENT_SECRET in .env}
+  ServiceIdentity__ClientSecret: ${SERVICE_IDENTITY_DEVELOPMENT_SECRET:?Set SERVICE_IDENTITY_DEVELOPMENT_SECRET in .env}
   Seq__ApiKey: ${SEQ_API_KEY:-}
   OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
   OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-true}
@@ -189,7 +191,7 @@ services:
         PROJECT_PATH: src/Modules/XFramework.Storage/Storage.Api/Storage.Api.csproj
     environment:
       <<: *common-env
-      BoltConfiguration__ClientName: Storage
+      BoltConfiguration__ClientName: XFramework.Storage
       Storage__DefaultProvider: ${STORAGE_DEFAULT_PROVIDER:-S3Compatible}
       Storage__ProviderProfileName: ${STORAGE_PROVIDER_PROFILE_NAME:-default}
       Storage__BucketPrefix: ${STORAGE_BUCKET_PREFIX:-xframework-dev}
@@ -351,12 +353,15 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${OPERATIONS_DASHBOARD_ASPNETCORE_ENVIRONMENT:-Docker}
-      BoltConfiguration__ClientName: OperationsDashboard
+      BoltConfiguration__ClientName: XFramework.Operations.Dashboard
       BoltConfiguration__ServerUrls__0: ws://bolt-hub:8080/bolt/ws
       BoltConfiguration__RpcTimeoutSeconds: 30
       JwtOptions__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JwtOptions__ValidAudience: ${JWT_AUDIENCE:-xframework}
       JwtOptions__ValidIssuer: ${JWT_ISSUER:-xframework}
+      ServiceIdentity__Issuer: XFramework.IdentityServer
+      ServiceIdentity__DevelopmentClientSecret: ${SERVICE_IDENTITY_DEVELOPMENT_SECRET:?Set SERVICE_IDENTITY_DEVELOPMENT_SECRET in .env}
+      ServiceIdentity__ClientSecret: ${SERVICE_IDENTITY_DEVELOPMENT_SECRET:?Set SERVICE_IDENTITY_DEVELOPMENT_SECRET in .env}
       Seq__Url: http://seq:80
       Seq__ApiKey: ${SEQ_API_KEY:-}
       Jaeger__QueryUrl: http://jaeger:16686

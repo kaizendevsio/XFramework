@@ -8,7 +8,9 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Abstractions.Wrappers;
+using XFramework.Integration.Security;
 
 namespace XFramework.Integration.Drivers;
 
@@ -24,6 +26,7 @@ public sealed class BoltDriver : IMessageBusWrapper
 {
     private readonly BoltClient _client;
     private readonly BoltConfiguration _config;
+    private readonly IServiceTokenProvider _serviceTokenProvider;
     private readonly ILogger<BoltDriver> _logger;
 
     public bool IsConnected => _client.IsConnected;
@@ -31,10 +34,15 @@ public sealed class BoltDriver : IMessageBusWrapper
     public Action OnReconnecting { get; set; } = () => { };
     public Action OnDisconnected { get; set; } = () => { };
 
-    public BoltDriver(BoltClient client, IOptions<BoltConfiguration> config, ILogger<BoltDriver> logger)
+    public BoltDriver(
+        BoltClient client,
+        IOptions<BoltConfiguration> config,
+        IServiceTokenProvider serviceTokenProvider,
+        ILogger<BoltDriver> logger)
     {
         _client = client;
         _config = config.Value;
+        _serviceTokenProvider = serviceTokenProvider;
         _logger = logger;
     }
 
@@ -58,7 +66,7 @@ public sealed class BoltDriver : IMessageBusWrapper
     public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        EnrichMetadata(request);
+        await EnrichMetadataAsync(request, recipient, ct);
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
         return DeserializeCmdResponse(status, responsePayload);
@@ -67,7 +75,7 @@ public sealed class BoltDriver : IMessageBusWrapper
     public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        EnrichMetadata(request);
+        await EnrichMetadataAsync(request, recipient, ct);
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
         return DeserializeCmdResponse<TResponse>(status, responsePayload);
@@ -76,7 +84,7 @@ public sealed class BoltDriver : IMessageBusWrapper
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        EnrichMetadata(request);
+        await EnrichMetadataAsync(request, recipient, ct);
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
         return DeserializeQueryResponse<TResponse>(status, responsePayload);
@@ -85,7 +93,12 @@ public sealed class BoltDriver : IMessageBusWrapper
     public async Task PublishAsync<TModel>(string eventName, string topic, TModel? data)
         where TModel : class, IHasRequestServer
     {
-        if (data is not null) EnrichMetadata(data);
+        if (data is not null)
+        {
+            data.Metadata ??= new RequestMetadata();
+            data.Metadata.Name = _config.ClientName ?? string.Empty;
+            data.Metadata.RequestId ??= Guid.NewGuid();
+        }
         await _client.PublishAsync(topic, data, durable: false);
     }
 
@@ -225,14 +238,27 @@ public sealed class BoltDriver : IMessageBusWrapper
         return Task.CompletedTask;
     }
 
-    private void EnrichMetadata<TRequest>(TRequest request) where TRequest : IHasRequestServer
+    private async Task EnrichMetadataAsync<TRequest>(TRequest request, string recipient, CancellationToken ct)
+        where TRequest : IHasRequestServer
     {
         request.Metadata ??= new RequestMetadata();
-        if (string.IsNullOrEmpty(request.Metadata.Name))
-            request.Metadata.Name = _config.ClientName ?? string.Empty;
+        request.Metadata.Name = _config.ClientName ?? string.Empty;
         if (request.Metadata.TenantId == null && _config.ClientGuid.HasValue)
             request.Metadata.TenantId = _config.ClientGuid.Value;
-        RequestMetadataTrust.Sign(request.Metadata, _config.Signature);
+        request.Metadata.RequestId ??= Guid.NewGuid();
+
+        var audience = ResolveAudience(recipient);
+        request.Metadata.ServiceAccessToken = await _serviceTokenProvider.GetTokenAsync(audience, null, ct);
+    }
+
+    private static string ResolveAudience(string recipient)
+    {
+        var trimmed = recipient.Trim();
+        var canonical = XFrameworkServiceNames.All.FirstOrDefault(name =>
+            string.Equals(name, trimmed, StringComparison.Ordinal) ||
+            string.Equals(name.ToSha256(), trimmed, StringComparison.OrdinalIgnoreCase));
+
+        return canonical ?? trimmed;
     }
 
     private static CmdResponse DeserializeCmdResponse(HttpStatusCode status, ReadOnlyMemory<byte> responsePayload)

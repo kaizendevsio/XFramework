@@ -25,7 +25,7 @@ public partial record SmsGatewayServiceWrapper(
 {
     public override void Initialize()
     {
-        TargetClient = "SmsGateway".ToSha256();
+        TargetClient = "XFramework.SmsGateway".ToSha256();
     }
 
     public async Task<CmdResponse> CreateSmsMessage(CreateSmsMessageRequest request)

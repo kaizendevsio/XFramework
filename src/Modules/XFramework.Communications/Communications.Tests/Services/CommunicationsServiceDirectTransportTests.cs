@@ -23,8 +23,6 @@ namespace Communications.Tests.Services;
 
 public sealed class CommunicationsServiceDirectTransportTests
 {
-    private const string TrustedMetadataSecret = "communications-direct-transport-test-secret";
-
     [Test]
     public async Task CreateDirectMessageAsync_UnsupportedTransport_DoesNotPersistDirectMessage()
     {
@@ -35,7 +33,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             new TestNotificationsServiceWrapper(),
             new TestCommunicationsTemplateService(),
-            new CommunicationsRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            ContextResolver(),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -69,7 +67,7 @@ public sealed class CommunicationsServiceDirectTransportTests
                 Message = "Gateway unavailable"
             }),
             new TestCommunicationsTemplateService(),
-            new CommunicationsRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            ContextResolver(),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -100,7 +98,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             new TestNotificationsServiceWrapper(),
             new TestCommunicationsTemplateService(),
-            new CommunicationsRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            ContextResolver(),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -130,7 +128,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             new TestNotificationsServiceWrapper(throwOnCreate: true),
             new TestCommunicationsTemplateService(),
-            new CommunicationsRequestContextResolver(new HttpContextAccessor(), TestConfiguration()),
+            ContextResolver(),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -151,17 +149,22 @@ public sealed class CommunicationsServiceDirectTransportTests
 
     private static RequestMetadata Metadata(Guid tenantId)
     {
-        var metadata = new RequestMetadata { TenantId = tenantId, Name = "ControlPanel" };
-        RequestMetadataTrust.Sign(metadata, TrustedMetadataSecret);
-        return metadata;
+        return new RequestMetadata
+        {
+            TenantId = tenantId,
+            Name = "XFramework.ControlPanel",
+            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidControlPanelToken
+        };
     }
+
+    private static CommunicationsRequestContextResolver ContextResolver() =>
+        new(
+            new HttpContextAccessor(),
+            TestConfiguration(),
+            serviceInvocationResolver: new FakeTrustedServiceInvocationResolver());
 
     private static IConfiguration TestConfiguration() =>
         new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Communications:TrustedMetadata:SharedSecret"] = TrustedMetadataSecret
-            })
             .Build();
 
     private sealed class TestTenantResolver(Guid tenantId) : ITenantResolver

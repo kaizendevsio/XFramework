@@ -55,14 +55,15 @@ public sealed class ServiceWrapperGeneratorTests
         generatedSource.Should().Contain("#nullable enable");
         generatedSource.Should().Contain("public partial interface IJuanBarangayServiceWrapper");
         generatedSource.Should().Contain("public partial record JuanBarangayServiceWrapper(");
-        generatedSource.Should().Contain($"TargetClient = \"{"JuanBarangay".ToSha256()}\"");
+        generatedSource.Should().Contain($"TargetClient = \"{"XFramework.JuanBarangay".ToSha256()}\"");
+        generatedSource.Should().Contain("IServiceTokenProvider serviceTokenProvider");
         generatedSource.Should().Contain("public IResidentCrudService Resident { get; init; }");
         generatedSource.Should().Contain("ValidateBarangayId(");
         generatedSource.Should().NotContain("namespace Juan.Integration.Drivers");
     }
 
     [Test]
-    public void GenerateWrapper_ConventionModuleName_RemainsBackwardCompatible()
+    public void GenerateWrapper_ConventionModuleName_UsesCanonicalXFrameworkTarget()
     {
         var domainReference = CreateReference(
             "Inventario.Domain.Shared",
@@ -95,7 +96,8 @@ public sealed class ServiceWrapperGeneratorTests
 
         generatedSource.Should().Contain("namespace Inventario.Integration.Drivers");
         generatedSource.Should().Contain("public partial interface IInventarioServiceWrapper");
-        generatedSource.Should().Contain($"TargetClient = \"{"Inventario".ToSha256()}\"");
+        generatedSource.Should().Contain($"TargetClient = \"{"XFramework.Inventario".ToSha256()}\"");
+        generatedSource.Should().Contain("IServiceTokenProvider serviceTokenProvider");
         generatedSource.Should().Contain("public IProductCrudService Product { get; init; }");
         generatedSource.Should().Contain("ReserveInventory(");
     }
