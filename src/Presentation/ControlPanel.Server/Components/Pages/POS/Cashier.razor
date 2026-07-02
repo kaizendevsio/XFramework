@@ -19,284 +19,357 @@ else if (!_moduleEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
-            <div class="xf-page-header">
+        <div class="pos-cashier-page">
+            <div class="xf-page-header pos-cashier-header">
                 <div>
                     <BbTypographyH3>Cashier</BbTypographyH3>
-                    <BbTypographyMuted>Checkout uses Inventario catalog and Wallets ledger posting.</BbTypographyMuted>
+                    <BbTypographyMuted>@CartItemCount item(s) | @Total.ToString("N2") total</BbTypographyMuted>
                 </div>
-                <div class="xf-page-actions">
+                <div class="xf-page-actions pos-cashier-header-actions">
                     @if (_cartsEnabled)
                     {
-                        <BbButton Variant="ButtonVariant.Outline" OnClick="@SuspendCart" Disabled="@(_savingCart || !_cart.Any())">
-                            <LucideIcon Name="pause" class="mr-2 h-4 w-4" />
-                            Suspend Cart
+                        <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Outline" OnClick="@OpenHeldCartsDialog">
+                            <LucideIcon Name="clock" class="mr-2 h-4 w-4" />
+                            Held Carts
+                            @if (_suspendedCarts.Count > 0)
+                            {
+                                <span class="pos-button-count">@_suspendedCarts.Count</span>
+                            }
                         </BbButton>
                     }
-                    <BbButton Variant="ButtonVariant.Destructive" OnClick="@ConfirmClearCurrentCart" Disabled="@(!_cart.Any())">
+                    <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Outline" OnClick="@OpenSaleDetailsDialog">
+                        <LucideIcon Name="clipboard-list" class="mr-2 h-4 w-4" />
+                        Sale Details
+                    </BbButton>
+                    <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Destructive" OnClick="@ConfirmClearCurrentCart" Disabled="@(!_cart.Any())">
                         <LucideIcon Name="x" class="mr-2 h-4 w-4" />
                         Clear
                     </BbButton>
-                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Outline" OnClick="@Reload">
                         <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
                         Refresh
                     </BbButton>
                 </div>
             </div>
 
-            <div class="grid gap-6 xl:grid-cols-2">
-                <div class="space-y-6">
-                    <BbCard>
-                        <BbCardHeader>
-                            <BbCardTitle>Catalog</BbCardTitle>
-                            <BbCardDescription>Search sellable products from Inventario.</BbCardDescription>
-                        </BbCardHeader>
-                        <BbCardContent>
-                            <div class="xf-filter-actions">
-                                <BbInput @bind-Value="_catalogSearch" Placeholder="Search SKU, product, variant, or brand" />
-                                <BbButton OnClick="@SearchCatalog" Disabled="@_searching">
-                                    <LucideIcon Name="search" class="mr-2 h-4 w-4" />
-                                    Search
-                                </BbButton>
-                            </div>
-                            <div class="mt-4">
-                                <BbDataGrid Items="@_catalogItems" ShowPagination="true" InitialPageSize="10">
-                                    <Columns>
-                                        <BbDataGridPropertyColumn Property="@(x => x.DisplayName)" Title="Item" Sortable="true" Filterable="true" />
-                                        <BbDataGridPropertyColumn Property="@(x => x.SKU)" Title="SKU" Sortable="true" Filterable="true" />
-                                        <BbDataGridTemplateColumn Title="Price" Sortable="true" Filterable="true" FilterBy="@(item => item.Price)">
-                                            <ChildContent Context="item">@item.Price.ToString("N2")</ChildContent>
-                                        </BbDataGridTemplateColumn>
-                                        <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsAvailable)">
-                                            <ChildContent Context="item">
-                                                <StatusBadge Text="@(item.IsAvailable ? "Available" : "Unavailable")"
-                                                             Status="@(item.IsAvailable ? "active" : "inactive")" />
-                                            </ChildContent>
-                                        </BbDataGridTemplateColumn>
-                                        <BbDataGridTemplateColumn Title="Actions">
-                                            <ChildContent Context="item">
-                                                <BbButton Size="ButtonSize.Small" OnClick="@(() => AddToCart(item))" Disabled="@(!item.IsAvailable)">
-                                                    Add
-                                                </BbButton>
-                                            </ChildContent>
-                                        </BbDataGridTemplateColumn>
-                                    </Columns>
-                                    <EmptyTemplate>
-                                        <BbEmpty Title="No catalog items" Description="Search Inventario sellable products to add items." />
-                                    </EmptyTemplate>
-                                </BbDataGrid>
-                            </div>
-                        </BbCardContent>
-                    </BbCard>
+            <div class="pos-cashier-shell">
+                <section class="pos-catalog-panel">
+                    <div class="pos-catalog-toolbar">
+                        <div class="pos-search-field">
+                            <BbInput id="pos-catalog-search"
+                                     @bind-Value="_catalogSearch"
+                                     Placeholder="Scan barcode or search SKU, product, variant, or brand"
+                                     Class="pos-search-input"
+                                     @onkeydown="@HandleCatalogKeyDown" />
+                        </div>
+                        <BbButton Size="ButtonSize.Large" OnClick="@(() => SearchCatalog())" Disabled="@_searching" Class="pos-search-button">
+                            <LucideIcon Name="search" class="mr-2 h-5 w-5" />
+                            Search
+                        </BbButton>
+                    </div>
 
-                    <BbCard>
-                        <BbCardHeader>
-                            <BbCardTitle>Cart</BbCardTitle>
-                            <BbCardDescription>@_cart.Count line(s)</BbCardDescription>
-                        </BbCardHeader>
-                        <BbCardContent>
-                            <BbDataGrid Items="@_cart" ShowPagination="false">
-                                <Columns>
-                                    <BbDataGridPropertyColumn Property="@(x => x.DisplayName)" Title="Item" Filterable="true" />
-                                    <BbDataGridTemplateColumn Title="Qty" Sortable="true" Filterable="true" FilterBy="@(item => item.Quantity)">
-                                        <ChildContent Context="item">
-                                            <div class="flex items-center gap-2">
-                                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ChangeQuantity(item, -1))">-</BbButton>
-                                                <span class="font-mono">@item.Quantity.ToString("N0")</span>
-                                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ChangeQuantity(item, 1))">+</BbButton>
-                                            </div>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Unit" Filterable="true" FilterBy="@(item => item.UnitPrice)">
-                                        <ChildContent Context="item">@item.UnitPrice.ToString("N2")</ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Total" Filterable="true" FilterBy="@(item => item.LineTotal)">
-                                        <ChildContent Context="item">@item.LineTotal.ToString("N2")</ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Actions">
-                                        <ChildContent Context="item">
-                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => RemoveFromCart(item))">Remove</BbButton>
-                                    </ChildContent>
-                                </BbDataGridTemplateColumn>
-                            </Columns>
+                    <div class="pos-category-strip" aria-label="Catalog categories">
+                        <BbButton Size="ButtonSize.Large"
+                                  Variant="@CategoryButtonVariant(null)"
+                                  Class="pos-category-chip"
+                                  OnClick="@(() => SelectCategory(null))">
+                            All
+                        </BbButton>
+                        @foreach (var category in _categories)
+                        {
+                            <BbButton Size="ButtonSize.Large"
+                                      Variant="@CategoryButtonVariant(category.Id)"
+                                      Class="pos-category-chip"
+                                      OnClick="@(() => SelectCategory(category.Id))">
+                                @category.Name
+                            </BbButton>
+                        }
+                    </div>
+
+                    <BbDataView TItem="PosCatalogItemResponse"
+                                Data="@_catalogItems"
+                                Layout="DataViewLayout.Grid"
+                                ShowToolbar="false"
+                                ShowPagination="true"
+                                InitialPageSize="24"
+                                GridColumnMinWidth="12rem"
+                                Class="pos-catalog-view"
+                                GridClass="pos-product-grid"
+                                IsLoading="@_searching">
+                        <Fields>
+                            <BbDataViewGridTemplate TItem="PosCatalogItemResponse" Context="item">
+                                <BbButton Variant="ButtonVariant.Outline"
+                                          Class="pos-product-tile"
+                                          OnClick="@(() => AddToCart(item))"
+                                          Disabled="@(!item.IsAvailable)">
+                                    <span class="pos-product-media">
+                                        @if (!string.IsNullOrWhiteSpace(item.Image))
+                                        {
+                                            <img src="@item.Image" alt="@item.DisplayName" />
+                                        }
+                                        else
+                                        {
+                                            <LucideIcon Name="package" class="pos-product-icon" />
+                                        }
+                                    </span>
+                                    <span class="pos-product-body">
+                                        <span class="pos-product-name">@item.DisplayName</span>
+                                        <span class="pos-product-meta">@FormatProductMeta(item)</span>
+                                        <span class="pos-product-footer">
+                                            <span class="pos-product-price">@item.Price.ToString("N2")</span>
+                                            <span class="@AvailabilityClass(item)">@AvailabilityText(item)</span>
+                                        </span>
+                                    </span>
+                                </BbButton>
+                            </BbDataViewGridTemplate>
+                        </Fields>
+                        <LoadingTemplate>
+                            <div class="pos-catalog-empty">
+                                <BbSpinner />
+                            </div>
+                        </LoadingTemplate>
+                        <EmptyTemplate>
+                            <BbEmpty Title="No catalog items" Description="Scan or search Inventario sellable products." />
+                        </EmptyTemplate>
+                    </BbDataView>
+                </section>
+
+                <aside class="pos-cart-panel">
+                    <div class="pos-checkout-panel">
+                        @if (!string.IsNullOrWhiteSpace(_activeCartNumber))
+                        {
+                            <BbAlert>
+                                <BbAlertTitle>Draft @_activeCartNumber</BbAlertTitle>
+                                <BbAlertDescription>Checkout or suspend to keep the queue moving.</BbAlertDescription>
+                            </BbAlert>
+                        }
+
+                        <XfEntityPicker TItem="PosRegister"
+                                        @bind-Value="_selectedRegisterId"
+                                        Items="@_registers"
+                                        Label="Register"
+                                        Placeholder="Select register"
+                                        SearchPlaceholder="Search registers..."
+                                        EmptyMessage="No POS registers found."
+                                        ValueSelector="@GetRegisterValue"
+                                        TextSelector="@GetRegisterLabel"
+                                        SearchTextSelector="@GetRegisterSearchText"
+                                        AdvancedColumns="@RegisterAdvancedColumns"
+                                        AdvancedSearchScope="Searches register name, code, default warehouse, default location, enabled state, and register id."
+                                        AdvancedSearchTitle="Find Register"
+                                        AdvancedSearchDescription="Select the register for this checkout." />
+
+                        <div class="pos-payment-block">
+                            <BbLabel>Payment</BbLabel>
+                            <BbRadioGroup TValue="PosPaymentMethod" @bind-Value="_paymentMethod" Class="pos-payment-options">
+                                <label class="pos-payment-option" for="pos-payment-cash">
+                                    <BbRadioGroupItem TValue="PosPaymentMethod" Value="@PosPaymentMethod.CashDrawer" id="pos-payment-cash" />
+                                    <span>
+                                        <strong>Cash Drawer</strong>
+                                        <small>Post to register cash drawer wallet</small>
+                                    </span>
+                                </label>
+                                <label class="pos-payment-option" for="pos-payment-wallet">
+                                    <BbRadioGroupItem TValue="PosPaymentMethod" Value="@PosPaymentMethod.WalletTransfer" id="pos-payment-wallet" />
+                                    <span>
+                                        <strong>Wallet Transfer</strong>
+                                        <small>Move funds from customer wallet</small>
+                                    </span>
+                                </label>
+                            </BbRadioGroup>
+                        </div>
+
+                        @if (IsWalletPayment)
+                        {
+                            <XfEntityPicker TItem="IdentityCredential"
+                                            @bind-Value="_selectedCustomerCredentialId"
+                                            Items="@_credentials"
+                                            Label="Customer Credential"
+                                            Placeholder="Select customer"
+                                            SearchPlaceholder="Search credentials..."
+                                            EmptyMessage="No credentials found."
+                                            ValueSelector="@GetCredentialValue"
+                                            TextSelector="@GetCredentialLabel"
+                                            SearchTextSelector="@GetCredentialSearchText"
+                                            AdvancedColumns="@CredentialAdvancedColumns"
+                                            AdvancedSearchScope="Searches customer credential username, alias, online state, last seen date, device, location, and credential id."
+                                            AdvancedSearchTitle="Find Customer Credential"
+                                            AdvancedSearchDescription="Select the customer wallet source." />
+                        }
+
+                        <div class="pos-adjustments">
+                            <BbFormFieldCurrencyInput @bind-Value="_discountAmount" Label="Discount" ShowSymbol="false" Min="0" />
+                            <BbFormFieldCurrencyInput @bind-Value="_taxAmount" Label="Tax" ShowSymbol="false" Min="0" />
+                        </div>
+
+                        @if (IsCashPayment)
+                        {
+                            <div class="pos-cash-panel">
+                                <BbFormFieldCurrencyInput @bind-Value="_cashTenderedAmount" Label="Cash Tendered" ShowSymbol="false" Min="0" />
+                                <div class="pos-change-due">
+                                    <span>Change Due</span>
+                                    <strong>@ChangeDue.ToString("N2")</strong>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="pos-cart-list">
+                        <div class="pos-cart-title-row">
+                            <div>
+                                <h2>Cart</h2>
+                                <span>@CartItemCount item(s)</span>
+                            </div>
+                            @if (_cartsEnabled)
+                            {
+                                <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Outline" OnClick="@SuspendCart" Disabled="@(_savingCart || !_cart.Any())">
+                                    <LucideIcon Name="pause" class="mr-2 h-4 w-4" />
+                                    Suspend
+                                </BbButton>
+                            }
+                        </div>
+
+                        <BbDataView TItem="CartLine"
+                                    Data="@_cart"
+                                    Layout="DataViewLayout.List"
+                                    ShowToolbar="false"
+                                    ShowPagination="false"
+                                    Class="pos-cart-view"
+                                    ListClass="pos-cart-lines">
+                            <Fields>
+                                <BbDataViewListTemplate TItem="CartLine" Context="line">
+                                    <div class="pos-cart-line">
+                                        <div class="pos-cart-line-main">
+                                            <strong>@line.DisplayName</strong>
+                                            <span>@line.UnitPrice.ToString("N2") each</span>
+                                        </div>
+                                        <div class="pos-qty-stepper" aria-label="Quantity controls">
+                                            <BbButton Size="ButtonSize.IconLarge" Variant="ButtonVariant.Outline" OnClick="@(() => ChangeQuantity(line, -1))" aria-label="Decrease quantity">
+                                                <LucideIcon Name="minus" class="h-4 w-4" />
+                                            </BbButton>
+                                            <span class="pos-qty-value">@FormatQuantity(line.Quantity)</span>
+                                            <BbButton Size="ButtonSize.IconLarge" Variant="ButtonVariant.Outline" OnClick="@(() => ChangeQuantity(line, 1))" aria-label="Increase quantity">
+                                                <LucideIcon Name="plus" class="h-4 w-4" />
+                                            </BbButton>
+                                        </div>
+                                        <div class="pos-cart-line-total">@line.LineTotal.ToString("N2")</div>
+                                        <BbButton Size="ButtonSize.IconLarge" Variant="ButtonVariant.Destructive" OnClick="@(() => RemoveFromCart(line))" aria-label="Remove item">
+                                            <LucideIcon Name="trash-2" class="h-4 w-4" />
+                                        </BbButton>
+                                    </div>
+                                </BbDataViewListTemplate>
+                            </Fields>
                             <EmptyTemplate>
                                 <BbEmpty Title="Cart is empty" Description="Add catalog items before checkout." />
                             </EmptyTemplate>
-                        </BbDataGrid>
-                    </BbCardContent>
-                </BbCard>
-                </div>
+                        </BbDataView>
+                    </div>
 
-                <div class="space-y-6">
-                    <BbCard>
-                        <BbCardHeader>
-                            <BbCardTitle>Checkout</BbCardTitle>
-                            <BbCardDescription>Select register and tender.</BbCardDescription>
-                        </BbCardHeader>
-                        <BbCardContent>
-                            <div class="grid gap-4">
-                                @if (!string.IsNullOrWhiteSpace(_activeCartNumber))
-                                {
-                                    <BbAlert>
-                                        <BbAlertTitle>Draft @_activeCartNumber</BbAlertTitle>
-                                        <BbAlertDescription>Changes will be saved before suspend or checkout.</BbAlertDescription>
-                                    </BbAlert>
-                                }
-
-                                <div class="grid gap-3 md:grid-cols-2">
-                                    <div class="grid gap-2">
-                                        <BbLabel>Customer Label</BbLabel>
-                                        <BbInput @bind-Value="_customerLabel" Placeholder="Name, queue number, or note" />
-                                    </div>
-                                    <div class="grid gap-2">
-                                        <BbLabel>Cart Notes</BbLabel>
-                                        <BbInput @bind-Value="_cartNotes" Placeholder="Optional cashier note" />
-                                    </div>
-                                </div>
-
-                                <XfEntityPicker TItem="PosRegister"
-                                                @bind-Value="_selectedRegisterId"
-                                                Items="@_registers"
-                                                Label="Register"
-                                                Placeholder="Select register"
-                                                SearchPlaceholder="Search registers..."
-                                                EmptyMessage="No POS registers found."
-                                                ValueSelector="@GetRegisterValue"
-                                                TextSelector="@GetRegisterLabel"
-                                                SearchTextSelector="@GetRegisterSearchText"
-                                                AdvancedColumns="@RegisterAdvancedColumns"
-                                                AdvancedSearchScope="Searches register name, code, default warehouse, default location, enabled state, and register id."
-                                                AdvancedSearchTitle="Find Register"
-                                                AdvancedSearchDescription="Select the register for this checkout." />
-
-                                <BbFormFieldSelect TValue="string" @bind-Value="PaymentMethodValue" Label="Payment">
-                                    <BbSelectItem Value="@PosPaymentMethod.CashDrawer.ToString()">Cash Drawer</BbSelectItem>
-                                    <BbSelectItem Value="@PosPaymentMethod.WalletTransfer.ToString()">Wallet Transfer</BbSelectItem>
-                                </BbFormFieldSelect>
-
-                                @if (_paymentMethod == PosPaymentMethod.WalletTransfer)
-                                {
-                                    <XfEntityPicker TItem="IdentityCredential"
-                                                    @bind-Value="_selectedCustomerCredentialId"
-                                                    Items="@_credentials"
-                                                    Label="Customer Credential"
-                                                    Placeholder="Select customer"
-                                                    SearchPlaceholder="Search credentials..."
-                                                    EmptyMessage="No credentials found."
-                                                    ValueSelector="@GetCredentialValue"
-                                                    TextSelector="@GetCredentialLabel"
-                                                    SearchTextSelector="@GetCredentialSearchText"
-                                                    AdvancedColumns="@CredentialAdvancedColumns"
-                                                    AdvancedSearchScope="Searches customer credential username, alias, online state, last seen date, device, location, and credential id."
-                                                    AdvancedSearchTitle="Find Customer Credential"
-                                                    AdvancedSearchDescription="Select the customer wallet source." />
-                                }
-
-                                <div class="grid gap-3 md:grid-cols-2">
-                                    <BbFormFieldCurrencyInput @bind-Value="_discountAmount" Label="Discount" ShowSymbol="false" Min="0" />
-                                    <BbFormFieldCurrencyInput @bind-Value="_taxAmount" Label="Tax" ShowSymbol="false" Min="0" />
-                                </div>
-
-                                <div class="grid gap-2 rounded border p-4">
-                                    <div class="flex justify-between">
-                                        <span>Subtotal</span>
-                                        <span class="font-mono">@Subtotal.ToString("N2")</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>Discount</span>
-                                        <span class="font-mono">-@_discountAmount.ToString("N2")</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>Tax</span>
-                                        <span class="font-mono">@_taxAmount.ToString("N2")</span>
-                                    </div>
-                                    <div class="flex justify-between text-lg font-semibold">
-                                        <span>Total</span>
-                                        <span class="font-mono">@Total.ToString("N2")</span>
-                                    </div>
-                                </div>
-
-                                <div class="grid gap-2 md:grid-cols-2">
-                                    @if (_cartsEnabled)
-                                    {
-                                        <BbButton Variant="ButtonVariant.Outline" OnClick="@SuspendCart" Disabled="@(_savingCart || !_cart.Any())">
-                                            <LucideIcon Name="pause" class="mr-2 h-4 w-4" />
-                                            Suspend Cart
-                                        </BbButton>
-                                    }
-                                    <BbButton OnClick="@Checkout" Disabled="@(_checkingOut || !_cart.Any())">
-                                        <LucideIcon Name="receipt" class="mr-2 h-4 w-4" />
-                                        Checkout
-                                    </BbButton>
-                                </div>
-                            </div>
-                        </BbCardContent>
-                    </BbCard>
+                    <div class="pos-total-bar">
+                        <div class="pos-total-lines">
+                            <div><span>Subtotal</span><strong>@Subtotal.ToString("N2")</strong></div>
+                            <div><span>Discount</span><strong>-@_discountAmount.ToString("N2")</strong></div>
+                            <div><span>Tax</span><strong>@_taxAmount.ToString("N2")</strong></div>
+                        </div>
+                        <div class="pos-grand-total">
+                            <span>Total</span>
+                            <strong>@Total.ToString("N2")</strong>
+                        </div>
+                        <BbButton Size="ButtonSize.Large" OnClick="@Checkout" Disabled="@(!CanCheckout)" Class="pos-checkout-action">
+                            <LucideIcon Name="receipt" class="mr-2 h-5 w-5" />
+                            Checkout
+                        </BbButton>
+                    </div>
 
                     @if (_lastReceipt is not null)
                     {
-                        <BbCard>
-                            <BbCardHeader>
-                                <BbCardTitle>Receipt @_lastReceipt.SaleNumber</BbCardTitle>
-                                <BbCardDescription>@_lastReceipt.Status</BbCardDescription>
-                            </BbCardHeader>
-                            <BbCardContent>
-                                <div class="grid gap-2 text-sm">
-                                    <div class="flex justify-between"><span>Total</span><span>@_lastReceipt.TotalAmount.ToString("N2")</span></div>
-                                    <div class="flex justify-between"><span>Lines</span><span>@_lastReceipt.Lines.Count</span></div>
-                                    @if (!string.IsNullOrWhiteSpace(_lastReceipt.FailureReason))
-                                    {
-                                        <BbAlert Variant="AlertVariant.Warning">
-                                            <BbAlertTitle>Recovery needed</BbAlertTitle>
-                                            <BbAlertDescription>@_lastReceipt.FailureReason</BbAlertDescription>
-                                        </BbAlert>
-                                    }
-                                </div>
-                            </BbCardContent>
-                        </BbCard>
+                        <div class="pos-receipt-panel">
+                            <div>
+                                <strong>Receipt @_lastReceipt.SaleNumber</strong>
+                                <span>@_lastReceipt.Status | @_lastReceipt.TotalAmount.ToString("N2")</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(_lastReceipt.FailureReason))
+                            {
+                                <BbAlert Variant="AlertVariant.Warning">
+                                    <BbAlertTitle>Recovery needed</BbAlertTitle>
+                                    <BbAlertDescription>@_lastReceipt.FailureReason</BbAlertDescription>
+                                </BbAlert>
+                            }
+                            <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Outline" OnClick="@StartNewSale">
+                                <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                                New Sale
+                            </BbButton>
+                        </div>
                     }
-
-                    @if (_cartsEnabled)
-                    {
-                        <BbCard>
-                            <BbCardHeader>
-                                <BbCardTitle>Suspended Carts</BbCardTitle>
-                                <BbCardDescription>@_suspendedCarts.Count cart(s) waiting</BbCardDescription>
-                            </BbCardHeader>
-                            <BbCardContent>
-                                <BbDataGrid Items="@_suspendedCarts" ShowPagination="true" InitialPageSize="8">
-                                    <Columns>
-                                        <BbDataGridPropertyColumn Property="@(x => x.CartNumber)" Title="Cart" Sortable="true" Filterable="true" />
-                                        <BbDataGridPropertyColumn Property="@(x => x.CustomerLabel)" Title="Customer" Sortable="true" Filterable="true" />
-                                        <BbDataGridTemplateColumn Title="Total" Sortable="true" Filterable="true" FilterBy="@(item => item.TotalAmount)">
-                                            <ChildContent Context="item">@item.TotalAmount.ToString("N2")</ChildContent>
-                                        </BbDataGridTemplateColumn>
-                                        <BbDataGridPropertyColumn Property="@(x => x.SuspendedAt)" Title="Suspended" Sortable="true" Filterable="true" />
-                                        <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
-                                        <BbDataGridTemplateColumn Title="Actions">
-                                            <ChildContent Context="item">
-                                                <div class="flex flex-wrap gap-1">
-                                                    <BbButton Size="ButtonSize.Small" OnClick="@(() => ResumeCart(item))" Disabled="@_actingOnCart">
-                                                        Resume
-                                                    </BbButton>
-                                                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelDraftCart(item))" Disabled="@_actingOnCart">
-                                                        Cancel
-                                                    </BbButton>
-                                                </div>
-                                            </ChildContent>
-                                        </BbDataGridTemplateColumn>
-                                    </Columns>
-                                    <EmptyTemplate>
-                                        <BbEmpty Title="No suspended carts" Description="Suspended customer carts will appear here." />
-                                    </EmptyTemplate>
-                                </BbDataGrid>
-                            </BbCardContent>
-                        </BbCard>
-                    }
-                </div>
+                </aside>
             </div>
         </div>
     </FadeInContent>
+
+    <BbDialog Open="@_saleDetailsOpen" OpenChanged="@(value => _saleDetailsOpen = value)">
+        <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+            <BbDialogHeader>
+                <BbDialogTitle>Sale Details</BbDialogTitle>
+                <BbDialogDescription>Optional customer and cashier notes for the active sale.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="pos-dialog-fields">
+                <div>
+                    <BbLabel>Customer Label</BbLabel>
+                    <BbInput @bind-Value="_customerLabel" Placeholder="Name, queue number, or note" />
+                </div>
+                <div>
+                    <BbLabel>Cart Notes</BbLabel>
+                    <BbTextarea @bind-Value="_cartNotes" Placeholder="Optional cashier note" />
+                </div>
+            </div>
+            <BbDialogFooter>
+                <BbButton Size="ButtonSize.Large" OnClick="@CloseSaleDetailsDialog">Done</BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
+
+    @if (_cartsEnabled)
+    {
+        <BbDialog Open="@_heldCartsOpen" OpenChanged="@(value => _heldCartsOpen = value)">
+            <BbDialogContent TrapFocus="false" Class="xf-dialog-wide pos-held-carts-dialog">
+                <BbDialogHeader>
+                    <BbDialogTitle>Held Carts</BbDialogTitle>
+                    <BbDialogDescription>@_suspendedCarts.Count suspended customer cart(s).</BbDialogDescription>
+                </BbDialogHeader>
+                <BbDataView TItem="PosCartSummaryResponse"
+                            Data="@_suspendedCarts"
+                            Layout="DataViewLayout.List"
+                            ShowToolbar="false"
+                            ShowPagination="true"
+                            InitialPageSize="8"
+                            Class="pos-held-carts-view"
+                            ListClass="pos-held-carts-list">
+                    <Fields>
+                        <BbDataViewListTemplate TItem="PosCartSummaryResponse" Context="cart">
+                            <div class="pos-held-cart-row">
+                                <div class="pos-held-cart-main">
+                                    <strong>@cart.CartNumber</strong>
+                                    <span>@HeldCartCustomer(cart) | @cart.TotalAmount.ToString("N2")</span>
+                                    <small>Suspended @FormatDateTime(cart.SuspendedAt) | Expires @FormatDateTime(cart.ExpiresAt)</small>
+                                </div>
+                                <div class="pos-held-cart-actions">
+                                    <BbButton Size="ButtonSize.Large" OnClick="@(() => ResumeCart(cart))" Disabled="@_actingOnCart">
+                                        Resume
+                                    </BbButton>
+                                    <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelDraftCart(cart))" Disabled="@_actingOnCart">
+                                        Cancel
+                                    </BbButton>
+                                </div>
+                            </div>
+                        </BbDataViewListTemplate>
+                    </Fields>
+                    <EmptyTemplate>
+                        <BbEmpty Title="No held carts" Description="Suspended customer carts will appear here." />
+                    </EmptyTemplate>
+                </BbDataView>
+            </BbDialogContent>
+        </BbDialog>
+    }
 }
 
 @code {
@@ -307,10 +380,12 @@ else
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
     [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
     private readonly List<CartLine> _cart = [];
     private List<PosRegister> _registers = [];
     private List<IdentityCredential> _credentials = [];
+    private List<ProductCategory> _categories = [];
     private List<PosCatalogItemResponse> _catalogItems = [];
     private List<PosCartSummaryResponse> _suspendedCarts = [];
     private bool _loading = true;
@@ -321,30 +396,30 @@ else
     private bool _checkingOut;
     private bool _savingCart;
     private bool _actingOnCart;
+    private bool _heldCartsOpen;
+    private bool _saleDetailsOpen;
     private string _catalogSearch = "";
     private string? _selectedRegisterId;
     private string? _selectedCustomerCredentialId;
     private string _customerLabel = "";
     private string _cartNotes = "";
+    private Guid? _selectedCategoryId;
     private Guid? _activeCartId;
     private Guid? _activeCartConcurrencyStamp;
     private string? _activeCartNumber;
     private decimal _discountAmount;
     private decimal _taxAmount;
+    private decimal _cashTenderedAmount;
     private PosPaymentMethod _paymentMethod = PosPaymentMethod.CashDrawer;
     private PosSaleReceiptResponse? _lastReceipt;
 
     private decimal Subtotal => _cart.Sum(line => line.LineTotal);
     private decimal Total => Subtotal - _discountAmount + _taxAmount;
-    private string PaymentMethodValue
-    {
-        get => _paymentMethod.ToString();
-        set
-        {
-            if (Enum.TryParse<PosPaymentMethod>(value, out var method))
-                _paymentMethod = method;
-        }
-    }
+    private decimal ChangeDue => Math.Max(0, _cashTenderedAmount - Total);
+    private decimal CartItemCount => _cart.Sum(line => line.Quantity);
+    private bool IsCashPayment => _paymentMethod == PosPaymentMethod.CashDrawer;
+    private bool IsWalletPayment => _paymentMethod == PosPaymentMethod.WalletTransfer;
+    private bool CanCheckout => !_checkingOut && _cart.Any() && Total >= 0;
 
     protected override void OnInitialized()
     {
@@ -367,6 +442,7 @@ else
             _cartsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "carts");
             _registers = [];
             _credentials = [];
+            _categories = [];
             _suspendedCarts = [];
 
             if (_hasTenant && _moduleEnabled && TenantFilter.SelectedTenantId is Guid tenantId)
@@ -385,6 +461,14 @@ else
                     .Where(item => item.TenantId == tenantId && !item.IsDeleted && item.IsEnabled)
                     .OrderBy(item => item.UserName)
                     .Take(200)
+                    .ToListAsync();
+
+                _categories = await DataContext.Query<ProductCategory>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(item => item.TenantId == tenantId && !item.IsDeleted)
+                    .OrderBy(item => item.Name)
+                    .Take(80)
                     .ToListAsync();
 
                 _selectedRegisterId ??= _registers.FirstOrDefault()?.Id.ToString();
@@ -424,7 +508,7 @@ else
             ToastService.Show(response.Message ?? "Could not load suspended carts.");
     }
 
-    private async Task SearchCatalog()
+    private async Task SearchCatalog(bool addExactSkuToCart = true)
     {
         if (TenantFilter.SelectedTenantId is not Guid)
         {
@@ -435,32 +519,72 @@ else
         _searching = true;
         try
         {
+            var searchText = _catalogSearch.Trim();
             var response = await POS.SearchPosCatalog(new SearchPosCatalogRequest
             {
                 Metadata = BuildMetadata(),
-                Search = _catalogSearch,
+                Search = searchText,
+                CategoryId = _selectedCategoryId,
                 Page = 1,
                 PageSize = 50
             });
 
             _catalogItems = response.Response ?? [];
             if (!response.IsSuccess)
+            {
                 ToastService.Show(response.Message ?? "Catalog search failed.");
+                return;
+            }
+
+            if (addExactSkuToCart && !string.IsNullOrWhiteSpace(searchText))
+                AddExactSkuMatchToCart(searchText);
         }
         finally
         {
             _searching = false;
+            await FocusCatalogSearchAsync();
         }
+    }
+
+    private async Task SelectCategory(Guid? categoryId)
+    {
+        if (_selectedCategoryId == categoryId)
+            return;
+
+        _selectedCategoryId = categoryId;
+        await SearchCatalog(false);
+    }
+
+    private async Task HandleCatalogKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+            await SearchCatalog();
+    }
+
+    private void AddExactSkuMatchToCart(string searchText)
+    {
+        var matches = _catalogItems
+            .Where(item => item.IsAvailable && string.Equals(item.SKU, searchText, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (matches.Count != 1)
+            return;
+
+        AddToCart(matches[0]);
+        _catalogSearch = "";
+        ToastService.Show("Item added to cart.");
     }
 
     private void AddToCart(PosCatalogItemResponse item)
     {
+        _lastReceipt = null;
         var existing = _cart.FirstOrDefault(line =>
             line.ProductId == item.ProductId &&
             line.ProductVariationId == item.ProductVariationId);
         if (existing is not null)
         {
-            existing.Quantity++;
+            SetQuantity(existing, existing.Quantity + 1);
+            _ = InvokeAsync(FocusCatalogSearchAsync);
             return;
         }
 
@@ -472,14 +596,24 @@ else
             UnitPrice = item.Price,
             Quantity = 1
         });
+        _ = InvokeAsync(FocusCatalogSearchAsync);
     }
 
-    private void ChangeQuantity(CartLine line, int delta)
+    private void ChangeQuantity(CartLine line, decimal delta)
     {
-        line.Quantity = Math.Max(1, line.Quantity + delta);
+        SetQuantity(line, line.Quantity + delta);
     }
 
-    private void RemoveFromCart(CartLine line) => _cart.Remove(line);
+    private static void SetQuantity(CartLine line, decimal quantity)
+    {
+        line.Quantity = Math.Max(1, quantity);
+    }
+
+    private void RemoveFromCart(CartLine line)
+    {
+        _lastReceipt = null;
+        _cart.Remove(line);
+    }
 
     private async Task SuspendCart()
     {
@@ -547,6 +681,7 @@ else
             ToastService.Show("Cart suspended.");
             ClearCurrentCart();
             await LoadSuspendedCarts();
+            _heldCartsOpen = true;
         }
         finally
         {
@@ -585,6 +720,7 @@ else
             }
 
             ApplyCart(response.Response);
+            _heldCartsOpen = false;
             if (response.Response.Warnings.Count > 0)
                 ToastService.Show(response.Response.Warnings[0]);
             else
@@ -684,7 +820,7 @@ else
         }
 
         Guid? customerCredentialId = null;
-        if (_paymentMethod == PosPaymentMethod.WalletTransfer)
+        if (IsWalletPayment)
         {
             if (!Guid.TryParse(_selectedCustomerCredentialId, out var parsedCustomer))
             {
@@ -784,6 +920,7 @@ else
 
     private void ApplyCart(PosCartResponse cart)
     {
+        _lastReceipt = null;
         _activeCartId = cart.Id;
         _activeCartConcurrencyStamp = cart.ConcurrencyStamp;
         _activeCartNumber = cart.CartNumber;
@@ -793,6 +930,7 @@ else
         _cartNotes = cart.Notes ?? "";
         _discountAmount = cart.DiscountAmount;
         _taxAmount = cart.TaxAmount;
+        _cashTenderedAmount = 0;
 
         _cart.Clear();
         foreach (var line in cart.Lines.OrderBy(item => item.LineNumber))
@@ -821,6 +959,7 @@ else
         _selectedCustomerCredentialId = null;
         _discountAmount = 0;
         _taxAmount = 0;
+        _cashTenderedAmount = 0;
     }
 
     private async Task ConfirmClearCurrentCart()
@@ -836,8 +975,25 @@ else
             return;
         }
 
+        _lastReceipt = null;
         ClearCurrentCart();
     }
+
+    private void StartNewSale()
+    {
+        _lastReceipt = null;
+        ClearCurrentCart();
+        _ = InvokeAsync(FocusCatalogSearchAsync);
+    }
+
+    private void OpenHeldCartsDialog()
+    {
+        if (_cartsEnabled)
+            _heldCartsOpen = true;
+    }
+
+    private void OpenSaleDetailsDialog() => _saleDetailsOpen = true;
+    private void CloseSaleDetailsDialog() => _saleDetailsOpen = false;
 
     private bool TryResolveRegister(out Guid registerId)
     {
@@ -863,6 +1019,21 @@ else
             ? customerCredentialId
             : null;
 
+    private async Task FocusCatalogSearchAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('pos-catalog-search')?.focus();");
+        }
+        catch (JSException)
+        {
+            // Focus is an ergonomic enhancement; checkout behavior must not depend on it.
+        }
+    }
+
+    private ButtonVariant CategoryButtonVariant(Guid? categoryId) =>
+        _selectedCategoryId == categoryId ? ButtonVariant.Default : ButtonVariant.Outline;
+
     private RequestMetadata BuildMetadata() => new()
     {
         TenantId = TenantFilter.SelectedTenantId,
@@ -883,6 +1054,31 @@ else
         string.IsNullOrWhiteSpace(credential.UserName) ? credential.Id.ToString()[..8] : credential.UserName;
     private static string GetCredentialSearchText(IdentityCredential credential) =>
         $"{credential.UserName} {credential.UserAlias}";
+
+    private static string FormatProductMeta(PosCatalogItemResponse item)
+    {
+        var parts = new[] { item.SKU, item.Brand, item.CategoryName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" | ", parts);
+    }
+
+    private static string AvailabilityText(PosCatalogItemResponse item)
+    {
+        if (!item.IsAvailable)
+            return "Unavailable";
+
+        return item.AvailableQuantity.HasValue
+            ? $"{FormatQuantity(item.AvailableQuantity.Value)} available"
+            : "Available";
+    }
+
+    private static string AvailabilityClass(PosCatalogItemResponse item) =>
+        item.IsAvailable ? "pos-product-status pos-product-status-ready" : "pos-product-status pos-product-status-offline";
+
+    private static string FormatQuantity(decimal value) => value % 1 == 0 ? value.ToString("N0") : value.ToString("N2");
+    private static string HeldCartCustomer(PosCartSummaryResponse cart) =>
+        string.IsNullOrWhiteSpace(cart.CustomerLabel) ? "Walk-in customer" : cart.CustomerLabel;
 
     private static IReadOnlyList<XfEntityPickerColumn<PosRegister>> RegisterAdvancedColumns =>
     [
@@ -907,7 +1103,7 @@ else
 
     private static string ShortId(Guid id) => id.ToString()[..8];
     private static string FormatBoolean(bool value) => value ? "Yes" : "No";
-    private static string FormatDateTime(DateTime? value) => value?.ToString("yyyy-MM-dd") ?? "-";
+    private static string FormatDateTime(DateTime? value) => value?.ToString("yyyy-MM-dd HH:mm") ?? "-";
 
     public void Dispose()
     {
