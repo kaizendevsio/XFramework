@@ -81,6 +81,9 @@ else
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
                         </Columns>
+                        <EmptyTemplate>
+                            <BbEmpty Title="No POS sales" Description="Completed and recoverable checkout records will appear here." />
+                        </EmptyTemplate>
                     </BbDataGrid>
                 </BbCardContent>
             </BbCard>
@@ -95,8 +98,9 @@ else
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
 
-    private List<PosSale> _sales = [];
+    private List<PosSaleSummaryResponse> _sales = [];
     private List<PosRegister> _registers = [];
     private bool _loading = true;
     private bool _acting;
@@ -120,8 +124,7 @@ else
         {
             await ModuleNavigation.EnsureLoadedAsync();
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
-            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales")
-                || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos);
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales");
             _sales = [];
             _registers = [];
 
@@ -132,11 +135,16 @@ else
                 .Where(item => item.TenantId == tenantId && !item.IsDeleted)
                 .Take(200)
                 .ToListAsync();
-            _sales = await DataContext.Query<PosSale>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-                .OrderByDescending(item => item.CreatedAt)
-                .Take(250)
-                .ToListAsync();
+            var salesResponse = await POS.SearchPosSales(new SearchPosSalesRequest
+            {
+                Metadata = BuildMetadata(),
+                Page = 1,
+                PageSize = 100
+            });
+
+            _sales = salesResponse.Response ?? [];
+            if (!salesResponse.IsSuccess)
+                ToastService.Show(salesResponse.Message ?? "Could not load POS sales.");
         }
         catch
         {
@@ -151,6 +159,14 @@ else
 
     private async Task CancelSale(Guid saleId)
     {
+        if (!await DialogService.Confirm(
+                "Cancel POS Sale",
+                "Cancel this sale and stop its recovery workflow?",
+                new ConfirmDialogOptions { Destructive = true }))
+        {
+            return;
+        }
+
         _acting = true;
         try
         {

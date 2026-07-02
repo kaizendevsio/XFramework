@@ -63,6 +63,9 @@ else
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
                         </Columns>
+                        <EmptyTemplate>
+                            <BbEmpty Title="No POS registers" Description="Create a register before using cashier checkout." />
+                        </EmptyTemplate>
                     </BbDataGrid>
                 </BbCardContent>
             </BbCard>
@@ -92,6 +95,8 @@ else
                                 ValueSelector="@GetCredentialValue"
                                 TextSelector="@GetCredentialLabel"
                                 SearchTextSelector="@GetCredentialSearchText"
+                                AdvancedColumns="@CredentialAdvancedColumns"
+                                AdvancedSearchScope="Searches credential name, username, alias, online state, last seen date, and credential id."
                                 AdvancedSearchTitle="Find Merchant Credential"
                                 AdvancedSearchDescription="Select the merchant credential used for Wallets transfers." />
                 <XfEntityPicker TItem="Wallet"
@@ -104,6 +109,8 @@ else
                                 ValueSelector="@GetWalletValue"
                                 TextSelector="@GetWalletLabel"
                                 SearchTextSelector="@GetWalletSearchText"
+                                AdvancedColumns="@WalletAdvancedColumns"
+                                AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, balance, available balance, and created date."
                                 AdvancedSearchTitle="Find Cash Drawer Wallet"
                                 AdvancedSearchDescription="Select the Wallets ledger account for cash drawer movement." />
             </div>
@@ -118,6 +125,8 @@ else
                                 ValueSelector="@GetWalletTypeValue"
                                 TextSelector="@GetWalletTypeLabel"
                                 SearchTextSelector="@GetWalletTypeSearchText"
+                                AdvancedColumns="@WalletTypeAdvancedColumns"
+                                AdvancedSearchScope="Searches wallet type code, name, currency, type, transfer rules, and description."
                                 AdvancedSearchTitle="Find Wallet Type"
                                 AdvancedSearchDescription="Select the wallet type used for POS payments." />
                 <XfEntityPicker TItem="Wallets.Domain.Shared.Contracts.CurrencyType"
@@ -130,6 +139,8 @@ else
                                 ValueSelector="@GetCurrencyValue"
                                 TextSelector="@GetCurrencyLabel"
                                 SearchTextSelector="@GetCurrencySearchText"
+                                AdvancedColumns="@CurrencyAdvancedColumns"
+                                AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
                                 AdvancedSearchTitle="Find Currency"
                                 AdvancedSearchDescription="Select the checkout currency." />
             </div>
@@ -145,6 +156,8 @@ else
                                 ValueSelector="@GetWarehouseValue"
                                 TextSelector="@GetWarehouseLabel"
                                 SearchTextSelector="@GetWarehouseSearchText"
+                                AdvancedColumns="@WarehouseAdvancedColumns"
+                                AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
                                 AdvancedSearchTitle="Find Warehouse"
                                 AdvancedSearchDescription="Select the default source warehouse." />
                 <XfEntityPicker TItem="InventoryLocation"
@@ -157,6 +170,8 @@ else
                                 ValueSelector="@GetLocationValue"
                                 TextSelector="@GetLocationLabel"
                                 SearchTextSelector="@GetLocationSearchText"
+                                AdvancedColumns="@LocationAdvancedColumns"
+                                AdvancedSearchScope="Searches location code, name, warehouse, type, pickable flag, and description."
                                 AdvancedSearchTitle="Find Location"
                                 AdvancedSearchDescription="Select the default stock location." />
             </div>
@@ -211,8 +226,7 @@ else
         {
             await ModuleNavigation.EnsureLoadedAsync();
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
-            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers")
-                || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos);
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers");
 
             _registers = [];
             if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
@@ -381,6 +395,87 @@ else
     private static string GetLocationValue(InventoryLocation item) => item.Id.ToString();
     private static string GetLocationLabel(InventoryLocation item) => string.IsNullOrWhiteSpace(item.Code) ? item.Name : $"{item.Name} ({item.Code})";
     private static string GetLocationSearchText(InventoryLocation item) => $"{item.Name} {item.Code} {item.Description}";
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityCredential>> CredentialAdvancedColumns =>
+    [
+        new("Name", item => item.IdentityInfo?.FullName ?? item.IdentityInfo?.IdentityName ?? item.UserName ?? item.UserAlias),
+        new("Username", item => item.UserName ?? item.UserAlias),
+        new("Online", item => FormatBoolean(item.IsOnline)),
+        new("Last Seen", item => FormatDateTime(item.LastSeen)),
+        new("Credential", item => ShortId(item.Id))
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallet>> WalletAdvancedColumns =>
+    [
+        new("Account", item => string.IsNullOrWhiteSpace(item.AccountNumber) ? ShortId(item.Id) : item.AccountNumber),
+        new("Credential", item => GetCredentialLabelById(item.CredentialId)),
+        new("Type", item => GetWalletTypeName(item.WalletTypeId)),
+        new("Status", item => item.Status.ToString()),
+        new("Balance", item => FormatDecimal(item.Balance)),
+        new("Available", item => FormatDecimal(item.AvailableBalance)),
+        new("Created", item => FormatDateTime(item.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallets.Domain.Shared.Contracts.WalletType>> WalletTypeAdvancedColumns =>
+    [
+        new("Code", item => item.Code),
+        new("Name", item => item.Name),
+        new("Currency", item => GetCurrencyName(item.CurrencyTypeId)),
+        new("Type", item => item.Type.ToString()),
+        new("Min Transfer", item => FormatDecimal(item.MinTransferRule)),
+        new("Max Transfer", item => FormatDecimal(item.MaxTransferRule)),
+        new("Description", item => item.Desc)
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallets.Domain.Shared.Contracts.CurrencyType>> CurrencyAdvancedColumns =>
+    [
+        new("ISO", item => item.CurrencyIsoCode3),
+        new("Name", item => item.Name),
+        new("Type", item => item.Type?.ToString()),
+        new("Scope", item => item.TenantId == Guid.Empty ? "Global" : "Tenant"),
+        new("Description", item => item.Description)
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Warehouse>> WarehouseAdvancedColumns =>
+    [
+        new("Code", item => item.Code),
+        new("Name", item => item.Name),
+        new("City", item => item.City),
+        new("Region", item => item.Region),
+        new("Country", item => item.CountryCode),
+        new("Default", item => FormatBoolean(item.IsDefault)),
+        new("Created", item => FormatDateTime(item.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<InventoryLocation>> LocationAdvancedColumns =>
+    [
+        new("Code", item => item.Code),
+        new("Name", item => item.Name),
+        new("Warehouse", item => GetWarehouseName(item.WarehouseId)),
+        new("Type", item => item.LocationType.ToString()),
+        new("Pickable", item => FormatBoolean(item.IsPickable)),
+        new("Description", item => item.Description)
+    ];
+
+    private string GetCredentialLabelById(Guid credentialId) =>
+        _credentials.FirstOrDefault(item => item.Id == credentialId) is { } credential
+            ? GetCredentialLabel(credential)
+            : ShortId(credentialId);
+
+    private string GetWalletTypeName(Guid? walletTypeId) =>
+        walletTypeId is Guid id
+            ? _walletTypes.FirstOrDefault(item => item.Id == id)?.Name ?? ShortId(id)
+            : "-";
+
+    private string GetCurrencyName(Guid? currencyId) =>
+        currencyId is Guid id
+            ? _currencies.FirstOrDefault(item => item.Id == id)?.CurrencyIsoCode3 ?? ShortId(id)
+            : "-";
+
+    private static string ShortId(Guid id) => id.ToString()[..8];
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDateTime(DateTime? value) => value?.ToString("yyyy-MM-dd") ?? "-";
+    private static string FormatDecimal(decimal? value) => value?.ToString("N2") ?? "-";
 
     public void Dispose()
     {

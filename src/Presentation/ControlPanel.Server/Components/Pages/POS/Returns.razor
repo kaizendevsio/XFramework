@@ -62,6 +62,9 @@ else
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                         </Columns>
+                        <EmptyTemplate>
+                            <BbEmpty Title="No POS returns" Description="Return and refund records will appear here." />
+                        </EmptyTemplate>
                     </BbDataGrid>
                 </BbCardContent>
             </BbCard>
@@ -76,7 +79,7 @@ else
             <BbDialogDescription>Select a completed sale and the quantities to return.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <XfEntityPicker TItem="PosSale"
+            <XfEntityPicker TItem="PosSaleSummaryResponse"
                             Value="@_selectedSaleId"
                             ValueChanged="@OnSaleChanged"
                             Items="@_completedSales"
@@ -87,43 +90,15 @@ else
                             ValueSelector="@GetSaleValue"
                             TextSelector="@GetSaleLabel"
                             SearchTextSelector="@GetSaleSearchText"
+                            AdvancedColumns="@SaleAdvancedColumns"
+                            AdvancedSearchScope="Searches sale number, register, total, status, created date, completed date, and sale id."
                             AdvancedSearchTitle="Find Original Sale"
                             AdvancedSearchDescription="Select the completed sale for this return." />
 
-            <div class="grid gap-2">
-                <BbLabel>Refund Method</BbLabel>
-                <div class="flex flex-wrap gap-2">
-                    @if (_refundMethod == PosPaymentMethod.CashDrawer)
-                    {
-                        <BbButton OnClick="@(() => _refundMethod = PosPaymentMethod.CashDrawer)">
-                            <LucideIcon Name="banknote" class="mr-2 h-4 w-4" />
-                            Cash Drawer
-                        </BbButton>
-                    }
-                    else
-                    {
-                        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _refundMethod = PosPaymentMethod.CashDrawer)">
-                            <LucideIcon Name="banknote" class="mr-2 h-4 w-4" />
-                            Cash Drawer
-                        </BbButton>
-                    }
-
-                    @if (_refundMethod == PosPaymentMethod.WalletTransfer)
-                    {
-                        <BbButton OnClick="@(() => _refundMethod = PosPaymentMethod.WalletTransfer)">
-                            <LucideIcon Name="wallet" class="mr-2 h-4 w-4" />
-                            Wallet Transfer
-                        </BbButton>
-                    }
-                    else
-                    {
-                        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _refundMethod = PosPaymentMethod.WalletTransfer)">
-                            <LucideIcon Name="wallet" class="mr-2 h-4 w-4" />
-                            Wallet Transfer
-                        </BbButton>
-                    }
-                </div>
-            </div>
+            <BbFormFieldSelect TValue="string" @bind-Value="RefundMethodValue" Label="Refund Method">
+                <BbSelectItem Value="@PosPaymentMethod.CashDrawer.ToString()">Cash Drawer</BbSelectItem>
+                <BbSelectItem Value="@PosPaymentMethod.WalletTransfer.ToString()">Wallet Transfer</BbSelectItem>
+            </BbFormFieldSelect>
 
             <BbDataGrid Items="@_returnLines" ShowPagination="false">
                 <Columns>
@@ -145,6 +120,9 @@ else
                         <ChildContent Context="item">@item.RefundAmount.ToString("N2")</ChildContent>
                     </BbDataGridTemplateColumn>
                 </Columns>
+                <EmptyTemplate>
+                    <BbEmpty Title="No returnable lines" Description="Select a completed sale with line items." />
+                </EmptyTemplate>
             </BbDataGrid>
             <BbFormFieldInput TValue="string" @bind-Value="_reason" Label="Reason" />
         </div>
@@ -165,8 +143,8 @@ else
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
 
-    private List<PosReturn> _returns = [];
-    private List<PosSale> _completedSales = [];
+    private List<PosReturnSummaryResponse> _returns = [];
+    private List<PosSaleSummaryResponse> _completedSales = [];
     private List<PosRegister> _registers = [];
     private List<ReturnLineForm> _returnLines = [];
     private bool _loading = true;
@@ -177,6 +155,16 @@ else
     private string? _selectedSaleId;
     private string _reason = "";
     private PosPaymentMethod _refundMethod = PosPaymentMethod.CashDrawer;
+
+    private string RefundMethodValue
+    {
+        get => _refundMethod.ToString();
+        set
+        {
+            if (Enum.TryParse<PosPaymentMethod>(value, out var method))
+                _refundMethod = method;
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -204,8 +192,7 @@ else
         {
             await ModuleNavigation.EnsureLoadedAsync();
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
-            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "returns")
-                || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos);
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "returns");
             _returns = [];
             _completedSales = [];
             _registers = [];
@@ -217,16 +204,26 @@ else
                 .Where(item => item.TenantId == tenantId && !item.IsDeleted)
                 .Take(200)
                 .ToListAsync();
-            _completedSales = await DataContext.Query<PosSale>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted && item.Status == PosSaleStatus.Completed)
-                .OrderByDescending(item => item.CreatedAt)
-                .Take(200)
-                .ToListAsync();
-            _returns = await DataContext.Query<PosReturn>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-                .OrderByDescending(item => item.CreatedAt)
-                .Take(250)
-                .ToListAsync();
+            var completedSalesResponse = await POS.SearchPosSales(new SearchPosSalesRequest
+            {
+                Metadata = BuildMetadata(),
+                Status = PosSaleStatus.Completed,
+                Page = 1,
+                PageSize = 100
+            });
+            _completedSales = completedSalesResponse.Response ?? [];
+            if (!completedSalesResponse.IsSuccess)
+                ToastService.Show(completedSalesResponse.Message ?? "Could not load completed POS sales.");
+
+            var returnsResponse = await POS.SearchPosReturns(new SearchPosReturnsRequest
+            {
+                Metadata = BuildMetadata(),
+                Page = 1,
+                PageSize = 100
+            });
+            _returns = returnsResponse.Response ?? [];
+            if (!returnsResponse.IsSuccess)
+                ToastService.Show(returnsResponse.Message ?? "Could not load POS returns.");
         }
         catch
         {
@@ -263,13 +260,19 @@ else
         if (TenantFilter.SelectedTenantId is not Guid tenantId)
             return;
 
-        var lines = await DataContext.Query<PosSaleLine>().IgnoreQueryFilters().NoCache()
-            .Where(item => item.TenantId == tenantId && item.SaleId == saleId && !item.IsDeleted)
-            .OrderBy(item => item.LineNumber)
-            .Take(100)
-            .ToListAsync();
+        var response = await POS.GetPosSale(new GetPosSaleRequest
+        {
+            Metadata = BuildMetadata(),
+            Id = saleId
+        });
 
-        _returnLines = lines.Select(line => new ReturnLineForm
+        if (!response.IsSuccess || response.Response is null)
+        {
+            ToastService.Show(response.Message ?? "Could not load sale lines.");
+            return;
+        }
+
+        _returnLines = response.Response.Lines.OrderBy(line => line.LineNumber).Select(line => new ReturnLineForm
         {
             SaleLineId = line.Id,
             ProductName = string.IsNullOrWhiteSpace(line.VariantName) ? line.ProductName : $"{line.ProductName} - {line.VariantName}",
@@ -347,9 +350,9 @@ else
 
     private string GetSaleNumber(Guid saleId) => _completedSales.FirstOrDefault(item => item.Id == saleId)?.SaleNumber ?? saleId.ToString()[..8];
     private string GetRegisterName(Guid registerId) => _registers.FirstOrDefault(item => item.Id == registerId)?.Name ?? registerId.ToString()[..8];
-    private static string GetSaleValue(PosSale item) => item.Id.ToString();
-    private static string GetSaleLabel(PosSale item) => $"{item.SaleNumber} - {item.TotalAmount:N2}";
-    private static string GetSaleSearchText(PosSale item) => $"{item.SaleNumber} {item.TotalAmount:N2} {item.CreatedAt:yyyy-MM-dd}";
+    private static string GetSaleValue(PosSaleSummaryResponse item) => item.Id.ToString();
+    private static string GetSaleLabel(PosSaleSummaryResponse item) => $"{item.SaleNumber} - {item.TotalAmount:N2}";
+    private string GetSaleSearchText(PosSaleSummaryResponse item) => $"{item.SaleNumber} {GetRegisterName(item.RegisterId)} {item.TotalAmount:N2} {item.CreatedAt:yyyy-MM-dd}";
     private static string GetReturnStatusBadge(PosReturnStatus status) =>
         status switch
         {
@@ -357,6 +360,17 @@ else
             PosReturnStatus.Failed => "warning",
             _ => "pending"
         };
+
+    private IReadOnlyList<XfEntityPickerColumn<PosSaleSummaryResponse>> SaleAdvancedColumns =>
+    [
+        new("Receipt", item => item.SaleNumber),
+        new("Register", item => GetRegisterName(item.RegisterId)),
+        new("Total", item => item.TotalAmount.ToString("N2")),
+        new("Status", item => item.Status.ToString()),
+        new("Created", item => item.CreatedAt.ToString("yyyy-MM-dd")),
+        new("Completed", item => item.CompletedAt?.ToString("yyyy-MM-dd") ?? "-"),
+        new("Sale", item => item.Id.ToString()[..8])
+    ];
 
     public void Dispose()
     {
