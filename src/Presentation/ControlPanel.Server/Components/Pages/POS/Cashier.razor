@@ -26,11 +26,14 @@ else
                     <BbTypographyMuted>Checkout uses Inventario catalog and Wallets ledger posting.</BbTypographyMuted>
                 </div>
                 <div class="xf-page-actions">
-                    <BbButton Variant="ButtonVariant.Outline" OnClick="@SuspendCart" Disabled="@(_savingCart || !_cart.Any())">
-                        <LucideIcon Name="pause" class="mr-2 h-4 w-4" />
-                        Suspend Cart
-                    </BbButton>
-                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ClearCurrentCart" Disabled="@(!_cart.Any())">
+                    @if (_cartsEnabled)
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@SuspendCart" Disabled="@(_savingCart || !_cart.Any())">
+                            <LucideIcon Name="pause" class="mr-2 h-4 w-4" />
+                            Suspend Cart
+                        </BbButton>
+                    }
+                    <BbButton Variant="ButtonVariant.Destructive" OnClick="@ConfirmClearCurrentCart" Disabled="@(!_cart.Any())">
                         <LucideIcon Name="x" class="mr-2 h-4 w-4" />
                         Clear
                     </BbButton>
@@ -41,7 +44,7 @@ else
                 </div>
             </div>
 
-            <div class="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
+            <div class="grid gap-6 xl:grid-cols-2">
                 <div class="space-y-6">
                     <BbCard>
                         <BbCardHeader>
@@ -49,7 +52,7 @@ else
                             <BbCardDescription>Search sellable products from Inventario.</BbCardDescription>
                         </BbCardHeader>
                         <BbCardContent>
-                            <div class="grid gap-3 md:grid-cols-[1fr_auto]">
+                            <div class="xf-filter-actions">
                                 <BbInput @bind-Value="_catalogSearch" Placeholder="Search SKU, product, variant, or brand" />
                                 <BbButton OnClick="@SearchCatalog" Disabled="@_searching">
                                     <LucideIcon Name="search" class="mr-2 h-4 w-4" />
@@ -78,6 +81,9 @@ else
                                             </ChildContent>
                                         </BbDataGridTemplateColumn>
                                     </Columns>
+                                    <EmptyTemplate>
+                                        <BbEmpty Title="No catalog items" Description="Search Inventario sellable products to add items." />
+                                    </EmptyTemplate>
                                 </BbDataGrid>
                             </div>
                         </BbCardContent>
@@ -110,12 +116,15 @@ else
                                     <BbDataGridTemplateColumn Title="Actions">
                                         <ChildContent Context="item">
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => RemoveFromCart(item))">Remove</BbButton>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                </Columns>
-                            </BbDataGrid>
-                        </BbCardContent>
-                    </BbCard>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="Cart is empty" Description="Add catalog items before checkout." />
+                            </EmptyTemplate>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
                 </div>
 
                 <div class="space-y-6">
@@ -155,43 +164,15 @@ else
                                                 ValueSelector="@GetRegisterValue"
                                                 TextSelector="@GetRegisterLabel"
                                                 SearchTextSelector="@GetRegisterSearchText"
+                                                AdvancedColumns="@RegisterAdvancedColumns"
+                                                AdvancedSearchScope="Searches register name, code, default warehouse, default location, enabled state, and register id."
                                                 AdvancedSearchTitle="Find Register"
                                                 AdvancedSearchDescription="Select the register for this checkout." />
 
-                                <div class="grid gap-2">
-                                    <BbLabel>Payment</BbLabel>
-                                    <div class="flex flex-wrap gap-2">
-                                        @if (_paymentMethod == PosPaymentMethod.CashDrawer)
-                                        {
-                                            <BbButton OnClick="@(() => _paymentMethod = PosPaymentMethod.CashDrawer)">
-                                                <LucideIcon Name="banknote" class="mr-2 h-4 w-4" />
-                                                Cash Drawer
-                                            </BbButton>
-                                        }
-                                        else
-                                        {
-                                            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _paymentMethod = PosPaymentMethod.CashDrawer)">
-                                                <LucideIcon Name="banknote" class="mr-2 h-4 w-4" />
-                                                Cash Drawer
-                                            </BbButton>
-                                        }
-
-                                        @if (_paymentMethod == PosPaymentMethod.WalletTransfer)
-                                        {
-                                            <BbButton OnClick="@(() => _paymentMethod = PosPaymentMethod.WalletTransfer)">
-                                                <LucideIcon Name="wallet" class="mr-2 h-4 w-4" />
-                                                Wallet Transfer
-                                            </BbButton>
-                                        }
-                                        else
-                                        {
-                                            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _paymentMethod = PosPaymentMethod.WalletTransfer)">
-                                                <LucideIcon Name="wallet" class="mr-2 h-4 w-4" />
-                                                Wallet Transfer
-                                            </BbButton>
-                                        }
-                                    </div>
-                                </div>
+                                <BbFormFieldSelect TValue="string" @bind-Value="PaymentMethodValue" Label="Payment">
+                                    <BbSelectItem Value="@PosPaymentMethod.CashDrawer.ToString()">Cash Drawer</BbSelectItem>
+                                    <BbSelectItem Value="@PosPaymentMethod.WalletTransfer.ToString()">Wallet Transfer</BbSelectItem>
+                                </BbFormFieldSelect>
 
                                 @if (_paymentMethod == PosPaymentMethod.WalletTransfer)
                                 {
@@ -205,6 +186,8 @@ else
                                                     ValueSelector="@GetCredentialValue"
                                                     TextSelector="@GetCredentialLabel"
                                                     SearchTextSelector="@GetCredentialSearchText"
+                                                    AdvancedColumns="@CredentialAdvancedColumns"
+                                                    AdvancedSearchScope="Searches customer credential username, alias, online state, last seen date, device, location, and credential id."
                                                     AdvancedSearchTitle="Find Customer Credential"
                                                     AdvancedSearchDescription="Select the customer wallet source." />
                                 }
@@ -234,10 +217,13 @@ else
                                 </div>
 
                                 <div class="grid gap-2 md:grid-cols-2">
-                                    <BbButton Variant="ButtonVariant.Outline" OnClick="@SuspendCart" Disabled="@(_savingCart || !_cart.Any())">
-                                        <LucideIcon Name="pause" class="mr-2 h-4 w-4" />
-                                        Suspend Cart
-                                    </BbButton>
+                                    @if (_cartsEnabled)
+                                    {
+                                        <BbButton Variant="ButtonVariant.Outline" OnClick="@SuspendCart" Disabled="@(_savingCart || !_cart.Any())">
+                                            <LucideIcon Name="pause" class="mr-2 h-4 w-4" />
+                                            Suspend Cart
+                                        </BbButton>
+                                    }
                                     <BbButton OnClick="@Checkout" Disabled="@(_checkingOut || !_cart.Any())">
                                         <LucideIcon Name="receipt" class="mr-2 h-4 w-4" />
                                         Checkout
@@ -270,37 +256,43 @@ else
                         </BbCard>
                     }
 
-                    <BbCard>
-                        <BbCardHeader>
-                            <BbCardTitle>Suspended Carts</BbCardTitle>
-                            <BbCardDescription>@_suspendedCarts.Count cart(s) waiting</BbCardDescription>
-                        </BbCardHeader>
-                        <BbCardContent>
-                            <BbDataGrid Items="@_suspendedCarts" ShowPagination="true" InitialPageSize="8">
-                                <Columns>
-                                    <BbDataGridPropertyColumn Property="@(x => x.CartNumber)" Title="Cart" Sortable="true" Filterable="true" />
-                                    <BbDataGridPropertyColumn Property="@(x => x.CustomerLabel)" Title="Customer" Sortable="true" Filterable="true" />
-                                    <BbDataGridTemplateColumn Title="Total" Sortable="true" Filterable="true" FilterBy="@(item => item.TotalAmount)">
-                                        <ChildContent Context="item">@item.TotalAmount.ToString("N2")</ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(x => x.SuspendedAt)" Title="Suspended" Sortable="true" Filterable="true" />
-                                    <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
-                                    <BbDataGridTemplateColumn Title="Actions">
-                                        <ChildContent Context="item">
-                                            <div class="flex flex-wrap gap-1">
-                                                <BbButton Size="ButtonSize.Small" OnClick="@(() => ResumeCart(item))" Disabled="@_actingOnCart">
-                                                    Resume
-                                                </BbButton>
-                                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelDraftCart(item))" Disabled="@_actingOnCart">
-                                                    Cancel
-                                                </BbButton>
-                                            </div>
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                </Columns>
-                            </BbDataGrid>
-                        </BbCardContent>
-                    </BbCard>
+                    @if (_cartsEnabled)
+                    {
+                        <BbCard>
+                            <BbCardHeader>
+                                <BbCardTitle>Suspended Carts</BbCardTitle>
+                                <BbCardDescription>@_suspendedCarts.Count cart(s) waiting</BbCardDescription>
+                            </BbCardHeader>
+                            <BbCardContent>
+                                <BbDataGrid Items="@_suspendedCarts" ShowPagination="true" InitialPageSize="8">
+                                    <Columns>
+                                        <BbDataGridPropertyColumn Property="@(x => x.CartNumber)" Title="Cart" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(x => x.CustomerLabel)" Title="Customer" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Total" Sortable="true" Filterable="true" FilterBy="@(item => item.TotalAmount)">
+                                            <ChildContent Context="item">@item.TotalAmount.ToString("N2")</ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                        <BbDataGridPropertyColumn Property="@(x => x.SuspendedAt)" Title="Suspended" Sortable="true" Filterable="true" />
+                                        <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
+                                        <BbDataGridTemplateColumn Title="Actions">
+                                            <ChildContent Context="item">
+                                                <div class="flex flex-wrap gap-1">
+                                                    <BbButton Size="ButtonSize.Small" OnClick="@(() => ResumeCart(item))" Disabled="@_actingOnCart">
+                                                        Resume
+                                                    </BbButton>
+                                                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelDraftCart(item))" Disabled="@_actingOnCart">
+                                                        Cancel
+                                                    </BbButton>
+                                                </div>
+                                            </ChildContent>
+                                        </BbDataGridTemplateColumn>
+                                    </Columns>
+                                    <EmptyTemplate>
+                                        <BbEmpty Title="No suspended carts" Description="Suspended customer carts will appear here." />
+                                    </EmptyTemplate>
+                                </BbDataGrid>
+                            </BbCardContent>
+                        </BbCard>
+                    }
                 </div>
             </div>
         </div>
@@ -314,6 +306,7 @@ else
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
 
     private readonly List<CartLine> _cart = [];
     private List<PosRegister> _registers = [];
@@ -323,6 +316,7 @@ else
     private bool _loading = true;
     private bool _hasTenant;
     private bool _moduleEnabled;
+    private bool _cartsEnabled;
     private bool _searching;
     private bool _checkingOut;
     private bool _savingCart;
@@ -342,6 +336,15 @@ else
 
     private decimal Subtotal => _cart.Sum(line => line.LineTotal);
     private decimal Total => Subtotal - _discountAmount + _taxAmount;
+    private string PaymentMethodValue
+    {
+        get => _paymentMethod.ToString();
+        set
+        {
+            if (Enum.TryParse<PosPaymentMethod>(value, out var method))
+                _paymentMethod = method;
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -360,7 +363,8 @@ else
         {
             await ModuleNavigation.EnsureLoadedAsync();
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
-            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos);
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales");
+            _cartsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "carts");
             _registers = [];
             _credentials = [];
             _suspendedCarts = [];
@@ -384,7 +388,8 @@ else
                     .ToListAsync();
 
                 _selectedRegisterId ??= _registers.FirstOrDefault()?.Id.ToString();
-                await LoadSuspendedCarts();
+                if (_cartsEnabled)
+                    await LoadSuspendedCarts();
             }
         }
         catch
@@ -400,6 +405,12 @@ else
 
     private async Task LoadSuspendedCarts()
     {
+        if (!_cartsEnabled)
+        {
+            _suspendedCarts = [];
+            return;
+        }
+
         var response = await POS.SearchPosCarts(new SearchPosCartsRequest
         {
             Metadata = BuildMetadata(),
@@ -472,6 +483,12 @@ else
 
     private async Task SuspendCart()
     {
+        if (!_cartsEnabled)
+        {
+            ToastService.Show("POS carts feature is not enabled.");
+            return;
+        }
+
         if (!TryResolveRegister(out var registerId) || !TryResolveCashier(out var cashierCredentialId))
             return;
 
@@ -539,6 +556,12 @@ else
 
     private async Task ResumeCart(PosCartSummaryResponse cart)
     {
+        if (!_cartsEnabled)
+        {
+            ToastService.Show("POS carts feature is not enabled.");
+            return;
+        }
+
         if (_cart.Any() && _activeCartId != cart.Id)
         {
             ToastService.Show("Suspend or clear the current cart before resuming another cart.");
@@ -577,6 +600,20 @@ else
 
     private async Task CancelDraftCart(PosCartSummaryResponse cart)
     {
+        if (!_cartsEnabled)
+        {
+            ToastService.Show("POS carts feature is not enabled.");
+            return;
+        }
+
+        if (!await DialogService.Confirm(
+                "Cancel Suspended Cart",
+                $"Cancel suspended cart {cart.CartNumber} and remove it from the queue?",
+                new ConfirmDialogOptions { Destructive = true }))
+        {
+            return;
+        }
+
         _actingOnCart = true;
         try
         {
@@ -633,6 +670,12 @@ else
     {
         if (!TryResolveRegister(out var registerId) || !TryResolveCashier(out var cashierCredentialId))
             return;
+
+        if (_activeCartId.HasValue && !_cartsEnabled)
+        {
+            ToastService.Show("POS carts feature is not enabled.");
+            return;
+        }
 
         if (Total < 0)
         {
@@ -780,6 +823,22 @@ else
         _taxAmount = 0;
     }
 
+    private async Task ConfirmClearCurrentCart()
+    {
+        if (!_cart.Any())
+            return;
+
+        if (!await DialogService.Confirm(
+                "Clear Cart",
+                "Discard all items and customer details from the active cart?",
+                new ConfirmDialogOptions { Destructive = true }))
+        {
+            return;
+        }
+
+        ClearCurrentCart();
+    }
+
     private bool TryResolveRegister(out Guid registerId)
     {
         if (Guid.TryParse(_selectedRegisterId, out registerId))
@@ -824,6 +883,31 @@ else
         string.IsNullOrWhiteSpace(credential.UserName) ? credential.Id.ToString()[..8] : credential.UserName;
     private static string GetCredentialSearchText(IdentityCredential credential) =>
         $"{credential.UserName} {credential.UserAlias}";
+
+    private static IReadOnlyList<XfEntityPickerColumn<PosRegister>> RegisterAdvancedColumns =>
+    [
+        new("Name", register => register.Name),
+        new("Code", register => register.Code),
+        new("Warehouse", register => ShortId(register.DefaultWarehouseId)),
+        new("Location", register => ShortId(register.DefaultLocationId)),
+        new("Enabled", register => FormatBoolean(register.IsEnabled)),
+        new("Register", register => ShortId(register.Id))
+    ];
+
+    private static IReadOnlyList<XfEntityPickerColumn<IdentityCredential>> CredentialAdvancedColumns =>
+    [
+        new("Username", credential => credential.UserName ?? credential.UserAlias),
+        new("Alias", credential => credential.UserAlias),
+        new("Online", credential => FormatBoolean(credential.IsOnline)),
+        new("Last Seen", credential => FormatDateTime(credential.LastSeen)),
+        new("Device", credential => credential.Device),
+        new("Location", credential => credential.Location),
+        new("Credential", credential => ShortId(credential.Id))
+    ];
+
+    private static string ShortId(Guid id) => id.ToString()[..8];
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDateTime(DateTime? value) => value?.ToString("yyyy-MM-dd") ?? "-";
 
     public void Dispose()
     {

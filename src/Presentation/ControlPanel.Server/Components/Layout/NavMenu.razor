@@ -53,10 +53,15 @@
     </SidebarSection>
 }
 
-@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos))
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers")
+     || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales")
+     || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "returns"))
 {
     <SidebarSection GroupId="pos" Title="POS" Icon="scan-barcode">
-        <SidebarNavItem Href="/pos/cashier" Label="Cashier" Icon="shopping-cart" />
+        @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales"))
+        {
+            <SidebarNavItem Href="/pos/cashier" Label="Cashier" Icon="shopping-cart" />
+        }
         @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers"))
         {
             <SidebarNavItem Href="/pos/registers" Label="Registers" Icon="store" />
