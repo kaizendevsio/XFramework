@@ -17,12 +17,19 @@ public sealed class ControlPanelContractTests
         "Returns.razor"
     ];
 
+    private static readonly string[] PosTabularPages =
+    [
+        "Registers.razor",
+        "Sales.razor",
+        "Returns.razor"
+    ];
+
     [Test]
     public void PosPages_TabularSurfaces_UseFilteredBlazorBlueprintDataGrids()
     {
         var pagesRoot = GetPosPagesRoot();
 
-        foreach (var page in PosPages)
+        foreach (var page in PosTabularPages)
         {
             var text = File.ReadAllText(Path.Combine(pagesRoot, page));
 
@@ -34,6 +41,62 @@ public sealed class ControlPanelContractTests
                 @"<BbDataGridTemplateColumn\b[^>]*Title=""Actions""[^>]*Filterable=""true""",
                 $"{page} should not expose filters on command/action columns");
         }
+    }
+
+    [Test]
+    public void PosCashier_UsesTouchFirstBlueprintDataViewsAndLayout()
+    {
+        var pagesRoot = GetPosPagesRoot();
+        var cashier = File.ReadAllText(Path.Combine(pagesRoot, "Cashier.razor"));
+
+        cashier.Should().NotContain("<table", "cashier touch surfaces should not use raw tables");
+        cashier.Should().NotContain("<BbDataGrid", "cashier product/cart surfaces are touch workflows, not tabular reports");
+        cashier.Should().Contain("<BbDataView TItem=\"PosCatalogItemResponse\"");
+        cashier.Should().Contain("<BbDataView TItem=\"CartLine\"");
+        cashier.Should().Contain("<BbDataView TItem=\"PosCartSummaryResponse\"");
+        cashier.Should().Contain("Layout=\"DataViewLayout.Grid\"");
+        cashier.Should().Contain("GridColumnMinWidth=\"12rem\"");
+        cashier.Should().Contain("<BbRadioGroup TValue=\"PosPaymentMethod\" @bind-Value=\"_paymentMethod\"");
+        cashier.Should().Contain("<BbDialog Open=\"@_saleDetailsOpen\"");
+        cashier.Should().Contain("<BbDialog Open=\"@_heldCartsOpen\"");
+        cashier.Should().Contain("ButtonSize.Large");
+        cashier.Should().Contain("ButtonSize.IconLarge");
+        cashier.Should().Contain("pos-cashier-shell");
+        cashier.Should().Contain("pos-product-tile");
+        cashier.Should().Contain("pos-cart-panel");
+        cashier.Should().Contain("pos-total-bar");
+        cashier.Should().Contain("CategoryId = _selectedCategoryId");
+        cashier.Should().Contain("DataContext.Query<ProductCategory>()");
+        cashier.Should().NotContain("grid-cols-[");
+    }
+
+    [Test]
+    public void PosCashier_CssDefinesTouchLayoutContracts()
+    {
+        var css = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot().FullName,
+            "src",
+            "Presentation",
+            "ControlPanel.Server",
+            "wwwroot",
+            "css",
+            "app.css"));
+
+        var requiredClasses = new[]
+        {
+            "pos-cashier-shell",
+            "pos-catalog-panel",
+            "pos-cart-panel",
+            "pos-checkout-panel",
+            "pos-product-grid",
+            "pos-product-tile",
+            "pos-cart-line",
+            "pos-total-bar",
+            "pos-checkout-action"
+        };
+
+        foreach (var cssClass in requiredClasses)
+            css.Should().Contain($".{cssClass}", $"{cssClass} is part of the cashier touch layout contract");
     }
 
     [Test]
@@ -152,7 +215,8 @@ public sealed class ControlPanelContractTests
         var sales = File.ReadAllText(Path.Combine(pagesRoot, "Sales.razor"));
         var returns = File.ReadAllText(Path.Combine(pagesRoot, "Returns.razor"));
 
-        cashier.Should().Contain("<BbFormFieldSelect TValue=\"string\" @bind-Value=\"PaymentMethodValue\" Label=\"Payment\">");
+        cashier.Should().Contain("<BbRadioGroup TValue=\"PosPaymentMethod\" @bind-Value=\"_paymentMethod\"");
+        cashier.Should().Contain("BbFormFieldCurrencyInput @bind-Value=\"_cashTenderedAmount\"");
         returns.Should().Contain("<BbFormFieldSelect TValue=\"string\" @bind-Value=\"RefundMethodValue\" Label=\"Refund Method\">");
         cashier.Should().NotContain("grid-cols-[");
         returns.Should().NotContain("@if (_refundMethod == PosPaymentMethod.CashDrawer)");
@@ -160,6 +224,7 @@ public sealed class ControlPanelContractTests
 
         cashier.Should().Contain("ConfirmClearCurrentCart");
         cashier.Should().Contain("Cancel Suspended Cart");
+        cashier.Should().Contain("Held Carts");
         sales.Should().Contain("Cancel POS Sale");
         (cashier + sales).Should().Contain("new ConfirmDialogOptions { Destructive = true }");
     }
