@@ -53,7 +53,11 @@ public sealed class ServiceIdentityService(
 
         var key = new RsaSecurityKey(rsa)
         {
-            KeyId = signingKey.KeyId
+            KeyId = signingKey.KeyId,
+            CryptoProviderFactory = new CryptoProviderFactory
+            {
+                CacheSignatureProviders = false
+            }
         };
 
         var now = DateTime.UtcNow;
