@@ -118,14 +118,6 @@ public sealed class PortalBootstrapSeeder(
 
         if (group is not null)
         {
-            if (group.Name != "Administrators" || group.Description != "Portal administrator roles")
-            {
-                group.Name = "Administrators";
-                group.Description = "Portal administrator roles";
-                group.ModifiedAt = now;
-                dataContext.Update(group);
-            }
-
             return group;
         }
 
@@ -158,39 +150,6 @@ public sealed class PortalBootstrapSeeder(
 
         if (roleType is not null)
         {
-            var changed = false;
-            if (roleType.Name != "Portal Super Admin")
-            {
-                roleType.Name = "Portal Super Admin";
-                changed = true;
-            }
-
-            if (roleType.GroupId != groupId)
-            {
-                roleType.GroupId = groupId;
-                changed = true;
-            }
-
-            if (roleType.RoleLevel != 100)
-            {
-                roleType.RoleLevel = 100;
-                changed = true;
-            }
-
-            if (!roleType.IsEnabled || roleType.IsDeleted)
-            {
-                roleType.IsEnabled = true;
-                roleType.IsDeleted = false;
-                roleType.DeletedAt = null;
-                changed = true;
-            }
-
-            if (changed)
-            {
-                roleType.ModifiedAt = now;
-                dataContext.Update(roleType);
-            }
-
             return roleType;
         }
 
@@ -265,12 +224,6 @@ public sealed class PortalBootstrapSeeder(
                 ConcurrencyStamp = Guid.NewGuid()
             };
             dataContext.Add(group);
-        }
-        else if (group.Description != "Portal authentication defaults")
-        {
-            group.Description = "Portal authentication defaults";
-            group.ModifiedAt = now;
-            dataContext.Update(group);
         }
 
         var config = await dataContext.Query<RegistryConfiguration>()
@@ -361,21 +314,6 @@ public sealed class PortalBootstrapSeeder(
 
         if (credential is not null)
         {
-            if (!credential.IsEnabled || credential.PasswordByte is not { Length: > 0 })
-            {
-                credential.IsEnabled = true;
-                credential.IsDeleted = false;
-                credential.DeletedAt = null;
-                credential.ModifiedAt = now;
-
-                if (credential.PasswordByte is not { Length: > 0 })
-                {
-                    credential.PasswordByte = HashPassword(options.Password!);
-                }
-
-                dataContext.Update(credential);
-            }
-
             return credential;
         }
 
@@ -407,16 +345,6 @@ public sealed class PortalBootstrapSeeder(
 
         if (role is not null)
         {
-            if (!role.IsEnabled || role.RoleExpiration <= now)
-            {
-                role.IsEnabled = true;
-                role.IsDeleted = false;
-                role.DeletedAt = null;
-                role.RoleExpiration = now.AddYears(50);
-                role.ModifiedAt = now;
-                dataContext.Update(role);
-            }
-
             return;
         }
 
