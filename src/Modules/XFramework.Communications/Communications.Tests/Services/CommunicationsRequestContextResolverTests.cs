@@ -18,7 +18,7 @@ public sealed class CommunicationsRequestContextResolverTests
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
-        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidControlPanelToken);
+        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidPortalToken);
         var resolver = Resolver();
 
         var result = resolver.Resolve(metadata);
@@ -32,7 +32,7 @@ public sealed class CommunicationsRequestContextResolverTests
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
-        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidControlPanelToken);
+        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidPortalToken);
         var resolver = Resolver();
 
         var result = resolver.ResolveTrustedInternal(metadata);
@@ -44,11 +44,11 @@ public sealed class CommunicationsRequestContextResolverTests
     }
 
     [Test]
-    public void ResolveAdmin_ControlPanelServiceTokenMetadata_ReturnsAdminContext()
+    public void ResolveAdmin_PortalServiceTokenMetadata_ReturnsAdminContext()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
-        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidControlPanelToken);
+        var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidPortalToken);
         var resolver = Resolver();
 
         var result = resolver.ResolveAdmin(metadata);
@@ -57,7 +57,7 @@ public sealed class CommunicationsRequestContextResolverTests
         Assert.That(result.Data!.TenantId, Is.EqualTo(tenantId));
         Assert.That(result.Data.CredentialId, Is.EqualTo(credentialId));
         Assert.That(result.Data.IsTrustedInternal, Is.True);
-        Assert.That(result.Data.TrustedServiceName, Is.EqualTo("XFramework.ControlPanel"));
+        Assert.That(result.Data.TrustedServiceName, Is.EqualTo("XFramework.Portal"));
     }
 
     [Test]
@@ -152,7 +152,7 @@ public sealed class CommunicationsRequestContextResolverTests
         {
             TenantId = tenantId,
             CredentialId = credentialId,
-            Name = "XFramework.ControlPanel",
+            Name = "XFramework.Portal",
             ServiceAccessToken = token
         };
     }

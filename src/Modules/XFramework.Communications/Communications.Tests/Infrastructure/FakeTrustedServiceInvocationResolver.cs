@@ -6,7 +6,7 @@ namespace Communications.Tests.Infrastructure;
 
 internal sealed class FakeTrustedServiceInvocationResolver : ITrustedServiceInvocationResolver
 {
-    public const string ValidControlPanelToken = "valid-control-panel-token";
+    public const string ValidPortalToken = "valid-portal-token";
     public const string OtherServiceToken = "valid-other-service-token";
     public const string WrongAudienceToken = "wrong-audience-token";
 
@@ -26,7 +26,7 @@ internal sealed class FakeTrustedServiceInvocationResolver : ITrustedServiceInvo
 
         var caller = metadata.ServiceAccessToken switch
         {
-            ValidControlPanelToken => XFrameworkServiceNames.ControlPanel,
+            ValidPortalToken => XFrameworkServiceNames.Portal,
             OtherServiceToken => "XFramework.OtherService",
             _ => null
         };

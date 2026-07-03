@@ -21,10 +21,10 @@ not ordinary CRUD.
 - `Wallets.Api` contains service implementations, endpoint slices, validators,
   installers, hosted services, and generated endpoint registration.
 - `Wallets.Integration` contains generated/custom Bolt service wrapper contracts
-  used by other modules and ControlPanel.
+  used by other modules and Portal.
 - `src/Tests/Wallets.IntegrationTests` contains integration and contract tests.
-- ControlPanel Wallets surfaces live under
-  `src/Presentation/ControlPanel.Server/Components/Pages/Finance`.
+- Portal Wallets surfaces live under
+  `src/Presentation/XFramework.Portal/Components/Pages/Finance`.
 
 ## Source Of Truth For Money
 
@@ -44,7 +44,7 @@ not ordinary CRUD.
 ## Integration Rules
 
 - Prefer generated `IWalletsServiceWrapper` methods from `IBoltRequest`
-  contracts for cross-module and ControlPanel calls.
+  contracts for cross-module and Portal calls.
 - Add new workflow actions as request/response DTOs under
   `Wallets.Domain.Shared.Contracts.Requests` and `Responses`, then expose them
   with `[BoltHandler]` and `[MapPost]`/`[MapGet]` endpoint slices.
@@ -89,13 +89,13 @@ not ordinary CRUD.
 - Never use ad hoc balance updates in batch or workflow code. Use ledger-backed
   service methods and verify snapshot/posting reconciliation.
 
-## ControlPanel Rules
+## Portal Rules
 
-- ControlPanel mutations must call Wallets service wrappers or backend workflow
+- Portal mutations must call Wallets service wrappers or backend workflow
   APIs. Read-only `IDataContext` queries are acceptable for grids, details,
   pickers, and display labels only.
 - Do not add direct `DataContext.Add`, `Update`, `Remove`, or
-  `SaveChangesAsync` calls for Wallets financial entities in ControlPanel.
+  `SaveChangesAsync` calls for Wallets financial entities in Portal.
 - Use shared `XfEntityPicker<TItem>` with useful Wallets-specific Advanced
   Search columns and filters when admins select wallets, credentials, wallet
   types, currencies, gateways, operations, approvals, cases, or reconciliation
@@ -130,7 +130,7 @@ not ordinary CRUD.
 - Do not swallow ledger, webhook, outbox, or reconciliation failures without
   durable audit state.
 - Do not add raw tables, native selects, custom table components, or direct
-  financial `IDataContext` mutations in ControlPanel.
+  financial `IDataContext` mutations in Portal.
 - Do not leak sensitive financial diagnostics in UI errors, toast messages, or
   logs.
 
@@ -144,9 +144,9 @@ dotnet build src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj 
 dotnet test src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj -m:1 /nr:false --logger "console;verbosity=minimal"
 ```
 
-For ControlPanel-only Wallets changes, also run:
+For Portal-only Wallets changes, also run:
 
 ```powershell
-dotnet build src/Presentation/ControlPanel.Server/ControlPanel.Server.csproj -m:1 /nr:false -v:minimal
-dotnet test src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj --filter "TestCategory=Area:ControlPanelContract" -m:1 /nr:false --logger "console;verbosity=minimal"
+dotnet build src/Presentation/XFramework.Portal/XFramework.Portal.csproj -m:1 /nr:false -v:minimal
+dotnet test src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj --filter "TestCategory=Area:PortalContract" -m:1 /nr:false --logger "console;verbosity=minimal"
 ```

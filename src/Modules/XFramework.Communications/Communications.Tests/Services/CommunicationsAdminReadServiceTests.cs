@@ -194,8 +194,8 @@ public sealed class CommunicationsAdminReadServiceTests
         var metadata = new RequestMetadata
         {
             TenantId = tenantId,
-            Name = "XFramework.ControlPanel",
-            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidControlPanelToken
+            Name = "XFramework.Portal",
+            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidPortalToken
         };
         return metadata;
     }

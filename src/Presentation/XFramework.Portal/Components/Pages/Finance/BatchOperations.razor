@@ -1,0 +1,523 @@
+@page "/finance/batch"
+@using System.Globalization
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Batch Operations - Portal</PageTitle>
+
+<div class="space-y-6">
+    <div class="xf-page-header">
+        <div>
+            <BbTypographyH3>Batch Operations</BbTypographyH3>
+            <BbTypographyMuted>Submit ledger-backed batch wallet operations and inspect recent batch activity.</BbTypographyMuted>
+        </div>
+        <div class="xf-page-actions">
+            <BbButton OnClick="@OpenBatchDialog" Disabled="@(_wallets.Count == 0)">
+                <LucideIcon Name="play" class="mr-2 h-4 w-4" />
+                Submit Batch
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else if (!_hasTenant)
+    {
+        <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
+    }
+    else if (!_moduleEnabled)
+    {
+        <ModuleUnavailable ModuleName="Wallets" />
+    }
+    else
+    {
+        <div class="xf-summary-grid xf-summary-grid-3">
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Wallets</BbTypographyMuted>
+                        <BbTypographyH3>@_wallets.Count</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Batch Operations</BbTypographyMuted>
+                        <BbTypographyH3>@_batchOperations.Count</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Latest</BbTypographyMuted>
+                        <BbTypographyLarge>@(_latest?.ToString("g") ?? "N/A")</BbTypographyLarge>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+        </div>
+
+        <BbDataGrid Items="@_batchOperations" ShowPagination="true" InitialPageSize="20">
+            <Columns>
+                <BbDataGridTemplateColumn Title="Operation" Filterable="true" FilterBy="@(item => BuildOperationLabel(item))">
+                    <ChildContent Context="item">@BuildOperationLabel(item)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Sortable="true" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Actor" Filterable="true" FilterBy="@(item => GetCredentialLabel(item.ActorCredentialId))">
+                    <ChildContent Context="item">@GetCredentialLabel(item.ActorCredentialId)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+            </Columns>
+            <EmptyTemplate>
+                <BbEmpty Title="No batch operations found" Description="Submit a batch item to review ledger-backed batch activity." />
+            </EmptyTemplate>
+        </BbDataGrid>
+    }
+</div>
+
+<BbDialog Open="@_batchDialogOpen" OpenChanged="@OnBatchDialogChanged">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogHeader>
+            <BbDialogTitle>Submit Batch</BbDialogTitle>
+            <BbDialogDescription>Runs through the Wallets batch ledger API with tenant and actor context.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <BbFormFieldSelect TValue="string" @bind-Value="_operation" Label="Operation">
+                    <BbSelectItem Value="@BatchIncrement">Increment</BbSelectItem>
+                    <BbSelectItem Value="@BatchDecrement">Decrement</BbSelectItem>
+                    <BbSelectItem Value="@BatchTransfer">Transfer</BbSelectItem>
+                </BbFormFieldSelect>
+                <XfEntityPicker TItem="Wallet"
+                                Label="@SourceWalletLabel"
+                                Value="@_sourceWalletId"
+                                ValueChanged="@(value => _sourceWalletId = value ?? NoSelectionValue)"
+                                Items="@_wallets"
+                                ValueSelector="@GetWalletPickerValue"
+                                TextSelector="@BuildWalletLabel"
+                                SearchTextSelector="@GetWalletSearchText"
+                                AdvancedColumns="@WalletAdvancedColumns"
+                                AdvancedFilters="@WalletAdvancedFilters"
+                                AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                Placeholder="Select wallet"
+                                SearchPlaceholder="Search wallets..."
+                                EmptyMessage="No wallets found."
+                                AllowClear="true"
+                                ClearText="Clear wallet"
+                                AdvancedSearchTitle="Find Source Wallet"
+                                AdvancedSearchDescription="Search wallets for batch increment, decrement, or transfer source." />
+                @if (_operation == BatchTransfer)
+                {
+                    <XfEntityPicker TItem="Wallet"
+                                    Label="Destination Wallet"
+                                    Value="@_destinationWalletId"
+                                    ValueChanged="@(value => _destinationWalletId = value ?? NoSelectionValue)"
+                                    Items="@DestinationWalletOptions"
+                                    ValueSelector="@GetWalletPickerValue"
+                                    TextSelector="@BuildWalletLabel"
+                                    SearchTextSelector="@GetWalletSearchText"
+                                    AdvancedColumns="@WalletAdvancedColumns"
+                                    AdvancedFilters="@WalletAdvancedFilters"
+                                    AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, available balance, held balance, and created date."
+                                    Placeholder="Select destination wallet"
+                                    SearchPlaceholder="Search destination wallets..."
+                                    EmptyMessage="No destination wallets found."
+                                    AllowClear="true"
+                                    ClearText="Clear destination wallet"
+                                    AdvancedSearchTitle="Find Destination Wallet"
+                                    AdvancedSearchDescription="Search wallets that can receive this batch transfer." />
+                }
+                <BbFormFieldCurrencyInput @bind-Value="_amount" Label="Amount" ShowSymbol="false" Min="0" />
+                <BbFormFieldCurrencyInput @bind-Value="_fee" Label="Fee" ShowSymbol="false" Min="0" />
+                <BbFormFieldSwitch Checked="@_onHold" CheckedChanged="@((bool value) => _onHold = value)" Label="Hold" />
+                <BbFormFieldInput TValue="string" @bind-Value="_referenceNumber" Label="Reference" Placeholder="Optional batch reference" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@CloseBatchDialog" Disabled="@_acting">Cancel</BbButton>
+            <BbButton OnClick="@SubmitBatch" Disabled="@(_acting || _wallets.Count == 0)">
+                @if (_acting)
+                {
+                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                }
+                Submit
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private const string NoSelectionValue = "__none__";
+    private const string BatchIncrement = "increment";
+    private const string BatchDecrement = "decrement";
+    private const string BatchTransfer = "transfer";
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private WalletsPortalDisplayService DisplayService { get; set; } = default!;
+    [Inject] private ILogger<BatchOperations> Logger { get; set; } = default!;
+
+    private List<Wallet> _wallets = [];
+    private List<WalletOperation> _batchOperations = [];
+    private IReadOnlyDictionary<Guid, string> _credentialLabels = new Dictionary<Guid, string>();
+    private bool _loading = true;
+    private bool _acting;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private bool _batchDialogOpen;
+    private DateTime? _latest;
+    private string? _lastOutcome;
+    private string _operation = BatchIncrement;
+    private string _sourceWalletId = NoSelectionValue;
+    private string _destinationWalletId = NoSelectionValue;
+    private bool _onHold;
+    private string _referenceNumber = "";
+    private decimal _amount;
+    private decimal _fee;
+
+    private string SourceWalletLabel => _operation == BatchTransfer ? "Source Wallet" : "Wallet";
+    private IReadOnlyList<Wallet> DestinationWalletOptions =>
+        Guid.TryParse(_sourceWalletId, out var sourceWalletId)
+            ? _wallets.Where(x => x.Id != sourceWalletId).ToArray()
+            : _wallets;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private void OnTenantChanged() => _ = InvokeAsync(LoadData);
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsBatch);
+            _wallets = [];
+            _batchOperations = [];
+            _credentialLabels = new Dictionary<Guid, string>();
+            _latest = null;
+
+            if (!_hasTenant || !_moduleEnabled)
+            {
+                return;
+            }
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _wallets = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.WalletType)
+                .Include(x => x.Credential)
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(250)
+                .ToListAsync();
+            _wallets = _wallets
+                .Where(x => x.Status != WalletStatus.Closed)
+                .ToList();
+
+            _batchOperations = await DataContext.Query<WalletOperation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(300)
+                .ToListAsync();
+            _batchOperations = _batchOperations
+                .Where(x => x.OperationType == WalletOperationType.Batch)
+                .Take(100)
+                .ToList();
+            _credentialLabels = await DisplayService.LoadCredentialLabelsAsync(
+                tenantId,
+                _batchOperations.Select(x => x.ActorCredentialId));
+
+            _latest = _batchOperations.Count == 0 ? null : _batchOperations.Max(x => x.CreatedAt);
+        }
+        catch (Exception ex)
+        {
+            _wallets = [];
+            _batchOperations = [];
+            _credentialLabels = new Dictionary<Guid, string>();
+            _latest = null;
+            Logger.LogError(ex, "Failed to load batch operations.");
+            ToastService.Error("Could not load batch operations.", "Wallets");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SubmitBatch()
+    {
+        if (!Guid.TryParse(_sourceWalletId, out var sourceWalletId))
+        {
+            ToastService.Warning("Select a wallet.", "Validation");
+            return;
+        }
+
+        if (_amount <= 0 || _fee < 0)
+        {
+            ToastService.Warning("Amount must be greater than zero and fee cannot be negative.", "Validation");
+            return;
+        }
+
+        var sourceWallet = _wallets.FirstOrDefault(x => x.Id == sourceWalletId);
+        if (sourceWallet is null)
+        {
+            ToastService.Warning("Selected wallet is not available.", "Validation");
+            return;
+        }
+
+        _acting = true;
+        try
+        {
+            var referenceNumber = string.IsNullOrWhiteSpace(_referenceNumber)
+                ? $"cp-batch-{Guid.NewGuid():N}"
+                : _referenceNumber.Trim();
+
+            var response = _operation switch
+            {
+                BatchIncrement => await WalletsAdminContracts.BatchIncrementAsync(new BatchIncrementWalletRequest
+                {
+                    Requests =
+                    [
+                        new BatchIncrementRequest
+                        {
+                            WalletId = sourceWallet.Id,
+                            WalletTypeId = sourceWallet.WalletTypeId ?? Guid.Empty,
+                            CredentialId = sourceWallet.CredentialId,
+                            Amount = _amount,
+                            Fee = _fee,
+                            OnHold = _onHold,
+                            ReferenceNumber = referenceNumber,
+                            Remarks = "Portal batch increment"
+                        }
+                    ]
+                }),
+                BatchDecrement => await WalletsAdminContracts.BatchDecrementAsync(new BatchDecrementWalletRequest
+                {
+                    Requests =
+                    [
+                        new BatchDecrementRequest
+                        {
+                            WalletId = sourceWallet.Id,
+                            CredentialId = sourceWallet.CredentialId,
+                            Amount = _amount,
+                            Fee = _fee,
+                            OnHold = _onHold,
+                            ReferenceNumber = referenceNumber,
+                            Remarks = "Portal batch decrement"
+                        }
+                    ]
+                }),
+                BatchTransfer => await SubmitBatchTransfer(sourceWallet, referenceNumber),
+                _ => new CmdResponse
+                {
+                    HttpStatusCode = System.Net.HttpStatusCode.BadRequest,
+                    Message = "Unknown batch operation."
+                }
+            };
+
+            if (response.IsSuccess)
+            {
+                _lastOutcome = $"{_operation} accepted";
+                ToastService.Success($"Batch {_operation} submitted.", "Wallets");
+                CloseBatchDialog();
+                await LoadData();
+                return;
+            }
+
+            Logger.LogWarning("Batch operation failed: {Message}", response.Message);
+            ToastService.Error("Batch operation could not be completed.", "Wallets");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Batch operation failed.");
+            ToastService.Error("Batch operation could not be completed.", "Wallets");
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private async Task<CmdResponse> SubmitBatchTransfer(Wallet sourceWallet, string referenceNumber)
+    {
+        if (!Guid.TryParse(_destinationWalletId, out var destinationWalletId))
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = System.Net.HttpStatusCode.BadRequest,
+                Message = "Select a destination wallet."
+            };
+        }
+
+        var destinationWallet = _wallets.FirstOrDefault(x => x.Id == destinationWalletId);
+        if (destinationWallet is null)
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = System.Net.HttpStatusCode.BadRequest,
+                Message = "Selected destination wallet is not available."
+            };
+        }
+
+        return await WalletsAdminContracts.BatchTransferAsync(new BatchTransferWalletRequest
+        {
+            Requests =
+            [
+                new BatchTransferRequest
+                {
+                    FromWalletId = sourceWallet.Id,
+                    ToWalletId = destinationWallet.Id,
+                    FromCredentialId = sourceWallet.CredentialId,
+                    ToCredentialId = destinationWallet.CredentialId,
+                    Amount = _amount,
+                    Fee = _fee,
+                    ReferenceNumber = referenceNumber,
+                    Remarks = "Portal batch transfer"
+                }
+            ]
+        });
+    }
+
+    private void OpenBatchDialog()
+    {
+        ResetBatchForm();
+        _batchDialogOpen = true;
+    }
+
+    private void CloseBatchDialog()
+    {
+        _batchDialogOpen = false;
+        ResetBatchForm();
+    }
+
+    private Task OnBatchDialogChanged(bool open)
+    {
+        _batchDialogOpen = open;
+        if (!open)
+        {
+            ResetBatchForm();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void ResetBatchForm()
+    {
+        _operation = BatchIncrement;
+        _sourceWalletId = NoSelectionValue;
+        _destinationWalletId = NoSelectionValue;
+        _onHold = false;
+        _referenceNumber = "";
+        _amount = 0;
+        _fee = 0;
+    }
+
+    private static string BuildOperationLabel(WalletOperation operation)
+    {
+        var reference = string.IsNullOrWhiteSpace(operation.ReferenceNumber)
+            ? $"Operation {operation.Id.ToString()[..8]}"
+            : operation.ReferenceNumber;
+        return $"{reference} - {operation.Status}";
+    }
+
+    private static string BuildWalletLabel(Wallet wallet)
+    {
+        var balance = wallet.Balance.ToString("N2", CultureInfo.InvariantCulture);
+        return $"{wallet.AccountNumber ?? wallet.Id.ToString()[..8]} - {GetWalletCredentialLabel(wallet)} - {balance}";
+    }
+
+    private static string GetWalletPickerValue(Wallet wallet) => wallet.Id.ToString();
+
+    private static string GetWalletSearchText(Wallet wallet) =>
+        $"{wallet.AccountNumber} {wallet.CredentialId} {GetWalletCredentialLabel(wallet)} {wallet.WalletType?.Code} {wallet.WalletType?.Name} {wallet.Status} {wallet.AvailableBalance}";
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallet>> WalletAdvancedColumns =>
+    [
+        new("Account", x => string.IsNullOrWhiteSpace(x.AccountNumber) ? x.Id.ToString()[..8] : x.AccountNumber),
+        new("Credential", GetWalletCredentialLabel),
+        new("Type", x => x.WalletType?.Name ?? ShortId(x.WalletTypeId)),
+        new("Status", x => x.Status.ToString()),
+        new("Available", x => FormatDecimal(x.AvailableBalance)),
+        new("Held", x => FormatDecimal(x.DebitOnHoldBalance + x.CreditOnHoldBalance)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<Wallet>> WalletAdvancedFilters =>
+    [
+        new("status", "Status", BuildEnumFilterOptions<WalletStatus>(), x => x.Status.ToString(), "All statuses"),
+        new("type", "Wallet type", BuildDistinctFilterOptions(_wallets, x => x.WalletType?.Code ?? x.WalletTypeId?.ToString()), x => x.WalletType?.Code ?? x.WalletTypeId?.ToString(), "All wallet types")
+    ];
+
+    private static string GetWalletCredentialLabel(Wallet wallet)
+    {
+        if (wallet.Credential is { } credential)
+        {
+            var displayName = credential.IdentityInfo?.FullName;
+            if (string.IsNullOrWhiteSpace(displayName))
+                displayName = credential.IdentityInfo?.IdentityName;
+            if (string.IsNullOrWhiteSpace(displayName))
+                displayName = credential.UserName ?? credential.UserAlias;
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+                return displayName;
+        }
+
+        return wallet.CredentialId.ToString()[..8];
+    }
+
+    private string GetCredentialLabel(Guid? credentialId) =>
+        DisplayService.CredentialLabel(credentialId, _credentialLabels);
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildEnumFilterOptions<TEnum>()
+        where TEnum : struct, Enum =>
+        Enum.GetValues<TEnum>()
+            .Select(value => new XfEntityPickerFilterOption(value.ToString(), value.ToString()))
+            .ToArray();
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    private static string FormatDateTime(DateTime value) =>
+        value == default ? "N/A" : value.ToString("g", CultureInfo.CurrentCulture);
+
+    private static string FormatDecimal(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+
+    private static string ShortId(Guid? id) => id is Guid value ? value.ToString()[..8] : "N/A";
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

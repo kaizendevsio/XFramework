@@ -1,0 +1,49 @@
+name: Deploy Xeon Dev - Portal
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - src/Presentation/XFramework.Portal/**
+      - src/Modules/XFramework.Community/Community.Domain.Shared/**
+      - src/Modules/XFramework.Community/Community.Integration/**
+      - src/Modules/XFramework.IdentityServer/IdentityServer.Domain.Shared/**
+      - src/Modules/XFramework.IdentityServer/IdentityServer.Integration/**
+      - src/Modules/XFramework.Inventario/Inventario.Domain.Shared/**
+      - src/Modules/XFramework.Inventario/Inventario.Integration/**
+      - src/Modules/XFramework.POS/POS.Domain.Shared/**
+      - src/Modules/XFramework.POS/POS.Integration/**
+      - src/Modules/XFramework.Communications/Communications.Domain.Shared/**
+      - src/Modules/XFramework.Communications/Communications.Integration/**
+      - src/Modules/XFramework.Wallets/Wallets.Domain.Shared/**
+      - src/Modules/XFramework.Wallets/Wallets.Integration/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  detect-shared-changes:
+    name: Detect shared deploy ownership
+    runs-on: ubuntu-latest
+    outputs:
+      has_shared: ${{ steps.shared.outputs.has_shared }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect shared changes
+        id: shared
+        uses: ./.github/actions/detect-shared-deploy-changes
+
+  deploy:
+    needs: detect-shared-changes
+    if: needs.detect-shared-changes.outputs.has_shared != 'true'
+    uses: ./.github/workflows/deploy-xeon-dev-service.yml
+    with:
+      service: portal
+      health_url: http://localhost:5000/health/ready
+      diagnostics_services: bolt-hub identityserver communications wallets inventario pos portal
+    secrets: inherit

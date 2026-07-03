@@ -1,0 +1,439 @@
+@page "/community/content/{Id:guid}"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Community Content Detail - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_access.HasTenant)
+{
+    <BbAlert>
+        <BbAlertTitle>Select a Tenant</BbAlertTitle>
+        <BbAlertDescription>Choose a tenant in the sidebar to review this Community content.</BbAlertDescription>
+    </BbAlert>
+}
+else if (!_access.CanUseCommunity)
+{
+    <BbAlert Variant="AlertVariant.Warning">
+        <BbAlertTitle>Community Module Disabled</BbAlertTitle>
+        <BbAlertDescription>Enable the Community module for this tenant before reviewing content.</BbAlertDescription>
+    </BbAlert>
+}
+else if (_content is null)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@GoBack">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Content
+        </BbButton>
+        <BbAlert Variant="AlertVariant.Danger">
+            <BbAlertTitle>Content Not Found</BbAlertTitle>
+            <BbAlertDescription>No Community content was found for the selected tenant.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@GoBack">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Content
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Content Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to the content tenant to view this record.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div class="flex items-center gap-4">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="@GoBack">
+                        <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                    </BbButton>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <BbTypographyH3>@(_content.Title ?? "Untitled content")</BbTypographyH3>
+                            <StatusBadge Text="@(_content.IsEnabled ? "Published" : "Hidden")"
+                                         Status="@(_content.IsEnabled ? "active" : "inactive")" />
+                        </div>
+                        <BbTypographyMuted>ID: @_content.Id - Author: @GetIdentityLabel(_content.SocialMediaIdentityId)</BbTypographyMuted>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ToggleEnabled">
+                        <LucideIcon Name="@(_content.IsEnabled ? "eye-off" : "eye")" class="mr-2 h-4 w-4" />
+                        @(_content.IsEnabled ? "Hide" : "Publish")
+                    </BbButton>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Reactions</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_reactions.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Files</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_files.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Comments</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_comments.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Type</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyLarge>@(_content.Type?.Name ?? GetContentTypeName(_content.TypeId))</BbTypographyLarge></BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Content Body</BbCardTitle>
+                    <BbCardDescription>Read-only content text and ownership references</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Author</BbTypographyMuted>
+                            <BbTypographyLarge>@GetIdentityLabel(_content.SocialMediaIdentityId)</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Community Group</BbTypographyMuted>
+                            <BbTypographyLarge>@GetIdentityLabel(_content.CommunityGroupId)</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Parent Content</BbTypographyMuted>
+                            @if (_content.ParentContentId is Guid parentId)
+                            {
+                                <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/community/content/{parentId}"))">
+                                    @parentId.ToString()[..8]...
+                                </BbButton>
+                            }
+                            else
+                            {
+                                <BbTypographyLarge>N/A</BbTypographyLarge>
+                            }
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Created</BbTypographyMuted>
+                            <BbTypographyLarge>@_content.CreatedAt.ToString("g")</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Modified</BbTypographyMuted>
+                            <BbTypographyLarge>@(_content.ModifiedAt?.ToString("g") ?? "N/A")</BbTypographyLarge>
+                        </div>
+                    </div>
+                    <div class="mt-6 space-y-2">
+                        <BbTypographyMuted>Text</BbTypographyMuted>
+                        <div class="rounded-md border border-border bg-muted/30 p-4 text-sm leading-6 whitespace-pre-wrap">
+                            @(_content.Text ?? "No text.")
+                        </div>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <BbTabs DefaultValue="reactions">
+                <BbTabsList>
+                    <BbTabsTrigger Value="reactions">Reactions (@_reactions.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="files">Files (@_files.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="comments">Comments (@_comments.Count)</BbTabsTrigger>
+                </BbTabsList>
+
+                <BbTabsContent Value="reactions" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardContent>
+                            <BbDataGrid Items="@_reactions" ShowPagination="true" InitialPageSize="10">
+                                <Columns>
+                                    <BbDataGridTemplateColumn Title="Identity">
+                                        <ChildContent Context="item">@GetIdentityLabel(item.SocialMediaIdentityId)</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Type">
+                                        <ChildContent Context="item">@(item.Type?.Name ?? GetReactionTypeName(item.TypeId))</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="files" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardContent>
+                            <BbDataGrid Items="@_files" ShowPagination="true" InitialPageSize="10">
+                                <Columns>
+                                    <BbDataGridTemplateColumn Title="Storage ID">
+                                        <ChildContent Context="item"><span class="font-mono text-xs">@item.StorageId</span></ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Enabled">
+                                        <ChildContent Context="item">
+                                            <StatusBadge Text="@(item.IsEnabled ? "Enabled" : "Disabled")"
+                                                         Status="@(item.IsEnabled ? "active" : "inactive")" />
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="comments" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardContent>
+                            <BbDataGrid Items="@_comments" ShowPagination="true" InitialPageSize="10"
+                                        OnRowClick="@((CommunityContent item) => Navigation.NavigateTo($"/community/content/{item.Id}"))"
+                                        Class="cursor-pointer">
+                                <Columns>
+                                    <BbDataGridTemplateColumn Title="Comment">
+                                        <ChildContent Context="item">@(item.Title ?? Truncate(item.Text, 90))</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Author">
+                                        <ChildContent Context="item">@GetIdentityLabel(item.SocialMediaIdentityId)</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Enabled">
+                                        <ChildContent Context="item">
+                                            <StatusBadge Text="@(item.IsEnabled ? "Published" : "Hidden")"
+                                                         Status="@(item.IsEnabled ? "active" : "inactive")" />
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+            </BbTabs>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private CommunityPortalAccessService AccessService { get; set; } = default!;
+
+    private CommunityPortalAccessState _access = new(null, null, false, null);
+    private CommunityContent? _content;
+    private List<CommunityContentReaction> _reactions = [];
+    private List<CommunityContentFile> _files = [];
+    private List<CommunityContent> _comments = [];
+    private Dictionary<Guid, string> _identityLabels = [];
+    private Dictionary<Guid, string> _contentTypeNames = [];
+    private Dictionary<Guid, string> _reactionTypeNames = [];
+    private bool _loading = true;
+    private bool _outsideTenantContext;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_loading)
+        {
+            await LoadData();
+        }
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _access = await AccessService.GetStateAsync();
+            ClearData();
+
+            if (!_access.CanUseCommunity || _access.TenantId is not Guid tenantId)
+            {
+                return;
+            }
+
+            _content = await DataContext.Query<CommunityContent>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            _outsideTenantContext = _content is not null && _content.TenantId != tenantId;
+            if (_content is null || _outsideTenantContext)
+            {
+                return;
+            }
+
+            await LoadLookups(tenantId);
+
+            _reactions = await DataContext.Query<CommunityContentReaction>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.TenantId == tenantId && x.ContentId == Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            _files = await DataContext.Query<CommunityContentFile>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.ContentId == Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            _comments = await DataContext.Query<CommunityContent>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.ParentContentId == Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load Community content: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadLookups(Guid tenantId)
+    {
+        var identities = await DataContext.Query<CommunityIdentity>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .Take(500)
+            .ToListAsync();
+        _identityLabels = identities.ToDictionary(x => x.Id, BuildIdentityLabel);
+
+        var contentTypes = await DataContext.Query<CommunityContentType>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .Take(100)
+            .ToListAsync();
+        _contentTypeNames = contentTypes.ToDictionary(x => x.Id, x => x.Name);
+
+        var reactionTypes = await DataContext.Query<CommunityContentReactionType>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .Take(100)
+            .ToListAsync();
+        _reactionTypeNames = reactionTypes.ToDictionary(x => x.Id, x => x.Name);
+    }
+
+    private async Task ToggleEnabled()
+    {
+        if (_content is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var fresh = await DataContext.Query<CommunityContent>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null || fresh.TenantId != _access.TenantId)
+            {
+                ToastService.Show("Content was not found in the selected tenant.");
+                return;
+            }
+
+            fresh.IsEnabled = !fresh.IsEnabled;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
+
+            if (result.IsSuccess)
+            {
+                ToastService.Show(fresh.IsEnabled ? "Content published." : "Content hidden.");
+                await LoadData();
+            }
+            else
+            {
+                ToastService.Show($"Failed to update content: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error updating content: {ex.Message}");
+        }
+    }
+
+    private void ClearData()
+    {
+        _content = null;
+        _reactions = [];
+        _files = [];
+        _comments = [];
+        _identityLabels = [];
+        _contentTypeNames = [];
+        _reactionTypeNames = [];
+        _outsideTenantContext = false;
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/community/content");
+
+    private string GetIdentityLabel(Guid identityId) =>
+        _identityLabels.TryGetValue(identityId, out var label)
+            ? label
+            : $"{identityId.ToString()[..8]}...";
+
+    private string GetContentTypeName(Guid typeId) =>
+        _contentTypeNames.TryGetValue(typeId, out var name) ? name : $"{typeId.ToString()[..8]}...";
+
+    private string GetReactionTypeName(Guid typeId) =>
+        _reactionTypeNames.TryGetValue(typeId, out var name) ? name : $"{typeId.ToString()[..8]}...";
+
+    private static string BuildIdentityLabel(CommunityIdentity identity) =>
+        identity.HandleName ?? identity.Alias ?? $"{identity.Id.ToString()[..8]}...";
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Untitled";
+        }
+
+        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+}

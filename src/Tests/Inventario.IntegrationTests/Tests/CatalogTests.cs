@@ -275,7 +275,7 @@ public sealed class CatalogTests : InventarioTestBase
 
     [Test]
     [Category(TestCategories.ExtendedIntegration)]
-    [Category(TestCategories.ControlPanelContract)]
+    [Category(TestCategories.PortalContract)]
     public async Task SaveChangesAsync_RemoteProductVariationCreate_ReturnsNotRegisteredForRemoteMutation()
     {
         await using var db = CreateDbContext();
@@ -305,7 +305,7 @@ public sealed class CatalogTests : InventarioTestBase
 
     [Test]
     [Category(TestCategories.ExtendedIntegration)]
-    [Category(TestCategories.ControlPanelContract)]
+    [Category(TestCategories.PortalContract)]
     public async Task SaveChangesAsync_RemoteProductVariationTypeCreate_ReturnsNotRegisteredForRemoteMutation()
     {
         var ctx = InventarioIntegrationTestFixture.DataContext;
@@ -330,7 +330,7 @@ public sealed class CatalogTests : InventarioTestBase
     [Test]
     [Category(TestCategories.ExtendedIntegration)]
     [Category(TestCategories.Planning)]
-    [Category(TestCategories.ControlPanelContract)]
+    [Category(TestCategories.PortalContract)]
     public async Task SaveChangesAsync_RemoteInventoryReorderRuleCreate_ReturnsNotRegisteredForRemoteMutation()
     {
         await using var db = CreateDbContext();
@@ -361,7 +361,7 @@ public sealed class CatalogTests : InventarioTestBase
 
     [Test]
     [Category(TestCategories.ExtendedIntegration)]
-    [Category(TestCategories.ControlPanelContract)]
+    [Category(TestCategories.PortalContract)]
     public async Task SaveChangesAsync_RemoteAdvancedInventarioEntityCreate_ReturnsNotRegisteredForRemoteMutation()
     {
         await using var db = CreateDbContext();

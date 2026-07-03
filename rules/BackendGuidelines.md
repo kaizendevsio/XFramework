@@ -20,7 +20,7 @@ Before changing backend code, read the most specific docs for the surface:
 - `docs/solutions/conventions/ef-core-data-access-patterns.md`
 - `docs/solutions/best-practices/xframework-caching-strategy.md`
 - `docs/solutions/architecture-patterns/decentralized-remote-data-context.md`
-- `docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md`
+- `docs/solutions/developer-experience/portal-service-wrapper-and-integration-test-contract.md`
 
 Current source code still wins if a document conflicts with implementation.
 
@@ -87,7 +87,7 @@ Current source code still wins if a document conflicts with implementation.
 ## Service Boundary Rules
 
 - Backend services own business rules. Endpoints should validate and delegate, not contain business logic.
-- ControlPanel and client surfaces must use service wrappers for business operations.
+- Portal and client surfaces must use service wrappers for business operations.
 - Direct `IDataContext` mutation is only for explicitly allowlisted simple CRUD paths with integration coverage.
 - Do not bypass validators, feature gates, tenant checks, idempotency, derived data updates, or ledger/allocation logic with direct data access.
 - Cross-module service calls should use the existing wrapper/Bolt/API conventions rather than taking a direct dependency on another module's service internals.

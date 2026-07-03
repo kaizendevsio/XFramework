@@ -18,7 +18,7 @@ Historical compatibility note: moved `StorageFile*` entity namespaces currently 
 
 ## Integration Rules
 
-- Use `IStorageServiceWrapper` for cross-module Storage behavior. Communications, Community, ControlPanel, Blazor, and future modules should call the wrapper for validation, upload sessions, upload parts, completion, URLs, delete, restore, and retention operations.
+- Use `IStorageServiceWrapper` for cross-module Storage behavior. Communications, Community, Portal, Blazor, and future modules should call the wrapper for validation, upload sessions, upload parts, completion, URLs, delete, restore, and retention operations.
 - Do not query or write Storage tables directly from another module to validate file references. Use `ValidateStorageFileReference` through the wrapper.
 - Direct `IDataContext.Query<StorageFile>()` is acceptable only for intentional read-only metadata display paths. Do not use remote data context to bypass Storage workflow rules.
 - Do not add client-provided `TenantId` fields to Storage request contracts. Storage derives tenant identity from authenticated context or trusted signed request metadata.
@@ -64,7 +64,7 @@ Historical compatibility note: moved `StorageFile*` entity namespaces currently 
 - MinIO uses the published `minio/minio` image; there is no local MinIO Dockerfile.
 - Storage should use the repo generic `Dockerfile` with `PROJECT_PATH=src/Modules/XFramework.Storage/Storage.Api/Storage.Api.csproj`.
 - If Storage endpoints, providers, ports, or health behavior change, update compose, `.env.example`, and xeon-dev workflows in the same PR.
-- ControlPanel navigation should expose Storage only when `TenantModuleFeatureKeys.Storage` is enabled.
+- Portal navigation should expose Storage only when `TenantModuleFeatureKeys.Storage` is enabled.
 
 ## Testing Expectations
 

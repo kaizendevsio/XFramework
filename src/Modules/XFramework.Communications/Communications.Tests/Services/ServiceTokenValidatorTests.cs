@@ -27,7 +27,7 @@ public sealed class ServiceTokenValidatorTests
             [XFrameworkServiceScopes.CommunicationsAdmin]);
 
         Assert.That(result.IsValid, Is.True, result.Error);
-        Assert.That(result.CallerClientId, Is.EqualTo(XFrameworkServiceNames.ControlPanel));
+        Assert.That(result.CallerClientId, Is.EqualTo(XFrameworkServiceNames.Portal));
         Assert.That(result.Scopes, Contains.Item(XFrameworkServiceScopes.CommunicationsAdmin));
     }
 
@@ -105,8 +105,8 @@ public sealed class ServiceTokenValidatorTests
             audience: audience,
             claims:
             [
-                new Claim("client_id", XFrameworkServiceNames.ControlPanel),
-                new Claim(JwtRegisteredClaimNames.Sub, XFrameworkServiceNames.ControlPanel),
+                new Claim("client_id", XFrameworkServiceNames.Portal),
+                new Claim(JwtRegisteredClaimNames.Sub, XFrameworkServiceNames.Portal),
                 new Claim("scope", string.Join(' ', scopes))
             ],
             notBefore: notBefore,

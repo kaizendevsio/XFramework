@@ -1,0 +1,117 @@
+@page "/identity/verifications"
+
+<PageTitle>Verifications - Portal</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Verifications</BbTypographyH3>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_verifications" ShowPagination="true" InitialPageSize="20" ShowSearch="true" SearchPlaceholder="Search verifications...">
+        <Columns>
+            <BbDataGridTemplateColumn Title="Credential" Filterable="true" FilterBy="@(item => GetCredentialLabel(item))">
+                <ChildContent Context="item">
+                    @GetCredentialLabel(item)
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Verification Type" Filterable="true" FilterBy="@(item => GetVerificationTypeLabel(item))">
+                <ChildContent Context="item">
+                    @GetVerificationTypeLabel(item)
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => GetStatusText(item.Status))">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@GetStatusText(item.Status)" Status="@GetStatusKey(item.Status)" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.Expiry)" Title="Expiry" Sortable="true" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.StatusUpdatedOn)" Title="Status Updated" Sortable="true" Filterable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+        </Columns>
+        <EmptyTemplate>
+            <BbEmpty Title="No verifications" Description="No verification records found for the selected tenant." />
+        </EmptyTemplate>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private List<IdentityVerification> _verifications = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var query = DataContext.Query<IdentityVerification>()
+                .Include(x => x.Credential)
+                .Include(x => x.VerificationType);
+            if (TenantFilter.SelectedTenantId is { } tenantId)
+            {
+                query = query.Where(x => x.TenantId == tenantId);
+            }
+
+            _verifications = (await query.Take(100).ToListAsync())
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList();
+        }
+        catch
+        {
+            _verifications = [];
+            ToastService.Error("Verifications could not be loaded.", "Load failed");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string GetCredentialLabel(IdentityVerification verification)
+    {
+        var credential = verification.Credential;
+        if (!string.IsNullOrWhiteSpace(credential?.UserName))
+            return credential.UserName;
+
+        if (!string.IsNullOrWhiteSpace(credential?.UserAlias))
+            return credential.UserAlias;
+
+        return "Unknown credential";
+    }
+
+    private static string GetVerificationTypeLabel(IdentityVerification verification) =>
+        string.IsNullOrWhiteSpace(verification.VerificationType?.Name)
+            ? "Unknown verification type"
+            : verification.VerificationType.Name;
+
+    private static string GetStatusText(short? status) => status switch
+    {
+        0 => "Pending",
+        1 => "Verified",
+        2 => "Rejected",
+        _ => "Unknown"
+    };
+
+    private static string GetStatusKey(short? status) => status switch
+    {
+        0 => "pending",
+        1 => "active",
+        2 => "failed",
+        _ => "inactive"
+    };
+}

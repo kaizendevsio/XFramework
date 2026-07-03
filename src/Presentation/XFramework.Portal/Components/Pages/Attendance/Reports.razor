@@ -1,0 +1,363 @@
+@page "/attendance/reports"
+@using XFramework.Domain.Shared.BusinessObjects
+@implements IDisposable
+
+<PageTitle>Attendance Reports - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Attendance" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="Attendance" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <BbTypographyH3>Attendance Reports</BbTypographyH3>
+                    <BbTypographyMuted>Review attendance counts by context and date range.</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Report Filters</BbCardTitle>
+                    <BbCardDescription>Select a context and range to load the attendance report.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_12rem_12rem_auto] lg:items-end">
+                        <XfEntityPicker TItem="AttendanceContextOption"
+                                        Label="Context"
+                                        Value="@SelectedContextPickerValue"
+                                        ValueChanged="@OnContextChanged"
+                                        Items="@_contextOptions"
+                                        ValueSelector="@(item => item.Id.ToString())"
+                                        TextSelector="@(item => item.Label)"
+                                        SearchTextSelector="@(item => $"{item.Label} {item.ContextType}")"
+                                        AdvancedColumns="@ContextAdvancedColumns"
+                                        AdvancedFilters="@ContextAdvancedFilters"
+                                        AdvancedSearchScope="Searches attendance context code, name, type, and active state."
+                                        Placeholder="Select context"
+                                        SearchPlaceholder="Search contexts..."
+                                        EmptyMessage="No attendance contexts found."
+                                        ShowCreate="false"
+                                        AdvancedSearchTitle="Find Attendance Context"
+                                        AdvancedSearchDescription="Select the context for this report." />
+                        <div class="xf-form-field">
+                            <BbLabel>From</BbLabel>
+                            <input type="date"
+                                   class="xf-datetime-input"
+                                   value="@_fromDate"
+                                   @oninput="@((ChangeEventArgs e) => _fromDate = e.Value?.ToString() ?? string.Empty)" />
+                        </div>
+                        <div class="xf-form-field">
+                            <BbLabel>To</BbLabel>
+                            <input type="date"
+                                   class="xf-datetime-input"
+                                   value="@_toDate"
+                                   @oninput="@((ChangeEventArgs e) => _toDate = e.Value?.ToString() ?? string.Empty)" />
+                        </div>
+                        <BbButton OnClick="@RunReport" Disabled="@(_running || _contextOptions.Count == 0)">
+                            @if (_running)
+                            {
+                                <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                            }
+                            Run Report
+                        </BbButton>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            @if (_report is null)
+            {
+                <BbEmpty Title="No report loaded" Description="Choose a context and date range to load attendance totals." />
+            }
+            else
+            {
+                <div class="xf-summary-grid xf-summary-grid-4">
+                    <BbCard>
+                        <BbCardHeader><BbCardTitle>Participants</BbCardTitle><BbCardDescription>Active in context</BbCardDescription></BbCardHeader>
+                        <BbCardContent><BbTypographyH2>@_report.ActiveParticipantCount</BbTypographyH2></BbCardContent>
+                    </BbCard>
+                    <BbCard>
+                        <BbCardHeader><BbCardTitle>Sessions</BbCardTitle><BbCardDescription>In selected range</BbCardDescription></BbCardHeader>
+                        <BbCardContent><BbTypographyH2>@_report.TotalSessions</BbTypographyH2></BbCardContent>
+                    </BbCard>
+                    <BbCard>
+                        <BbCardHeader><BbCardTitle>Present</BbCardTitle><BbCardDescription>Present or late records</BbCardDescription></BbCardHeader>
+                        <BbCardContent><BbTypographyH2>@_report.Sessions.Sum(x => x.PresentCount + x.LateCount)</BbTypographyH2></BbCardContent>
+                    </BbCard>
+                    <BbCard>
+                        <BbCardHeader><BbCardTitle>Absent</BbCardTitle><BbCardDescription>Computed absences</BbCardDescription></BbCardHeader>
+                        <BbCardContent><BbTypographyH2>@_report.Sessions.Sum(x => x.AbsentCount)</BbTypographyH2></BbCardContent>
+                    </BbCard>
+                </div>
+
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Session Report</BbCardTitle>
+                        <BbCardDescription>@_report.Sessions.Count session row(s) loaded from @_report.TotalSessions total.</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@ReportSessions"
+                                    ShowPagination="true"
+                                    InitialPageSize="20"
+                                    ShowSearch="true"
+                                    SearchPlaceholder="Search sessions..."
+                                    OnRowClick="@((AttendanceSessionReportItemResponse item) => OpenSession(item.SessionId))"
+                                    Class="cursor-pointer">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.SessionName)" Title="Session" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.StartsAt)" Title="Starts" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.EndsAt)" Title="Ends" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.PresentCount)" Title="Present" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LateCount)" Title="Late" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AbsentCount)" Title="Absent" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.IncompleteCount)" Title="Incomplete" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ManualAdjustedCount)" Title="Manual" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ExcusedCount)" Title="Excused" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        <BbButton Variant="ButtonVariant.Ghost"
+                                                  Size="ButtonSize.Icon"
+                                                  AriaLabel="Open session roster"
+                                                  OnClick="@(() => OpenSession(item.SessionId))">
+                                            <LucideIcon Name="eye" class="h-4 w-4" />
+                                        </BbButton>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No sessions" Description="No attendance sessions match the selected context and date range." />
+                            </EmptyTemplate>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            }
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private AttendancePortalReadService AttendanceReadService { get; set; } = default!;
+    [Inject] private IAttendanceServiceWrapper Attendance { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private ILogger<Reports> Logger { get; set; } = default!;
+
+    private List<AttendanceContextOption> _contextOptions = [];
+    private AttendanceReportResponse? _report;
+    private string _selectedContextId = string.Empty;
+    private string _fromDate = DateTime.Today.AddDays(-30).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private string _toDate = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private bool _running;
+
+    private string? SelectedContextPickerValue => string.IsNullOrWhiteSpace(_selectedContextId) ? null : _selectedContextId;
+    private IReadOnlyList<AttendanceSessionReportItemResponse> ReportSessions => _report?.Sessions ?? [];
+
+    private IReadOnlyList<XfEntityPickerColumn<AttendanceContextOption>> ContextAdvancedColumns =>
+    [
+        new("Context", x => x.Label),
+        new("Type", x => AttendancePortalReadService.FormatEnumLabel(x.ContextType)),
+        new("Status", x => x.IsActive ? "Active" : "Inactive")
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<AttendanceContextOption>> ContextAdvancedFilters =>
+    [
+        new("type", "Type", BuildDistinctFilterOptions(_contextOptions, x => x.ContextType.ToString()), x => x.ContextType.ToString(), "All types"),
+        new("active", "Status", ActiveFilterOptions, x => x.IsActive ? "true" : "false", "All statuses")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> ActiveFilterOptions =
+    [
+        new("true", "Active"),
+        new("false", "Inactive")
+    ];
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Attendance);
+            _contextOptions = [];
+            _report = null;
+
+            if (!_hasTenant || !_moduleEnabled)
+            {
+                return;
+            }
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _contextOptions = (await AttendanceReadService.LoadContextOptionsAsync(tenantId)).ToList();
+            if (string.IsNullOrWhiteSpace(_selectedContextId) && _contextOptions.Count > 0)
+            {
+                _selectedContextId = _contextOptions[0].Id.ToString();
+            }
+
+            if (!string.IsNullOrWhiteSpace(_selectedContextId))
+            {
+                await RunReport();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load attendance report page.");
+            ToastService.Error("Attendance reports could not be loaded.", "Attendance");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnContextChanged(string? value)
+    {
+        _selectedContextId = value ?? string.Empty;
+        _report = null;
+        if (!string.IsNullOrWhiteSpace(_selectedContextId))
+        {
+            await RunReport();
+        }
+    }
+
+    private async Task RunReport()
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId)
+        {
+            ToastService.Warning("Select a tenant before running a report.", "Validation");
+            return;
+        }
+
+        if (!Guid.TryParse(_selectedContextId, out var contextId))
+        {
+            ToastService.Warning("Select an attendance context.", "Validation");
+            return;
+        }
+
+        if (!TryBuildDateRange(out var fromUtc, out var toUtc))
+        {
+            ToastService.Warning("Choose a valid date range.", "Validation");
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            var response = await Attendance.GetAttendanceReport(new GetAttendanceReportRequest
+            {
+                TenantId = tenantId,
+                ContextId = contextId,
+                FromUtc = fromUtc,
+                ToUtc = toUtc,
+                Page = 1,
+                PageSize = 100,
+                Metadata = BuildMetadata(tenantId)
+            });
+
+            if (response.IsSuccess && response.Response is not null)
+            {
+                _report = response.Response;
+            }
+            else
+            {
+                Logger.LogWarning("Attendance report failed with status {StatusCode}", response.HttpStatusCode);
+                ToastService.Error("Attendance report could not be loaded.", "Attendance");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Attendance report failed.");
+            ToastService.Error("Attendance report could not be loaded.", "Attendance");
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private bool TryBuildDateRange(out DateTime fromUtc, out DateTime toUtc)
+    {
+        fromUtc = default;
+        toUtc = default;
+
+        if (!DateTime.TryParse(_fromDate, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var fromDate)
+            || !DateTime.TryParse(_toDate, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var toDate))
+        {
+            return false;
+        }
+
+        if (toDate.Date < fromDate.Date)
+        {
+            return false;
+        }
+
+        fromUtc = DateTime.SpecifyKind(fromDate.Date, DateTimeKind.Local).ToUniversalTime();
+        toUtc = DateTime.SpecifyKind(toDate.Date.AddDays(1).AddTicks(-1), DateTimeKind.Local).ToUniversalTime();
+        return true;
+    }
+
+    private void OpenSession(Guid sessionId) => Navigation.NavigateTo($"/attendance/sessions/{sessionId}");
+
+    private RequestMetadata BuildMetadata(Guid tenantId) => new()
+    {
+        TenantId = tenantId,
+        CredentialId = RequestMetadata.CredentialId,
+        SessionId = RequestMetadata.SessionId,
+        RequestId = Guid.NewGuid(),
+        Name = RequestMetadata.Name ?? "Portal",
+        DeviceName = RequestMetadata.DeviceName,
+        DeviceAgent = RequestMetadata.DeviceAgent,
+        IpAddress = RequestMetadata.IpAddress
+    };
+
+    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, string?> valueSelector) =>
+        items
+            .Select(valueSelector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(value => new XfEntityPickerFilterOption(value!, value!))
+            .ToArray();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

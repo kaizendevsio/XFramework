@@ -1,0 +1,120 @@
+@using XFramework.Portal.Components.Shared
+
+@if (_context is not null && _context.IsEditing && !ReadOnly)
+{
+    @switch (FieldType)
+    {
+        case EditableFieldType.Text:
+            <BbFormFieldInput TValue="string"
+                              Value="@Value"
+                              ValueChanged="OnValueChanged"
+                              UpdateTiming="UpdateTiming.Immediate"
+                              Label="@Label"
+                              Placeholder="@Placeholder"
+                              Required="@Required" />
+            break;
+
+        case EditableFieldType.Textarea:
+            <BbFormFieldTextarea Value="@Value"
+                                 ValueChanged="OnValueChanged"
+                                 UpdateTiming="UpdateTiming.Immediate"
+                                 Label="@Label"
+                                 Placeholder="@Placeholder"
+                                 Required="@Required" />
+            break;
+
+        case EditableFieldType.Select:
+            @if (Options is not null)
+            {
+                <BbFormFieldSelect TValue="string"
+                                   Value="@Value"
+                                   ValueChanged="OnValueChanged"
+                                   Label="@Label"
+                                   Options="@Options"
+                                   Placeholder="@Placeholder" />
+            }
+            else
+            {
+                <BbFormFieldInput TValue="string"
+                                  Value="@Value"
+                                  ValueChanged="OnValueChanged"
+                                  UpdateTiming="UpdateTiming.Immediate"
+                                  Label="@Label"
+                                  Placeholder="@Placeholder" />
+            }
+            break;
+
+        case EditableFieldType.Switch:
+            <BbFormFieldSwitch Checked="@CurrentSwitchValue"
+                               CheckedChanged="OnSwitchChanged"
+                               Label="@Label" />
+            break;
+    }
+}
+else
+{
+    <div>
+        <BbTypographyMuted>@Label</BbTypographyMuted>
+        @if (CustomDisplay is not null)
+        {
+            @CustomDisplay
+        }
+        else
+        {
+            <BbTypographyP>@(DisplayValue ?? Value ?? "N/A")</BbTypographyP>
+        }
+    </div>
+}
+
+@code {
+    [CascadingParameter] private EditableFormContext? _context { get; set; }
+
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string? DisplayValue { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EditableFieldType FieldType { get; set; } = EditableFieldType.Text;
+    [Parameter] public IEnumerable<SelectOption<string>>? Options { get; set; }
+    [Parameter] public RenderFragment? CustomDisplay { get; set; }
+
+    private string _fieldId = Guid.NewGuid().ToString();
+    private string? _originalValue;
+    private bool _hasOriginalValue;
+    private bool CurrentSwitchValue => bool.TryParse(Value, out var value) && value;
+
+    protected override void OnParametersSet()
+    {
+        if (_context is { IsEditing: true } && !_hasOriginalValue)
+        {
+            _originalValue = Value;
+            _hasOriginalValue = true;
+        }
+        else if (_context is { IsEditing: false })
+        {
+            _originalValue = null;
+            _hasOriginalValue = false;
+        }
+    }
+
+    private async Task OnValueChanged(string? newValue)
+    {
+        Value = newValue;
+        await ValueChanged.InvokeAsync(newValue);
+
+        if (_context is not null)
+        {
+            if (newValue != _originalValue)
+                _context.MarkFieldDirty(_fieldId);
+            else
+                _context.MarkFieldClean(_fieldId);
+        }
+    }
+
+    private async Task OnSwitchChanged(bool newValue)
+    {
+        await OnValueChanged(newValue.ToString().ToLowerInvariant());
+    }
+}

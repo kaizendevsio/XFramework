@@ -1,0 +1,140 @@
+@page "/inventario/transactions"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Inventario Transactions - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <BbTypographyH3>Inventory Transactions</BbTypographyH3>
+                    <BbTypographyMuted>Read-only stock and sales movement history for the selected tenant.</BbTypographyMuted>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Transactions</BbCardTitle>
+                    <BbCardDescription>@_transactions.Count transaction(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((ProductTransaction item) => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Total" Filterable="true" FilterBy="@(item => item.TotalPrice)">
+                                <ChildContent Context="item">@item.TotalPrice.ToString("N2")</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.TransactionDate)" Title="Transaction Date" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View transaction"
+                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))">
+                                        <LucideIcon Name="eye" class="h-4 w-4" />
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+
+    private List<ProductTransaction> _transactions = [];
+    private Dictionary<Guid, string> _productNames = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
+            _transactions = [];
+            _productNames = [];
+            if (!_hasTenant || !_moduleEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            var products = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Take(1000)
+                .ToListAsync();
+            _productNames = products.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]);
+
+            _transactions = await DataContext.Query<ProductTransaction>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.TransactionDate)
+                .Take(250)
+                .ToListAsync();
+        }
+        catch
+        {
+            ToastService.Show("Could not load inventory transactions.");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetProductName(Guid productId) =>
+        _productNames.TryGetValue(productId, out var name) ? name : productId.ToString()[..8];
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

@@ -108,7 +108,7 @@ public partial class QueryExecutionServiceTests
             Mode = QueryExecutionMode.ToList,
             Metadata = new RequestMetadata
             {
-                DeviceAgent = "ControlPanel;xframework.ignoreQueryFilters"
+                DeviceAgent = "Portal;xframework.ignoreQueryFilters"
             }
         };
 

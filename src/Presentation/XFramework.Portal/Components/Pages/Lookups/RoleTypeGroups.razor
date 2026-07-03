@@ -1,0 +1,48 @@
+@page "/lookups/role-type-groups"
+@using XFramework.Domain.Shared.DataContext
+
+<PageTitle>Role Type Groups - Portal</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Role Type Groups</BbTypographyH3>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+            <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<IdentityRoleTypeGroup> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            _items = await DataContext.Query<IdentityRoleTypeGroup>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

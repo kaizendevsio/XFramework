@@ -80,7 +80,7 @@
   </Folder>
   <Folder Name="/Presentation/">
     <Project Path="src\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
-    <Project Path="src\Presentation\ControlPanel.Server\ControlPanel.Server.csproj" />
+    <Project Path="src\Presentation\XFramework.Portal\XFramework.Portal.csproj" />
     <Project Path="src\Presentation\Fluid\Fluid.csproj" />
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
     <Project Path="src\Presentation\XFramework.Operations.Dashboard\XFramework.Operations.Dashboard.csproj" />
@@ -95,7 +95,7 @@
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\Attendance.IntegrationTests\Attendance.IntegrationTests.csproj" />
-    <Project Path="src\Tests\ControlPanel.E2ETests\ControlPanel.E2ETests.csproj" />
+    <Project Path="src\Tests\Portal.E2ETests\Portal.E2ETests.csproj" />
     <Project Path="src\Tests\Inventario.Api.Tests\Inventario.Api.Tests.csproj" />
     <Project Path="src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.csproj" />
     <Project Path="src\Tests\POS.Api.Tests\POS.Api.Tests.csproj" />

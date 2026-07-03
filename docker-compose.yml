@@ -4,7 +4,7 @@
 #   Production:           podman-compose --env-file .env.production up --build
 #
 # Service config lives in appsettings.Docker.json per service.
-# ControlPanel uses appsettings.dev.json for the xeon-dev admin surface.
+# Portal uses appsettings.dev.json for the xeon-dev admin surface.
 # Only secrets and infra overrides go in env vars / .env files.
 
 x-common-env: &common-env
@@ -25,7 +25,7 @@ x-common-env: &common-env
 
 services:
 
-  # ── PostgreSQL ──────────────────────────────────────────────
+  # -- PostgreSQL ----------------------------------------------
   postgres:
     container_name: xframework-postgres
     image: postgres:17-alpine
@@ -56,7 +56,7 @@ services:
       timeout: 3s
       retries: 10
 
-  # ── Database Migration Runner (runs once, then exits) ───────
+  # -- Database Migration Runner (runs once, then exits) -------
   minio:
     container_name: xframework-minio
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -92,7 +92,7 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # ── Bolt Hub (must be healthy before services start) ─────────
+  # -- Bolt Hub (must be healthy before services start) ---------
   bolt-hub:
     container_name: xframework-bolt-hub
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/bolt-hub:${IMAGE_TAG:-develop}
@@ -121,7 +121,7 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── Identity Server ─────────────────────────────────────────
+  # -- Identity Server -----------------------------------------
   identityserver:
     container_name: xframework-identityserver
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/identityserver:${IMAGE_TAG:-develop}
@@ -144,7 +144,7 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── Communications Server ────────────────────────────────────────
+  # -- Communications Server ----------------------------------------
   communications:
     container_name: xframework-communications
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/communications:${IMAGE_TAG:-develop}
@@ -167,7 +167,7 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── Notifications Server ────────────────────────────────────
+  # -- Notifications Server ------------------------------------
   notifications:
     container_name: xframework-notifications
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/notifications:${IMAGE_TAG:-develop}
@@ -250,7 +250,7 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── SMS Gateway ─────────────────────────────────────────────
+  # -- SMS Gateway ---------------------------------------------
   smsgateway:
     container_name: xframework-smsgateway
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/smsgateway:${IMAGE_TAG:-develop}
@@ -273,7 +273,7 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── Wallets Server ──────────────────────────────────────────
+  # -- Wallets Server ------------------------------------------
   wallets:
     container_name: xframework-wallets
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/wallets:${IMAGE_TAG:-develop}
@@ -296,7 +296,7 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── Inventario Server ───────────────────────────────────────
+  # -- Inventario Server ---------------------------------------
   inventario:
     container_name: xframework-inventario
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/inventario:${IMAGE_TAG:-develop}
@@ -319,7 +319,7 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── Control Panel ───────────────────────────────────────────
+  # -- POS -----------------------------------------------------
   pos:
     container_name: xframework-pos
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/pos:${IMAGE_TAG:-develop}
@@ -346,19 +346,20 @@ services:
       retries: 15
       start_period: 15s
 
-  controlpanel:
-    container_name: xframework-controlpanel
-    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/controlpanel:${IMAGE_TAG:-develop}
+  # -- Portal --------------------------------------------------
+  portal:
+    container_name: xframework-portal
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/portal:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        PROJECT_PATH: src/Presentation/ControlPanel.Server/ControlPanel.Server.csproj
+        PROJECT_PATH: src/Presentation/XFramework.Portal/XFramework.Portal.csproj
     environment:
       <<: *common-env
-      ASPNETCORE_ENVIRONMENT: ${CONTROLPANEL_ASPNETCORE_ENVIRONMENT:-dev}
+      ASPNETCORE_ENVIRONMENT: ${PORTAL_ASPNETCORE_ENVIRONMENT:-dev}
     ports:
-      - "${CONTROLPANEL_EXPOSE_PORT:-5000}:8080"
+      - "${PORTAL_EXPOSE_PORT:-5000}:8080"
     depends_on:
       bolt-hub:
         condition: service_healthy
@@ -383,7 +384,7 @@ services:
       retries: 15
       start_period: 15s
 
-  # ── Seq (structured log aggregator) ──────────────────────────
+  # -- Seq (structured log aggregator) --------------------------
   # Operations Dashboard
   operations-dashboard:
     container_name: xframework-operations-dashboard

@@ -1,0 +1,1376 @@
+@page "/admin/reference-data"
+@using XFramework.Domain.Shared.Contracts.Base
+@using XFramework.Domain.Shared.DataContext
+
+<PageTitle>Reference Data - Portal</PageTitle>
+
+<div class="space-y-4">
+    <div>
+        <h2 class="text-2xl font-bold tracking-tight">Reference Data</h2>
+        <p class="text-sm text-muted-foreground">System lookup tables and reference types. These are shared across tenants.</p>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <FadeInContent>
+    <BbTabs DefaultValue="role-types"
+            Orientation="BlazorBlueprint.Primitives.Tabs.TabsOrientation.Vertical"
+            OnValueChange="@OnReferenceCategoryChanged"
+            Class="reference-data-layout">
+        <div class="reference-data-sidebar">
+            <div class="space-y-2">
+                <BbLabel For="reference-category-search">Categories</BbLabel>
+                <input id="reference-category-search"
+                       class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                       value="@_categorySearch"
+                       @oninput="OnCategorySearchInput"
+                       placeholder="Search reference data" />
+            </div>
+            <nav class="reference-data-nav" aria-label="Reference data categories">
+                @foreach (var group in VisibleCategoryGroups)
+                {
+                    <section class="reference-data-group-section" aria-labelledby="@($"reference-data-group-{group.Key.Replace(" ", "-").ToLowerInvariant()}")">
+                        <div id="@($"reference-data-group-{group.Key.Replace(" ", "-").ToLowerInvariant()}")"
+                             class="reference-data-group-label">
+                            @group.Key
+                        </div>
+                        <BbTabsList Class="reference-data-group-list" Responsive="false">
+                            @foreach (var category in group)
+                            {
+                                <BbTabsTrigger Value="@category.Value"
+                                               Label="@category.Label"
+                                               Class="reference-data-trigger">
+                                    @category.Label
+                                </BbTabsTrigger>
+                            }
+                        </BbTabsList>
+                    </section>
+                }
+            </nav>
+        </div>
+
+        <div class="reference-data-content">
+        @if (_activeTabLoading)
+        {
+            <CenteredSpinner />
+        }
+        else
+        {
+
+        @* -- Role Types -- *@
+        <BbTabsContent Value="role-types" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Role Types</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Role Type
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_roleTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.RoleLevel)" Title="Level" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name ?? "", "", "", (item.RoleLevel ?? 0).ToString(), item.SystemReferenceId.ToString(), groupId: item.GroupId.ToString()))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name ?? ""))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Role Type Groups -- *@
+        <BbTabsContent Value="role-type-groups" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Role Groups</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Role Group
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_roleTypeGroups" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name, item.Description, "", "", item.SystemReferenceId.ToString()))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Contact Types -- *@
+        <BbTabsContent Value="contact-types" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Contact Types</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Contact Type
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_contactTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name ?? "", "", "", "", item.SystemReferenceId.ToString()))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name ?? ""))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Contact Groups -- *@
+        <BbTabsContent Value="contact-groups" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Contact Groups</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Contact Group
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_contactGroups" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name, "", "", "", item.SystemReferenceId.ToString()))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Address Types -- *@
+        <BbTabsContent Value="address-types" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Address Types</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Address Type
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_addressTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name ?? "", "", "", "", item.SystemReferenceId.ToString()))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name ?? ""))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Verification Types -- *@
+        <BbTabsContent Value="verification-types" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Verification Types</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Verification Type
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_verificationTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.DefaultExpiry)" Title="Default Expiry" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Priority)" Title="Priority" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name ?? "", "", "", "", item.SystemReferenceId.ToString(), (item.DefaultExpiry ?? 0).ToString(), (item.Priority ?? 0).ToString()))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name ?? ""))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Session Types -- *@
+        <BbTabsContent Value="session-types" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Session Types</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Session Type
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_sessionTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name ?? "", "", "", "", item.SystemReferenceId.ToString()))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name ?? ""))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Wallet Types -- *@
+        <BbTabsContent Value="wallet-types" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Wallet Types</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Wallet Type
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_walletTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Desc)" Title="Description" />
+                    <BbDataGridPropertyColumn Property="@(x => x.MinTransferRule)" Title="Min Transfer" />
+                    <BbDataGridPropertyColumn Property="@(x => x.MaxTransferRule)" Title="Max Transfer" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditWalletType(item))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Currency Types -- *@
+        <BbTabsContent Value="currency-types" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Currency Types</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Currency Type
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_currencyTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.CurrencyIsoCode3)" Title="ISO Code" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditCurrencyType(item))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, item.Name ?? ""))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        @* -- Exchange Rates -- *@
+        <BbTabsContent Value="exchange-rates" Class="xf-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <BbTypographyH3>Exchange Rates</BbTypographyH3>
+                <BbButton OnClick="@(() => OpenAddDialog())">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Add Exchange Rate
+                </BbButton>
+            </div>
+            <BbDataGrid Items="@_exchangeRates" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.SourceCurrencyTypeId)" Title="Source Currency" />
+                    <BbDataGridPropertyColumn Property="@(x => x.TargetCurrencyTypeId)" Title="Target Currency" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Rate" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Fee)" Title="Fee" />
+                    <BbDataGridPropertyColumn Property="@(x => x.EffectivityDate)" Title="Effective" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.ExpiryDate)" Title="Expires" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-2">
+                                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenEditExchangeRate(item))">
+                                    Edit
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                          OnClick="@(() => OpenDeleteDialog(item, $"Rate {item.Value}"))">
+                                    Delete
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+        }
+        </div>
+    </BbTabs>
+    </FadeInContent>
+    }
+</div>
+
+@* -- Create / Edit Dialog -- *@
+<BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(_isEditing ? "Edit" : "Add") @TabDisplayName</BbDialogTitle>
+            <BbDialogDescription>@(_isEditing ? "Update the record below." : "Fill in the details to create a new record.")</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="space-y-4 py-4">
+            @switch (_activeTab)
+            {
+                case "role-types":
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formName"
+                                      Label="Name"
+                                      Placeholder="Role type name"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formLevel"
+                                      Label="Level"
+                                      Placeholder="Numeric role level (e.g. 1)" />
+                    @if (_roleTypeGroups.Count == 0)
+                    {
+                        <div>
+                            <BbLabel>Group</BbLabel>
+                            <p class="text-sm text-muted-foreground">Create a role group before adding role types.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <BbFormFieldSelect TValue="string"
+                                           @bind-Value="_formGroupId"
+                                           Label="Group"
+                                           Placeholder="Select role group"
+                                           Required="true">
+                            @foreach (var group in _roleTypeGroups)
+                            {
+                                <BbSelectItem Value="@group.Id.ToString()">@group.Name</BbSelectItem>
+                            }
+                        </BbFormFieldSelect>
+                    }
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formSystemRef"
+                                      Label="System Reference ID"
+                                      Placeholder="GUID (leave empty for auto-generated)" />
+                    break;
+
+                case "role-type-groups":
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formName"
+                                      Label="Name"
+                                      Placeholder="Group name"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formDescription"
+                                      Label="Description"
+                                      Placeholder="Group description" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formSystemRef"
+                                      Label="System Reference ID"
+                                      Placeholder="GUID (leave empty for auto-generated)" />
+                    break;
+
+                case "contact-types":
+                case "contact-groups":
+                case "address-types":
+                case "session-types":
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formName"
+                                      Label="Name"
+                                      Placeholder="Type name"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formSystemRef"
+                                      Label="System Reference ID"
+                                      Placeholder="GUID (leave empty for auto-generated)" />
+                    break;
+
+                case "verification-types":
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formName"
+                                      Label="Name"
+                                      Placeholder="Verification type name"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formDefaultExpiry"
+                                      Label="Default Expiry (seconds)"
+                                      Placeholder="e.g. 3600" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formPriority"
+                                      Label="Priority"
+                                      Placeholder="e.g. 1" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formSystemRef"
+                                      Label="System Reference ID"
+                                      Placeholder="GUID (leave empty for auto-generated)" />
+                    break;
+
+                case "wallet-types":
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formCode"
+                                      Label="Code"
+                                      Placeholder="Short code (e.g. PHP)"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formName"
+                                      Label="Name"
+                                      Placeholder="Wallet type name"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formDescription"
+                                      Label="Description"
+                                      Placeholder="Description" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formMinTransfer"
+                                      Label="Min Transfer"
+                                      Placeholder="e.g. 0.01" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formMaxTransfer"
+                                      Label="Max Transfer"
+                                      Placeholder="e.g. 100000" />
+                    break;
+
+                case "currency-types":
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formName"
+                                      Label="Name"
+                                      Placeholder="Currency name (e.g. Philippine Peso)"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formCurrencyCode"
+                                      Label="Currency ISO Code"
+                                      Placeholder="3-letter ISO code (e.g. PHP)" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formDescription"
+                                      Label="Description"
+                                      Placeholder="Description" />
+                    break;
+
+                case "exchange-rates":
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formSourceCurrency"
+                                      Label="Source Currency Type ID"
+                                      Placeholder="GUID of source currency"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formTargetCurrency"
+                                      Label="Target Currency Type ID"
+                                      Placeholder="GUID of target currency"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formValue"
+                                      Label="Rate"
+                                      Placeholder="Exchange rate value"
+                                      Required="true" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formFee"
+                                      Label="Fee"
+                                      Placeholder="Transaction fee" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formEffectivity"
+                                      Label="Effectivity Date"
+                                      Placeholder="YYYY-MM-DD HH:mm" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_formExpiry"
+                                      Label="Expiry Date"
+                                      Placeholder="YYYY-MM-DD HH:mm" />
+                    break;
+            }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveRecord">@(_isEditing ? "Update" : "Create")</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@* -- Delete Confirmation Dialog -- *@
+<ConfirmDeleteDialog Open="@_deleteDialogOpen"
+                     OpenChanged="@(v => _deleteDialogOpen = v)"
+                     Message="@($"This will permanently delete \"{_deleteName}\". This action cannot be undone.")"
+                     OnConfirm="@ConfirmDelete" />
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private bool _loading = true;
+    private bool _dialogOpen;
+    private bool _deleteDialogOpen;
+    private bool _isEditing;
+    private string _activeTab = "role-types";
+    private bool _activeTabLoading;
+    private string _categorySearch = "";
+    private readonly HashSet<string> _loadedTabs = [];
+
+    private static readonly List<ReferenceCategory> _referenceCategories =
+    [
+        new("role-types", "Role Types", "Identity"),
+        new("role-type-groups", "Role Groups", "Identity"),
+        new("contact-types", "Contact Types", "Profile Data"),
+        new("contact-groups", "Contact Groups", "Profile Data"),
+        new("address-types", "Address Types", "Profile Data"),
+        new("verification-types", "Verification Types", "Security"),
+        new("session-types", "Session Types", "Security"),
+        new("wallet-types", "Wallet Types", "Finance"),
+        new("currency-types", "Currency Types", "Finance"),
+        new("exchange-rates", "Exchange Rates", "Finance")
+    ];
+
+    private IEnumerable<IGrouping<string, ReferenceCategory>> VisibleCategoryGroups =>
+        _referenceCategories
+            .Where(x => string.IsNullOrWhiteSpace(_categorySearch)
+                        || x.Label.Contains(_categorySearch, StringComparison.OrdinalIgnoreCase)
+                        || x.Group.Contains(_categorySearch, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(x => x.Group);
+
+    private void OnCategorySearchInput(ChangeEventArgs args)
+    {
+        _categorySearch = args.Value?.ToString() ?? "";
+    }
+
+    // Generic form fields
+    private Guid _editingId;
+    private string _formName = "";
+    private string _formDescription = "";
+    private string _formCode = "";
+    private string _formLevel = "";
+    private string _formGroupId = "";
+    private string _formSystemRef = "";
+    private string _formPriority = "";
+    private string _formDefaultExpiry = "";
+    private string _formMinTransfer = "";
+    private string _formMaxTransfer = "";
+    private string _formCurrencyCode = "";
+    private string _formValue = "";
+    private string _formFee = "";
+    private string _formSourceCurrency = "";
+    private string _formTargetCurrency = "";
+    private string _formEffectivity = "";
+    private string _formExpiry = "";
+
+    // Delete state
+    private string _deleteName = "";
+    private object? _deleteTarget;
+
+    // Data lists
+    private List<IdentityRoleType> _roleTypes = [];
+    private List<IdentityRoleTypeGroup> _roleTypeGroups = [];
+    private List<IdentityContactType> _contactTypes = [];
+    private List<IdentityContactGroup> _contactGroups = [];
+    private List<IdentityAddressType> _addressTypes = [];
+    private List<IdentityVerificationType> _verificationTypes = [];
+    private List<SessionType> _sessionTypes = [];
+    private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
+    private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _currencyTypes = [];
+    private List<ExchangeRate> _exchangeRates = [];
+
+    private string TabDisplayName => _activeTab switch
+    {
+        "role-types" => "Role Type",
+        "role-type-groups" => "Role Group",
+        "contact-types" => "Contact Type",
+        "contact-groups" => "Contact Group",
+        "address-types" => "Address Type",
+        "verification-types" => "Verification Type",
+        "session-types" => "Session Type",
+        "wallet-types" => "Wallet Type",
+        "currency-types" => "Currency Type",
+        "exchange-rates" => "Exchange Rate",
+        _ => "Record"
+    };
+
+    private sealed record ReferenceCategory(string Value, string Label, string Group);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            await ReloadActiveTab();
+        }
+        catch { /* Non-critical - empty tabs are fine */ }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnReferenceCategoryChanged(string? value)
+    {
+        var nextTab = string.IsNullOrWhiteSpace(value) ? "role-types" : value;
+        if (_activeTab == nextTab)
+        {
+            return;
+        }
+
+        _activeTab = nextTab;
+        if (_loadedTabs.Contains(_activeTab))
+        {
+            return;
+        }
+
+        _activeTabLoading = true;
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            await ReloadActiveTab();
+        }
+        finally
+        {
+            _activeTabLoading = false;
+        }
+    }
+
+    private async Task LoadAllData()
+    {
+        _roleTypes = await LoadList<IdentityRoleType>();
+        _roleTypeGroups = await LoadList<IdentityRoleTypeGroup>();
+        _contactTypes = await LoadList<IdentityContactType>();
+        _contactGroups = await LoadList<IdentityContactGroup>();
+        _addressTypes = await LoadList<IdentityAddressType>();
+        _verificationTypes = await LoadList<IdentityVerificationType>();
+        _sessionTypes = await LoadList<SessionType>();
+        _walletTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.WalletType>();
+        _currencyTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.CurrencyType>();
+        _exchangeRates = await LoadList<ExchangeRate>();
+    }
+
+    private async Task ReloadActiveTab()
+    {
+        try
+        {
+            switch (_activeTab)
+            {
+                case "role-types":
+                    _roleTypes = await LoadList<IdentityRoleType>();
+                    break;
+                case "role-type-groups":
+                    _roleTypeGroups = await LoadList<IdentityRoleTypeGroup>();
+                    break;
+                case "contact-types":
+                    _contactTypes = await LoadList<IdentityContactType>();
+                    break;
+                case "contact-groups":
+                    _contactGroups = await LoadList<IdentityContactGroup>();
+                    break;
+                case "address-types":
+                    _addressTypes = await LoadList<IdentityAddressType>();
+                    break;
+                case "verification-types":
+                    _verificationTypes = await LoadList<IdentityVerificationType>();
+                    break;
+                case "session-types":
+                    _sessionTypes = await LoadList<SessionType>();
+                    break;
+                case "wallet-types":
+                    _walletTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.WalletType>();
+                    break;
+                case "currency-types":
+                    _currencyTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.CurrencyType>();
+                    break;
+                case "exchange-rates":
+                    _exchangeRates = await LoadList<ExchangeRate>();
+                    break;
+            }
+
+            _loadedTabs.Add(_activeTab);
+        }
+        catch { /* reload failure is non-critical */ }
+    }
+
+    private async Task<List<T>> LoadList<T>(int take = 100) where T : BaseModel =>
+        await DataContext.Query<T>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => !x.IsDeleted)
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(take)
+            .ToListAsync();
+
+    // -- Add / Edit Helpers --
+
+    private void ResetFormFields()
+    {
+        _editingId = Guid.Empty;
+        _formName = "";
+        _formDescription = "";
+        _formCode = "";
+        _formLevel = "";
+        _formGroupId = "";
+        _formSystemRef = "";
+        _formPriority = "";
+        _formDefaultExpiry = "";
+        _formMinTransfer = "";
+        _formMaxTransfer = "";
+        _formCurrencyCode = "";
+        _formValue = "";
+        _formFee = "";
+        _formSourceCurrency = "";
+        _formTargetCurrency = "";
+        _formEffectivity = "";
+        _formExpiry = "";
+    }
+
+    private void OpenAddDialog()
+    {
+        _isEditing = false;
+        ResetFormFields();
+        if (_activeTab == "role-types" && _roleTypeGroups.Count == 1)
+        {
+            _formGroupId = _roleTypeGroups[0].Id.ToString();
+        }
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(Guid id, string name, string description, string code, string level, string systemRef, string defaultExpiry = "", string priority = "", string groupId = "")
+    {
+        _isEditing = true;
+        ResetFormFields();
+        _editingId = id;
+        _formName = name;
+        _formDescription = description;
+        _formCode = code;
+        _formLevel = level;
+        _formGroupId = groupId;
+        _formSystemRef = systemRef;
+        _formDefaultExpiry = defaultExpiry;
+        _formPriority = priority;
+        _dialogOpen = true;
+    }
+
+    private void OpenEditWalletType(global::Wallets.Domain.Shared.Contracts.WalletType item)
+    {
+        _isEditing = true;
+        ResetFormFields();
+        _editingId = item.Id;
+        _formCode = item.Code;
+        _formName = item.Name;
+        _formDescription = item.Desc ?? "";
+        _formMinTransfer = item.MinTransferRule?.ToString() ?? "";
+        _formMaxTransfer = item.MaxTransferRule?.ToString() ?? "";
+        _dialogOpen = true;
+    }
+
+    private void OpenEditCurrencyType(global::Wallets.Domain.Shared.Contracts.CurrencyType item)
+    {
+        _isEditing = true;
+        ResetFormFields();
+        _editingId = item.Id;
+        _formName = item.Name ?? "";
+        _formCurrencyCode = item.CurrencyIsoCode3 ?? "";
+        _formDescription = item.Description ?? "";
+        _dialogOpen = true;
+    }
+
+    private void OpenEditExchangeRate(ExchangeRate item)
+    {
+        _isEditing = true;
+        ResetFormFields();
+        _editingId = item.Id;
+        _formSourceCurrency = item.SourceCurrencyTypeId.ToString();
+        _formTargetCurrency = item.TargetCurrencyTypeId.ToString();
+        _formValue = item.Value?.ToString() ?? "";
+        _formFee = item.Fee?.ToString() ?? "";
+        _formEffectivity = item.EffectivityDate?.ToString("yyyy-MM-ddTHH:mm") ?? "";
+        _formExpiry = item.ExpiryDate?.ToString("yyyy-MM-ddTHH:mm") ?? "";
+        _dialogOpen = true;
+    }
+
+    // -- Delete Helpers --
+
+    private void OpenDeleteDialog(object target, string displayName)
+    {
+        _deleteTarget = target;
+        _deleteName = displayName;
+        _deleteDialogOpen = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deleteTarget is null) return;
+
+        DataContextResult? result = _deleteTarget switch
+        {
+            IdentityRoleType entity => await RemoveEntity(entity),
+            IdentityRoleTypeGroup entity => await RemoveEntity(entity),
+            IdentityContactType entity => await RemoveEntity(entity),
+            IdentityContactGroup entity => await RemoveEntity(entity),
+            IdentityAddressType entity => await RemoveEntity(entity),
+            IdentityVerificationType entity => await RemoveEntity(entity),
+            SessionType entity => await RemoveEntity(entity),
+            global::Wallets.Domain.Shared.Contracts.WalletType entity => await RemoveEntity(entity),
+            global::Wallets.Domain.Shared.Contracts.CurrencyType entity => await RemoveEntity(entity),
+            ExchangeRate entity => await RemoveEntity(entity),
+            _ => null
+        };
+        ToastService.Show(result?.IsSuccess == true ? $"{TabDisplayName} deleted." : $"Error: {result?.Message}");
+        _deleteDialogOpen = false;
+        _deleteTarget = null;
+        _deleteName = "";
+        await ReloadActiveTab();
+    }
+
+    private async Task<DataContextResult> RemoveEntity<T>(T entity) where T : BaseModel
+    {
+        DataContext.Remove(entity);
+        return await DataContext.SaveChangesAsync();
+    }
+
+    // -- Save (Create / Update) --
+
+    private async Task SaveRecord()
+    {
+        switch (_activeTab)
+        {
+            case "role-types":
+                await SaveRoleType();
+                break;
+            case "role-type-groups":
+                await SaveRoleTypeGroup();
+                break;
+            case "contact-types":
+                await SaveContactType();
+                break;
+            case "contact-groups":
+                await SaveContactGroup();
+                break;
+            case "address-types":
+                await SaveAddressType();
+                break;
+            case "verification-types":
+                await SaveVerificationType();
+                break;
+            case "session-types":
+                await SaveSessionType();
+                break;
+            case "wallet-types":
+                await SaveWalletType();
+                break;
+            case "currency-types":
+                await SaveCurrencyType();
+                break;
+            case "exchange-rates":
+                await SaveExchangeRate();
+                break;
+        }
+    }
+
+    private Guid ParseSystemRef() =>
+        Guid.TryParse(_formSystemRef, out var id) ? id : Guid.NewGuid();
+
+    private async Task SaveRoleType()
+    {
+        var name = _formName.Trim();
+        if (string.IsNullOrWhiteSpace(name)) { ToastService.Show("Name is required."); return; }
+
+        if (!Guid.TryParse(_formGroupId, out var groupId) || groupId == Guid.Empty)
+        {
+            ToastService.Show("Role group is required.");
+            return;
+        }
+
+        if (_isEditing)
+        {
+            var entity = new IdentityRoleType
+            {
+                Id = _editingId,
+                Name = name,
+                RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : null,
+                GroupId = groupId,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new IdentityRoleType
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : null,
+                GroupId = groupId,
+                SystemReferenceId = ParseSystemRef(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveRoleTypeGroup()
+    {
+        if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
+
+        if (_isEditing)
+        {
+            var entity = new IdentityRoleTypeGroup
+            {
+                Id = _editingId,
+                Name = _formName,
+                Description = _formDescription,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new IdentityRoleTypeGroup
+            {
+                Id = Guid.NewGuid(),
+                Name = _formName,
+                Description = _formDescription,
+                SystemReferenceId = ParseSystemRef(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveContactType()
+    {
+        if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
+
+        if (_isEditing)
+        {
+            var entity = new IdentityContactType
+            {
+                Id = _editingId,
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new IdentityContactType
+            {
+                Id = Guid.NewGuid(),
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveContactGroup()
+    {
+        if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
+
+        if (_isEditing)
+        {
+            var entity = new IdentityContactGroup
+            {
+                Id = _editingId,
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new IdentityContactGroup
+            {
+                Id = Guid.NewGuid(),
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveAddressType()
+    {
+        if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
+
+        if (_isEditing)
+        {
+            var entity = new IdentityAddressType
+            {
+                Id = _editingId,
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new IdentityAddressType
+            {
+                Id = Guid.NewGuid(),
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveVerificationType()
+    {
+        if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
+
+        if (_isEditing)
+        {
+            var entity = new IdentityVerificationType
+            {
+                Id = _editingId,
+                Name = _formName,
+                DefaultExpiry = long.TryParse(_formDefaultExpiry, out var exp) ? exp : null,
+                Priority = short.TryParse(_formPriority, out var pri) ? pri : null,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new IdentityVerificationType
+            {
+                Id = Guid.NewGuid(),
+                Name = _formName,
+                DefaultExpiry = long.TryParse(_formDefaultExpiry, out var exp) ? exp : null,
+                Priority = short.TryParse(_formPriority, out var pri) ? pri : null,
+                SystemReferenceId = ParseSystemRef(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveSessionType()
+    {
+        if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
+
+        if (_isEditing)
+        {
+            var entity = new SessionType
+            {
+                Id = _editingId,
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new SessionType
+            {
+                Id = Guid.NewGuid(),
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveWalletType()
+    {
+        var code = _formCode.Trim();
+        var name = _formName.Trim();
+        var description = _formDescription.Trim();
+
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code))
+        {
+            ToastService.Show("Code and Name are required.");
+            return;
+        }
+
+        if (code.Length > 9)
+        {
+            ToastService.Show("Wallet type code must be 9 characters or fewer.");
+            return;
+        }
+
+        if (name.Length > 20)
+        {
+            ToastService.Show("Wallet type name must be 20 characters or fewer.");
+            return;
+        }
+
+        if (description.Length > 500)
+        {
+            ToastService.Show("Wallet type description must be 500 characters or fewer.");
+            return;
+        }
+
+        if (_isEditing)
+        {
+            var entity = new global::Wallets.Domain.Shared.Contracts.WalletType
+            {
+                Id = _editingId,
+                Code = code,
+                Name = name,
+                Desc = string.IsNullOrWhiteSpace(description) ? null : description,
+                MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null,
+                MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new global::Wallets.Domain.Shared.Contracts.WalletType
+            {
+                Id = Guid.NewGuid(),
+                Code = code,
+                Name = name,
+                Desc = string.IsNullOrWhiteSpace(description) ? null : description,
+                MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null,
+                MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveCurrencyType()
+    {
+        if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
+
+        if (_isEditing)
+        {
+            var entity = new global::Wallets.Domain.Shared.Contracts.CurrencyType
+            {
+                Id = _editingId,
+                Name = _formName,
+                CurrencyIsoCode3 = string.IsNullOrWhiteSpace(_formCurrencyCode) ? null : _formCurrencyCode,
+                Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new global::Wallets.Domain.Shared.Contracts.CurrencyType
+            {
+                Id = Guid.NewGuid(),
+                Name = _formName,
+                CurrencyIsoCode3 = string.IsNullOrWhiteSpace(_formCurrencyCode) ? null : _formCurrencyCode,
+                Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task SaveExchangeRate()
+    {
+        if (!Guid.TryParse(_formSourceCurrency, out var sourceId) || !Guid.TryParse(_formTargetCurrency, out var targetId))
+        {
+            ToastService.Show("Source and Target Currency IDs must be valid GUIDs.");
+            return;
+        }
+
+        if (!decimal.TryParse(_formValue, out var rate))
+        {
+            ToastService.Show("Rate must be a valid number.");
+            return;
+        }
+
+        if (_isEditing)
+        {
+            var entity = new ExchangeRate
+            {
+                Id = _editingId,
+                SourceCurrencyTypeId = sourceId,
+                TargetCurrencyTypeId = targetId,
+                Value = rate,
+                Fee = decimal.TryParse(_formFee, out var fee) ? fee : null,
+                EffectivityDate = DateTime.TryParse(_formEffectivity, out var eff) ? eff : null,
+                ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? exp : null,
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(entity);
+        }
+        else
+        {
+            var entity = new ExchangeRate
+            {
+                Id = Guid.NewGuid(),
+                SourceCurrencyTypeId = sourceId,
+                TargetCurrencyTypeId = targetId,
+                Value = rate,
+                Fee = decimal.TryParse(_formFee, out var fee) ? fee : null,
+                EffectivityDate = DateTime.TryParse(_formEffectivity, out var eff) ? eff : null,
+                ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? exp : null,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            await PersistAndClose(entity);
+        }
+    }
+
+    private async Task PersistAndClose<T>(T entity) where T : class
+    {
+        if (!await PrepareEntityForPersistence(entity))
+        {
+            return;
+        }
+
+        if (_isEditing)
+        {
+            DataContext.Update(entity);
+        }
+        else
+        {
+            DataContext.Add(entity);
+        }
+
+        var result = await DataContext.SaveChangesAsync();
+        if (!result.IsSuccess)
+        {
+            ToastService.Show($"Error: {result.Message}");
+            return;
+        }
+
+        ToastService.Show(_isEditing ? $"{TabDisplayName} updated." : $"{TabDisplayName} created.");
+        _dialogOpen = false;
+        await ReloadActiveTab();
+    }
+
+    private async Task<bool> PrepareEntityForPersistence<T>(T entity) where T : class
+    {
+        if (entity is not BaseModel model)
+        {
+            return true;
+        }
+
+        var tenantId = await ResolveReferenceTenantId();
+        if (tenantId is null)
+        {
+            ToastService.Show("Create or select a tenant before adding reference data.");
+            return false;
+        }
+
+        model.TenantId = tenantId.Value;
+        if (model.ConcurrencyStamp == Guid.Empty)
+        {
+            model.ConcurrencyStamp = Guid.NewGuid();
+        }
+
+        if (entity is IHasSystemReferenceId systemReference && systemReference.SystemReferenceId == Guid.Empty)
+        {
+            systemReference.SystemReferenceId = ParseSystemRef();
+        }
+
+        return true;
+    }
+
+    private async Task<Guid?> ResolveReferenceTenantId()
+    {
+        if (TenantFilter.SelectedTenantId is Guid selectedTenantId)
+        {
+            return selectedTenantId;
+        }
+
+        var tenant = await DataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Take(1)
+            .FirstOrDefaultAsync();
+
+        return tenant?.Id;
+    }
+}

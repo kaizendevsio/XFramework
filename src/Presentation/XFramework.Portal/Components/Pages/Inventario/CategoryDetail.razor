@@ -1,0 +1,315 @@
+@page "/inventario/categories/{Id:guid}"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Inventario Category - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario" />
+}
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/inventario/categories"))">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Categories
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Category Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to this category's tenant to view its details.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else if (_category is null)
+{
+    <BbTypographyMuted>Category not found.</BbTypographyMuted>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-detail-header">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to categories"
+                          OnClick="@(() => Navigation.NavigateTo("/inventario/categories"))">
+                    <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                </BbButton>
+                <div class="xf-detail-header-main">
+                    <div class="xf-detail-header-title">
+                        <BbTypographyH3>@(_category.Name ?? "Unnamed Category")</BbTypographyH3>
+                        <StatusBadge Text="@(_category.IsEnabled ? "Enabled" : "Disabled")"
+                                     Status="@(_category.IsEnabled ? "active" : "inactive")" />
+                    </div>
+                    <BbTypographyMuted>ID: @_category.Id</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    @if (_editMode)
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@CancelEdit" Disabled="@_saving">Discard</BbButton>
+                        <BbButton OnClick="@SaveCategory" Disabled="@_saving">
+                            <LucideIcon Name="save" class="mr-2 h-4 w-4" />
+                            Save
+                        </BbButton>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                            Refresh
+                        </BbButton>
+                        <BbButton OnClick="@StartEdit">
+                            <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
+                            Edit
+                        </BbButton>
+                    }
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Category Summary</BbCardTitle>
+                    <BbCardDescription>Catalog category details for the selected tenant.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_editMode)
+                    {
+                        <div class="grid gap-4">
+                            <BbFormFieldInput TValue="string" @bind-Value="_name" Label="Name" Required="true" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_description" Label="Description" />
+                            <BbFormFieldSwitch Checked="@_isEnabled"
+                                               CheckedChanged="@((bool value) => _isEnabled = value)"
+                                               Label="Enabled" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="xf-detail-field-grid">
+                            <div>
+                                <BbTypographyMuted>Name</BbTypographyMuted>
+                                <div>@(_category.Name ?? "Unnamed Category")</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Products</BbTypographyMuted>
+                                <div>@_products.Count</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Created</BbTypographyMuted>
+                                <div>@_category.CreatedAt.ToLocalTime().ToString("g")</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Last Modified</BbTypographyMuted>
+                                <div>@(_category.ModifiedAt?.ToLocalTime().ToString("g") ?? "Never")</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Description</BbTypographyMuted>
+                                <div>@(_category.Description ?? "No description")</div>
+                            </div>
+                        </div>
+                    }
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Products</BbCardTitle>
+                    <BbCardDescription>Products assigned to this category.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_products" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="SKU" Filterable="true" FilterBy="@(item => item.SKU ?? string.Empty)">
+                                <ChildContent Context="item">
+                                    <span class="font-mono text-xs">@(item.SKU ?? "N/A")</span>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Price" Sortable="true" Filterable="true" FilterBy="@(item => item.Price)">
+                                <ChildContent Context="item">@item.Price.ToString("N2")</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Stock" Sortable="true" Filterable="true" FilterBy="@(item => item.StockQuantity)">
+                                <ChildContent Context="item">@item.StockQuantity</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsAvailable ? "Available" : "Unavailable")">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsAvailable ? "Available" : "Unavailable")"
+                                                 Status="@(item.IsAvailable ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+
+    private ProductCategory? _category;
+    private List<Product> _products = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private bool _outsideTenantContext;
+    private bool _editMode;
+    private bool _saving;
+    private bool _isEnabled = true;
+    private string _name = "";
+    private string _description = "";
+    private Guid? _loadedId;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id) return;
+        _loadedId = Id;
+        await Reload();
+    }
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
+            _outsideTenantContext = false;
+            _category = null;
+            _products = [];
+
+            if (!_hasTenant || !_moduleEnabled) return;
+
+            _category = await DataContext.Query<ProductCategory>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id && !x.IsDeleted)
+                .FirstOrDefaultAsync();
+
+            _outsideTenantContext = _category is not null && _category.TenantId != TenantFilter.SelectedTenantId;
+            if (_category is null || _outsideTenantContext) return;
+
+            _products = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == _category.TenantId && x.CategoryId == Id && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(250)
+                .ToListAsync();
+
+            if (!_editMode)
+                LoadForm();
+        }
+        catch
+        {
+            ToastService.Show("Could not load category.");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void StartEdit()
+    {
+        LoadForm();
+        _editMode = true;
+    }
+
+    private void CancelEdit()
+    {
+        LoadForm();
+        _editMode = false;
+    }
+
+    private void LoadForm()
+    {
+        if (_category is null) return;
+        _name = _category.Name ?? "";
+        _description = _category.Description ?? "";
+        _isEnabled = _category.IsEnabled;
+    }
+
+    private async Task SaveCategory()
+    {
+        if (_category is null || TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            ToastService.Show("Category name is required.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var fresh = await DataContext.Query<ProductCategory>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == _category.Id && x.TenantId == tenantId && !x.IsDeleted)
+                .FirstOrDefaultAsync();
+            if (fresh is null)
+            {
+                ToastService.Show("Category not found.");
+                return;
+            }
+
+            fresh.Name = _name.Trim();
+            fresh.Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim();
+            fresh.IsEnabled = _isEnabled;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Category updated.");
+                _editMode = false;
+                await Reload();
+            }
+            else
+            {
+                ToastService.Show("Could not save category.");
+            }
+        }
+        catch
+        {
+            ToastService.Show("Could not save category.");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

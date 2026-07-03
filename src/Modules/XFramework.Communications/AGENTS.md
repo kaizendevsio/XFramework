@@ -19,7 +19,7 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 ## Integration Rules
 
 - Use `ICommunicationsServiceWrapper` or `ICommunicationsChatClient` for tenant/chat app integration.
-- ControlPanel must use Communications wrapper-backed admin/settings/template APIs for Communications business behavior. Do not use direct `IDataContext` mutation from ControlPanel for Communications settings, moderation, templates, messages, threads, or delivery actions.
+- Portal must use Communications wrapper-backed admin/settings/template APIs for Communications business behavior. Do not use direct `IDataContext` mutation from Portal for Communications settings, moderation, templates, messages, threads, or delivery actions.
 - Communications API services must resolve trusted tenant/credential context through `ICommunicationsRequestContextResolver`; do not trust client-supplied tenant IDs on protected paths.
 - Communications trusted internal/admin calls use the shared trusted metadata infrastructure. Bolt signs service-to-service metadata with a shared secret and target audience; Communications validates the expected Communications Bolt audience and allowed trusted service name. Do not add page-level/manual metadata signatures.
 - Chat APIs must enforce Communications feature gates, membership checks, block policy, tenant isolation, policy settings, and rate limits in service logic.
@@ -39,7 +39,7 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 
 - Use `CommunicationsSettingsCatalog` as the authoritative list of supported settings.
 - Settings reads/writes must go through `CommunicationsSettingsService` and wrapper contracts. Do not mutate `RegistryConfiguration` directly from UI pages.
-- Message templates are real `MessageTemplate` records. System templates are seeded/read-only; tenant templates are admin-configurable; user templates are app/user-owned and only audited in ControlPanel unless a later plan expands that scope.
+- Message templates are real `MessageTemplate` records. System templates are seeded/read-only; tenant templates are admin-configurable; user templates are app/user-owned and only audited in Portal unless a later plan expands that scope.
 - Template rendering happens server-side in Communications. Preserve token validation and template audit fields on messages/direct messages.
 
 ## Data And EF Rules
@@ -56,7 +56,7 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 - Add focused tests for tenant isolation, feature gates, membership/permission rules, block filtering, policy/rate-limit enforcement, outbox behavior, templates, attachments, moderation, and wrapper/admin-read behavior.
 - If changes touch external delivery integration, also run or update Notifications/SmsGateway tests.
 - If changes touch realtime transport or topic authorization, also run or update Bolt tests.
-- If changes touch ControlPanel, build `ControlPanel.Server` and browser-smoke the affected pages.
+- If changes touch Portal, build `XFramework.Portal` and browser-smoke the affected pages.
 
 ## Do
 
@@ -72,6 +72,6 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 - Do not add direct cross-module writes from Communications into Notifications, SmsGateway, Storage, or Identity schemas.
 - Do not reintroduce direct SmsGateway sends from Communications.
 - Do not add TypeScript or JSON duplicate realtime paths for Communications chat without an explicit .NET stack architecture change.
-- Do not expose full message content in ControlPanel lists by default.
+- Do not expose full message content in Portal lists by default.
 - Do not add in-memory queues for production Communications, Notifications, or SmsGateway delivery workflows.
 - Do not leave this guide stale after bug fixes, feature changes, or integration contract changes in this module.

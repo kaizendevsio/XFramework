@@ -8,8 +8,8 @@ Update this file in the same PR whenever Inventario behavior, contracts, feature
 
 - Start with the repository root `AGENTS.md` and `CLAUDE.md`.
 - Read `rules/BackendGuidelines.md` before changing services, EF entities, configurations, migrations, wrappers, Bolt handlers, caching, or runtime setup.
-- Read `rules/UiGuidelines.md` before changing ControlPanel or Blazor UI.
-- Read `docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md` before changing ControlPanel write paths, service wrappers, or remote `IDataContext` usage.
+- Read `rules/UiGuidelines.md` before changing Portal or Blazor UI.
+- Read `docs/solutions/developer-experience/portal-service-wrapper-and-integration-test-contract.md` before changing Portal write paths, service wrappers, or remote `IDataContext` usage.
 - Current source code wins over this guide. If source and this guide disagree, fix this guide as part of the change.
 
 ## Module Purpose
@@ -22,9 +22,9 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 
 - `Inventario.Api`: VSA endpoints, validators, domain services, feature gates, health checks, generated endpoint registration, and Bolt/data-context runtime setup.
 - `Inventario.Domain.Shared`: EF entities, configurations, enums, request contracts, response contracts, report rows, and shared DTOs.
-- `Inventario.Integration`: generated `IInventarioServiceWrapper` integration surface for ControlPanel and cross-module callers.
-- `src/Tests/Inventario.IntegrationTests`: PostgreSQL-backed integration tests, wrapper completeness tests, remote `IDataContext` tests, and ControlPanel contract tests.
-- `src/Presentation/ControlPanel.Server/Components/Pages/Inventario`: ControlPanel Inventario UI. UI guidance lives in root `rules/UiGuidelines.md`; keep module-specific workflow details here.
+- `Inventario.Integration`: generated `IInventarioServiceWrapper` integration surface for Portal and cross-module callers.
+- `src/Tests/Inventario.IntegrationTests`: PostgreSQL-backed integration tests, wrapper completeness tests, remote `IDataContext` tests, and Portal contract tests.
+- `src/Presentation/XFramework.Portal/Components/Pages/Inventario`: Portal Inventario UI. UI guidance lives in root `rules/UiGuidelines.md`; keep module-specific workflow details here.
 
 ## Ownership Boundaries
 
@@ -73,7 +73,7 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 
 ## Bolt, Wrappers, And DataContext
 
-- ControlPanel and cross-module business operations must use `IInventarioServiceWrapper` when a request contract exists.
+- Portal and cross-module business operations must use `IInventarioServiceWrapper` when a request contract exists.
 - Do not use direct remote `IDataContext.Add`, `Update`, `Remove`, or `SaveChangesAsync` to bypass Inventario validators, feature gates, tenant checks, stock posting, lot matching, reservation allocation, purchase/receiving status, idempotency, or report snapshot rules.
 - Remote `IDataContext.Query<T>()` is acceptable for tenant-scoped read UI and report/detail projections when the query shape is tested.
 - Direct remote mutation is acceptable only for intentionally allowlisted simple catalog/admin entities and only when no richer wrapper request exists.
@@ -85,10 +85,10 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 
 - Inventario APIs are gated by `TenantModuleFeatureKeys.Inventario`.
 - Subfeature routes include warehousing, stock balances, movements, reservations, traceability, planning, reporting, purchasing, and receiving.
-- ControlPanel pages must hide or disable Inventario workflows when the tenant feature or subfeature is unavailable.
-- If feature keys, route prefixes, or tenant-module behavior change, update `InventarioFeatureGateRoutes`, ControlPanel navigation, integration tests, and this guide.
+- Portal pages must hide or disable Inventario workflows when the tenant feature or subfeature is unavailable.
+- If feature keys, route prefixes, or tenant-module behavior change, update `InventarioFeatureGateRoutes`, Portal navigation, integration tests, and this guide.
 
-## ControlPanel Rules
+## Portal Rules
 
 - Follow `rules/UiGuidelines.md` for every Inventario UI change.
 - Use BlazorBlueprint `BbDataGrid` for lists, reports, finder dialogs, and data-heavy detail tabs. Enable native filtering on useful business columns.
@@ -124,7 +124,7 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 
 - Add or update unit/service tests for business rules, validators, idempotency, tenant validation, variant matching, stock math, reservation allocation, and purchasing/receiving transitions.
 - Add or update `Inventario.IntegrationTests` for PostgreSQL mappings, migrations, service wrappers, remote `IDataContext`, feature gates, and deployed-shape behavior.
-- Add or update ControlPanel contract tests when Inventario UI write paths, grids, entity pickers, breadcrumbs, detail navigation, or toast behavior change.
+- Add or update Portal contract tests when Inventario UI write paths, grids, entity pickers, breadcrumbs, detail navigation, or toast behavior change.
 - Run focused wrapper tests when adding or changing `IBoltRequest` contracts:
 
 ```powershell
@@ -135,7 +135,7 @@ dotnet test src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.cs
 
 ```powershell
 dotnet build src\Modules\XFramework.Inventario\Inventario.Api\Inventario.Api.csproj -m:1 /nr:false
-dotnet build src\Presentation\ControlPanel.Server\ControlPanel.Server.csproj -m:1 /nr:false
+dotnet build src\Presentation\XFramework.Portal\XFramework.Portal.csproj -m:1 /nr:false
 dotnet build src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.csproj -m:1 /nr:false
 ```
 
@@ -147,15 +147,15 @@ dotnet build src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.c
 - Use Inventario services and wrapper contracts for business behavior.
 - Preserve product/variant/lot/warehouse/location consistency through every stock workflow.
 - Keep product-level views aggregated and variant-specific views filtered.
-- Use `BbDataGrid` and `XfEntityPicker` for Inventario ControlPanel workflows.
+- Use `BbDataGrid` and `XfEntityPicker` for Inventario Portal workflows.
 - Update this guide when a bug fix or feature change teaches future agents a new rule.
 
 ## Do Not
 
-- Do not bypass `IInventarioServiceWrapper` for stock, lot, reservation, purchasing, receiving, planning, variation, or product business writes from ControlPanel.
+- Do not bypass `IInventarioServiceWrapper` for stock, lot, reservation, purchasing, receiving, planning, variation, or product business writes from Portal.
 - Do not directly mutate stock balances without movement/transaction records.
 - Do not allow a lot, reservation, receiving line, or stock movement to silently cross product or variant boundaries.
-- Do not expose raw GUIDs as primary labels in ControlPanel.
+- Do not expose raw GUIDs as primary labels in Portal.
 - Do not create raw HTML tables or custom table components for Inventario list/report UI.
 - Do not duplicate product detail navigation when the shell/sidebar already owns it.
 - Do not leave this guide stale after Inventario bug fixes, feature changes, integration contract changes, deployment changes, or UI workflow changes.

@@ -1,0 +1,424 @@
+@page "/finance/outbox-webhooks"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Wallet Outbox - Portal</PageTitle>
+
+<div class="space-y-6">
+    <div class="xf-page-header">
+        <div>
+            <BbTypographyH3>Outbox & Webhooks</BbTypographyH3>
+            <BbTypographyMuted>Monitor Wallets integration events and failed webhook deliveries.</BbTypographyMuted>
+        </div>
+        <div class="xf-page-actions">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@LoadData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else if (!_hasTenant)
+    {
+        <ModuleUnavailable ModuleName="Wallets" RequiresTenant="true" />
+    }
+    else if (!_moduleEnabled)
+    {
+        <ModuleUnavailable ModuleName="Wallets" />
+    }
+    else
+    {
+        <div class="xf-summary-grid xf-summary-grid-4">
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Pending</BbTypographyMuted>
+                        <BbTypographyH3>@_pendingCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Failed</BbTypographyMuted>
+                        <BbTypographyH3>@_failedCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Dead Letter</BbTypographyMuted>
+                        <BbTypographyH3>@_deadLetterCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+            <BbCard>
+                <BbCardContent>
+                    <div class="space-y-1 pt-4">
+                        <BbTypographyMuted>Published</BbTypographyMuted>
+                        <BbTypographyH3>@_publishedCount</BbTypographyH3>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+        </div>
+
+        <BbTabs DefaultValue="outbox-messages">
+            <BbTabsList>
+                <BbTabsTrigger Value="outbox-messages">Outbox Messages (@_items.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="webhook-audit">Webhook Audit (@_webhookEvents.Count)</BbTabsTrigger>
+            </BbTabsList>
+
+            <BbTabsContent Value="outbox-messages" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Outbox Messages</BbCardTitle>
+                        <BbCardDescription>@_items.Count integration event(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.EventType)" Title="Event" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Aggregate" Filterable="true" FilterBy="@(item => GetAggregateLabel(item))">
+                                    <ChildContent Context="item">@GetAggregateLabel(item)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
+                                    <ChildContent Context="item">
+                                        <BbBadge Variant="@(item.Status == WalletOutboxStatus.Pending ? BadgeVariant.Outline : BadgeVariant.Default)">@item.Status</BbBadge>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.Attempts)" Title="Attempts" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.NextAttemptAt)" Title="Next Attempt" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Delivery" Filterable="true" FilterBy="@(item => GetOutboxDeliverySummary(item))">
+                                    <ChildContent Context="item">@GetOutboxDeliverySummary(item)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        @if (item.Status is WalletOutboxStatus.Failed or WalletOutboxStatus.DeadLetter)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => RetryOutbox(item))" Disabled="@_acting">
+                                                Retry
+                                            </BbButton>
+                                        }
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReplayOutbox(item))" Disabled="@_acting">
+                                            Replay
+                                        </BbButton>
+                                        @if (item.Status is not WalletOutboxStatus.DeadLetter)
+                                        {
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => DeadLetterOutbox(item))" Disabled="@_acting">
+                                                Dead-letter
+                                            </BbButton>
+                                        }
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No outbox messages found" Description="Wallet integration events will appear here after ledger operations." />
+                            </EmptyTemplate>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            <BbTabsContent Value="webhook-audit" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Payment Webhook Audit</BbCardTitle>
+                        <BbCardDescription>@_webhookEvents.Count provider webhook event(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_webhookEvents" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ProviderKey)" Title="Provider" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ExternalEventId)" Title="External Event" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ExternalReference)" Title="Reference" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.ProcessingStatus.ToString())">
+                                    <ChildContent Context="item">
+                                        <BbBadge Variant="@GetWebhookStatusVariant(item.ProcessingStatus)">@item.ProcessingStatus</BbBadge>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Signature" Filterable="true" FilterBy="@(item => item.SignatureValid)">
+                                    <ChildContent Context="item">
+                                        <BbBadge Variant="@(item.SignatureValid ? BadgeVariant.Default : BadgeVariant.Destructive)">
+                                            @(item.SignatureValid ? "Valid" : "Invalid")
+                                        </BbBadge>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.MappedWorkflowStatus)" Title="Mapped" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Links" Filterable="true" FilterBy="@(item => GetWebhookLinksLabel(item))">
+                                    <ChildContent Context="item">
+                                        <div class="space-y-1 text-xs">
+                                            <div>@GetWebhookDepositLabel(item.DepositRequestId)</div>
+                                            <div>@GetWebhookWithdrawalLabel(item.WithdrawalRequestId)</div>
+                                            <div>@GetOperationLabel(item.OperationId)</div>
+                                        </div>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Processing" Filterable="true" FilterBy="@(item => WalletsPortalDisplayService.SafeFailureSummary(item.ProcessingError))">
+                                    <ChildContent Context="item">
+                                        @WalletsPortalDisplayService.SafeFailureSummary(item.ProcessingError)
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ProcessedAt)" Title="Processed" Sortable="true" Filterable="true" />
+                            </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No webhook events found" Description="Provider webhook audit records will appear here." />
+                            </EmptyTemplate>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+        </BbTabs>
+    }
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private XFramework.Portal.Services.TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private WalletsAdminBackendContractService WalletsAdminContracts { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private WalletsPortalDisplayService DisplayService { get; set; } = default!;
+    [Inject] private ILogger<OutboxWebhooks> Logger { get; set; } = default!;
+
+    private List<WalletOutboxMessage> _items = [];
+    private List<WalletPaymentWebhookEvent> _webhookEvents = [];
+    private IReadOnlyDictionary<Guid, string> _operationLabels = new Dictionary<Guid, string>();
+    private bool _loading = true;
+    private bool _acting;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private int _pendingCount;
+    private int _failedCount;
+    private int _deadLetterCount;
+    private int _publishedCount;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private void OnTenantChanged()
+    {
+        _ = InvokeAsync(LoadData);
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.WalletsWebhooks);
+            _items = [];
+            _webhookEvents = [];
+            _operationLabels = new Dictionary<Guid, string>();
+            ResetSummary();
+
+            if (!_hasTenant || !_moduleEnabled)
+            {
+                return;
+            }
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            var query = DataContext.Query<WalletOutboxMessage>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt);
+
+            _items = await query.Take(200).ToListAsync();
+            _webhookEvents = await DataContext.Query<WalletPaymentWebhookEvent>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.ReceivedAt)
+                .Take(200)
+                .ToListAsync();
+
+            _operationLabels = await DisplayService.LoadOperationLabelsAsync(
+                tenantId,
+                _items.Select(x => x.OperationId).Concat(_webhookEvents.Select(x => x.OperationId)));
+
+            _pendingCount = _items.Count(x => x.Status == WalletOutboxStatus.Pending);
+            _failedCount = _items.Count(x => x.Status == WalletOutboxStatus.Failed);
+            _deadLetterCount = _items.Count(x => x.Status == WalletOutboxStatus.DeadLetter);
+            _publishedCount = _items.Count(x => x.Status == WalletOutboxStatus.Published);
+        }
+        catch (Exception ex)
+        {
+            _items = [];
+            _webhookEvents = [];
+            _operationLabels = new Dictionary<Guid, string>();
+            ResetSummary();
+            Logger.LogError(ex, "Failed to load wallet outbox messages.");
+            ToastService.Error("Could not load wallet outbox messages.", "Wallets");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RetryOutbox(WalletOutboxMessage item)
+    {
+        if (!await DialogService.Confirm("Retry Outbox Message", "Retry delivery for this outbox message?", new ConfirmDialogOptions()))
+        {
+            return;
+        }
+
+        _acting = true;
+        try
+        {
+            var result = await WalletsAdminContracts.RetryOutboxMessageAsync(item.Id);
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Outbox retry submitted.", "Wallets");
+                await LoadData();
+            }
+            else
+            {
+                Logger.LogWarning("Outbox retry failed: {Message}", result.Message);
+                ToastService.Error("Outbox retry could not be submitted.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Outbox retry failed.");
+            ToastService.Error("Outbox retry could not be submitted.", "Wallets");
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private async Task ReplayOutbox(WalletOutboxMessage item)
+    {
+        if (!await DialogService.Confirm("Replay Outbox Message", "Replay this outbox message?", new ConfirmDialogOptions()))
+        {
+            return;
+        }
+
+        _acting = true;
+        try
+        {
+            var result = await WalletsAdminContracts.ReplayOutboxMessageAsync(item.Id);
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Outbox replay submitted.", "Wallets");
+                await LoadData();
+            }
+            else
+            {
+                Logger.LogWarning("Outbox replay failed: {Message}", result.Message);
+                ToastService.Error("Outbox replay could not be submitted.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Outbox replay failed.");
+            ToastService.Error("Outbox replay could not be submitted.", "Wallets");
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private async Task DeadLetterOutbox(WalletOutboxMessage item)
+    {
+        if (!await DialogService.Confirm(
+                "Dead-letter Outbox Message",
+                "Move this outbox message to dead-letter status?",
+                new ConfirmDialogOptions { Destructive = true }))
+        {
+            return;
+        }
+
+        _acting = true;
+        try
+        {
+            var result = await WalletsAdminContracts.DeadLetterOutboxMessageAsync(item.Id);
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Outbox message dead-lettered.", "Wallets");
+                await LoadData();
+            }
+            else
+            {
+                Logger.LogWarning("Outbox dead-letter failed: {Message}", result.Message);
+                ToastService.Error("Outbox message could not be dead-lettered.", "Wallets");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Outbox dead-letter failed.");
+            ToastService.Error("Outbox message could not be dead-lettered.", "Wallets");
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private void ResetSummary()
+    {
+        _pendingCount = 0;
+        _failedCount = 0;
+        _deadLetterCount = 0;
+        _publishedCount = 0;
+    }
+
+    private static BadgeVariant GetWebhookStatusVariant(WalletWebhookProcessingStatus status) => status switch
+    {
+        WalletWebhookProcessingStatus.Processed or WalletWebhookProcessingStatus.Duplicate => BadgeVariant.Default,
+        WalletWebhookProcessingStatus.Failed or WalletWebhookProcessingStatus.Rejected => BadgeVariant.Destructive,
+        _ => BadgeVariant.Outline
+    };
+
+    private string GetOperationLabel(Guid? operationId) =>
+        DisplayService.OperationLabel(operationId, _operationLabels);
+
+    private string GetAggregateLabel(WalletOutboxMessage item)
+    {
+        if (item.OperationId is Guid operationId)
+        {
+            return GetOperationLabel(operationId);
+        }
+
+        return $"{item.AggregateType} {WalletsPortalDisplayService.ShortId(item.AggregateId)}";
+    }
+
+    private static string GetWebhookDepositLabel(Guid? depositRequestId) =>
+        depositRequestId is Guid value ? $"Deposit request {WalletsPortalDisplayService.ShortId(value)}" : "No deposit request";
+
+    private static string GetWebhookWithdrawalLabel(Guid? withdrawalRequestId) =>
+        withdrawalRequestId is Guid value ? $"Withdrawal request {WalletsPortalDisplayService.ShortId(value)}" : "No withdrawal request";
+
+    private string GetWebhookLinksLabel(WalletPaymentWebhookEvent item) =>
+        $"{GetWebhookDepositLabel(item.DepositRequestId)} {GetWebhookWithdrawalLabel(item.WithdrawalRequestId)} {GetOperationLabel(item.OperationId)}";
+
+    private static string GetOutboxDeliverySummary(WalletOutboxMessage item) =>
+        item.Status is WalletOutboxStatus.Failed or WalletOutboxStatus.DeadLetter
+            ? $"Delivery failed after {item.Attempts} attempt(s)"
+            : $"{item.Status} after {item.Attempts} attempt(s)";
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

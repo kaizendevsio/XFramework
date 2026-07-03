@@ -35,7 +35,7 @@ Use this file to orient quickly, then follow the canonical docs. Do not treat th
 - Bolt: [Bolt unified transport layer](docs/solutions/architecture-patterns/bolt-unified-transport-layer.md), [Bolt SignalR removal](docs/solutions/architecture-patterns/bolt-signalr-removal.md), `src/Libraries/Bolt/BOLT.md`, and `src/Libraries/Bolt/BOLT-MEDIA.md`.
 - Backend/database boundaries: [backend guidelines](rules/BackendGuidelines.md).
 - EF Core/data access: [EF Core data access patterns](docs/solutions/conventions/ef-core-data-access-patterns.md).
-- ControlPanel API usage and broad integration tests: [ControlPanel service wrapper and integration test contract](docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md).
+- Portal API usage and broad integration tests: [Portal service wrapper and integration test contract](docs/solutions/developer-experience/portal-service-wrapper-and-integration-test-contract.md).
 - Caching: [XFramework caching strategy](docs/solutions/best-practices/xframework-caching-strategy.md).
 - Logging/observability: [logging standards](docs/solutions/conventions/logging-standards.md), [unified ZLogger logging pipeline](docs/solutions/architecture-patterns/unified-zlogger-logging-pipeline.md), and [OpenTelemetry integration guide](docs/solutions/tooling-decisions/opentelemetry-integration-guide.md).
 

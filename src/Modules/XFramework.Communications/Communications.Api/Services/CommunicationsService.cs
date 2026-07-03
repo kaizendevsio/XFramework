@@ -37,7 +37,7 @@ public sealed class CommunicationsService(
         {
             var tenantContext = requestContextResolver.ResolveTrustedInternal(
                 request.Metadata,
-                XFrameworkServiceNames.ControlPanel,
+                XFrameworkServiceNames.Portal,
                 XFrameworkServiceNames.IdentityServer);
             if (!tenantContext.IsSuccess)
             {
