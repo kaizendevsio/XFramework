@@ -143,10 +143,13 @@
                                     <LucideIcon Name="settings" class="mr-2 h-4 w-4" />
                                     Tenant Settings
                                 </BbButton>
-                                <BbButton Variant="ButtonVariant.Outline" OnClick="@ManageTenants" Class="profile-menu-button">
-                                    <LucideIcon Name="building-2" class="mr-2 h-4 w-4" />
-                                    Manage Tenants
-                                </BbButton>
+                                @if (_canManageTenants)
+                                {
+                                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ManageTenants" Class="profile-menu-button">
+                                        <LucideIcon Name="building-2" class="mr-2 h-4 w-4" />
+                                        Manage Tenants
+                                    </BbButton>
+                                }
                                 <BbButton Variant="ButtonVariant.Ghost" OnClick="@Logout" Class="profile-menu-button">
                                     <LucideIcon Name="log-out" class="mr-2 h-4 w-4" />
                                     Sign Out
@@ -196,11 +199,13 @@
     private Guid? _breadcrumbWalletId;
     private string? _breadcrumbWalletLabel;
     private bool _profileMenuOpen;
+    private bool _canManageTenants;
 
     private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
     private string ActiveTenantLabel => string.IsNullOrWhiteSpace(_selectedTenantName) ? "All Tenants" : _selectedTenantName;
     private string CurrentPath => new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
     private bool IsTenantListRoute => string.Equals(CurrentPath, "/identity/tenants", StringComparison.OrdinalIgnoreCase);
+    private bool IsManageTenantsRoute => IsTenantListRoute || TryGetTenantDetailRoute(out _, out _);
     private bool HasActiveTenant => Guid.TryParse(_selectedTenantId, out _);
     private string TenantSettingsTitle => HasActiveTenant ? "Open active tenant settings" : "Select a tenant to open tenant settings";
     private string SidebarClass => "app-sidebar shrink-0 border-r bg-sidebar text-sidebar-foreground"
@@ -349,12 +354,14 @@
             return;
         }
 
+        _canManageTenants = ControlPanelAccess.CanManageTenants(user);
         _userName = user.Identity.Name ?? "";
         _displayName = user.FindFirst(ControlPanelAuthClaims.DisplayName)?.Value
             ?? user.Identity.Name
             ?? "Administrator";
         _userInitials = BuildInitials(_displayName);
 
+        await EnsureManageTenantsRouteUsesAllTenants();
         await RefreshBreadcrumbEntityLabels();
     }
 
@@ -520,6 +527,12 @@
 
     private async Task RestoreTenantSelection()
     {
+        if (_canManageTenants && IsManageTenantsRoute)
+        {
+            await SetAllTenantsActive();
+            return;
+        }
+
         var selectedTenantId = TenantFilter.SelectedTenantId;
         var storedTenantId = await ReadStoredTenantId();
 
@@ -597,6 +610,13 @@
 
     private async Task OnTenantSelectionChanged(string? value)
     {
+        if (_canManageTenants && IsManageTenantsRoute)
+        {
+            await SetAllTenantsActive();
+            _profileMenuOpen = false;
+            return;
+        }
+
         _selectedTenantId = string.IsNullOrWhiteSpace(value) ? AllTenantsValue : value;
 
         if (Guid.TryParse(_selectedTenantId, out var tenantId))
@@ -625,10 +645,37 @@
         Nav.NavigateTo($"/identity/tenants/{tenantId}/configurations");
     }
 
-    private void ManageTenants()
+    private async Task ManageTenants()
     {
+        if (!_canManageTenants)
+        {
+            return;
+        }
+
         _profileMenuOpen = false;
+        await SetAllTenantsActive();
         Nav.NavigateTo("/identity/tenants");
+    }
+
+    private async Task EnsureManageTenantsRouteUsesAllTenants()
+    {
+        if (!_canManageTenants || !IsManageTenantsRoute)
+        {
+            return;
+        }
+
+        await SetAllTenantsActive();
+    }
+
+    private async Task SetAllTenantsActive()
+    {
+        _selectedTenantId = AllTenantsValue;
+        if (TenantFilter.SelectedTenantId is not null || !string.IsNullOrWhiteSpace(TenantFilter.SelectedTenantName))
+        {
+            TenantFilter.Clear();
+        }
+
+        await ClearStoredTenantId();
     }
 
     private void Logout()
@@ -843,6 +890,7 @@
     {
         _ = InvokeAsync(async () =>
         {
+            await EnsureManageTenantsRouteUsesAllTenants();
             UpdateActiveSidebarGroup();
             _contentRenderKey++;
             await RefreshBreadcrumbEntityLabels();

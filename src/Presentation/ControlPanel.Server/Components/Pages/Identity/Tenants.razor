@@ -2,6 +2,19 @@
 
 <PageTitle>Tenant Management - Control Panel</PageTitle>
 
+@if (!_accessChecked)
+{
+    <CenteredSpinner />
+}
+else if (!_canManageTenants)
+{
+    <BbAlert Variant="AlertVariant.Danger">
+        <BbAlertTitle>Tenant Management Restricted</BbAlertTitle>
+        <BbAlertDescription>Only super users can manage tenants.</BbAlertDescription>
+    </BbAlert>
+}
+else
+{
 <div class="space-y-6">
 
     @* -- Header -- *@
@@ -106,86 +119,90 @@
     </FadeInContent>
     }
 </div>
+}
 
-@* -- Create Tenant Dialog -- *@
-<BbDialog Open="@_tenantDialogOpen" OpenChanged="@(v => _tenantDialogOpen = v)">
-    <BbDialogContent TrapFocus="false">
-        <BbDialogHeader>
-            <BbDialogTitle>Create Tenant</BbDialogTitle>
-            <BbDialogDescription>Fill in the details for the new tenant.</BbDialogDescription>
-        </BbDialogHeader>
-        <div class="grid gap-4 py-4">
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_tenantForm.Name"
-                              Label="Name"
-                              Placeholder="Tenant name"
-                              Required="true" />
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_tenantForm.Description"
-                              Label="Description"
-                              Placeholder="Brief description" />
-            <div class="grid grid-cols-2 gap-4">
+@if (_canManageTenants)
+{
+    @* -- Create Tenant Dialog -- *@
+    <BbDialog Open="@_tenantDialogOpen" OpenChanged="@(v => _tenantDialogOpen = v)">
+        <BbDialogContent TrapFocus="false">
+            <BbDialogHeader>
+                <BbDialogTitle>Create Tenant</BbDialogTitle>
+                <BbDialogDescription>Fill in the details for the new tenant.</BbDialogDescription>
+            </BbDialogHeader>
+            <div class="grid gap-4 py-4">
                 <BbFormFieldInput TValue="string"
-                                  @bind-Value="_tenantForm.VersionString"
-                                  Label="Version"
-                                  Placeholder="1.0" />
-                <BbFormFieldSelect TValue="string"
-                                   @bind-Value="_tenantForm.StatusString"
-                                   Label="Status">
-                    <BbSelectItem Value="0">Pending</BbSelectItem>
-                    <BbSelectItem Value="1">Active</BbSelectItem>
-                    <BbSelectItem Value="2">Suspended</BbSelectItem>
-                    <BbSelectItem Value="3">Inactive</BbSelectItem>
-                </BbFormFieldSelect>
+                                  @bind-Value="_tenantForm.Name"
+                                  Label="Name"
+                                  Placeholder="Tenant name"
+                                  Required="true" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.Description"
+                                  Label="Description"
+                                  Placeholder="Brief description" />
+                <div class="grid grid-cols-2 gap-4">
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_tenantForm.VersionString"
+                                      Label="Version"
+                                      Placeholder="1.0" />
+                    <BbFormFieldSelect TValue="string"
+                                       @bind-Value="_tenantForm.StatusString"
+                                       Label="Status">
+                        <BbSelectItem Value="0">Pending</BbSelectItem>
+                        <BbSelectItem Value="1">Active</BbSelectItem>
+                        <BbSelectItem Value="2">Suspended</BbSelectItem>
+                        <BbSelectItem Value="3">Inactive</BbSelectItem>
+                    </BbFormFieldSelect>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_tenantForm.ExpirationString"
+                                      Label="Expiration Date"
+                                      Placeholder="YYYY-MM-DD" />
+                    <BbFormFieldInput TValue="string"
+                                      @bind-Value="_tenantForm.AvailabilityString"
+                                      Label="Availability Date"
+                                      Placeholder="YYYY-MM-DD" />
+                </div>
+                <XfEntityPicker TItem="Tenant"
+                                  Value="@_tenantForm.ParentTenantIdString"
+                                  ValueChanged="@(value => _tenantForm.ParentTenantIdString = value ?? "")"
+                                  Label="Parent Tenant"
+                                  Items="@_tenants"
+                                  ValueSelector="@GetTenantPickerValue"
+                                  TextSelector="@GetTenantLabel"
+                                  SearchTextSelector="@GetTenantSearchText"
+                                  AdvancedColumns="@TenantAdvancedColumns"
+                                  AdvancedFilters="@TenantAdvancedFilters"
+                                  AdvancedSearchScope="Searches tenant name, description, status, version, expiration, enabled state, and created date."
+                                  SearchPlaceholder="Search tenants..."
+                                  EmptyMessage="No tenants found."
+                                  AllowClear="true"
+                                  ClearText="No parent tenant"
+                                  ShowCreate="false"
+                                  AdvancedSearchTitle="Find Parent Tenant"
+                                  AdvancedSearchDescription="Search existing tenants to use as the parent tenant."
+                                  Placeholder="Optional - leave blank for root tenant" />
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <BbFormFieldInput TValue="string"
-                                  @bind-Value="_tenantForm.ExpirationString"
-                                  Label="Expiration Date"
-                                  Placeholder="YYYY-MM-DD" />
-                <BbFormFieldInput TValue="string"
-                                  @bind-Value="_tenantForm.AvailabilityString"
-                                  Label="Availability Date"
-                                  Placeholder="YYYY-MM-DD" />
-            </div>
-            <XfEntityPicker TItem="Tenant"
-                              Value="@_tenantForm.ParentTenantIdString"
-                              ValueChanged="@(value => _tenantForm.ParentTenantIdString = value ?? "")"
-                              Label="Parent Tenant"
-                              Items="@_tenants"
-                              ValueSelector="@GetTenantPickerValue"
-                              TextSelector="@GetTenantLabel"
-                              SearchTextSelector="@GetTenantSearchText"
-                              AdvancedColumns="@TenantAdvancedColumns"
-                              AdvancedFilters="@TenantAdvancedFilters"
-                              AdvancedSearchScope="Searches tenant name, description, status, version, expiration, enabled state, and created date."
-                              SearchPlaceholder="Search tenants..."
-                              EmptyMessage="No tenants found."
-                              AllowClear="true"
-                              ClearText="No parent tenant"
-                              ShowCreate="false"
-                              AdvancedSearchTitle="Find Parent Tenant"
-                              AdvancedSearchDescription="Search existing tenants to use as the parent tenant."
-                              Placeholder="Optional - leave blank for root tenant" />
-        </div>
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _tenantDialogOpen = false)">Cancel</BbButton>
-            <BbButton OnClick="@CreateTenant" Disabled="@_saving">
-                @if (_saving)
-                {
-                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                }
-                Create
-            </BbButton>
-        </BbDialogFooter>
-    </BbDialogContent>
-</BbDialog>
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _tenantDialogOpen = false)">Cancel</BbButton>
+                <BbButton OnClick="@CreateTenant" Disabled="@_saving">
+                    @if (_saving)
+                    {
+                        <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                    }
+                    Create
+                </BbButton>
+            </BbDialogFooter>
+        </BbDialogContent>
+    </BbDialog>
 
-@* -- Delete Tenant Confirmation -- *@
-<ConfirmDeleteDialog Open="@_deleteDialogOpen"
-                     OpenChanged="@(v => _deleteDialogOpen = v)"
-                     Message="@($"This will soft-delete the tenant \"{_deletingTenant?.Name}\". The tenant and its data will be marked as deleted.")"
-                     OnConfirm="@ConfirmDeleteTenant" />
+    @* -- Delete Tenant Confirmation -- *@
+    <ConfirmDeleteDialog Open="@_deleteDialogOpen"
+                         OpenChanged="@(v => _deleteDialogOpen = v)"
+                         Message="@($"This will soft-delete the tenant \"{_deletingTenant?.Name}\". The tenant and its data will be marked as deleted.")"
+                         OnConfirm="@ConfirmDeleteTenant" />
+}
 
 @code {
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
@@ -193,11 +210,14 @@
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
 
     // -- Tenant list state --
     private List<Tenant> _tenants = [];
     private bool _saving;
     private bool _loading;
+    private bool _accessChecked;
+    private bool _canManageTenants;
 
     // -- Tenant create dialog --
     private bool _tenantDialogOpen;
@@ -211,7 +231,26 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await ResolveAccess();
+        if (!_canManageTenants)
+        {
+            return;
+        }
+
         await LoadTenants();
+    }
+
+    private async Task ResolveAccess()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            _accessChecked = true;
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        _canManageTenants = ControlPanelAccess.CanManageTenants(authState.User);
+        _accessChecked = true;
     }
 
     private async Task LoadTenants()

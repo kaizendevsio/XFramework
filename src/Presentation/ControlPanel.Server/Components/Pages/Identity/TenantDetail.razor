@@ -4,7 +4,18 @@
 
 <PageTitle>Tenant Detail - Control Panel</PageTitle>
 
-@if (_loading)
+@if (!_accessChecked)
+{
+    <CenteredSpinner />
+}
+else if (!_canManageTenants)
+{
+    <BbAlert Variant="AlertVariant.Danger">
+        <BbAlertTitle>Tenant Management Restricted</BbAlertTitle>
+        <BbAlertDescription>Only super users can manage tenant details.</BbAlertDescription>
+    </BbAlert>
+}
+else if (_loading)
 {
     <CenteredSpinner />
 }
@@ -525,11 +536,14 @@ else
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleFeatureDefinitionResolver ModuleFeatureDefinitionResolver { get; set; } = default!;
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private Tenant? _tenant;
     private bool _loading;
     private bool _saving;
     private bool _outsideTenantContext;
+    private bool _accessChecked;
+    private bool _canManageTenants;
     private Guid? _loadedId;
     private EditableForm<Tenant>? _editableForm;
 
@@ -588,6 +602,12 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        await ResolveAccess();
+        if (!_canManageTenants)
+        {
+            return;
+        }
+
         if (!IsValidSection(Section))
         {
             Navigation.NavigateTo($"/identity/tenants/{Id}", replace: true);
@@ -603,6 +623,19 @@ else
         await LoadTenant();
     }
 
+    private async Task ResolveAccess()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            _accessChecked = true;
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        _canManageTenants = ControlPanelAccess.CanManageTenants(authState.User);
+        _accessChecked = true;
+    }
+
     private void OnTenantFilterChanged()
     {
         _ = InvokeAsync(async () =>
@@ -614,10 +647,17 @@ else
 
     private async Task LoadTenant()
     {
+        if (!_canManageTenants)
+        {
+            _tenant = null;
+            ClearDetailData();
+            return;
+        }
+
         _loading = true;
         try
         {
-            _outsideTenantContext = TenantFilter.SelectedTenantId is Guid tenantId && tenantId != Id;
+            _outsideTenantContext = !_canManageTenants && TenantFilter.SelectedTenantId is Guid tenantId && tenantId != Id;
             if (_outsideTenantContext)
             {
                 _tenant = null;
