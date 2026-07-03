@@ -51,6 +51,8 @@ public partial class Reservation : BaseModel
     public DateTime? ReleasedAt { get; set; }
     [MemoryPackOrder(12)]
     public DateTime? FulfilledAt { get; set; }
+    [MemoryPackOrder(13)]
+    public string? IdempotencyKey { get; set; }
     [MemoryPackIgnore]
     public List<ReservationAllocation> Allocations { get; set; } = [];
 }

@@ -12,6 +12,7 @@ public sealed class ReserveInventoryValidator : AbstractValidator<ReserveInvento
         RuleFor(x => x.LocationId).NotEmpty();
         RuleFor(x => x.Quantity).GreaterThan(0);
         RuleFor(x => x.ReferenceType).MaximumLength(100);
+        RuleFor(x => x.IdempotencyKey).MaximumLength(200);
         RuleFor(x => x.UnitOfMeasure).MaximumLength(20);
         RuleFor(x => x.Reason).MaximumLength(500);
         RuleFor(x => x.ExpiredLotOverrideReason)

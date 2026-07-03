@@ -1,7 +1,9 @@
 using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Responses;
 using POS.Domain.Shared.Enums;
-using XFramework.Domain.Shared.BusinessObjects;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace POS.Api.Services;
 
@@ -9,12 +11,6 @@ internal static class PosServiceHelpers
 {
     public const string SaleLineReferenceType = "POS.SaleLine";
     public const string ReturnLineReferenceType = "POS.ReturnLine";
-
-    public static bool TryResolveTenantId(RequestMetadata metadata, out Guid tenantId)
-    {
-        tenantId = metadata.TenantId ?? Guid.Empty;
-        return tenantId != Guid.Empty;
-    }
 
     public static (int Page, int PageSize) NormalizePage(int page, int pageSize, int defaultPageSize = 50)
     {
@@ -43,6 +39,62 @@ internal static class PosServiceHelpers
 
     public static string ReturnRefundReference(PosReturn posReturn) =>
         $"POS-RETURN-{posReturn.Id:N}"[..80];
+
+    public static string BuildSaleRequestHash(CheckoutPosSaleRequest request) =>
+        Hash(new
+        {
+            request.RegisterId,
+            request.CashierCredentialId,
+            request.CustomerCredentialId,
+            request.WarehouseId,
+            request.LocationId,
+            request.CurrencyId,
+            request.WalletTypeId,
+            request.DiscountAmount,
+            request.TaxAmount,
+            Payment = new
+            {
+                request.Payment.Method,
+                request.Payment.Amount,
+                request.Payment.CustomerCredentialId
+            },
+            Lines = request.Lines.Select((line, index) => new
+            {
+                index,
+                line.ProductId,
+                line.ProductVariationId,
+                line.Quantity,
+                line.ExpectedUnitPrice,
+                line.DiscountAmount,
+                line.TaxAmount,
+                line.WarehouseId,
+                line.LocationId,
+                line.LotId,
+                line.UnitOfMeasure
+            }).ToArray()
+        });
+
+    public static string BuildReturnRequestHash(CreatePosReturnRequest request) =>
+        Hash(new
+        {
+            request.SaleId,
+            request.CashierCredentialId,
+            request.RefundMethod,
+            request.Reason,
+            Lines = request.Lines.Select((line, index) => new
+            {
+                index,
+                line.SaleLineId,
+                line.Quantity,
+                line.TaxAmount
+            }).ToArray()
+        });
+
+    private static string Hash<T>(T value)
+    {
+        var json = JsonSerializer.Serialize(value);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
+    }
 
     public static PosRegisterResponse ToRegisterResponse(PosRegister register) => new()
     {

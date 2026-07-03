@@ -22,6 +22,7 @@ public partial record ReserveInventoryRequest : RequestBase,
     public string? UnitOfMeasure { get; init; }
     public string? ReferenceType { get; init; }
     public Guid? ReferenceId { get; init; }
+    public string? IdempotencyKey { get; init; }
     public string? Reason { get; init; }
     public bool AllowExpiredLotOverride { get; init; }
     public string? ExpiredLotOverrideReason { get; init; }

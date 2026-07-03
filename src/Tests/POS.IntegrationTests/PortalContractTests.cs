@@ -66,6 +66,7 @@ public sealed class PortalContractTests
         cashier.Should().Contain("pos-cart-panel");
         cashier.Should().Contain("pos-total-bar");
         cashier.Should().Contain("CategoryId = _selectedCategoryId");
+        cashier.Should().Contain("RegisterId = TryResolveSelectedRegisterId()");
         cashier.Should().Contain("DataContext.Query<ProductCategory>()");
         cashier.Should().NotContain("grid-cols-[");
     }
@@ -119,10 +120,14 @@ public sealed class PortalContractTests
         cashier.Should().Contain("POS.CancelPosCart(");
         cashier.Should().Contain("POS.CheckoutPosCart(");
         cashier.Should().Contain("POS.SearchPosCatalog(");
+        cashier.Should().Contain("NewSaleIdempotencyKey()");
+        cashier.Should().Contain("_cashTenderedAmount < Total");
         registers.Should().Contain("POS.CreatePosRegister(");
         sales.Should().Contain("POS.CancelPosSale(");
         sales.Should().Contain("POS.RetryPosSaleFulfillment(");
         returns.Should().Contain("POS.CreatePosReturn(");
+        returns.Should().Contain("NewReturnIdempotencyKey()");
+        returns.Should().Contain("IdempotencyKey = _returnIdempotencyKey");
 
         var offenders = PosPages
             .Select(page => new

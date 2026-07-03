@@ -23,6 +23,9 @@ public sealed class PosOrchestrationContractTests
         source.Should().Contain("InventoryFulfillmentFailed", "paid-but-unfulfilled sales need a recoverable status");
         source.Should().Contain("RetryFulfillmentAsync", "fulfillment retry must be an explicit POS command");
         source.Should().Contain("IdempotencyKey", "cross-module calls must use stable idempotency keys");
+        source.Should().Contain("IPosRequestContextResolver", "checkout must use trusted tenant/cashier context");
+        source.Should().Contain("BuildSaleRequestHash", "checkout replays must compare the original request payload");
+        source.Should().Contain("ContinueCheckoutAsync", "checkout replays must resume the persisted sale state");
     }
 
     [Test]
@@ -36,6 +39,10 @@ public sealed class PosOrchestrationContractTests
         source.Should().Contain("DecrementWallet", "cash refunds must debit the cash drawer wallet");
         source.Should().Contain("TransferWallet", "wallet refunds must reverse transfer through Wallets");
         source.Should().Contain("TransactionPurpose.Refund");
+        source.Should().Contain("RetryAsync", "recoverable return failures need an explicit retry command");
+        source.Should().Contain("InventoryPostFailed", "inventory-post failures need a retryable state");
+        source.Should().Contain("RefundFailed", "refund failures need a retryable state");
+        source.Should().Contain("BuildReturnRequestHash", "return replays must compare the original request payload");
         source.Should().NotContain("db.Set<Wallet", "POS must not directly mutate Wallets tables");
         source.Should().NotContain("db.Set<InventoryMovement", "POS must not directly mutate Inventario tables");
     }
@@ -63,6 +70,9 @@ public sealed class PosOrchestrationContractTests
         var source = ReadSource("src", "Modules", "XFramework.POS", "POS.Api", "Program.cs");
 
         source.Should().Contain("TenantModuleFeatureKeys.PosCarts");
+        source.Should().Contain("TenantModuleFeatureKeys.PosRegisters");
+        source.Should().Contain("TenantModuleFeatureKeys.PosSales");
+        source.Should().Contain("TenantModuleFeatureKeys.PosReturns");
         source.Should().Contain("RequireFeature(TenantModuleFeatureKeys.Pos, \"/api/pos\")");
         source.Should().Contain("MapGeneratedEndpoints");
     }

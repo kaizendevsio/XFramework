@@ -255,6 +255,9 @@ public partial class PosSale : BaseModel
     [MemoryPackOrder(18)]
     public string? RecoveryState { get; set; }
 
+    [MemoryPackOrder(19)]
+    public string? RequestHash { get; set; }
+
     [MemoryPackIgnore]
     public virtual PosRegister Register { get; set; } = null!;
 
@@ -445,6 +448,9 @@ public partial class PosReturn : BaseModel
 
     [MemoryPackOrder(16)]
     public string? FailureReason { get; set; }
+
+    [MemoryPackOrder(17)]
+    public string? RequestHash { get; set; }
 
     [MemoryPackIgnore]
     public virtual PosSale Sale { get; set; } = null!;

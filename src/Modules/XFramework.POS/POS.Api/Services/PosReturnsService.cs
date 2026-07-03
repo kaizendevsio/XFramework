@@ -1,3 +1,5 @@
+using System.Data;
+using Inventario.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
 using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
@@ -11,38 +13,48 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Enums;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock;
 using XFramework.Inventario.Domain.Shared.Enums;
-using Inventario.Integration.Drivers;
 
 namespace POS.Api.Services;
 
 public sealed class PosReturnsService(
     AppDbContext db,
     IInventarioServiceWrapper inventario,
-    IWalletsServiceWrapper wallets)
+    IWalletsServiceWrapper wallets,
+    IPosRequestContextResolver contextResolver)
 {
     public async Task<Result<PosReturnResponse>> CreateAsync(
         CreatePosReturnRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosReturnResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request, request.CashierCredentialId);
+        if (!contextResult.IsSuccess)
+            return Result<PosReturnResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
 
-        var idempotencyKey = PosServiceHelpers.NormalizeOptional(request.IdempotencyKey)
-            ?? $"POS.Return.{Guid.NewGuid():N}";
+        var idempotencyKey = PosServiceHelpers.NormalizeOptional(request.IdempotencyKey) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+            return Result<PosReturnResponse>.Failure("Return idempotency key is required", 400);
 
-        var replay = await LoadReturnByIdempotencyAsync(tenantId, idempotencyKey, ct);
+        var context = contextResult.Data!;
+        var requestHash = PosServiceHelpers.BuildReturnRequestHash(request);
+        var replay = await LoadReturnByIdempotencyAsync(context.TenantId, idempotencyKey, tracking: true, ct);
         if (replay is not null)
-            return Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(replay), "POS return replayed");
+        {
+            if (!string.Equals(replay.RequestHash, requestHash, StringComparison.Ordinal))
+                return Result<PosReturnResponse>.Conflict("Return idempotency key was reused with a different payload");
+
+            return await ExecuteReturnWorkflowAsync(replay, context.Metadata, ct, replayed: true);
+        }
 
         if (request.Lines.Count == 0)
             return Result<PosReturnResponse>.Failure("At least one return line is required", 400);
 
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var sale = await db.Set<PosSale>()
             .AsTracking()
             .Include(item => item.Register)
             .Include(item => item.Lines)
             .FirstOrDefaultAsync(item =>
-                item.TenantId == tenantId &&
+                item.TenantId == context.TenantId &&
                 item.Id == request.SaleId &&
                 !item.IsDeleted,
                 ct);
@@ -57,7 +69,7 @@ public sealed class PosReturnsService(
         var posReturn = new PosReturn
         {
             Id = Guid.NewGuid(),
-            TenantId = tenantId,
+            TenantId = context.TenantId,
             ReturnNumber = string.Empty,
             SaleId = sale.Id,
             RegisterId = sale.RegisterId,
@@ -69,12 +81,15 @@ public sealed class PosReturnsService(
             WalletTypeId = sale.WalletTypeId,
             Reason = PosServiceHelpers.NormalizeOptional(request.Reason),
             IdempotencyKey = idempotencyKey,
+            RequestHash = requestHash,
             CreatedAt = now,
             ConcurrencyStamp = Guid.NewGuid(),
-            IsEnabled = true
+            IsEnabled = true,
+            Sale = sale,
+            Register = sale.Register
         };
         posReturn.ReturnNumber = PosServiceHelpers.NewReturnNumber(now, posReturn.Id);
-        posReturn.Lines = await BuildReturnLinesAsync(posReturn, sale, request, tenantId, ct);
+        posReturn.Lines = await BuildReturnLinesAsync(posReturn, sale, request, context.TenantId, ct);
 
         if (posReturn.Lines.Count != request.Lines.Count)
             return Result<PosReturnResponse>.Failure("One or more return lines are invalid", 400);
@@ -85,44 +100,47 @@ public sealed class PosReturnsService(
 
         db.Set<PosReturn>().Add(posReturn);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
 
-        var inventoryResult = await PostReturnInventoryAsync(posReturn, request.Metadata);
-        if (!inventoryResult.IsSuccess)
+        return await ExecuteReturnWorkflowAsync(posReturn, context.Metadata, ct, replayed: false);
+    }
+
+    public async Task<Result<PosReturnResponse>> RetryAsync(
+        RetryPosReturnRequest request,
+        CancellationToken ct)
+    {
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosReturnResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var posReturn = await LoadReturnAsync(contextResult.Data!.TenantId, request.ReturnId, tracking: true, ct);
+        if (posReturn is null)
+            return Result<PosReturnResponse>.NotFound("POS return was not found");
+
+        if (posReturn.Status == PosReturnStatus.Completed)
+            return Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(posReturn), "POS return already completed");
+
+        if (posReturn.Status is not PosReturnStatus.Pending
+            and not PosReturnStatus.InventoryPostFailed
+            and not PosReturnStatus.InventoryPosted
+            and not PosReturnStatus.RefundFailed
+            and not PosReturnStatus.Failed)
         {
-            posReturn.Status = PosReturnStatus.Failed;
-            posReturn.FailureReason = inventoryResult.Message;
-            await db.SaveChangesAsync(ct);
-            return Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(posReturn), inventoryResult.Message);
+            return Result<PosReturnResponse>.Conflict("POS return is not in a retryable state");
         }
 
-        posReturn.Status = PosReturnStatus.InventoryPosted;
-        await db.SaveChangesAsync(ct);
-
-        var refundResult = await RefundAsync(posReturn, sale.Register, request.Metadata);
-        if (!refundResult.IsSuccess)
-        {
-            posReturn.Status = PosReturnStatus.Failed;
-            posReturn.FailureReason = refundResult.Message;
-            await db.SaveChangesAsync(ct);
-            return Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(posReturn), refundResult.Message);
-        }
-
-        posReturn.Status = PosReturnStatus.Completed;
-        posReturn.CompletedAt = DateTime.UtcNow;
-        posReturn.FailureReason = null;
-        await db.SaveChangesAsync(ct);
-
-        return Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(posReturn), 201, "POS return completed");
+        return await ExecuteReturnWorkflowAsync(posReturn, contextResult.Data.Metadata, ct, replayed: true);
     }
 
     public async Task<Result<PosReturnResponse>> GetAsync(
         GetPosReturnRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosReturnResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosReturnResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
 
-        var posReturn = await LoadReturnAsync(tenantId, request.Id, false, ct);
+        var posReturn = await LoadReturnAsync(contextResult.Data!.TenantId, request.Id, false, ct);
         return posReturn is null
             ? Result<PosReturnResponse>.NotFound("POS return was not found")
             : Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(posReturn));
@@ -132,9 +150,11 @@ public sealed class PosReturnsService(
         SearchPosReturnsRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<List<PosReturnSummaryResponse>>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<List<PosReturnSummaryResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
 
+        var tenantId = contextResult.Data!.TenantId;
         var (page, pageSize) = PosServiceHelpers.NormalizePage(request.Page, request.PageSize);
         IQueryable<PosReturn> query = db.Set<PosReturn>()
             .AsNoTracking()
@@ -171,6 +191,51 @@ public sealed class PosReturnsService(
 
         return Result<List<PosReturnSummaryResponse>>.Success(
             items.Select(PosServiceHelpers.ToReturnSummaryResponse).ToList());
+    }
+
+    private async Task<Result<PosReturnResponse>> ExecuteReturnWorkflowAsync(
+        PosReturn posReturn,
+        RequestMetadata metadata,
+        CancellationToken ct,
+        bool replayed)
+    {
+        if (posReturn.Status is PosReturnStatus.Pending or PosReturnStatus.InventoryPostFailed or PosReturnStatus.Failed)
+        {
+            var inventoryResult = await PostReturnInventoryAsync(posReturn, metadata, ct);
+            if (!inventoryResult.IsSuccess)
+            {
+                posReturn.Status = PosReturnStatus.InventoryPostFailed;
+                posReturn.FailureReason = inventoryResult.Message;
+                await db.SaveChangesAsync(ct);
+                return Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(posReturn), inventoryResult.Message);
+            }
+
+            posReturn.Status = PosReturnStatus.InventoryPosted;
+            posReturn.FailureReason = null;
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (posReturn.Status is PosReturnStatus.InventoryPosted or PosReturnStatus.RefundFailed)
+        {
+            var refundResult = await RefundAsync(posReturn, posReturn.Register, metadata);
+            if (!refundResult.IsSuccess)
+            {
+                posReturn.Status = PosReturnStatus.RefundFailed;
+                posReturn.FailureReason = refundResult.Message;
+                await db.SaveChangesAsync(ct);
+                return Result<PosReturnResponse>.Success(PosServiceHelpers.ToReturnResponse(posReturn), refundResult.Message);
+            }
+
+            posReturn.Status = PosReturnStatus.Completed;
+            posReturn.CompletedAt = DateTime.UtcNow;
+            posReturn.FailureReason = null;
+            await db.SaveChangesAsync(ct);
+        }
+
+        var response = PosServiceHelpers.ToReturnResponse(posReturn);
+        return replayed
+            ? Result<PosReturnResponse>.Success(response, "POS return replay completed")
+            : Result<PosReturnResponse>.Success(response, 201, "POS return completed");
     }
 
     private async Task<List<PosReturnLine>> BuildReturnLinesAsync(
@@ -228,10 +293,14 @@ public sealed class PosReturnsService(
 
     private async Task<Result> PostReturnInventoryAsync(
         PosReturn posReturn,
-        RequestMetadata metadata)
+        RequestMetadata metadata,
+        CancellationToken ct)
     {
-        foreach (var line in posReturn.Lines)
+        foreach (var line in posReturn.Lines.OrderBy(item => item.CreatedAt))
         {
+            if (!string.IsNullOrWhiteSpace(line.InventoryMovementReferenceNumber))
+                continue;
+
             var idempotencyKey = $"POS.ReturnLine.{line.Id:N}";
             var response = await inventario.PostStockMovement(new PostStockMovementRequest
             {
@@ -252,11 +321,13 @@ public sealed class PosReturnsService(
             if (!response.IsSuccess)
             {
                 line.FailureReason = response.Message ?? "Inventory return posting failed";
+                await db.SaveChangesAsync(ct);
                 return Result.Failure(line.FailureReason, (int)response.HttpStatusCode);
             }
 
             line.InventoryMovementReferenceNumber = idempotencyKey;
             line.FailureReason = null;
+            await db.SaveChangesAsync(ct);
         }
 
         return Result.Success();
@@ -267,7 +338,8 @@ public sealed class PosReturnsService(
         PosRegister register,
         RequestMetadata metadata)
     {
-        var reference = PosServiceHelpers.ReturnRefundReference(posReturn);
+        var reference = PosServiceHelpers.NormalizeOptional(posReturn.RefundReferenceNumber)
+            ?? PosServiceHelpers.ReturnRefundReference(posReturn);
         posReturn.RefundReferenceNumber = reference;
 
         if (posReturn.RefundMethod == PosPaymentMethod.CashDrawer)
@@ -320,6 +392,7 @@ public sealed class PosReturnsService(
     {
         var query = db.Set<PosReturn>()
             .Include(item => item.Sale)
+            .Include(item => item.Register)
             .Include(item => item.Lines)
             .Where(item => item.TenantId == tenantId && item.Id == returnId && !item.IsDeleted);
 
@@ -332,14 +405,17 @@ public sealed class PosReturnsService(
     private async Task<PosReturn?> LoadReturnByIdempotencyAsync(
         Guid tenantId,
         string idempotencyKey,
+        bool tracking,
         CancellationToken ct) =>
-        await db.Set<PosReturn>()
-            .AsNoTracking()
+        await (tracking
+                ? db.Set<PosReturn>().AsTracking()
+                : db.Set<PosReturn>().AsNoTracking())
             .Include(item => item.Sale)
+            .Include(item => item.Register)
             .Include(item => item.Lines)
             .FirstOrDefaultAsync(item =>
-                item.TenantId == tenantId &&
-                item.IdempotencyKey == idempotencyKey &&
-                !item.IsDeleted,
+                    item.TenantId == tenantId &&
+                    item.IdempotencyKey == idempotencyKey &&
+                    !item.IsDeleted,
                 ct);
 }

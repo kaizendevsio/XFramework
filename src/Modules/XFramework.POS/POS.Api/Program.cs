@@ -30,6 +30,10 @@ app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
 app.UseTenantModuleFeatureGate(options =>
 {
+    options.RequireFeature(TenantModuleFeatureKeys.PosRegisters, "/api/pos/registers");
+    options.RequireFeature(TenantModuleFeatureKeys.PosSales, "/api/pos/catalog");
+    options.RequireFeature(TenantModuleFeatureKeys.PosSales, "/api/pos/sales");
+    options.RequireFeature(TenantModuleFeatureKeys.PosReturns, "/api/pos/returns");
     options.RequireFeature(TenantModuleFeatureKeys.PosCarts, "/api/pos/carts");
     options.RequireFeature(TenantModuleFeatureKeys.Pos, "/api/pos");
 });

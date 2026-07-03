@@ -13,6 +13,7 @@ public sealed class ServicesInstaller : IInstaller
     {
         services.AddTenantResolver();
         services.AddTenantModuleFeatures();
+        services.AddScoped<IPosRequestContextResolver, PosRequestContextResolver>();
         services.AddScoped<PosRegisterService>();
         services.AddScoped<PosCatalogService>();
         services.AddScoped<PosCartService>();

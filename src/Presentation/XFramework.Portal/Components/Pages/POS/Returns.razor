@@ -154,6 +154,7 @@ else
     private bool _dialogOpen;
     private string? _selectedSaleId;
     private string _reason = "";
+    private string _returnIdempotencyKey = NewReturnIdempotencyKey();
     private PosPaymentMethod _refundMethod = PosPaymentMethod.CashDrawer;
 
     private string RefundMethodValue
@@ -240,6 +241,7 @@ else
     {
         _selectedSaleId = _completedSales.FirstOrDefault()?.Id.ToString();
         _reason = "";
+        _returnIdempotencyKey = NewReturnIdempotencyKey();
         _refundMethod = PosPaymentMethod.CashDrawer;
         _returnLines = [];
         if (Guid.TryParse(_selectedSaleId, out var saleId))
@@ -250,6 +252,7 @@ else
     private async Task OnSaleChanged(string? value)
     {
         _selectedSaleId = value;
+        _returnIdempotencyKey = NewReturnIdempotencyKey();
         _returnLines = [];
         if (Guid.TryParse(value, out var saleId))
             await LoadSaleLines(saleId);
@@ -311,7 +314,7 @@ else
                 CashierCredentialId = cashierCredentialId,
                 RefundMethod = _refundMethod,
                 Reason = string.IsNullOrWhiteSpace(_reason) ? null : _reason.Trim(),
-                IdempotencyKey = $"Portal.POS.Return.{Guid.NewGuid():N}",
+                IdempotencyKey = _returnIdempotencyKey,
                 Lines = _returnLines
                     .Where(line => line.ReturnQuantity > 0)
                     .Select(line => new CreatePosReturnLineRequest
@@ -326,6 +329,7 @@ else
             {
                 ToastService.Show(response.Response?.Status == PosReturnStatus.Completed ? "Return completed." : "Return recorded with recovery status.");
                 _dialogOpen = false;
+                _returnIdempotencyKey = NewReturnIdempotencyKey();
                 await Reload();
             }
             else
@@ -353,6 +357,7 @@ else
     private static string GetSaleValue(PosSaleSummaryResponse item) => item.Id.ToString();
     private static string GetSaleLabel(PosSaleSummaryResponse item) => $"{item.SaleNumber} - {item.TotalAmount:N2}";
     private string GetSaleSearchText(PosSaleSummaryResponse item) => $"{item.SaleNumber} {GetRegisterName(item.RegisterId)} {item.TotalAmount:N2} {item.CreatedAt:yyyy-MM-dd}";
+    private static string NewReturnIdempotencyKey() => $"Portal.POS.Return.{Guid.NewGuid():N}";
     private static string GetReturnStatusBadge(PosReturnStatus status) =>
         status switch
         {

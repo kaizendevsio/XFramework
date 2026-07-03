@@ -2,17 +2,24 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using IdentityServer.Domain.Shared.Contracts;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Services;
 
 public sealed class ServiceIdentityService(
     IDataContext dataContext,
     IConfiguration configuration,
-    ILogger<ServiceIdentityService> logger)
+    ILogger<ServiceIdentityService> logger,
+    IHttpContextAccessor? httpContextAccessor = null,
+    ITrustedServiceInvocationResolver? serviceInvocationResolver = null,
+    IHostEnvironment? hostEnvironment = null)
     : IServiceIdentityService
 {
     private const string Algorithm = "RS256";
@@ -124,6 +131,10 @@ public sealed class ServiceIdentityService(
         RotateServiceSigningKeyRequest request,
         CancellationToken ct = default)
     {
+        var adminResult = await EnsureSigningKeyAdminAsync(request.Metadata, ct);
+        if (!adminResult.IsSuccess)
+            return Result<ServiceSigningKeyResponse>.Failure(adminResult.Message!, adminResult.StatusCode);
+
         var key = await RotateSigningKeyCoreAsync(request.Reason ?? request.Metadata?.Name ?? "manual", ct);
         return Result<ServiceSigningKeyResponse>.Success(ToResponse(key));
     }
@@ -132,6 +143,10 @@ public sealed class ServiceIdentityService(
         RetireServiceSigningKeyRequest request,
         CancellationToken ct = default)
     {
+        var adminResult = await EnsureSigningKeyAdminAsync(request.Metadata, ct);
+        if (!adminResult.IsSuccess)
+            return Result<ServiceSigningKeyResponse>.Failure(adminResult.Message!, adminResult.StatusCode);
+
         if (string.IsNullOrWhiteSpace(request.KeyId))
             return Result<ServiceSigningKeyResponse>.Failure("KeyId is required", 400);
 
@@ -212,6 +227,14 @@ public sealed class ServiceIdentityService(
         var devSecret = configuration["ServiceIdentity:DevelopmentClientSecret"];
         if (!string.IsNullOrWhiteSpace(devSecret) && XFrameworkServiceNames.All.Contains(clientId))
         {
+            if (!AllowsDevelopmentClientFallback())
+            {
+                logger.LogWarning(
+                    "Service identity development client-secret fallback rejected outside a development-style environment. ClientId={ClientId}",
+                    clientId);
+                return null;
+            }
+
             return new ServiceClientDefinition(
                 clientId,
                 devSecret,
@@ -224,6 +247,42 @@ public sealed class ServiceIdentityService(
 
     private string ResolveIssuer() =>
         configuration["ServiceIdentity:Issuer"] ?? XFrameworkServiceNames.IdentityServer;
+
+    private async Task<Result> EnsureSigningKeyAdminAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct)
+    {
+        var user = httpContextAccessor?.HttpContext?.User;
+        if (user?.Identity?.IsAuthenticated == true && user.IsInRole("SuperAdmin"))
+            return Result.Success();
+
+        if (serviceInvocationResolver is not null)
+        {
+            var invocation = await serviceInvocationResolver.ResolveAsync(
+                metadata,
+                configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.IdentityServer,
+                [XFrameworkServiceScopes.IdentityAdmin],
+                requireTenant: false,
+                ct: ct);
+
+            if (invocation.IsSuccess)
+                return Result.Success();
+
+            return Result.Failure(
+                invocation.Error ?? "Trusted identity.admin service metadata is required for service signing key administration",
+                invocation.StatusCode);
+        }
+
+        return Result.Forbidden("Service signing key administration requires SuperAdmin or trusted identity.admin service metadata");
+    }
+
+    private bool AllowsDevelopmentClientFallback()
+    {
+        if (hostEnvironment?.IsDevelopment() == true)
+            return true;
+
+        return configuration.GetValue<bool>("ServiceIdentity:AllowDevelopmentClientSecretFallback");
+    }
 
     private static ServiceSigningKeyResponse ToResponse(ServiceSigningKey key) => new()
     {

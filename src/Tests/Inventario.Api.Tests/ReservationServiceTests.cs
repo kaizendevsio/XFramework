@@ -55,6 +55,68 @@ public sealed class ReservationServiceTests
     }
 
     [Test]
+    public async Task ReserveAsync_SameIdempotencyKey_ReplaysExistingReservationWithoutDoubleReserving()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var dataContext = SeedReservationData(tenantId, ids, onHand: 10, reserved: 0);
+        var service = CreateService(dataContext, tenantId);
+        var request = new ReserveInventoryRequest
+        {
+            ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId,
+            LocationId = ids.LocationId,
+            Quantity = 4,
+            ReferenceType = "POS.SaleLine",
+            ReferenceId = Guid.NewGuid(),
+            IdempotencyKey = "pos-line-reservation"
+        };
+
+        var first = await service.ReserveAsync(request);
+        var second = await service.ReserveAsync(request);
+
+        first.IsSuccess.Should().BeTrue(first.Message);
+        second.IsSuccess.Should().BeTrue(second.Message);
+        second.StatusCode.Should().Be(200);
+        second.Data!.Id.Should().Be(first.Data!.Id);
+        second.Data.IdempotencyKey.Should().Be("pos-line-reservation");
+        dataContext.Set<StockBalance>().Single().ReservedQuantity.Should().Be(4);
+        dataContext.Added.OfType<Reservation>().Should().ContainSingle();
+        dataContext.SaveCount.Should().Be(1);
+    }
+
+    [Test]
+    public async Task ReserveAsync_SameIdempotencyKeyDifferentPayload_ReturnsConflict()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var dataContext = SeedReservationData(tenantId, ids, onHand: 10, reserved: 0);
+        var service = CreateService(dataContext, tenantId);
+
+        await service.ReserveAsync(new ReserveInventoryRequest
+        {
+            ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId,
+            LocationId = ids.LocationId,
+            Quantity = 4,
+            IdempotencyKey = "pos-line-reservation"
+        });
+        var conflict = await service.ReserveAsync(new ReserveInventoryRequest
+        {
+            ProductId = ids.ProductId,
+            WarehouseId = ids.WarehouseId,
+            LocationId = ids.LocationId,
+            Quantity = 5,
+            IdempotencyKey = "pos-line-reservation"
+        });
+
+        conflict.IsSuccess.Should().BeFalse();
+        conflict.StatusCode.Should().Be(409);
+        dataContext.Set<StockBalance>().Single().ReservedQuantity.Should().Be(4);
+        dataContext.SaveCount.Should().Be(1);
+    }
+
+    [Test]
     public async Task ReserveAsync_MultipleLots_AllocatesEarliestExpiryFirst()
     {
         var tenantId = Guid.NewGuid();
