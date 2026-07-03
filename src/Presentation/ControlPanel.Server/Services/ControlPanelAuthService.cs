@@ -124,7 +124,8 @@ public sealed class ControlPanelAuthService(
             new(ControlPanelAuthClaims.IdentityId, identityId.ToString()),
             new(ControlPanelAuthClaims.CredentialId, credentialId.ToString()),
             new(ControlPanelAuthClaims.TenantId, tenantId.ToString()),
-            new(ControlPanelAuthClaims.RoleTypeId, roleTypeId.ToString())
+            new(ControlPanelAuthClaims.RoleTypeId, roleTypeId.ToString()),
+            new(ControlPanelAuthClaims.IsSuperUser, IsSuperUserRole(roleTypeId).ToString())
         };
 
         if (response.SessionId is { } sessionId)
@@ -135,6 +136,9 @@ public sealed class ControlPanelAuthService(
         var identity = new ClaimsIdentity(claims, ControlPanelAuthDefaults.AuthenticationScheme);
         return new ClaimsPrincipal(identity);
     }
+
+    private static bool IsSuperUserRole(Guid roleTypeId) =>
+        roleTypeId == ControlPanelBootstrapConstants.AdminRoleTypeId;
 }
 
 public sealed record ControlPanelLoginResult(bool IsSuccess, string? Error, ClaimsPrincipal? Principal)
