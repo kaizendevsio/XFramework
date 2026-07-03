@@ -9,7 +9,7 @@ Update this file in the same PR whenever Attendance behavior, contracts, deploym
 - Start with the repository root `AGENTS.md` and `CLAUDE.md`.
 - Read `rules/BackendGuidelines.md` before changing services, EF entities, configurations, migrations, wrappers, Bolt handlers, caching, or runtime setup.
 - Read `docs/solutions/conventions/xframework-best-practices.md` before backend implementation work.
-- Read `docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md` before changing wrappers, remote `IDataContext`, or ControlPanel integration.
+- Read `docs/solutions/developer-experience/portal-service-wrapper-and-integration-test-contract.md` before changing wrappers, remote `IDataContext`, or Portal integration.
 - Current source code wins over this guide. If source and this guide disagree, fix the guide as part of the change.
 
 ## Purpose
@@ -30,10 +30,10 @@ The mental model is:
 
 - `Attendance.Api`: VSA endpoints, validators, service implementation, runtime setup, health checks, and generated Bolt handler registration.
 - `Attendance.Domain.Shared`: entities, EF configurations, enums, request contracts, and response contracts shared by API, tests, wrappers, and consumers.
-- `Attendance.Integration`: `IAttendanceServiceWrapper` and wrapper registration for ControlPanel and cross-module callers.
+- `Attendance.Integration`: `IAttendanceServiceWrapper` and wrapper registration for Portal and cross-module callers.
 - `Attendance.Tests`: focused service/unit tests.
 - `src/Tests/Attendance.IntegrationTests`: PostgreSQL-backed module integration tests, wrapper tests, remote `IDataContext` tests, and deployed-shape safety tests.
-- `src/Tests/ControlPanel.E2ETests/AttendanceControlPanelContractTests.cs`: ControlPanel read/display contract coverage for Attendance.
+- `src/Tests/Portal.E2ETests/AttendancePortalContractTests.cs`: Portal read/display contract coverage for Attendance.
 
 ## Ownership Boundaries
 
@@ -60,10 +60,10 @@ The mental model is:
 
 ## Bolt And Wrapper Rules
 
-- Cross-module and ControlPanel business operations must go through `IAttendanceServiceWrapper`.
+- Cross-module and Portal business operations must go through `IAttendanceServiceWrapper`.
 - Use wrapper methods for creating or updating contexts, participants, sessions, attendance events, adjustments, and reports.
-- Do not perform direct remote `IDataContext` mutations from ControlPanel or another module for Attendance business actions.
-- Remote `IDataContext.Query<T>()` is acceptable only for tenant-scoped read projections that are covered by integration or ControlPanel contract tests.
+- Do not perform direct remote `IDataContext` mutations from Portal or another module for Attendance business actions.
+- Remote `IDataContext.Query<T>()` is acceptable only for tenant-scoped read projections that are covered by integration or Portal contract tests.
 - Keep `Attendance.Api/Program.cs` explicit generated Bolt registration:
   `BoltHandlerRegistry.RegisterAll(client, logger, scopeFactory)`.
 - Do not remove the explicit registration just because REST endpoints still work. Production wrapper calls can fail even when HTTP routes are healthy if Bolt handlers are not registered.
@@ -74,18 +74,18 @@ The mental model is:
 - Avoid `DateTimeKind.Unspecified` at API boundaries. Normalize before comparing or displaying.
 - `AttendanceSession` defines the scheduled window. Actual time-in/time-out is recorded through `RecordAttendanceEventRequest`.
 - `AttendanceEvent` is append-only and idempotent by tenant plus `IdempotencyKey`.
-- Generate a unique, deterministic-enough idempotency key per UI or device action. ControlPanel keys should stay prefixed with a ControlPanel-specific value.
+- Generate a unique, deterministic-enough idempotency key per UI or device action. Portal keys should stay prefixed with a Portal-specific value.
 - Duplicate idempotency-key replays should return the existing event outcome, not create another event.
 - Check-in after the grace period becomes `Late`.
 - Missing checkout can become `Incomplete` when the policy requires checkout.
 - Manual adjustments must include `ActorCredentialId` and a non-empty reason.
 - Manual check-in/check-out from operators should use `AttendanceEventSource.Manual` and the scoped operator credential from `RequestMetadata.CredentialId`.
 
-## ControlPanel Integration Rules
+## Portal Integration Rules
 
 - Attendance navigation and pages must be feature-gated by `TenantModuleFeatureKeys.Attendance`.
-- ControlPanel writes must call `IAttendanceServiceWrapper`.
-- ControlPanel read-heavy screens may use `IDataContext.Query<T>()` through `AttendanceControlPanelReadService` when tenant-scoped and tested.
+- Portal writes must call `IAttendanceServiceWrapper`.
+- Portal read-heavy screens may use `IDataContext.Query<T>()` through `AttendancePortalReadService` when tenant-scoped and tested.
 - Use `XfEntityPicker<IdentityCredential>` or an equivalent credential picker for participant selection. Never make operators type credential GUIDs.
 - Copy `DisplayName` and `ReferenceCode` from the selected credential for participant display, but treat IdentityServer as authoritative.
 - Session rosters should show active context participants. If a participant has no `AttendanceRecord` for the session, display `Absent` without creating a record.
@@ -96,8 +96,8 @@ The mental model is:
 
 - Be careful with remote `IDataContext` expression serialization.
 - Do not push `DateTime` constants into remote Attendance predicates unless a deployed-shape integration test proves that query shape works.
-- For ControlPanel session date filters, prefer bounded tenant/context/status reads followed by normalized in-process UTC filtering, or use wrapper/report endpoints.
-- If a remote query works locally but fails on xeon-dev, add coverage in `Attendance.IntegrationTests` or `ControlPanel.E2ETests` before shipping the fix.
+- For Portal session date filters, prefer bounded tenant/context/status reads followed by normalized in-process UTC filtering, or use wrapper/report endpoints.
+- If a remote query works locally but fails on xeon-dev, add coverage in `Attendance.IntegrationTests` or `Portal.E2ETests` before shipping the fix.
 
 ## EF And Schema Rules
 
@@ -120,7 +120,7 @@ The mental model is:
 
 - Add or update `Attendance.Tests` for service rules, state transitions, idempotency, policies, tenant validation, and manual adjustments.
 - Add or update `Attendance.IntegrationTests` for PostgreSQL mappings, migrations, wrapper calls, remote `IDataContext` query surfaces, and production-like Bolt registration.
-- Add or update ControlPanel contract tests when Attendance read/display projection behavior changes.
+- Add or update Portal contract tests when Attendance read/display projection behavior changes.
 - For deployment or wrapper fixes, verify both HTTP endpoint behavior and wrapper/Bolt behavior.
 - Documentation-only changes do not require a full build, but run `git diff --check` and check links/paths you reference.
 
@@ -137,7 +137,7 @@ The mental model is:
 
 - Do not write IdentityServer data from Attendance.
 - Do not require raw credential GUID entry in operator UI.
-- Do not bypass `IAttendanceServiceWrapper` for business writes from ControlPanel or another module.
+- Do not bypass `IAttendanceServiceWrapper` for business writes from Portal or another module.
 - Do not remove generated Bolt handler registration from `Program.cs`.
 - Do not add untested remote `IDataContext` mutation surfaces.
 - Do not assume a session itself is the time-in/time-out record; actual attendance capture is an event operation.

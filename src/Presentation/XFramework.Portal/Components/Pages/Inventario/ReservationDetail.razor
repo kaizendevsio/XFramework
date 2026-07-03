@@ -1,0 +1,419 @@
+@page "/inventario/reservations/{Id:guid}"
+@using XFramework.Domain.Shared.BusinessObjects
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Inventario Reservation - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_reservationsEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Reservations" />
+}
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/inventario/reservations"))">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Reservations
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Reservation Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to this reservation's tenant to view its details.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else if (_reservation is null)
+{
+    <BbTypographyMuted>Reservation not found.</BbTypographyMuted>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-detail-header">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to reservations"
+                          OnClick="@(() => Navigation.NavigateTo("/inventario/reservations"))">
+                    <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                </BbButton>
+                <div class="xf-detail-header-main">
+                    <div class="xf-detail-header-title">
+                        <BbTypographyH3>Reservation</BbTypographyH3>
+                        <StatusBadge Text="@_reservation.Status.ToString()" Status="@GetStatusBadge(_reservation.Status)" />
+                    </div>
+                    <BbTypographyMuted>@GetProductLabel() - Qty @_reservation.Quantity.ToString("N2")</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    @if (_reservation.Status == ReservationStatus.Active)
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@ReleaseReservation" Disabled="@_runningAction">
+                            Release
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@FulfillReservation" Disabled="@_runningAction">
+                            Fulfill
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Destructive" OnClick="@CancelReservation" Disabled="@_runningAction">
+                            Cancel
+                        </BbButton>
+                    }
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <div class="xf-summary-grid xf-summary-grid-3">
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Quantity</BbTypographyMuted>
+                            <BbTypographyH3>@_reservation.Quantity.ToString("N2")</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Reserved</BbTypographyMuted>
+                            <BbTypographyH3>@FormatDate(_reservation.ReservedAt)</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardContent>
+                        <div class="space-y-1 pt-4">
+                            <BbTypographyMuted>Expires</BbTypographyMuted>
+                            <BbTypographyH3>@FormatDate(_reservation.ExpiresAt)</BbTypographyH3>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Reservation Details</BbCardTitle>
+                    <BbCardDescription>Allocation context and lifecycle timestamps.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <BbTypographyMuted>Product</BbTypographyMuted>
+                            <div>@GetProductLabel()</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Warehouse</BbTypographyMuted>
+                            <div>@GetWarehouseLabel()</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Location</BbTypographyMuted>
+                            <div>@GetLocationLabel()</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Stock Balance</BbTypographyMuted>
+                            <div>@GetBalanceLabel()</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Reference</BbTypographyMuted>
+                            <div>@FormatReference()</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Created</BbTypographyMuted>
+                            <div>@_reservation.CreatedAt.ToLocalTime().ToString("g")</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Released</BbTypographyMuted>
+                            <div>@FormatDate(_reservation.ReleasedAt)</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Fulfilled</BbTypographyMuted>
+                            <div>@FormatDate(_reservation.FulfilledAt)</div>
+                        </div>
+                        <div class="md:col-span-2">
+                            <BbTypographyMuted>ID</BbTypographyMuted>
+                            <div class="font-mono text-xs">@_reservation.Id</div>
+                        </div>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Allocation Output</BbCardTitle>
+                    <BbCardDescription>Lots and balances selected for this reservation.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_allocations.Count == 0)
+                    {
+                        <BbTypographyMuted>No allocation rows recorded for this reservation.</BbTypographyMuted>
+                    }
+                    else
+                    {
+                        <BbDataGrid Items="@_allocations" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId))">
+                                    <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
+                                    <ChildContent Context="item">
+                                        <StatusBadge Text="@item.Status.ToString()" Status="@GetAllocationStatusBadge(item.Status)" />
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReleasedAt)" Title="Released" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.FulfilledAt)" Title="Fulfilled" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Balance" Filterable="true" FilterBy="@(item => ShortId(item.StockBalanceId))">
+                                    <ChildContent Context="item">
+                                        <span class="font-mono text-xs">@ShortId(item.StockBalanceId)</span>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+
+    private Reservation? _reservation;
+    private Product? _product;
+    private Warehouse? _warehouse;
+    private InventoryLocation? _location;
+    private StockBalance? _balance;
+    private List<ReservationAllocation> _allocations = [];
+    private List<InventoryLot> _lots = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _reservationsEnabled;
+    private bool _outsideTenantContext;
+    private bool _runningAction;
+    private Guid? _loadedId;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id) return;
+        _loadedId = Id;
+        await Reload();
+    }
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _reservationsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reservations");
+            _outsideTenantContext = false;
+            _reservation = null;
+            _product = null;
+            _warehouse = null;
+            _location = null;
+            _balance = null;
+            _allocations = [];
+            _lots = [];
+
+            if (!_hasTenant || !_reservationsEnabled) return;
+
+            _reservation = await DataContext.Query<Reservation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id && !x.IsDeleted)
+                .FirstOrDefaultAsync();
+
+            _outsideTenantContext = _reservation is not null && _reservation.TenantId != TenantFilter.SelectedTenantId;
+            if (_reservation is null || _outsideTenantContext) return;
+
+            var tenantId = _reservation.TenantId;
+            _product = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.Id == _reservation.ProductId && !x.IsDeleted)
+                .FirstOrDefaultAsync();
+
+            if (_reservation.WarehouseId is { } warehouseId)
+            {
+                _warehouse = await DataContext.Query<Warehouse>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && x.Id == warehouseId && !x.IsDeleted)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (_reservation.LocationId is { } locationId)
+            {
+                _location = await DataContext.Query<InventoryLocation>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && x.Id == locationId && !x.IsDeleted)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (_reservation.StockBalanceId is { } balanceId)
+            {
+                _balance = await DataContext.Query<StockBalance>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && x.Id == balanceId && !x.IsDeleted)
+                    .FirstOrDefaultAsync();
+            }
+
+            _allocations = await DataContext.Query<ReservationAllocation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.ReservationId == Id && !x.IsDeleted)
+                .OrderBy(x => x.ReservedAt)
+                .ToListAsync();
+
+            var lotIds = _allocations
+                .Where(x => x.LotId is not null)
+                .Select(x => x.LotId!.Value)
+                .Distinct()
+                .ToList();
+            if (lotIds.Count > 0)
+            {
+                _lots = await DataContext.Query<InventoryLot>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && lotIds.Contains(x.Id) && !x.IsDeleted)
+                    .ToListAsync();
+            }
+        }
+        catch
+        {
+            ToastService.Show("Could not load reservation.");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ReleaseReservation() =>
+        await RunReservationAction(
+            () => Inventario.ReleaseReservation(new ReleaseReservationRequest
+            {
+                Metadata = BuildMetadata(),
+                ReservationId = Id
+            }),
+            "Reservation released.");
+
+    private async Task FulfillReservation() =>
+        await RunReservationAction(
+            () => Inventario.FulfillReservation(new FulfillReservationRequest
+            {
+                Metadata = BuildMetadata(),
+                ReservationId = Id
+            }),
+            "Reservation fulfilled.");
+
+    private async Task CancelReservation() =>
+        await RunReservationAction(
+            () => Inventario.CancelReservation(new CancelReservationRequest
+            {
+                Metadata = BuildMetadata(),
+                ReservationId = Id
+            }),
+            "Reservation cancelled.");
+
+    private async Task RunReservationAction(Func<Task<CmdResponse>> action, string successMessage)
+    {
+        _runningAction = true;
+        try
+        {
+            var result = await action();
+            ToastService.Show(result.IsSuccess ? successMessage : "Could not update reservation.");
+            if (result.IsSuccess)
+                await Reload();
+        }
+        finally
+        {
+            _runningAction = false;
+        }
+    }
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "Portal"
+    };
+
+    private string GetProductLabel() =>
+        _product is null
+            ? _reservation?.ProductId.ToString()[..8] ?? "N/A"
+            : string.IsNullOrWhiteSpace(_product.SKU) ? _product.Name ?? _product.Id.ToString()[..8] : $"{_product.Name} ({_product.SKU})";
+
+    private string GetWarehouseLabel() =>
+        _warehouse is null ? ShortId(_reservation?.WarehouseId) : $"{_warehouse.Code} - {_warehouse.Name}";
+
+    private string GetLocationLabel() =>
+        _location is null ? ShortId(_reservation?.LocationId) : $"{_location.Code} - {_location.Name}";
+
+    private string GetBalanceLabel() =>
+        _balance is null ? ShortId(_reservation?.StockBalanceId) : $"{_balance.OnHandQuantity:N2} on hand";
+
+    private string GetLotLabel(Guid? lotId)
+    {
+        if (lotId is not { } id)
+            return "Untracked";
+
+        var lot = _lots.FirstOrDefault(x => x.Id == id);
+        return lot is null ? id.ToString()[..8] : $"{lot.LotNumber} ({FormatDate(lot.ExpiresAt)})";
+    }
+
+    private string FormatReference() =>
+        string.IsNullOrWhiteSpace(_reservation?.ReferenceType)
+            ? "N/A"
+            : _reservation.ReferenceId is { } referenceId ? $"{_reservation.ReferenceType} / {referenceId}" : _reservation.ReferenceType;
+
+    private static string GetStatusBadge(ReservationStatus status) =>
+        status == ReservationStatus.Active ? "active" : "inactive";
+
+    private static string GetAllocationStatusBadge(ReservationAllocationStatus status) =>
+        status == ReservationAllocationStatus.Reserved ? "active" : "inactive";
+
+    private static string FormatDate(DateTime value) => value.ToLocalTime().ToString("g");
+
+    private static string FormatDate(DateTime? value) =>
+        value is null ? "N/A" : value.Value.ToLocalTime().ToString("g");
+
+    private static string ShortId(Guid? id) =>
+        id is null ? "N/A" : id.Value.ToString()[..8];
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

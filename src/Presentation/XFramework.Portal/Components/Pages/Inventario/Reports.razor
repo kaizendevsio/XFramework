@@ -1,0 +1,575 @@
+@page "/inventario/reports"
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Inventario Reports - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_reportingEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Reporting" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <BbTypographyH3>Inventory Reports</BbTypographyH3>
+                    <BbTypographyMuted>Focused inventory views for stock, expiry, movement, and allocation status.</BbTypographyMuted>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            <div class="xf-summary-grid xf-summary-grid-4">
+                <ReportMetric Title="Low Stock" Value="@_lowStock.Count.ToString()" />
+                <ReportMetric Title="Near Expiry" Value="@_nearExpiry.Count.ToString()" />
+                <ReportMetric Title="Expired Lots" Value="@_expired.Count.ToString()" />
+                <ReportMetric Title="Stock Positions" Value="@_stockPositions.Count.ToString()" />
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Report Filters</BbCardTitle>
+                    <BbCardDescription>Scope the report cards before using column filters inside each grid.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <XfEntityPicker TItem="Product"
+                                        @bind-Value="_filterProductId"
+                                        Items="@_products"
+                                        Label="Product"
+                                        Placeholder="All products"
+                                        SearchPlaceholder="Search products..."
+                                        EmptyMessage="No products found."
+                                        ValueSelector="@GetProductPickerValue"
+                                        TextSelector="@GetProductLabel"
+                                        SearchTextSelector="@GetProductSearchText"
+                                        AllowClear="true"
+                                        ClearText="All products"
+                                        AdvancedSearchTitle="Find Product"
+                                        AdvancedSearchDescription="Search products in the active tenant." />
+                        <XfEntityPicker TItem="Warehouse"
+                                        Value="@_filterWarehouseId"
+                                        ValueChanged="@OnFilterWarehouseChanged"
+                                        Items="@_warehouses"
+                                        Label="Warehouse"
+                                        Placeholder="All warehouses"
+                                        SearchPlaceholder="Search warehouses..."
+                                        EmptyMessage="No warehouses found."
+                                        ValueSelector="@GetWarehousePickerValue"
+                                        TextSelector="@GetWarehouseLabel"
+                                        SearchTextSelector="@GetWarehouseSearchText"
+                                        AllowClear="true"
+                                        ClearText="All warehouses"
+                                        AdvancedSearchTitle="Find Warehouse"
+                                        AdvancedSearchDescription="Search warehouses in the active tenant." />
+                        <XfEntityPicker TItem="InventoryLocation"
+                                        @bind-Value="_filterLocationId"
+                                        Items="@LocationsForSelectedWarehouse().ToList()"
+                                        Label="Location"
+                                        Placeholder="All locations"
+                                        SearchPlaceholder="Search locations..."
+                                        EmptyMessage="No locations found."
+                                        ValueSelector="@GetLocationPickerValue"
+                                        TextSelector="@GetLocationLabel"
+                                        SearchTextSelector="@GetLocationSearchText"
+                                        AllowClear="true"
+                                        ClearText="All locations"
+                                        AdvancedSearchTitle="Find Location"
+                                        AdvancedSearchDescription="Search locations in the selected warehouse." />
+                        <BbFormFieldNumericInput TValue="int"
+                                                 @bind-Value="_nearExpiryWindowDays"
+                                                 Label="Near Expiry Window"
+                                                 Min="1"
+                                                 Max="365"
+                                                 Step="1" />
+                        <BbFormFieldDatePicker @bind-Value="_movementFrom" Label="Movement From" />
+                        <BbFormFieldDatePicker @bind-Value="_movementTo" Label="Movement To" />
+                    </div>
+                    <div class="mt-4 flex flex-wrap justify-end gap-2">
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@ResetReportFilters">
+                            <LucideIcon Name="rotate-ccw" class="mr-2 h-4 w-4" />
+                            Reset
+                        </BbButton>
+                        <BbButton OnClick="@ApplyReportFilters">
+                            Apply Filters
+                        </BbButton>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Low Stock</BbCardTitle>
+                    <BbCardDescription>@_lowStock.Count scoped rule(s) at or below reorder point</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_lowStock.Count == 0)
+                    {
+                        <BbEmpty Title="No low-stock rows" Description="Adjust filters or configure active reorder rules." />
+                    }
+                    else
+                    {
+                        <BbDataGrid Items="@_lowStock" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Scope" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Near Expiry</BbCardTitle>
+                    <BbCardDescription>Lots expiring in the next @_nearExpiryWindowDays day(s) with on-hand stock</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_nearExpiry.Count == 0)
+                    {
+                        <BbEmpty Title="No near-expiry stock" Description="Adjust filters or expand the expiry window." />
+                    }
+                    else
+                    {
+                        <BbDataGrid Items="@_nearExpiry" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Expired Stock</BbCardTitle>
+                    <BbCardDescription>Expired or expired-status lots that still have on-hand stock</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_expired.Count == 0)
+                    {
+                        <BbEmpty Title="No expired stock" Description="No expired lots match the current filters." />
+                    }
+                    else
+                    {
+                        <BbDataGrid Items="@_expired" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expired" Sortable="true" Filterable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Stock By Product / Location / Lot</BbCardTitle>
+                    <BbCardDescription>@_stockPositions.Count balance row(s)</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_stockPositions.Count == 0)
+                    {
+                        <BbEmpty Title="No stock positions" Description="No balances match the current filters." />
+                    }
+                    else
+                    {
+                        <BbDataGrid Items="@_stockPositions" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Recent Movement Ledger</BbCardTitle>
+                    <BbCardDescription>@_movements.Count latest movement(s)</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_movements.Count == 0)
+                    {
+                        <BbEmpty Title="No movements" Description="No movement rows match the current filters." />
+                    }
+                    else
+                    {
+                        <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Reference)" Title="Reference" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Date" Sortable="true" Filterable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Reservation Allocation Status</BbCardTitle>
+                    <BbCardDescription>@_allocations.Count allocation row(s)</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_allocations.Count == 0)
+                    {
+                        <BbEmpty Title="No allocations" Description="No reservation allocations match the current filters." />
+                    }
+                    else
+                    {
+                        <BbDataGrid Items="@_allocations" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private List<Product> _products = [];
+    private List<Warehouse> _warehouses = [];
+    private List<InventoryLocation> _locations = [];
+    private List<InventoryLot> _lots = [];
+    private List<StockBalance> _balances = [];
+    private List<InventoryReorderRule> _rules = [];
+    private List<InventoryMovement> _rawMovements = [];
+    private List<ReservationAllocation> _rawAllocations = [];
+    private List<LowStockRow> _lowStock = [];
+    private List<ExpiryRow> _nearExpiry = [];
+    private List<ExpiryRow> _expired = [];
+    private List<StockRow> _stockPositions = [];
+    private List<MovementRow> _movements = [];
+    private List<AllocationRow> _allocations = [];
+    private string? _filterProductId;
+    private string? _filterWarehouseId;
+    private string? _filterLocationId;
+    private int _nearExpiryWindowDays = 30;
+    private DateTime? _movementFrom;
+    private DateTime? _movementTo;
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _reportingEnabled;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _reportingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reporting");
+            ClearRows();
+            if (!_hasTenant || !_reportingEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _lots = await DataContext.Query<InventoryLot>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _balances = await DataContext.Query<StockBalance>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(2000).ToListAsync();
+            _rules = await DataContext.Query<InventoryReorderRule>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted).Take(1000).ToListAsync();
+            _rawMovements = await DataContext.Query<InventoryMovement>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.MovementDate).Take(500).ToListAsync();
+            _rawAllocations = await DataContext.Query<ReservationAllocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.ReservedAt).Take(500).ToListAsync();
+
+            BuildRows();
+        }
+        catch
+        {
+            ToastService.Show("Could not load inventory reports.");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearRows()
+    {
+        _products = [];
+        _warehouses = [];
+        _locations = [];
+        _lots = [];
+        _balances = [];
+        _rules = [];
+        _rawMovements = [];
+        _rawAllocations = [];
+        _lowStock = [];
+        _nearExpiry = [];
+        _expired = [];
+        _stockPositions = [];
+        _movements = [];
+        _allocations = [];
+    }
+
+    private void BuildRows()
+    {
+        var productId = ParseFilterGuid(_filterProductId);
+        var warehouseId = ParseFilterGuid(_filterWarehouseId);
+        var locationId = ParseFilterGuid(_filterLocationId);
+        var balances = _balances
+            .Where(x => MatchesProduct(productId, x.ProductId))
+            .Where(x => MatchesWarehouse(warehouseId, x.WarehouseId))
+            .Where(x => MatchesLocation(locationId, x.LocationId))
+            .ToList();
+        var rules = _rules
+            .Where(x => MatchesProduct(productId, x.ProductId))
+            .Where(x => MatchesNullableScope(warehouseId, x.WarehouseId))
+            .Where(x => MatchesNullableScope(locationId, x.LocationId))
+            .ToList();
+        var movements = _rawMovements
+            .Where(x => MatchesProduct(productId, x.ProductId))
+            .Where(x => MatchesWarehouse(warehouseId, x.WarehouseId))
+            .Where(x => MatchesLocation(locationId, x.LocationId))
+            .Where(MatchesMovementDateRange)
+            .ToList();
+        var allocations = _rawAllocations
+            .Where(x => MatchesProduct(productId, x.ProductId))
+            .Where(x => MatchesWarehouse(warehouseId, x.WarehouseId))
+            .Where(x => MatchesLocation(locationId, x.LocationId))
+            .ToList();
+
+        _lowStock = rules.Select(rule =>
+            {
+                var available = balances.Where(x =>
+                        x.ProductId == rule.ProductId &&
+                        (rule.WarehouseId is null || x.WarehouseId == rule.WarehouseId) &&
+                        (rule.LocationId is null || x.LocationId == rule.LocationId))
+                    .Sum(x => x.AvailableQuantity);
+                var reorderPoint = rule.ReorderPoint > 0 ? rule.ReorderPoint : rule.MinimumQuantity;
+                return new LowStockRow(GetProductName(rule.ProductId), GetScope(rule.WarehouseId, rule.LocationId), available, reorderPoint);
+            })
+            .Where(x => x.AvailableQuantity <= x.ReorderPoint)
+            .ToList();
+
+        var now = DateTime.UtcNow;
+        var expiryWindow = Math.Clamp(_nearExpiryWindowDays, 1, 365);
+        _nearExpiry = BuildExpiryRows(
+            balances,
+            lot => MatchesProduct(productId, lot.ProductId) &&
+                   lot.ExpiresAt is not null &&
+                   lot.ExpiresAt > now &&
+                   lot.ExpiresAt <= now.AddDays(expiryWindow));
+        _expired = BuildExpiryRows(
+            balances,
+            lot => MatchesProduct(productId, lot.ProductId) &&
+                   (lot.Status == InventoryLotStatus.Expired || lot.ExpiresAt is not null && lot.ExpiresAt <= now));
+        _stockPositions = balances.Select(balance => new StockRow(
+                GetProductName(balance.ProductId),
+                GetScope(balance.WarehouseId, balance.LocationId),
+                GetLotNumber(balance.LotId),
+                balance.OnHandQuantity,
+                balance.ReservedQuantity,
+                balance.AvailableQuantity))
+            .ToList();
+        _movements = movements.Select(movement => new MovementRow(
+                GetProductName(movement.ProductId),
+                movement.MovementType,
+                movement.QuantityDelta,
+                FormatReference(movement.ReferenceType, movement.ReferenceId),
+                movement.MovementDate))
+            .ToList();
+        _allocations = allocations.Select(allocation => new AllocationRow(
+                GetProductName(allocation.ProductId),
+                GetLotNumber(allocation.LotId),
+                allocation.Quantity,
+                allocation.Status,
+                allocation.ReservedAt))
+            .ToList();
+    }
+
+    private List<ExpiryRow> BuildExpiryRows(
+        IReadOnlyCollection<StockBalance> balances,
+        Func<InventoryLot, bool> lotFilter)
+    {
+        var lots = _lots.Where(lotFilter).ToDictionary(x => x.Id);
+        if (lots.Count == 0) return [];
+
+        return balances
+            .Where(x => x.LotId is { } lotId && lots.ContainsKey(lotId) && x.OnHandQuantity > 0)
+            .Select(balance =>
+            {
+                var lot = lots[balance.LotId!.Value];
+                return new ExpiryRow(
+                    GetProductName(lot.ProductId),
+                    lot.LotNumber ?? lot.Id.ToString()[..8],
+                    GetScope(balance.WarehouseId, balance.LocationId),
+                    balance.AvailableQuantity,
+                    lot.ExpiresAt);
+            })
+            .OrderBy(x => x.ExpiresAt)
+            .ToList();
+    }
+
+    private void ApplyReportFilters()
+    {
+        _nearExpiryWindowDays = Math.Clamp(_nearExpiryWindowDays, 1, 365);
+        BuildRows();
+    }
+
+    private void ResetReportFilters()
+    {
+        _filterProductId = null;
+        _filterWarehouseId = null;
+        _filterLocationId = null;
+        _nearExpiryWindowDays = 30;
+        _movementFrom = null;
+        _movementTo = null;
+        BuildRows();
+    }
+
+    private Task OnFilterWarehouseChanged(string? value)
+    {
+        _filterWarehouseId = value;
+        _filterLocationId = null;
+        return Task.CompletedTask;
+    }
+
+    private IEnumerable<InventoryLocation> LocationsForSelectedWarehouse()
+    {
+        var warehouseId = ParseFilterGuid(_filterWarehouseId);
+        return warehouseId is null
+            ? _locations
+            : _locations.Where(x => x.WarehouseId == warehouseId.Value);
+    }
+
+    private static Guid? ParseFilterGuid(string? value) =>
+        Guid.TryParse(value, out var parsed) ? parsed : null;
+
+    private static bool MatchesProduct(Guid? filterProductId, Guid productId) =>
+        filterProductId is null || productId == filterProductId.Value;
+
+    private static bool MatchesWarehouse(Guid? filterWarehouseId, Guid warehouseId) =>
+        filterWarehouseId is null || warehouseId == filterWarehouseId.Value;
+
+    private static bool MatchesWarehouse(Guid? filterWarehouseId, Guid? warehouseId) =>
+        filterWarehouseId is null || warehouseId == filterWarehouseId.Value;
+
+    private static bool MatchesLocation(Guid? filterLocationId, Guid locationId) =>
+        filterLocationId is null || locationId == filterLocationId.Value;
+
+    private static bool MatchesLocation(Guid? filterLocationId, Guid? locationId) =>
+        filterLocationId is null || locationId == filterLocationId.Value;
+
+    private static bool MatchesNullableScope(Guid? filterId, Guid? scopeId) =>
+        filterId is null || scopeId is null || scopeId == filterId.Value;
+
+    private bool MatchesMovementDateRange(InventoryMovement movement)
+    {
+        if (_movementFrom is { } from && movement.MovementDate.Date < from.Date)
+            return false;
+
+        if (_movementTo is { } to && movement.MovementDate.Date > to.Date)
+            return false;
+
+        return true;
+    }
+
+    private string GetProductName(Guid productId) =>
+        _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
+
+    private string GetScope(Guid? warehouseId, Guid? locationId) =>
+        $"{GetWarehouseName(warehouseId)} / {GetLocationName(locationId)}";
+
+    private string GetWarehouseName(Guid? id) =>
+        id is { } value ? _warehouses.FirstOrDefault(x => x.Id == value) is { } warehouse ? $"{warehouse.Code} - {warehouse.Name}" : value.ToString()[..8] : "Any warehouse";
+
+    private string GetLocationName(Guid? id) =>
+        id is { } value ? _locations.FirstOrDefault(x => x.Id == value) is { } location ? $"{location.Code} - {location.Name}" : value.ToString()[..8] : "Any location";
+
+    private string GetLotNumber(Guid? id) =>
+        id is { } value ? _lots.FirstOrDefault(x => x.Id == value)?.LotNumber ?? value.ToString()[..8] : "Untracked";
+
+    private static string FormatReference(string? type, Guid? id) =>
+        string.IsNullOrWhiteSpace(type) ? "N/A" : id is { } value ? $"{type} / {value.ToString()[..8]}" : type;
+
+    private static string GetProductPickerValue(Product product) => product.Id.ToString();
+
+    private static string GetWarehousePickerValue(Warehouse warehouse) => warehouse.Id.ToString();
+
+    private static string GetLocationPickerValue(InventoryLocation location) => location.Id.ToString();
+
+    private static string GetProductLabel(Product product) =>
+        string.IsNullOrWhiteSpace(product.SKU)
+            ? product.Name ?? product.Id.ToString()[..8]
+            : $"{product.SKU} - {product.Name ?? product.Id.ToString()[..8]}";
+
+    private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+
+    private string GetLocationLabel(InventoryLocation location) =>
+        $"{location.Code} - {location.Name} ({GetWarehouseName(location.WarehouseId)})";
+
+    private static string GetProductSearchText(Product product) =>
+        $"{product.SKU} {product.Name} {product.Description}";
+
+    private static string GetWarehouseSearchText(Warehouse warehouse) =>
+        $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
+
+    private string GetLocationSearchText(InventoryLocation location) =>
+        $"{location.Code} {location.Name} {GetWarehouseName(location.WarehouseId)}";
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed record LowStockRow(string ProductName, string Scope, decimal AvailableQuantity, decimal ReorderPoint);
+    private sealed record ExpiryRow(string ProductName, string LotNumber, string Scope, decimal AvailableQuantity, DateTime? ExpiresAt);
+    private sealed record StockRow(string ProductName, string Scope, string LotNumber, decimal OnHandQuantity, decimal ReservedQuantity, decimal AvailableQuantity);
+    private sealed record MovementRow(string ProductName, InventoryMovementType MovementType, decimal QuantityDelta, string Reference, DateTime MovementDate);
+    private sealed record AllocationRow(string ProductName, string LotNumber, decimal Quantity, ReservationAllocationStatus Status, DateTime ReservedAt);
+}

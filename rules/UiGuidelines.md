@@ -1,13 +1,13 @@
 # UI Guidelines
 
-This is the primary UI rules entrypoint for XFramework agents. Read this file before changing ControlPanel or Blazor UI.
+This is the primary UI rules entrypoint for XFramework agents. Read this file before changing Portal or Blazor UI.
 
 ## Authority
 
 - Current source code wins when docs and implementation disagree.
 - This file owns agent-facing UI rules. Do not create parallel UI guidance elsewhere unless explicitly requested.
-- For exact BlazorBlueprint component APIs, setup details, overlay pitfalls, and visual verification workflow, use [BlazorBlueprint ControlPanel Agent Guide](../docs/solutions/tooling-decisions/blazor-blueprint-controlpanel-agent-guide.md).
-- For ControlPanel business operations, wrapper vs `IDataContext` decisions, and UI write-path tests, use [ControlPanel Service Wrapper And Integration Test Contract](../docs/solutions/developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md).
+- For exact BlazorBlueprint component APIs, setup details, overlay pitfalls, and visual verification workflow, use [BlazorBlueprint Portal Agent Guide](../docs/solutions/tooling-decisions/blazor-blueprint-portal-agent-guide.md).
+- For Portal business operations, wrapper vs `IDataContext` decisions, and UI write-path tests, use [Portal Service Wrapper And Integration Test Contract](../docs/solutions/developer-experience/portal-service-wrapper-and-integration-test-contract.md).
 - Before using newer or less-common BlazorBlueprint parameters/components, inspect the installed NuGet XML because website docs can lead the pinned package version.
 
 ```powershell
@@ -15,7 +15,7 @@ $xml = "$env:USERPROFILE\.nuget\packages\blazorblueprint.components\3.12.0\lib\n
 Select-String -Path $xml -Pattern 'BbDataGrid|BbDynamicForm|BbFormWizard|BbFilterBuilder|DialogOpenOptions|ToastData'
 ```
 
-## ControlPanel Baseline
+## Portal Baseline
 
 - Preserve BlazorBlueprint setup: `AddInteractiveServerComponents`, `AddBlazorBlueprintComponents`, `_content/BlazorBlueprint.Components` CSS, `InteractiveServer` render mode, and shared imports.
 - Preserve `BbToastProvider`, `BbDialogProvider`, and `BbPortalHost` in layouts that use portal-based controls.
@@ -94,7 +94,7 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 - Use `BbInputOTP` only for OTP/verification-code entry.
 - Use `BbFileUpload` for uploads so drag/drop, preview, and progress behavior stay consistent.
 - GUIDs should usually be hidden behind user-facing labels in comboboxes or entity pickers.
-- Avoid native OS dropdowns in ControlPanel unless the Blueprint control cannot support the workflow.
+- Avoid native OS dropdowns in Portal unless the Blueprint control cannot support the workflow.
 - Use typed `SelectOption<TValue>` options for simple `BbCombobox` selections. Use compositional combobox items only for rich option rows.
 - For dialogs launched from menus or other overlays, use controlled state with `@bind-Open`.
 - For overlays inside dialogs, set `TrapFocus="false"` on `BbDialogContent` when required by the nested control behavior.
@@ -156,12 +156,12 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 - Do not put existing-record edits in list-page modals.
 - Do not put required information behind hover-only UI.
 - Do not hard-code third-party component chrome text when `IBbLocalizer` can override it.
-- Do not introduce arbitrary responsive Tailwind utility classes without verifying they exist in the compiled ControlPanel CSS.
+- Do not introduce arbitrary responsive Tailwind utility classes without verifying they exist in the compiled Portal CSS.
 - Do not expose raw exception details, SQL, stack traces, tokens, or PII in UI toasts, alerts, or validation messages.
 
 ## Loading And Editable Detail UI
 
-- Do not leave bare `"Loading..."` text in new or touched ControlPanel UI.
+- Do not leave bare `"Loading..."` text in new or touched Portal UI.
 - Use the shared `CenteredSpinner` or a BlazorBlueprint spinner/skeleton pattern that matches the surrounding page.
 - Use `BbEmpty` for no-data states that need a clear message and optional action.
 - Use `BbAlert` for persistent warnings or contextual messages; use `ToastService` for temporary result feedback.
@@ -202,10 +202,10 @@ Before creating custom UI, check the installed BlazorBlueprint component surface
 
 ## Verification
 
-- Build the relevant ControlPanel project after UI changes:
+- Build the relevant Portal project after UI changes:
 
 ```powershell
-dotnet build src/Presentation/ControlPanel.Server/ControlPanel.Server.csproj -m:1 /nr:false
+dotnet build src/Presentation/XFramework.Portal/XFramework.Portal.csproj -m:1 /nr:false
 ```
 
 - Browser-smoke user-facing UI changes.
@@ -222,8 +222,8 @@ dotnet build src/Presentation/ControlPanel.Server/ControlPanel.Server.csproj -m:
 ## Useful Searches
 
 ```powershell
-rg -n "BlazorBlueprint|BbPortalHost|BbToastProvider|BbDialogProvider|AddBlazorBlueprint|@rendermode|Interactive" Directory.Packages.props src/Presentation/ControlPanel.Server
-rg -n "<table\b|<BbDataGrid\b|Filterable=|FilterBy=|OnRowClick=" src/Presentation/ControlPanel.Server
-rg -n "DataContext\.(Add|Update|Remove)|SaveChangesAsync\(" src/Presentation/ControlPanel.Server/Components/Pages
-rg -n "BbDynamicForm|FormSchema|FormFieldDefinition|FilterDefinition|ToastData|DialogOpenOptions|<select\b|<table\b" src/Presentation/ControlPanel.Server
+rg -n "BlazorBlueprint|BbPortalHost|BbToastProvider|BbDialogProvider|AddBlazorBlueprint|@rendermode|Interactive" Directory.Packages.props src/Presentation/XFramework.Portal
+rg -n "<table\b|<BbDataGrid\b|Filterable=|FilterBy=|OnRowClick=" src/Presentation/XFramework.Portal
+rg -n "DataContext\.(Add|Update|Remove)|SaveChangesAsync\(" src/Presentation/XFramework.Portal/Components/Pages
+rg -n "BbDynamicForm|FormSchema|FormFieldDefinition|FilterDefinition|ToastData|DialogOpenOptions|<select\b|<table\b" src/Presentation/XFramework.Portal
 ```

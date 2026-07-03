@@ -27,7 +27,7 @@
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
-        <ProjectReference Include="..\..\Presentation\ControlPanel.Server\ControlPanel.Server.csproj" />
+        <ProjectReference Include="..\..\Presentation\XFramework.Portal\XFramework.Portal.csproj" />
     </ItemGroup>
 
 </Project>

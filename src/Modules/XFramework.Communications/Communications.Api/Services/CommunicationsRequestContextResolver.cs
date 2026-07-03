@@ -320,7 +320,7 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
 
         var configured = configuration["Communications:TrustedAdminServiceNames"];
         var allowed = string.IsNullOrWhiteSpace(configured)
-            ? [XFrameworkServiceNames.ControlPanel]
+            ? [XFrameworkServiceNames.Portal]
             : configured
                 .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 

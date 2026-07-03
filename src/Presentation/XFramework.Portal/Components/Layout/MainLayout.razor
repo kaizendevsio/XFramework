@@ -1,0 +1,922 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@using System.Text.Json
+@using XFramework.Portal.Services
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts
+
+<div class="portal-shell flex h-screen overflow-hidden bg-background text-foreground">
+    @* Fixed left sidebar - always visible *@
+    <aside class="@SidebarClass"
+           aria-label="Portal navigation"
+           @onmouseenter="OnSidebarMouseEnter"
+           @onmouseleave="OnSidebarMouseLeave">
+        <div class="app-sidebar-inner flex h-full min-h-0 flex-col">
+            @* Header *@
+            <div class="sidebar-header flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
+                <div class="sidebar-mark flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">
+                    X
+                </div>
+                <div class="sidebar-brand min-w-0">
+                    <span class="text-sm font-semibold">Portal</span>
+                    <p class="text-[10px] leading-none text-muted-foreground">Modules &amp; operations</p>
+                </div>
+            </div>
+
+            @* Scrollable nav *@
+            <nav class="app-sidebar-nav flex-1 min-h-0 overflow-y-auto p-3">
+                <CascadingValue Value="_sidebarState" IsFixed="false">
+                    @if (IsTenantListRoute)
+                    {
+                        <TenantListSidebar />
+                    }
+                    else if (TryGetInventarioProductDetailRoute(out var productRouteId, out _))
+                    {
+                        <ProductDetailSidebar ProductId="@productRouteId" />
+                    }
+                    else if (TryGetWalletDetailRoute(out var walletRouteId, out _))
+                    {
+                        <WalletDetailSidebar WalletId="@walletRouteId" />
+                    }
+                    else if (TryGetTenantDetailRoute(out var tenantRouteId, out _))
+                    {
+                        <TenantDetailSidebar TenantId="@tenantRouteId" />
+                    }
+                    else if (TryGetUserDetailRoute(out var userRouteId, out _))
+                    {
+                        <UserDetailSidebar UserId="@userRouteId" />
+                    }
+                    else
+                    {
+                        <NavMenu />
+                    }
+                </CascadingValue>
+            </nav>
+
+            @* Footer *@
+            <div class="sidebar-footer flex items-center gap-2 border-t border-sidebar-border px-4 py-3">
+                <span class="sidebar-footer-text text-xs text-muted-foreground">v1.0 - XFramework</span>
+                <button type="button"
+                        class="sidebar-collapse-button"
+                        title="@SidebarToggleTitle"
+                        aria-label="@SidebarToggleTitle"
+                        @onclick="ToggleSidebarCollapsed">
+                    <LucideIcon Name="@SidebarToggleIcon" class="h-4 w-4" />
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    @* Main content *@
+    <div class="app-content-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header class="app-header flex h-14 shrink-0 items-center justify-between border-b px-6">
+            <div class="app-header-breadcrumb flex min-w-0 items-center gap-2">
+                <BbBreadcrumb>
+                    <BbBreadcrumbList>
+                        <BbBreadcrumbItem>
+                            <BbBreadcrumbLink Href="/">Dashboard</BbBreadcrumbLink>
+                        </BbBreadcrumbItem>
+                        @foreach (var crumb in GetBreadcrumbs())
+                        {
+                            <BbBreadcrumbSeparator />
+                            <BbBreadcrumbItem>
+                                <BbBreadcrumbPage>@crumb</BbBreadcrumbPage>
+                            </BbBreadcrumbItem>
+                        }
+                    </BbBreadcrumbList>
+                </BbBreadcrumb>
+            </div>
+            <div class="app-header-actions flex shrink-0 items-center gap-2">
+                <BbDarkModeToggle Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" />
+                <BbThemeSwitcher />
+                <div class="profile-menu">
+                    @if (_profileMenuOpen)
+                    {
+                        <button type="button"
+                                class="profile-menu-backdrop"
+                                aria-label="Close profile menu"
+                                @onclick="CloseProfileMenu"></button>
+                    }
+                    <BbPopover Open="@_profileMenuOpen" OpenChanged="@OnProfileMenuOpenChanged" RestoreFocusOnClose="true">
+                        <BbPopoverTrigger>
+                            <BbButton Variant="ButtonVariant.Ghost" Class="profile-trigger">
+                                <span class="profile-avatar">@_userInitials</span>
+                                <span class="profile-trigger-text">
+                                    <span class="profile-name">@_displayName</span>
+                                    <span class="profile-tenant">@ActiveTenantLabel</span>
+                                </span>
+                                <LucideIcon Name="chevron-down" class="h-4 w-4 text-muted-foreground" />
+                            </BbButton>
+                        </BbPopoverTrigger>
+                        <BbPopoverContent Class="profile-menu-panel"
+                                          Offset="8"
+                                          CloseOnClickOutside="false"
+                                          CloseOnEscape="true"
+                                          ZIndex="10000">
+                            <div class="profile-menu-user">
+                                <span class="profile-avatar profile-avatar-large">@_userInitials</span>
+                                <div class="min-w-0">
+                                    <div class="profile-menu-name">@_displayName</div>
+                                    <div class="profile-menu-username">@_userName</div>
+                                </div>
+                            </div>
+
+                            <div class="profile-menu-section">
+                                <label class="profile-menu-label">Active Tenant</label>
+                                <BbCombobox TValue="string"
+                                             Value="@_selectedTenantId"
+                                             ValueChanged="@OnTenantSelectionChanged"
+                                             Options="@TenantOptions"
+                                             Placeholder="All Tenants"
+                                             SearchPlaceholder="Search tenants..."
+                                             EmptyMessage="No tenants found."
+                                             Class="tenant-filter-combobox profile-tenant-combobox"
+                                             MatchTriggerWidth="true" />
+                            </div>
+
+                            <div class="profile-menu-actions">
+                                <BbButton Variant="ButtonVariant.Outline"
+                                          OnClick="@OpenActiveTenantSettings"
+                                          Disabled="@(!HasActiveTenant)"
+                                          Class="profile-menu-button"
+                                          title="@TenantSettingsTitle">
+                                    <LucideIcon Name="settings" class="mr-2 h-4 w-4" />
+                                    Tenant Settings
+                                </BbButton>
+                                @if (_canManageTenants)
+                                {
+                                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ManageTenants" Class="profile-menu-button">
+                                        <LucideIcon Name="building-2" class="mr-2 h-4 w-4" />
+                                        Manage Tenants
+                                    </BbButton>
+                                }
+                                <BbButton Variant="ButtonVariant.Ghost" OnClick="@Logout" Class="profile-menu-button">
+                                    <LucideIcon Name="log-out" class="mr-2 h-4 w-4" />
+                                    Sign Out
+                                </BbButton>
+                            </div>
+                        </BbPopoverContent>
+                    </BbPopover>
+                </div>
+            </div>
+        </header>
+        <main class="app-main flex-1 min-h-0 min-w-0 overflow-y-auto p-6">
+            <FadeInContent @key="_contentRenderKey">
+                @Body
+            </FadeInContent>
+        </main>
+    </div>
+</div>
+
+<BbToastProvider Position="ToastPosition.BottomRight" />
+<BbDialogProvider />
+<BbPortalHost />
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private NavigationHistoryService NavigationHistory { get; set; } = default!;
+    [Inject] private IJSRuntime Js { get; set; } = default!;
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private static readonly string[] DefaultOpenSidebarGroups = [];
+
+    private const string AllTenantsValue = "__all_tenants__";
+    private const string ActiveTenantStorageKey = "xframework.portal.activeTenantId";
+    private const string SidebarCollapsedStorageKey = "xframework.portal.sidebarCollapsed";
+    private const string SidebarOpenGroupsStorageKey = "xframework.portal.sidebarOpenGroups.v2";
+
+    private readonly PortalSidebarState _sidebarState = new(DefaultOpenSidebarGroups);
+    private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
+    private string _selectedTenantId = AllTenantsValue;
+    private int _contentRenderKey;
+    private string _displayName = "Administrator";
+    private string _userName = "";
+    private string _userInitials = "A";
+    private Guid? _breadcrumbProductId;
+    private string? _breadcrumbProductLabel;
+    private Guid? _breadcrumbWalletId;
+    private string? _breadcrumbWalletLabel;
+    private bool _profileMenuOpen;
+    private bool _canManageTenants;
+
+    private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
+    private string ActiveTenantLabel => string.IsNullOrWhiteSpace(_selectedTenantName) ? "All Tenants" : _selectedTenantName;
+    private string CurrentPath => new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+    private bool IsTenantListRoute => string.Equals(CurrentPath, "/identity/tenants", StringComparison.OrdinalIgnoreCase);
+    private bool IsManageTenantsRoute => IsTenantListRoute || TryGetTenantDetailRoute(out _, out _);
+    private bool HasActiveTenant => Guid.TryParse(_selectedTenantId, out _);
+    private string TenantSettingsTitle => HasActiveTenant ? "Open active tenant settings" : "Select a tenant to open tenant settings";
+    private string SidebarClass => "app-sidebar shrink-0 border-r bg-sidebar text-sidebar-foreground"
+        + (_sidebarState.IsCollapsed ? " app-sidebar-collapsed" : " app-sidebar-expanded")
+        + (_sidebarState.IsHoverExpanded ? " app-sidebar-hover-expanded" : "");
+    private string SidebarToggleTitle => _sidebarState.IsCollapsed ? "Expand sidebar" : "Collapse sidebar";
+    private string SidebarToggleIcon => _sidebarState.IsCollapsed ? "panel-left-open" : "panel-left-close";
+
+    private List<SelectOption<string>> TenantOptions =>
+    [
+        new(AllTenantsValue, "All Tenants"),
+        .. _tenants.Select(t => new SelectOption<string>(t.Id.ToString(), t.Name ?? t.Id.ToString()[..8]))
+    ];
+
+    private void CloseProfileMenu() => _profileMenuOpen = false;
+
+    private void OnProfileMenuOpenChanged(bool open) => _profileMenuOpen = open;
+
+    private List<string> GetBreadcrumbs()
+    {
+        if (TryGetInventarioProductDetailRoute(out var productId, out var section))
+        {
+            return BuildInventarioProductBreadcrumbs(productId, section);
+        }
+
+        if (TryGetWalletDetailRoute(out var walletId, out section))
+        {
+            return BuildWalletBreadcrumbs(walletId, section);
+        }
+
+        var path = new Uri(Nav.Uri).AbsolutePath.Trim('/');
+        if (string.IsNullOrEmpty(path)) return [];
+
+        return path.Split('/')
+            .Select(HumanizeSegment)
+            .ToList();
+    }
+
+    private List<string> BuildInventarioProductBreadcrumbs(Guid productId, string section)
+    {
+        var normalizedSection = NormalizeProductDetailSection(section);
+
+        return
+        [
+            "Inventario",
+            "Products",
+            GetProductBreadcrumbLabel(productId),
+            ProductSectionLabel(normalizedSection)
+        ];
+    }
+
+    private string GetProductBreadcrumbLabel(Guid productId) =>
+        _breadcrumbProductId == productId && !string.IsNullOrWhiteSpace(_breadcrumbProductLabel)
+            ? _breadcrumbProductLabel
+            : ShortId(productId);
+
+    private List<string> BuildWalletBreadcrumbs(Guid walletId, string section)
+    {
+        var normalizedSection = NormalizeWalletDetailSection(section);
+
+        return
+        [
+            "Finance",
+            "Wallets",
+            GetWalletBreadcrumbLabel(walletId),
+            WalletSectionLabel(normalizedSection)
+        ];
+    }
+
+    private string GetWalletBreadcrumbLabel(Guid walletId) =>
+        _breadcrumbWalletId == walletId && !string.IsNullOrWhiteSpace(_breadcrumbWalletLabel)
+            ? _breadcrumbWalletLabel
+            : $"Wallet {ShortId(walletId)}";
+
+    private static string NormalizeProductDetailSection(string? section) =>
+        string.IsNullOrWhiteSpace(section)
+            ? "summary"
+            : section.ToLowerInvariant() switch
+            {
+                "batches" => "lots",
+                "lots-batches" => "lots",
+                "reorder" => "replenishment",
+                "rules" => "replenishment",
+                _ => section.ToLowerInvariant()
+            };
+
+    private static string ProductSectionLabel(string section) => section switch
+    {
+        "summary" => "Summary",
+        "stock" => "Stock",
+        "lots" => "Lots / Batches",
+        "replenishment" => "Replenishment",
+        "variations" => "Variations",
+        "transactions" => "Transactions",
+        _ => HumanizeSegment(section)
+    };
+
+    private static string NormalizeWalletDetailSection(string? section) =>
+        string.IsNullOrWhiteSpace(section)
+            ? "summary"
+            : section.ToLowerInvariant() switch
+            {
+                "activity" => "transactions",
+                "history" => "transactions",
+                "operations" => "workflows",
+                "workflow" => "workflows",
+                "limits" => "rules",
+                _ => section.ToLowerInvariant()
+            };
+
+    private static string WalletSectionLabel(string section) => section switch
+    {
+        "summary" => "Summary",
+        "workflows" => "Workflows",
+        "transactions" => "Transactions",
+        "rules" => "Rules",
+        _ => HumanizeSegment(section)
+    };
+
+    private static string HumanizeSegment(string segment) =>
+        System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(segment.Replace("-", " "));
+
+    private static string ShortId(Guid id) => id.ToString("N")[..8];
+
+    protected override void OnInitialized()
+    {
+        _sidebarState.ToggleGroupAsync = ToggleSidebarGroup;
+        UpdateActiveSidebarGroup();
+
+        Nav.LocationChanged += OnLocationChanged;
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        TenantFilter.OnTenantsChanged += OnTenantsChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        _canManageTenants = PortalAccess.CanManageTenants(user);
+        _userName = user.Identity.Name ?? "";
+        _displayName = user.FindFirst(PortalAuthClaims.DisplayName)?.Value
+            ?? user.Identity.Name
+            ?? "Administrator";
+        _userInitials = BuildInitials(_displayName);
+
+        await EnsureManageTenantsRouteUsesAllTenants();
+        await RefreshBreadcrumbEntityLabels();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        await RestoreSidebarState();
+        await LoadTenants();
+    }
+
+    private async Task RestoreSidebarState()
+    {
+        var storedCollapsed = await ReadStorageItem(SidebarCollapsedStorageKey);
+        if (bool.TryParse(storedCollapsed, out var isCollapsed))
+        {
+            _sidebarState.IsCollapsed = isCollapsed;
+        }
+
+        var storedOpenGroups = await ReadStorageItem(SidebarOpenGroupsStorageKey);
+        var restoredStoredOpenGroups = false;
+        if (!string.IsNullOrWhiteSpace(storedOpenGroups))
+        {
+            try
+            {
+                var groupIds = JsonSerializer.Deserialize<string[]>(storedOpenGroups);
+                if (groupIds is not null)
+                {
+                    _sidebarState.ReplaceOpenGroups(groupIds);
+                    restoredStoredOpenGroups = true;
+                }
+            }
+            catch (JsonException)
+            {
+                _sidebarState.ReplaceOpenGroups(DefaultOpenSidebarGroups);
+            }
+        }
+
+        var activeGroup = UpdateActiveSidebarGroup();
+
+        if (!restoredStoredOpenGroups && activeGroup is not null)
+        {
+            _sidebarState.SetGroupOpen(activeGroup, true);
+        }
+
+        await StoreSidebarGroups();
+        StateHasChanged();
+    }
+
+    private async Task ToggleSidebarCollapsed()
+    {
+        _sidebarState.IsCollapsed = !_sidebarState.IsCollapsed;
+        _sidebarState.IsHoverExpanded = false;
+        await StoreStorageItem(SidebarCollapsedStorageKey, _sidebarState.IsCollapsed.ToString());
+    }
+
+    private void OnSidebarMouseEnter()
+    {
+        if (!_sidebarState.IsCollapsed)
+        {
+            return;
+        }
+
+        _sidebarState.IsHoverExpanded = true;
+    }
+
+    private void OnSidebarMouseLeave()
+    {
+        if (!_sidebarState.IsHoverExpanded)
+        {
+            return;
+        }
+
+        _sidebarState.IsHoverExpanded = false;
+    }
+
+    private async Task ToggleSidebarGroup(string groupId)
+    {
+        _sidebarState.SetGroupOpen(groupId, !_sidebarState.IsGroupOpen(groupId));
+        await StoreSidebarGroups();
+    }
+
+    private async Task StoreSidebarGroups()
+    {
+        var groupIds = _sidebarState.OpenGroupIds.OrderBy(static groupId => groupId, StringComparer.OrdinalIgnoreCase);
+        await StoreStorageItem(SidebarOpenGroupsStorageKey, JsonSerializer.Serialize(groupIds));
+    }
+
+    private string? UpdateActiveSidebarGroup()
+    {
+        var activeGroup = GetActiveSidebarGroup();
+        _sidebarState.ActiveGroupId = activeGroup;
+        return activeGroup;
+    }
+
+    private string? GetActiveSidebarGroup()
+    {
+        if (IsTenantListRoute)
+        {
+            return "tenant-admin";
+        }
+
+        if (TryGetInventarioProductDetailRoute(out _, out _))
+        {
+            return "product-detail";
+        }
+
+        if (TryGetWalletDetailRoute(out _, out _))
+        {
+            return "wallet-detail";
+        }
+
+        if (TryGetTenantDetailRoute(out _, out _))
+        {
+            return "tenant-detail";
+        }
+
+        if (TryGetUserDetailRoute(out _, out _))
+        {
+            return "user-detail";
+        }
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length == 0)
+        {
+            return null;
+        }
+
+        return segments[0].ToLowerInvariant() switch
+        {
+            "identity" => "identity",
+            "inventario" => "inventario",
+            "communications" => "communications",
+            "community" => "community",
+            "attendance" => "attendance",
+            "finance" => "finance",
+            "admin" => "system",
+            _ => null
+        };
+    }
+
+    private async Task LoadTenants()
+    {
+        try
+        {
+            _tenants = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(t => !t.IsDeleted)
+                .OrderBy(t => t.Name)
+                .Take(100)
+                .ToListAsync();
+
+            await RestoreTenantSelection();
+
+            StateHasChanged();
+        }
+        catch { /* Tenant loading is non-critical */ }
+    }
+
+    private async Task RestoreTenantSelection()
+    {
+        if (_canManageTenants && IsManageTenantsRoute)
+        {
+            await SetAllTenantsActive();
+            return;
+        }
+
+        var selectedTenantId = TenantFilter.SelectedTenantId;
+        var storedTenantId = await ReadStoredTenantId();
+
+        if (selectedTenantId is null && Guid.TryParse(storedTenantId, out var persistedTenantId))
+        {
+            selectedTenantId = persistedTenantId;
+        }
+
+        if (selectedTenantId is Guid tenantId
+            && _tenants.FirstOrDefault(t => t.Id == tenantId) is { } tenant)
+        {
+            _selectedTenantId = tenantId.ToString();
+
+            if (TenantFilter.SelectedTenantId != tenantId || TenantFilter.SelectedTenantName != tenant.Name)
+            {
+                TenantFilter.SetTenant(tenantId, tenant.Name);
+            }
+
+            return;
+        }
+
+        _selectedTenantId = AllTenantsValue;
+        if (TenantFilter.SelectedTenantId is not null)
+        {
+            TenantFilter.Clear();
+        }
+
+        if (!string.IsNullOrWhiteSpace(storedTenantId))
+        {
+            await ClearStoredTenantId();
+        }
+    }
+
+    private Task<string?> ReadStoredTenantId() => ReadStorageItem(ActiveTenantStorageKey);
+
+    private Task StoreTenantId(string tenantId) => StoreStorageItem(ActiveTenantStorageKey, tenantId);
+
+    private Task ClearStoredTenantId() => RemoveStorageItem(ActiveTenantStorageKey);
+
+    private async Task<string?> ReadStorageItem(string key)
+    {
+        try
+        {
+            return await Js.InvokeAsync<string?>("localStorage.getItem", key);
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private async Task StoreStorageItem(string key, string value)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("localStorage.setItem", key, value);
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    private async Task RemoveStorageItem(string key)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("localStorage.removeItem", key);
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    private async Task OnTenantSelectionChanged(string? value)
+    {
+        if (_canManageTenants && IsManageTenantsRoute)
+        {
+            await SetAllTenantsActive();
+            _profileMenuOpen = false;
+            return;
+        }
+
+        _selectedTenantId = string.IsNullOrWhiteSpace(value) ? AllTenantsValue : value;
+
+        if (Guid.TryParse(_selectedTenantId, out var tenantId))
+        {
+            var name = _tenants.FirstOrDefault(t => t.Id == tenantId)?.Name ?? "";
+            TenantFilter.SetTenant(tenantId, name);
+            await StoreTenantId(_selectedTenantId);
+        }
+        else
+        {
+            TenantFilter.Clear();
+            await ClearStoredTenantId();
+        }
+
+        _profileMenuOpen = false;
+    }
+
+    private void OpenActiveTenantSettings()
+    {
+        if (!Guid.TryParse(_selectedTenantId, out var tenantId))
+        {
+            return;
+        }
+
+        _profileMenuOpen = false;
+        Nav.NavigateTo($"/identity/tenants/{tenantId}/configurations");
+    }
+
+    private async Task ManageTenants()
+    {
+        if (!_canManageTenants)
+        {
+            return;
+        }
+
+        _profileMenuOpen = false;
+        await SetAllTenantsActive();
+        Nav.NavigateTo("/identity/tenants");
+    }
+
+    private async Task EnsureManageTenantsRouteUsesAllTenants()
+    {
+        if (!_canManageTenants || !IsManageTenantsRoute)
+        {
+            return;
+        }
+
+        await SetAllTenantsActive();
+    }
+
+    private async Task SetAllTenantsActive()
+    {
+        _selectedTenantId = AllTenantsValue;
+        if (TenantFilter.SelectedTenantId is not null || !string.IsNullOrWhiteSpace(TenantFilter.SelectedTenantName))
+        {
+            TenantFilter.Clear();
+        }
+
+        await ClearStoredTenantId();
+    }
+
+    private void Logout()
+    {
+        _profileMenuOpen = false;
+        Nav.NavigateTo("/auth/logout", forceLoad: true);
+    }
+
+    private bool TryGetTenantDetailRoute(out Guid tenantId, out string section)
+    {
+        tenantId = Guid.Empty;
+        section = "summary";
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 3
+            || !string.Equals(segments[0], "identity", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(segments[1], "tenants", StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(segments[2], out tenantId))
+        {
+            return false;
+        }
+
+        if (segments.Length >= 4)
+        {
+            section = segments[3];
+        }
+
+        return true;
+    }
+
+    private bool TryGetUserDetailRoute(out Guid userId, out string section)
+    {
+        userId = Guid.Empty;
+        section = "summary";
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 3
+            || !string.Equals(segments[0], "identity", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(segments[1], "users", StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(segments[2], out userId))
+        {
+            return false;
+        }
+
+        if (segments.Length >= 4)
+        {
+            section = segments[3];
+        }
+
+        return true;
+    }
+
+    private bool TryGetInventarioProductDetailRoute(out Guid productId, out string section)
+    {
+        productId = Guid.Empty;
+        section = "summary";
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 3
+            || !string.Equals(segments[0], "inventario", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(segments[1], "products", StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(segments[2], out productId))
+        {
+            return false;
+        }
+
+        if (segments.Length >= 4)
+        {
+            section = segments[3];
+        }
+
+        return true;
+    }
+
+    private async Task RefreshBreadcrumbEntityLabels()
+    {
+        if (TryGetInventarioProductDetailRoute(out var productId, out _))
+        {
+            _breadcrumbWalletId = null;
+            _breadcrumbWalletLabel = null;
+            await RefreshProductBreadcrumbLabel(productId);
+            return;
+        }
+
+        if (TryGetWalletDetailRoute(out var walletId, out _))
+        {
+            _breadcrumbProductId = null;
+            _breadcrumbProductLabel = null;
+            await RefreshWalletBreadcrumbLabel(walletId);
+            return;
+        }
+
+        _breadcrumbProductId = null;
+        _breadcrumbProductLabel = null;
+        _breadcrumbWalletId = null;
+        _breadcrumbWalletLabel = null;
+    }
+
+    private async Task RefreshProductBreadcrumbLabel(Guid productId)
+    {
+        if (_breadcrumbProductId == productId && !string.IsNullOrWhiteSpace(_breadcrumbProductLabel))
+        {
+            return;
+        }
+
+        _breadcrumbProductId = productId;
+        _breadcrumbProductLabel = ShortId(productId);
+
+        try
+        {
+            var product = (await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == productId && !x.IsDeleted)
+                .Take(1)
+                .ToListAsync())
+                .FirstOrDefault();
+
+            _breadcrumbProductLabel = product is null
+                ? ShortId(productId)
+                : !string.IsNullOrWhiteSpace(product.Name)
+                    ? product.Name
+                    : !string.IsNullOrWhiteSpace(product.SKU)
+                        ? product.SKU
+                        : ShortId(productId);
+        }
+        catch
+        {
+            _breadcrumbProductLabel = ShortId(productId);
+        }
+    }
+
+    private async Task RefreshWalletBreadcrumbLabel(Guid walletId)
+    {
+        if (_breadcrumbWalletId == walletId && !string.IsNullOrWhiteSpace(_breadcrumbWalletLabel))
+        {
+            return;
+        }
+
+        _breadcrumbWalletId = walletId;
+        _breadcrumbWalletLabel = $"Wallet {ShortId(walletId)}";
+
+        try
+        {
+            var wallet = (await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.WalletType)
+                .Include(x => x.Credential)
+                .Where(x => x.Id == walletId && !x.IsDeleted)
+                .Take(1)
+                .ToListAsync())
+                .FirstOrDefault();
+
+            _breadcrumbWalletLabel = wallet is null
+                ? $"Wallet {ShortId(walletId)}"
+                : WalletsPortalDisplayService.BuildWalletLabel(wallet);
+        }
+        catch
+        {
+            _breadcrumbWalletLabel = $"Wallet {ShortId(walletId)}";
+        }
+    }
+
+    private bool TryGetWalletDetailRoute(out Guid walletId, out string section)
+    {
+        walletId = Guid.Empty;
+        section = "summary";
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 3
+            || !string.Equals(segments[0], "finance", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(segments[1], "wallets", StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(segments[2], out walletId))
+        {
+            return false;
+        }
+
+        if (segments.Length >= 4)
+        {
+            section = segments[3];
+        }
+
+        return true;
+    }
+
+    private static string BuildInitials(string displayName)
+    {
+        var parts = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            return "A";
+        }
+
+        var initials = string.Concat(parts.Take(2).Select(x => char.ToUpperInvariant(x[0])));
+        return string.IsNullOrWhiteSpace(initials) ? "A" : initials;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await EnsureManageTenantsRouteUsesAllTenants();
+            UpdateActiveSidebarGroup();
+            _contentRenderKey++;
+            await RefreshBreadcrumbEntityLabels();
+            StateHasChanged();
+        });
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            _contentRenderKey++;
+            await RefreshBreadcrumbEntityLabels();
+            StateHasChanged();
+        });
+    }
+
+    private void OnTenantsChanged()
+    {
+        _ = InvokeAsync(LoadTenants);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+        TenantFilter.OnTenantsChanged -= OnTenantsChanged;
+    }
+}

@@ -152,8 +152,8 @@ public sealed class CommunicationsServiceDirectTransportTests
         return new RequestMetadata
         {
             TenantId = tenantId,
-            Name = "XFramework.ControlPanel",
-            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidControlPanelToken
+            Name = "XFramework.Portal",
+            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidPortalToken
         };
     }
 

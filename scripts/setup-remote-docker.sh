@@ -55,7 +55,7 @@ EOF
 
 systemctl restart docker
 
-# 5. Firewall — open ports for services
+# 5. Firewall - open ports for services
 echo "[5/5] Configuring firewall..."
 if command -v ufw &> /dev/null; then
     ufw allow OpenSSH
@@ -68,12 +68,12 @@ if command -v ufw &> /dev/null; then
     ufw allow 5274/tcp   comment 'SmsGateway'
     ufw allow 9696/tcp   comment 'Wallets'
     ufw allow 8105/tcp   comment 'Inventario'
-    ufw allow 5000/tcp   comment 'ControlPanel'
+    ufw allow 5000/tcp   comment 'Portal'
     ufw allow 5050/tcp   comment 'OperationsDashboard'
     ufw --force enable
     echo "UFW firewall configured."
 else
-    echo "UFW not installed — skipping firewall config. Make sure ports are accessible."
+    echo "UFW not installed - skipping firewall config. Make sure ports are accessible."
 fi
 
 # Verify

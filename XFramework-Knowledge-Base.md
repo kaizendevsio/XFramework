@@ -44,22 +44,22 @@ XFramework is a modern, enterprise-grade .NET 9.0 framework designed for buildin
 ### Clean Architecture Layers
 
 ```
-┌─────────────────────────────────────────┐
-│              Presentation               │
-│     (ControlPanel, Gateway, Fluid)      │
-├─────────────────────────────────────────┤
-│               Modules                   │
-│  (Identity, Community, Wallets, etc.)   │
-├─────────────────────────────────────────┤
-│               Kernel                    │
-│         (Core, Domain)                  │
-├─────────────────────────────────────────┤
-│            Infrastructure               │
-│         (Integration Services)          │
-├─────────────────────────────────────────┤
-│               Shared                    │
-│        (Domain Contracts)               │
-└─────────────────────────────────────────┘
+â”Œ-----------------------------------------â”
+â”‚              Presentation               â”‚
+â”‚     (Portal, Gateway, Fluid)      â”‚
+â”œ-----------------------------------------â”¤
+â”‚               Modules                   â”‚
+â”‚  (Identity, Community, Wallets, etc.)   â”‚
+â”œ-----------------------------------------â”¤
+â”‚               Kernel                    â”‚
+â”‚         (Core, Domain)                  â”‚
+â”œ-----------------------------------------â”¤
+â”‚            Infrastructure               â”‚
+â”‚         (Integration Services)          â”‚
+â”œ-----------------------------------------â”¤
+â”‚               Shared                    â”‚
+â”‚        (Domain Contracts)               â”‚
+â””-----------------------------------------â”˜
 ```
 
 ### Core Design Patterns
@@ -116,33 +116,33 @@ XFramework is a modern, enterprise-grade .NET 9.0 framework designed for buildin
 
 ```
 XFramework/
-├── src/
-│   ├── Infrastructure/
-│   │   └── XFramework.Integration/
-│   ├── Kernel/
-│   │   ├── XFramework.Core/
-│   │   └── XFramework.Domain/
-│   ├── Modules/
-│   │   ├── XFramework.Blazor/
-│   │   ├── XFramework.Coins/
-│   │   ├── XFramework.Community/
-│   │   ├── XFramework.IdentityServer/
-│   │   ├── XFramework.Inventario/
-│   │   ├── XFramework.Communications/
-│   │   ├── XFramework.PaymentGateways/
-│   │   ├── XFramework.Payments/
-│   │   ├── XFramework.SmsGateway/
-│   │   ├── XFramework.StreamFlow/
-│   │   └── XFramework.Wallets/
-│   ├── Presentation/
-│   │   ├── ControlPanel/
-│   │   ├── Fluid/
-│   │   └── Gateway/
-│   ├── Shared/
-│   │   └── XFramework.Domain.Shared/
-│   └── Tests/
-├── docs/
-└── tools/
+â”œ-- src/
+â”‚   â”œ-- Infrastructure/
+â”‚   â”‚   â””-- XFramework.Integration/
+â”‚   â”œ-- Kernel/
+â”‚   â”‚   â”œ-- XFramework.Core/
+â”‚   â”‚   â””-- XFramework.Domain/
+â”‚   â”œ-- Modules/
+â”‚   â”‚   â”œ-- XFramework.Blazor/
+â”‚   â”‚   â”œ-- XFramework.Coins/
+â”‚   â”‚   â”œ-- XFramework.Community/
+â”‚   â”‚   â”œ-- XFramework.IdentityServer/
+â”‚   â”‚   â”œ-- XFramework.Inventario/
+â”‚   â”‚   â”œ-- XFramework.Communications/
+â”‚   â”‚   â”œ-- XFramework.PaymentGateways/
+â”‚   â”‚   â”œ-- XFramework.Payments/
+â”‚   â”‚   â”œ-- XFramework.SmsGateway/
+â”‚   â”‚   â”œ-- XFramework.StreamFlow/
+â”‚   â”‚   â””-- XFramework.Wallets/
+â”‚   â”œ-- Presentation/
+â”‚   â”‚   â”œ-- Portal/
+â”‚   â”‚   â”œ-- Fluid/
+â”‚   â”‚   â””-- Gateway/
+â”‚   â”œ-- Shared/
+â”‚   â”‚   â””-- XFramework.Domain.Shared/
+â”‚   â””-- Tests/
+â”œ-- docs/
+â””-- tools/
 ```
 
 ### Layer Responsibilities
@@ -167,7 +167,7 @@ Independent business domains with their own:
 
 #### Presentation
 Frontend applications and gateways:
-- **ControlPanel**: Administrative interface
+- **Portal**: Administrative interface
 - **Gateway**: API gateway and routing
 - **Fluid**: Dynamic content management
 
@@ -221,10 +221,10 @@ All entities must implement core interfaces:
 Each module follows a consistent structure:
 ```
 ModuleName/
-├── ModuleName.Api/           # Web API endpoints
-├── ModuleName.Core/          # Business logic
-├── ModuleName.Domain.Shared/ # Contracts and DTOs
-└── ModuleName.Integration/   # External integrations
+â”œ-- ModuleName.Api/           # Web API endpoints
+â”œ-- ModuleName.Core/          # Business logic
+â”œ-- ModuleName.Domain.Shared/ # Contracts and DTOs
+â””-- ModuleName.Integration/   # External integrations
 ```
 
 ### Available Modules

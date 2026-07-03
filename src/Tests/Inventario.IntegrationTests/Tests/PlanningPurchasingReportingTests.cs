@@ -19,7 +19,7 @@ public sealed class PlanningPurchasingReportingTests : InventarioTestBase
     [Category(TestCategories.ExtendedIntegration)]
     [Category(TestCategories.Planning)]
     [Category(TestCategories.Wrappers)]
-    [Category(TestCategories.ControlPanelContract)]
+    [Category(TestCategories.PortalContract)]
     public async Task CreateInventoryReorderRule_ValidRequest_PersistsThroughWrapper()
     {
         var seed = await SeedInventoryScope();
@@ -35,7 +35,7 @@ public sealed class PlanningPurchasingReportingTests : InventarioTestBase
                 MaximumQuantity = 20,
                 ReorderPoint = 5,
                 ReorderQuantity = 10,
-                PreferredSupplier = "control-panel-wrapper",
+                PreferredSupplier = "portal-wrapper",
                 IsActive = true
             });
 
@@ -48,7 +48,7 @@ public sealed class PlanningPurchasingReportingTests : InventarioTestBase
                 x.ProductId == seed.Product.Id &&
                 x.WarehouseId == seed.Warehouse.Id &&
                 x.LocationId == seed.Location.Id &&
-                x.PreferredSupplier == "control-panel-wrapper");
+                x.PreferredSupplier == "portal-wrapper");
 
         persisted.Should().NotBeNull();
         persisted!.TenantId.Should().Be(InventarioIntegrationTestFixture.TestTenantId);

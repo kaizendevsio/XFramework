@@ -10,7 +10,7 @@ namespace XFramework.SourceGenerators;
 /// Source generator that creates client-side service wrapper interfaces and implementations
 /// for cross-module Bolt calls. Auto-discovers entities from [GenerateEndpoints] attribute
 /// in referenced assemblies and custom Bolt methods from IBoltRequest types.
-/// No [BoltWrapper] attribute needed — derives everything from assembly name convention.
+/// No [BoltWrapper] attribute needed - derives everything from assembly name convention.
 /// </summary>
 [Generator]
 public class ServiceWrapperGenerator : IIncrementalGenerator
@@ -101,7 +101,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
         return clientName switch
         {
-            "ControlPanel" => "XFramework.ControlPanel",
+            "Portal" => "XFramework.Portal",
             "OperationsDashboard" => "XFramework.Operations.Dashboard",
             _ => $"XFramework.{clientName}"
         };
@@ -190,7 +190,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         sb.AppendLine($"namespace {serviceName}.Integration.Drivers");
         sb.AppendLine("{");
 
-        // ── Interface ──
+        // -- Interface --
         sb.AppendLine($"public partial interface I{serviceName}ServiceWrapper : IXFrameworkService, IServiceWrapper, IDataContextServiceWrapper");
         sb.AppendLine("{");
         foreach (var model in models)
@@ -203,13 +203,13 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         }
         sb.AppendLine("}");
 
-        // ── CRUD service interfaces ──
+        // -- CRUD service interfaces --
         foreach (var model in models)
         {
             sb.AppendLine($"public interface I{model}CrudService : ICrudService<{model}>;");
         }
 
-        // ── ServiceWrapper record ──
+        // -- ServiceWrapper record --
         sb.AppendLine($"public partial record {serviceName}ServiceWrapper(");
         var constructorParameters = models
             .Select(static model => $"I{model}CrudService {model}")
@@ -292,9 +292,9 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         }
         sb.AppendLine("}");
 
-        // ── CRUD service implementations ──
+        // -- CRUD service implementations --
         // Route through __db_query__ / __db_changes__ (same handlers as IDataContext).
-        // Uses BoltClient.InvokeAsync directly — zero-copy deserialization from response span.
+        // Uses BoltClient.InvokeAsync directly - zero-copy deserialization from response span.
         foreach (var model in models)
         {
             sb.AppendLine(
@@ -465,7 +465,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                   """);
         }
 
-        // ── DI Registration ──
+        // -- DI Registration --
         sb.AppendLine($$"""
                          public static class {{serviceName}}ServiceWrapperExtensions
                          {

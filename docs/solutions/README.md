@@ -50,8 +50,8 @@ status: current
 - [Logging standards](conventions/logging-standards.md) - structured logging conventions for the current ZLogger pipeline.
 - [Unified ZLogger logging pipeline](architecture-patterns/unified-zlogger-logging-pipeline.md) - current logging decision record and historical Serilog removal context.
 - [Decentralized remote data context](architecture-patterns/decentralized-remote-data-context.md) - remote `IDataContext` architecture over generated service wrappers.
-- [ControlPanel service wrapper and integration test contract](developer-experience/controlpanel-service-wrapper-and-integration-test-contract.md) - wrapper-first ControlPanel business operations, direct `IDataContext` mutation rules, and standard/extended integration-test tiers.
-- [UI guidelines](../../rules/UiGuidelines.md) - primary ControlPanel and Blazor UI rules, with links to BlazorBlueprint component details.
+- [Portal service wrapper and integration test contract](developer-experience/portal-service-wrapper-and-integration-test-contract.md) - wrapper-first Portal business operations, direct `IDataContext` mutation rules, and standard/extended integration-test tiers.
+- [UI guidelines](../../rules/UiGuidelines.md) - primary Portal and Blazor UI rules, with links to BlazorBlueprint component details.
 
 ## Current Vs Historical Guidance
 

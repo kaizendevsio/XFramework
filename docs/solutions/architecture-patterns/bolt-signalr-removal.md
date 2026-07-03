@@ -19,15 +19,15 @@ tags: [bolt, signalr, transport, pubsub, migration]
 
 ## Goal
 
-Migrate all XFramework services from SignalR-based transport (`BoltDriverSignalR` → `SignalRService` → `HubConnection`) to the existing Bolt thin protocol (`BoltDriver` → `BoltClient` → WebSocket binary frames). Add native pub/sub support to the Bolt protocol. Delete all SignalR code from both client (`XFramework.Integration`) and Hub (`Bolt.Hub`).
+Migrate all XFramework services from SignalR-based transport (`BoltDriverSignalR` -> `SignalRService` -> `HubConnection`) to the existing Bolt thin protocol (`BoltDriver` -> `BoltClient` -> WebSocket binary frames). Add native pub/sub support to the Bolt protocol. Delete all SignalR code from both client (`XFramework.Integration`) and Hub (`Bolt.Hub`).
 
 The `IMessageBusWrapper` interface stays unchanged so all service code continues to work without modification.
 
 ## Non-Goals
 
-- **DB proxy decentralization** — Moving `ExecuteQuery`/`ExecuteChanges` from Hub into individual services is parked as a separate brainstorm. The Hub keeps temporary `ExecuteQuery`/`ExecuteChanges` Bolt frame handlers as a transitional shim so existing `RemoteDataContext` clients keep working.
-- **Wildcard topic patterns** (e.g., `chat.room.*`) — V1 uses exact-match topics only.
-- **Migration of any code outside the `IMessageBusWrapper` consumers** — The interface stays identical.
+- **DB proxy decentralization** - Moving `ExecuteQuery`/`ExecuteChanges` from Hub into individual services is parked as a separate brainstorm. The Hub keeps temporary `ExecuteQuery`/`ExecuteChanges` Bolt frame handlers as a transitional shim so existing `RemoteDataContext` clients keep working.
+- **Wildcard topic patterns** (e.g., `chat.room.*`) - V1 uses exact-match topics only.
+- **Migration of any code outside the `IMessageBusWrapper` consumers** - The interface stays identical.
 
 ## Architecture
 
@@ -35,28 +35,28 @@ The `IMessageBusWrapper` interface stays unchanged so all service code continues
 
 ```
 Service Code
-    ↓ IMessageBusWrapper
+    v IMessageBusWrapper
 BoltDriverSignalR  (XFramework.Integration)
-    ↓ ISignalRService
+    v ISignalRService
 SignalRService     (XFramework.Integration)
-    ↓ HubConnection (Microsoft.AspNetCore.SignalR.Client)
+    v HubConnection (Microsoft.AspNetCore.SignalR.Client)
 SignalR Hub        (/stream-flow/queue on Bolt.Hub)
-    ↓ MessageQueueHub
-IBoltHubService → service routing
+    v MessageQueueHub
+IBoltHubService -> service routing
 ```
 
 ### After
 
 ```
 Service Code
-    ↓ IMessageBusWrapper        (unchanged)
-BoltDriver         (XFramework.Integration — renamed, internals replaced)
-    ↓ BoltClient
-BoltClient         (Bolt.Client library — already exists)
-    ↓ WebSocket binary frames
-BoltServer         (/bolt/ws on Bolt.Hub — already exists)
-    ↓ frame routing
-IBoltHubService → service routing
+    v IMessageBusWrapper        (unchanged)
+BoltDriver         (XFramework.Integration - renamed, internals replaced)
+    v BoltClient
+BoltClient         (Bolt.Client library - already exists)
+    v WebSocket binary frames
+BoltServer         (/bolt/ws on Bolt.Hub - already exists)
+    v frame routing
+IBoltHubService -> service routing
 ```
 
 ## Pub/Sub Protocol Extensions
@@ -67,13 +67,13 @@ Extend `FrameType` enum in `Bolt.Protocol`:
 
 | Frame | Hex | Direction | Purpose |
 |---|---|---|---|
-| `Subscribe` | 0x10 | Client → Hub | Subscribe to a topic (transient or durable) |
-| `Unsubscribe` | 0x11 | Client → Hub | Unsubscribe from a topic |
-| `Publish` | 0x12 | Client → Hub | Publish to a topic (Hub fans out + queues for durable subscribers) |
-| `Event` | 0x13 | Hub → Client | Deliver published message to subscriber (carries sequence number for durable) |
-| `Ack` | 0x14 | Client → Hub | Acknowledge processing of a durable Event up to a sequence number |
-| `ExecuteQuery` | 0x15 | Client → Hub | Temporary DB proxy shim (parked work) |
-| `ExecuteChanges` | 0x16 | Client → Hub | Temporary DB proxy shim (parked work) |
+| `Subscribe` | 0x10 | Client -> Hub | Subscribe to a topic (transient or durable) |
+| `Unsubscribe` | 0x11 | Client -> Hub | Unsubscribe from a topic |
+| `Publish` | 0x12 | Client -> Hub | Publish to a topic (Hub fans out + queues for durable subscribers) |
+| `Event` | 0x13 | Hub -> Client | Deliver published message to subscriber (carries sequence number for durable) |
+| `Ack` | 0x14 | Client -> Hub | Acknowledge processing of a durable Event up to a sequence number |
+| `ExecuteQuery` | 0x15 | Client -> Hub | Temporary DB proxy shim (parked work) |
+| `ExecuteChanges` | 0x16 | Client -> Hub | Temporary DB proxy shim (parked work) |
 
 ### Frame Layouts
 
@@ -89,13 +89,13 @@ Ack          [1:type=0x14] [4:topicHash] [4:subscriberIdLen] [subscriberId UTF-8
 
 **Subscribe flags:** `0x01` = durable. When set, the Hub persists messages for this subscriber and replays unacked messages on reconnect. When unset, the subscription is transient (in-memory only, no persistence, no replay).
 
-**Publish flags:** `0x01` = durable-eligible. When set, the Hub queues the message for any durable subscribers on this topic. When unset, the message is fan-out only (no queuing even for durable subscribers — useful for ephemeral signals like typing indicators).
+**Publish flags:** `0x01` = durable-eligible. When set, the Hub queues the message for any durable subscribers on this topic. When unset, the message is fan-out only (no queuing even for durable subscribers - useful for ephemeral signals like typing indicators).
 
 **Event flags:** `0x01` = replay (delivered from durable queue, not live). Lets clients distinguish replay traffic from live traffic if they care.
 
 **Sequence number:** Monotonically increasing per `(topicHash, subscriberId)`. The Hub assigns sequence numbers when queuing a message. Live (non-queued) deliveries use sequence `0`.
 
-**SubscriberId vs ClientId:** `clientId` is per-connection (changes on reconnect). `subscriberId` is stable across reconnects — typically the service's name or a persistent UUID. Durable subscriptions are keyed by `(topicHash, subscriberId)` so reconnecting clients resume from where they left off.
+**SubscriberId vs ClientId:** `clientId` is per-connection (changes on reconnect). `subscriberId` is stable across reconnects - typically the service's name or a persistent UUID. Durable subscriptions are keyed by `(topicHash, subscriberId)` so reconnecting clients resume from where they left off.
 
 ### Pub/Sub Semantics
 
@@ -137,9 +137,9 @@ Ack          [1:type=0x14] [4:topicHash] [4:subscriberIdLen] [subscriberId UTF-8
 
 **Retention policy (configurable per Hub):**
 
-- `BoltConfiguration.Durable.MessageTtlSeconds` — Default 604800 (7 days). Redis stream entries older than this are trimmed by a periodic background job.
-- `BoltConfiguration.Durable.MaxQueueSize` — Default 10000 messages per subscriber. When exceeded, the oldest messages are dropped (`XADD MAXLEN ~ 10000`).
-- `BoltConfiguration.Durable.MaxReplayBatchSize` — Default 1000 messages per reconnect. Larger queues are replayed in chunks.
+- `BoltConfiguration.Durable.MessageTtlSeconds` - Default 604800 (7 days). Redis stream entries older than this are trimmed by a periodic background job.
+- `BoltConfiguration.Durable.MaxQueueSize` - Default 10000 messages per subscriber. When exceeded, the oldest messages are dropped (`XADD MAXLEN ~ 10000`).
+- `BoltConfiguration.Durable.MaxReplayBatchSize` - Default 1000 messages per reconnect. Larger queues are replayed in chunks.
 
 **Subscriber identity:**
 
@@ -147,7 +147,7 @@ Ack          [1:type=0x14] [4:topicHash] [4:subscriberIdLen] [subscriberId UTF-8
   - Service-to-service: use the service name (e.g., `"XFramework.IdentityServer"`).
   - User-facing chat: use the user GUID.
   - Anonymous browser session: persist a UUID in `localStorage`.
-- The Hub does not authenticate `subscriberId` — it's the application's responsibility to ensure subscribers don't impersonate each other. (Authentication is a separate layer.)
+- The Hub does not authenticate `subscriberId` - it's the application's responsibility to ensure subscribers don't impersonate each other. (Authentication is a separate layer.)
 
 **Failure modes:**
 
@@ -191,8 +191,8 @@ public interface IDurableQueueStore
 ```
 
 Two implementations:
-- `RedisDurableQueueStore` — uses Redis Streams
-- `InMemoryDurableQueueStore` — uses `ConcurrentDictionary<(int, string), List<(long, byte[])>>` with locking; logs warning on Hub startup
+- `RedisDurableQueueStore` - uses Redis Streams
+- `InMemoryDurableQueueStore` - uses `ConcurrentDictionary<(int, string), List<(long, byte[])>>` with locking; logs warning on Hub startup
 
 Frame handling:
 
@@ -202,7 +202,7 @@ Frame handling:
   - Set `_liveDurableConnections[(topicHash, subscriberId)] = connection`.
   - Look up unacked messages via `_durableStore.ReadFromAsync(...)`. Send each as an `Event` frame with `flags=replay` and the stored sequence number, in batches up to `MaxReplayBatchSize`.
   - Send ack frame to signal end of replay.
-- **Unsubscribe:** Remove from `_liveSubscribersByTopic`. For durable, remove from `_liveDurableConnections` (does NOT delete the queue — durable subscribers can disconnect and reconnect). To permanently delete a durable subscription, the application must explicitly call a separate `DeleteDurableSubscriptionAsync` method (not exposed via frame in V1; admin operation).
+- **Unsubscribe:** Remove from `_liveSubscribersByTopic`. For durable, remove from `_liveDurableConnections` (does NOT delete the queue - durable subscribers can disconnect and reconnect). To permanently delete a durable subscription, the application must explicitly call a separate `DeleteDurableSubscriptionAsync` method (not exposed via frame in V1; admin operation).
 - **Publish:**
   - Fan out live `Event` frames to all entries in `_liveSubscribersByTopic[topicHash]` (skip publisher).
   - If `flags=durable-eligible`, for each subscriberId in `_durableSubscribersByTopic[topicHash]`:
@@ -216,22 +216,22 @@ Frame handling:
 `BoltClient` adds:
 
 ```csharp
-// Transient subscribe — returns IAsyncEnumerable<T> backed by a Channel
+// Transient subscribe - returns IAsyncEnumerable<T> backed by a Channel
 public IAsyncEnumerable<T> SubscribeAsync<T>(string topic, CancellationToken ct = default);
 
-// Durable subscribe — replay on reconnect, requires manual ack
+// Durable subscribe - replay on reconnect, requires manual ack
 public IAsyncEnumerable<DurableMessage<T>> SubscribeDurableAsync<T>(
     string topic,
     string subscriberId,
     CancellationToken ct = default);
 
-// Publish — fire-and-forget. durable=true queues for durable subscribers; false fan-out only.
+// Publish - fire-and-forget. durable=true queues for durable subscribers; false fan-out only.
 public ValueTask PublishAsync<T>(string topic, T payload, bool durable = false, CancellationToken ct = default);
 
 // Explicit unsubscribe (cancelling the IAsyncEnumerable's CancellationToken also unsubscribes)
 public ValueTask UnsubscribeAsync(string topic);
 
-// Ack a durable message (or batch — DurableMessage carries an Ack() helper that calls this)
+// Ack a durable message (or batch - DurableMessage carries an Ack() helper that calls this)
 public ValueTask AckAsync(string topic, string subscriberId, long upToSequence, CancellationToken ct = default);
 ```
 
@@ -290,7 +290,7 @@ public Task PublishAsync<TRequest>(string topic, TRequest payload, bool durable 
     => _client.PublishAsync(topic, payload, durable).AsTask();
 ```
 
-The new `SubscribeDurableAsync` is added to `IMessageBusWrapper` as well — it's the only interface change in this migration. All existing methods stay backward-compatible.
+The new `SubscribeDurableAsync` is added to `IMessageBusWrapper` as well - it's the only interface change in this migration. All existing methods stay backward-compatible.
 
 ## BoltDriver Implementation
 
@@ -326,7 +326,7 @@ public sealed class BoltDriver : IMessageBusWrapper
 
 ### Recipient Resolution
 
-`BoltConfiguration.Targets` (the GUID-keyed map of service names → service IDs) stays. `BoltDriver` looks up the target service ID from `Targets` and passes it to `BoltClient.SendAsync`. `BoltClient` FNV1a-hashes the recipient ID into the frame header for Hub routing.
+`BoltConfiguration.Targets` (the GUID-keyed map of service names -> service IDs) stays. `BoltDriver` looks up the target service ID from `Targets` and passes it to `BoltClient.SendAsync`. `BoltClient` FNV1a-hashes the recipient ID into the frame header for Hub routing.
 
 ### DI Registration
 
@@ -356,10 +356,10 @@ Each service's `Program.cs` calls `services.AddXFrameworkBoltClient(builder.Conf
 
 ```
 Services/SignalRService.cs
-Services/ConnectionPool.cs                    — subsumed by BoltClient's pool
-Services/PooledRpcCall.cs                     — subsumed by BoltClient's tracking
+Services/ConnectionPool.cs                    - subsumed by BoltClient's pool
+Services/PooledRpcCall.cs                     - subsumed by BoltClient's tracking
 Drivers/BaseSignalRHandler.cs
-Drivers/BoltDriverSignalR.cs                  — replaced by BoltDriver
+Drivers/BoltDriverSignalR.cs                  - replaced by BoltDriver
 Abstractions/ISignalRService.cs
 Abstractions/ISignalREventHandler.cs
 ```
@@ -367,55 +367,55 @@ Abstractions/ISignalREventHandler.cs
 ### New Files (`XFramework.Integration`)
 
 ```
-Drivers/BoltDriver.cs                          — IMessageBusWrapper over BoltClient
+Drivers/BoltDriver.cs                          - IMessageBusWrapper over BoltClient
 ```
 
 ### Modified Files (`XFramework.Integration`)
 
 ```
-Extensions/ServiceCollectionExtensions.cs      — AddXFrameworkBoltClient extension
-XFramework.Integration.csproj                  — remove SignalR.Client, add Bolt.Net.Client reference
-Services/Helpers/BoltHelper.cs                 — keep, still useful for MemoryPack helpers
+Extensions/ServiceCollectionExtensions.cs      - AddXFrameworkBoltClient extension
+XFramework.Integration.csproj                  - remove SignalR.Client, add Bolt.Net.Client reference
+Services/Helpers/BoltHelper.cs                 - keep, still useful for MemoryPack helpers
 ```
 
 ### Deleted Files (`Bolt.Hub`)
 
 ```
-Hubs/MessageQueueHub.cs                        — entire SignalR hub
+Hubs/MessageQueueHub.cs                        - entire SignalR hub
 ```
 
 ### New Files (`Bolt.Hub`)
 
 ```
-Durable/IDurableQueueStore.cs                  — abstraction for durable queue backend
-Durable/RedisDurableQueueStore.cs              — Redis Streams implementation (preferred)
-Durable/InMemoryDurableQueueStore.cs           — in-process fallback (logs warning)
-Durable/DurableQueueOptions.cs                 — TTL, MaxQueueSize, MaxReplayBatchSize config
+Durable/IDurableQueueStore.cs                  - abstraction for durable queue backend
+Durable/RedisDurableQueueStore.cs              - Redis Streams implementation (preferred)
+Durable/InMemoryDurableQueueStore.cs           - in-process fallback (logs warning)
+Durable/DurableQueueOptions.cs                 - TTL, MaxQueueSize, MaxReplayBatchSize config
 ```
 
 ### Modified Files (`Bolt.Hub`)
 
 ```
-Installers/BoltInstaller.cs                    — remove AddSignalR + MessagePack protocol; register IDurableQueueStore (Redis or in-memory based on config)
-Extensions/ApplicationBuilderExtension.cs      — remove MapHub, keep MapBolt
-Bolt.Hub.csproj                                — remove SignalR + MessagePack packages; add StackExchange.Redis (optional)
-ThinProtocol/BoltServer.cs                     — add Subscribe/Unsubscribe/Publish/Ack frame handlers (transient + durable) + temp ExecuteQuery/ExecuteChanges handlers
-Services/QueryExecutionService.cs              — keep as-is, called from new BoltServer frame handlers
-appsettings.json                               — add Durable section (Redis connection string optional)
+Installers/BoltInstaller.cs                    - remove AddSignalR + MessagePack protocol; register IDurableQueueStore (Redis or in-memory based on config)
+Extensions/ApplicationBuilderExtension.cs      - remove MapHub, keep MapBolt
+Bolt.Hub.csproj                                - remove SignalR + MessagePack packages; add StackExchange.Redis (optional)
+ThinProtocol/BoltServer.cs                     - add Subscribe/Unsubscribe/Publish/Ack frame handlers (transient + durable) + temp ExecuteQuery/ExecuteChanges handlers
+Services/QueryExecutionService.cs              - keep as-is, called from new BoltServer frame handlers
+appsettings.json                               - add Durable section (Redis connection string optional)
 ```
 
 ### Modified Files (`Bolt.Protocol`)
 
 ```
-Protocol/FrameType.cs                          — add Subscribe (0x10), Unsubscribe (0x11), Publish (0x12), Event (0x13), ExecuteQuery (0x14), ExecuteChanges (0x15)
-Protocol/BoltCodec.cs                          — encode/decode for new frame types
+Protocol/FrameType.cs                          - add Subscribe (0x10), Unsubscribe (0x11), Publish (0x12), Event (0x13), ExecuteQuery (0x14), ExecuteChanges (0x15)
+Protocol/BoltCodec.cs                          - encode/decode for new frame types
 ```
 
 ### Modified Files (`Bolt.Client`)
 
 ```
-BoltClient.cs                                  — SubscribeAsync<T>, SubscribeDurableAsync<T>, PublishAsync<T>, UnsubscribeAsync, AckAsync; reconnect re-sends Subscribe frames
-DurableMessage.cs                              — record wrapping payload + sequence + IsReplay + AckAsync helper
+BoltClient.cs                                  - SubscribeAsync<T>, SubscribeDurableAsync<T>, PublishAsync<T>, UnsubscribeAsync, AckAsync; reconnect re-sends Subscribe frames
+DurableMessage.cs                              - record wrapping payload + sequence + IsReplay + AckAsync helper
 ```
 
 ### Modified Files (Service Configs)
@@ -430,15 +430,15 @@ Docker before: "http://bolt-hub:8080/stream-flow/queue"
 Docker after:  "ws://bolt-hub:8080/bolt/ws"
 ```
 
-Affected services: IdentityServer, Wallets, Communications, Community, SmsGateway, Inventario, Coins, Gateway, ControlPanel.Server.
+Affected services: IdentityServer, Wallets, Communications, Community, SmsGateway, Inventario, Coins, Gateway, XFramework.Portal.
 
 ## Testing
 
 ### Integration Tests
 
 Existing fixtures (`IdentityServer.IntegrationTests`, `Wallets.IntegrationTests`) need updates:
-- Test fixture switches `MapHub<MessageQueueHub>` → `MapBolt`
-- Service URLs change from `http://localhost:.../stream-flow/queue` → `ws://localhost:.../bolt/ws`
+- Test fixture switches `MapHub<MessageQueueHub>` -> `MapBolt`
+- Service URLs change from `http://localhost:.../stream-flow/queue` -> `ws://localhost:.../bolt/ws`
 - The `IMessageBusWrapper`-based test code works unchanged
 - Verify all existing tests pass after the swap
 
@@ -450,7 +450,7 @@ Existing fixtures (`IdentityServer.IntegrationTests`, `Wallets.IntegrationTests`
 |---|---|
 | `BoltDriverRpcTests` | `IMessageBusWrapper.SendAsync` round-trip via BoltClient |
 | `BoltDriverPushTests` | Fire-and-forget `PushAsync` |
-| `BoltPubSubTests_BasicFlow` | Subscribe → Publish → Subscriber receives Event |
+| `BoltPubSubTests_BasicFlow` | Subscribe -> Publish -> Subscriber receives Event |
 | `BoltPubSubTests_PublisherDoesNotReceiveOwnMessages` | Publisher does not receive its own published messages |
 | `BoltPubSubTests_MultipleSubscribers` | All subscribers to a topic receive the published message |
 | `BoltPubSubTests_UnsubscribeStopsDelivery` | Unsubscribed client stops receiving |
@@ -458,11 +458,11 @@ Existing fixtures (`IdentityServer.IntegrationTests`, `Wallets.IntegrationTests`
 | `BoltPubSubTests_DisconnectCleansUp` | Hub removes all transient subscriptions when a client disconnects |
 | `BoltServerSubscribeFrameTests` | Server-side Subscribe/Unsubscribe/Publish frame parsing and routing |
 
-**Durable pub/sub (in-memory store — covered by integration tests; Redis store covered by separate fixture if Redis is available):**
+**Durable pub/sub (in-memory store - covered by integration tests; Redis store covered by separate fixture if Redis is available):**
 
 | Test | Verifies |
 |---|---|
-| `BoltDurablePubSubTests_BasicFlow` | Durable subscribe → publish (durable=true) → receive with sequence number → ack |
+| `BoltDurablePubSubTests_BasicFlow` | Durable subscribe -> publish (durable=true) -> receive with sequence number -> ack |
 | `BoltDurablePubSubTests_OfflineMessagesQueued` | Subscribe durable, disconnect, publish 5 messages, reconnect, receive all 5 with replay flag in order |
 | `BoltDurablePubSubTests_AckTrimsQueue` | Acked messages are removed; unacked are re-delivered on reconnect |
 | `BoltDurablePubSubTests_ReplayThenLive` | After reconnect, replayed messages arrive before live messages even if live messages are published mid-replay |
@@ -475,7 +475,7 @@ Existing fixtures (`IdentityServer.IntegrationTests`, `Wallets.IntegrationTests`
 
 ### Benchmarks
 
-`IdentityServer.Benchmarks` already compares Bolt thin protocol vs HTTP. After this migration there's only one Bolt path — the SignalR comparison goes away. Benchmark suite updates:
+`IdentityServer.Benchmarks` already compares Bolt thin protocol vs HTTP. After this migration there's only one Bolt path - the SignalR comparison goes away. Benchmark suite updates:
 - Remove SignalR variants from `TransportBenchmarks`
 - Add a `Bolt_PubSub_Throughput` benchmark measuring publish throughput with N subscribers
 
@@ -483,17 +483,17 @@ Existing fixtures (`IdentityServer.IntegrationTests`, `Wallets.IntegrationTests`
 
 The migration must happen in a specific order to avoid breaking existing services:
 
-1. **Add pub/sub frame types to `Bolt.Protocol`** — non-breaking, just new enum values (Subscribe, Unsubscribe, Publish, Event, Ack, ExecuteQuery, ExecuteChanges)
-2. **Add `IDurableQueueStore` interface + `InMemoryDurableQueueStore` to `Bolt.Hub`** — non-breaking
-3. **Add `RedisDurableQueueStore` to `Bolt.Hub`** — non-breaking, opt-in via config
-4. **Add transient pub/sub support to `BoltClient`** — non-breaking, just new methods
-5. **Add transient pub/sub frame handlers to `BoltServer`** — non-breaking, just new handlers
-6. **Add durable pub/sub support to `BoltClient` (`SubscribeDurableAsync`, `AckAsync`, `DurableMessage<T>`)** — non-breaking
-7. **Add durable pub/sub frame handlers to `BoltServer` (replay-on-reconnect, ack handling)** — non-breaking
-8. **Add `ExecuteQuery`/`ExecuteChanges` shim handlers to `BoltServer`** — non-breaking
-9. **Create new `BoltDriver` (alongside `BoltDriverSignalR`)** — non-breaking, doesn't replace yet
-10. **Switch DI registration in one service** (IdentityServer) — verify it works end-to-end
-11. **Switch remaining services one by one** — Wallets, Communications, Community, SmsGateway, Inventario, ControlPanel.Server, Gateway, Coins
+1. **Add pub/sub frame types to `Bolt.Protocol`** - non-breaking, just new enum values (Subscribe, Unsubscribe, Publish, Event, Ack, ExecuteQuery, ExecuteChanges)
+2. **Add `IDurableQueueStore` interface + `InMemoryDurableQueueStore` to `Bolt.Hub`** - non-breaking
+3. **Add `RedisDurableQueueStore` to `Bolt.Hub`** - non-breaking, opt-in via config
+4. **Add transient pub/sub support to `BoltClient`** - non-breaking, just new methods
+5. **Add transient pub/sub frame handlers to `BoltServer`** - non-breaking, just new handlers
+6. **Add durable pub/sub support to `BoltClient` (`SubscribeDurableAsync`, `AckAsync`, `DurableMessage<T>`)** - non-breaking
+7. **Add durable pub/sub frame handlers to `BoltServer` (replay-on-reconnect, ack handling)** - non-breaking
+8. **Add `ExecuteQuery`/`ExecuteChanges` shim handlers to `BoltServer`** - non-breaking
+9. **Create new `BoltDriver` (alongside `BoltDriverSignalR`)** - non-breaking, doesn't replace yet
+10. **Switch DI registration in one service** (IdentityServer) - verify it works end-to-end
+11. **Switch remaining services one by one** - Wallets, Communications, Community, SmsGateway, Inventario, XFramework.Portal, Gateway, Coins
 12. **Delete `BoltDriverSignalR`, `SignalRService`, `ConnectionPool`, `PooledRpcCall`, `BaseSignalRHandler`, `ISignalRService`, `ISignalREventHandler`**
 13. **Delete `MessageQueueHub`** and remove SignalR registration from `Bolt.Hub`
 14. **Remove SignalR package references** from `Bolt.Hub.csproj` and `XFramework.Integration.csproj`

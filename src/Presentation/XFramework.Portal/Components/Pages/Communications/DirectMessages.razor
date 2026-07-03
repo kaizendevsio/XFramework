@@ -1,0 +1,14 @@
+@page "/communications/direct-messages"
+
+<PageTitle>Direct Messages - Portal</PageTitle>
+
+<CenteredSpinner />
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/communications/users", replace: true);
+    }
+}

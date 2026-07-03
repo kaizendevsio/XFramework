@@ -7,7 +7,7 @@ public static class XFrameworkServiceNames
     public const string Coins = "XFramework.Coins";
     public const string Communications = "XFramework.Communications";
     public const string Community = "XFramework.Community";
-    public const string ControlPanel = "XFramework.ControlPanel";
+    public const string Portal = "XFramework.Portal";
     public const string Gateway = "XFramework.Gateway";
     public const string IdentityServer = "XFramework.IdentityServer";
     public const string Inventario = "XFramework.Inventario";
@@ -26,7 +26,7 @@ public static class XFrameworkServiceNames
         Coins,
         Communications,
         Community,
-        ControlPanel,
+        Portal,
         Gateway,
         IdentityServer,
         Inventario,

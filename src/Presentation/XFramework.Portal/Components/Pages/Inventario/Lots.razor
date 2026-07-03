@@ -1,0 +1,319 @@
+@page "/inventario/lots"
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Lots
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Inventario Lots - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_traceabilityEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Traceability" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <BbTypographyH3>Lots and Batches</BbTypographyH3>
+                    <BbTypographyMuted>Track inventory by product, source, received date, and expiry.</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton OnClick="@OpenCreateDialog" Disabled="@(_products.Count == 0)">
+                        <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                        Create Lot
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Lot List</BbCardTitle>
+                    <BbCardDescription>@_lots.Count lot(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_lots" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="On Hand" Filterable="true" FilterBy="@(item => GetLotOnHand(item.Id))">
+                                <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("N2")</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View lot"
+                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))">
+                                        <LucideIcon Name="eye" class="h-4 w-4" />
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+<BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+        <BbDialogHeader>
+            <BbDialogTitle>Create Lot</BbDialogTitle>
+            <BbDialogDescription>Lot numbers are unique per product inside the selected tenant.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <XfEntityPicker TItem="Product"
+                            @bind-Value="_form.ProductId"
+                            Items="@_products"
+                            Label="Product"
+                            Placeholder="Select product"
+                            SearchPlaceholder="Search products..."
+                            EmptyMessage="No products found."
+                            ValueSelector="@GetProductPickerValue"
+                            TextSelector="@GetProductLabel"
+                            SearchTextSelector="@GetProductSearchText"
+                            AdvancedSearchTitle="Find Product"
+                            AdvancedSearchDescription="Search products in the active tenant." />
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.LotNumber" Label="Lot / Batch Number" Required="true" />
+                <BbFormFieldSelect TValue="string" @bind-Value="_form.Status" Label="Status">
+                    @foreach (var status in Enum.GetValues<InventoryLotStatus>())
+                    {
+                        <BbSelectItem Value="@status.ToString()">@status</BbSelectItem>
+                    }
+                </BbFormFieldSelect>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.SupplierReference" Label="Supplier / Source Ref" />
+                <BbFormFieldCurrencyInput @bind-Value="_form.UnitCost"
+                                          Label="Unit Cost"
+                                          Min="0"
+                                          ShowSymbol="false" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-3">
+                <BbFormFieldDatePicker @bind-Value="_form.ReceivedAt" Label="Received Date" />
+                <BbFormFieldDatePicker @bind-Value="_form.ManufacturedAt" Label="Manufacture Date" />
+                <BbFormFieldDatePicker @bind-Value="_form.ExpiresAt" Label="Expiration Date" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.SourceReferenceType" Label="Source Type" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.SourceReferenceId" Label="Source ID" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _createDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@CreateLot" Disabled="@IsCreateDisabled">Create</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private readonly LotForm _form = new();
+    private List<Product> _products = [];
+    private List<InventoryLot> _lots = [];
+    private List<StockBalance> _balances = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _traceabilityEnabled;
+    private bool _saving;
+    private bool _createDialogOpen;
+    private bool IsCreateDisabled => _saving || _products.Count == 0 || string.IsNullOrWhiteSpace(_form.ProductId) || string.IsNullOrWhiteSpace(_form.LotNumber);
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _traceabilityEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability");
+            _products = [];
+            _lots = [];
+            _balances = [];
+
+            if (!_hasTenant || !_traceabilityEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _products = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(250)
+                .ToListAsync();
+
+            _lots = await DataContext.Query<InventoryLot>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.LotNumber)
+                .Take(500)
+                .ToListAsync();
+
+            _balances = await DataContext.Query<StockBalance>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.LotId != null && !x.IsDeleted)
+                .Take(500)
+                .ToListAsync();
+
+            _form.ProductId = _products.FirstOrDefault()?.Id.ToString() ?? "";
+        }
+        catch
+        {
+            ToastService.Show("Could not load lots.");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        _form.Reset(_products.FirstOrDefault()?.Id.ToString() ?? "");
+        _createDialogOpen = true;
+    }
+
+    private async Task CreateLot()
+    {
+        if (!Guid.TryParse(_form.ProductId, out var productId))
+        {
+            ToastService.Show("Select a product.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await Inventario.CreateInventoryLot(new CreateInventoryLotRequest
+            {
+                Metadata = BuildMetadata(),
+                ProductId = productId,
+                LotNumber = NullIfEmpty(_form.LotNumber),
+                SupplierReference = NullIfEmpty(_form.SupplierReference),
+                SourceReferenceType = NullIfEmpty(_form.SourceReferenceType),
+                SourceReferenceId = Guid.TryParse(_form.SourceReferenceId, out var sourceId) ? sourceId : null,
+                ReceivedAt = _form.ReceivedAt,
+                ManufacturedAt = _form.ManufacturedAt,
+                ExpiresAt = _form.ExpiresAt,
+                UnitCost = _form.UnitCost > 0 ? _form.UnitCost : null,
+                Status = Enum.TryParse<InventoryLotStatus>(_form.Status, out var status) ? status : InventoryLotStatus.Available
+            });
+
+            ToastService.Show(result.IsSuccess ? "Lot created." : "Could not create lot.");
+            if (result.IsSuccess)
+            {
+                _createDialogOpen = false;
+                await Reload();
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "Portal"
+    };
+
+    private string GetProductName(Guid productId) =>
+        _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
+
+    private static string GetProductLabel(Product product) =>
+        string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
+
+    private static string GetProductPickerValue(Product product) => product.Id.ToString();
+
+    private static string GetProductSearchText(Product product) =>
+        $"{product.Name} {product.SKU} {product.Brand} {product.Description}";
+
+    private decimal GetLotOnHand(Guid lotId) =>
+        _balances.Where(x => x.LotId == lotId).Sum(x => x.OnHandQuantity);
+
+    private static string GetStatusBadge(InventoryLotStatus status) =>
+        status is InventoryLotStatus.Available ? "active" : "inactive";
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class LotForm
+    {
+        public string ProductId { get; set; } = "";
+        public string LotNumber { get; set; } = "";
+        public string SupplierReference { get; set; } = "";
+        public string SourceReferenceType { get; set; } = "";
+        public string SourceReferenceId { get; set; } = "";
+        public DateTime? ReceivedAt { get; set; }
+        public DateTime? ManufacturedAt { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public decimal UnitCost { get; set; }
+        public string Status { get; set; } = InventoryLotStatus.Available.ToString();
+
+        public void Reset(string productId)
+        {
+            ProductId = productId;
+            LotNumber = "";
+            SupplierReference = "";
+            SourceReferenceType = "";
+            SourceReferenceId = "";
+            ReceivedAt = DateTime.Today;
+            ManufacturedAt = null;
+            ExpiresAt = null;
+            UnitCost = 0m;
+            Status = InventoryLotStatus.Available.ToString();
+        }
+    }
+}

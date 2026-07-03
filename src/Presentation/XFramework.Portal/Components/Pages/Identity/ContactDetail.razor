@@ -1,0 +1,517 @@
+@page "/identity/contacts/{Id:guid}"
+
+<PageTitle>Contact Detail - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (_contact is null)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@BackToContacts">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Contacts
+        </BbButton>
+        <BbAlert Variant="AlertVariant.Danger">
+            <BbAlertTitle>Contact Not Found</BbAlertTitle>
+            <BbAlertDescription>No contact found with the specified ID.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@BackToContacts">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Contacts
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Contact Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to All Tenants or the contact's tenant to view this record.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="@BackToContacts">
+                            <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                        </BbButton>
+                        <div>
+                            <BbTypographyH3>@ContactTitle</BbTypographyH3>
+                            <BbTypographyMuted>@GetCredentialLabelById(_contact.CredentialId)</BbTypographyMuted>
+                        </div>
+                    </div>
+                </div>
+                <div class="xf-page-actions">
+                    <StatusBadge Text="@(_contact.IsEnabled ? "Enabled" : "Disabled")"
+                                 Status="@(_contact.IsEnabled ? "active" : "inactive")" />
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ReloadData">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Destructive" OnClick="@OpenDeleteDialog">
+                        <LucideIcon Name="trash-2" class="mr-2 h-4 w-4" />
+                        Delete
+                    </BbButton>
+                </div>
+            </div>
+
+            <EditableForm @ref="_editableForm"
+                          TModel="IdentityContact"
+                          Model="_contact"
+                          OnSave="SaveContact"
+                          OnDiscard="DiscardContactEdit"
+                          Saving="_saving"
+                          RequireDirtyForSave="false"
+                          Title="Contact Details">
+                @if (_editableForm?.IsEditing == true)
+                {
+                    <div class="xf-detail-field-grid">
+                        <BbFormFieldInput TValue="string"
+                                          @bind-Value="_formValue"
+                                          Label="Value"
+                                          Placeholder="Email, phone number, or other contact value"
+                                          Required="true" />
+                        <XfEntityPicker TItem="IdentityCredential"
+                                        Label="Credential"
+                                        Value="@_formCredentialId"
+                                        ValueChanged="@(value => _formCredentialId = value ?? string.Empty)"
+                                        Items="@_credentials"
+                                        ValueSelector="@GetCredentialPickerValue"
+                                        TextSelector="@GetCredentialLabel"
+                                        SearchTextSelector="@GetCredentialSearchText"
+                                        AdvancedColumns="@CredentialAdvancedColumns"
+                                        AdvancedFilters="@CredentialAdvancedFilters"
+                                        AdvancedSearchScope="Searches username, alias, owning identity, online state, device, location, last seen, and created date."
+                                        Placeholder="Select credential"
+                                        SearchPlaceholder="Search credentials..."
+                                        EmptyMessage="No credentials found."
+                                        ShowCreate="false"
+                                        AdvancedSearchTitle="Find Credential"
+                                        AdvancedSearchDescription="Search credentials in the contact tenant." />
+                        <XfEntityPicker TItem="IdentityContactType"
+                                        Label="Contact Type"
+                                        Value="@_formTypeId"
+                                        ValueChanged="@(value => _formTypeId = value ?? string.Empty)"
+                                        Items="@_contactTypes"
+                                        ValueSelector="@GetContactTypePickerValue"
+                                        TextSelector="@GetContactTypeLabel"
+                                        SearchTextSelector="@GetContactTypeSearchText"
+                                        AdvancedColumns="@ContactTypeAdvancedColumns"
+                                        AdvancedFilters="@ContactTypeAdvancedFilters"
+                                        AdvancedSearchScope="Searches contact type name, enabled state, system reference, and created date."
+                                        Placeholder="No contact type"
+                                        SearchPlaceholder="Search contact types..."
+                                        EmptyMessage="No contact types found."
+                                        AllowClear="true"
+                                        ClearText="No contact type"
+                                        ShowCreate="false"
+                                        AdvancedSearchTitle="Find Contact Type"
+                                        AdvancedSearchDescription="Search contact classification types." />
+                        <XfEntityPicker TItem="IdentityContactGroup"
+                                        Label="Contact Group"
+                                        Value="@_formGroupId"
+                                        ValueChanged="@(value => _formGroupId = value ?? string.Empty)"
+                                        Items="@_contactGroups"
+                                        ValueSelector="@GetContactGroupPickerValue"
+                                        TextSelector="@GetContactGroupLabel"
+                                        SearchTextSelector="@GetContactGroupSearchText"
+                                        AdvancedColumns="@ContactGroupAdvancedColumns"
+                                        AdvancedFilters="@ContactGroupAdvancedFilters"
+                                        AdvancedSearchScope="Searches contact group name, enabled state, system reference, and created date."
+                                        Placeholder="Select contact group"
+                                        SearchPlaceholder="Search contact groups..."
+                                        EmptyMessage="No contact groups found."
+                                        ShowCreate="false"
+                                        AdvancedSearchTitle="Find Contact Group"
+                                        AdvancedSearchDescription="Search contact groups in the contact tenant." />
+                    </div>
+                }
+                else
+                {
+                    <div class="xf-summary-grid">
+                        <div>
+                            <BbTypographyMuted>Value</BbTypographyMuted>
+                            <div class="font-medium">@_contact.Value</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Credential</BbTypographyMuted>
+                            <div class="font-medium">@GetCredentialLabelById(_contact.CredentialId)</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Contact Type</BbTypographyMuted>
+                            <div class="font-medium">@GetContactTypeLabel(_contact)</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Contact Group</BbTypographyMuted>
+                            <div class="font-medium">@GetContactGroupLabelById(_contact.GroupId)</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Created</BbTypographyMuted>
+                            <div class="font-medium">@FormatDateTime(_contact.CreatedAt)</div>
+                        </div>
+                        <div>
+                            <BbTypographyMuted>Updated</BbTypographyMuted>
+                            <div class="font-medium">@FormatDateTime(_contact.ModifiedAt)</div>
+                        </div>
+                    </div>
+                }
+            </EditableForm>
+        </div>
+    </FadeInContent>
+}
+
+<ConfirmDeleteDialog Open="@_deleteDialogOpen"
+                     OpenChanged="@(value => _deleteDialogOpen = value)"
+                     Message="Delete this contact record? This action cannot be undone."
+                     OnConfirm="@ConfirmDelete" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+
+    private IdentityContact? _contact;
+    private List<IdentityCredential> _credentials = [];
+    private List<IdentityContactType> _contactTypes = [];
+    private List<IdentityContactGroup> _contactGroups = [];
+    private EditableForm<IdentityContact>? _editableForm;
+
+    private bool _loading = true;
+    private bool _saving;
+    private bool _deleteDialogOpen;
+    private bool _outsideTenantContext;
+
+    private string _formValue = string.Empty;
+    private string _formCredentialId = string.Empty;
+    private string _formTypeId = string.Empty;
+    private string _formGroupId = string.Empty;
+
+    private string ContactTitle =>
+        string.IsNullOrWhiteSpace(_contact?.Value) ? "Contact" : _contact.Value;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await ReloadData();
+    }
+
+    private async Task ReloadData()
+    {
+        _loading = true;
+        try
+        {
+            _outsideTenantContext = false;
+            _contact = await DataContext.Query<IdentityContact>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Include(x => x.Group)
+                .Include(x => x.Credential)
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (_contact is null)
+            {
+                ClearLookups();
+                return;
+            }
+
+            _outsideTenantContext = TenantFilter.SelectedTenantId is Guid tenantId && tenantId != _contact.TenantId;
+            if (_outsideTenantContext)
+            {
+                ClearLookups();
+                return;
+            }
+
+            SyncFormFields();
+            await LoadLookups(_contact.TenantId);
+        }
+        catch
+        {
+            _contact = null;
+            ClearLookups();
+            ToastService.Error("Contact could not be loaded.", "Load failed");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ClearLookups()
+    {
+        _credentials = [];
+        _contactTypes = [];
+        _contactGroups = [];
+    }
+
+    private async Task LoadLookups(Guid tenantId)
+    {
+        var credentialQuery = DataContext.Query<IdentityCredential>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Include(x => x.IdentityInfo)
+            .Where(x => x.TenantId == tenantId)
+            .OrderBy(x => x.UserName);
+
+        var typeQuery = DataContext.Query<IdentityContactType>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .OrderBy(x => x.Name);
+
+        var groupQuery = DataContext.Query<IdentityContactGroup>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .OrderBy(x => x.Name);
+
+        _credentials = await credentialQuery.Take(500).ToListAsync();
+        _contactTypes = await typeQuery.Take(100).ToListAsync();
+        _contactGroups = await groupQuery.Take(100).ToListAsync();
+    }
+
+    private void SyncFormFields()
+    {
+        if (_contact is null)
+        {
+            return;
+        }
+
+        _formValue = _contact.Value;
+        _formCredentialId = _contact.CredentialId.ToString();
+        _formTypeId = _contact.TypeId?.ToString() ?? string.Empty;
+        _formGroupId = _contact.GroupId.ToString();
+    }
+
+    private void DiscardContactEdit() => SyncFormFields();
+
+    private async Task SaveContact()
+    {
+        if (_contact is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_formValue))
+        {
+            ToastService.Warning("Contact value is required.", "Missing value");
+            return;
+        }
+
+        if (!Guid.TryParse(_formCredentialId, out var credentialId))
+        {
+            ToastService.Warning("Select a credential.", "Missing credential");
+            return;
+        }
+
+        if (!Guid.TryParse(_formGroupId, out var groupId))
+        {
+            ToastService.Warning("Select a contact group.", "Missing contact group");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var fresh = await DataContext.Query<IdentityContact>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Warning("Contact was not found.", "Contact unavailable");
+                return;
+            }
+
+            fresh.Value = _formValue;
+            fresh.CredentialId = credentialId;
+            fresh.TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null;
+            fresh.GroupId = groupId;
+            fresh.ModifiedAt = DateTime.UtcNow;
+
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Contact updated.", "Saved");
+                _editableForm?.ExitEditMode();
+                await ReloadData();
+            }
+            else
+            {
+                ToastService.Error("Contact could not be updated.", "Save failed");
+            }
+        }
+        catch
+        {
+            ToastService.Error("Contact could not be updated.", "Save failed");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void OpenDeleteDialog()
+    {
+        _deleteDialogOpen = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_contact is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _contact.IsDeleted = true;
+            _contact.IsEnabled = false;
+            DataContext.Update(_contact);
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Success("Contact deleted.", "Deleted");
+                BackToContacts();
+            }
+            else
+            {
+                ToastService.Error("Contact could not be deleted.", "Delete failed");
+            }
+        }
+        catch
+        {
+            ToastService.Error("Contact could not be deleted.", "Delete failed");
+        }
+        finally
+        {
+            _deleteDialogOpen = false;
+        }
+    }
+
+    private void BackToContacts() => Navigation.NavigateTo("/identity/contacts");
+
+    private static string GetCredentialPickerValue(IdentityCredential credential) => credential.Id.ToString();
+    private static string GetContactTypePickerValue(IdentityContactType contactType) => contactType.Id.ToString();
+    private static string GetContactGroupPickerValue(IdentityContactGroup contactGroup) => contactGroup.Id.ToString();
+
+    private static string GetCredentialLabel(IdentityCredential credential)
+    {
+        if (!string.IsNullOrWhiteSpace(credential.UserName))
+        {
+            return credential.UserName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(credential.UserAlias))
+        {
+            return credential.UserAlias;
+        }
+
+        return credential.Id.ToString()[..8];
+    }
+
+    private string GetCredentialLabelById(Guid credentialId) =>
+        _credentials.FirstOrDefault(x => x.Id == credentialId) is { } credential
+            ? GetCredentialLabel(credential)
+            : _contact?.Credential is { } loadedCredential
+                ? GetCredentialLabel(loadedCredential)
+                : "Unknown credential";
+
+    private static string GetContactTypeLabel(IdentityContactType contactType) =>
+        string.IsNullOrWhiteSpace(contactType.Name)
+            ? contactType.Id.ToString()[..8]
+            : contactType.Name;
+
+    private static string GetContactTypeLabel(IdentityContact contact) =>
+        string.IsNullOrWhiteSpace(contact.Type?.Name)
+            ? "No contact type"
+            : contact.Type.Name;
+
+    private static string GetContactGroupLabel(IdentityContactGroup contactGroup) =>
+        string.IsNullOrWhiteSpace(contactGroup.Name)
+            ? contactGroup.Id.ToString()[..8]
+            : contactGroup.Name;
+
+    private string GetContactGroupLabelById(Guid groupId) =>
+        _contactGroups.FirstOrDefault(x => x.Id == groupId) is { } group
+            ? GetContactGroupLabel(group)
+            : _contact?.Group is { } loadedGroup
+                ? GetContactGroupLabel(loadedGroup)
+                : "Unknown group";
+
+    private static string GetCredentialSearchText(IdentityCredential credential) =>
+        $"{credential.UserName} {credential.UserAlias} {credential.Device} {credential.Location} {credential.IdentityInfo?.FullName} {credential.IdentityInfo?.IdentityName}";
+
+    private static string GetContactTypeSearchText(IdentityContactType contactType) =>
+        $"{contactType.Name} {contactType.SystemReferenceId}";
+
+    private static string GetContactGroupSearchText(IdentityContactGroup contactGroup) =>
+        $"{contactGroup.Name} {contactGroup.SystemReferenceId}";
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityCredential>> CredentialAdvancedColumns =>
+    [
+        new("Username", x => x.UserName),
+        new("Alias", x => x.UserAlias),
+        new("Identity", x => x.IdentityInfo?.FullName ?? x.IdentityInfo?.IdentityName),
+        new("Online", x => FormatBoolean(x.IsOnline)),
+        new("Device", x => x.Device),
+        new("Location", x => x.Location),
+        new("Last Seen", x => FormatDateTime(x.LastSeen)),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityCredential>> CredentialAdvancedFilters =>
+    [
+        new("online", "Online", YesNoFilterOptions, x => x.IsOnline ? "true" : "false", "All credentials"),
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityContactType>> ContactTypeAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("System Ref", x => x.SystemReferenceId.ToString()[..8]),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityContactType>> ContactTypeAdvancedFilters =>
+    [
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses")
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityContactGroup>> ContactGroupAdvancedColumns =>
+    [
+        new("Name", x => x.Name),
+        new("Enabled", x => FormatBoolean(x.IsEnabled)),
+        new("System Ref", x => x.SystemReferenceId.ToString()[..8]),
+        new("Created", x => FormatDateTime(x.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerFilter<IdentityContactGroup>> ContactGroupAdvancedFilters =>
+    [
+        new("enabled", "Enabled", YesNoFilterOptions, x => x.IsEnabled ? "true" : "false", "All statuses")
+    ];
+
+    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
+    [
+        new("true", "Yes"),
+        new("false", "No")
+    ];
+
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
+    private static string FormatDateTime(DateTime? value) => value.HasValue ? FormatDateTime(value.Value) : "N/A";
+}

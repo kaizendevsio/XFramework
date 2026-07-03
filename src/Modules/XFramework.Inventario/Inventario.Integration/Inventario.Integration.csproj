@@ -7,7 +7,7 @@
         <Nullable>enable</Nullable>
         <PackageId>XFramework.Inventario.Integration</PackageId>
         <Version>$(XFrameworkVersion)</Version>
-        <Description>XFramework Inventario service wrapper for ControlPanel and cross-module Bolt RPC calls.</Description>
+        <Description>XFramework Inventario service wrapper for Portal and cross-module Bolt RPC calls.</Description>
     </PropertyGroup>
 
     <ItemGroup>
