@@ -11,6 +11,8 @@ string[] domainAssemblyNames =
     "IdentityServer.Domain.Shared",
     "Inventario.Domain.Shared",
     "Communications.Domain.Shared",
+    "Notifications.Domain.Shared",
+    "SmsGateway.Domain.Shared",
     "Storage.Domain.Shared",
     "POS.Domain.Shared",
     "Wallets.Domain.Shared"

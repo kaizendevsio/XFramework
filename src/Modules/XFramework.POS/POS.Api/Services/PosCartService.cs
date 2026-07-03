@@ -15,6 +15,7 @@ public sealed class PosCartService(
     AppDbContext db,
     IInventarioServiceWrapper inventario,
     PosSalesService salesService,
+    IPosRequestContextResolver contextResolver,
     ILogger<PosCartService> logger)
 {
     private static readonly TimeSpan CartTtl = TimeSpan.FromHours(24);
@@ -23,8 +24,11 @@ public sealed class PosCartService(
         CreatePosCartRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosCartResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request, request.CashierCredentialId);
+        if (!contextResult.IsSuccess)
+            return Result<PosCartResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
 
         var idempotencyKey = PosServiceHelpers.NormalizeOptional(request.IdempotencyKey) ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
@@ -68,7 +72,7 @@ public sealed class PosCartService(
         var lineResult = await BuildCartLinesAsync(
             cart.Id,
             tenantId,
-            request.Metadata,
+            contextResult.Data.Metadata,
             register,
             cart.WarehouseId,
             cart.LocationId,
@@ -95,8 +99,11 @@ public sealed class PosCartService(
         UpdatePosCartRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosCartResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosCartResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
 
         await ExpireDueCartsAsync(tenantId, ct);
         var cart = await LoadCartAsync(tenantId, request.Id, tracking: true, ct);
@@ -130,7 +137,7 @@ public sealed class PosCartService(
         var lineResult = await BuildCartLinesAsync(
             cart.Id,
             tenantId,
-            request.Metadata,
+            contextResult.Data.Metadata,
             register,
             cart.WarehouseId,
             cart.LocationId,
@@ -158,15 +165,18 @@ public sealed class PosCartService(
         GetPosCartRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosCartResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosCartResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
 
         await ExpireDueCartsAsync(tenantId, ct);
         var cart = await LoadCartAsync(tenantId, request.Id, tracking: false, ct);
         if (cart is null)
             return Result<PosCartResponse>.NotFound("POS cart was not found");
 
-        var warnings = await BuildCatalogWarningsAsync(cart, request.Metadata);
+        var warnings = await BuildCatalogWarningsAsync(cart, contextResult.Data.Metadata);
         return Result<PosCartResponse>.Success(PosServiceHelpers.ToCartResponse(cart, warnings));
     }
 
@@ -174,8 +184,11 @@ public sealed class PosCartService(
         SearchPosCartsRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<List<PosCartSummaryResponse>>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<List<PosCartSummaryResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
 
         await ExpireDueCartsAsync(tenantId, ct);
         var (page, pageSize) = PosServiceHelpers.NormalizePage(request.Page, request.PageSize);
@@ -223,8 +236,11 @@ public sealed class PosCartService(
         SuspendPosCartRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosCartResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosCartResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
 
         await ExpireDueCartsAsync(tenantId, ct);
         var cart = await LoadCartAsync(tenantId, request.CartId, tracking: true, ct);
@@ -254,8 +270,11 @@ public sealed class PosCartService(
         ResumePosCartRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosCartResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosCartResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
 
         await ExpireDueCartsAsync(tenantId, ct);
         var cart = await LoadCartAsync(tenantId, request.CartId, tracking: true, ct);
@@ -277,7 +296,7 @@ public sealed class PosCartService(
         cart.ConcurrencyStamp = Guid.NewGuid();
 
         await db.SaveChangesAsync(ct);
-        var warnings = await BuildCatalogWarningsAsync(cart, request.Metadata);
+        var warnings = await BuildCatalogWarningsAsync(cart, contextResult.Data.Metadata);
         return Result<PosCartResponse>.Success(PosServiceHelpers.ToCartResponse(cart, warnings), "POS cart resumed");
     }
 
@@ -285,8 +304,11 @@ public sealed class PosCartService(
         CancelPosCartRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosCartResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosCartResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
 
         await ExpireDueCartsAsync(tenantId, ct);
         var cart = await LoadCartAsync(tenantId, request.CartId, tracking: true, ct);
@@ -316,8 +338,11 @@ public sealed class PosCartService(
         CheckoutPosCartRequest request,
         CancellationToken ct)
     {
-        if (!PosServiceHelpers.TryResolveTenantId(request.Metadata, out var tenantId))
-            return Result<PosSaleReceiptResponse>.Failure("Tenant ID is required", 400);
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosSaleReceiptResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
 
         await ExpireDueCartsAsync(tenantId, ct);
         var cart = await LoadCartAsync(tenantId, request.CartId, tracking: true, ct);

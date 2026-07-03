@@ -56,7 +56,8 @@ public sealed class WrapperContractTests
                 typeof(CheckoutPosSaleRequest),
                 typeof(CancelPosSaleRequest),
                 typeof(RetryPosSaleFulfillmentRequest),
-                typeof(CreatePosReturnRequest)
+                typeof(CreatePosReturnRequest),
+                typeof(RetryPosReturnRequest)
             ]);
 
         foreach (var item in typedCommandRequests)

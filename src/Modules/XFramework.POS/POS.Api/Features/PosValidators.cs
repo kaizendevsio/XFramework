@@ -138,7 +138,7 @@ public sealed class CheckoutPosCartValidator : AbstractValidator<CheckoutPosCart
     public CheckoutPosCartValidator()
     {
         RuleFor(x => x.CartId).NotEmpty();
-        RuleFor(x => x.IdempotencyKey).MaximumLength(160).When(x => !string.IsNullOrWhiteSpace(x.IdempotencyKey));
+        RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(160);
         RuleFor(x => x.Payment).NotNull();
         RuleFor(x => x.Payment.Amount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Payment.Method).IsInEnum();
@@ -156,6 +156,7 @@ public sealed class CheckoutPosSaleValidator : AbstractValidator<CheckoutPosSale
         RuleFor(x => x.CashierCredentialId).NotEmpty();
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(160);
         RuleFor(x => x.Lines).NotEmpty();
         RuleFor(x => x.Payment).NotNull();
         RuleFor(x => x.Payment.Amount).GreaterThanOrEqualTo(0);
@@ -214,6 +215,7 @@ public sealed class CreatePosReturnValidator : AbstractValidator<CreatePosReturn
         RuleFor(x => x.CashierCredentialId).NotEmpty();
         RuleFor(x => x.RefundMethod).IsInEnum();
         RuleFor(x => x.Reason).MaximumLength(500).When(x => !string.IsNullOrWhiteSpace(x.Reason));
+        RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(160);
         RuleFor(x => x.Lines).NotEmpty();
         RuleForEach(x => x.Lines).ChildRules(line =>
         {
@@ -238,4 +240,10 @@ public sealed class SearchPosReturnsValidator : AbstractValidator<SearchPosRetur
         RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
         RuleFor(x => x.Status).IsInEnum().When(x => x.Status.HasValue);
     }
+}
+
+public sealed class RetryPosReturnValidator : AbstractValidator<RetryPosReturnRequest>
+{
+    public RetryPosReturnValidator() =>
+        RuleFor(x => x.ReturnId).NotEmpty();
 }

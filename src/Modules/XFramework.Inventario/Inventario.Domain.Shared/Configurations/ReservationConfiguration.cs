@@ -15,10 +15,15 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
         entity.Property(e => e.Quantity).HasPrecision(18, 4);
         entity.Property(e => e.Status).HasDefaultValue(ReservationStatus.Active);
         entity.Property(e => e.ReferenceType).HasMaxLength(100);
+        entity.Property(e => e.IdempotencyKey).HasMaxLength(200);
         entity.Property(e => e.ReservedAt).HasDefaultValueSql("now()");
 
         entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.Status });
         entity.HasIndex(e => new { e.TenantId, e.ReferenceType, e.ReferenceId });
+        entity.HasIndex(e => new { e.TenantId, e.IdempotencyKey })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false AND \"IdempotencyKey\" IS NOT NULL AND \"IdempotencyKey\" <> ''")
+            .HasDatabaseName("UX_Inventario_Reservation_Tenant_Idempotency_Active");
         entity.HasIndex(e => e.ExpiresAt);
 
         entity.HasOne(e => e.Product)

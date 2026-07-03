@@ -69,6 +69,7 @@ public sealed class PosValidatorTests
             SaleId = Guid.NewGuid(),
             CashierCredentialId = Guid.NewGuid(),
             RefundMethod = PosPaymentMethod.CashDrawer,
+            IdempotencyKey = "return-key",
             Lines =
             [
                 new CreatePosReturnLineRequest
@@ -132,6 +133,7 @@ public sealed class PosValidatorTests
         var request = new CheckoutPosCartRequest
         {
             CartId = Guid.NewGuid(),
+            IdempotencyKey = "cart-checkout-key",
             Payment = new CheckoutPosPaymentRequest
             {
                 Method = PosPaymentMethod.WalletTransfer,
@@ -159,10 +161,57 @@ public sealed class PosValidatorTests
         returns.IsValid.Should().BeFalse();
     }
 
+    [Test]
+    public void CheckoutAndReturnValidators_MissingIdempotencyKeys_ReturnValidationErrors()
+    {
+        var sale = ValidCheckout();
+        sale.IdempotencyKey = "";
+        var cart = new CheckoutPosCartRequest
+        {
+            CartId = Guid.NewGuid(),
+            Payment = new CheckoutPosPaymentRequest
+            {
+                Method = PosPaymentMethod.CashDrawer,
+                Amount = 10
+            }
+        };
+        var posReturn = new CreatePosReturnRequest
+        {
+            SaleId = Guid.NewGuid(),
+            CashierCredentialId = Guid.NewGuid(),
+            RefundMethod = PosPaymentMethod.CashDrawer,
+            Lines =
+            [
+                new CreatePosReturnLineRequest
+                {
+                    SaleLineId = Guid.NewGuid(),
+                    Quantity = 1
+                }
+            ]
+        };
+
+        new CheckoutPosSaleValidator().Validate(sale).Errors
+            .Should().Contain(error => error.PropertyName == nameof(CheckoutPosSaleRequest.IdempotencyKey));
+        new CheckoutPosCartValidator().Validate(cart).Errors
+            .Should().Contain(error => error.PropertyName == nameof(CheckoutPosCartRequest.IdempotencyKey));
+        new CreatePosReturnValidator().Validate(posReturn).Errors
+            .Should().Contain(error => error.PropertyName == nameof(CreatePosReturnRequest.IdempotencyKey));
+    }
+
+    [Test]
+    public void RetryPosReturnValidator_MissingReturnId_ReturnsValidationError()
+    {
+        var result = new RetryPosReturnValidator().Validate(new RetryPosReturnRequest());
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error => error.PropertyName == nameof(RetryPosReturnRequest.ReturnId));
+    }
+
     private static CheckoutPosSaleRequest ValidCheckout() => new()
     {
         RegisterId = Guid.NewGuid(),
         CashierCredentialId = Guid.NewGuid(),
+        IdempotencyKey = "sale-checkout-key",
         Lines =
         [
             new CheckoutPosSaleLineRequest

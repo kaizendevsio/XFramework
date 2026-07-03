@@ -39,6 +39,7 @@ public sealed class PosSaleConfiguration : IEntityTypeConfiguration<PosSale>
         entity.Property(e => e.IdempotencyKey).HasMaxLength(160);
         entity.Property(e => e.FailureReason).HasMaxLength(1000);
         entity.Property(e => e.RecoveryState).HasMaxLength(1000);
+        entity.Property(e => e.RequestHash).HasMaxLength(64);
 
         entity.HasIndex(e => new { e.TenantId, e.SaleNumber })
             .IsUnique()
@@ -218,6 +219,7 @@ public sealed class PosReturnConfiguration : IEntityTypeConfiguration<PosReturn>
         entity.Property(e => e.IdempotencyKey).HasMaxLength(160);
         entity.Property(e => e.RefundReferenceNumber).HasMaxLength(120);
         entity.Property(e => e.FailureReason).HasMaxLength(1000);
+        entity.Property(e => e.RequestHash).HasMaxLength(64);
 
         entity.HasIndex(e => new { e.TenantId, e.ReturnNumber })
             .IsUnique()

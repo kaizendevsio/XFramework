@@ -60,6 +60,27 @@ public sealed class ReservationService(
         if (request.Quantity <= 0)
             return Result<Reservation>.Failure("Reservation quantity must be greater than zero.", 400);
 
+        var idempotencyKey = NormalizeOptional(request.IdempotencyKey);
+        if (idempotencyKey is not null)
+        {
+            var existingReservation = await dataContext.Query<Reservation>()
+                .IgnoreQueryFilters()
+                .Include(x => x.Allocations)
+                .Where(x =>
+                    x.TenantId == tenantResult.Data &&
+                    x.IdempotencyKey == idempotencyKey &&
+                    !x.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (existingReservation is not null)
+            {
+                if (!ReferencesSameReservation(existingReservation, request))
+                    return Result<Reservation>.Conflict("Reservation idempotency key was reused with a different payload.");
+
+                return Result<Reservation>.Success(existingReservation, "Reservation replayed.");
+            }
+        }
+
         var reservationId = Guid.NewGuid();
         var allocationsResult = await allocationService.ReserveAsync(tenantResult.Data, reservationId, request, ct);
         if (!allocationsResult.IsSuccess)
@@ -82,6 +103,7 @@ public sealed class ReservationService(
             ReferenceId = request.ReferenceId,
             ReservedAt = now,
             ExpiresAt = request.ExpiresAt,
+            IdempotencyKey = idempotencyKey,
             IsEnabled = true,
             CreatedAt = now,
             ConcurrencyStamp = Guid.NewGuid(),
@@ -286,4 +308,13 @@ public sealed class ReservationService(
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool ReferencesSameReservation(Reservation reservation, ReserveInventoryRequest request) =>
+        reservation.ProductId == request.ProductId &&
+        reservation.ProductVariationId == request.ProductVariationId &&
+        reservation.WarehouseId == request.WarehouseId &&
+        reservation.LocationId == request.LocationId &&
+        reservation.Quantity == request.Quantity &&
+        string.Equals(reservation.ReferenceType, NormalizeOptional(request.ReferenceType), StringComparison.Ordinal) &&
+        reservation.ReferenceId == request.ReferenceId;
 }

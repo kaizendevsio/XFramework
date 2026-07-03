@@ -407,6 +407,8 @@ else
     private Guid? _activeCartId;
     private Guid? _activeCartConcurrencyStamp;
     private string? _activeCartNumber;
+    private string _activeSaleIdempotencyKey = NewSaleIdempotencyKey();
+    private string _activeCartCreateIdempotencyKey = NewCartIdempotencyKey();
     private decimal _discountAmount;
     private decimal _taxAmount;
     private decimal _cashTenderedAmount;
@@ -419,7 +421,12 @@ else
     private decimal CartItemCount => _cart.Sum(line => line.Quantity);
     private bool IsCashPayment => _paymentMethod == PosPaymentMethod.CashDrawer;
     private bool IsWalletPayment => _paymentMethod == PosPaymentMethod.WalletTransfer;
-    private bool CanCheckout => !_checkingOut && _cart.Any() && Total >= 0;
+    private bool CanCheckout =>
+        !_checkingOut &&
+        _cart.Any() &&
+        Total >= 0 &&
+        (!IsCashPayment || _cashTenderedAmount >= Total) &&
+        (!IsWalletPayment || Guid.TryParse(_selectedCustomerCredentialId, out _));
 
     protected override void OnInitialized()
     {
@@ -525,6 +532,7 @@ else
                 Metadata = BuildMetadata(),
                 Search = searchText,
                 CategoryId = _selectedCategoryId,
+                RegisterId = TryResolveSelectedRegisterId(),
                 Page = 1,
                 PageSize = 50
             });
@@ -667,7 +675,7 @@ else
                     DiscountAmount = _discountAmount,
                     TaxAmount = _taxAmount,
                     Suspend = true,
-                    IdempotencyKey = $"Portal.POS.Cart.{Guid.NewGuid():N}",
+                    IdempotencyKey = _activeCartCreateIdempotencyKey,
                     Lines = BuildCartLineRequests()
                 });
 
@@ -819,6 +827,12 @@ else
             return;
         }
 
+        if (IsCashPayment && _cashTenderedAmount < Total)
+        {
+            ToastService.Show("Cash tendered must cover the sale total.");
+            return;
+        }
+
         Guid? customerCredentialId = null;
         if (IsWalletPayment)
         {
@@ -877,7 +891,7 @@ else
                 CustomerCredentialId = customerCredentialId,
                 DiscountAmount = _discountAmount,
                 TaxAmount = _taxAmount,
-                IdempotencyKey = $"Portal.POS.{Guid.NewGuid():N}",
+                IdempotencyKey = _activeSaleIdempotencyKey,
                 Lines = _cart.Select(line => new CheckoutPosSaleLineRequest
                 {
                     ProductId = line.ProductId,
@@ -960,6 +974,8 @@ else
         _discountAmount = 0;
         _taxAmount = 0;
         _cashTenderedAmount = 0;
+        _activeSaleIdempotencyKey = NewSaleIdempotencyKey();
+        _activeCartCreateIdempotencyKey = NewCartIdempotencyKey();
     }
 
     private async Task ConfirmClearCurrentCart()
@@ -1019,6 +1035,11 @@ else
             ? customerCredentialId
             : null;
 
+    private Guid? TryResolveSelectedRegisterId() =>
+        Guid.TryParse(_selectedRegisterId, out var registerId)
+            ? registerId
+            : null;
+
     private async Task FocusCatalogSearchAsync()
     {
         try
@@ -1054,6 +1075,9 @@ else
         string.IsNullOrWhiteSpace(credential.UserName) ? credential.Id.ToString()[..8] : credential.UserName;
     private static string GetCredentialSearchText(IdentityCredential credential) =>
         $"{credential.UserName} {credential.UserAlias}";
+
+    private static string NewSaleIdempotencyKey() => $"Portal.POS.Sale.{Guid.NewGuid():N}";
+    private static string NewCartIdempotencyKey() => $"Portal.POS.Cart.{Guid.NewGuid():N}";
 
     private static string FormatProductMeta(PosCatalogItemResponse item)
     {

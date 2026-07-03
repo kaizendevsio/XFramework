@@ -249,3 +249,16 @@ public static class SearchPosReturnsEndpoint
         CancellationToken ct) =>
         service.SearchAsync(request, ct);
 }
+
+public static class RetryPosReturnEndpoint
+{
+    [BoltHandler]
+    [MapPost("/api/pos/returns/{returnId:guid}/retry", Tags = ["POS Returns"],
+        Summary = "Retry POS return",
+        Description = "Retries recoverable inventory posting or refund failures for a POS return.")]
+    public static Task<Result<PosReturnResponse>> Handle(
+        RetryPosReturnRequest request,
+        PosReturnsService service,
+        CancellationToken ct) =>
+        service.RetryAsync(request, ct);
+}

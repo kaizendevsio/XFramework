@@ -7,6 +7,9 @@ public partial record SearchPosCatalogRequest : RequestBase,
 {
     public string? Search { get; set; }
     public Guid? CategoryId { get; set; }
+    public Guid? RegisterId { get; set; }
+    public Guid? WarehouseId { get; set; }
+    public Guid? LocationId { get; set; }
     public bool? IsAvailable { get; set; } = true;
     public bool IncludeBaseProducts { get; set; } = true;
     public bool IncludeVariants { get; set; } = true;
@@ -297,4 +300,12 @@ public partial record SearchPosReturnsRequest : RequestBase,
     public DateTime? To { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 50;
+}
+
+[MemoryPackable]
+public partial record RetryPosReturnRequest : RequestBase,
+    ICommand<CmdResponse<PosReturnResponse>>,
+    IBoltRequest<RetryPosReturnRequest, CmdResponse<PosReturnResponse>>
+{
+    public Guid ReturnId { get; set; }
 }
