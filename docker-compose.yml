@@ -27,6 +27,7 @@ services:
 
   # ── PostgreSQL ──────────────────────────────────────────────
   postgres:
+    container_name: xframework-postgres
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: ${DB_NAME:-XFramework}
@@ -43,6 +44,7 @@ services:
       retries: 10
 
   redis:
+    container_name: xframework-redis
     image: redis:7-alpine
     ports:
       - "${REDIS_EXPOSE_PORT:-6379}:6379"
@@ -56,6 +58,7 @@ services:
 
   # ── Database Migration Runner (runs once, then exits) ───────
   minio:
+    container_name: xframework-minio
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     command: server /data --console-address ":9001"
     environment:
@@ -74,6 +77,7 @@ services:
       start_period: 10s
 
   migrate:
+    container_name: xframework-migrate
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/migrate:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -90,6 +94,7 @@ services:
 
   # ── Bolt Hub (must be healthy before services start) ─────────
   bolt-hub:
+    container_name: xframework-bolt-hub
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/bolt-hub:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -118,6 +123,7 @@ services:
 
   # ── Identity Server ─────────────────────────────────────────
   identityserver:
+    container_name: xframework-identityserver
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/identityserver:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -140,6 +146,7 @@ services:
 
   # ── Communications Server ────────────────────────────────────────
   communications:
+    container_name: xframework-communications
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/communications:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -162,6 +169,7 @@ services:
 
   # ── Notifications Server ────────────────────────────────────
   notifications:
+    container_name: xframework-notifications
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/notifications:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -183,6 +191,7 @@ services:
       start_period: 15s
 
   storage:
+    container_name: xframework-storage
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/storage:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -220,6 +229,7 @@ services:
       start_period: 15s
 
   attendance:
+    container_name: xframework-attendance
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/attendance:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -242,6 +252,7 @@ services:
 
   # ── SMS Gateway ─────────────────────────────────────────────
   smsgateway:
+    container_name: xframework-smsgateway
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/smsgateway:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -264,6 +275,7 @@ services:
 
   # ── Wallets Server ──────────────────────────────────────────
   wallets:
+    container_name: xframework-wallets
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/wallets:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -286,6 +298,7 @@ services:
 
   # ── Inventario Server ───────────────────────────────────────
   inventario:
+    container_name: xframework-inventario
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/inventario:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -308,6 +321,7 @@ services:
 
   # ── Control Panel ───────────────────────────────────────────
   pos:
+    container_name: xframework-pos
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/pos:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -333,6 +347,7 @@ services:
       start_period: 15s
 
   controlpanel:
+    container_name: xframework-controlpanel
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/controlpanel:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -371,6 +386,7 @@ services:
   # ── Seq (structured log aggregator) ──────────────────────────
   # Operations Dashboard
   operations-dashboard:
+    container_name: xframework-operations-dashboard
     image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/operations-dashboard:${IMAGE_TAG:-develop}
     build:
       context: .
@@ -412,6 +428,7 @@ services:
       start_period: 15s
 
   seq:
+    container_name: xframework-seq
     image: datalust/seq:2025
     environment:
       ACCEPT_EULA: "Y"
@@ -423,6 +440,7 @@ services:
 
   # Jaeger (OpenTelemetry trace backend for dev)
   jaeger:
+    container_name: xframework-jaeger
     image: jaegertracing/all-in-one:1.57
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
