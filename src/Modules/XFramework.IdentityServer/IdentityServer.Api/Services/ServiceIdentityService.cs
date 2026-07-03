@@ -3,7 +3,6 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -18,8 +17,7 @@ public sealed class ServiceIdentityService(
     IConfiguration configuration,
     ILogger<ServiceIdentityService> logger,
     IHttpContextAccessor? httpContextAccessor = null,
-    ITrustedServiceInvocationResolver? serviceInvocationResolver = null,
-    IHostEnvironment? hostEnvironment = null)
+    ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
     : IServiceIdentityService
 {
     private const string Algorithm = "RS256";
@@ -224,24 +222,6 @@ public sealed class ServiceIdentityService(
         if (client is not null)
             return client;
 
-        var devSecret = configuration["ServiceIdentity:DevelopmentClientSecret"];
-        if (!string.IsNullOrWhiteSpace(devSecret) && XFrameworkServiceNames.All.Contains(clientId))
-        {
-            if (!AllowsDevelopmentClientFallback())
-            {
-                logger.LogWarning(
-                    "Service identity development client-secret fallback rejected outside a development-style environment. ClientId={ClientId}",
-                    clientId);
-                return null;
-            }
-
-            return new ServiceClientDefinition(
-                clientId,
-                devSecret,
-                XFrameworkServiceNames.All.ToHashSet(StringComparer.Ordinal),
-                XFrameworkServiceScopes.AdminDefaults.ToHashSet(StringComparer.OrdinalIgnoreCase));
-        }
-
         return null;
     }
 
@@ -274,14 +254,6 @@ public sealed class ServiceIdentityService(
         }
 
         return Result.Forbidden("Service signing key administration requires SuperAdmin or trusted identity.admin service metadata");
-    }
-
-    private bool AllowsDevelopmentClientFallback()
-    {
-        if (hostEnvironment?.IsDevelopment() == true)
-            return true;
-
-        return configuration.GetValue<bool>("ServiceIdentity:AllowDevelopmentClientSecretFallback");
     }
 
     private static ServiceSigningKeyResponse ToResponse(ServiceSigningKey key) => new()
