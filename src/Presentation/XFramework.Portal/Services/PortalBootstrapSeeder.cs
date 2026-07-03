@@ -1,6 +1,8 @@
 using System.Text;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
@@ -9,13 +11,14 @@ namespace XFramework.Portal.Services;
 
 public sealed class PortalBootstrapSeeder(
     IDataContext dataContext,
+    IIdentityServerServiceWrapper identityServer,
     RequestMetadata requestMetadata,
     ILogger<PortalBootstrapSeeder> logger)
 {
     public async Task SeedAsync(PortalAuthOptions options, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var tenant = await EnsureTenant(options, now, ct);
+        var tenant = await EnsureTenant(options, ct);
 
         requestMetadata.TenantId = tenant.Id;
 
@@ -39,7 +42,7 @@ public sealed class PortalBootstrapSeeder(
             credential.Id);
     }
 
-    private async Task<Tenant> EnsureTenant(PortalAuthOptions options, DateTime now, CancellationToken ct)
+    private async Task<Tenant> EnsureTenant(PortalAuthOptions options, CancellationToken ct)
     {
         var tenant = await dataContext.Query<Tenant>()
             .IgnoreQueryFilters()
@@ -48,58 +51,54 @@ public sealed class PortalBootstrapSeeder(
             .OrderBy(x => x.CreatedAt)
             .FirstOrDefaultAsync(ct);
 
-        tenant ??= await dataContext.Query<Tenant>()
+        if (tenant is not null)
+        {
+            return tenant;
+        }
+
+        var lookupNames = PortalBootstrapConstants.BuildAdminTenantLookupNames(options.TenantName);
+        tenant = await dataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => lookupNames.Contains(x.Name))
+            .OrderBy(x => x.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (tenant is not null)
+        {
+            return tenant;
+        }
+
+        var createResult = await identityServer.CreateTenant(new CreateTenantRequest
+        {
+            Name = options.TenantName,
+            Description = "Portal bootstrap administration tenant",
+            Status = 1,
+            Version = 1.0m,
+            Metadata = new RequestMetadata
+            {
+                Name = "Portal",
+                RequestId = Guid.NewGuid()
+            }
+        });
+
+        if (!createResult.IsSuccess)
+        {
+            throw new InvalidOperationException($"Portal bootstrap admin tenant could not be created: {createResult.Message}");
+        }
+
+        tenant = await dataContext.Query<Tenant>()
             .IgnoreQueryFilters()
             .NoCache()
             .Where(x => x.Name == options.TenantName)
             .OrderBy(x => x.CreatedAt)
             .FirstOrDefaultAsync(ct);
 
-        if (tenant is not null)
+        if (tenant is null)
         {
-            var changed = false;
-            if (!tenant.IsEnabled || tenant.IsDeleted)
-            {
-                tenant.IsEnabled = true;
-                tenant.IsDeleted = false;
-                tenant.DeletedAt = null;
-                changed = true;
-            }
-
-            if (tenant.Name != options.TenantName)
-            {
-                tenant.Name = options.TenantName;
-                changed = true;
-            }
-
-            if (tenant.Description != "Portal bootstrap administration tenant")
-            {
-                tenant.Description = "Portal bootstrap administration tenant";
-                changed = true;
-            }
-
-            if (changed)
-            {
-                tenant.ModifiedAt = now;
-                dataContext.Update(tenant);
-            }
-
-            return tenant;
+            throw new InvalidOperationException("Portal bootstrap admin tenant was created but could not be loaded.");
         }
 
-        tenant = new Tenant
-        {
-            Id = PortalBootstrapConstants.AdminTenantId,
-            TenantId = PortalBootstrapConstants.AdminTenantId,
-            Name = options.TenantName,
-            Description = "Portal bootstrap administration tenant",
-            Status = 1,
-            Version = 1.0m,
-            IsEnabled = true,
-            CreatedAt = now,
-            ConcurrencyStamp = Guid.NewGuid()
-        };
-        dataContext.Add(tenant);
         return tenant;
     }
 
