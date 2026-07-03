@@ -53,6 +53,62 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task DeleteTenant_WithExistingTenant_SoftDeletesAndDisablesTenant()
+    {
+        var tenantName = $"Wrapper Delete Tenant {Guid.NewGuid():N}";
+        var create = await IntegrationTestFixture.ServiceWrapper.CreateTenant(new CreateTenantRequest
+        {
+            Name = tenantName,
+            Description = "Created for direct delete wrapper coverage",
+            Version = 1.0m,
+            Status = 1,
+            ParentTenantId = IntegrationTestFixture.TestTenantId,
+            Metadata = CreateMetadata()
+        });
+
+        create.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var lookupDb = CreateDbContext();
+        var tenantId = await lookupDb.Set<Tenant>()
+            .IgnoreQueryFilters()
+            .Where(t => t.Name == tenantName)
+            .Select(t => t.Id)
+            .FirstAsync();
+
+        var result = await IntegrationTestFixture.ServiceWrapper.DeleteTenant(new DeleteTenantRequest
+        {
+            TenantId = tenantId,
+            Metadata = CreateMetadata()
+        });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        result.IsSuccess.Should().BeTrue();
+
+        await using var db = CreateDbContext();
+        var tenant = await db.Set<Tenant>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+        tenant.Should().NotBeNull();
+        tenant!.IsDeleted.Should().BeTrue();
+        tenant.IsEnabled.Should().BeFalse();
+        tenant.DeletedAt.Should().NotBeNull();
+    }
+
+    [Test]
+    public async Task DeleteTenant_WithUnknownTenant_ReturnsNotFound()
+    {
+        var result = await IntegrationTestFixture.ServiceWrapper.DeleteTenant(new DeleteTenantRequest
+        {
+            TenantId = Guid.NewGuid(),
+            Metadata = CreateMetadata()
+        });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.NotFound);
+        result.IsSuccess.Should().BeFalse();
+    }
+
+    [Test]
     public async Task CreateCredential_WithValidData_HashesPasswordAndCreatesCredential()
     {
         var info = await SeedIdentityInfo();

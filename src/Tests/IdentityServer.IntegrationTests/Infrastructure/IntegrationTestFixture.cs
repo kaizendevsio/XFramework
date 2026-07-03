@@ -23,8 +23,10 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Extensions;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Extensions;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Security;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.IntegrationTests;
@@ -46,6 +48,8 @@ public class IntegrationTestFixture
     public static string TestClientUrl => XFramework.TestInfrastructure.TestConstants.Ports.IdentityTestClient;
 
     public static IServiceProvider Services => _identityServerApp.Services;
+    private const string TestServiceClientId = "TestClient";
+    private const string TestServiceClientSecret = "IdentityServerIntegrationTestSecret-2026";
 
     /// <summary>
     /// Service wrapper that calls IdentityServer through the actual Bolt transport.
@@ -146,7 +150,7 @@ public class IntegrationTestFixture
         builder.WebHost.UseUrls(IdentityServerUrl);
 
         // Override configuration first — installers read config at registration time
-        OverrideConfiguration(builder, "IdentityServer", Guid.NewGuid().ToString(), IdentityServerUrl);
+        OverrideConfiguration(builder, XFrameworkServiceNames.IdentityServer, Guid.NewGuid().ToString(), IdentityServerUrl);
         builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
         // Register services that the installers normally provide, except WrapperInstaller
@@ -171,6 +175,8 @@ public class IntegrationTestFixture
         builder.Services.AddCommunicationsWrapperServices();
         builder.Services.AddScoped<IStorageServiceWrapper, TestStorageServiceWrapper>();
         builder.Services.AddScoped<IAuthService, AuthService>();
+        builder.Services.AddScoped<IServiceIdentityService, ServiceIdentityService>();
+        builder.Services.AddSingleton<IIdentitySigningKeyProvider, IdentityServerLocalSigningKeyProvider>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
 
@@ -213,6 +219,8 @@ public class IntegrationTestFixture
             ["BoltConfiguration:ClientName"] = "TestClient",
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
+            ["ServiceIdentity:ClientId"] = TestServiceClientId,
+            ["ServiceIdentity:ClientSecret"] = TestServiceClientSecret,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Kestrel:Endpoints:Http:Url"] = TestClientUrl,
             ["urls"] = TestClientUrl,
@@ -312,6 +320,8 @@ public class IntegrationTestFixture
             ["DefaultDatabaseConnection"] = ConnectionString,
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
+            ["ServiceIdentity:Clients:0:ClientId"] = TestServiceClientId,
+            ["ServiceIdentity:Clients:0:ClientSecret"] = TestServiceClientSecret,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Kestrel:Endpoints:Http:Url"] = serverUrl,
             ["urls"] = serverUrl,

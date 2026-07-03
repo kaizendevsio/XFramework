@@ -349,25 +349,10 @@ else
 
         try
         {
-            var fresh = await DataContext.Query<Tenant>()
-                .IgnoreQueryFilters()
-                .Where(x => x.Id == _deletingTenant.Id)
-                .FirstOrDefaultAsync();
-
-            if (fresh is null)
+            var result = await IdentityServer.DeleteTenant(new DeleteTenantRequest
             {
-                ToastService.Warning("Tenant was not found.", "Tenant unavailable");
-                _deleteDialogOpen = false;
-                return;
-            }
-
-            fresh.IsDeleted = true;
-            fresh.IsEnabled = false;
-            fresh.DeletedAt = DateTime.UtcNow;
-            fresh.ModifiedAt = DateTime.UtcNow;
-
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+                TenantId = _deletingTenant.Id
+            });
 
             if (result.IsSuccess)
             {

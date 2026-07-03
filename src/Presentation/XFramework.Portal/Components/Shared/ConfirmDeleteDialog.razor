@@ -1,5 +1,3 @@
-@inject DialogService DialogService
-
 <BbAlertDialog Open="@Open" OpenChanged="@OpenChanged">
     <BbAlertDialogContent>
         <BbAlertDialogHeader>
@@ -16,8 +14,12 @@
             </BbAlertDialogDescription>
         </BbAlertDialogHeader>
         <BbAlertDialogFooter>
-            <BbAlertDialogCancel>Cancel</BbAlertDialogCancel>
-            <BbAlertDialogAction OnClick="@OnConfirm">Delete</BbAlertDialogAction>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" OnClick="@Confirm">Delete</BbButton>
+            </BbAlertDialogAction>
         </BbAlertDialogFooter>
     </BbAlertDialogContent>
 </BbAlertDialog>
@@ -27,4 +29,9 @@
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
     [Parameter] public string? Message { get; set; }
     [Parameter] public EventCallback OnConfirm { get; set; }
+
+    private async Task Confirm()
+    {
+        await OnConfirm.InvokeAsync();
+    }
 }
