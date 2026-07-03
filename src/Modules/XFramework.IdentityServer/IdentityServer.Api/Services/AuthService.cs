@@ -136,6 +136,54 @@ public sealed class AuthService : IAuthService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<Result> DeleteTenantAsync(
+        DeleteTenantRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            if (request.TenantId == Guid.Empty)
+            {
+                return Result.Failure("Tenant identifier is required", 400);
+            }
+
+            if (request.Metadata?.TenantId == request.TenantId)
+            {
+                return Result.Forbidden("The active tenant cannot be deleted");
+            }
+
+            var tenant = await _dataContext.Query<Tenant>()
+                .IgnoreQueryFilters()
+                .Where(x => x.Id == request.TenantId)
+                .FirstOrDefaultAsync(ct);
+
+            if (tenant is null || tenant.IsDeleted)
+            {
+                return Result.NotFound("Tenant not found");
+            }
+
+            tenant.IsEnabled = false;
+
+            _dataContext.Remove(tenant);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+            {
+                _logger.OperationFailed("DeleteTenant", "Tenant", tenant.Id, saveResult.Message ?? string.Empty, null);
+                return Result.Failure("Tenant could not be deleted", saveResult.StatusCode);
+            }
+
+            _logger.EntityUpdated("Tenant", tenant.Id);
+
+            return Result.Success("Tenant deleted");
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("DeleteTenant", "Tenant", request.TenantId, ex.Message, ex);
+            return Result.Failure("Tenant could not be deleted", 500);
+        }
+    }
+
     #endregion
 
     #region Credential Management

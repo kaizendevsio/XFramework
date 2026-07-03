@@ -174,7 +174,11 @@ public sealed class IdentityServerPortalContractTests
         tenants.Should().Contain("[Inject] private IIdentityServerServiceWrapper IdentityServer");
         tenants.Should().Contain("new CreateTenantRequest");
         tenants.Should().Contain("IdentityServer.CreateTenant(request)");
+        tenants.Should().Contain("new DeleteTenantRequest");
+        tenants.Should().Contain("IdentityServer.DeleteTenant(new DeleteTenantRequest");
         tenants.Should().NotContain("DataContext.Add(tenant)");
+        tenants.Should().NotContain("DataContext.Update(");
+        tenants.Should().NotContain("SaveChangesAsync(");
         tenants.Should().NotContain("TenantId = tenantId");
         userDetail.Should().NotContain("BCrypt.Net.BCrypt.HashPassword");
         userDetail.Should().NotContain("DataContext.Add(credential)");
@@ -249,6 +253,24 @@ public sealed class IdentityServerPortalContractTests
         source.Should().Contain("ToastService.Success(");
         source.Should().Contain("ToastService.Error(");
         source.Should().Contain("ToastService.Warning(");
+    }
+
+    [Test]
+    public void SharedConfirmDeleteDialog_UsesSupportedBlueprintAlertDialogComposition()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal",
+            "Components",
+            "Shared",
+            "ConfirmDeleteDialog.razor"));
+
+        source.Should().Contain("<BbAlertDialogAction>");
+        source.Should().Contain("Variant=\"ButtonVariant.Destructive\"");
+        source.Should().NotContain("<BbAlertDialogAction OnClick=");
     }
 
     [Test]

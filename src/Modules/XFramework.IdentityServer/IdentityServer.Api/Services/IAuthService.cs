@@ -19,6 +19,16 @@ public interface IAuthService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Soft-deletes a tenant through the IdentityServer admin workflow.
+    /// </summary>
+    /// <param name="request">Tenant deletion request</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Result indicating whether the tenant was deleted</returns>
+    Task<Result> DeleteTenantAsync(
+        DeleteTenantRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Creates a new identity credential with BCrypt password hashing (workFactor 11).
     /// </summary>
     /// <param name="request">The credential creation request containing username, password, and identity info</param>
