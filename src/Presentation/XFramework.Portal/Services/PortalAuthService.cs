@@ -32,12 +32,7 @@ public sealed class PortalAuthService(
         var options = new PortalAuthOptions();
         configuration.GetSection(PortalAuthOptions.BootstrapAdminSectionName).Bind(options);
 
-        var tenant = await dataContext.Query<Tenant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => !x.IsDeleted)
-            .Where(x => x.Name == options.TenantName)
-            .FirstOrDefaultAsync(ct);
+        var tenant = await FindBootstrapTenantAsync(options, ct);
 
         if (tenant is null)
         {
@@ -139,6 +134,30 @@ public sealed class PortalAuthService(
 
     private static bool IsSuperUserRole(Guid roleTypeId) =>
         roleTypeId == PortalBootstrapConstants.AdminRoleTypeId;
+
+    private async Task<Tenant?> FindBootstrapTenantAsync(PortalAuthOptions options, CancellationToken ct)
+    {
+        var tenant = await dataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => !x.IsDeleted)
+            .Where(x => x.Id == PortalBootstrapConstants.AdminTenantId)
+            .FirstOrDefaultAsync(ct);
+
+        if (tenant is not null)
+        {
+            return tenant;
+        }
+
+        var lookupNames = PortalBootstrapConstants.BuildAdminTenantLookupNames(options.TenantName);
+        return await dataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => !x.IsDeleted)
+            .Where(x => lookupNames.Contains(x.Name))
+            .OrderBy(x => x.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+    }
 }
 
 public sealed record PortalLoginResult(bool IsSuccess, string? Error, ClaimsPrincipal? Principal)
