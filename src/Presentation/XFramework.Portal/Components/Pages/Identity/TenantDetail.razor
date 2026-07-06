@@ -405,35 +405,40 @@ else
             <BbTabsContent Value="role-types" Class="xf-fade-in">
                 <BbCard>
                     <BbCardContent>
-                        @if (_detailRoleTypes.Count == 0)
-                        {
-                            <BbAlert Variant="AlertVariant.Info">No role types found for this tenant.</BbAlert>
-                        }
-                        else
-                        {
-                            <BbDataGrid Items="@_detailRoleTypes" ShowPagination="true" InitialPageSize="10">
-                                <Columns>
-                                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
-                                    <BbDataGridTemplateColumn Title="Role Level">
-                                        <ChildContent Context="rt">
-                                            @(rt.RoleLevel?.ToString() ?? "N/A")
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Group">
-                                        <ChildContent Context="rt">
-                                            @(rt.Group?.Name ?? rt.GroupId.ToString()[..8])
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridTemplateColumn Title="Enabled">
-                                        <ChildContent Context="rt">
-                                            <StatusBadge Text="@(rt.IsEnabled ? "Enabled" : "Disabled")"
-                                                         Status="@(rt.IsEnabled ? "active" : "inactive")" />
-                                        </ChildContent>
-                                    </BbDataGridTemplateColumn>
-                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
-                                </Columns>
-                            </BbDataGrid>
-                        }
+                        <BbDataGrid Items="@_detailRoleTypes" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Role Level" Sortable="true" Filterable="true" FilterBy="@(rt => FormatRoleLevel(rt))">
+                                    <ChildContent Context="rt">
+                                        @FormatRoleLevel(rt)
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Group" Filterable="true" FilterBy="@(rt => GetRoleTypeGroupLabel(rt))">
+                                    <ChildContent Context="rt">
+                                        @GetRoleTypeGroupLabel(rt)
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Enabled" Filterable="true" FilterBy="@(rt => FormatBoolean(rt.IsEnabled))">
+                                    <ChildContent Context="rt">
+                                        <StatusBadge Text="@(rt.IsEnabled ? "Enabled" : "Disabled")"
+                                                     Status="@(rt.IsEnabled ? "active" : "inactive")" />
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="rt">
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  title="Edit role type permissions"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/identity/tenants/{Id}/role-types/{rt.Id}"))">
+                                            <LucideIcon Name="shield-check" class="h-4 w-4" />
+                                        </BbButton>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                            <EmptyTemplate>
+                                <BbEmpty Title="No role types" Description="No role types are configured for this tenant." />
+                            </EmptyTemplate>
+                        </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
             </BbTabsContent>
@@ -1483,6 +1488,9 @@ else
 
     private static string FormatBoolean(bool value) => value ? "Yes" : "No";
     private static string FormatDateTime(DateTime value) => value == default ? "N/A" : value.ToString("g");
+    private static string FormatRoleLevel(IdentityRoleType roleType) => roleType.RoleLevel?.ToString() ?? "N/A";
+    private static string GetRoleTypeGroupLabel(IdentityRoleType roleType) =>
+        roleType.Group?.Name ?? roleType.GroupId.ToString()[..8];
 
     private sealed class ModuleFeatureTreeNode(ModuleFeatureRow row, IReadOnlyList<ModuleFeatureTreeNode> children)
     {

@@ -2,6 +2,7 @@ using System.Text;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
@@ -35,6 +36,8 @@ public sealed class PortalBootstrapSeeder(
         {
             throw new InvalidOperationException($"Bootstrap admin seed failed: {result.Message}");
         }
+
+        await EnsureAdminAuthorization(tenant.Id, roleType.Id, ct);
 
         logger.LogInformation(
             "Portal bootstrap admin ensured for tenant {TenantId} and credential {CredentialId}.",
@@ -360,6 +363,51 @@ public sealed class PortalBootstrapSeeder(
             ConcurrencyStamp = Guid.NewGuid()
         });
     }
+
+    private async Task EnsureAdminAuthorization(Guid tenantId, Guid roleTypeId, CancellationToken ct)
+    {
+        var policyResult = await identityServer.UpdateTenantAuthorizationPolicy(new UpdateTenantAuthorizationPolicyRequest
+        {
+            TenantId = tenantId,
+            MissingPermissionBehavior = MissingPermissionBehavior.Deny,
+            Metadata = BuildMetadata(tenantId)
+        });
+
+        if (!policyResult.IsSuccess)
+        {
+            throw new InvalidOperationException($"Bootstrap admin authorization policy could not be saved: {policyResult.Message}");
+        }
+
+        var permissionResult = await identityServer.SetRoleTypePermissions(new SetRoleTypePermissionsRequest
+        {
+            RoleTypeId = roleTypeId,
+            Permissions = BuildAdminPermissions(),
+            Metadata = BuildMetadata(tenantId)
+        });
+
+        if (!permissionResult.IsSuccess)
+        {
+            throw new InvalidOperationException($"Bootstrap admin permissions could not be saved: {permissionResult.Message}");
+        }
+    }
+
+    private static List<CapabilityPermissionDto> BuildAdminPermissions() =>
+        TenantModuleFeatureKeys.All
+            .SelectMany(feature => IdentityAuthorizationConstants.CapabilityKeys.Select(capability => new CapabilityPermissionDto
+            {
+                ModuleKey = feature.ModuleKey,
+                SubFeatureKey = feature.SubFeatureKey,
+                CapabilityKey = capability,
+                Effect = RoleCapabilityPermissionEffect.Allow
+            }))
+            .ToList();
+
+    private static RequestMetadata BuildMetadata(Guid tenantId) => new()
+    {
+        TenantId = tenantId,
+        Name = "Portal",
+        RequestId = Guid.NewGuid()
+    };
 
     private static byte[] HashPassword(string password) =>
         Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: password, workFactor: 11));

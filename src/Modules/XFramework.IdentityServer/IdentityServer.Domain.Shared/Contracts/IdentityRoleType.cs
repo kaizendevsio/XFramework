@@ -33,6 +33,10 @@ public partial class IdentityRoleType : BaseModel, IHasSystemReferenceId
     [MemoryPackOrder(5)]
     public virtual ICollection<IdentityRole> IdentityRoles { get; set; } = new List<IdentityRole>();
 
+    [MemoryPackOrder(6)]
+    public virtual ICollection<IdentityRoleTypeFeaturePermission> FeaturePermissions { get; set; } =
+        new List<IdentityRoleTypeFeaturePermission>();
+
     [MemoryPackOrder(200)]
     public Guid SystemReferenceId { get; set; }
 }

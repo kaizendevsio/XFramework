@@ -40,6 +40,16 @@ public static class TenantModuleFeatureKeys
     public const string Notifications = "notifications";
     public const string Attendance = "attendance";
     public const string Storage = "storage";
+    public const string Identity = "identity";
+    public const string IdentityUsers = "identity.users";
+    public const string IdentityCredentials = "identity.credentials";
+    public const string IdentityRoles = "identity.roles";
+    public const string IdentityTenants = "identity.tenants";
+    public const string IdentitySessions = "identity.sessions";
+    public const string IdentityVerifications = "identity.verifications";
+    public const string IdentityContacts = "identity.contacts";
+    public const string IdentityAddresses = "identity.addresses";
+    public const string IdentityAuthLogs = "identity.auth_logs";
 
     public const string CatalogSubFeature = "catalog";
     public const string TransfersSubFeature = "transfers";
@@ -70,6 +80,15 @@ public static class TenantModuleFeatureKeys
     public const string PosReportingSubFeature = "reporting";
     public const string ChatSubFeature = "chat";
     public const string AudioVideoSubFeature = "audio_video";
+    public const string UsersSubFeature = "users";
+    public const string CredentialsSubFeature = "credentials";
+    public const string RolesSubFeature = "roles";
+    public const string TenantsSubFeature = "tenants";
+    public const string SessionsSubFeature = "sessions";
+    public const string VerificationsSubFeature = "verifications";
+    public const string ContactsSubFeature = "contacts";
+    public const string AddressesSubFeature = "addresses";
+    public const string AuthLogsSubFeature = "auth_logs";
 
     public static IReadOnlyList<TenantModuleFeatureDefinition> All { get; } =
     [
@@ -110,7 +129,17 @@ public static class TenantModuleFeatureKeys
         new(Payments, string.Empty, "Payments", "Payment gateway and cash-in/cash-out capabilities.", "credit-card"),
         new(Notifications, string.Empty, "Notifications", "Tenant notifications and read-state workflows.", "bell"),
         new(Attendance, string.Empty, "Attendance", "Attendance contexts, sessions, participants, time events, and reports.", "calendar-check"),
-        new(Storage, string.Empty, "Storage", "Tenant file metadata, resumable uploads, signed URLs, and retention cleanup.", "hard-drive")
+        new(Storage, string.Empty, "Storage", "Tenant file metadata, resumable uploads, signed URLs, and retention cleanup.", "hard-drive"),
+        new(Identity, string.Empty, "Identity", "Identity, credential, role, tenant, session, and verification administration.", "users"),
+        new(Identity, UsersSubFeature, "Identity Users", "Identity information and user administration.", "users"),
+        new(Identity, CredentialsSubFeature, "Identity Credentials", "Credential creation, status, avatars, and credential metadata.", "key-round"),
+        new(Identity, RolesSubFeature, "Identity Roles", "Role assignment, role types, and role capability permissions.", "shield-check"),
+        new(Identity, TenantsSubFeature, "Identity Tenants", "Tenant records, hierarchy, module access, and authorization policy.", "building-2"),
+        new(Identity, SessionsSubFeature, "Identity Sessions", "Session monitoring, refresh, and termination.", "monitor"),
+        new(Identity, VerificationsSubFeature, "Identity Verifications", "Verification tokens, password reset, and approval workflows.", "badge-check"),
+        new(Identity, ContactsSubFeature, "Identity Contacts", "Credential contact records and contact grouping.", "contact"),
+        new(Identity, AddressesSubFeature, "Identity Addresses", "Identity address records and geographic lookups.", "map-pin"),
+        new(Identity, AuthLogsSubFeature, "Identity Auth Logs", "Authentication audit log review.", "scroll-text")
     ];
 
     public static (string ModuleKey, string SubFeatureKey) Normalize(string moduleKey, string? subFeatureKey = null)

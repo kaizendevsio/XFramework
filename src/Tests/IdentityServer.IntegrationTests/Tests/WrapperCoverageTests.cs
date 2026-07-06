@@ -511,6 +511,261 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         result.IsSuccess.Should().BeFalse();
     }
 
+    [Test]
+    public async Task TenantAuthorizationPolicy_WrapperCanGetAndUpdateMissingPermissionBehavior()
+    {
+        var tenantName = $"Authorization Policy Tenant {Guid.NewGuid():N}";
+        var create = await IntegrationTestFixture.ServiceWrapper.CreateTenant(new CreateTenantRequest
+        {
+            Name = tenantName,
+            Description = "Created for authorization policy wrapper coverage",
+            Version = 1.0m,
+            Status = 1,
+            ParentTenantId = IntegrationTestFixture.TestTenantId,
+            Metadata = CreateMetadata()
+        });
+        create.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var tenantId = await db.Set<Tenant>()
+            .IgnoreQueryFilters()
+            .Where(t => t.Name == tenantName)
+            .Select(t => t.Id)
+            .FirstAsync();
+
+        var initial = await IntegrationTestFixture.ServiceWrapper.GetTenantAuthorizationPolicy(new GetTenantAuthorizationPolicyRequest
+        {
+            TenantId = tenantId,
+            Metadata = CreateMetadata(tenantId)
+        });
+
+        initial.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        initial.Response.Should().NotBeNull();
+        initial.Response!.MissingPermissionBehavior.Should().Be(MissingPermissionBehavior.Deny);
+
+        var update = await IntegrationTestFixture.ServiceWrapper.UpdateTenantAuthorizationPolicy(new UpdateTenantAuthorizationPolicyRequest
+        {
+            TenantId = tenantId,
+            MissingPermissionBehavior = MissingPermissionBehavior.Allow,
+            Metadata = CreateMetadata(tenantId)
+        });
+
+        update.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        update.Response.Should().NotBeNull();
+        update.Response!.MissingPermissionBehavior.Should().Be(MissingPermissionBehavior.Allow);
+    }
+
+    [Test]
+    public async Task RoleTypePermissions_WrapperCanSetGetAndCheckCredentialCapability()
+    {
+        var roleType = await SeedRoleType("Capability Role");
+        var credential = await SeedCredentialWithRole(UniqueUsername(), "CapabilityPassword123!", roleType.Id);
+
+        var set = await IntegrationTestFixture.ServiceWrapper.SetRoleTypePermissions(new SetRoleTypePermissionsRequest
+        {
+            RoleTypeId = roleType.Id,
+            Permissions =
+            [
+                new CapabilityPermissionDto
+                {
+                    ModuleKey = TenantModuleFeatureKeys.Identity,
+                    CapabilityKey = IdentityAuthorizationConstants.View,
+                    Effect = RoleCapabilityPermissionEffect.Allow
+                }
+            ],
+            Metadata = CreateMetadata()
+        });
+
+        set.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        set.Response.Should().NotBeNull();
+        set.Response!.Permissions.Should().ContainSingle(x =>
+            x.ModuleKey == TenantModuleFeatureKeys.Identity &&
+            x.CapabilityKey == IdentityAuthorizationConstants.View &&
+            x.Effect == RoleCapabilityPermissionEffect.Allow);
+
+        var get = await IntegrationTestFixture.ServiceWrapper.GetRoleTypePermissions(new GetRoleTypePermissionsRequest
+        {
+            RoleTypeId = roleType.Id,
+            Metadata = CreateMetadata()
+        });
+
+        get.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        get.Response.Should().NotBeNull();
+        get.Response!.Permissions.Should().ContainSingle(x =>
+            x.ModuleKey == TenantModuleFeatureKeys.Identity &&
+            x.CapabilityKey == IdentityAuthorizationConstants.View);
+
+        var allowed = await IntegrationTestFixture.ServiceWrapper.CheckCredentialCapability(new CheckCredentialCapabilityRequest
+        {
+            CredentialId = credential.Id,
+            ModuleKey = TenantModuleFeatureKeys.Identity,
+            CapabilityKey = IdentityAuthorizationConstants.View,
+            Metadata = CreateMetadata()
+        });
+
+        allowed.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        allowed.Response.Should().NotBeNull();
+        allowed.Response!.IsAllowed.Should().BeTrue();
+
+        var denied = await IntegrationTestFixture.ServiceWrapper.CheckCredentialCapability(new CheckCredentialCapabilityRequest
+        {
+            CredentialId = credential.Id,
+            ModuleKey = TenantModuleFeatureKeys.Identity,
+            CapabilityKey = IdentityAuthorizationConstants.Delete,
+            Metadata = CreateMetadata()
+        });
+
+        denied.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        denied.Response.Should().NotBeNull();
+        denied.Response!.IsAllowed.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task CredentialRolePermissionOverrides_WrapperCanSetGetAndOverrideRoleTypePermissions()
+    {
+        var roleType = await SeedRoleType("Override Role");
+        var credential = await SeedCredentialWithoutRole(UniqueUsername(), "OverridePassword123!");
+
+        var assign = await IntegrationTestFixture.ServiceWrapper.AssignCredentialRole(new AssignCredentialRoleRequest
+        {
+            CredentialId = credential.Id,
+            RoleTypeId = roleType.Id,
+            RoleExpiration = DateTime.UtcNow.AddYears(1),
+            Metadata = CreateMetadata()
+        });
+        assign.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        assign.Response.Should().NotBeNull();
+
+        await IntegrationTestFixture.ServiceWrapper.SetRoleTypePermissions(new SetRoleTypePermissionsRequest
+        {
+            RoleTypeId = roleType.Id,
+            Permissions =
+            [
+                new CapabilityPermissionDto
+                {
+                    ModuleKey = TenantModuleFeatureKeys.Identity,
+                    CapabilityKey = IdentityAuthorizationConstants.View,
+                    Effect = RoleCapabilityPermissionEffect.Allow
+                }
+            ],
+            Metadata = CreateMetadata()
+        });
+
+        var setOverrides = await IntegrationTestFixture.ServiceWrapper.SetCredentialRolePermissionOverrides(
+            new SetCredentialRolePermissionOverridesRequest
+            {
+                IdentityRoleId = assign.Response!.Id,
+                Overrides =
+                [
+                    new CapabilityPermissionDto
+                    {
+                        ModuleKey = TenantModuleFeatureKeys.Identity,
+                        CapabilityKey = IdentityAuthorizationConstants.View,
+                        Effect = RoleCapabilityPermissionEffect.Deny
+                    },
+                    new CapabilityPermissionDto
+                    {
+                        ModuleKey = TenantModuleFeatureKeys.Identity,
+                        CapabilityKey = IdentityAuthorizationConstants.Delete,
+                        Effect = RoleCapabilityPermissionEffect.Allow
+                    }
+                ],
+                Metadata = CreateMetadata()
+            });
+
+        setOverrides.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        setOverrides.Response.Should().NotBeNull();
+        setOverrides.Response!.Overrides.Should().HaveCount(2);
+
+        var getOverrides = await IntegrationTestFixture.ServiceWrapper.GetCredentialRolePermissionOverrides(
+            new GetCredentialRolePermissionOverridesRequest
+            {
+                IdentityRoleId = assign.Response.Id,
+                Metadata = CreateMetadata()
+            });
+
+        getOverrides.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        getOverrides.Response.Should().NotBeNull();
+        getOverrides.Response!.Overrides.Should().Contain(x =>
+            x.CapabilityKey == IdentityAuthorizationConstants.View &&
+            x.Effect == RoleCapabilityPermissionEffect.Deny);
+
+        var deniedView = await IntegrationTestFixture.ServiceWrapper.CheckCredentialCapability(new CheckCredentialCapabilityRequest
+        {
+            CredentialId = credential.Id,
+            ModuleKey = TenantModuleFeatureKeys.Identity,
+            CapabilityKey = IdentityAuthorizationConstants.View,
+            Metadata = CreateMetadata()
+        });
+        deniedView.Response!.IsAllowed.Should().BeFalse();
+
+        var allowedDelete = await IntegrationTestFixture.ServiceWrapper.CheckCredentialCapability(new CheckCredentialCapabilityRequest
+        {
+            CredentialId = credential.Id,
+            ModuleKey = TenantModuleFeatureKeys.Identity,
+            CapabilityKey = IdentityAuthorizationConstants.Delete,
+            Metadata = CreateMetadata()
+        });
+        allowedDelete.Response!.IsAllowed.Should().BeTrue();
+    }
+
+    [Test]
+    public async Task AssignAndRemoveCredentialRole_WrapperMutatesRoleThroughAuthorizationApi()
+    {
+        var roleType = await SeedRoleType("Assignable Role");
+        var credential = await SeedCredentialWithoutRole(UniqueUsername(), "AssignPassword123!");
+
+        var assign = await IntegrationTestFixture.ServiceWrapper.AssignCredentialRole(new AssignCredentialRoleRequest
+        {
+            CredentialId = credential.Id,
+            RoleTypeId = roleType.Id,
+            RoleExpiration = DateTime.UtcNow.AddMonths(6),
+            Metadata = CreateMetadata()
+        });
+
+        assign.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        assign.Response.Should().NotBeNull();
+        assign.Response!.CredentialId.Should().Be(credential.Id);
+        assign.Response.TypeId.Should().Be(roleType.Id);
+
+        var remove = await IntegrationTestFixture.ServiceWrapper.RemoveCredentialRole(new RemoveCredentialRoleRequest
+        {
+            IdentityRoleId = assign.Response.Id,
+            Metadata = CreateMetadata()
+        });
+
+        remove.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        remove.IsSuccess.Should().BeTrue();
+
+        await using var db = CreateDbContext();
+        var savedRole = await db.Set<IdentityRole>()
+            .IgnoreQueryFilters()
+            .FirstAsync(x => x.Id == assign.Response.Id);
+
+        savedRole.IsDeleted.Should().BeTrue();
+        savedRole.IsEnabled.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task GetEffectiveCredentialCapabilities_WrapperReturnsResolvedCapabilities()
+    {
+        var credential = await SeedCredentialWithRole(UniqueUsername(), "EffectivePassword123!");
+
+        var result = await IntegrationTestFixture.ServiceWrapper.GetEffectiveCredentialCapabilities(
+            new GetEffectiveCredentialCapabilitiesRequest
+            {
+                CredentialId = credential.Id,
+                Metadata = CreateMetadata()
+            });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        result.Response.Should().NotBeNull();
+        result.Response!.Capabilities.Should().Contain(x =>
+            x.ModuleKey == TenantModuleFeatureKeys.Identity &&
+            x.CapabilityKey == IdentityAuthorizationConstants.View &&
+            x.IsAllowed);
+    }
+
     private async Task<QueryResponse<AuthenticateIdentityResponse>> AuthenticateThroughWrapper()
     {
         var username = UniqueUsername();
@@ -554,7 +809,26 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         return info;
     }
 
-    private async Task<IdentityCredential> SeedCredentialWithRole(string username, string password)
+    private async Task<IdentityCredential> SeedCredentialWithRole(string username, string password, Guid? roleTypeId = null)
+    {
+        var credential = await SeedCredentialWithoutRole(username, password);
+
+        await using var db = CreateDbContext();
+        var role = new IdentityRole
+        {
+            Id = Guid.NewGuid(),
+            CredentialId = credential.Id,
+            TypeId = roleTypeId ?? TestData.RoleTypeId,
+            RoleExpiration = DateTime.UtcNow.AddYears(1),
+            TenantId = IntegrationTestFixture.TestTenantId
+        };
+        db.Set<IdentityRole>().Add(role);
+
+        await db.SaveChangesAsync();
+        return credential;
+    }
+
+    private async Task<IdentityCredential> SeedCredentialWithoutRole(string username, string password)
     {
         await using var db = CreateDbContext();
 
@@ -579,17 +853,26 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         };
         db.Set<IdentityCredential>().Add(credential);
 
-        var role = new IdentityRole
-        {
-            Id = Guid.NewGuid(),
-            CredentialId = credential.Id,
-            TypeId = TestData.RoleTypeId,
-            TenantId = IntegrationTestFixture.TestTenantId
-        };
-        db.Set<IdentityRole>().Add(role);
-
         await db.SaveChangesAsync();
         return credential;
+    }
+
+    private async Task<IdentityRoleType> SeedRoleType(string namePrefix)
+    {
+        await using var db = CreateDbContext();
+        var roleType = new IdentityRoleType
+        {
+            Id = Guid.NewGuid(),
+            TenantId = IntegrationTestFixture.TestTenantId,
+            Name = $"{namePrefix} {Guid.NewGuid():N}",
+            GroupId = XFramework.TestInfrastructure.TestConstants.RoleGroupId,
+            RoleLevel = 10,
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.Set<IdentityRoleType>().Add(roleType);
+        await db.SaveChangesAsync();
+        return roleType;
     }
 
     private async Task<string> SeedPendingPasswordResetVerification(Guid credentialId)

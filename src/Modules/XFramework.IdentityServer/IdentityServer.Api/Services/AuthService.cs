@@ -101,6 +101,7 @@ public sealed class AuthService : IAuthService
             }
 
             var tenantId = Guid.NewGuid();
+            var now = DateTime.UtcNow;
             var tenant = new Tenant
             {
                 Id = tenantId,
@@ -112,12 +113,39 @@ public sealed class AuthService : IAuthService
                 Expiration = request.Expiration,
                 AvailabilityDate = request.AvailabilityDate,
                 ParentTenantId = request.ParentTenantId,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = now,
                 IsEnabled = true,
                 ConcurrencyStamp = Guid.NewGuid()
             };
 
             _dataContext.Add(tenant);
+            _dataContext.Add(new TenantAuthorizationPolicy
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                MissingPermissionBehavior = MissingPermissionBehavior.Deny,
+                CreatedAt = now,
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
+            });
+
+            foreach (var feature in TenantModuleFeatureKeys.All
+                         .Where(x => string.Equals(x.ModuleKey, TenantModuleFeatureKeys.Identity, StringComparison.OrdinalIgnoreCase)))
+            {
+                _dataContext.Add(new TenantModuleFeature
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    ModuleKey = feature.ModuleKey,
+                    SubFeatureKey = feature.SubFeatureKey,
+                    DisplayName = feature.DisplayName,
+                    Description = feature.Description,
+                    CreatedAt = now,
+                    IsEnabled = true,
+                    ConcurrencyStamp = Guid.NewGuid()
+                });
+            }
+
             var saveResult = await _dataContext.SaveChangesAsync(ct);
             if (!saveResult.IsSuccess)
             {
@@ -1503,10 +1531,14 @@ public sealed class AuthService : IAuthService
         IdentityCredential credential,
         CancellationToken ct)
     {
+        var now = DateTime.UtcNow;
         var roleList = await _dataContext.Query<IdentityRole>()
             .IgnoreQueryFilters()
             .Include(i => i.Type)
+            .Where(i => i.TenantId == credential.TenantId)
             .Where(i => i.CredentialId == credential.Id)
+            .Where(i => !i.IsDeleted && i.IsEnabled)
+            .Where(i => i.RoleExpiration >= now)
             .ToListAsync(ct);
 
         return roleList.Any() ? roleList : null;

@@ -168,6 +168,11 @@ public sealed class IdentityServerPortalContractTests
         userDetail.Should().Contain("IdentityServer.Logout(new LogoutRequest");
         userDetail.Should().Contain("IdentityServer.UploadCredentialAvatar(new UploadCredentialAvatarRequest");
         userDetail.Should().Contain("IdentityServer.RemoveCredentialAvatar(new RemoveCredentialAvatarRequest");
+        userDetail.Should().Contain("IdentityServer.AssignCredentialRole(new AssignCredentialRoleRequest");
+        userDetail.Should().Contain("IdentityServer.RemoveCredentialRole(new RemoveCredentialRoleRequest");
+        userDetail.Should().Contain("IdentityServer.GetCredentialRolePermissionOverrides(new GetCredentialRolePermissionOverridesRequest");
+        userDetail.Should().Contain("IdentityServer.SetCredentialRolePermissionOverrides(new SetCredentialRolePermissionOverridesRequest");
+        userDetail.Should().Contain("title=\"Edit role permission overrides\"");
         credentials.Should().Contain("[Inject] private IIdentityServerServiceWrapper IdentityServer");
         credentials.Should().Contain("IdentityServer.UploadCredentialAvatar(new UploadCredentialAvatarRequest");
         credentials.Should().Contain("IdentityServer.RemoveCredentialAvatar(new RemoveCredentialAvatarRequest");
@@ -182,8 +187,190 @@ public sealed class IdentityServerPortalContractTests
         tenants.Should().NotContain("TenantId = tenantId");
         userDetail.Should().NotContain("BCrypt.Net.BCrypt.HashPassword");
         userDetail.Should().NotContain("DataContext.Add(credential)");
+        userDetail.Should().NotContain("DataContext.Add(role)");
+        userDetail.Should().NotContain("DataContext.Update(_removingRole)");
+        userDetail.Should().NotContain("DataContext.Remove(_removingRole)");
         userDetail.Should().NotContain("DataContext.Update(session)");
         userDetail.Should().NotContain("fresh.Status = CurrentSessionState.Inactive");
+    }
+
+    [Test]
+    public void IdentityServerRoleCapabilities_UseSharedWrapperBackedPermissionSurfaces()
+    {
+        var pagesRoot = GetIdentityPagesRoot();
+        var tenantDetail = File.ReadAllText(Path.Combine(pagesRoot, "TenantDetail.razor"));
+        var roleTypeDetail = File.ReadAllText(Path.Combine(pagesRoot, "RoleTypeDetail.razor"));
+        var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+
+        tenantDetail.Should().Contain("/identity/tenants/{Id}/role-types/{rt.Id}");
+        tenantDetail.Should().Contain("title=\"Edit role type permissions\"");
+        tenantDetail.Should().Contain("<BbDataGrid Items=\"@_detailRoleTypes\" ShowPagination=\"true\" InitialPageSize=\"10\">");
+        tenantDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Role Level\" Sortable=\"true\" Filterable=\"true\" FilterBy=\"@(rt => FormatRoleLevel(rt))\">");
+        tenantDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Group\" Filterable=\"true\" FilterBy=\"@(rt => GetRoleTypeGroupLabel(rt))\">");
+        tenantDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Enabled\" Filterable=\"true\" FilterBy=\"@(rt => FormatBoolean(rt.IsEnabled))\">");
+        tenantDetail.Should().Contain("<EmptyTemplate>");
+        tenantDetail.Should().Contain("<BbEmpty Title=\"No role types\"");
+
+        roleTypeDetail.Should().Contain("@page \"/identity/tenants/{TenantId:guid}/role-types/{RoleTypeId:guid}\"");
+        roleTypeDetail.Should().Contain("<BbTreeView TItem=\"PermissionFeatureTreeNode\"");
+        roleTypeDetail.Should().Contain("IdentityServer.GetTenantAuthorizationPolicy(new GetTenantAuthorizationPolicyRequest");
+        roleTypeDetail.Should().Contain("IdentityServer.UpdateTenantAuthorizationPolicy(new UpdateTenantAuthorizationPolicyRequest");
+        roleTypeDetail.Should().Contain("IdentityServer.GetRoleTypePermissions(new GetRoleTypePermissionsRequest");
+        roleTypeDetail.Should().Contain("IdentityServer.SetRoleTypePermissions(new SetRoleTypePermissionsRequest");
+        roleTypeDetail.Should().Contain("IdentityAuthorizationConstants.CapabilityKeys");
+        roleTypeDetail.Should().Contain("MissingPermissionBehavior.Allow");
+        roleTypeDetail.Should().Contain("MissingPermissionBehavior.Deny");
+        roleTypeDetail.Should().Contain("_permissionsLoaded");
+        roleTypeDetail.Should().Contain("title=\"Back to role types\"");
+        roleTypeDetail.Should().Contain(".Where(x => !x.IsDeleted && x.IsEnabled)");
+        roleTypeDetail.Should().NotContain("_roleType is null || !_permissionsLoaded");
+        roleTypeDetail.Should().NotContain("DataContext.Add(");
+        roleTypeDetail.Should().NotContain("DataContext.Update(");
+        roleTypeDetail.Should().NotContain("DataContext.Remove(");
+        roleTypeDetail.Should().NotContain("SaveChangesAsync(");
+
+        userDetail.Should().Contain("Role Permission Overrides");
+        userDetail.Should().Contain("IdentityServer.GetCredentialRolePermissionOverrides(new GetCredentialRolePermissionOverridesRequest");
+        userDetail.Should().Contain("IdentityServer.SetCredentialRolePermissionOverrides(new SetCredentialRolePermissionOverridesRequest");
+        userDetail.Should().Contain("IdentityAuthorizationConstants.CapabilityKeys");
+        userDetail.Should().Contain("RoleCapabilityPermissionEffect.Allow");
+        userDetail.Should().Contain("RoleCapabilityPermissionEffect.Deny");
+        userDetail.Should().Contain("_rolePermissionOverridesLoaded");
+        userDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Level\" Sortable=\"true\" Filterable=\"true\" FilterBy=\"@(role => GetRoleLevelFilter(role))\">");
+        userDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Expiration\" Sortable=\"true\" Filterable=\"true\" FilterBy=\"@(role => GetRoleExpirationFilter(role))\">");
+        userDetail.Should().Contain("title=\"Remove assigned role\"");
+        userDetail.Should().Contain("<BbFormFieldDatePicker @bind-Value=\"_roleForm.ExpirationDate\" Label=\"Expiration Date\" />");
+        userDetail.Should().NotContain("type=\"datetime-local\"");
+    }
+
+    [Test]
+    public void IdentityServerAuthorizationBackend_RequiresEndpointAndServiceLevelAuthorization()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var authorizationRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Features",
+            "Authorization");
+        var endpointFiles = Directory.EnumerateFiles(authorizationRoot, "Endpoint.cs", SearchOption.AllDirectories)
+            .ToArray();
+
+        endpointFiles.Should().NotBeEmpty();
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(endpointFile);
+            source.Should().Contain(
+                "RequireAuthorization = true",
+                $"{Path.GetFileName(Path.GetDirectoryName(endpointFile))} must require HTTP authorization");
+            source.Should().Contain("[BoltHandler]");
+            source.Should().Contain("HandleHttp(");
+            source.Should().Contain("HttpContext httpContext");
+            source.Should().Contain("IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);");
+        }
+
+        var endpointMetadata = File.ReadAllText(Path.Combine(
+            authorizationRoot,
+            "Shared",
+            "IdentityAuthorizationEndpointMetadata.cs"));
+        endpointMetadata.Should().Contain("metadata.TenantId = ResolveGuidClaim(httpContext.User");
+        endpointMetadata.Should().Contain("metadata.CredentialId = ResolveGuidClaim(");
+        endpointMetadata.Should().Contain("metadata.ServiceAccessToken = null");
+
+        var serviceSource = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Services",
+            "IdentityAuthorizationService.cs"));
+
+        serviceSource.Should().Contain("ITrustedServiceInvocationResolver trustedServiceInvocationResolver");
+        serviceSource.Should().Contain("IHttpContextAccessor httpContextAccessor");
+        serviceSource.Should().Contain("EnsureCallerCapabilityAsync(");
+        serviceSource.Should().Contain("EnsureCanInspectCredentialCapabilitiesAsync(");
+        serviceSource.Should().Contain("TryResolveAuthenticatedHttpCredential(");
+        serviceSource.Should().Contain("httpContextAccessor.HttpContext?.User");
+        serviceSource.Should().Contain("XFrameworkServiceNames.IdentityServer");
+        serviceSource.Should().Contain("XFrameworkServiceScopes.IdentityAdmin");
+        serviceSource.Should().Contain("metadata.TenantId.Value == targetTenantId");
+        serviceSource.Should().Contain("new CapabilityDecision(false, \"NoActiveRole\")");
+        serviceSource.Should().Contain("RequiresTenantFeature(moduleKey, subFeatureKey)");
+        serviceSource.Should().NotContain("IsCoreIdentityFeature(");
+
+        var authServiceSource = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Services",
+            "AuthService.cs"));
+        authServiceSource.Should().Contain("TenantModuleFeatureKeys.All");
+        authServiceSource.Should().Contain("TenantModuleFeatureKeys.Identity");
+        authServiceSource.Should().Contain("new TenantModuleFeature");
+    }
+
+    [Test]
+    public void IdentityServerAuthorizationRoutes_UseCorrectFeatureGatesAndDisableGeneratedRoleWrites()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var routes = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Infrastructure",
+            "IdentityServerFeatureGateRoutes.cs"));
+        var identityRole = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Domain.Shared",
+            "Contracts",
+            "IdentityRole.cs"));
+
+        var tenantPolicyRouteIndex = routes.IndexOf(
+            "TenantModuleFeatureKeys.IdentityTenants, \"/api/identity/authorization/tenant-policy\"",
+            StringComparison.Ordinal);
+        var authorizationRouteIndex = routes.IndexOf(
+            "TenantModuleFeatureKeys.IdentityRoles, \"/api/identity/authorization\"",
+            StringComparison.Ordinal);
+
+        tenantPolicyRouteIndex.Should().BeGreaterThanOrEqualTo(0);
+        authorizationRouteIndex.Should().BeGreaterThanOrEqualTo(0);
+        tenantPolicyRouteIndex.Should().BeLessThan(authorizationRouteIndex);
+
+        identityRole.Should().Contain("Actions = EndpointActions.Get | EndpointActions.GetList");
+        identityRole.Should().NotContain("EndpointActions.Create");
+        identityRole.Should().NotContain("EndpointActions.Delete");
+    }
+
+    [Test]
+    public void IdentityServerRoleCapabilityMigration_BackfillsAdminPermissions()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var migration = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Kernel",
+            "XFramework.Domain",
+            "Migrations",
+            "20260705084341_AddIdentityRoleCapabilities.cs"));
+
+        migration.Should().Contain("\"Identity\".\"TenantAuthorizationPolicy\"");
+        migration.Should().Contain("\"Identity\".\"TenantModuleFeature\"");
+        migration.Should().Contain("\"Identity\".\"IdentityRoleTypeFeaturePermission\"");
+        migration.Should().Contain("('identity', 'roles', 'Identity Roles'");
+        migration.Should().Contain("('identity', 'tenants', 'Identity Tenants'");
+        migration.Should().Contain("role_type.\"SystemReferenceId\" = '6e7b6bf5-6ad6-49fb-80b0-38e967fc35f3'");
+        migration.Should().Contain("('identity', 'roles')");
+        migration.Should().Contain("VALUES ('view'), ('create'), ('update'), ('delete'), ('manage')");
     }
 
     [Test]

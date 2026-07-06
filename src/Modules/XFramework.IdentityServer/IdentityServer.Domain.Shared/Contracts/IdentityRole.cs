@@ -6,7 +6,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Both,
-    Actions = EndpointActions.Create | EndpointActions.Get | EndpointActions.GetList | EndpointActions.Delete,
+    Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-roles",
     RequireAuthorization = true,
     CacheDurationSeconds = 300,
@@ -29,6 +29,10 @@ public partial class IdentityRole : BaseModel
 
     [MemoryPackOrder(5)]
     public virtual IdentityCredential Credential { get; set; } = null!;
+
+    [MemoryPackOrder(6)]
+    public virtual ICollection<IdentityRoleFeaturePermissionOverride> PermissionOverrides { get; set; } =
+        new List<IdentityRoleFeaturePermissionOverride>();
 }
 
 public class CreateIdentityRoleRequest

@@ -35,6 +35,18 @@ public static class TestSeedData
                 Description = "Shared integration test tenant"
             });
         }
+
+        if (!await db.Set<IdentityContracts.TenantAuthorizationPolicy>().AnyAsync(p => p.TenantId == TestConstants.TenantId))
+        {
+            db.Set<IdentityContracts.TenantAuthorizationPolicy>().Add(new IdentityContracts.TenantAuthorizationPolicy
+            {
+                Id = Guid.NewGuid(),
+                TenantId = TestConstants.TenantId,
+                MissingPermissionBehavior = IdentityContracts.MissingPermissionBehavior.Deny,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
     }
 
     private static async Task SeedIdentityRoles(AppDbContext db)
@@ -59,6 +71,37 @@ public static class TestSeedData
                 GroupId = TestConstants.RoleGroupId,
                 TenantId = TestConstants.TenantId
             });
+        }
+
+        foreach (var feature in IdentityContracts.TenantModuleFeatureKeys.All)
+        {
+            foreach (var capability in IdentityContracts.IdentityAuthorizationConstants.CapabilityKeys)
+            {
+                var exists = await db.Set<IdentityContracts.IdentityRoleTypeFeaturePermission>()
+                    .IgnoreQueryFilters()
+                    .AnyAsync(permission =>
+                        permission.TenantId == TestConstants.TenantId &&
+                        permission.RoleTypeId == TestConstants.RoleTypeId &&
+                        permission.ModuleKey == feature.ModuleKey &&
+                        permission.SubFeatureKey == feature.SubFeatureKey &&
+                        permission.CapabilityKey == capability);
+
+                if (exists)
+                    continue;
+
+                db.Set<IdentityContracts.IdentityRoleTypeFeaturePermission>().Add(new IdentityContracts.IdentityRoleTypeFeaturePermission
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = TestConstants.TenantId,
+                    RoleTypeId = TestConstants.RoleTypeId,
+                    ModuleKey = feature.ModuleKey,
+                    SubFeatureKey = feature.SubFeatureKey,
+                    CapabilityKey = capability,
+                    Effect = IdentityContracts.RoleCapabilityPermissionEffect.Allow,
+                    IsEnabled = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
         }
     }
 

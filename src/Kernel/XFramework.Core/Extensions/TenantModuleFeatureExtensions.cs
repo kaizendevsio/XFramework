@@ -15,6 +15,7 @@ public static class TenantModuleFeatureExtensions
         services.AddTenantModuleFeatureDefinitions();
         services.AddMemoryCache();
         services.TryAddScoped<ITenantModuleFeatureService, TenantModuleFeatureService>();
+        services.TryAddScoped<ITenantCredentialCapabilityService, TenantCredentialCapabilityService>();
 
         return services;
     }
@@ -27,6 +28,7 @@ public static class TenantModuleFeatureExtensions
         services.AddTenantModuleFeatureDefinitions(configuration);
         services.AddMemoryCache();
         services.TryAddScoped<ITenantModuleFeatureService, TenantModuleFeatureService>();
+        services.TryAddScoped<ITenantCredentialCapabilityService, TenantCredentialCapabilityService>();
 
         return services;
     }
