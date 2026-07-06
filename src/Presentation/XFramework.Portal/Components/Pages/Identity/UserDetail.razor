@@ -787,7 +787,7 @@ else
 
 <!-- Credential Role Permission Overrides Dialog -->
 <BbDialog Open="@_rolePermissionDialogOpen" OpenChanged="@CloseRolePermissionsDialog">
-    <BbDialogContent TrapFocus="false">
+    <BbDialogContent TrapFocus="false" Class="identity-role-permissions-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Role Permission Overrides</BbDialogTitle>
             <BbDialogDescription>
@@ -801,7 +801,7 @@ else
         }
         else
         {
-            <div class="grid max-h-[65vh] gap-4 overflow-y-auto py-4 pr-2">
+            <div class="identity-role-permissions-dialog-body">
                 @foreach (var moduleGroup in PermissionFeatureGroups)
                 {
                     <section class="grid gap-3">
