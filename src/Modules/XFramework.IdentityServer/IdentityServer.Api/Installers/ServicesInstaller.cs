@@ -15,5 +15,6 @@ public class ServicesInstaller : IInstaller
 
         // Register AuthService for VSA pattern
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IIdentityAuthorizationService, IdentityAuthorizationService>();
     }
 }

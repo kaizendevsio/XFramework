@@ -1,0 +1,515 @@
+@page "/identity/tenants/{TenantId:guid}/role-types/{RoleTypeId:guid}"
+
+<PageTitle>Role Type Permissions - Portal</PageTitle>
+
+@if (!_accessChecked)
+{
+    <CenteredSpinner />
+}
+else if (!_canManageTenants)
+{
+    <BbAlert Variant="AlertVariant.Danger">
+        <BbAlertTitle>Tenant Management Restricted</BbAlertTitle>
+        <BbAlertDescription>Only super users can manage tenant role permissions.</BbAlertDescription>
+    </BbAlert>
+}
+else if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (_roleType is null)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@BackToTenantRoles">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Role Types
+        </BbButton>
+        <BbAlert Variant="AlertVariant.Danger">
+            <BbAlertTitle>Role Type Not Found</BbAlertTitle>
+            <BbAlertDescription>No role type found for this tenant.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="xf-page-header">
+                <div class="flex items-center gap-4">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" title="Back to role types" OnClick="@BackToTenantRoles">
+                        <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                    </BbButton>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <BbTypographyH3>@(_roleType.Name ?? "Unnamed Role Type")</BbTypographyH3>
+                            <StatusBadge Text="@(_roleType.IsEnabled ? "Enabled" : "Disabled")"
+                                         Status="@(_roleType.IsEnabled ? "active" : "inactive")" />
+                        </div>
+                        <BbTypographyMuted>
+                            @(_roleType.Group?.Name ?? "No group") - Level @(_roleType.RoleLevel?.ToString() ?? "N/A")
+                        </BbTypographyMuted>
+                    </div>
+                </div>
+                <div class="xf-page-actions">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ReloadPermissions" Disabled="@_saving">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Reload
+                    </BbButton>
+                    <BbButton OnClick="@SaveRoleTypePermissions" Disabled="@(_saving || !_permissionsLoaded)">
+                        <LucideIcon Name="save" class="mr-2 h-4 w-4" />
+                        @(_saving ? "Saving..." : "Save")
+                    </BbButton>
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Tenant Permission Default</BbCardTitle>
+                    <BbCardDescription>Choose how this tenant handles capabilities with no explicit role permission.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="xf-detail-field-grid">
+                        <BbFormFieldSelect TValue="string"
+                                           Value="@_missingPermissionBehaviorValue"
+                                           ValueChanged="@((string value) => _missingPermissionBehaviorValue = value)"
+                                           Label="Missing Permission Behavior">
+                            <BbSelectItem Value="@MissingPermissionDeny">Deny</BbSelectItem>
+                            <BbSelectItem Value="@MissingPermissionAllow">Allow</BbSelectItem>
+                        </BbFormFieldSelect>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            @if (!_permissionsLoaded)
+            {
+                <BbAlert Variant="AlertVariant.Danger">
+                    <BbAlertTitle>Permissions Not Loaded</BbAlertTitle>
+                    <BbAlertDescription>Reload permissions before making changes.</BbAlertDescription>
+                </BbAlert>
+            }
+
+            <div class="tenant-modules-grid">
+                <BbCard class="tenant-modules-tree-card">
+                    <BbCardHeader>
+                        <BbCardTitle>Feature Tree</BbCardTitle>
+                        <BbCardDescription>Select a module feature to configure CRUD capabilities.</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbTreeView TItem="PermissionFeatureTreeNode"
+                                    ShowIcons="true"
+                                    ShowLines="true"
+                                    ShowSearch="true"
+                                    SearchPlaceholder="Search features..."
+                                    ExpandOnClick="true"
+                                    SelectionMode="TreeSelectionMode.Single"
+                                    SelectedValue="@_selectedFeatureKey"
+                                    SelectedValueChanged="@OnFeatureSelected"
+                                    ExpandedValues="@_expandedFeatureKeys"
+                                    ExpandedValuesChanged="@OnFeatureTreeExpandedValuesChanged"
+                                    AriaLabel="Role type permission feature tree"
+                                    Class="tenant-module-tree">
+                            @foreach (var node in _permissionTreeNodes)
+                            {
+                                <BbTreeItem Value="@node.Feature.Key"
+                                            Label="@node.Feature.DisplayName"
+                                            Icon="@node.Feature.IconName"
+                                            Badge="@GetPermissionBadge(node.Feature)"
+                                            Class="@GetPermissionTreeItemClass(node.Feature)">
+                                    <LabelTemplate>
+                                        <div class="tenant-module-tree-label">
+                                            <span class="tenant-module-tree-label-main">@node.Feature.DisplayName</span>
+                                            <span class="tenant-module-tree-label-sub">@node.Feature.Description</span>
+                                        </div>
+                                    </LabelTemplate>
+                                    <ChildContent>
+                                        @foreach (var childNode in node.Children)
+                                        {
+                                            <BbTreeItem Value="@childNode.Feature.Key"
+                                                        Label="@childNode.Feature.DisplayName"
+                                                        Icon="@childNode.Feature.IconName"
+                                                        Badge="@GetPermissionBadge(childNode.Feature)"
+                                                        IsLeaf="true"
+                                                        Class="@GetPermissionTreeItemClass(childNode.Feature)">
+                                                <LabelTemplate>
+                                                    <div class="tenant-module-tree-label tenant-module-tree-label-child">
+                                                        <span class="tenant-module-tree-label-main">@childNode.Feature.DisplayName</span>
+                                                        <span class="tenant-module-tree-label-sub">@childNode.Feature.Description</span>
+                                                    </div>
+                                                </LabelTemplate>
+                                            </BbTreeItem>
+                                        }
+                                    </ChildContent>
+                                </BbTreeItem>
+                            }
+                        </BbTreeView>
+                    </BbCardContent>
+                </BbCard>
+
+                <BbCard class="tenant-module-preview-card">
+                    <BbCardHeader>
+                        <BbCardTitle>@(SelectedFeature?.DisplayName ?? "Select a Feature")</BbCardTitle>
+                        <BbCardDescription>
+                            @(SelectedFeature?.Description ?? "Use the feature tree to inspect role permissions.")
+                        </BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        @if (SelectedFeature is null)
+                        {
+                            <BbEmpty Title="No feature selected" Description="Select a module or sub-feature to configure permissions." />
+                        }
+                        else
+                        {
+                            <div class="grid gap-3 md:grid-cols-5">
+                                @foreach (var capability in PermissionCapabilities)
+                                {
+                                    <BbFormFieldSelect TValue="string"
+                                                       Label="@FormatCapabilityLabel(capability)"
+                                                       Value="@GetPermissionValue(SelectedFeature, capability)"
+                                                       ValueChanged="@((string value) => SetPermissionValue(SelectedFeature, capability, value))">
+                                        <BbSelectItem Value="@PermissionDefault">Tenant default</BbSelectItem>
+                                        <BbSelectItem Value="@PermissionAllow">Allow</BbSelectItem>
+                                        <BbSelectItem Value="@PermissionDeny">Deny</BbSelectItem>
+                                    </BbFormFieldSelect>
+                                }
+                            </div>
+                        }
+                    </BbCardContent>
+                </BbCard>
+            </div>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid TenantId { get; set; }
+    [Parameter] public Guid RoleTypeId { get; set; }
+
+    [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityServer { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private IdentityRoleType? _roleType;
+    private bool _accessChecked;
+    private bool _canManageTenants;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _permissionsLoaded;
+    private string _selectedFeatureKey = TenantModuleFeatureKeys.Identity;
+    private HashSet<string> _expandedFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
+    private List<PermissionFeatureTreeNode> _permissionTreeNodes = [];
+    private Dictionary<string, string> _permissionValues = new(StringComparer.OrdinalIgnoreCase);
+    private string _missingPermissionBehaviorValue = MissingPermissionDeny;
+
+    private const string PermissionDefault = "default";
+    private const string PermissionAllow = "allow";
+    private const string PermissionDeny = "deny";
+    private const string MissingPermissionAllow = "allow";
+    private const string MissingPermissionDeny = "deny";
+    private static readonly IReadOnlyList<string> PermissionCapabilities = IdentityAuthorizationConstants.CapabilityKeys;
+
+    private TenantModuleFeatureDefinition? SelectedFeature =>
+        TenantModuleFeatureKeys.Find(_selectedFeatureKey);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await ResolveAccess();
+        if (!_canManageTenants)
+        {
+            return;
+        }
+
+        await LoadRoleType();
+    }
+
+    private async Task ResolveAccess()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            _accessChecked = true;
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        _canManageTenants = PortalAccess.CanManageTenants(authState.User);
+        _accessChecked = true;
+    }
+
+    private async Task LoadRoleType()
+    {
+        _loading = true;
+        try
+        {
+            _permissionsLoaded = false;
+            _permissionTreeNodes = BuildPermissionTree();
+            _expandedFeatureKeys = _permissionTreeNodes
+                .Select(x => x.Feature.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _selectedFeatureKey = TenantModuleFeatureKeys.Identity;
+
+            _roleType = await DataContext.Query<IdentityRoleType>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Group)
+                .Where(x => x.Id == RoleTypeId && x.TenantId == TenantId)
+                .Where(x => !x.IsDeleted && x.IsEnabled)
+                .FirstOrDefaultAsync();
+
+            if (_roleType is null)
+            {
+                _permissionValues = [];
+                return;
+            }
+
+            await LoadPermissions();
+        }
+        catch
+        {
+            ToastService.Error("Role type permissions could not be loaded.", "Permissions failed");
+            _roleType = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadPermissions()
+    {
+        _permissionsLoaded = false;
+        _permissionValues = BuildEmptyPermissionValueMap();
+
+        var policyResult = await IdentityServer.GetTenantAuthorizationPolicy(new GetTenantAuthorizationPolicyRequest
+        {
+            TenantId = TenantId,
+            Metadata = CreateMetadata(TenantId)
+        });
+
+        if (policyResult.IsSuccess && policyResult.Response is not null)
+        {
+            _missingPermissionBehaviorValue = policyResult.Response.MissingPermissionBehavior == MissingPermissionBehavior.Allow
+                ? MissingPermissionAllow
+                : MissingPermissionDeny;
+        }
+        else
+        {
+            ToastService.Error("Tenant permission default could not be loaded.", "Permissions failed");
+            return;
+        }
+
+        var permissionsResult = await IdentityServer.GetRoleTypePermissions(new GetRoleTypePermissionsRequest
+        {
+            RoleTypeId = RoleTypeId,
+            Metadata = CreateMetadata(TenantId)
+        });
+
+        if (!permissionsResult.IsSuccess || permissionsResult.Response is null)
+        {
+            ToastService.Error("Role type permissions could not be loaded.", "Permissions failed");
+            return;
+        }
+
+        foreach (var permission in permissionsResult.Response.Permissions)
+        {
+            _permissionValues[BuildPermissionKey(permission.ModuleKey, permission.SubFeatureKey, permission.CapabilityKey)] =
+                permission.Effect == RoleCapabilityPermissionEffect.Allow ? PermissionAllow : PermissionDeny;
+        }
+
+        _permissionsLoaded = true;
+    }
+
+    private async Task ReloadPermissions()
+    {
+        if (_roleType is null)
+        {
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            await LoadPermissions();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveRoleTypePermissions()
+    {
+        if (_roleType is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var policyResult = await IdentityServer.UpdateTenantAuthorizationPolicy(new UpdateTenantAuthorizationPolicyRequest
+            {
+                TenantId = TenantId,
+                MissingPermissionBehavior = _missingPermissionBehaviorValue == MissingPermissionAllow
+                    ? MissingPermissionBehavior.Allow
+                    : MissingPermissionBehavior.Deny,
+                Metadata = CreateMetadata(TenantId)
+            });
+
+            if (!policyResult.IsSuccess)
+            {
+                ToastService.Error("Tenant permission default could not be saved.", "Permissions failed");
+                return;
+            }
+
+            var permissionsResult = await IdentityServer.SetRoleTypePermissions(new SetRoleTypePermissionsRequest
+            {
+                RoleTypeId = RoleTypeId,
+                Permissions = BuildRoleTypePermissions(),
+                Metadata = CreateMetadata(TenantId)
+            });
+
+            if (permissionsResult.IsSuccess)
+            {
+                ToastService.Success("Role type permissions saved.", "Permissions saved");
+            }
+            else
+            {
+                ToastService.Error("Role type permissions could not be saved.", "Permissions failed");
+            }
+        }
+        catch
+        {
+            ToastService.Error("Role type permissions could not be saved.", "Permissions failed");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private List<CapabilityPermissionDto> BuildRoleTypePermissions()
+    {
+        var permissions = new List<CapabilityPermissionDto>();
+        foreach (var feature in TenantModuleFeatureKeys.All)
+        {
+            foreach (var capability in PermissionCapabilities)
+            {
+                var value = GetPermissionValue(feature, capability);
+                if (value == PermissionDefault)
+                {
+                    continue;
+                }
+
+                permissions.Add(new CapabilityPermissionDto
+                {
+                    ModuleKey = feature.ModuleKey,
+                    SubFeatureKey = feature.SubFeatureKey,
+                    CapabilityKey = capability,
+                    Effect = value == PermissionAllow
+                        ? RoleCapabilityPermissionEffect.Allow
+                        : RoleCapabilityPermissionEffect.Deny
+                });
+            }
+        }
+
+        return permissions;
+    }
+
+    private static List<PermissionFeatureTreeNode> BuildPermissionTree()
+    {
+        var roots = TenantModuleFeatureKeys.All
+            .Where(x => string.IsNullOrWhiteSpace(x.SubFeatureKey))
+            .Select(root => new PermissionFeatureTreeNode(
+                root,
+                TenantModuleFeatureKeys.All
+                    .Where(child => string.Equals(child.ModuleKey, root.ModuleKey, StringComparison.OrdinalIgnoreCase)
+                                    && !string.IsNullOrWhiteSpace(child.SubFeatureKey))
+                    .Select(child => new PermissionFeatureTreeNode(child, []))
+                    .ToList()))
+            .ToList();
+
+        return roots;
+    }
+
+    private static Dictionary<string, string> BuildEmptyPermissionValueMap()
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var feature in TenantModuleFeatureKeys.All)
+        {
+            foreach (var capability in PermissionCapabilities)
+            {
+                values[BuildPermissionKey(feature, capability)] = PermissionDefault;
+            }
+        }
+
+        return values;
+    }
+
+    private string GetPermissionValue(TenantModuleFeatureDefinition feature, string capability) =>
+        _permissionValues.TryGetValue(BuildPermissionKey(feature, capability), out var value)
+            ? value
+            : PermissionDefault;
+
+    private void SetPermissionValue(TenantModuleFeatureDefinition feature, string capability, string value)
+    {
+        _permissionValues[BuildPermissionKey(feature, capability)] =
+            value == PermissionAllow || value == PermissionDeny ? value : PermissionDefault;
+    }
+
+    private string GetPermissionBadge(TenantModuleFeatureDefinition feature)
+    {
+        var explicitCount = PermissionCapabilities.Count(capability =>
+            GetPermissionValue(feature, capability) is var value
+            && (value == PermissionAllow || value == PermissionDeny));
+
+        return explicitCount == 0 ? "Tenant default" : $"{explicitCount} explicit";
+    }
+
+    private string GetPermissionTreeItemClass(TenantModuleFeatureDefinition feature) =>
+        string.Equals(feature.Key, _selectedFeatureKey, StringComparison.OrdinalIgnoreCase)
+            ? "tenant-module-tree-item-selected"
+            : string.Empty;
+
+    private Task OnFeatureSelected(string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            _selectedFeatureKey = value;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task OnFeatureTreeExpandedValuesChanged(HashSet<string> values)
+    {
+        _expandedFeatureKeys = new HashSet<string>(values, StringComparer.OrdinalIgnoreCase);
+        return Task.CompletedTask;
+    }
+
+    private void BackToTenantRoles() =>
+        Navigation.NavigateTo($"/identity/tenants/{TenantId}/role-types");
+
+    private static string BuildPermissionKey(TenantModuleFeatureDefinition feature, string capability) =>
+        BuildPermissionKey(feature.ModuleKey, feature.SubFeatureKey, capability);
+
+    private static string BuildPermissionKey(string moduleKey, string? subFeatureKey, string capability) =>
+        $"{moduleKey}|{subFeatureKey ?? string.Empty}|{capability}";
+
+    private static string FormatCapabilityLabel(string capability) =>
+        CultureInfo.CurrentCulture.TextInfo.ToTitleCase(capability.Replace('_', ' '));
+
+    private static RequestMetadata CreateMetadata(Guid tenantId) => new()
+    {
+        TenantId = tenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "Portal",
+        DeviceName = "Portal",
+        DeviceAgent = "Portal",
+        IpAddress = "Portal"
+    };
+
+    private sealed record PermissionFeatureTreeNode(
+        TenantModuleFeatureDefinition Feature,
+        IReadOnlyList<PermissionFeatureTreeNode> Children);
+}

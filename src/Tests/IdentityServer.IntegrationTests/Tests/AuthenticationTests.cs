@@ -394,6 +394,7 @@ public class AuthenticationTests : IntegrationTestBase
             Id = Guid.NewGuid(),
             CredentialId = credential.Id,
             TypeId = TestData.RoleTypeId,
+            RoleExpiration = DateTime.UtcNow.AddYears(1),
             TenantId = IntegrationTestFixture.TestTenantId
         };
         db.Set<IdentityRole>().Add(role);

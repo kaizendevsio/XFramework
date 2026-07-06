@@ -1,6 +1,7 @@
 using FluentValidation;
 using IdentityServer.Api.Features.Verification.Confirm;
 using IdentityServer.Api.Generated;
+using IdentityServer.Api.Infrastructure;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -14,6 +15,7 @@ builder.Logging.AddXFrameworkLogging(builder.Configuration);
 
 // Register AuthService
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IIdentityAuthorizationService, IdentityAuthorizationService>();
 builder.Services.AddScoped<IServiceIdentityService, ServiceIdentityService>();
 builder.Services.AddSingleton<IIdentitySigningKeyProvider, IdentityServerLocalSigningKeyProvider>();
 
@@ -43,6 +45,7 @@ var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
+app.UseTenantModuleFeatureGate(IdentityServerFeatureGateRoutes.Configure);
 app.EnsureDatabase<DbContext>();
 // Bolt handlers are now source-generated from [BoltHandler] on endpoint methods.
 // Generated IBoltHandler implementations are auto-registered by

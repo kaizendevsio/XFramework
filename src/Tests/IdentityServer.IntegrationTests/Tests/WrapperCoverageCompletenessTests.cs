@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using XFramework.TestInfrastructure;
 
 namespace IdentityServer.IntegrationTests.Tests;
@@ -31,9 +32,12 @@ public sealed class WrapperCoverageCompletenessTests
         var requestContracts = Directory
             .EnumerateFiles(requestsRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => File.ReadAllText(path).Contains("IBoltRequest", StringComparison.Ordinal))
-            .Select(path => Path.GetFileNameWithoutExtension(path))
-            .Where(name => name.EndsWith("Request", StringComparison.Ordinal))
+            .SelectMany(path => Regex.Matches(
+                    File.ReadAllText(path),
+                    @"\b(?:class|record|struct)\s+(?<name>[A-Za-z0-9_]+Request)\b")
+                .Select(match => match.Groups["name"].Value))
             .Select(name => name[..^"Request".Length])
+            .Distinct(StringComparer.Ordinal)
             .OrderBy(name => name)
             .ToArray();
 

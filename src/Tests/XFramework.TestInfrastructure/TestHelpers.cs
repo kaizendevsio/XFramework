@@ -78,6 +78,7 @@ public static class TestHelpers
             Id = Guid.NewGuid(),
             CredentialId = credential.Id,
             TypeId = TestConstants.RoleTypeId,
+            RoleExpiration = DateTime.UtcNow.AddYears(1),
             TenantId = TestConstants.TenantId
         };
         db.Set<IdentityRole>().Add(role);

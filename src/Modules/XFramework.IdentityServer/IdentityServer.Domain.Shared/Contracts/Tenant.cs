@@ -54,6 +54,9 @@ public partial class Tenant : BaseModel
     public virtual ICollection<TenantModuleFeature> TenantModuleFeatures { get; set; } =
         new List<TenantModuleFeature>();
 
+    [MemoryPackOrder(12)]
+    public virtual TenantAuthorizationPolicy? AuthorizationPolicy { get; set; }
+
 }
 
 public class GetTenantListRequest

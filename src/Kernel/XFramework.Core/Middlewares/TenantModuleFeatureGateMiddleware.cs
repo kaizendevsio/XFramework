@@ -2,6 +2,7 @@ using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.FeatureGates;
 
@@ -15,6 +16,7 @@ public sealed class TenantModuleFeatureGateMiddleware(
     public async Task InvokeAsync(
         HttpContext context,
         ITenantModuleFeatureService featureService,
+        ITenantCredentialCapabilityService capabilityService,
         IConfiguration configuration)
     {
         var rule = options.Rules
@@ -54,6 +56,43 @@ public sealed class TenantModuleFeatureGateMiddleware(
 
             await WriteResult(context, result);
             return;
+        }
+
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            var credentialId = ResolveCredentialIdFromClaims(context);
+            if (credentialId is null || credentialId == Guid.Empty)
+            {
+                await WriteResult(
+                    context,
+                    Result.Forbidden("Capability gate requires a credential context."));
+                return;
+            }
+
+            var capability = ResolveCapabilityKey(context.Request);
+            var capabilityResult = await capabilityService.EnsureAllowedAsync(
+                tenantId.Value,
+                credentialId.Value,
+                rule.ModuleKey,
+                rule.SubFeatureKey,
+                capability,
+                context.RequestAborted);
+
+            if (!capabilityResult.IsSuccess)
+            {
+                logger.LogWarning(
+                    "Tenant credential capability gate denied request {Method} {Path} for tenant {TenantId}, credential {CredentialId}, feature {FeatureKey}, capability {CapabilityKey}: {Message}",
+                    context.Request.Method,
+                    context.Request.Path,
+                    tenantId,
+                    credentialId,
+                    TenantModuleFeatureKeys.Combine(rule.ModuleKey, rule.SubFeatureKey),
+                    capability,
+                    capabilityResult.Message);
+
+                await WriteResult(context, capabilityResult);
+                return;
+            }
         }
 
         await next(context);
@@ -101,6 +140,65 @@ public sealed class TenantModuleFeatureGateMiddleware(
         }
 
         return null;
+    }
+
+    private static Guid? ResolveCredentialIdFromClaims(HttpContext context)
+    {
+        foreach (var claimName in new[] { "credentialId", "credential_id", ClaimTypes.NameIdentifier, "sub" })
+        {
+            var claimValue = context.User.FindFirst(claimName)?.Value;
+            if (Guid.TryParse(claimValue, out var credentialId))
+                return credentialId;
+        }
+
+        return null;
+    }
+
+    private static string ResolveCapabilityKey(HttpRequest request)
+    {
+        var method = request.Method;
+        if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method))
+            return IdentityAuthorizationConstants.View;
+
+        if (HttpMethods.IsDelete(method))
+            return IdentityAuthorizationConstants.Delete;
+
+        if (HttpMethods.IsPut(method) || HttpMethods.IsPatch(method))
+            return IdentityAuthorizationConstants.Update;
+
+        if (HttpMethods.IsPost(method))
+        {
+            var path = request.Path.Value ?? string.Empty;
+            if (path.Contains("/query", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/search", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/get", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/reports", StringComparison.OrdinalIgnoreCase))
+            {
+                return IdentityAuthorizationConstants.View;
+            }
+
+            if (path.Contains("/delete", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/remove", StringComparison.OrdinalIgnoreCase))
+            {
+                return IdentityAuthorizationConstants.Delete;
+            }
+
+            if (path.Contains("/update", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/patch", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/replace", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/set", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/approve", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/reject", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/settle", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/cancel", StringComparison.OrdinalIgnoreCase))
+            {
+                return IdentityAuthorizationConstants.Update;
+            }
+
+            return IdentityAuthorizationConstants.Create;
+        }
+
+        return IdentityAuthorizationConstants.Manage;
     }
 
     private static async Task WriteResult(HttpContext context, Result result)
