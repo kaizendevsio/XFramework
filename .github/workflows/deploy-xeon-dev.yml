@@ -50,7 +50,18 @@ jobs:
       DB_PASSWORD: compose-validation-placeholder
       JWT_SECRET: compose-validation-placeholder
       BOLT_SIGNATURE: compose-validation-placeholder
-      SERVICE_IDENTITY_DEVELOPMENT_SECRET: compose-validation-placeholder
+      IDENTITYSERVER_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      BOLT_HUB_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      COMMUNICATIONS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      NOTIFICATIONS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      STORAGE_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      ATTENDANCE_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      SMSGATEWAY_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      WALLETS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      INVENTARIO_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      POS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      PORTAL_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_TRUSTED_METADATA_SECRET: compose-validation-placeholder
 
     steps:
@@ -90,6 +101,54 @@ jobs:
         run: |
           set -euo pipefail
           docker compose -f "$COMPOSE_FILE_PATH" config >/tmp/xframework-compose.yml
+
+      - name: Ensure xeon-dev service identity secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_vars=(
+            IDENTITYSERVER_SERVICE_IDENTITY_SECRET
+            BOLT_HUB_SERVICE_IDENTITY_SECRET
+            COMMUNICATIONS_SERVICE_IDENTITY_SECRET
+            NOTIFICATIONS_SERVICE_IDENTITY_SECRET
+            STORAGE_SERVICE_IDENTITY_SECRET
+            ATTENDANCE_SERVICE_IDENTITY_SECRET
+            SMSGATEWAY_SERVICE_IDENTITY_SECRET
+            WALLETS_SERVICE_IDENTITY_SECRET
+            INVENTARIO_SERVICE_IDENTITY_SECRET
+            POS_SERVICE_IDENTITY_SECRET
+            PORTAL_SERVICE_IDENTITY_SECRET
+            OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET
+          )
+
+          quoted_vars="$(printf '%q ' "${required_vars[@]}")"
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' bash -s -- $quoted_vars" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+
+          env_file="$XFRAMEWORK_ENV_FILE"
+          test -f "$env_file"
+
+          tmp_file="$(mktemp)"
+          trap 'rm -f "$tmp_file"' EXIT
+
+          grep -v '^SERVICE_IDENTITY_DEVELOPMENT_SECRET=' "$env_file" > "$tmp_file" || true
+
+          changed=0
+          for variable_name in "$@"; do
+            if ! grep -q "^${variable_name}=" "$tmp_file"; then
+              secret_value="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
+              printf '%s=%s\n' "$variable_name" "$secret_value" >> "$tmp_file"
+              changed=1
+            fi
+          done
+
+          if [ "$changed" -eq 1 ] || grep -q '^SERVICE_IDENTITY_DEVELOPMENT_SECRET=' "$env_file"; then
+            install -m 600 "$tmp_file" "$env_file"
+          fi
+          REMOTE_SCRIPT
 
       - name: Login to dev registry
         shell: bash
