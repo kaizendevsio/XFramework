@@ -828,6 +828,19 @@
     max-width: min(74rem, calc(100vw - 2rem));
 }
 
+.identity-role-permissions-dialog {
+    width: min(52rem, calc(100vw - 2rem));
+    max-width: min(52rem, calc(100vw - 2rem));
+}
+
+.identity-role-permissions-dialog-body {
+    display: grid;
+    gap: 1rem;
+    overflow-y: auto;
+    max-height: min(62vh, 34rem);
+    padding: 1rem 0.5rem 1rem 0;
+}
+
 .xf-entity-picker-advanced-hint {
     color: var(--muted-foreground);
     font-size: 0.8125rem;

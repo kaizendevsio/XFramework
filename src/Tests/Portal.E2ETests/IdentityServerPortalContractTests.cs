@@ -236,6 +236,9 @@ public sealed class IdentityServerPortalContractTests
         userDetail.Should().Contain("RoleCapabilityPermissionEffect.Allow");
         userDetail.Should().Contain("RoleCapabilityPermissionEffect.Deny");
         userDetail.Should().Contain("_rolePermissionOverridesLoaded");
+        userDetail.Should().Contain("<BbDialogContent TrapFocus=\"false\" Class=\"identity-role-permissions-dialog\">");
+        userDetail.Should().Contain("<div class=\"identity-role-permissions-dialog-body\">");
+        userDetail.Should().NotContain("max-h-[65vh]");
         userDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Level\" Sortable=\"true\" Filterable=\"true\" FilterBy=\"@(role => GetRoleLevelFilter(role))\">");
         userDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Expiration\" Sortable=\"true\" Filterable=\"true\" FilterBy=\"@(role => GetRoleExpirationFilter(role))\">");
         userDetail.Should().Contain("title=\"Remove assigned role\"");
