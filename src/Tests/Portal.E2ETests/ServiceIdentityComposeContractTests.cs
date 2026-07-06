@@ -45,6 +45,16 @@ public sealed class ServiceIdentityComposeContractTests
         var repositoryRoot = FindRepositoryRoot();
         var compose = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "docker-compose.yml"));
         var envExample = File.ReadAllText(Path.Combine(repositoryRoot.FullName, ".env.example"));
+        var deployWorkflow = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            ".github",
+            "workflows",
+            "deploy-xeon-dev.yml"));
+        var serviceDeployWorkflow = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            ".github",
+            "workflows",
+            "deploy-xeon-dev-service.yml"));
         var serviceIdentityService = File.ReadAllText(Path.Combine(
             repositoryRoot.FullName,
             "src",
@@ -58,6 +68,8 @@ public sealed class ServiceIdentityComposeContractTests
         compose.Should().NotContain("ServiceIdentity__AllowDevelopmentClientSecretFallback");
         compose.Should().NotContain("SERVICE_IDENTITY_DEVELOPMENT_SECRET");
         envExample.Should().NotContain("SERVICE_IDENTITY_DEVELOPMENT_SECRET");
+        deployWorkflow.Should().NotContain("SERVICE_IDENTITY_DEVELOPMENT_SECRET: compose-validation-placeholder");
+        serviceDeployWorkflow.Should().NotContain("SERVICE_IDENTITY_DEVELOPMENT_SECRET: compose-validation-placeholder");
         serviceIdentityService.Should().NotContain("DevelopmentClientSecret");
         serviceIdentityService.Should().NotContain("AllowDevelopmentClientSecretFallback");
         serviceIdentityService.Should().NotContain("AllowsDevelopmentClientFallback");
@@ -66,6 +78,10 @@ public sealed class ServiceIdentityComposeContractTests
         {
             compose.Should().Contain($"${{{variable}:?Set {variable} in .env}}");
             envExample.Should().Contain($"{variable}=");
+            deployWorkflow.Should().Contain($"{variable}: compose-validation-placeholder");
+            serviceDeployWorkflow.Should().Contain($"{variable}: compose-validation-placeholder");
+            deployWorkflow.Should().Contain(variable);
+            serviceDeployWorkflow.Should().Contain(variable);
         }
 
         foreach (var clientId in RegisteredServiceClients)
