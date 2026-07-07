@@ -16,6 +16,9 @@ public class BoltConfiguration
     public bool SendAccessTokenAsQueryString { get; set; }
     public bool GenerateServiceAccessToken { get; set; } = true;
     public int RpcTimeoutSeconds { get; set; } = 30;
+    public int MaxFrameBytes { get; set; } = 100 * 1024 * 1024;
+    public int SendQueueCapacity { get; set; }
+    public int SendEnqueueTimeoutMs { get; set; }
     public int MaxPendingRpcCalls { get; set; } = 1000;
     public int DeadLetterQueueCapacity { get; set; } = 100_000;
     public int MaxParallelInvocationsPerClient { get; set; } = 64;

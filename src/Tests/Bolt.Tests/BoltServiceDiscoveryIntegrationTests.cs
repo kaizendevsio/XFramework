@@ -9,8 +9,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Shared.ServiceIdentity;
 
 namespace Bolt.Tests;
 
@@ -19,6 +23,7 @@ namespace Bolt.Tests;
 public sealed class BoltServiceDiscoveryIntegrationTests
 {
     private static int _portCounter = 20200;
+    private const string JuanBarangayServiceName = "XFramework.JuanBarangay";
     private WebApplication _hubApp = null!;
     private ILoggerFactory _loggerFactory = null!;
     private string _databaseName = string.Empty;
@@ -42,6 +47,24 @@ public sealed class BoltServiceDiscoveryIntegrationTests
 
         _hubApp = builder.Build();
         _hubApp.UseWebSockets();
+        _hubApp.Use(async (context, next) =>
+        {
+            var authorization = context.Request.Headers.Authorization.ToString();
+            if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                var principalToken = authorization["Bearer ".Length..].Trim();
+                if (principalToken.StartsWith("user:", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.User = CreateAuthenticatedUserPrincipal(principalToken["user:".Length..]);
+                }
+                else if (!string.IsNullOrWhiteSpace(principalToken))
+                {
+                    context.User = CreateServicePrincipal(principalToken);
+                }
+            }
+
+            await next();
+        });
         _hubApp.MapBolt("/bolt");
         _hubApp.MapGet("/health", () => "ok");
         _ = Task.Run(() => _hubApp.RunAsync());
@@ -59,7 +82,7 @@ public sealed class BoltServiceDiscoveryIntegrationTests
     [Test]
     public async Task AdvertiseServiceManifest_ThroughHubLocalHandler_PersistsSenderClientAndReturnsRegistry()
     {
-        var client = CreateClient("discovery_client", "DiscoveryService");
+        var client = CreateServiceClient(JuanBarangayServiceName);
         await client.ConnectAsync();
 
         var response = await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
@@ -81,18 +104,131 @@ public sealed class BoltServiceDiscoveryIntegrationTests
 
         using var scope = _hubApp.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DbContext>();
-        var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "discovery_client");
-        record.ClientName.Should().Be("DiscoveryService");
-        record.ServiceName.Should().Be("Juan_Barangay_Service");
+        var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == Sha256Hex(JuanBarangayServiceName));
+        record.ClientName.Should().Be(JuanBarangayServiceName);
+        record.ServiceName.Should().Be(JuanBarangayServiceName);
         record.IsConnected.Should().BeTrue();
 
         await client.DisposeAsync();
     }
 
     [Test]
+    public async Task AdvertiseServiceManifest_UnauthenticatedClient_IsRejectedAndDoesNotPersistManifestModules()
+    {
+        var client = CreateClient("portal_user", "PortalUser");
+        await client.ConnectAsync();
+
+        var response = await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.AdvertiseServiceManifest,
+            CreateJuanBarangayManifest());
+
+        response.Should().NotBeNull();
+        response!.Accepted.Should().BeFalse();
+        response.Message.Should().Contain("Authenticated service identity");
+
+        await WaitUntilAsync(async () =>
+        {
+            using var waitScope = _hubApp.Services.CreateScope();
+            var waitDb = waitScope.ServiceProvider.GetRequiredService<DbContext>();
+            return await waitDb.Set<BoltServiceManifestRecord>().AnyAsync(x => x.ClientId == "portal_user");
+        });
+
+        using var scope = _hubApp.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+        var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "portal_user");
+        record.ManifestJson.Should().NotContain("juan_barangay");
+
+        await client.DisposeAsync();
+    }
+
+    [Test]
+    public async Task AdvertiseServiceManifest_AuthenticatedUserWithoutServiceScope_IsRejectedAndDoesNotPersistManifestModules()
+    {
+        var client = CreateClient("normal_user", "NormalUser", "user:normal-user");
+        await client.ConnectAsync();
+
+        var response = await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.AdvertiseServiceManifest,
+            CreateJuanBarangayManifest());
+
+        response.Should().NotBeNull();
+        response!.Accepted.Should().BeFalse();
+        response.Message.Should().Contain("bolt.service scope");
+
+        await WaitUntilAsync(async () =>
+        {
+            using var waitScope = _hubApp.Services.CreateScope();
+            var waitDb = waitScope.ServiceProvider.GetRequiredService<DbContext>();
+            return await waitDb.Set<BoltServiceManifestRecord>().AnyAsync(x => x.ClientId == "normal_user");
+        });
+
+        using var scope = _hubApp.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+        var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "normal_user");
+        record.ManifestJson.Should().NotContain("juan_barangay");
+
+        await client.DisposeAsync();
+    }
+
+    [Test]
+    public async Task AdvertiseServiceManifest_MismatchedServiceName_IsRejectedAndDoesNotOverwriteExistingManifest()
+    {
+        var client = CreateServiceClient(JuanBarangayServiceName);
+        await client.ConnectAsync();
+
+        var accepted = await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.AdvertiseServiceManifest,
+            CreateJuanBarangayManifest());
+        accepted!.Accepted.Should().BeTrue();
+
+        var spoofed = CreateJuanBarangayManifest();
+        spoofed.ServiceName = XFrameworkServiceNames.IdentityServer;
+
+        var rejected = await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.AdvertiseServiceManifest,
+            spoofed);
+
+        rejected.Should().NotBeNull();
+        rejected!.Accepted.Should().BeFalse();
+        rejected.Message.Should().Contain("Manifest service name");
+
+        using var scope = _hubApp.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+        var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == Sha256Hex(JuanBarangayServiceName));
+        record.ServiceName.Should().Be(JuanBarangayServiceName);
+        record.ManifestJson.Should().NotContain(XFrameworkServiceNames.IdentityServer);
+
+        await client.DisposeAsync();
+    }
+
+    [Test]
+    public async Task ConnectAsync_ServiceTokenForDifferentService_RejectsRegistration()
+    {
+        var client = CreateServiceClient(
+            XFrameworkServiceNames.IdentityServer,
+            accessTokenServiceName: XFrameworkServiceNames.Wallets);
+
+        try
+        {
+            await FluentActions.Invoking(() => client.ConnectAsync())
+                .Should()
+                .ThrowAsync<InvalidOperationException>()
+                .WithMessage("*rejected registration*");
+        }
+        finally
+        {
+            await client.DisposeAsync();
+        }
+    }
+
+    [Test]
     public async Task Disconnect_AfterManifestAdvertisement_KeepsManifestAndMarksServiceOffline()
     {
-        var client = CreateClient("disconnect_client", "DisconnectService");
+        var client = CreateServiceClient(JuanBarangayServiceName);
         await client.ConnectAsync();
         await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
             string.Empty,
@@ -105,7 +241,7 @@ public sealed class BoltServiceDiscoveryIntegrationTests
         {
             using var scope = _hubApp.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DbContext>();
-            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "disconnect_client");
+            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == Sha256Hex(JuanBarangayServiceName));
             return !record.IsConnected && record.ConnectionCount == 0 && record.ManifestJson.Contains("juan_barangay");
         });
     }
@@ -204,7 +340,7 @@ public sealed class BoltServiceDiscoveryIntegrationTests
     [Test]
     public async Task Reconnect_AfterDisconnect_MarksServiceOnlineAndUpdatesLastSeen()
     {
-        var firstClient = CreateClient("reconnect_client", "ReconnectService");
+        var firstClient = CreateServiceClient(JuanBarangayServiceName);
         await firstClient.ConnectAsync();
         await firstClient.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
             string.Empty,
@@ -216,7 +352,7 @@ public sealed class BoltServiceDiscoveryIntegrationTests
         {
             using var scope = _hubApp.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DbContext>();
-            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "reconnect_client");
+            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == Sha256Hex(JuanBarangayServiceName));
             return !record.IsConnected;
         });
 
@@ -224,17 +360,17 @@ public sealed class BoltServiceDiscoveryIntegrationTests
         using (var scope = _hubApp.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DbContext>();
-            offlineSeenAt = (await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "reconnect_client")).LastSeenAt;
+            offlineSeenAt = (await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == Sha256Hex(JuanBarangayServiceName))).LastSeenAt;
         }
 
-        var secondClient = CreateClient("reconnect_client", "ReconnectService");
+        var secondClient = CreateServiceClient(JuanBarangayServiceName);
         await secondClient.ConnectAsync();
 
         await WaitUntilAsync(async () =>
         {
             using var scope = _hubApp.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DbContext>();
-            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "reconnect_client");
+            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == Sha256Hex(JuanBarangayServiceName));
             return record.IsConnected && record.ConnectionCount == 1 && record.LastSeenAt >= offlineSeenAt;
         });
 
@@ -244,7 +380,7 @@ public sealed class BoltServiceDiscoveryIntegrationTests
     [Test]
     public async Task GetModuleRegistry_RequiredMissingServiceDependency_ReturnsDegradedModuleAndFeature()
     {
-        var client = CreateClient("dependency_client", "DependencyService");
+        var client = CreateServiceClient(JuanBarangayServiceName);
         await client.ConnectAsync();
         var manifest = CreateJuanBarangayManifest();
         manifest.Modules[0].Dependencies.Add(new BoltDependencyRequirement
@@ -275,18 +411,52 @@ public sealed class BoltServiceDiscoveryIntegrationTests
         await client.DisposeAsync();
     }
 
-    private BoltClient CreateClient(string id, string name) =>
+    private BoltClient CreateServiceClient(string serviceName, string? accessTokenServiceName = null) =>
+        CreateClient(Sha256Hex(serviceName), serviceName, accessTokenServiceName ?? serviceName);
+
+    private BoltClient CreateClient(string id, string name, string? serviceIdentityName = null) =>
         new(
             new Uri($"ws://localhost:{_port}/bolt"),
             id,
             name,
-            new BoltClientOptions { RpcTimeoutSeconds = 5 },
+            new BoltClientOptions
+            {
+                RpcTimeoutSeconds = 5,
+                AccessToken = serviceIdentityName
+            },
             _loggerFactory.CreateLogger<BoltClient>());
+
+    private static ClaimsPrincipal CreateServicePrincipal(string serviceName)
+    {
+        List<Claim> claims =
+        [
+            new("client_id", serviceName),
+            new("service", serviceName),
+            new("scope", XFrameworkServiceScopes.BoltService),
+            new(ClaimTypes.Name, serviceName)
+        ];
+
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, "TestService"));
+    }
+
+    private static ClaimsPrincipal CreateAuthenticatedUserPrincipal(string userName)
+    {
+        List<Claim> claims =
+        [
+            new(ClaimTypes.Name, userName),
+            new(ClaimTypes.NameIdentifier, userName)
+        ];
+
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, "TestUser"));
+    }
+
+    private static string Sha256Hex(string value) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private static BoltServiceManifest CreateJuanBarangayManifest() =>
         new()
         {
-            ServiceName = "Juan_Barangay_Service",
+            ServiceName = JuanBarangayServiceName,
             DisplayName = "Juan Barangay",
             Version = "1.0.0",
             Modules =

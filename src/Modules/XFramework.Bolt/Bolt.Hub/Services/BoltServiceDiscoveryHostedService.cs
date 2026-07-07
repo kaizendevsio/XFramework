@@ -12,6 +12,9 @@ public sealed class BoltServiceDiscoveryHostedService(
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        logger.LogWarning(
+            "Bolt service discovery presence is single-instance only. Do not horizontally scale Bolt Hub service discovery until instance-scoped leases are implemented.");
+
         using (var scope = scopeFactory.CreateScope())
         {
             var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();

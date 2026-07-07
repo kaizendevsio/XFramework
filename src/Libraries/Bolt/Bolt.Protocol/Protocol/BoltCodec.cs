@@ -9,8 +9,8 @@ namespace Bolt.Protocol;
 /// <summary>
 /// Zero-allocation binary codec for the thin Bolt protocol.
 ///
-/// Request frame:  [1:type] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]
-///                 = 29 bytes header + N payload
+/// Request frame:  [1:type] [16:requestId] [4:recipientHash] [4:senderHash] [4:commandHash] [4:payloadLen] [payload]
+///                 = 33 bytes header + N payload
 ///
 /// Response frame: [1:type] [16:requestId] [2:statusCode] [4:payloadLen] [payload]
 ///                 = 23 bytes header + N payload
@@ -21,6 +21,9 @@ namespace Bolt.Protocol;
 /// </summary>
 public static class BoltCodec
 {
+    public const int DefaultMaxFrameBytes = 100 * 1024 * 1024;
+    private const int DefaultMaxStringBytes = 64 * 1024;
+
     public const int RequestHeaderSize = 1 + 16 + 4 + 4 + 4 + 4;   // 33 bytes (added senderHash)
     public const int ResponseHeaderSize = 1 + 16 + 2 + 4;       // 23 bytes
 
@@ -36,9 +39,9 @@ public static class BoltCodec
     // Pub/sub header sizes (variable for Subscribe/Unsubscribe/Publish/Ack due to string fields)
     public const int PublishHeaderSize = 1 + 4 + 1 + 4 + 4;        // 14 bytes + topic + payload
     public const int EventHeaderSize = 1 + 4 + 8 + 1 + 4 + 4;      // 22 bytes + subscriberId + payload
-    // Subscribe header is variable: 1 + 4 + 1 + 4 + N + 4 + M (10 + subscriberId + topic)
-    // Unsubscribe header is variable: 1 + 4 + 4 + N + 4 + M (13 + topic + subscriberId)
-    // Ack header is variable: 1 + 4 + 4 + N + 4 + M + 8 (21 + topic + subscriberId)
+    // Subscribe header is variable: 1 + 4 + 1 + 4 + N + 4 + M + 4 + T (18 + subscriberId + topic + actorToken)
+    // Unsubscribe header is variable: 1 + 4 + 4 + N + 4 + M + 1 + 4 + T (18 + topic + subscriberId + actorToken)
+    // Ack header is variable: 1 + 4 + 4 + N + 4 + M + 8 + 4 + T (25 + topic + subscriberId + actorToken)
 
     #region Encoding
 
@@ -460,6 +463,24 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static FrameType PeekFrameType(ReadOnlySpan<byte> buffer) => (FrameType)buffer[0];
 
+    private static bool TryAddLength(int headerSize, int payloadLength, out int totalSize)
+    {
+        totalSize = 0;
+        if (payloadLength < 0 || payloadLength > DefaultMaxFrameBytes)
+            return false;
+
+        try
+        {
+            totalSize = checked(headerSize + payloadLength);
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+
+        return totalSize <= DefaultMaxFrameBytes;
+    }
+
     /// <summary>
     /// Try to read a complete request frame. Zero-copy: Payload references the source buffer.
     /// Caller must consume the payload before the buffer is reused.
@@ -472,8 +493,7 @@ public static class BoltCodec
         if (buffer.Length < RequestHeaderSize) return false;
 
         var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(29));
-        if (payloadLen < 0) return false;
-        var totalSize = RequestHeaderSize + payloadLen;
+        if (!TryAddLength(RequestHeaderSize, payloadLen, out var totalSize)) return false;
         if (buffer.Length < totalSize) return false;
 
         frame = new RequestFrame
@@ -502,8 +522,7 @@ public static class BoltCodec
         if (buffer.Length < RequestHeaderSize) return false;
 
         var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(29));
-        if (payloadLen < 0) return false;
-        totalSize = RequestHeaderSize + payloadLen;
+        if (!TryAddLength(RequestHeaderSize, payloadLen, out totalSize)) return false;
         if (buffer.Length < totalSize) return false;
 
         requestId = ReadGuid(buffer.Slice(1));
@@ -523,8 +542,7 @@ public static class BoltCodec
         if (buffer.Length < ResponseHeaderSize) return false;
 
         var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(19));
-        if (payloadLen < 0) return false;
-        totalSize = ResponseHeaderSize + payloadLen;
+        if (!TryAddLength(ResponseHeaderSize, payloadLen, out totalSize)) return false;
         if (buffer.Length < totalSize) return false;
 
         requestId = ReadGuid(buffer.Slice(1));
@@ -542,8 +560,7 @@ public static class BoltCodec
         if (buffer.Length < ResponseHeaderSize) return false;
 
         var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(19));
-        if (payloadLen < 0) return false;
-        var totalSize = ResponseHeaderSize + payloadLen;
+        if (!TryAddLength(ResponseHeaderSize, payloadLen, out var totalSize)) return false;
         if (buffer.Length < totalSize) return false;
 
         frame = new ResponseFrame
@@ -569,11 +586,12 @@ public static class BoltCodec
         if (buffer.Length < 9) return false; // 1 + 4 + at least 4
 
         var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(1));
-        if (idLen < 0 || buffer.Length < 9 + idLen) return false;
+        if (idLen < 0 || idLen > DefaultMaxStringBytes) return false;
+        if (!TryAddLength(9, idLen, out var minimumRegisterSize) || buffer.Length < minimumRegisterSize) return false;
 
         var nameLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(5 + idLen));
-        if (nameLen < 0) return false;
-        var totalSize = 9 + idLen + nameLen;
+        if (nameLen < 0 || nameLen > DefaultMaxStringBytes) return false;
+        if (!TryAddLength(9 + idLen, nameLen, out var totalSize)) return false;
         if (buffer.Length < totalSize) return false;
 
         clientId = Encoding.UTF8.GetString(buffer.Slice(5, idLen));
@@ -615,9 +633,8 @@ public static class BoltCodec
 
         streamId = ReadGuid(buffer.Slice(1));
         payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(17));
-        if (payloadLength < 0) return false;
+        if (!TryAddLength(StreamDataHeaderSize, payloadLength, out totalSize)) return false;
         payloadOffset = StreamDataHeaderSize;
-        totalSize = StreamDataHeaderSize + payloadLength;
         return buffer.Length >= totalSize;
     }
 
@@ -652,7 +669,7 @@ public static class BoltCodec
         if (buffer.Length < MediaFrameHeaderSize) return false;
 
         var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(26));
-        if (payloadLength < 0 || buffer.Length < MediaFrameHeaderSize + payloadLength) return false;
+        if (!TryAddLength(MediaFrameHeaderSize, payloadLength, out var totalSize) || buffer.Length < totalSize) return false;
 
         header = new MediaFrameHeader
         {
@@ -683,7 +700,7 @@ public static class BoltCodec
         if (buffer.Length < MediaConfigHeaderSize) return false;
 
         var extensionLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(48));
-        if (extensionLength < 0 || buffer.Length < MediaConfigHeaderSize + extensionLength) return false;
+        if (!TryAddLength(MediaConfigHeaderSize, extensionLength, out var totalSize) || buffer.Length < totalSize) return false;
 
         config = new MediaConfigData
         {
@@ -735,7 +752,7 @@ public static class BoltCodec
         if (buffer.Length < CallSignalHeaderSize) return false;
 
         var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(18));
-        if (payloadLength < 0 || buffer.Length < CallSignalHeaderSize + payloadLength) return false;
+        if (!TryAddLength(CallSignalHeaderSize, payloadLength, out var totalSize) || buffer.Length < totalSize) return false;
 
         header = new CallSignalHeader
         {
@@ -754,7 +771,7 @@ public static class BoltCodec
         if (buffer.Length < FecFrameHeaderSize) return false;
 
         var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(22));
-        if (payloadLength < 0 || buffer.Length < FecFrameHeaderSize + payloadLength) return false;
+        if (!TryAddLength(FecFrameHeaderSize, payloadLength, out var totalSize) || buffer.Length < totalSize) return false;
 
         header = new FecFrameHeader
         {
@@ -774,7 +791,7 @@ public static class BoltCodec
         if (buffer.Length < NackRequestHeaderSize) return false;
 
         var nackCount = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(17));
-        var totalSize = NackRequestHeaderSize + nackCount * 4;
+        if (!TryAddLength(NackRequestHeaderSize, nackCount * 4, out var totalSize)) return false;
         if (buffer.Length < totalSize) return false;
 
         header = new NackRequestHeader

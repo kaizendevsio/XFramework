@@ -916,6 +916,51 @@ public class CallLifecycleTests
         endedCallId.Should().Be(callId);
     }
 
+    [Test]
+    public async Task AnswerCall_FromNonCallee_IsIgnored()
+    {
+        await using var clientC = await ConnectClientAsync("client_c", "ClientC");
+        var incomingTcs = new TaskCompletionSource<IncomingCallInfo>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var answeredTcs = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _mediaB.OnIncomingCall += info =>
+        {
+            incomingTcs.TrySetResult(info);
+            return Task.CompletedTask;
+        };
+        _mediaA.OnCallAnswered += callId =>
+        {
+            answeredTcs.TrySetResult(callId);
+            return Task.CompletedTask;
+        };
+
+        var callId = await _mediaA.StartCallAsync("client_b");
+        var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await SendCallSignalAsync(clientC, callId, SignalType.Answer);
+
+        (await Task.WhenAny(answeredTcs.Task, Task.Delay(300))).Should().NotBe(answeredTcs.Task);
+
+        await _mediaB.AnswerCallAsync(incoming.CallId);
+        (await answeredTcs.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(callId);
+    }
+
+    private async Task<BoltClient> ConnectClientAsync(string clientId, string clientName)
+    {
+        var client = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            clientId, clientName, new BoltClientOptions { RpcTimeoutSeconds = 10 },
+            _loggerFactory.CreateLogger<BoltClient>());
+        await client.ConnectAsync();
+        return client;
+    }
+
+    private static async Task SendCallSignalAsync(BoltClient client, Guid callId, SignalType signalType)
+    {
+        var writer = new ArrayBufferWriter<byte>(64);
+        BoltCodec.WriteCallSignal(writer, callId, signalType, ReadOnlySpan<byte>.Empty);
+        await client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+    }
+
     private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
     {
         using var client = new HttpClient();
@@ -1106,6 +1151,183 @@ public class MediaFrameExchangeTests
             var ended = await endedTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
             ended.Should().Be(callId);
         }
+    }
+
+    [Test]
+    public async Task MediaConfig_FromNonParticipant_IsIgnored()
+    {
+        await using var clientC = await ConnectClientAsync("media_client_c", "MediaClientC");
+        var callId = await StartAnsweredCallAsync();
+        var streamId = Guid.NewGuid();
+        var configTcs = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _clientB.RegisterFrameHandler(FrameType.MediaConfig, (_, buffer, length) =>
+        {
+            if (BoltCodec.TryReadMediaConfig(buffer.AsSpan(0, length), out var config))
+                configTcs.TrySetResult(config.StreamId);
+        });
+
+        await SendMediaConfigAsync(clientC, streamId, callId);
+
+        (await Task.WhenAny(configTcs.Task, Task.Delay(300))).Should().NotBe(configTcs.Task);
+
+        await SendMediaConfigAsync(_clientA, streamId, callId);
+
+        (await configTcs.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(streamId);
+    }
+
+    [Test]
+    public async Task MediaFrame_FromNonOwner_IsIgnored()
+    {
+        await using var clientC = await ConnectClientAsync("media_client_c", "MediaClientC");
+        var callId = await StartAnsweredCallAsync();
+        var streamId = Guid.NewGuid();
+        var configTcs = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var frameTcs = new TaskCompletionSource<uint>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _clientB.RegisterFrameHandler(FrameType.MediaConfig, (_, buffer, length) =>
+        {
+            if (BoltCodec.TryReadMediaConfig(buffer.AsSpan(0, length), out var config))
+                configTcs.TrySetResult(config.StreamId);
+        });
+        _clientB.RegisterFrameHandler(FrameType.MediaFrame, (_, buffer, length) =>
+        {
+            if (BoltCodec.TryReadMediaFrame(buffer.AsSpan(0, length), out var frame))
+                frameTcs.TrySetResult(frame.SequenceNumber);
+        });
+
+        await SendMediaConfigAsync(_clientA, streamId, callId);
+        (await configTcs.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(streamId);
+
+        await SendMediaFrameAsync(clientC, streamId, 1);
+        (await Task.WhenAny(frameTcs.Task, Task.Delay(300))).Should().NotBe(frameTcs.Task);
+
+        await SendMediaFrameAsync(_clientA, streamId, 2);
+        (await frameTcs.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(2);
+    }
+
+    [Test]
+    public async Task MediaFeedback_FromNonRecipient_IsIgnored()
+    {
+        await using var clientC = await ConnectClientAsync("media_client_c", "MediaClientC");
+        var callId = await StartAnsweredCallAsync();
+        var streamId = Guid.NewGuid();
+        var configTcs = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var feedbackTcs = new TaskCompletionSource<uint>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _clientB.RegisterFrameHandler(FrameType.MediaConfig, (_, buffer, length) =>
+        {
+            if (BoltCodec.TryReadMediaConfig(buffer.AsSpan(0, length), out var config))
+                configTcs.TrySetResult(config.StreamId);
+        });
+        _clientA.RegisterFrameHandler(FrameType.MediaFeedback, (_, buffer, length) =>
+        {
+            if (BoltCodec.TryReadMediaFeedback(buffer.AsSpan(0, length), out var feedback))
+                feedbackTcs.TrySetResult(feedback.HighestSeqReceived);
+        });
+
+        await SendMediaConfigAsync(_clientA, streamId, callId);
+        (await configTcs.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(streamId);
+
+        await SendMediaFeedbackAsync(clientC, streamId, 10);
+        (await Task.WhenAny(feedbackTcs.Task, Task.Delay(300))).Should().NotBe(feedbackTcs.Task);
+
+        await SendMediaFeedbackAsync(_clientB, streamId, 20);
+        (await feedbackTcs.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(20);
+    }
+
+    [Test]
+    public async Task AddParticipant_FromNonOwner_IsIgnored()
+    {
+        await using var clientC = await ConnectClientAsync("media_client_c", "MediaClientC");
+        var callId = await StartAnsweredCallAsync();
+        var addedTcs = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var payload = ClientHashPayload("media_client_c");
+
+        clientC.RegisterFrameHandler(FrameType.CallSignal, (_, buffer, length) =>
+        {
+            if (BoltCodec.TryReadCallSignal(buffer.AsSpan(0, length), out var signal) &&
+                signal.SignalType == SignalType.AddParticipant)
+            {
+                addedTcs.TrySetResult(signal.CallId);
+            }
+        });
+
+        await SendCallSignalAsync(_clientB, callId, SignalType.AddParticipant, payload);
+
+        (await Task.WhenAny(addedTcs.Task, Task.Delay(300))).Should().NotBe(addedTcs.Task);
+
+        await SendCallSignalAsync(_clientA, callId, SignalType.AddParticipant, payload);
+
+        (await addedTcs.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(callId);
+    }
+
+    private async Task<Guid> StartAnsweredCallAsync()
+    {
+        var incomingTcs = new TaskCompletionSource<IncomingCallInfo>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var answeredTcs = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _mediaB.OnIncomingCall += info =>
+        {
+            incomingTcs.TrySetResult(info);
+            return Task.CompletedTask;
+        };
+        _mediaA.OnCallAnswered += callId =>
+        {
+            answeredTcs.TrySetResult(callId);
+            return Task.CompletedTask;
+        };
+
+        var callId = await _mediaA.StartCallAsync("media_client_b", encrypted: false);
+        var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await _mediaB.AnswerCallAsync(incoming.CallId);
+        (await answeredTcs.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(callId);
+        return callId;
+    }
+
+    private async Task<BoltClient> ConnectClientAsync(string clientId, string clientName)
+    {
+        var client = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            clientId, clientName, new BoltClientOptions { RpcTimeoutSeconds = 10 },
+            _loggerFactory.CreateLogger<BoltClient>());
+        await client.ConnectAsync();
+        return client;
+    }
+
+    private static async Task SendCallSignalAsync(BoltClient client, Guid callId, SignalType signalType, ReadOnlyMemory<byte> payload = default)
+    {
+        var writer = new ArrayBufferWriter<byte>(64);
+        BoltCodec.WriteCallSignal(writer, callId, signalType, payload.Span);
+        await client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+    }
+
+    private static async Task SendMediaConfigAsync(BoltClient client, Guid streamId, Guid callId)
+    {
+        var writer = new ArrayBufferWriter<byte>(128);
+        BoltCodec.WriteMediaConfig(writer, streamId, callId, MediaType.Audio, CodecId.Opus,
+            48000, 2, 128, 0x00, ReadOnlySpan<byte>.Empty);
+        await client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+    }
+
+    private static async Task SendMediaFrameAsync(BoltClient client, Guid streamId, uint sequence)
+    {
+        var writer = new ArrayBufferWriter<byte>(128);
+        BoltCodec.WriteMediaFrame(writer, streamId, sequence, sequence * 960, 0x00, new byte[] { 0xAA, 0xBB });
+        await client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+    }
+
+    private static async Task SendMediaFeedbackAsync(BoltClient client, Guid streamId, uint highestSequence)
+    {
+        var writer = new ArrayBufferWriter<byte>(128);
+        BoltCodec.WriteMediaFeedback(writer, streamId, highestSequence, 0, 0, 0, QualityHint.Maintain);
+        await client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+    }
+
+    private static byte[] ClientHashPayload(string clientId)
+    {
+        var payload = new byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(payload, BoltCodec.Fnv1aHash(clientId));
+        return payload;
     }
 
     private static async Task WaitForHealth(string url, int timeoutSeconds = 15)

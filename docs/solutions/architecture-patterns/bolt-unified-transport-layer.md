@@ -14,12 +14,12 @@ tags: [bolt, transport, quic, webtransport, websocket]
 # Bolt Unified Transport Layer
 
 **Date**: 2026-03-31
-**Status**: Approved
-**Scope**: Transport abstraction for Bolt protocol — QUIC default, WebTransport for browsers, WebSocket fallback
+**Status**: Approved direction; current implementation is WebSocket-first for RPC
+**Scope**: Transport abstraction for Bolt protocol. Today, production RPC uses WebSocket. QUIC/WebTransport remain planned or media/browser-specific transport work unless explicitly implemented in the runtime.
 
 ## Goal
 
-Make QUIC the default transport for all Bolt communication (RPC, streaming, media), with WebTransport for browser clients and WebSocket as a universal fallback. One `BoltClient`, one `BoltServer`, three transport pipes, one wire protocol (`BoltCodec` with `senderHash`).
+Keep one Bolt wire protocol (`BoltCodec` with `senderHash`) behind `IBoltConnection`, while preserving the current WebSocket RPC path. QUIC and WebTransport can use the same codec and length-prefixed framing when their runtime endpoints are completed, but they are not the default RPC path today.
 
 ## Decision: One Codec Everywhere
 
@@ -84,51 +84,52 @@ QUIC's ideal model is opening a fresh stream per RPC. But that requires a comple
 Tries transports in priority order with a 3-second timeout per attempt. Returns the first working `IBoltConnection`.
 
 ```
-Priority: QUIC -> WebTransport -> WebSocket
+Default priority today: WebSocket
+Optional configured order: WebTransport -> WebSocket
 ```
 
-Configuration via `BoltConnectionOptions` (extends `BoltClientOptions` — existing `BoltClientOptions` stays for backward compatibility, `BoltConnectionOptions` adds transport fields):
+Configuration via `BoltClientOptions`:
 
 ```csharp
-public class BoltConnectionOptions : BoltClientOptions
+public class BoltClientOptions
 {
     public BoltTransport[] PreferredTransports { get; set; } =
-        [BoltTransport.Quic, BoltTransport.WebTransport, BoltTransport.WebSocket];
+        [BoltTransport.WebSocket];
     public int TransportAttemptTimeoutMs { get; set; } = 3000;
-    public Uri ServerUri { get; set; }
 }
 
 public enum BoltTransport { Quic, WebTransport, WebSocket }
 ```
 
+The .NET `BoltTransportNegotiator` currently attempts WebSocket and has a placeholder for WebTransport. QUIC is not used for RPC transport; it is reserved for media/datagram work.
+
 ### Runtime detection
 
 | Transport | Available when |
 |-----------|---------------|
-| QUIC | `QuicConnection.IsSupported == true` (.NET 7+, OS has msquic) |
-| WebTransport | Browser environment (Blazor WASM) OR server advertises HTTP/3 |
+| QUIC | Planned for media/datagram or future RPC work; not attempted by the .NET RPC negotiator today |
+| WebTransport | Planned/browser-specific; the .NET RPC negotiator placeholder returns no connection today |
 | WebSocket | Always |
 
 ### Transport selection by environment
 
 | Environment | Default | Fallback |
 |------------|---------|----------|
-| .NET server-to-server (Win11/Linux) | QUIC | WebSocket |
-| .NET server-to-server (macOS) | WebSocket | -- |
-| Blazor WASM (Chrome/Edge) | WebTransport | WebSocket |
+| .NET server-to-server | WebSocket | -- |
+| Blazor WASM (Chrome/Edge) | WebSocket today | WebTransport planned |
 | Blazor WASM (Safari/Firefox) | WebSocket | -- |
-| MAUI Android/Windows | QUIC | WebSocket |
+| MAUI Android/Windows | WebSocket today | QUIC planned |
 | MAUI iOS/macOS | WebSocket | -- |
 
-### Server-side: accept all transports
+### Server-side: current RPC endpoint
 
-The server doesn't negotiate. `MapBolt` sets up all three entry points:
+The server doesn't negotiate transport inside one endpoint. Current `MapBolt` maps the WebSocket RPC endpoint:
 
-1. **WebSocket**: `app.Map("/bolt")` — accepts WebSocket upgrade, wraps in `WebSocketBoltConnection`
-2. **WebTransport**: `app.Map("/bolt/webtransport")` — accepts HTTP/3 WebTransport session, wraps in `WebTransportBoltConnection`
-3. **QUIC**: `BoltServer.StartQuicListenerAsync()` — separate `QuicListener` with ALPN "bolt", wraps each connection in `QuicBoltConnection`
+1. **WebSocket**: `app.MapBolt("/bolt")` or `app.MapBolt("/bolt/ws")` accepts WebSocket upgrade and wraps it in `WebSocketBoltConnection`.
+2. **WebTransport**: not currently mapped by `MapBolt`.
+3. **QUIC**: not currently started by `BoltServer` for RPC.
 
-All three funnel into the same `HandleConnectionAsync(IBoltConnection, CancellationToken)`. The hub routing logic is identical regardless of transport. A QUIC client can call a WebSocket client through the hub.
+Any future transport should still funnel into `HandleConnectionAsync(IBoltConnection, ClaimsPrincipal?, CancellationToken)` so hub routing remains transport-agnostic.
 
 ### Reconnection
 
@@ -177,13 +178,13 @@ Signature changes from `(WebSocket, CancellationToken)` to `(IBoltConnection, Ca
 
 Changes from wrapping `WebSocket` to wrapping `IBoltConnection`. `SendAsync` delegates to `Transport.SendAsync`.
 
-### Raw QUIC listener
+### Raw QUIC listener (planned)
 
 ```csharp
 public async Task StartQuicListenerAsync(IPEndPoint endpoint, X509Certificate2 cert, CancellationToken ct)
 ```
 
-Creates a `QuicListener` with ALPN "bolt", accepts connections in a background loop, wraps each in `QuicBoltConnection`, and calls `HandleConnectionAsync`.
+A future RPC QUIC listener would create a `QuicListener` with ALPN "bolt", accept connections in a background loop, wrap each in `QuicBoltConnection`, and call `HandleConnectionAsync`. This is not part of the current `MapBolt` runtime.
 
 ## Data Flow by Frame Type
 
@@ -198,25 +199,24 @@ Creates a `QuicListener` with ALPN "bolt", accepts connections in a background l
 
 ## File Changes
 
-### New files (6)
+### Transport files
 
 ```
 Bolt.Client/Transport/IBoltConnection.cs
 Bolt.Client/Transport/BoltTransport.cs
 Bolt.Client/Transport/BoltTransportNegotiator.cs
 Bolt.Client/Transport/WebSocketBoltConnection.cs
-Bolt.Client/Transport/QuicBoltConnection.cs
 Bolt.Client/Transport/WebTransportBoltConnection.cs
 ```
 
-### Modified files (5+)
+### Current modified runtime surface
 
 ```
 Bolt.Client/BoltClient.cs              — IBoltConnection instead of ClientWebSocket
-Bolt.Client/BoltClientOptions.cs       — extended to BoltConnectionOptions with transport prefs
+Bolt.Client/BoltClientOptions.cs       — PreferredTransports and transport attempt timeout
 Bolt.Client/BoltConnection.cs          — wraps IBoltConnection
 Bolt.Server/BoltServer.cs              — HandleConnectionAsync takes IBoltConnection
-Bolt.Server/BoltServerExtensions.cs    — MapBolt accepts all 3 transports
+Bolt.Server/BoltServerExtensions.cs    — MapBolt accepts WebSocket connections
 IdentityServer.Benchmarks/            — updated to use unified BoltClient
 ```
 

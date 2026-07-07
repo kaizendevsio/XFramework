@@ -2,9 +2,11 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
+using System.Reflection;
 using Bolt.Client;
 using Bolt.Media;
 using Bolt.Protocol;
+using Bolt.Protocol.Buffers;
 using Bolt.Server;
 using FluentAssertions;
 using MemoryPack;
@@ -255,16 +257,18 @@ public class RpcStressTests
         await sender.ConnectAsync();
         await receiver.ConnectAsync();
 
-        await using var echoStream = await sender.OpenStreamAsync("stream_echo_receiver", "echo");
-        var payload = "reply-to-initiator"u8.ToArray();
+        await using (var echoStream = await sender.OpenStreamAsync("stream_echo_receiver", "echo"))
+        {
+            var payload = "reply-to-initiator"u8.ToArray();
 
-        await echoStream.SendAsync(payload);
+            await echoStream.SendAsync(payload);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var (hasData, data) = await echoStream.ReadAsync(cts.Token);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var (hasData, data) = await echoStream.ReadAsync(cts.Token);
 
-        hasData.Should().BeTrue();
-        data.ToArray().Should().Equal(payload);
+            hasData.Should().BeTrue();
+            data.ToArray().Should().Equal(payload);
+        }
 
         await sender.DisposeAsync();
         await receiver.DisposeAsync();
@@ -425,6 +429,380 @@ public class RpcStressTests
     }
 
     [Test]
+    public async Task LargePayload_TruncatedRequestStream_ReturnsBadRequestAndDoesNotInvokeHandler()
+    {
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 5, LargePayloadThreshold = 1024 };
+        var sender = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "truncated_req_sender", "TruncatedReqSender", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var receiver = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "truncated_req_receiver", "TruncatedReqReceiver", opts, _loggerFactory.CreateLogger<BoltClient>());
+
+        var handlerInvoked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var errorReceived = new TaskCompletionSource<HttpStatusCode>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        receiver.RegisterHandler("truncated-target", (_, _) =>
+        {
+            handlerInvoked.TrySetResult();
+            return Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty));
+        });
+
+        await sender.ConnectAsync();
+        await receiver.ConnectAsync();
+
+        sender.RegisterHandler("__bolt_large_rpc_response__", (payload, _) =>
+        {
+            if (payload.Length >= 18)
+            {
+                var statusCode = (HttpStatusCode)System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(payload.Span[16..]);
+                errorReceived.TrySetResult(statusCode);
+            }
+
+            return Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty));
+        });
+
+        await using var stream = await sender.OpenStreamAsync("truncated_req_receiver", "__bolt_large_rpc__");
+        var header = new byte[28];
+        Guid.NewGuid().TryWriteBytes(header);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(16), BoltCodec.Fnv1aHash("truncated-target"));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(20), 4096);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(24), BoltCodec.Fnv1aHash("truncated_req_sender"));
+
+        await stream.SendAsync((ReadOnlyMemory<byte>)header);
+        await stream.SendAsync(new byte[64]);
+        await stream.CloseAsync();
+
+        var status = await errorReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        status.Should().Be(HttpStatusCode.BadRequest);
+        handlerInvoked.Task.IsCompleted.Should().BeFalse("the malformed stream ended before the declared payload size");
+
+        await sender.DisposeAsync();
+        await receiver.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargeResponse_TruncatedResponseStream_FaultsPendingCall()
+    {
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 5, LargePayloadThreshold = 1024 };
+        var caller = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "truncated_resp_caller", "TruncatedRespCaller", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var responder = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "truncated_resp_responder", "TruncatedRespResponder", opts, _loggerFactory.CreateLogger<BoltClient>());
+
+        await caller.ConnectAsync();
+        await responder.ConnectAsync();
+
+        var requestId = Guid.NewGuid();
+        var pendingCall = PooledRpcCall.Rent();
+        var pendingTask = pendingCall.GetTask();
+        AddPendingCall(caller, requestId, pendingCall);
+
+        var requestStream = await caller.OpenStreamAsync("truncated_resp_responder", "__bolt_large_rpc__");
+        var requestHeader = new byte[28];
+        requestId.TryWriteBytes(requestHeader);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(16), BoltCodec.Fnv1aHash("blocked-target"));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(20), 4096);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(24), BoltCodec.Fnv1aHash("truncated_resp_caller"));
+        await requestStream.SendAsync((ReadOnlyMemory<byte>)requestHeader);
+        await WaitForServerPendingInvocation(requestId);
+
+        await using var stream = await responder.OpenStreamAsync("truncated_resp_caller", "__bolt_large_rpc_response_stream__");
+        var header = new byte[22];
+        requestId.TryWriteBytes(header);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(header.AsSpan(16), (short)HttpStatusCode.OK);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(18), 4096);
+
+        await stream.SendAsync((ReadOnlyMemory<byte>)header);
+        await stream.SendAsync(new byte[64]);
+        await stream.CloseAsync();
+
+        await FluentActions.Invoking(async () => await pendingTask.AsTask().WaitAsync(TimeSpan.FromSeconds(5)))
+            .Should()
+            .ThrowAsync<InvalidOperationException>()
+            .WithMessage("*ended before declared size*");
+
+        try { await requestStream.CloseAsync(); } catch { }
+        await caller.DisposeAsync();
+        await responder.DisposeAsync();
+    }
+
+    [Test]
+    public async Task Register_DifferentClientIdWithSameServiceHash_IsRejected()
+    {
+        const string firstClientId = "svc_fs_0q-d4on";
+        const string secondClientId = "svc_VZqRSRRtpi";
+        BoltCodec.Fnv1aHash(firstClientId).Should().Be(BoltCodec.Fnv1aHash(secondClientId));
+
+        var first = CreateClient(firstClientId, "CollisionFirst");
+        var second = CreateClient(secondClientId, "CollisionSecond");
+
+        await first.ConnectAsync();
+
+        await FluentActions.Invoking(() => second.ConnectAsync())
+            .Should()
+            .ThrowAsync<InvalidOperationException>()
+            .WithMessage("*rejected registration*");
+
+        await first.DisposeAsync();
+        await second.DisposeAsync();
+    }
+
+    [Test]
+    public void RegisterHandler_DifferentCommandNameWithSameHash_IsRejected()
+    {
+        const string firstCommand = "collision_b000y79vlv";
+        const string secondCommand = "collision_2ntw1i1ulr";
+        BoltCodec.Fnv1aHash(firstCommand).Should().Be(BoltCodec.Fnv1aHash(secondCommand));
+
+        var client = CreateClient("command_collision_client", "CommandCollisionClient");
+
+        client.RegisterHandler(firstCommand, (_, _) =>
+            Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty)));
+
+        FluentActions.Invoking(() => client.RegisterHandler(secondCommand, (_, _) =>
+                Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty))))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*command hash collision*");
+
+        var server = new BoltServer(_loggerFactory.CreateLogger<BoltServer>());
+        server.RegisterHandler(firstCommand, (_, _) =>
+            Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty)));
+
+        FluentActions.Invoking(() => server.RegisterHandler(secondCommand, (_, _) =>
+                Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty))))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*command hash collision*");
+
+        server.Dispose();
+    }
+
+    [Test]
+    public async Task Push_WithSpoofedSenderHash_IsRejected()
+    {
+        var sender = CreateClient("push_sender", "PushSender");
+        var receiver = CreateClient("push_receiver", "PushReceiver");
+        var attacker = CreateClient("push_attacker", "PushAttacker");
+        var received = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        receiver.RegisterHandler("notify", (_, _) =>
+        {
+            received.TrySetResult();
+            return Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty));
+        });
+
+        await sender.ConnectAsync();
+        await receiver.ConnectAsync();
+        await attacker.ConnectAsync();
+
+        var spoofedWriter = new RentedBufferWriter(128);
+        BoltCodec.WritePush(
+            spoofedWriter,
+            Guid.NewGuid(),
+            BoltCodec.Fnv1aHash("push_receiver"),
+            BoltCodec.Fnv1aHash("push_sender"),
+            BoltCodec.Fnv1aHash("notify"),
+            ReadOnlySpan<byte>.Empty);
+        await attacker.GetPrimaryConnection().SendAsync(spoofedWriter.WrittenMemory, CancellationToken.None);
+
+        await Task.Delay(300);
+        received.Task.IsCompleted.Should().BeFalse("the hub must reject push frames whose sender hash does not match the connection");
+
+        await sender.PushAsync("push_receiver", "notify", ReadOnlyMemory<byte>.Empty);
+        await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await sender.DisposeAsync();
+        await receiver.DisposeAsync();
+        await attacker.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargeRpcResponsePush_FromUnexpectedResponder_IsRejected()
+    {
+        var caller = CreateClient("large_rpc_caller", "LargeRpcCaller");
+        var responder = CreateClient("large_rpc_responder", "LargeRpcResponder");
+        var attacker = CreateClient("large_rpc_attacker", "LargeRpcAttacker");
+        var releaseResponder = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var responses = new ConcurrentQueue<HttpStatusCode>();
+        var responseReceived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        responder.RegisterHandler("large-rpc-target", async (_, _) =>
+        {
+            await releaseResponder.Task;
+            return (HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty);
+        });
+
+        await caller.ConnectAsync();
+        await responder.ConnectAsync();
+        await attacker.ConnectAsync();
+
+        caller.RegisterHandler("__bolt_large_rpc_response__", (payload, _) =>
+        {
+            if (payload.Length >= 18)
+            {
+                var status = (HttpStatusCode)System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(payload.Span[16..]);
+                responses.Enqueue(status);
+                responseReceived.TrySetResult();
+            }
+
+            return Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty));
+        });
+
+        var requestId = Guid.NewGuid();
+        await using var requestStream = await caller.OpenStreamAsync("large_rpc_responder", "__bolt_large_rpc__");
+        var requestHeader = new byte[28];
+        requestId.TryWriteBytes(requestHeader);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(16), BoltCodec.Fnv1aHash("large-rpc-target"));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(20), 0);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(24), BoltCodec.Fnv1aHash("large_rpc_caller"));
+        await requestStream.SendAsync((ReadOnlyMemory<byte>)requestHeader);
+        await requestStream.CloseAsync();
+
+        var spoofedPayload = new byte[18];
+        requestId.TryWriteBytes(spoofedPayload);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(spoofedPayload.AsSpan(16), (short)HttpStatusCode.Accepted);
+
+        var spoofedWriter = new RentedBufferWriter(128);
+        BoltCodec.WritePush(
+            spoofedWriter,
+            Guid.NewGuid(),
+            BoltCodec.Fnv1aHash("large_rpc_caller"),
+            BoltCodec.Fnv1aHash("large_rpc_attacker"),
+            BoltCodec.Fnv1aHash("__bolt_large_rpc_response__"),
+            spoofedPayload);
+        await attacker.GetPrimaryConnection().SendAsync(spoofedWriter.WrittenMemory, CancellationToken.None);
+
+        await Task.Delay(300);
+        responses.Should().BeEmpty("only the expected responder may complete the large RPC request");
+
+        releaseResponder.SetResult();
+        await responseReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        responses.Should().ContainSingle().Which.Should().Be(HttpStatusCode.OK);
+
+        await caller.DisposeAsync();
+        await responder.DisposeAsync();
+        await attacker.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargeRpcResponseStream_FromUnexpectedResponder_DoesNotCompletePendingCall()
+    {
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 5, LargePayloadThreshold = 16 };
+        var caller = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "large_stream_caller", "LargeStreamCaller", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var responder = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "large_stream_responder", "LargeStreamResponder", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var attacker = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "large_stream_attacker", "LargeStreamAttacker", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var responderStarted = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseResponder = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        responder.RegisterHandler("slow-large-stream", async (_, requestId) =>
+        {
+            responderStarted.TrySetResult(requestId);
+            await releaseResponder.Task;
+            return (HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty);
+        });
+
+        await caller.ConnectAsync();
+        await responder.ConnectAsync();
+        await attacker.ConnectAsync();
+
+        var invokeTask = caller.InvokeAsync("large_stream_responder", "slow-large-stream", new byte[256]);
+        var requestId = await responderStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await using (var attackStream = await attacker.OpenStreamAsync("large_stream_caller", "__bolt_large_rpc_response_stream__"))
+        {
+            var responseHeader = new byte[22];
+            requestId.TryWriteBytes(responseHeader);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(responseHeader.AsSpan(16), (short)HttpStatusCode.Accepted);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(responseHeader.AsSpan(18), 0);
+            await attackStream.SendAsync((ReadOnlyMemory<byte>)responseHeader);
+            await attackStream.CloseAsync();
+        }
+
+        await Task.Delay(300);
+        invokeTask.IsCompleted.Should().BeFalse("an unexpected responder must not complete the pending large RPC call");
+
+        releaseResponder.SetResult();
+        var (status, _) = await invokeTask.WaitAsync(TimeSpan.FromSeconds(5));
+        status.Should().Be(HttpStatusCode.OK);
+
+        await caller.DisposeAsync();
+        await responder.DisposeAsync();
+        await attacker.DisposeAsync();
+    }
+
+    [Test]
+    public async Task StreamClose_TruncatedFrame_DoesNotRemoveActiveStream()
+    {
+        var sender = CreateClient("stream_close_sender", "StreamCloseSender");
+        var receiver = CreateClient("stream_close_receiver", "StreamCloseReceiver");
+        var received = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        receiver.RegisterStreamHandler("upload", async stream =>
+        {
+            var (hasData, data) = await stream.ReadAsync();
+            if (hasData)
+                received.TrySetResult(data.ToArray());
+        });
+
+        await sender.ConnectAsync();
+        await receiver.ConnectAsync();
+
+        var stream = await sender.OpenStreamAsync("stream_close_receiver", "upload");
+        var truncatedClose = new byte[17];
+        truncatedClose[0] = (byte)FrameType.StreamClose;
+        stream.StreamId.TryWriteBytes(truncatedClose.AsSpan(1));
+        await sender.GetPrimaryConnection().SendAsync(truncatedClose, CancellationToken.None);
+
+        var payload = "still-open"u8.ToArray();
+        await stream.SendAsync(payload);
+
+        (await received.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Equal(payload);
+
+        try { await stream.CloseAsync(); } catch { }
+        await sender.DisposeAsync();
+        await receiver.DisposeAsync();
+    }
+
+    [Test]
+    public async Task StreamClose_FromNonparticipant_DoesNotRemoveActiveStream()
+    {
+        var sender = CreateClient("stream_owner", "StreamOwner");
+        var receiver = CreateClient("stream_recipient", "StreamRecipient");
+        var attacker = CreateClient("stream_close_attacker", "StreamCloseAttacker");
+        var received = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        receiver.RegisterStreamHandler("upload", async stream =>
+        {
+            var (hasData, data) = await stream.ReadAsync();
+            if (hasData)
+                received.TrySetResult(data.ToArray());
+        });
+
+        await sender.ConnectAsync();
+        await receiver.ConnectAsync();
+        await attacker.ConnectAsync();
+
+        var stream = await sender.OpenStreamAsync("stream_recipient", "upload");
+        var closeWriter = new RentedBufferWriter(64);
+        BoltCodec.WriteStreamClose(closeWriter, stream.StreamId);
+        await attacker.GetPrimaryConnection().SendAsync(closeWriter.WrittenMemory, CancellationToken.None);
+
+        var payload = "still-routed"u8.ToArray();
+        await stream.SendAsync(payload);
+
+        (await received.Task.WaitAsync(TimeSpan.FromSeconds(5))).Should().Equal(payload);
+
+        try { await stream.CloseAsync(); } catch { }
+        await sender.DisposeAsync();
+        await receiver.DisposeAsync();
+        await attacker.DisposeAsync();
+    }
+
+    [Test]
     public async Task SmallPayload_StillUsesNormalRpc()
     {
         var opts = new BoltClientOptions { RpcTimeoutSeconds = 15, LargePayloadThreshold = 65536 };
@@ -461,6 +839,35 @@ public class RpcStressTests
             await Task.Delay(100);
         }
         throw new TimeoutException($"Service at {url} not healthy within {timeoutSeconds}s");
+    }
+
+    private static void AddPendingCall(BoltClient client, Guid requestId, PooledRpcCall pendingCall)
+    {
+        var field = typeof(BoltClient).GetField("_pendingCalls", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("BoltClient pending-call field not found.");
+        var pendingCalls = (ConcurrentDictionary<Guid, PooledRpcCall>)field.GetValue(client)!;
+        pendingCalls[requestId] = pendingCall;
+    }
+
+    private async Task WaitForServerPendingInvocation(Guid requestId)
+    {
+        var server = _serverApp.Services.GetRequiredService<BoltServer>();
+        var field = typeof(BoltServer).GetField("_pendingInvocations", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("BoltServer pending-invocation field not found.");
+        var pendingInvocations = field.GetValue(server)!;
+        var containsKey = pendingInvocations.GetType().GetMethod("ContainsKey")
+            ?? throw new InvalidOperationException("BoltServer pending-invocation collection does not expose ContainsKey.");
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            if ((bool)containsKey.Invoke(pendingInvocations, [requestId])!)
+                return;
+
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException($"BoltServer did not track pending invocation {requestId}.");
     }
 }
 
@@ -897,6 +1304,54 @@ public class CodecSecurityTests
         BitConverter.TryWriteBytes(data.AsSpan(48), -10);
 
         BoltCodec.TryReadMediaConfig(data, out _).Should().BeFalse();
+    }
+
+    [Test]
+    public void OversizedPayloadLength_Request_ReturnsFalse()
+    {
+        var writer = new ArrayBufferWriter<byte>(64);
+        BoltCodec.WriteRequest(writer, Guid.NewGuid(), 123, 789, 456, new byte[] { 1, 2, 3 });
+
+        var data = writer.WrittenSpan.ToArray();
+        BitConverter.TryWriteBytes(data.AsSpan(29), int.MaxValue);
+
+        BoltCodec.TryReadRequest(data, out _, out _).Should().BeFalse();
+        BoltCodec.TryReadRequestHeader(data, out _, out _, out _).Should().BeFalse();
+    }
+
+    [Test]
+    public void OversizedPayloadLength_Response_ReturnsFalse()
+    {
+        var writer = new ArrayBufferWriter<byte>(64);
+        BoltCodec.WriteResponse(writer, Guid.NewGuid(), HttpStatusCode.OK, new byte[] { 1, 2 });
+
+        var data = writer.WrittenSpan.ToArray();
+        BitConverter.TryWriteBytes(data.AsSpan(19), int.MaxValue);
+
+        BoltCodec.TryReadResponse(data, out _, out _).Should().BeFalse();
+        BoltCodec.TryReadResponseHeader(data, out _, out _).Should().BeFalse();
+    }
+
+    [Test]
+    public void OversizedPayloadLength_StreamData_ReturnsFalse()
+    {
+        var writer = new ArrayBufferWriter<byte>(64);
+        BoltCodec.WriteStreamData(writer, Guid.NewGuid(), new byte[] { 1, 2, 3 });
+
+        var data = writer.WrittenSpan.ToArray();
+        BitConverter.TryWriteBytes(data.AsSpan(17), int.MaxValue);
+
+        BoltCodec.TryReadStreamData(data, out _, out _, out _, out _).Should().BeFalse();
+    }
+
+    [Test]
+    public void OversizedStringLength_Register_ReturnsFalse()
+    {
+        var data = new byte[5];
+        data[0] = (byte)FrameType.Register;
+        BitConverter.TryWriteBytes(data.AsSpan(1), int.MaxValue);
+
+        BoltCodec.TryReadRegister(data, out _, out _, out _).Should().BeFalse();
     }
 
     [Test]

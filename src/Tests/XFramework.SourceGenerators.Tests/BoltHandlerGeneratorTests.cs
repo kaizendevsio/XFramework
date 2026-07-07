@@ -167,6 +167,151 @@ public sealed record SaleReceipt;
         generatedSource.Should().Contain("sfResponse.Response = result.Data;");
     }
 
+    [Test]
+    public void GenerateBoltHandler_WithDetectedValidator_ReturnsBadRequestEnvelopeBeforeHandler()
+    {
+        const string source = """
+
+namespace Sample.Features.Users.Create;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using FluentValidation;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+
+public static class CreateUserEndpoint
+{
+    [MapPost("/api/users")]
+    [BoltHandler]
+    public static Task<Result<UserResponse>> Handle(
+        CreateUserRequest request,
+        UserService userService,
+        CancellationToken ct)
+    {
+        return Task.FromResult(Result<UserResponse>.Success(new UserResponse()));
+    }
+}
+
+public sealed record CreateUserRequest(string Name) : IBoltRequest<CreateUserRequest, QueryResponse<UserResponse>>;
+
+public sealed class UserResponse;
+
+public sealed class UserService;
+
+public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>;
+""";
+
+        var generatedSource = RunGenerator(source, "CreateUserEndpoint_Handle_BoltHandler.g.cs");
+
+        generatedSource.Should().Contain(
+            "var validator = scope.ServiceProvider.GetRequiredService<FluentValidation.IValidator<global::Sample.Features.Users.Create.CreateUserRequest>>();");
+        generatedSource.Should().Contain("var validationResult = await validator.ValidateAsync(request, ct);");
+        generatedSource.Should().Contain(".GroupBy(static e => e.PropertyName)");
+        generatedSource.Should().Contain(".ToDictionary(static g => g.Key, static g => g.Select(static e => e.ErrorMessage).ToArray());");
+        generatedSource.Should().Contain("validationResponse.HttpStatusCode = System.Net.HttpStatusCode.BadRequest;");
+        generatedSource.Should().Contain("validationResponse.Message = \"Validation failed\";");
+        generatedSource.Should().Contain("validationResponse.ValidationErrors = errors;");
+        generatedSource.Should().Contain("var validationResponseBytes = MemoryPackSerializer.Serialize(validationResponse);");
+        generatedSource.Should().Contain(
+            "var @userService = scope.ServiceProvider.GetRequiredService<global::Sample.Features.Users.Create.UserService>();");
+        generatedSource.IndexOf("var validationResult = await validator.ValidateAsync(request, ct);", StringComparison.Ordinal)
+            .Should()
+            .BeLessThan(generatedSource.IndexOf("var @userService = scope.ServiceProvider.GetRequiredService", StringComparison.Ordinal));
+        generatedSource.IndexOf("var validationResult = await validator.ValidateAsync(request, ct);", StringComparison.Ordinal)
+            .Should()
+            .BeLessThan(generatedSource.IndexOf("var result = await global::Sample.Features.Users.Create.CreateUserEndpoint.Handle", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public void GenerateRestEndpoint_WithDetectedValidator_ReturnsValidationProblemBeforeHandler()
+    {
+        const string source = """
+
+namespace Sample.Features.Users.Create;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using FluentValidation;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+
+public static class CreateUserEndpoint
+{
+    [MapPost("/api/users")]
+    [BoltHandler]
+    public static Task<Result<UserResponse>> Handle(
+        CreateUserRequest request,
+        UserService userService,
+        CancellationToken ct)
+    {
+        return Task.FromResult(Result<UserResponse>.Success(new UserResponse()));
+    }
+}
+
+public sealed record CreateUserRequest(string Name) : IBoltRequest<CreateUserRequest, QueryResponse<UserResponse>>;
+
+public sealed class UserResponse;
+
+public sealed class UserService;
+
+public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>;
+""";
+
+        var generatedSource = RunGenerator(source, "CreateUserEndpoint_Handle_RestEndpoint.g.cs");
+
+        generatedSource.Should().Contain(
+            "FluentValidation.IValidator<global::Sample.Features.Users.Create.CreateUserRequest> validator");
+        generatedSource.Should().Contain("var validationResult = await validator.ValidateAsync(request, ct);");
+        generatedSource.Should().Contain(".GroupBy(static e => e.PropertyName)");
+        generatedSource.Should().Contain("return TypedResults.ValidationProblem(errors);");
+        generatedSource.Should().Contain("Results<Ok<global::Sample.Features.Users.Create.UserResponse>, ValidationProblem, NotFound, ProblemHttpResult>");
+        generatedSource.IndexOf("var validationResult = await validator.ValidateAsync(request, ct);", StringComparison.Ordinal)
+            .Should()
+            .BeLessThan(generatedSource.IndexOf("var result = await global::Sample.Features.Users.Create.CreateUserEndpoint.Handle", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public void GenerateBoltHandler_WithoutDetectedValidator_DoesNotEmitValidation()
+    {
+        const string source = """
+
+namespace Sample.Features.Health.Check;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+
+public static class CheckHealthEndpoint
+{
+    [BoltHandler]
+    public static Task<Result<HealthResponse>> Handle(
+        CheckHealthRequest request,
+        CancellationToken ct)
+    {
+        return Task.FromResult(Result<HealthResponse>.Success(new HealthResponse()));
+    }
+}
+
+public sealed record CheckHealthRequest : IBoltRequest<CheckHealthRequest, QueryResponse<HealthResponse>>;
+
+public sealed class HealthResponse;
+""";
+
+        var generatedSource = RunGenerator(source, "CheckHealthEndpoint_Handle_BoltHandler.g.cs");
+
+        generatedSource.Should().NotContain("IValidator<");
+        generatedSource.Should().NotContain("ValidateAsync(request, ct)");
+        generatedSource.Should().NotContain("validationResponse");
+    }
+
     private static string RunGenerator(string source, string generatedHintName)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -230,6 +375,16 @@ namespace XFramework.Integration.Attributes
 {
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class BoltHandlerAttribute : Attribute;
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class MapPostAttribute(string route) : Attribute
+    {
+        public string Route { get; } = route;
+        public string[]? Tags { get; set; }
+        public string? Summary { get; set; }
+        public string? Description { get; set; }
+        public bool ExcludeFromOpenApi { get; set; }
+    }
 
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class MapGetAttribute(string route) : Attribute
@@ -353,11 +508,42 @@ namespace XFramework.Domain.Shared.BusinessObjects
     {
         public System.Net.HttpStatusCode HttpStatusCode { get; set; }
         public string? Message { get; set; }
+        public Dictionary<string, string[]>? ValidationErrors { get; set; }
     }
 
     public class CmdResponse<T> : CmdResponse
     {
         public T? Response { get; set; }
+    }
+
+    public class QueryResponse<T> : CmdResponse<T>;
+}
+
+namespace FluentValidation
+{
+    public interface IValidator<T>
+    {
+        Task<ValidationResult> ValidateAsync(T instance, System.Threading.CancellationToken cancellation = default);
+    }
+
+    public abstract class AbstractValidator<T> : IValidator<T>
+    {
+        public Task<ValidationResult> ValidateAsync(T instance, System.Threading.CancellationToken cancellation = default)
+        {
+            return Task.FromResult(new ValidationResult());
+        }
+    }
+
+    public sealed class ValidationResult
+    {
+        public bool IsValid { get; set; } = true;
+        public List<ValidationFailure> Errors { get; set; } = new();
+    }
+
+    public sealed class ValidationFailure
+    {
+        public string PropertyName { get; set; } = string.Empty;
+        public string ErrorMessage { get; set; } = string.Empty;
     }
 }
 
@@ -370,6 +556,14 @@ namespace Microsoft.AspNetCore.Builder
 {
     public static class EndpointRouteBuilderExtensions
     {
+        public static RouteHandlerBuilder MapPost(
+            this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder app,
+            string pattern,
+            Delegate handler)
+        {
+            return new RouteHandlerBuilder();
+        }
+
         public static RouteHandlerBuilder MapGet(
             this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder app,
             string pattern,

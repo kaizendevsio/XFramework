@@ -7,7 +7,7 @@ A high-performance binary RPC and streaming protocol for .NET. Faster than gRPC,
 Bolt was built to answer a simple question: *what if we stripped away every layer of overhead between two .NET services and just sent raw bytes?*
 
 The result is a protocol that:
-- Uses a **29-byte binary header** instead of HTTP/2 frames, HPACK headers, and Protobuf encoding
+- Uses a compact **33-byte request header** instead of HTTP/2 frames, HPACK headers, and Protobuf encoding
 - Routes messages through a hub by reading only the header — **the payload is never decoded** during routing
 - Achieves **zero Gen0 garbage collections** under any load level
 - Scales via **connection pooling** — multiple WebSocket connections per client, distributed round-robin
@@ -82,7 +82,7 @@ At 100 clients, Bolt is 56% faster and uses 94% less memory than gRPC.
 Every Bolt frame starts with a 1-byte type followed by a fixed-size header. The hub only reads the header for routing — the payload bytes are forwarded without decoding.
 
 ```
-RPC Request:  [1:type] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]   29B header
+RPC Request:  [1:type] [16:requestId] [4:recipientHash] [4:senderHash] [4:commandHash] [4:payloadLen] [payload]   33B header
 RPC Response: [1:type] [16:requestId] [2:statusCode] [4:payloadLen] [payload]                       23B header
 Stream Open:  [1:type] [16:streamId]  [4:recipientHash] [4:commandHash]                             25B header
 Stream Data:  [1:type] [16:streamId]  [4:payloadLen] [payload]                                      21B header
@@ -120,7 +120,7 @@ For direct mode (no hub), the client connects straight to the service:
 4. gRPC status and trailer processing
 
 **Bolt eliminates all of this:**
-1. 29-byte binary header — no HTTP framing
+1. Compact binary headers — no HTTP framing
 2. MemoryPack payload — faster than Protobuf, no schema required
 3. Hub forwards raw bytes — zero decode at the routing layer
 4. FNV-1a hash routing — 4-byte integer comparison

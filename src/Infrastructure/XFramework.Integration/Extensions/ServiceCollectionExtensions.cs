@@ -78,13 +78,30 @@ public static class ServiceCollectionExtensions
                 .UseAccessTokenQueryString(boltConfig.SendAccessTokenAsQueryString)
                 .WithOptions(options =>
                 {
+                    options.MaxFrameBytes = boltConfig.MaxFrameBytes > 0
+                        ? boltConfig.MaxFrameBytes
+                        : options.MaxFrameBytes;
+                    options.SendQueueCapacity = boltConfig.SendQueueCapacity > 0
+                        ? boltConfig.SendQueueCapacity
+                        : boltConfig.QueueDepth > 0
+                            ? boltConfig.QueueDepth
+                            : options.SendQueueCapacity;
+                    options.SendEnqueueTimeoutMs = boltConfig.SendEnqueueTimeoutMs > 0
+                        ? boltConfig.SendEnqueueTimeoutMs
+                        : Math.Max(1, boltConfig.RpcTimeoutSeconds) * 1000;
+                    options.MinConnections = Math.Max(1, boltConfig.MinConnections);
+                    options.MaxConnections = Math.Max(
+                        options.MinConnections,
+                        boltConfig.MaxConnections > 0 ? boltConfig.MaxConnections : options.MaxConnections);
+                    options.ScaleUpThreshold = boltConfig.ScaleUpThreshold > 0
+                        ? boltConfig.ScaleUpThreshold
+                        : options.ScaleUpThreshold;
+
                     if (!string.IsNullOrWhiteSpace(boltConfig.AccessToken))
                     {
                         options.AccessToken = boltConfig.AccessToken;
-                        return;
                     }
-
-                    if (!boltConfig.Anonymous && boltConfig.GenerateServiceAccessToken)
+                    else if (!boltConfig.Anonymous && boltConfig.GenerateServiceAccessToken)
                     {
                         options.AccessTokenProvider = _ =>
                             new ValueTask<string?>(GenerateBoltServiceAccessToken(configuration, clientName));

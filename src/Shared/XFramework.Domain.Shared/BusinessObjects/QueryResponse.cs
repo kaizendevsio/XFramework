@@ -12,6 +12,7 @@ public partial class QueryResponse<T> : IBaseResponse, IHasRequestServer, IQuery
     public Guid ResponseId { get; set; } = Guid.NewGuid();
     public HttpStatusCode HttpStatusCode { get; set; }
     public string? Message { get; set; }
+    public Dictionary<string, string[]>? ValidationErrors { get; set; }
     public bool IsSuccess => (int)HttpStatusCode >= 200 && (int)HttpStatusCode < 300;
     public T? Response { get; set; }
     public RequestMetadata? Metadata { get; set; }

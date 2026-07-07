@@ -15,6 +15,15 @@ public class BoltServerOptions
     /// <summary>RPC invocation timeout in milliseconds. Default: 30000.</summary>
     public int InvocationTimeoutMs { get; set; } = 30_000;
 
+    /// <summary>Maximum complete Bolt frame size accepted by receive loops. Default: 100MB.</summary>
+    public int MaxFrameBytes { get; set; } = 100 * 1024 * 1024;
+
+    /// <summary>Bounded send queue capacity per connection. Default: 4096.</summary>
+    public int SendQueueCapacity { get; set; } = 4096;
+
+    /// <summary>Max time to wait for a send queue slot. 0 uses InvocationTimeoutMs.</summary>
+    public int SendEnqueueTimeoutMs { get; set; } = 0;
+
     /// <summary>
     /// Media processors that receive copies of media frames for server-side processing
     /// (recording, transcription, AI analysis, etc.).

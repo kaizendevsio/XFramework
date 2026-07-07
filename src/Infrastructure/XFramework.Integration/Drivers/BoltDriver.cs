@@ -1,4 +1,5 @@
 using System.Net;
+using System.Collections.Concurrent;
 using Bolt.Client;
 using Bolt.Domain.Shared.Contracts.Requests;
 using MemoryPack;
@@ -28,6 +29,7 @@ public sealed class BoltDriver : IMessageBusWrapper
     private readonly BoltConfiguration _config;
     private readonly IServiceTokenProvider _serviceTokenProvider;
     private readonly ILogger<BoltDriver> _logger;
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _legacySubscriptions = new();
 
     public bool IsConnected => _client.IsConnected;
     public Action OnReconnected { get; set; } = () => { };
@@ -44,6 +46,9 @@ public sealed class BoltDriver : IMessageBusWrapper
         _config = config.Value;
         _serviceTokenProvider = serviceTokenProvider;
         _logger = logger;
+        _client.Disconnected += () => OnDisconnected();
+        _client.Reconnecting += () => OnReconnecting();
+        _client.Reconnected += () => OnReconnected();
     }
 
     public async Task<bool> Connect()
@@ -66,27 +71,27 @@ public sealed class BoltDriver : IMessageBusWrapper
     public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        await EnrichMetadataAsync(request, recipient, ct);
+        var recipientId = await EnrichMetadataAsync(request, recipient, ct);
         var payload = MemoryPackSerializer.Serialize(request);
-        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
+        var (status, responsePayload) = await _client.InvokeAsync(recipientId, typeof(TRequest).Name, payload, ct);
         return DeserializeCmdResponse(status, responsePayload);
     }
 
     public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        await EnrichMetadataAsync(request, recipient, ct);
+        var recipientId = await EnrichMetadataAsync(request, recipient, ct);
         var payload = MemoryPackSerializer.Serialize(request);
-        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
+        var (status, responsePayload) = await _client.InvokeAsync(recipientId, typeof(TRequest).Name, payload, ct);
         return DeserializeCmdResponse<TResponse>(status, responsePayload);
     }
 
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        await EnrichMetadataAsync(request, recipient, ct);
+        var recipientId = await EnrichMetadataAsync(request, recipient, ct);
         var payload = MemoryPackSerializer.Serialize(request);
-        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload, ct);
+        var (status, responsePayload) = await _client.InvokeAsync(recipientId, typeof(TRequest).Name, payload, ct);
         return DeserializeQueryResponse<TResponse>(status, responsePayload);
     }
 
@@ -114,16 +119,30 @@ public sealed class BoltDriver : IMessageBusWrapper
     public Task Subscribe<TResponse>(BoltSubscriptionRequest<TResponse> request)
         where TResponse : class
     {
+        var cts = new CancellationTokenSource();
+        if (_legacySubscriptions.TryRemove(request.Name, out var existing))
+        {
+            existing.Cancel();
+            existing.Dispose();
+        }
+        _legacySubscriptions[request.Name] = cts;
+
         _ = Task.Run(async () =>
         {
             try
             {
-                await foreach (var item in _client.SubscribeAsync<TResponse>(request.Name))
+                await foreach (var item in _client.SubscribeAsync<TResponse>(request.Name, cts.Token))
                     request.OnInvoke?.Invoke(item);
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Transient subscription error: topic={Topic}", request.Name);
+            }
+            finally
+            {
+                _legacySubscriptions.TryRemove(new KeyValuePair<string, CancellationTokenSource>(request.Name, cts));
+                cts.Dispose();
             }
         });
         return Task.CompletedTask;
@@ -177,13 +196,22 @@ public sealed class BoltDriver : IMessageBusWrapper
         return Task.CompletedTask;
     }
 
-    public Task Unsubscribe(BoltSubscriptionRequest request)
+    public async Task Unsubscribe(BoltSubscriptionRequest request)
     {
-        // BoltClient's SubscribeAsync handles unsubscribe via CancellationToken cancellation.
-        // The current IMessageBusWrapper.Unsubscribe signature doesn't expose a CTS, so this
-        // is a no-op. Callers that need explicit unsubscribe should cancel the token passed
-        // to Subscribe's underlying enumeration.
-        return Task.CompletedTask;
+        if (_legacySubscriptions.TryRemove(request.Name, out var cts))
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
+
+        try
+        {
+            await _client.UnsubscribeAsync(request.Name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Bolt unsubscribe failed. topic={Topic}", request.Name);
+        }
     }
 
     public Task SubscribeDurableAsync<TResponse>(string topic, string subscriberId, Func<TResponse, Task> handler, CancellationToken ct = default)
@@ -238,7 +266,7 @@ public sealed class BoltDriver : IMessageBusWrapper
         return Task.CompletedTask;
     }
 
-    private async Task EnrichMetadataAsync<TRequest>(TRequest request, string recipient, CancellationToken ct)
+    private async Task<string> EnrichMetadataAsync<TRequest>(TRequest request, string recipient, CancellationToken ct)
         where TRequest : IHasRequestServer
     {
         request.Metadata ??= new RequestMetadata();
@@ -249,6 +277,7 @@ public sealed class BoltDriver : IMessageBusWrapper
 
         var audience = ResolveAudience(recipient);
         request.Metadata.ServiceAccessToken = await _serviceTokenProvider.GetTokenAsync(audience, null, ct);
+        return ResolveRecipientId(recipient);
     }
 
     private static string ResolveAudience(string recipient)
@@ -259,6 +288,16 @@ public sealed class BoltDriver : IMessageBusWrapper
             string.Equals(name.ToSha256(), trimmed, StringComparison.OrdinalIgnoreCase));
 
         return canonical ?? trimmed;
+    }
+
+    private static string ResolveRecipientId(string recipient)
+    {
+        var trimmed = recipient.Trim();
+        var canonical = XFrameworkServiceNames.All.FirstOrDefault(name =>
+            string.Equals(name, trimmed, StringComparison.Ordinal) ||
+            string.Equals(name.ToSha256(), trimmed, StringComparison.OrdinalIgnoreCase));
+
+        return canonical is null ? trimmed : canonical.ToSha256();
     }
 
     private static CmdResponse DeserializeCmdResponse(HttpStatusCode status, ReadOnlyMemory<byte> responsePayload)

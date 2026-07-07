@@ -1,4 +1,5 @@
 using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
+using Bolt.Hub.Security;
 using Bolt.Hub.Services;
 using Bolt.Server;
 
@@ -24,12 +25,14 @@ public static class ApplicationBuilderExtension
             app.MapGet("/api/bolt/services", async (
                     IBoltServiceDiscoveryRegistry registry,
                     CancellationToken ct) =>
-                Results.Ok(await registry.GetServicesAsync(new BoltServiceRegistryRequest(), ct)));
+                Results.Ok(await registry.GetServicesAsync(new BoltServiceRegistryRequest(), ct)))
+                .RequireAuthorization(BoltAuthorizationPolicies.ServiceDiscoveryReader);
 
             app.MapGet("/api/bolt/modules", async (
                     IBoltServiceDiscoveryRegistry registry,
                     CancellationToken ct) =>
-                Results.Ok(await registry.GetModulesAsync(new BoltModuleRegistryRequest(), ct)));
+                Results.Ok(await registry.GetModulesAsync(new BoltModuleRegistryRequest(), ct)))
+                .RequireAuthorization(BoltAuthorizationPolicies.ServiceDiscoveryReader);
         }
 
         return app;

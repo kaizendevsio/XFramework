@@ -16,4 +16,7 @@ public sealed class DurableQueueOptions
 
     /// <summary>Maximum messages replayed in a single batch on reconnect.</summary>
     public int MaxReplayBatchSize { get; set; } = 1_000;
+
+    /// <summary>Maximum Redis stream entries scanned per durable replay or ack page.</summary>
+    public int RedisStreamScanBatchSize { get; set; } = 256;
 }

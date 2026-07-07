@@ -28,15 +28,17 @@ public sealed class BoltStream : IAsyncDisposable
     private readonly Guid _streamId;
     private readonly BoltConnection _connection;
     private readonly Channel<ReadOnlyMemory<byte>> _inboundChannel;
+    private readonly Action<Guid>? _onClosed;
     private volatile bool _closed;
 
     public Guid StreamId => _streamId;
     public bool IsClosed => _closed;
 
-    internal BoltStream(Guid streamId, BoltConnection connection)
+    internal BoltStream(Guid streamId, BoltConnection connection, Action<Guid>? onClosed = null)
     {
         _streamId = streamId;
         _connection = connection;
+        _onClosed = onClosed;
         _inboundChannel = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(1024)
         {
             FullMode = BoundedChannelFullMode.Wait,
@@ -158,6 +160,7 @@ public sealed class BoltStream : IAsyncDisposable
         await _connection.SendAsync(writer.WrittenMemory, ct);
 
         _inboundChannel.Writer.TryComplete();
+        _onClosed?.Invoke(_streamId);
     }
 
     internal ValueTask EnqueueInboundAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
@@ -167,6 +170,7 @@ public sealed class BoltStream : IAsyncDisposable
     {
         _closed = true;
         _inboundChannel.Writer.TryComplete();
+        _onClosed?.Invoke(_streamId);
     }
 
     public async ValueTask DisposeAsync()
