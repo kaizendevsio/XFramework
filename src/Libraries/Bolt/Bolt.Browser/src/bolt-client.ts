@@ -3,9 +3,11 @@ import {
   writeRegister, writeCallSignal, writeMediaConfig, writeMediaFeedback,
   writeMediaKeyRequest, writeNackRequest,
   writeRequest, writeResponse, writePush,
+  writeSubscribe, writeUnsubscribe, writePublish, writeAck,
   writeStreamOpen, writeStreamData, writeStreamClose,
   readFrameType, readCallSignal, readMediaFrame, readMediaConfig,
   readMediaFeedback, readMediaKeyRequest, readFecFrame, readNackRequest,
+  readEvent,
   readRequest, readResponse, readStreamOpen, readStreamData, readStreamClose,
   readRegisterAck, guidToBytes, newGuid, fnv1aHash,
   type QualityHintValue, QualityHint,
@@ -36,6 +38,14 @@ export interface BoltBrowserStream {
   close(statusCode?: number): void;
   onData?: (data: Uint8Array) => void;
   onClose?: (statusCode: number) => void;
+}
+
+export interface BoltBrowserEvent {
+  topicHash: number;
+  sequenceNumber: bigint;
+  isReplay: boolean;
+  subscriberId: string;
+  payload: Uint8Array;
 }
 
 /**
@@ -96,6 +106,9 @@ export class BoltBrowserClient {
 
   // Events — push frames
   public onPush?: (commandHash: number, payload: Uint8Array) => void;
+
+  // Events — pub/sub frames
+  public onEvent?: (event: BoltBrowserEvent) => void;
 
   get isConnected(): boolean { return this.connected; }
 
@@ -266,6 +279,28 @@ export class BoltBrowserClient {
     this.ws.send(frame);
   }
 
+  // ── Pub/sub ──────────────────────────────────────────────
+
+  subscribe(topic: string, subscriberId = '', durable = false, actorAccessToken = ''): void {
+    if (!this.connected || !this.ws) return;
+    this.ws.send(writeSubscribe(topic, subscriberId, durable, actorAccessToken));
+  }
+
+  unsubscribe(topic: string, subscriberId = '', permanent = true, actorAccessToken = ''): void {
+    if (!this.connected || !this.ws) return;
+    this.ws.send(writeUnsubscribe(topic, subscriberId, permanent, actorAccessToken));
+  }
+
+  publish(topic: string, payload: Uint8Array, durableEligible = false): void {
+    if (!this.connected || !this.ws) return;
+    this.ws.send(writePublish(topic, durableEligible, payload));
+  }
+
+  ack(topic: string, subscriberId: string, upToSequenceNumber: bigint | number, actorAccessToken = ''): void {
+    if (!this.connected || !this.ws) return;
+    this.ws.send(writeAck(topic, subscriberId, upToSequenceNumber, actorAccessToken));
+  }
+
   // ── Streaming (file transfer) ──────────────────────────────
 
   /**
@@ -411,6 +446,11 @@ export class BoltBrowserClient {
           if (handler) handler(req.payload, req.requestId);
           else this.onPush?.(req.commandHash, req.payload);
         }
+        break;
+      }
+      case FRAME.Event: {
+        const evt = readEvent(data);
+        if (evt) this.onEvent?.(evt);
         break;
       }
 

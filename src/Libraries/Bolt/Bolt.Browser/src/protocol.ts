@@ -16,6 +16,11 @@ export const FrameType = {
     Register:        0x03,
     RegisterAck:     0x04,
     Push:            0x05,
+    Subscribe:       0x06,
+    Unsubscribe:     0x07,
+    Publish:         0x08,
+    Event:           0x09,
+    Ack:             0x0A,
     StreamOpen:      0x10,
     StreamData:      0x11,
     StreamClose:     0x12,
@@ -101,6 +106,8 @@ export const HEADER_SIZE = {
     StreamOpen:     25,  // 1 + 16 + 4 + 4
     StreamData:     21,  // 1 + 16 + 4
     StreamClose:    19,  // 1 + 16 + 2
+    Publish:        14,  // 1 + 4 + 1 + 4 + topic + 4 + payload
+    Event:          22,  // 1 + 4 + 8 + 1 + 4 + subscriberId + 4 + payload
     RegisterAck:     2,  // 1 + 1
 } as const;
 
@@ -187,6 +194,21 @@ export interface StreamDataFrame {
 export interface StreamCloseData {
     streamId: string;
     statusCode: number;
+}
+
+export interface PublishFrameData {
+    topicHash: number;
+    topic: string;
+    durableEligible: boolean;
+    payload: Uint8Array;
+}
+
+export interface EventFrameData {
+    topicHash: number;
+    sequenceNumber: bigint;
+    isReplay: boolean;
+    subscriberId: string;
+    payload: Uint8Array;
 }
 
 // ─── GUID helpers (little-endian, matches .NET Guid binary layout) ───────────
@@ -296,6 +318,10 @@ function writeUint16LE(view: DataView, offset: number, value: number): void {
     view.setUint16(offset, value, true);
 }
 
+function writeInt64LE(view: DataView, offset: number, value: bigint | number): void {
+    view.setBigInt64(offset, BigInt(value), true);
+}
+
 function readUint8(view: DataView, offset: number): number {
     return view.getUint8(offset);
 }
@@ -312,10 +338,17 @@ function readUint16LE(view: DataView, offset: number): number {
     return view.getUint16(offset, true);
 }
 
+function readInt64LE(view: DataView, offset: number): bigint {
+    return view.getBigInt64(offset, true);
+}
+
 function writeGuid(arr: Uint8Array, offset: number, uuid: string): void {
     const guidBytes = guidToBytes(uuid);
     arr.set(guidBytes, offset);
 }
+
+const UTF8_ENCODER = new TextEncoder();
+const UTF8_DECODER = new TextDecoder();
 
 // ─── FNV-1a hash (matches BoltCodec.Fnv1aHash in C#) ────────────────────────
 
@@ -640,7 +673,7 @@ export function readFecFrame(data: Uint8Array): FecFrameData | null {
 
 /**
  * Encode a Request frame.
- * Layout: [1:type] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]
+ * Layout: [1:type] [16:requestId] [4:recipientHash] [4:senderHash] [4:commandHash] [4:payloadLen] [payload]
  */
 export function writeRequest(
     requestId: string,
@@ -749,7 +782,175 @@ export function writePush(
     return buf;
 }
 
-// ─── Stream frame encoding/decoding ─────────────────────────────────────────
+// ─── Pub/sub frame encoding/decoding ─────────────────────────────────────────
+
+/**
+ * Encode a Subscribe frame.
+ * Layout: [1:type] [4:topicHash] [1:flags] [4:subscriberIdLen] [subscriberId]
+ *         [4:topicLen] [topic] [4:actorTokenLen] [actorToken]
+ */
+export function writeSubscribe(
+    topic: string,
+    subscriberId = '',
+    durable = false,
+    actorAccessToken = '',
+): Uint8Array {
+    const topicBytes = UTF8_ENCODER.encode(topic);
+    const idBytes = UTF8_ENCODER.encode(subscriberId);
+    const tokenBytes = UTF8_ENCODER.encode(actorAccessToken);
+    const totalSize = 1 + 4 + 1 + 4 + idBytes.length + 4 + topicBytes.length + 4 + tokenBytes.length;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.Subscribe);
+    writeInt32LE(view, 1, fnv1aHash(topic));
+    writeUint8(view, 5, durable ? 0x01 : 0x00);
+    writeInt32LE(view, 6, idBytes.length);
+    buf.set(idBytes, 10);
+    writeInt32LE(view, 10 + idBytes.length, topicBytes.length);
+    buf.set(topicBytes, 14 + idBytes.length);
+    writeInt32LE(view, 14 + idBytes.length + topicBytes.length, tokenBytes.length);
+    buf.set(tokenBytes, 18 + idBytes.length + topicBytes.length);
+
+    return buf;
+}
+
+/**
+ * Encode an Unsubscribe frame.
+ * Layout: [1:type] [4:topicHash] [4:topicLen] [topic] [4:subscriberIdLen]
+ *         [subscriberId] [1:permanent] [4:actorTokenLen] [actorToken]
+ */
+export function writeUnsubscribe(
+    topic: string,
+    subscriberId = '',
+    permanent = true,
+    actorAccessToken = '',
+): Uint8Array {
+    const topicBytes = UTF8_ENCODER.encode(topic);
+    const idBytes = UTF8_ENCODER.encode(subscriberId);
+    const tokenBytes = UTF8_ENCODER.encode(actorAccessToken);
+    const totalSize = 1 + 4 + 4 + topicBytes.length + 4 + idBytes.length + 1 + 4 + tokenBytes.length;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.Unsubscribe);
+    writeInt32LE(view, 1, fnv1aHash(topic));
+    writeInt32LE(view, 5, topicBytes.length);
+    buf.set(topicBytes, 9);
+    writeInt32LE(view, 9 + topicBytes.length, idBytes.length);
+    buf.set(idBytes, 13 + topicBytes.length);
+    writeUint8(view, 13 + topicBytes.length + idBytes.length, permanent ? 0x01 : 0x00);
+    writeInt32LE(view, 14 + topicBytes.length + idBytes.length, tokenBytes.length);
+    buf.set(tokenBytes, 18 + topicBytes.length + idBytes.length);
+
+    return buf;
+}
+
+/**
+ * Encode a Publish frame.
+ * Layout: [1:type] [4:topicHash] [1:flags] [4:topicLen] [topic] [4:payloadLen] [payload]
+ */
+export function writePublish(topic: string, durableEligible: boolean, payload: Uint8Array): Uint8Array {
+    const topicBytes = UTF8_ENCODER.encode(topic);
+    const totalSize = HEADER_SIZE.Publish + topicBytes.length + payload.length;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.Publish);
+    writeInt32LE(view, 1, fnv1aHash(topic));
+    writeUint8(view, 5, durableEligible ? 0x01 : 0x00);
+    writeInt32LE(view, 6, topicBytes.length);
+    buf.set(topicBytes, 10);
+    writeInt32LE(view, 10 + topicBytes.length, payload.length);
+    buf.set(payload, 14 + topicBytes.length);
+
+    return buf;
+}
+
+/**
+ * Encode an Ack frame.
+ * Layout: [1:type] [4:topicHash] [4:topicLen] [topic] [4:subscriberIdLen]
+ *         [subscriberId] [8:upToSequence] [4:actorTokenLen] [actorToken]
+ */
+export function writeAck(
+    topic: string,
+    subscriberId: string,
+    upToSequenceNumber: bigint | number,
+    actorAccessToken = '',
+): Uint8Array {
+    const topicBytes = UTF8_ENCODER.encode(topic);
+    const idBytes = UTF8_ENCODER.encode(subscriberId);
+    const tokenBytes = UTF8_ENCODER.encode(actorAccessToken);
+    const totalSize = 1 + 4 + 4 + topicBytes.length + 4 + idBytes.length + 8 + 4 + tokenBytes.length;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.Ack);
+    writeInt32LE(view, 1, fnv1aHash(topic));
+    writeInt32LE(view, 5, topicBytes.length);
+    buf.set(topicBytes, 9);
+    writeInt32LE(view, 9 + topicBytes.length, idBytes.length);
+    buf.set(idBytes, 13 + topicBytes.length);
+    writeInt64LE(view, 13 + topicBytes.length + idBytes.length, upToSequenceNumber);
+    writeInt32LE(view, 21 + topicBytes.length + idBytes.length, tokenBytes.length);
+    buf.set(tokenBytes, 25 + topicBytes.length + idBytes.length);
+
+    return buf;
+}
+
+/**
+ * Read a Publish frame.
+ */
+export function readPublish(data: Uint8Array): PublishFrameData | null {
+    if (data.length < HEADER_SIZE.Publish) return null;
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const topicHash = readInt32LE(view, 1);
+    const durableEligible = (readUint8(view, 5) & 0x01) !== 0;
+    const topicLen = readInt32LE(view, 6);
+    if (topicLen <= 0 || topicLen > 4096 || data.length < 10 + topicLen + 4) return null;
+
+    const topic = UTF8_DECODER.decode(data.slice(10, 10 + topicLen));
+    if (fnv1aHash(topic) !== topicHash) return null;
+
+    const payloadLen = readInt32LE(view, 10 + topicLen);
+    const payloadOffset = HEADER_SIZE.Publish + topicLen;
+    if (payloadLen < 0 || data.length < payloadOffset + payloadLen) return null;
+
+    return {
+        topicHash,
+        topic,
+        durableEligible,
+        payload: data.slice(payloadOffset, payloadOffset + payloadLen),
+    };
+}
+
+/**
+ * Read an Event frame.
+ */
+export function readEvent(data: Uint8Array): EventFrameData | null {
+    if (data.length < HEADER_SIZE.Event) return null;
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const topicHash = readInt32LE(view, 1);
+    const sequenceNumber = readInt64LE(view, 5);
+    const isReplay = (readUint8(view, 13) & 0x01) !== 0;
+    const subscriberIdLen = readInt32LE(view, 14);
+    if (subscriberIdLen < 0 || subscriberIdLen > 4096 || data.length < 18 + subscriberIdLen + 4) return null;
+
+    const subscriberId = UTF8_DECODER.decode(data.slice(18, 18 + subscriberIdLen));
+    const payloadLen = readInt32LE(view, 18 + subscriberIdLen);
+    const payloadOffset = HEADER_SIZE.Event + subscriberIdLen;
+    if (payloadLen < 0 || data.length < payloadOffset + payloadLen) return null;
+
+    return {
+        topicHash,
+        sequenceNumber,
+        isReplay,
+        subscriberId,
+        payload: data.slice(payloadOffset, payloadOffset + payloadLen),
+    };
+}
 
 /**
  * Encode a StreamOpen frame.

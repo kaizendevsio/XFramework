@@ -10,6 +10,7 @@ public partial class CmdResponse<T> : IBaseResponse, IHasRequestServer, ICmdWith
     
     public HttpStatusCode HttpStatusCode { get; set; }
     public string? Message { get; set; }
+    public Dictionary<string, string[]>? ValidationErrors { get; set; }
     public bool IsSuccess => (int)HttpStatusCode >= 200 && (int)HttpStatusCode < 300;
     public RequestMetadata? Metadata { get; set; }
     public T? Response { get; set; }
@@ -23,6 +24,7 @@ public partial class CmdResponse : IBaseResponse, IHasRequestServer, ICmdRespons
     
     public HttpStatusCode HttpStatusCode { get; set; }
     public string? Message { get; set; }
+    public Dictionary<string, string[]>? ValidationErrors { get; set; }
     public bool IsSuccess => (int)HttpStatusCode >= 200 && (int)HttpStatusCode < 300;
     public RequestMetadata? Metadata { get; set; }
 }

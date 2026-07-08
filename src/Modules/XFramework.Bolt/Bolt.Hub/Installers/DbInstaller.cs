@@ -16,9 +16,7 @@ public sealed class DbInstaller : IInstaller
         services.AddScoped<AuditInterceptor>();
         
         services.AddDbContext<DbContext, AppDbContext>((serviceProvider, options) => options
-            .UseNpgsql(string.IsNullOrEmpty(configuration["DefaultDatabaseConnection"])
-                ? configuration.GetConnectionString("DefaultDatabaseConnection")
-                : configuration["DefaultDatabaseConnection"],
+            .UseNpgsql(ResolveConnectionString(configuration),
                 npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
@@ -27,4 +25,24 @@ public sealed class DbInstaller : IInstaller
 
         services.AddServerDataContext<AppDbContext>();
     }
+
+    public static string ResolveConnectionString(IConfiguration configuration)
+    {
+        var connectionString = FirstNonEmpty(
+            configuration["DefaultDatabaseConnection"],
+            configuration.GetConnectionString("DefaultDatabaseConnection"),
+            configuration.GetConnectionString("DatabaseConnection"),
+            configuration["DatabaseConnection"]);
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "Bolt Hub database connection is required. Configure DefaultDatabaseConnection or ConnectionStrings:DatabaseConnection.");
+        }
+
+        return connectionString;
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+        => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 }

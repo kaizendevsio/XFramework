@@ -67,24 +67,39 @@ public sealed class WebTransportBoltConnection : IBoltConnection
         if (_remainingMessageBytes > 0)
         {
             var toRead = Math.Min(_remainingMessageBytes, buffer.Length);
-            var bytesRead = await ReadExactlyOrEofAsync(_stream, buffer[..toRead], ct);
-            if (bytesRead == 0) return (0, true);
-            _remainingMessageBytes -= bytesRead;
-            return (bytesRead, _remainingMessageBytes == 0);
+            if (!await TryReadExactlyAsync(_stream, buffer[..toRead], ct))
+            {
+                _remainingMessageBytes = 0;
+                _closed = true;
+                return (0, true);
+            }
+
+            _remainingMessageBytes -= toRead;
+            return (toRead, _remainingMessageBytes == 0);
         }
 
-        var prefixRead = await ReadExactlyOrEofAsync(_stream, _lengthBuf.AsMemory(), ct);
-        if (prefixRead == 0) return (0, true);
+        if (!await TryReadExactlyAsync(_stream, _lengthBuf.AsMemory(), ct))
+        {
+            _closed = true;
+            return (0, true);
+        }
 
-        var messageLength = (int)BinaryPrimitives.ReadUInt32LittleEndian(_lengthBuf);
-        if (messageLength == 0) return (0, false);
+        var messageLength = BinaryPrimitives.ReadUInt32LittleEndian(_lengthBuf);
+        if (messageLength == 0 || messageLength > int.MaxValue)
+        {
+            _closed = true;
+            return (0, true);
+        }
 
-        var chunkSize = Math.Min(messageLength, buffer.Length);
-        var read = await ReadExactlyOrEofAsync(_stream, buffer[..chunkSize], ct);
-        if (read == 0) return (0, true);
+        var chunkSize = Math.Min((int)messageLength, buffer.Length);
+        if (!await TryReadExactlyAsync(_stream, buffer[..chunkSize], ct))
+        {
+            _closed = true;
+            return (0, true);
+        }
 
-        _remainingMessageBytes = messageLength - read;
-        return (read, _remainingMessageBytes == 0);
+        _remainingMessageBytes = (int)messageLength - chunkSize;
+        return (chunkSize, _remainingMessageBytes == 0);
     }
 
     public async ValueTask SendDatagramAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
@@ -110,15 +125,16 @@ public sealed class WebTransportBoltConnection : IBoltConnection
         await _stream.DisposeAsync();
     }
 
-    private static async Task<int> ReadExactlyOrEofAsync(Stream stream, Memory<byte> buffer, CancellationToken ct)
+    private static async Task<bool> TryReadExactlyAsync(Stream stream, Memory<byte> buffer, CancellationToken ct)
     {
         var totalRead = 0;
         while (totalRead < buffer.Length)
         {
             var read = await stream.ReadAsync(buffer[totalRead..], ct);
-            if (read == 0) return totalRead == 0 ? 0 : totalRead;
+            if (read == 0) return false;
             totalRead += read;
         }
-        return totalRead;
+
+        return true;
     }
 }

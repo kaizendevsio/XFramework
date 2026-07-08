@@ -5,7 +5,7 @@ namespace Bolt.Protocol;
 /// </summary>
 public enum FrameType : byte
 {
-    /// <summary>RPC request: [1:type] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]</summary>
+    /// <summary>RPC request: [1:type] [16:requestId] [4:recipientHash] [4:senderHash] [4:commandHash] [4:payloadLen] [payload]</summary>
     Request = 0x01,
     /// <summary>RPC response: [1:type] [16:requestId] [2:statusCode] [4:payloadLen] [payload]</summary>
     Response = 0x02,
@@ -13,17 +13,17 @@ public enum FrameType : byte
     Register = 0x03,
     /// <summary>Registration ack: [1:type] [1:success]</summary>
     RegisterAck = 0x04,
-    /// <summary>Fire-and-forget push: same header as Request</summary>
+    /// <summary>Fire-and-forget push: same header as Request, including senderHash</summary>
     Push = 0x05,
-    /// <summary>Subscribe to a topic: [1:type] [4:topicHash] [1:flags] [4:subscriberIdLen] [subscriberId] [4:topicLen] [topic]</summary>
+    /// <summary>Subscribe to a topic: [1:type] [4:topicHash] [1:flags] [4:subscriberIdLen] [subscriberId] [4:topicLen] [topic] [4:actorTokenLen] [actorToken]</summary>
     Subscribe = 0x06,
-    /// <summary>Unsubscribe from a topic: [1:type] [4:topicHash] [4:subscriberIdLen] [subscriberId]</summary>
+    /// <summary>Unsubscribe from a topic: [1:type] [4:topicHash] [4:topicLen] [topic] [4:subscriberIdLen] [subscriberId] [1:permanent] [4:actorTokenLen] [actorToken]</summary>
     Unsubscribe = 0x07,
-    /// <summary>Publish to a topic: [1:type] [4:topicHash] [1:flags] [4:payloadLen] [payload]</summary>
+    /// <summary>Publish to a topic: [1:type] [4:topicHash] [1:flags] [4:topicLen] [topic] [4:payloadLen] [payload]</summary>
     Publish = 0x08,
-    /// <summary>Hub-delivered event: [1:type] [4:topicHash] [8:sequenceNumber] [1:flags] [4:payloadLen] [payload]</summary>
+    /// <summary>Hub-delivered event: [1:type] [4:topicHash] [8:sequenceNumber] [1:flags] [4:subscriberIdLen] [subscriberId] [4:payloadLen] [payload]</summary>
     Event = 0x09,
-    /// <summary>Acknowledge durable messages: [1:type] [4:topicHash] [4:subscriberIdLen] [subscriberId] [8:upToSequenceNumber]</summary>
+    /// <summary>Acknowledge durable messages: [1:type] [4:topicHash] [4:topicLen] [topic] [4:subscriberIdLen] [subscriberId] [8:upToSequenceNumber] [4:actorTokenLen] [actorToken]</summary>
     Ack = 0x0A,
     /// <summary>Open bidirectional stream: [1:type] [16:streamId] [4:recipientHash] [4:commandHash]</summary>
     StreamOpen = 0x10,

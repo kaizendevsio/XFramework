@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Threading;
 using Bolt.Client;
 using MemoryPack;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,7 @@ public sealed class IdentityServerServiceTokenProvider(
     : IServiceTokenProvider
 {
     private readonly ConcurrentDictionary<string, CachedToken> _cache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _inflight = new(StringComparer.Ordinal);
 
     public async ValueTask<string> GetTokenAsync(
         string audience,
@@ -26,6 +28,55 @@ public sealed class IdentityServerServiceTokenProvider(
 
         var requestedScopes = NormalizeScopes(scopes);
         var cacheKey = $"{audience}|{string.Join(' ', requestedScopes)}";
+        var now = DateTime.UtcNow;
+        var options = serviceIdentityOptions.Value;
+        var refreshSkew = TimeSpan.FromSeconds(Math.Clamp(options.TokenRefreshSkewSeconds, 10, 600));
+
+        if (_cache.TryGetValue(cacheKey, out var cached) &&
+            cached.ExpiresAtUtc > now.Add(refreshSkew))
+        {
+            return cached.AccessToken;
+        }
+
+        ct.ThrowIfCancellationRequested();
+
+        var acquisition = _inflight.GetOrAdd(
+            cacheKey,
+            _ => CreateAcquisition(audience, requestedScopes, cacheKey));
+
+        return await acquisition.Value.WaitAsync(ct);
+    }
+
+    private Lazy<Task<string>> CreateAcquisition(
+        string audience,
+        IReadOnlyCollection<string> requestedScopes,
+        string cacheKey)
+    {
+        Lazy<Task<string>>? acquisition = null;
+        acquisition = new Lazy<Task<string>>(
+            async () =>
+            {
+                try
+                {
+                    return await AcquireTokenAsync(audience, requestedScopes, cacheKey, CancellationToken.None);
+                }
+                finally
+                {
+                    if (_inflight.TryGetValue(cacheKey, out var current) && ReferenceEquals(current, acquisition))
+                        _inflight.TryRemove(cacheKey, out _);
+                }
+            },
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
+        return acquisition;
+    }
+
+    private async Task<string> AcquireTokenAsync(
+        string audience,
+        IReadOnlyCollection<string> requestedScopes,
+        string cacheKey,
+        CancellationToken ct)
+    {
         var now = DateTime.UtcNow;
         var options = serviceIdentityOptions.Value;
         var refreshSkew = TimeSpan.FromSeconds(Math.Clamp(options.TokenRefreshSkewSeconds, 10, 600));
@@ -49,7 +100,7 @@ public sealed class IdentityServerServiceTokenProvider(
             ClientId = clientId,
             ClientSecret = clientSecret,
             Audience = audience,
-            Scopes = requestedScopes,
+            Scopes = requestedScopes.ToList(),
             Metadata = new RequestMetadata
             {
                 Name = clientId,

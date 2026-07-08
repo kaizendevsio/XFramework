@@ -23,6 +23,9 @@ namespace Bolt.Server;
 /// </summary>
 public sealed class BoltServer : IDisposable
 {
+    private const string DefaultRequiredServiceScope = "bolt.service";
+    private static readonly string[] DefaultServiceIdentityClaimTypes = ["client_id", "service", "azp", "sub"];
+
     private sealed class DurableReplayState
     {
         public object SyncRoot { get; } = new();
@@ -33,11 +36,12 @@ public sealed class BoltServer : IDisposable
     private readonly ILogger<BoltServer> _logger;
     private readonly ConcurrentDictionary<string, BoltHubConnection> _connectionsByStreamId = new();
     private readonly ConcurrentDictionary<int, ConcurrentBag<BoltHubConnection>> _connectionsByServiceHash = new();
-    private readonly ConcurrentDictionary<Guid, (BoltHubConnection Caller, long Timestamp)> _pendingInvocations = new();
+    private readonly ConcurrentDictionary<int, string> _clientIdsByServiceHash = new();
+    private readonly ConcurrentDictionary<Guid, PendingInvocation> _pendingInvocations = new();
     private readonly ConcurrentDictionary<int, int> _roundRobinIndex = new();
 
     // Stream routing: streamId → (sender connection, recipient connection)
-    private readonly ConcurrentDictionary<Guid, (BoltHubConnection Sender, BoltHubConnection Recipient)> _activeStreams = new();
+    private readonly ConcurrentDictionary<Guid, StreamRoute> _activeStreams = new();
 
     // Media routing: streamId → route (sender + recipients for multicast)
     private readonly ConcurrentDictionary<Guid, MediaStreamRoute> _activeMediaStreams = new();
@@ -48,6 +52,7 @@ public sealed class BoltServer : IDisposable
     // Direct handlers — when registered, server handles requests locally instead of routing
     private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _localHandlers = new();
     private readonly ConcurrentDictionary<int, Func<BoltRequestContext, ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _contextLocalHandlers = new();
+    private readonly ConcurrentDictionary<int, string> _commandNamesByHash = new();
 
     // Media processor tap: registered processors receive copies of media frames on a background thread
     private readonly List<IMediaProcessor> _mediaProcessors = new();
@@ -56,6 +61,18 @@ public sealed class BoltServer : IDisposable
 
     private readonly Timer _cleanupTimer;
     private readonly int _invocationTimeoutMs;
+    private readonly int _maxFrameBytes;
+    private readonly int _sendQueueCapacity;
+    private readonly int _sendEnqueueTimeoutMs;
+    private readonly BoltRegistrationIdentityBindingMode _registrationIdentityBindingMode;
+    private readonly string _requiredServiceScope;
+    private readonly string[] _serviceIdentityClaimTypes;
+    private readonly HashSet<string> _reservedServiceNames;
+    private readonly string[] _reservedServiceNamePrefixes;
+    private readonly HashSet<string> _reservedServiceClientIds;
+    private static readonly int LargeRpcCommandHash = BoltCodec.Fnv1aHash("__bolt_large_rpc__");
+    private static readonly int LargeRpcResponseHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response__");
+    private static readonly int LargeRpcResponseStreamHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response_stream__");
 
     // Pub/sub state — transient (live fan-out only)
     private readonly ConcurrentDictionary<int, ConcurrentDictionary<BoltHubConnection, byte>> _liveSubscribersByTopic = new();
@@ -85,6 +102,35 @@ public sealed class BoltServer : IDisposable
         _logger = logger;
         _topicAuthorizers = topicAuthorizers?.ToList() ?? [];
         _invocationTimeoutMs = Math.Max(1, options.InvocationTimeoutMs);
+        _maxFrameBytes = Math.Max(1024, options.MaxFrameBytes);
+        _sendQueueCapacity = Math.Max(1, options.SendQueueCapacity);
+        _sendEnqueueTimeoutMs = options.SendEnqueueTimeoutMs > 0
+            ? options.SendEnqueueTimeoutMs
+            : _invocationTimeoutMs;
+        if (!Enum.IsDefined(options.RegistrationIdentityBindingMode))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported Bolt registration identity binding mode '{options.RegistrationIdentityBindingMode}'.");
+        }
+
+        _registrationIdentityBindingMode = options.RegistrationIdentityBindingMode;
+        _requiredServiceScope = string.IsNullOrWhiteSpace(options.RequiredServiceScope)
+            ? DefaultRequiredServiceScope
+            : options.RequiredServiceScope.Trim();
+        _serviceIdentityClaimTypes = options.ServiceIdentityClaimTypes
+            .Where(static claimType => !string.IsNullOrWhiteSpace(claimType))
+            .Select(static claimType => claimType.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (_serviceIdentityClaimTypes.Length == 0)
+            _serviceIdentityClaimTypes = DefaultServiceIdentityClaimTypes;
+
+        _reservedServiceNames = NormalizeOptionSet(options.ReservedServiceNames, StringComparer.Ordinal);
+        _reservedServiceNamePrefixes = NormalizeOptionList(options.ReservedServiceNamePrefixes);
+        _reservedServiceClientIds = NormalizeOptionSet(options.ReservedServiceClientIds, StringComparer.OrdinalIgnoreCase);
+        foreach (var reservedServiceName in _reservedServiceNames)
+            _reservedServiceClientIds.Add(Sha256Hex(reservedServiceName));
+
         var cleanupInterval = TimeSpan.FromSeconds(Math.Max(1, options.CleanupIntervalSeconds));
         _cleanupTimer = new Timer(CleanupStaleInvocations, null, cleanupInterval, cleanupInterval);
         _mediaTapChannel = Channel.CreateBounded<(Guid, Guid, byte[], uint, uint)>(
@@ -129,7 +175,7 @@ public sealed class BoltServer : IDisposable
     /// </summary>
     public void RegisterHandler(string commandName, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
     {
-        var hash = BoltCodec.Fnv1aHash(commandName);
+        var hash = GetCommandHash(commandName);
         _localHandlers[hash] = handler;
     }
 
@@ -141,8 +187,23 @@ public sealed class BoltServer : IDisposable
         string commandName,
         Func<BoltRequestContext, ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
     {
-        var hash = BoltCodec.Fnv1aHash(commandName);
+        var hash = GetCommandHash(commandName);
         _contextLocalHandlers[hash] = handler;
+    }
+
+    private int GetCommandHash(string commandName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(commandName);
+
+        var hash = BoltCodec.Fnv1aHash(commandName);
+        var existing = _commandNamesByHash.GetOrAdd(hash, commandName);
+        if (!string.Equals(existing, commandName, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Bolt command hash collision detected. hash={hash}, existing='{existing}', rejected='{commandName}'");
+        }
+
+        return hash;
     }
 
     public event Func<BoltClientConnectionEvent, CancellationToken, Task>? ClientRegistered;
@@ -154,7 +215,7 @@ public sealed class BoltServer : IDisposable
 
     public async Task HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal? user, CancellationToken ct)
     {
-        var connection = new BoltHubConnection(transport)
+        var connection = new BoltHubConnection(transport, _sendQueueCapacity, _sendEnqueueTimeoutMs)
         {
             User = user
         };
@@ -175,13 +236,19 @@ public sealed class BoltServer : IDisposable
                 if (bytesRead == 0)
                     continue;
 
+                if (bytesRead > _maxFrameBytes)
+                {
+                    _logger.LogWarning("Closing Bolt connection because frame fragment exceeded max size. bytes={Bytes} max={Max}", bytesRead, _maxFrameBytes);
+                    break;
+                }
+
                 byte[] frameBytes;
                 int totalLength;
                 if (!endOfMessage)
                 {
                     // Multi-frame: accumulate into growing pooled buffer (zero MemoryStream alloc)
                     var assembled = bytesRead;
-                    var capacity = Math.Max(bytesRead * 4, 512 * 1024);
+                    var capacity = Math.Min(_maxFrameBytes, Math.Max(bytesRead * 4, 512 * 1024));
                     if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
                     largeBuffer = ArrayPool<byte>.Shared.Rent(capacity);
                     receiveBuffer.AsSpan(0, bytesRead).CopyTo(largeBuffer);
@@ -189,9 +256,23 @@ public sealed class BoltServer : IDisposable
                     while (!endOfMessage)
                     {
                         (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), ct);
+                        if (bytesRead == 0 && endOfMessage)
+                            break;
+
+                        if (bytesRead > _maxFrameBytes || assembled > _maxFrameBytes - bytesRead)
+                        {
+                            _logger.LogWarning(
+                                "Closing Bolt connection because assembled frame exceeded max size. assembled={Assembled} next={Bytes} max={Max}",
+                                assembled,
+                                bytesRead,
+                                _maxFrameBytes);
+                            return;
+                        }
+
                         if (assembled + bytesRead > largeBuffer.Length)
                         {
-                            var newBuf = ArrayPool<byte>.Shared.Rent(largeBuffer.Length * 2);
+                            var newCapacity = Math.Min(_maxFrameBytes, Math.Max(assembled + bytesRead, largeBuffer.Length * 2));
+                            var newBuf = ArrayPool<byte>.Shared.Rent(newCapacity);
                             largeBuffer.AsSpan(0, assembled).CopyTo(newBuf);
                             ArrayPool<byte>.Shared.Return(largeBuffer);
                             largeBuffer = newBuf;
@@ -208,6 +289,12 @@ public sealed class BoltServer : IDisposable
                     totalLength = bytesRead;
                 }
 
+                if (totalLength <= 0 || totalLength > _maxFrameBytes)
+                {
+                    _logger.LogWarning("Closing Bolt connection because frame size was invalid. size={Size} max={Max}", totalLength, _maxFrameBytes);
+                    break;
+                }
+
                 await ProcessFrameAsync(connection, frameBytes, totalLength, ct);
             }
         }
@@ -219,6 +306,8 @@ public sealed class BoltServer : IDisposable
         finally
         {
             connection.CompleteSendChannel();
+            if (connection.SendLoop is not null)
+                try { await connection.SendLoop; } catch { }
             ArrayPool<byte>.Shared.Return(receiveBuffer);
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             await RemoveConnectionAsync(connection);
@@ -231,6 +320,13 @@ public sealed class BoltServer : IDisposable
     private async Task ProcessFrameAsync(BoltHubConnection connection, byte[] buffer, int length, CancellationToken ct)
     {
         var frameType = (FrameType)buffer[0];
+
+        if (frameType != FrameType.Register && !connection.IsRegistered)
+        {
+            _logger.LogWarning("Closing unregistered Bolt connection after {FrameType} frame", frameType);
+            await connection.CloseAsync(ct);
+            return;
+        }
 
         switch (frameType)
         {
@@ -268,7 +364,7 @@ public sealed class BoltServer : IDisposable
                 break;
             case FrameType.StreamClose:
                 await RouteStreamFrameAsync(connection, buffer, length, ct);
-                CleanupStream(buffer);
+                CleanupStream(connection, buffer, length);
                 break;
 
             // ── Media frame routing ──
@@ -296,6 +392,13 @@ public sealed class BoltServer : IDisposable
 
     private async Task HandleRegisterAsync(BoltHubConnection connection, byte[] buffer, int length, CancellationToken ct)
     {
+        if (connection.IsRegistered)
+        {
+            _logger.LogWarning("Rejected duplicate Bolt register frame from {ClientId}", connection.ClientId);
+            await connection.CloseAsync(ct);
+            return;
+        }
+
         if (!BoltCodec.TryReadRegister(buffer.AsSpan(0, length), out var clientId, out var clientName, out _))
         {
             _logger.LogWarning("Invalid register frame");
@@ -317,9 +420,27 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
+        var serviceHash = BoltCodec.Fnv1aHash(clientId);
+        var existingClientId = _clientIdsByServiceHash.GetOrAdd(serviceHash, clientId);
+        if (!string.Equals(existingClientId, clientId, StringComparison.Ordinal))
+        {
+            _logger.LogWarning(
+                "Rejected Bolt register identity because service hash collision was detected. hash={ServiceHash} existingClientId={ExistingClientId} rejectedClientId={RejectedClientId}",
+                serviceHash,
+                existingClientId,
+                clientId);
+
+            var rejectWriter = new ArrayBufferWriter<byte>(2);
+            BoltCodec.WriteRegisterAck(rejectWriter, false);
+            await connection.SendAsync(rejectWriter.WrittenMemory, ct);
+            await connection.CloseAsync(ct);
+            return;
+        }
+
         connection.ClientId = clientId;
         connection.ClientName = clientName;
-        connection.ServiceHash = BoltCodec.Fnv1aHash(clientId);
+        connection.ServiceHash = serviceHash;
+        connection.IsRegistered = true;
 
         _connectionsByStreamId[connection.StreamId] = connection;
         _connectionsByServiceHash.AddOrUpdate(
@@ -341,9 +462,24 @@ public sealed class BoltServer : IDisposable
     {
         var span = buffer.AsSpan(0, length);
 
-        // Check for local handler first (direct mode — server handles request itself)
-        if ((_contextLocalHandlers.Count > 0 || _localHandlers.Count > 0)
-            && BoltCodec.TryReadRequest(span, out var frame, out var consumed))
+        if (!BoltCodec.TryReadRequest(span, out var frame, out var consumed))
+        {
+            _logger.LogWarning("Invalid request frame from {ClientId}", caller.ClientId);
+            return;
+        }
+
+        if (frame.SenderHash != caller.ServiceHash)
+        {
+            _logger.LogWarning(
+                "Rejected request with spoofed sender hash. client={ClientId} expected={ExpectedHash} actual={ActualHash}",
+                caller.ClientId,
+                caller.ServiceHash,
+                frame.SenderHash);
+            return;
+        }
+
+        // Check for local handler first (direct mode - server handles request itself)
+        if (_contextLocalHandlers.Count > 0 || _localHandlers.Count > 0)
         {
             if (_contextLocalHandlers.TryGetValue(frame.CommandHash, out var contextHandler))
             {
@@ -389,27 +525,40 @@ public sealed class BoltServer : IDisposable
             }
         }
 
-        // Hub mode — route to recipient
-        if (!BoltCodec.TryReadRequestHeader(span, out var requestId, out var recipientHash, out var totalSize))
-        {
-            _logger.LogWarning("Invalid request frame from {ClientId}", caller.ClientId);
-            return;
-        }
-
-        _pendingInvocations[requestId] = (caller, Environment.TickCount64);
-
-        var recipient = GetRecipient(recipientHash);
+        var recipient = GetRecipient(frame.RecipientHash);
         if (recipient is null)
         {
             var errWriter = RentedBufferWriter.GetThreadLocal();
-            BoltCodec.WriteResponse(errWriter, requestId, HttpStatusCode.NotFound, ReadOnlySpan<byte>.Empty);
+            BoltCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.NotFound, ReadOnlySpan<byte>.Empty);
             await caller.SendAsync(errWriter.WrittenMemory, ct);
-            _pendingInvocations.TryRemove(requestId, out _);
             return;
         }
 
-        // Forward raw bytes — zero decode, zero copy
-        await recipient.SendAsync(buffer.AsMemory(0, totalSize), ct);
+        if (!_pendingInvocations.TryAdd(frame.RequestId, new PendingInvocation(caller, recipient, Environment.TickCount64)))
+        {
+            var errWriter = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.Conflict, ReadOnlySpan<byte>.Empty);
+            await caller.SendAsync(errWriter.WrittenMemory, ct);
+            return;
+        }
+
+        try
+        {
+            await recipient.SendAsync(buffer.AsMemory(0, consumed), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _pendingInvocations.TryRemove(frame.RequestId, out _);
+            _logger.LogWarning(
+                ex,
+                "Failed to enqueue routed request {RequestId} to recipient {Recipient}",
+                frame.RequestId,
+                recipient.ClientId);
+
+            var errWriter = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.ServiceUnavailable, ReadOnlySpan<byte>.Empty);
+            await caller.SendAsync(errWriter.WrittenMemory, ct);
+        }
     }
 
     private async Task HandleResponseAsync(BoltHubConnection responder, byte[] buffer, int length, CancellationToken ct)
@@ -421,19 +570,49 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        if (_pendingInvocations.TryRemove(requestId, out var pending))
+        if (_pendingInvocations.TryGetValue(requestId, out var pending))
         {
-            await pending.Caller.SendAsync(buffer.AsMemory(0, totalSize), ct);
+            if (pending.ExpectedResponder.StreamId != responder.StreamId)
+            {
+                _logger.LogWarning(
+                    "Rejected response from unexpected responder. requestId={RequestId} expected={Expected} actual={Actual}",
+                    requestId,
+                    pending.ExpectedResponder.ClientId,
+                    responder.ClientId);
+                return;
+            }
+
+            if (_pendingInvocations.TryRemove(requestId, out var removed))
+                await removed.Caller.SendAsync(buffer.AsMemory(0, totalSize), ct);
         }
     }
 
     private async Task HandlePushAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
-        if (!BoltCodec.TryReadRequestHeader(buffer.AsSpan(0, length), out _, out var recipientHash, out var totalSize))
+        if (!BoltCodec.TryReadRequest(buffer.AsSpan(0, length), out var frame, out var totalSize))
+        {
+            _logger.LogWarning("Invalid push frame from {ClientId}", sender.ClientId);
             return;
+        }
+
+        if (frame.SenderHash != sender.ServiceHash)
+        {
+            _logger.LogWarning(
+                "Rejected push with spoofed sender hash. client={ClientId} expected={ExpectedHash} actual={ActualHash}",
+                sender.ClientId,
+                sender.ServiceHash,
+                frame.SenderHash);
+            return;
+        }
 
         // Broadcast: recipientHash == 0 → send to all connected clients (except sender)
-        if (recipientHash == 0)
+        if (frame.CommandHash == LargeRpcResponseHash)
+        {
+            await RouteLargeRpcResponsePushAsync(sender, frame, buffer, totalSize, ct);
+            return;
+        }
+
+        if (frame.RecipientHash == 0)
         {
             var data = buffer.AsMemory(0, totalSize);
             foreach (var (_, bag) in _connectionsByServiceHash)
@@ -448,9 +627,48 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        var recipient = GetRecipient(recipientHash);
+        var recipient = GetRecipient(frame.RecipientHash);
         if (recipient is not null && !recipient.IsUnderPressure)
             await recipient.SendAsync(buffer.AsMemory(0, totalSize), ct);
+    }
+
+    private async Task RouteLargeRpcResponsePushAsync(
+        BoltHubConnection sender,
+        RequestFrame frame,
+        byte[] buffer,
+        int totalSize,
+        CancellationToken ct)
+    {
+        var payload = frame.GetPayload(buffer.AsMemory(0, totalSize));
+        if (payload.Length < 18)
+        {
+            _logger.LogWarning("Rejected malformed large RPC response push from {ClientId}", sender.ClientId);
+            return;
+        }
+
+        var requestId = new Guid(payload.Span[..16]);
+        if (!_pendingInvocations.TryGetValue(requestId, out var pending))
+        {
+            _logger.LogWarning(
+                "Rejected large RPC response push without pending invocation. requestId={RequestId} sender={ClientId}",
+                requestId,
+                sender.ClientId);
+            return;
+        }
+
+        if (pending.ExpectedResponder.StreamId != sender.StreamId ||
+            pending.Caller.ServiceHash != frame.RecipientHash)
+        {
+            _logger.LogWarning(
+                "Rejected large RPC response push from unexpected responder or recipient. requestId={RequestId} sender={Sender} recipientHash={RecipientHash}",
+                requestId,
+                sender.ClientId,
+                frame.RecipientHash);
+            return;
+        }
+
+        if (_pendingInvocations.TryRemove(requestId, out var removed))
+            await removed.Caller.SendAsync(buffer.AsMemory(0, totalSize), ct);
     }
 
     /// <summary>Get the count of currently connected clients.</summary>
@@ -470,13 +688,13 @@ public sealed class BoltServer : IDisposable
 
     private void HandleStreamOpen(BoltHubConnection sender, byte[] buffer, int length)
     {
-        if (!BoltCodec.TryReadStreamOpen(buffer.AsSpan(0, length), out var streamId, out var recipientHash, out _))
+        if (!BoltCodec.TryReadStreamOpen(buffer.AsSpan(0, length), out var streamId, out var recipientHash, out var commandHash))
             return;
 
         var recipient = GetRecipient(recipientHash);
         if (recipient is not null)
         {
-            _activeStreams[streamId] = (sender, recipient);
+            _activeStreams[streamId] = new StreamRoute(sender, recipient, commandHash);
             _logger.LogDebug("Stream opened: {StreamId} from {Sender} to {Recipient}",
                 streamId, sender.ClientId, recipient.ClientId);
         }
@@ -490,6 +708,13 @@ public sealed class BoltServer : IDisposable
     {
         if (length < 17) return; // Need at least 1 byte type + 16 bytes streamId
 
+        if ((FrameType)buffer[0] == FrameType.StreamClose &&
+            !BoltCodec.TryReadStreamClose(buffer.AsSpan(0, length), out _, out _))
+        {
+            _logger.LogWarning("Rejected truncated stream close from {ClientId}", sender.ClientId);
+            return;
+        }
+
         var streamId = BoltCodec.ReadStreamId(buffer.AsSpan(0, length));
 
         if (!_activeStreams.TryGetValue(streamId, out var peers))
@@ -501,6 +726,12 @@ public sealed class BoltServer : IDisposable
         // forward to both peers (the one that sent it will ignore its own frame in its receive loop)
         // Actually, we route based on the stream open: sender→recipient for data, recipient→sender for data back
         // For simplicity, forward to recipient (sender initiated the stream)
+        if ((FrameType)buffer[0] == FrameType.StreamData &&
+            !TryAuthorizeStreamData(sender, peers, buffer, length))
+        {
+            return;
+        }
+
         BoltHubConnection? recipient = null;
         if (peers.Sender.StreamId == sender.StreamId)
             recipient = peers.Recipient;
@@ -513,16 +744,204 @@ public sealed class BoltServer : IDisposable
         await recipient.SendAsync(buffer.AsMemory(0, length), ct);
     }
 
-    private void CleanupStream(byte[] buffer)
+    private bool TryAuthorizeStreamData(BoltHubConnection sender, StreamRoute route, byte[] buffer, int length)
     {
-        if (buffer.Length >= 17)
+        if (route.CommandHash == LargeRpcCommandHash && route.Sender.StreamId == sender.StreamId)
+            return TryTrackLargeRpcRequest(route, buffer, length);
+
+        if (route.CommandHash == LargeRpcResponseStreamHash)
         {
-            var streamId = BoltCodec.ReadStreamId(buffer.AsSpan());
-            _activeStreams.TryRemove(streamId, out _);
+            if (route.Sender.StreamId != sender.StreamId)
+            {
+                _logger.LogWarning("Rejected large RPC response stream data from non-owner {ClientId}", sender.ClientId);
+                return false;
+            }
+
+            return TryValidateLargeRpcResponseStream(route, buffer, length);
+        }
+
+        return true;
+    }
+
+    private bool TryTrackLargeRpcRequest(StreamRoute route, byte[] buffer, int length)
+    {
+        lock (route.SyncRoot)
+        {
+            if (route.LargeRpcRequestTracked)
+                return true;
+
+            if (!BoltCodec.TryReadStreamData(buffer.AsSpan(0, length), out _, out var payloadOffset, out var payloadLength, out _))
+                return false;
+
+            if (payloadLength < 28)
+            {
+                _logger.LogWarning("Rejected malformed large RPC request header from {ClientId}", route.Sender.ClientId);
+                return false;
+            }
+
+            var payload = buffer.AsSpan(payloadOffset, payloadLength);
+            var requestId = new Guid(payload[..16]);
+            var metadataSenderHash = BinaryPrimitives.ReadInt32LittleEndian(payload[24..]);
+            if (metadataSenderHash != route.Sender.ServiceHash)
+            {
+                _logger.LogWarning(
+                    "Rejected large RPC request with spoofed metadata sender hash. requestId={RequestId} client={ClientId}",
+                    requestId,
+                    route.Sender.ClientId);
+                return false;
+            }
+
+            if (!_pendingInvocations.TryAdd(requestId, new PendingInvocation(route.Sender, route.Recipient, Environment.TickCount64)))
+            {
+                _logger.LogWarning(
+                    "Rejected large RPC request with duplicate request id. requestId={RequestId} client={ClientId}",
+                    requestId,
+                    route.Sender.ClientId);
+                return false;
+            }
+
+            route.LargeRpcRequestTracked = true;
+            return true;
         }
     }
 
+    private bool TryValidateLargeRpcResponseStream(StreamRoute route, byte[] buffer, int length)
+    {
+        lock (route.SyncRoot)
+        {
+            if (route.LargeRpcResponseValidated)
+                return true;
+
+            if (!BoltCodec.TryReadStreamData(buffer.AsSpan(0, length), out _, out var payloadOffset, out var payloadLength, out _))
+                return false;
+
+            if (payloadLength < 22)
+            {
+                _logger.LogWarning("Rejected malformed large RPC response stream header from {ClientId}", route.Sender.ClientId);
+                return false;
+            }
+
+            var payload = buffer.AsSpan(payloadOffset, payloadLength);
+            var requestId = new Guid(payload[..16]);
+            if (!_pendingInvocations.TryGetValue(requestId, out var pending))
+            {
+                _logger.LogWarning(
+                    "Rejected large RPC response stream without pending invocation. requestId={RequestId} sender={ClientId}",
+                    requestId,
+                    route.Sender.ClientId);
+                return false;
+            }
+
+            if (pending.ExpectedResponder.StreamId != route.Sender.StreamId ||
+                pending.Caller.ServiceHash != route.Recipient.ServiceHash)
+            {
+                _logger.LogWarning(
+                    "Rejected large RPC response stream from unexpected responder or recipient. requestId={RequestId} sender={Sender}",
+                    requestId,
+                    route.Sender.ClientId);
+                return false;
+            }
+
+            if (!_pendingInvocations.TryRemove(requestId, out _))
+                return false;
+
+            route.LargeRpcResponseValidated = true;
+            return true;
+        }
+    }
+
+    private void CleanupStream(BoltHubConnection sender, byte[] buffer, int length)
+    {
+        if (!BoltCodec.TryReadStreamClose(buffer.AsSpan(0, length), out var streamId, out _))
+            return;
+
+        if (!_activeStreams.TryGetValue(streamId, out var peers))
+            return;
+
+        if (peers.Sender.StreamId != sender.StreamId && peers.Recipient.StreamId != sender.StreamId)
+        {
+            _logger.LogWarning(
+                "Rejected stream close from nonparticipant. streamId={StreamId} client={ClientId}",
+                streamId,
+                sender.ClientId);
+            return;
+        }
+
+        _activeStreams.TryRemove(streamId, out _);
+    }
+
     // ── Media frame routing ──
+
+    private static bool IsSameConnection(BoltHubConnection? left, BoltHubConnection right)
+        => left is not null && left.StreamId == right.StreamId;
+
+    private static bool IsCallParticipant(ServerCallState callState, BoltHubConnection connection)
+    {
+        lock (callState.Participants)
+        {
+            return callState.Participants.Any(p => p.StreamId == connection.StreamId);
+        }
+    }
+
+    private static List<BoltHubConnection> GetParticipantSnapshot(ServerCallState callState)
+    {
+        lock (callState.Participants)
+        {
+            return new List<BoltHubConnection>(callState.Participants);
+        }
+    }
+
+    private static bool TryAddCallParticipant(ServerCallState callState, BoltHubConnection connection)
+    {
+        lock (callState.Participants)
+        {
+            if (callState.Participants.Any(p => p.StreamId == connection.StreamId))
+                return false;
+
+            callState.Participants.Add(connection);
+            return true;
+        }
+    }
+
+    private static bool TryRemoveCallParticipantByServiceHash(ServerCallState callState, int serviceHash, out string? removedClientId)
+    {
+        lock (callState.Participants)
+        {
+            var idx = callState.Participants.FindIndex(p => p.ServiceHash == serviceHash);
+            if (idx < 0)
+            {
+                removedClientId = null;
+                return false;
+            }
+
+            removedClientId = callState.Participants[idx].ClientId;
+            callState.Participants.RemoveAt(idx);
+            return true;
+        }
+    }
+
+    private static bool IsCallMediaActive(ServerCallState callState)
+        => callState.Status is ServerCallStatus.Active or ServerCallStatus.Held;
+
+    private static bool IsCallOwner(ServerCallState callState, BoltHubConnection connection)
+        => callState.CallerConnection.StreamId == connection.StreamId;
+
+    private static List<Guid> GetMediaStreamSnapshot(ServerCallState callState)
+    {
+        lock (callState.MediaStreamIds)
+        {
+            return new List<Guid>(callState.MediaStreamIds);
+        }
+    }
+
+    private static void AddMediaStream(ServerCallState callState, Guid streamId)
+    {
+        lock (callState.MediaStreamIds)
+        {
+            if (!callState.MediaStreamIds.Contains(streamId))
+                callState.MediaStreamIds.Add(streamId);
+        }
+    }
 
     /// <summary>
     /// Hot path for MediaFrame and FecFrame: header-only decode (streamId from bytes 1-16),
@@ -537,13 +956,35 @@ public sealed class BoltServer : IDisposable
         if (!_activeMediaStreams.TryGetValue(streamId, out var route))
             return;
 
+        if (route.Sender.StreamId != sender.StreamId)
+        {
+            _logger.LogWarning(
+                "Rejected media frame from non-owner. streamId={StreamId} owner={Owner} sender={Sender}",
+                streamId,
+                route.Sender.ClientId,
+                sender.ClientId);
+            return;
+        }
+
+        if (!_activeCalls.TryGetValue(route.CallId, out var owningCall) ||
+            !IsCallMediaActive(owningCall) ||
+            !IsCallParticipant(owningCall, sender))
+        {
+            _logger.LogWarning(
+                "Rejected media frame for inactive or unauthorized call. streamId={StreamId} call={CallId} sender={Sender}",
+                streamId,
+                route.CallId,
+                sender.ClientId);
+            return;
+        }
+
         var data = buffer.AsMemory(0, length);
 
         // Simulcast-aware routing: if this stream has a layer ID, only forward to
         // recipients whose preferred layer matches (or who have no preference = forward all)
         var isSimulcast = route.SimulcastLayerId.HasValue;
 
-        foreach (var recipient in route.Recipients)
+        foreach (var recipient in route.GetRecipientSnapshot())
         {
             if (recipient.StreamId == sender.StreamId || !recipient.IsAlive)
                 continue;
@@ -589,39 +1030,48 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        // Register or update the media stream route
+        if (!_activeCalls.TryGetValue(config.CallId, out var callState) ||
+            !IsCallMediaActive(callState) ||
+            !IsCallParticipant(callState, sender))
+        {
+            _logger.LogWarning(
+                "Rejected MediaConfig for inactive or unauthorized call. streamId={StreamId} call={CallId} sender={Sender}",
+                config.StreamId,
+                config.CallId,
+                sender.ClientId);
+            return;
+        }
+
+        // Register or update the media stream route.
         var route = _activeMediaStreams.GetOrAdd(config.StreamId, _ => new MediaStreamRoute
         {
             Sender = sender,
             CallId = config.CallId,
         });
 
-        // If the call exists, add stream to its tracking list
-        if (_activeCalls.TryGetValue(config.CallId, out var callState))
+        if (route.Sender.StreamId != sender.StreamId || route.CallId != config.CallId)
         {
-            lock (callState.MediaStreamIds)
-            {
-                if (!callState.MediaStreamIds.Contains(config.StreamId))
-                    callState.MediaStreamIds.Add(config.StreamId);
-            }
-
-            // Add all call participants (except sender) as recipients
-            lock (callState.Participants)
-            {
-                foreach (var participant in callState.Participants)
-                {
-                    if (participant.StreamId != sender.StreamId && !route.Recipients.Any(r => r.StreamId == participant.StreamId))
-                        route.Recipients.Add(participant);
-                }
-            }
+            _logger.LogWarning(
+                "Rejected MediaConfig that attempted to reuse a stream route. streamId={StreamId} owner={Owner} sender={Sender}",
+                config.StreamId,
+                route.Sender.ClientId,
+                sender.ClientId);
+            return;
         }
+
+        AddMediaStream(callState, config.StreamId);
+
+        // Add all call participants (except sender) as recipients
+        route.AddRecipients(GetParticipantSnapshot(callState));
 
         // Forward config to all recipients
         var data = buffer.AsMemory(0, length);
-        foreach (var recipient in route.Recipients)
+        foreach (var recipient in route.GetRecipientSnapshot())
         {
-            if (recipient.IsAlive)
+            if (recipient.IsAlive && IsCallParticipant(callState, recipient))
+            {
                 await recipient.SendAsync(data, ct);
+            }
         }
 
         _logger.LogDebug("Media stream registered: {StreamId} (call={CallId}, type={MediaType}, codec={CodecId}) from {ClientId}",
@@ -639,6 +1089,20 @@ public sealed class BoltServer : IDisposable
 
         if (!_activeMediaStreams.TryGetValue(streamId, out var route))
             return;
+
+        if (route.Sender.StreamId == sender.StreamId ||
+            !route.ContainsRecipient(sender) ||
+            !_activeCalls.TryGetValue(route.CallId, out var owningCall) ||
+            !IsCallMediaActive(owningCall) ||
+            !IsCallParticipant(owningCall, sender))
+        {
+            _logger.LogWarning(
+                "Rejected media feedback from unauthorized sender. streamId={StreamId} call={CallId} sender={Sender}",
+                streamId,
+                route.CallId,
+                sender.ClientId);
+            return;
+        }
 
         // Simulcast layer selection: if feedback contains Decrease/KeyframeNeeded,
         // downgrade the recipient to a lower layer; if Increase, upgrade.
@@ -704,6 +1168,7 @@ public sealed class BoltServer : IDisposable
                 break;
             case SignalType.DirectOffer:
             case SignalType.DirectAnswer:
+            case SignalType.KeyExchange:
                 await RelayCallSignalAsync(sender, buffer, length, header, ct);
                 break;
             default:
@@ -739,6 +1204,12 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
+        if (callee.StreamId == caller.StreamId)
+        {
+            _logger.LogWarning("Rejected self-call initiate from {ClientId}", caller.ClientId);
+            return;
+        }
+
         var callState = new ServerCallState
         {
             CallId = header.CallId,
@@ -749,7 +1220,14 @@ public sealed class BoltServer : IDisposable
         callState.Participants.Add(caller);
         callState.Participants.Add(callee);
 
-        _activeCalls[header.CallId] = callState;
+        if (!_activeCalls.TryAdd(header.CallId, callState))
+        {
+            _logger.LogWarning(
+                "Rejected CallSignal Initiate with duplicate call id. call={CallId} sender={ClientId}",
+                header.CallId,
+                caller.ClientId);
+            return;
+        }
 
         // Send Ring back to caller
         var ringWriter = RentedBufferWriter.GetThreadLocal();
@@ -774,6 +1252,15 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
+        if (!IsSameConnection(callState.CalleeConnection, sender) || callState.Status != ServerCallStatus.Ringing)
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized CallSignal Answer. call={CallId} sender={ClientId}",
+                header.CallId,
+                sender.ClientId);
+            return;
+        }
+
         callState.Status = ServerCallStatus.Active;
 
         // Forward Answer to the caller
@@ -792,6 +1279,15 @@ public sealed class BoltServer : IDisposable
     {
         if (!_activeCalls.TryGetValue(header.CallId, out var callState))
             return;
+
+        if (!IsSameConnection(callState.CalleeConnection, sender) || callState.Status != ServerCallStatus.Ringing)
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized CallSignal Reject. call={CallId} sender={ClientId}",
+                header.CallId,
+                sender.ClientId);
+            return;
+        }
 
         callState.Status = ServerCallStatus.Rejected;
 
@@ -814,17 +1310,23 @@ public sealed class BoltServer : IDisposable
         if (!_activeCalls.TryGetValue(header.CallId, out var callState))
             return;
 
+        if (!IsCallParticipant(callState, sender))
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized CallSignal End. call={CallId} sender={ClientId}",
+                header.CallId,
+                sender.ClientId);
+            return;
+        }
+
         callState.Status = ServerCallStatus.Ended;
 
         // Forward End to all other participants (supports group calls)
         var data = buffer.AsMemory(0, length);
-        lock (callState.Participants)
+        foreach (var participant in GetParticipantSnapshot(callState))
         {
-            foreach (var participant in callState.Participants)
-            {
-                if (participant.StreamId != sender.StreamId && participant.IsAlive)
-                    _ = participant.SendAsync(data, ct);
-            }
+            if (participant.StreamId != sender.StreamId && participant.IsAlive)
+                _ = participant.SendAsync(data, ct);
         }
 
         CleanupCall(header.CallId);
@@ -843,15 +1345,24 @@ public sealed class BoltServer : IDisposable
         if (!_activeCalls.TryGetValue(header.CallId, out var callState))
             return;
 
+        if (!IsCallParticipant(callState, sender) || callState.Status is ServerCallStatus.Ringing or ServerCallStatus.Ended or ServerCallStatus.Rejected)
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized CallSignal {SignalType}. call={CallId} sender={ClientId}",
+                header.SignalType,
+                header.CallId,
+                sender.ClientId);
+            return;
+        }
+
         callState.Status = header.SignalType == SignalType.Hold ? ServerCallStatus.Held : ServerCallStatus.Active;
 
-        // Forward to the other party
-        var otherParty = callState.CallerConnection.StreamId == sender.StreamId
-            ? callState.CalleeConnection
-            : callState.CallerConnection;
-
-        if (otherParty is { IsAlive: true })
-            await otherParty.SendAsync(buffer.AsMemory(0, length), ct);
+        var data = buffer.AsMemory(0, length);
+        foreach (var participant in GetParticipantSnapshot(callState))
+        {
+            if (participant.StreamId != sender.StreamId && participant.IsAlive)
+                _ = participant.SendAsync(data, ct);
+        }
     }
 
     /// <summary>
@@ -862,12 +1373,22 @@ public sealed class BoltServer : IDisposable
         if (!_activeCalls.TryGetValue(header.CallId, out var callState))
             return;
 
-        var otherParty = callState.CallerConnection.StreamId == sender.StreamId
-            ? callState.CalleeConnection
-            : callState.CallerConnection;
+        if (!IsCallParticipant(callState, sender) || !IsCallMediaActive(callState))
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized CallSignal {SignalType}. call={CallId} sender={ClientId}",
+                header.SignalType,
+                header.CallId,
+                sender.ClientId);
+            return;
+        }
 
-        if (otherParty is { IsAlive: true })
-            await otherParty.SendAsync(buffer.AsMemory(0, length), ct);
+        var data = buffer.AsMemory(0, length);
+        foreach (var participant in GetParticipantSnapshot(callState))
+        {
+            if (participant.StreamId != sender.StreamId && participant.IsAlive)
+                _ = participant.SendAsync(data, ct);
+        }
     }
 
     // ── Group call: Add/Remove participant ──
@@ -882,6 +1403,15 @@ public sealed class BoltServer : IDisposable
         if (!_activeCalls.TryGetValue(header.CallId, out var callState))
         {
             _logger.LogDebug("Call {CallId} AddParticipant from {ClientId} but call not found", header.CallId, sender.ClientId);
+            return;
+        }
+
+        if (!IsCallOwner(callState, sender) || !IsCallMediaActive(callState))
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized CallSignal AddParticipant. call={CallId} sender={ClientId}",
+                header.CallId,
+                sender.ClientId);
             return;
         }
 
@@ -901,31 +1431,24 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        // Add to participants list
-        lock (callState.Participants)
+        if (!TryAddCallParticipant(callState, newParticipant))
         {
-            if (!callState.Participants.Any(p => p.StreamId == newParticipant.StreamId))
-                callState.Participants.Add(newParticipant);
+            _logger.LogDebug(
+                "Call {CallId} AddParticipant ignored existing participant {Participant}",
+                header.CallId,
+                newParticipant.ClientId);
+            return;
         }
 
         // Add to all existing media stream routes as a recipient + request keyframes from senders
-        List<Guid> streamIds;
-        lock (callState.MediaStreamIds)
-        {
-            streamIds = new List<Guid>(callState.MediaStreamIds);
-        }
-
-        foreach (var streamId in streamIds)
+        foreach (var streamId in GetMediaStreamSnapshot(callState))
         {
             if (!_activeMediaStreams.TryGetValue(streamId, out var route))
                 continue;
 
             // Add new participant as recipient (if not already present and not the sender)
-            if (route.Sender.StreamId != newParticipant.StreamId &&
-                !route.Recipients.Any(r => r.StreamId == newParticipant.StreamId))
-            {
-                route.Recipients.Add(newParticipant);
-            }
+            if (route.Sender.StreamId != newParticipant.StreamId)
+                route.AddRecipient(newParticipant);
 
             // Send MediaKeyRequest to the stream's sender so the new participant gets a keyframe
             if (route.Sender.IsAlive)
@@ -938,13 +1461,10 @@ public sealed class BoltServer : IDisposable
 
         // Forward the AddParticipant signal to all existing participants
         var data = buffer.AsMemory(0, length);
-        lock (callState.Participants)
+        foreach (var participant in GetParticipantSnapshot(callState))
         {
-            foreach (var participant in callState.Participants)
-            {
-                if (participant.StreamId != sender.StreamId && participant.StreamId != newParticipant.StreamId && participant.IsAlive)
-                    _ = participant.SendAsync(data, ct);
-            }
+            if (participant.StreamId != sender.StreamId && participant.StreamId != newParticipant.StreamId && participant.IsAlive)
+                _ = participant.SendAsync(data, ct);
         }
 
         // Also send the signal to the new participant
@@ -967,6 +1487,15 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
+        if (!IsCallOwner(callState, sender) || !IsCallMediaActive(callState))
+        {
+            _logger.LogWarning(
+                "Rejected unauthorized CallSignal RemoveParticipant. call={CallId} sender={ClientId}",
+                header.CallId,
+                sender.ClientId);
+            return;
+        }
+
         if (header.PayloadLength < 4)
         {
             _logger.LogWarning("CallSignal RemoveParticipant from {ClientId} has no recipient hash in payload", sender.ClientId);
@@ -976,40 +1505,27 @@ public sealed class BoltServer : IDisposable
         var recipientHash = BinaryPrimitives.ReadInt32LittleEndian(
             buffer.AsSpan(header.PayloadOffset, 4));
 
-        // Remove from participants list
-        string? removedClientId = null;
-        lock (callState.Participants)
-        {
-            var idx = callState.Participants.FindIndex(p => p.ServiceHash == recipientHash);
-            if (idx >= 0)
-            {
-                removedClientId = callState.Participants[idx].ClientId;
-                callState.Participants.RemoveAt(idx);
-            }
-        }
+        if (!TryRemoveCallParticipantByServiceHash(callState, recipientHash, out var removedClientId))
+            return;
 
         // Remove from all media stream recipient lists
-        List<Guid> streamIds;
-        lock (callState.MediaStreamIds)
-        {
-            streamIds = new List<Guid>(callState.MediaStreamIds);
-        }
-
-        foreach (var streamId in streamIds)
+        foreach (var streamId in GetMediaStreamSnapshot(callState))
         {
             if (_activeMediaStreams.TryGetValue(streamId, out var route))
-                route.Recipients.RemoveAll(r => r.ServiceHash == recipientHash);
+            {
+                if (route.Sender.ServiceHash == recipientHash)
+                    _activeMediaStreams.TryRemove(streamId, out _);
+                else
+                    route.RemoveRecipientsWhere(r => r.ServiceHash == recipientHash);
+            }
         }
 
         // Forward the RemoveParticipant signal to remaining participants
         var data = buffer.AsMemory(0, length);
-        lock (callState.Participants)
+        foreach (var participant in GetParticipantSnapshot(callState))
         {
-            foreach (var participant in callState.Participants)
-            {
-                if (participant.StreamId != sender.StreamId && participant.IsAlive)
-                    _ = participant.SendAsync(data, ct);
-            }
+            if (participant.StreamId != sender.StreamId && participant.IsAlive)
+                _ = participant.SendAsync(data, ct);
         }
 
         _logger.LogDebug("Call {CallId} participant removed: {Removed} (by {Sender})",
@@ -1083,11 +1599,8 @@ public sealed class BoltServer : IDisposable
     {
         if (_activeCalls.TryRemove(callId, out var callState))
         {
-            lock (callState.MediaStreamIds)
-            {
-                foreach (var streamId in callState.MediaStreamIds)
-                    _activeMediaStreams.TryRemove(streamId, out _);
-            }
+            foreach (var streamId in GetMediaStreamSnapshot(callState))
+                _activeMediaStreams.TryRemove(streamId, out _);
         }
     }
 
@@ -1506,39 +2019,100 @@ public sealed class BoltServer : IDisposable
         return true;
     }
 
-    private static bool ValidateRegisterIdentity(BoltHubConnection connection, string clientId, string clientName)
+    private bool ValidateRegisterIdentity(BoltHubConnection connection, string clientId, string clientName)
     {
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientName))
             return false;
+
+        if (_registrationIdentityBindingMode == BoltRegistrationIdentityBindingMode.Off)
+            return true;
 
         var user = connection.User;
         if (user?.Identity?.IsAuthenticated != true)
             return true;
 
-        var hasServiceScope = user.Claims.Any(claim =>
-            string.Equals(claim.Type, "scope", StringComparison.OrdinalIgnoreCase) &&
-            claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Any(scope => string.Equals(scope, "bolt.service", StringComparison.Ordinal)));
+        var hasServiceScope = HasRequiredServiceScope(user);
+        var serviceClaim = ResolveServiceIdentityName(user);
+        var isReservedServiceIdentity = IsReservedServiceIdentity(clientId, clientName);
 
-        var serviceClaim =
-            user.FindFirstValue("client_id") ??
-            user.FindFirstValue("service") ??
-            user.FindFirstValue("azp");
+        if (!hasServiceScope && !isReservedServiceIdentity)
+            return true;
 
-        var isDeterministicServiceClientId = string.Equals(clientId, Sha256Hex(clientName), StringComparison.Ordinal);
-        var isReservedServiceName = isDeterministicServiceClientId ||
-                                    clientName.StartsWith("XFramework.", StringComparison.Ordinal) ||
-                                    string.Equals(clientName, serviceClaim, StringComparison.Ordinal);
-
+        string? rejectionReason = null;
         if (!hasServiceScope)
-            return !isReservedServiceName;
+            rejectionReason = $"authenticated service registration requires scope '{_requiredServiceScope}'";
+        else if (string.IsNullOrWhiteSpace(serviceClaim))
+            rejectionReason = "authenticated service registration requires a service identity claim";
+        else if (!string.Equals(serviceClaim, clientName, StringComparison.Ordinal))
+            rejectionReason = "registered Bolt client name must match the authenticated service identity";
+        else if (!string.Equals(clientId, Sha256Hex(serviceClaim), StringComparison.Ordinal))
+            rejectionReason = "registered Bolt client id must be SHA256(authenticated service identity)";
 
-        return string.Equals(serviceClaim, clientName, StringComparison.Ordinal) &&
-               string.Equals(clientId, Sha256Hex(clientName), StringComparison.Ordinal);
+        if (rejectionReason is null)
+            return true;
+
+        if (_registrationIdentityBindingMode == BoltRegistrationIdentityBindingMode.Audit)
+        {
+            _logger.LogWarning(
+                "Bolt registration identity mismatch allowed in audit mode. reason={Reason} clientId={ClientId} clientName={ClientName} serviceClaim={ServiceClaim}",
+                rejectionReason,
+                clientId,
+                clientName,
+                serviceClaim);
+            return true;
+        }
+
+        _logger.LogWarning(
+            "Bolt registration identity mismatch rejected. reason={Reason} clientId={ClientId} clientName={ClientName} serviceClaim={ServiceClaim}",
+            rejectionReason,
+            clientId,
+            clientName,
+            serviceClaim);
+        return false;
+    }
+
+    private bool IsReservedServiceIdentity(string clientId, string clientName) =>
+        _reservedServiceNames.Contains(clientName) ||
+        _reservedServiceClientIds.Contains(clientId) ||
+        _reservedServiceNamePrefixes.Any(prefix => clientName.StartsWith(prefix, StringComparison.Ordinal));
+
+    private bool HasRequiredServiceScope(ClaimsPrincipal user) =>
+        user.Claims
+            .Where(static claim =>
+                string.Equals(claim.Type, "scope", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(claim.Type, "scp", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(static claim => claim.Value.Split(
+                ' ',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Any(scope => string.Equals(scope, _requiredServiceScope, StringComparison.OrdinalIgnoreCase));
+
+    private string? ResolveServiceIdentityName(ClaimsPrincipal user)
+    {
+        foreach (var claimType in _serviceIdentityClaimTypes)
+        {
+            var value = user.FindFirstValue(claimType);
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
     }
 
     private static string Sha256Hex(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
+    private static HashSet<string> NormalizeOptionSet(IEnumerable<string> values, StringComparer comparer) =>
+        values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .ToHashSet(comparer);
+
+    private static string[] NormalizeOptionList(IEnumerable<string> values) =>
+        values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
     private BoltHubConnection? GetRecipient(int serviceHash)
     {
@@ -1586,9 +2160,15 @@ public sealed class BoltServer : IDisposable
             {
                 var updated = new ConcurrentBag<BoltHubConnection>(bag.Where(c => c.StreamId != connection.StreamId));
                 if (updated.IsEmpty)
+                {
                     _connectionsByServiceHash.TryRemove(connection.ServiceHash, out _);
+                    _clientIdsByServiceHash.TryRemove(
+                        new KeyValuePair<int, string>(connection.ServiceHash, connection.ClientId));
+                }
                 else
+                {
                     _connectionsByServiceHash[connection.ServiceHash] = updated;
+                }
             }
 
             _logger.LogInformation("Client disconnected: {ClientId} ({ClientName})", connection.ClientId, connection.ClientName);
@@ -1597,38 +2177,35 @@ public sealed class BoltServer : IDisposable
 
         foreach (var (requestId, pending) in _pendingInvocations)
         {
-            if (pending.Caller.StreamId == connection.StreamId)
+            if (pending.Caller.StreamId == connection.StreamId || pending.ExpectedResponder.StreamId == connection.StreamId)
                 _pendingInvocations.TryRemove(requestId, out _);
         }
 
         // End any active calls this connection is part of
         foreach (var (callId, callState) in _activeCalls)
         {
-            var isParticipant = callState.CallerConnection.StreamId == connection.StreamId
-                || (callState.CalleeConnection is not null && callState.CalleeConnection.StreamId == connection.StreamId);
-
-            if (!isParticipant) continue;
+            if (!IsCallParticipant(callState, connection))
+                continue;
 
             callState.Status = ServerCallStatus.Ended;
 
-            // Notify the other party
-            var otherParty = callState.CallerConnection.StreamId == connection.StreamId
-                ? callState.CalleeConnection
-                : callState.CallerConnection;
-
-            if (otherParty is { IsAlive: true })
+            // Notify the other participants.
+            foreach (var participant in GetParticipantSnapshot(callState))
             {
+                if (participant.StreamId == connection.StreamId || !participant.IsAlive)
+                    continue;
+
+                var writer = RentedBufferWriter.GetThreadLocal();
                 try
                 {
-                    var writer = RentedBufferWriter.GetThreadLocal();
                     BoltCodec.WriteCallSignal(writer, callId, SignalType.End, ReadOnlySpan<byte>.Empty);
-                    // Fire-and-forget: we're in cleanup, can't await reliably
-                    _ = otherParty.SendAsync(writer.WrittenMemory, CancellationToken.None);
+                    _ = participant.SendAsync(writer.WrittenMemory, CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogDebug(ex, "Failed to send End signal for call {CallId} during disconnect cleanup", callId);
                 }
+                finally { writer.Reset(); }
             }
 
             CleanupCall(callId);
@@ -1637,7 +2214,7 @@ public sealed class BoltServer : IDisposable
         // Remove connection from any media stream recipient lists
         foreach (var (streamId, route) in _activeMediaStreams)
         {
-            route.Recipients.RemoveAll(r => r.StreamId == connection.StreamId);
+            route.RemoveRecipientsWhere(r => r.StreamId == connection.StreamId);
 
             // If sender disconnected, remove the whole route
             if (route.Sender.StreamId == connection.StreamId)
@@ -1779,7 +2356,8 @@ public sealed record BoltRequestContext(
     string? ClientId,
     string? ClientName,
     int ServiceHash,
-    BoltTransport TransportType)
+    BoltTransport TransportType,
+    ClaimsPrincipal? User)
 {
     internal static BoltRequestContext FromConnection(BoltHubConnection connection) =>
         new(
@@ -1787,7 +2365,8 @@ public sealed record BoltRequestContext(
             connection.ClientId,
             connection.ClientName,
             connection.ServiceHash,
-            connection.TransportType);
+            connection.TransportType,
+            connection.User);
 }
 
 public sealed record BoltClientConnectionEvent(
@@ -1808,6 +2387,21 @@ public sealed record BoltClientConnectionEvent(
             DateTime.UtcNow);
 }
 
+internal sealed record PendingInvocation(
+    BoltHubConnection Caller,
+    BoltHubConnection ExpectedResponder,
+    long Timestamp);
+
+internal sealed class StreamRoute(BoltHubConnection sender, BoltHubConnection recipient, int commandHash)
+{
+    public BoltHubConnection Sender { get; } = sender;
+    public BoltHubConnection Recipient { get; } = recipient;
+    public int CommandHash { get; } = commandHash;
+    public object SyncRoot { get; } = new();
+    public bool LargeRpcRequestTracked { get; set; }
+    public bool LargeRpcResponseValidated { get; set; }
+}
+
 /// <summary>
 /// Server-side wrapper for a connected client's transport.
 /// Uses a Channel-based send queue with a dedicated background send loop
@@ -1819,13 +2413,15 @@ public sealed class BoltHubConnection
 {
     private readonly IBoltConnection _transport;
     private readonly Channel<(byte[] Buffer, int Length)> _sendChannel;
-    private Task? _sendLoop;
+    private readonly TimeSpan _sendEnqueueTimeout;
+    public Task? SendLoop { get; private set; }
 
     public string StreamId { get; } = Guid.NewGuid().ToString("N");
     public string? ClientId { get; set; }
     public string? ClientName { get; set; }
     public ClaimsPrincipal? User { get; set; }
     public int ServiceHash { get; set; }
+    public bool IsRegistered { get; set; }
     public bool IsAlive => _transport.IsConnected;
     public BoltTransport TransportType => _transport.TransportType;
 
@@ -1842,11 +2438,14 @@ public sealed class BoltHubConnection
     /// <summary>True if this connection is under backpressure (pending > drop threshold).</summary>
     public bool IsUnderPressure => PendingBytes > BackpressureDropThreshold;
 
-    public BoltHubConnection(IBoltConnection transport)
+    public BoltHubConnection(IBoltConnection transport, int sendQueueCapacity = 4096, int sendEnqueueTimeoutMs = 0)
     {
         _transport = transport;
+        _sendEnqueueTimeout = sendEnqueueTimeoutMs > 0
+            ? TimeSpan.FromMilliseconds(sendEnqueueTimeoutMs)
+            : TimeSpan.Zero;
         _sendChannel = Channel.CreateBounded<(byte[], int)>(
-            new BoundedChannelOptions(4096)
+            new BoundedChannelOptions(Math.Max(1, sendQueueCapacity))
             {
                 FullMode = BoundedChannelFullMode.Wait,
                 SingleReader = true,
@@ -1857,7 +2456,7 @@ public sealed class BoltHubConnection
     /// <summary>Start the background send loop. Call once after construction.</summary>
     public void StartSendLoop(CancellationToken ct)
     {
-        _sendLoop = Task.Run(async () =>
+        SendLoop = Task.Run(async () =>
         {
             try
             {
@@ -1866,7 +2465,15 @@ public sealed class BoltHubConnection
                     try
                     {
                         if (_transport.IsConnected)
-                            await _transport.SendAsync(buf.AsMemory(0, len), ct);
+                        {
+                            using var sendTimeoutCts = _sendEnqueueTimeout > TimeSpan.Zero
+                                ? new CancellationTokenSource(_sendEnqueueTimeout)
+                                : null;
+                            using var linkedSendCts = sendTimeoutCts is null
+                                ? CancellationTokenSource.CreateLinkedTokenSource(ct)
+                                : CancellationTokenSource.CreateLinkedTokenSource(ct, sendTimeoutCts.Token);
+                            await _transport.SendAsync(buf.AsMemory(0, len), linkedSendCts.Token);
+                        }
                     }
                     catch (OperationCanceledException) { }
                     catch { /* Transport error — receive loop will detect disconnect */ }
@@ -1878,6 +2485,14 @@ public sealed class BoltHubConnection
                 }
             }
             catch (OperationCanceledException) { }
+            finally
+            {
+                while (_sendChannel.Reader.TryRead(out var pending))
+                {
+                    ArrayPool<byte>.Shared.Return(pending.Buffer);
+                    Interlocked.Add(ref _pendingBytes, -pending.Length);
+                }
+            }
         }, ct);
     }
 
@@ -1898,7 +2513,31 @@ public sealed class BoltHubConnection
 
     private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)
     {
-        await _sendChannel.Writer.WriteAsync((buf, len), ct);
+        CancellationTokenSource? timeoutCts = null;
+        CancellationTokenSource? linkedCts = null;
+        var enqueueToken = ct;
+        try
+        {
+            if (_sendEnqueueTimeout > TimeSpan.Zero)
+            {
+                timeoutCts = new CancellationTokenSource(_sendEnqueueTimeout);
+                linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+                enqueueToken = linkedCts.Token;
+            }
+
+            await _sendChannel.Writer.WriteAsync((buf, len), enqueueToken);
+        }
+        catch
+        {
+            ArrayPool<byte>.Shared.Return(buf);
+            Interlocked.Add(ref _pendingBytes, -len);
+            throw;
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+            timeoutCts?.Dispose();
+        }
     }
 
     /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>
@@ -1913,8 +2552,10 @@ public sealed class BoltHubConnection
 /// </summary>
 internal sealed class MediaStreamRoute
 {
+    private readonly object _sync = new();
+    private readonly List<BoltHubConnection> _recipients = new();
+
     public BoltHubConnection Sender { get; init; } = null!;
-    public List<BoltHubConnection> Recipients { get; } = new();
     public Guid CallId { get; init; }
 
     /// <summary>
@@ -1923,6 +2564,57 @@ internal sealed class MediaStreamRoute
     /// The hub forwards only the selected layer per recipient.
     /// </summary>
     public byte? SimulcastLayerId { get; set; }
+
+    public bool ContainsRecipient(BoltHubConnection connection)
+    {
+        lock (_sync)
+        {
+            return _recipients.Any(r => r.StreamId == connection.StreamId);
+        }
+    }
+
+    public bool AddRecipient(BoltHubConnection connection)
+    {
+        lock (_sync)
+        {
+            if (_recipients.Any(r => r.StreamId == connection.StreamId))
+                return false;
+
+            _recipients.Add(connection);
+            return true;
+        }
+    }
+
+    public void AddRecipients(IEnumerable<BoltHubConnection> connections)
+    {
+        lock (_sync)
+        {
+            foreach (var connection in connections)
+            {
+                if (connection.StreamId == Sender.StreamId)
+                    continue;
+
+                if (!_recipients.Any(r => r.StreamId == connection.StreamId))
+                    _recipients.Add(connection);
+            }
+        }
+    }
+
+    public void RemoveRecipientsWhere(Predicate<BoltHubConnection> predicate)
+    {
+        lock (_sync)
+        {
+            _recipients.RemoveAll(predicate);
+        }
+    }
+
+    public BoltHubConnection[] GetRecipientSnapshot()
+    {
+        lock (_sync)
+        {
+            return _recipients.ToArray();
+        }
+    }
 }
 
 /// <summary>Server-side call status.</summary>

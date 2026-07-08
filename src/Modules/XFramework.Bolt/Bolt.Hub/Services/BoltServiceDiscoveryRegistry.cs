@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
 using Bolt.Server;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Shared.ServiceIdentity;
 
 namespace Bolt.Hub.Services;
 
@@ -46,6 +48,12 @@ public sealed class BoltServiceDiscoveryRegistry(
                 Accepted = false,
                 Message = "Registered Bolt client id is required before advertising a manifest."
             };
+        }
+
+        var authorization = ValidateManifestAdvertisement(context, manifest);
+        if (!authorization.Accepted)
+        {
+            return authorization;
         }
 
         return await presenceTracker.UpdateAsync(
@@ -166,7 +174,8 @@ public sealed class BoltServiceDiscoveryRegistry(
                     connectionEvent.ClientId,
                     connectionEvent.ClientName,
                     connectionEvent.ServiceHash,
-                    connectionEvent.TransportType),
+                    connectionEvent.TransportType,
+                    null),
                 new BoltServiceManifest());
             var manifestJson = JsonSerializer.Serialize(manifest, JsonOptions);
 
@@ -437,6 +446,67 @@ public sealed class BoltServiceDiscoveryRegistry(
 
         return manifest;
     }
+
+    private static BoltServiceManifestAdvertisementResponse ValidateManifestAdvertisement(
+        BoltRequestContext context,
+        BoltServiceManifest manifest)
+    {
+        var user = context.User;
+        if (user?.Identity?.IsAuthenticated != true)
+        {
+            return Reject("Authenticated service identity is required before advertising a manifest.");
+        }
+
+        if (!HasBoltServiceScope(user))
+        {
+            return Reject("Service identity must include the bolt.service scope before advertising a manifest.");
+        }
+
+        var serviceName = ResolveServiceName(user);
+        if (string.IsNullOrWhiteSpace(serviceName))
+        {
+            return Reject("Service identity claim is required before advertising a manifest.");
+        }
+
+        if (!string.Equals(context.ClientName, serviceName, StringComparison.Ordinal))
+        {
+            return Reject("Registered Bolt client name must match the authenticated service identity.");
+        }
+
+        if (!string.Equals(context.ClientId, ComputeSha256(serviceName), StringComparison.OrdinalIgnoreCase))
+        {
+            return Reject("Registered Bolt client id must match the authenticated service identity.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.ServiceName) &&
+            !string.Equals(manifest.ServiceName, serviceName, StringComparison.Ordinal))
+        {
+            return Reject("Manifest service name must match the authenticated service identity.");
+        }
+
+        manifest.ServiceName = serviceName;
+        return new BoltServiceManifestAdvertisementResponse { Accepted = true, Message = "Accepted" };
+    }
+
+    private static bool HasBoltServiceScope(ClaimsPrincipal user) =>
+        user.Claims
+            .Where(static claim => claim.Type is "scope" or "scp")
+            .SelectMany(static claim => claim.Value.Split(
+                ' ',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Any(static scope => string.Equals(scope, XFrameworkServiceScopes.BoltService, StringComparison.OrdinalIgnoreCase));
+
+    private static string? ResolveServiceName(ClaimsPrincipal user) =>
+        user.FindFirstValue("client_id") ??
+        user.FindFirstValue("service") ??
+        user.FindFirstValue("azp");
+
+    private static BoltServiceManifestAdvertisementResponse Reject(string message) =>
+        new()
+        {
+            Accepted = false,
+            Message = message
+        };
 
     private static void NormalizeFeature(BoltModuleManifest module, BoltTenantModuleFeatureManifest feature)
     {

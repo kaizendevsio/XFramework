@@ -15,6 +15,34 @@ public class BoltServerOptions
     /// <summary>RPC invocation timeout in milliseconds. Default: 30000.</summary>
     public int InvocationTimeoutMs { get; set; } = 30_000;
 
+    /// <summary>Maximum complete Bolt frame size accepted by receive loops. Default: 100MB.</summary>
+    public int MaxFrameBytes { get; set; } = 100 * 1024 * 1024;
+
+    /// <summary>Bounded send queue capacity per connection. Default: 4096.</summary>
+    public int SendQueueCapacity { get; set; } = 4096;
+
+    /// <summary>Max time to wait for a send queue slot. 0 uses InvocationTimeoutMs.</summary>
+    public int SendEnqueueTimeoutMs { get; set; } = 0;
+
+    /// <summary>Controls whether authenticated service identities are bound to Bolt registration identities.</summary>
+    public BoltRegistrationIdentityBindingMode RegistrationIdentityBindingMode { get; set; } =
+        BoltRegistrationIdentityBindingMode.Audit;
+
+    /// <summary>Scope required before an authenticated principal can register a reserved service identity.</summary>
+    public string RequiredServiceScope { get; set; } = "bolt.service";
+
+    /// <summary>Claims inspected, in order, to resolve the authenticated service name.</summary>
+    public List<string> ServiceIdentityClaimTypes { get; } = ["client_id", "service", "azp", "sub"];
+
+    /// <summary>Service names whose Bolt registrations are reserved for authenticated service principals.</summary>
+    public List<string> ReservedServiceNames { get; } = [];
+
+    /// <summary>Service name prefixes whose Bolt registrations are reserved for authenticated service principals.</summary>
+    public List<string> ReservedServiceNamePrefixes { get; } = [];
+
+    /// <summary>Client IDs whose Bolt registrations are reserved for authenticated service principals.</summary>
+    public List<string> ReservedServiceClientIds { get; } = [];
+
     /// <summary>
     /// Media processors that receive copies of media frames for server-side processing
     /// (recording, transcription, AI analysis, etc.).

@@ -7,6 +7,9 @@ using XFramework.Integration.Abstractions;
 
 namespace Bolt.Hub.Services;
 
+// Approved architecture exception documented in
+// docs/solutions/architecture-patterns/bolt-hub-operational-constraints-and-exceptions.md:
+// the Hub performs read-only Identity/Communications checks to authorize Communications topic access.
 public sealed class CommunicationsBoltTopicAuthorizer(
     IServiceScopeFactory scopeFactory,
     IJwtService jwtService,

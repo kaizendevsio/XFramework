@@ -21,6 +21,9 @@ public class BoltClientOptions
     /// <summary>RPC call timeout in seconds. Default: 30.</summary>
     public int RpcTimeoutSeconds { get; set; } = 30;
 
+    /// <summary>Maximum complete Bolt frame size accepted by receive loops. Default: 100MB.</summary>
+    public int MaxFrameBytes { get; set; } = 100 * 1024 * 1024;
+
     /// <summary>
     /// Static bearer token sent during the Bolt WebSocket handshake.
     /// Prefer AccessTokenProvider for long-running clients.
@@ -46,6 +49,20 @@ public class BoltClientOptions
 
     /// <summary>Pending send count threshold to trigger connection scale-up. Default: 48.</summary>
     public int ScaleUpThreshold { get; set; } = 48;
+
+    /// <summary>Bounded send queue capacity per connection. Default: 4096.</summary>
+    public int SendQueueCapacity { get; set; } = 4096;
+
+    /// <summary>Maximum time to wait when the send queue is full. Default: RPC timeout.</summary>
+    public int SendEnqueueTimeoutMs { get; set; } = 0;
+
+    /// <summary>
+    /// Maximum buffered pub/sub events per subscription. Slow transient subscriptions drop
+    /// the oldest unread event; slow durable subscriptions fail locally without dropping
+    /// unread entries so persisted messages can replay later.
+    /// Default: 4096.
+    /// </summary>
+    public int PubSubChannelCapacity { get; set; } = 4096;
 
     /// <summary>
     /// Payload size threshold (bytes) above which InvokeAsync transparently switches

@@ -16,6 +16,9 @@ namespace Bolt.Server.Durable;
 /// </summary>
 public sealed class RedisDurableQueueStore : IDurableQueueStore
 {
+    private const string FirstStreamId = "-";
+    private const string LastStreamId = "+";
+
     private readonly IConnectionMultiplexer _redis;
     private readonly DurableQueueOptions _options;
     private readonly ILogger<RedisDurableQueueStore> _logger;
@@ -32,6 +35,7 @@ public sealed class RedisDurableQueueStore : IDurableQueueStore
     private static string SeqKey(int topicHash, string subscriberId) => $"bolt:durable:seq:{topicHash}:{subscriberId}";
     private static string AckKey(int topicHash, string subscriberId) => $"bolt:durable:ack:{topicHash}:{subscriberId}";
     private TimeSpan MessageTtl => TimeSpan.FromSeconds(Math.Max(60, _options.MessageTtlSeconds));
+    private int StreamScanBatchSize => Math.Max(1, _options.RedisStreamScanBatchSize);
 
     public async Task<long> AppendAsync(int topicHash, string subscriberId, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
@@ -64,23 +68,42 @@ public sealed class RedisDurableQueueStore : IDurableQueueStore
     {
         var db = _redis.GetDatabase();
         var remaining = Math.Max(1, maxCount);
-        var entries = await db.StreamRangeAsync(MsgKey(topicHash, subscriberId));
+        var msgKey = MsgKey(topicHash, subscriberId);
+        RedisValue minId = FirstStreamId;
 
-        foreach (var entry in entries)
+        while (remaining > 0)
         {
             ct.ThrowIfCancellationRequested();
 
-            var seqValue = entry.Values.FirstOrDefault(v => v.Name == "seq").Value;
-            var payloadValue = entry.Values.FirstOrDefault(v => v.Name == "payload").Value;
-            if (seqValue.IsNullOrEmpty || payloadValue.IsNullOrEmpty) continue;
+            var entries = await db.StreamRangeAsync(
+                msgKey,
+                minId,
+                LastStreamId,
+                StreamScanBatchSize,
+                Order.Ascending);
 
-            var seqBytes = (byte[])seqValue!;
-            var seq = BinaryPrimitives.ReadInt64LittleEndian(seqBytes);
-            if (seq <= fromSequence) continue;
+            if (entries.Length == 0)
+                yield break;
 
-            yield return (seq, (byte[])payloadValue!);
-            remaining--;
-            if (remaining == 0)
+            foreach (var entry in entries)
+            {
+                ct.ThrowIfCancellationRequested();
+                minId = ExcludeStreamId(entry.Id);
+
+                if (!TryReadSequence(entry, out var seq) || seq <= fromSequence)
+                    continue;
+
+                var payloadValue = entry.Values.FirstOrDefault(v => v.Name == "payload").Value;
+                if (payloadValue.IsNullOrEmpty)
+                    continue;
+
+                yield return (seq, (byte[])payloadValue!);
+                remaining--;
+                if (remaining == 0)
+                    yield break;
+            }
+
+            if (entries.Length < StreamScanBatchSize)
                 yield break;
         }
     }
@@ -95,19 +118,51 @@ public sealed class RedisDurableQueueStore : IDurableQueueStore
         await db.StringSetAsync(ackKey, upToSequence);
         await db.KeyExpireAsync(ackKey, MessageTtl);
 
-        // Delete entries with seq <= upToSequence
-        var entries = await db.StreamRangeAsync(msgKey);
         var toDelete = new List<RedisValue>();
-        foreach (var entry in entries)
+        RedisValue minId = FirstStreamId;
+
+        while (true)
         {
-            var seqValue = entry.Values.FirstOrDefault(v => v.Name == "seq").Value;
-            if (seqValue.IsNullOrEmpty) continue;
-            var seq = BinaryPrimitives.ReadInt64LittleEndian((byte[])seqValue!);
-            if (seq <= upToSequence)
+            ct.ThrowIfCancellationRequested();
+
+            var entries = await db.StreamRangeAsync(
+                msgKey,
+                minId,
+                LastStreamId,
+                StreamScanBatchSize,
+                Order.Ascending);
+
+            if (entries.Length == 0)
+                break;
+
+            foreach (var entry in entries)
+            {
+                minId = ExcludeStreamId(entry.Id);
+
+                if (!TryReadSequence(entry, out var seq))
+                    continue;
+
+                if (seq > upToSequence)
+                {
+                    if (toDelete.Count > 0)
+                        await db.StreamDeleteAsync(msgKey, toDelete.ToArray());
+
+                    await db.KeyExpireAsync(msgKey, MessageTtl);
+                    return;
+                }
+
                 toDelete.Add(entry.Id);
+            }
+
+            if (toDelete.Count > 0)
+            {
+                await db.StreamDeleteAsync(msgKey, toDelete.ToArray());
+                toDelete.Clear();
+            }
+
+            if (entries.Length < StreamScanBatchSize)
+                break;
         }
-        if (toDelete.Count > 0)
-            await db.StreamDeleteAsync(msgKey, toDelete.ToArray());
 
         await db.KeyExpireAsync(msgKey, MessageTtl);
     }
@@ -141,5 +196,22 @@ public sealed class RedisDurableQueueStore : IDurableQueueStore
         var db = _redis.GetDatabase();
         var value = await db.StringGetAsync(AckKey(topicHash, subscriberId));
         return value.IsNullOrEmpty ? 0L : (long)value;
+    }
+
+    private static RedisValue ExcludeStreamId(RedisValue streamId) => $"({streamId}";
+
+    private static bool TryReadSequence(StreamEntry entry, out long sequence)
+    {
+        sequence = 0;
+        var seqValue = entry.Values.FirstOrDefault(v => v.Name == "seq").Value;
+        if (seqValue.IsNullOrEmpty)
+            return false;
+
+        var seqBytes = (byte[])seqValue!;
+        if (seqBytes.Length < sizeof(long))
+            return false;
+
+        sequence = BinaryPrimitives.ReadInt64LittleEndian(seqBytes);
+        return true;
     }
 }
