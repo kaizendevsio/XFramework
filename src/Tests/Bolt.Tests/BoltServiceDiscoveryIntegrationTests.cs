@@ -39,7 +39,8 @@ public sealed class BoltServiceDiscoveryIntegrationTests
         builder.WebHost.UseUrls($"http://localhost:{_port}");
         builder.Services.AddDbContext<DbContext, AppDbContext>(options =>
             options.UseInMemoryDatabase(_databaseName));
-        builder.Services.AddBoltServer();
+        builder.Services.AddBoltServer(options =>
+            options.RegistrationIdentityBindingMode = BoltRegistrationIdentityBindingMode.Enforce);
         builder.Services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         builder.Services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         builder.Services.AddHostedService<BoltServiceDiscoveryHostedService>();

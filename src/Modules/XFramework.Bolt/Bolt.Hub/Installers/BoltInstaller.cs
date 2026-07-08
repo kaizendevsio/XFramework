@@ -5,6 +5,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Interfaces;
+using XFramework.Domain.Shared.ServiceIdentity;
 
 namespace Bolt.Hub.Installers;
 
@@ -33,6 +34,10 @@ public sealed class BoltInstaller : IInstaller
                     ? boltConfiguration.QueueDepth
                     : options.SendQueueCapacity;
             options.SendEnqueueTimeoutMs = boltConfiguration.SendEnqueueTimeoutMs;
+            options.RegistrationIdentityBindingMode = ResolveRegistrationIdentityBindingMode(
+                boltConfiguration.RegistrationIdentityBindingMode);
+            options.ReservedServiceNames.AddRange(XFrameworkServiceNames.All);
+            options.ReservedServiceNamePrefixes.Add("XFramework.");
         });
         services.AddSingleton<IBoltTopicAuthorizer, CommunicationsBoltTopicAuthorizer>();
         services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
@@ -68,5 +73,20 @@ public sealed class BoltInstaller : IInstaller
             opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
                 new[] { "application/octet-stream" });
         });
+    }
+
+    private static BoltRegistrationIdentityBindingMode ResolveRegistrationIdentityBindingMode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return BoltRegistrationIdentityBindingMode.Audit;
+
+        if (Enum.TryParse<BoltRegistrationIdentityBindingMode>(value, ignoreCase: true, out var mode) &&
+            Enum.IsDefined(mode))
+        {
+            return mode;
+        }
+
+        throw new InvalidOperationException(
+            "BoltConfiguration:RegistrationIdentityBindingMode must be one of: Off, Audit, Enforce.");
     }
 }

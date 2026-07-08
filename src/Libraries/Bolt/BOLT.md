@@ -91,6 +91,14 @@ Stream Close: [1:type] [16:streamId]  [2:statusCode]                            
 
 Routing uses FNV-1a hashes (4-byte integer comparison) instead of string matching.
 
+### Registration Identity Binding
+
+Authenticated service connections can bind the Bolt register identity to the service identity from the authenticated principal. The reusable server exposes `BoltServerOptions.RegistrationIdentityBindingMode` with `Off`, `Audit`, and `Enforce` modes. XFramework Bolt Hub configures this through `BoltConfiguration:RegistrationIdentityBindingMode`, reserves the central `XFrameworkServiceNames.All` identities, and defaults to `Audit` so mismatches are visible before rollout switches to `Enforce`.
+
+For service clients, the expected Bolt registration is `clientName == authenticated service name` and `clientId == SHA256(clientName)`. Non-service user/browser clients keep the normal registration path unless they attempt to claim a reserved service identity by name, prefix, or reserved deterministic service client ID.
+
+XFramework Hub intentionally fixes the required service scope to `bolt.service` and resolves service identity from `client_id`, `service`, `azp`, then `sub`. Set `BoltConfiguration:RegistrationIdentityBindingMode` to `Audit` during rollout and watch for `Bolt registration identity mismatch allowed in audit mode` warnings. Switch to `Enforce` once all callers register with their authenticated service identity.
+
 ### Architecture
 
 ```

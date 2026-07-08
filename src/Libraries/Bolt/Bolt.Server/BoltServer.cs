@@ -23,6 +23,9 @@ namespace Bolt.Server;
 /// </summary>
 public sealed class BoltServer : IDisposable
 {
+    private const string DefaultRequiredServiceScope = "bolt.service";
+    private static readonly string[] DefaultServiceIdentityClaimTypes = ["client_id", "service", "azp", "sub"];
+
     private sealed class DurableReplayState
     {
         public object SyncRoot { get; } = new();
@@ -61,6 +64,12 @@ public sealed class BoltServer : IDisposable
     private readonly int _maxFrameBytes;
     private readonly int _sendQueueCapacity;
     private readonly int _sendEnqueueTimeoutMs;
+    private readonly BoltRegistrationIdentityBindingMode _registrationIdentityBindingMode;
+    private readonly string _requiredServiceScope;
+    private readonly string[] _serviceIdentityClaimTypes;
+    private readonly HashSet<string> _reservedServiceNames;
+    private readonly string[] _reservedServiceNamePrefixes;
+    private readonly HashSet<string> _reservedServiceClientIds;
     private static readonly int LargeRpcCommandHash = BoltCodec.Fnv1aHash("__bolt_large_rpc__");
     private static readonly int LargeRpcResponseHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response__");
     private static readonly int LargeRpcResponseStreamHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response_stream__");
@@ -98,6 +107,30 @@ public sealed class BoltServer : IDisposable
         _sendEnqueueTimeoutMs = options.SendEnqueueTimeoutMs > 0
             ? options.SendEnqueueTimeoutMs
             : _invocationTimeoutMs;
+        if (!Enum.IsDefined(options.RegistrationIdentityBindingMode))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported Bolt registration identity binding mode '{options.RegistrationIdentityBindingMode}'.");
+        }
+
+        _registrationIdentityBindingMode = options.RegistrationIdentityBindingMode;
+        _requiredServiceScope = string.IsNullOrWhiteSpace(options.RequiredServiceScope)
+            ? DefaultRequiredServiceScope
+            : options.RequiredServiceScope.Trim();
+        _serviceIdentityClaimTypes = options.ServiceIdentityClaimTypes
+            .Where(static claimType => !string.IsNullOrWhiteSpace(claimType))
+            .Select(static claimType => claimType.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (_serviceIdentityClaimTypes.Length == 0)
+            _serviceIdentityClaimTypes = DefaultServiceIdentityClaimTypes;
+
+        _reservedServiceNames = NormalizeOptionSet(options.ReservedServiceNames, StringComparer.Ordinal);
+        _reservedServiceNamePrefixes = NormalizeOptionList(options.ReservedServiceNamePrefixes);
+        _reservedServiceClientIds = NormalizeOptionSet(options.ReservedServiceClientIds, StringComparer.OrdinalIgnoreCase);
+        foreach (var reservedServiceName in _reservedServiceNames)
+            _reservedServiceClientIds.Add(Sha256Hex(reservedServiceName));
+
         var cleanupInterval = TimeSpan.FromSeconds(Math.Max(1, options.CleanupIntervalSeconds));
         _cleanupTimer = new Timer(CleanupStaleInvocations, null, cleanupInterval, cleanupInterval);
         _mediaTapChannel = Channel.CreateBounded<(Guid, Guid, byte[], uint, uint)>(
@@ -1986,39 +2019,100 @@ public sealed class BoltServer : IDisposable
         return true;
     }
 
-    private static bool ValidateRegisterIdentity(BoltHubConnection connection, string clientId, string clientName)
+    private bool ValidateRegisterIdentity(BoltHubConnection connection, string clientId, string clientName)
     {
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientName))
             return false;
+
+        if (_registrationIdentityBindingMode == BoltRegistrationIdentityBindingMode.Off)
+            return true;
 
         var user = connection.User;
         if (user?.Identity?.IsAuthenticated != true)
             return true;
 
-        var hasServiceScope = user.Claims.Any(claim =>
-            string.Equals(claim.Type, "scope", StringComparison.OrdinalIgnoreCase) &&
-            claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Any(scope => string.Equals(scope, "bolt.service", StringComparison.Ordinal)));
+        var hasServiceScope = HasRequiredServiceScope(user);
+        var serviceClaim = ResolveServiceIdentityName(user);
+        var isReservedServiceIdentity = IsReservedServiceIdentity(clientId, clientName);
 
-        var serviceClaim =
-            user.FindFirstValue("client_id") ??
-            user.FindFirstValue("service") ??
-            user.FindFirstValue("azp");
+        if (!hasServiceScope && !isReservedServiceIdentity)
+            return true;
 
-        var isDeterministicServiceClientId = string.Equals(clientId, Sha256Hex(clientName), StringComparison.Ordinal);
-        var isReservedServiceName = isDeterministicServiceClientId ||
-                                    clientName.StartsWith("XFramework.", StringComparison.Ordinal) ||
-                                    string.Equals(clientName, serviceClaim, StringComparison.Ordinal);
-
+        string? rejectionReason = null;
         if (!hasServiceScope)
-            return !isReservedServiceName;
+            rejectionReason = $"authenticated service registration requires scope '{_requiredServiceScope}'";
+        else if (string.IsNullOrWhiteSpace(serviceClaim))
+            rejectionReason = "authenticated service registration requires a service identity claim";
+        else if (!string.Equals(serviceClaim, clientName, StringComparison.Ordinal))
+            rejectionReason = "registered Bolt client name must match the authenticated service identity";
+        else if (!string.Equals(clientId, Sha256Hex(serviceClaim), StringComparison.Ordinal))
+            rejectionReason = "registered Bolt client id must be SHA256(authenticated service identity)";
 
-        return string.Equals(serviceClaim, clientName, StringComparison.Ordinal) &&
-               string.Equals(clientId, Sha256Hex(clientName), StringComparison.Ordinal);
+        if (rejectionReason is null)
+            return true;
+
+        if (_registrationIdentityBindingMode == BoltRegistrationIdentityBindingMode.Audit)
+        {
+            _logger.LogWarning(
+                "Bolt registration identity mismatch allowed in audit mode. reason={Reason} clientId={ClientId} clientName={ClientName} serviceClaim={ServiceClaim}",
+                rejectionReason,
+                clientId,
+                clientName,
+                serviceClaim);
+            return true;
+        }
+
+        _logger.LogWarning(
+            "Bolt registration identity mismatch rejected. reason={Reason} clientId={ClientId} clientName={ClientName} serviceClaim={ServiceClaim}",
+            rejectionReason,
+            clientId,
+            clientName,
+            serviceClaim);
+        return false;
+    }
+
+    private bool IsReservedServiceIdentity(string clientId, string clientName) =>
+        _reservedServiceNames.Contains(clientName) ||
+        _reservedServiceClientIds.Contains(clientId) ||
+        _reservedServiceNamePrefixes.Any(prefix => clientName.StartsWith(prefix, StringComparison.Ordinal));
+
+    private bool HasRequiredServiceScope(ClaimsPrincipal user) =>
+        user.Claims
+            .Where(static claim =>
+                string.Equals(claim.Type, "scope", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(claim.Type, "scp", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(static claim => claim.Value.Split(
+                ' ',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Any(scope => string.Equals(scope, _requiredServiceScope, StringComparison.OrdinalIgnoreCase));
+
+    private string? ResolveServiceIdentityName(ClaimsPrincipal user)
+    {
+        foreach (var claimType in _serviceIdentityClaimTypes)
+        {
+            var value = user.FindFirstValue(claimType);
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
     }
 
     private static string Sha256Hex(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
+    private static HashSet<string> NormalizeOptionSet(IEnumerable<string> values, StringComparer comparer) =>
+        values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .ToHashSet(comparer);
+
+    private static string[] NormalizeOptionList(IEnumerable<string> values) =>
+        values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
     private BoltHubConnection? GetRecipient(int serviceHash)
     {

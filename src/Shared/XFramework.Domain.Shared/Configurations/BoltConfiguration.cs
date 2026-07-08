@@ -19,6 +19,7 @@ public class BoltConfiguration
     public int MaxFrameBytes { get; set; } = 100 * 1024 * 1024;
     public int SendQueueCapacity { get; set; }
     public int SendEnqueueTimeoutMs { get; set; }
+    public string RegistrationIdentityBindingMode { get; set; } = "Audit";
     public int MaxPendingRpcCalls { get; set; } = 1000;
     public int DeadLetterQueueCapacity { get; set; } = 100_000;
     public int MaxParallelInvocationsPerClient { get; set; } = 64;
