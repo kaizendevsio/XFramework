@@ -247,6 +247,51 @@ public sealed class IdentityServerPortalContractTests
     }
 
     [Test]
+    public void IdentityServerRolePermissionDialog_LoadsBeforeOpeningAndRendersOnlyTheSelectedFeature()
+    {
+        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+
+        var dialogStart = userDetail.IndexOf(
+            "<!-- Credential Role Permission Overrides Dialog -->",
+            StringComparison.Ordinal);
+        var dialogEnd = userDetail.IndexOf(
+            "<!-- Remove Role Confirmation -->",
+            dialogStart,
+            StringComparison.Ordinal);
+        dialogStart.Should().BeGreaterThanOrEqualTo(0);
+        dialogEnd.Should().BeGreaterThan(dialogStart);
+
+        var dialogSource = userDetail[dialogStart..dialogEnd];
+        dialogSource.Should().Contain("<BbTreeView TItem=\"PermissionFeatureTreeNode\"");
+        dialogSource.Should().Contain("SelectedRolePermissionFeature");
+        dialogSource.Should().NotContain("<CenteredSpinner");
+        dialogSource.Split("<BbFormFieldSelect", StringSplitOptions.None)
+            .Should().HaveCount(2, "the selected feature should render one capability editor template");
+
+        var openMethodStart = userDetail.IndexOf(
+            "private async Task OpenRolePermissionsDialog",
+            StringComparison.Ordinal);
+        var openMethodEnd = userDetail.IndexOf(
+            "private void CloseRolePermissionsDialog",
+            openMethodStart,
+            StringComparison.Ordinal);
+        var openMethod = userDetail[openMethodStart..openMethodEnd];
+        var loadIndex = openMethod.IndexOf(
+            "await IdentityServer.GetCredentialRolePermissionOverrides",
+            StringComparison.Ordinal);
+        var loadedIndex = openMethod.IndexOf("_rolePermissionOverridesLoaded = true;", StringComparison.Ordinal);
+        var dialogOpenIndex = openMethod.IndexOf("_rolePermissionDialogOpen = true;", StringComparison.Ordinal);
+
+        loadIndex.Should().BeGreaterThanOrEqualTo(0);
+        loadedIndex.Should().BeGreaterThan(loadIndex);
+        dialogOpenIndex.Should().BeGreaterThan(
+            loadedIndex,
+            "portaled dialog content must be complete before the dialog is registered as open");
+        openMethod.Split("_rolePermissionDialogOpen = true;", StringSplitOptions.None)
+            .Should().HaveCount(2, "the dialog should have one post-load open transition");
+    }
+
+    [Test]
     public void IdentityServerAuthorizationBackend_RequiresEndpointAndServiceLevelAuthorization()
     {
         var repositoryRoot = FindRepositoryRoot();

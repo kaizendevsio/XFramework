@@ -227,8 +227,16 @@ else
                                     <ChildContent Context="role">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                   title="Edit role permission overrides"
+                                                  Disabled="@_loadingRolePermissions"
                                                   OnClick="@(() => OpenRolePermissionsDialog(role))">
-                                            <LucideIcon Name="shield-check" class="h-4 w-4" />
+                                            @if (_loadingRolePermissions && _loadingRolePermissionsRoleId == role.Id)
+                                            {
+                                                <LucideIcon Name="loader-2" class="h-4 w-4 animate-spin" />
+                                            }
+                                            else
+                                            {
+                                                <LucideIcon Name="shield-check" class="h-4 w-4" />
+                                            }
                                         </BbButton>
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                   title="Remove assigned role"
@@ -795,51 +803,94 @@ else
             </BbDialogDescription>
         </BbDialogHeader>
 
-        @if (_loadingRolePermissions)
-        {
-            <CenteredSpinner />
-        }
-        else
-        {
-            <div class="identity-role-permissions-dialog-body">
-                @foreach (var moduleGroup in PermissionFeatureGroups)
-                {
-                    <section class="grid gap-3">
-                        <div>
-                            <h4 class="text-sm font-semibold">@GetModulePermissionHeading(moduleGroup)</h4>
-                            <p class="text-xs text-muted-foreground">Capability overrides inherit from the role type unless an explicit allow or deny is selected.</p>
-                        </div>
+        <div class="identity-role-permissions-dialog-body">
+            <section class="identity-role-permissions-tree-panel" aria-label="Permission features">
+                <BbTreeView TItem="PermissionFeatureTreeNode"
+                            ShowIcons="true"
+                            ShowLines="true"
+                            ShowSearch="true"
+                            SearchPlaceholder="Search features..."
+                            ExpandOnClick="true"
+                            SelectionMode="TreeSelectionMode.Single"
+                            SelectedValue="@_selectedRolePermissionFeatureKey"
+                            SelectedValueChanged="@OnRolePermissionFeatureSelected"
+                            ExpandedValues="@_expandedRolePermissionFeatureKeys"
+                            ExpandedValuesChanged="@OnRolePermissionTreeExpandedValuesChanged"
+                            AriaLabel="Credential role permission feature tree"
+                            Class="tenant-module-tree identity-role-permissions-tree">
+                    @foreach (var node in _rolePermissionTreeNodes)
+                    {
+                        <BbTreeItem Value="@node.Feature.Key"
+                                    Label="@node.Feature.DisplayName"
+                                    Icon="@node.Feature.IconName"
+                                    Badge="@GetPermissionOverrideBadge(node.Feature)"
+                                    Class="@GetRolePermissionTreeItemClass(node.Feature)">
+                            <LabelTemplate>
+                                <div class="tenant-module-tree-label">
+                                    <span class="tenant-module-tree-label-main">@node.Feature.DisplayName</span>
+                                    <span class="tenant-module-tree-label-sub">@node.Feature.Description</span>
+                                </div>
+                            </LabelTemplate>
+                            <ChildContent>
+                                @foreach (var childNode in node.Children)
+                                {
+                                    <BbTreeItem Value="@childNode.Feature.Key"
+                                                Label="@childNode.Feature.DisplayName"
+                                                Icon="@childNode.Feature.IconName"
+                                                Badge="@GetPermissionOverrideBadge(childNode.Feature)"
+                                                IsLeaf="true"
+                                                Class="@GetRolePermissionTreeItemClass(childNode.Feature)">
+                                        <LabelTemplate>
+                                            <div class="tenant-module-tree-label tenant-module-tree-label-child">
+                                                <span class="tenant-module-tree-label-main">@childNode.Feature.DisplayName</span>
+                                                <span class="tenant-module-tree-label-sub">@childNode.Feature.Description</span>
+                                            </div>
+                                        </LabelTemplate>
+                                    </BbTreeItem>
+                                }
+                            </ChildContent>
+                        </BbTreeItem>
+                    }
+                </BbTreeView>
+            </section>
 
-                        @foreach (var feature in moduleGroup)
-                        {
-                            <div class="grid gap-3 rounded-md border border-border p-3">
-                                <div>
-                                    <div class="text-sm font-medium">@feature.DisplayName</div>
-                                    <div class="text-xs text-muted-foreground">@feature.Description</div>
-                                </div>
-                                <div class="grid gap-3 md:grid-cols-5">
-                                    @foreach (var capability in PermissionCapabilities)
-                                    {
-                                        <BbFormFieldSelect TValue="string"
-                                                           Label="@FormatCapabilityLabel(capability)"
-                                                           Value="@GetPermissionOverrideValue(feature, capability)"
-                                                           ValueChanged="@((string value) => SetPermissionOverrideValue(feature, capability, value))">
-                                            <BbSelectItem Value="@PermissionInherit">Inherit</BbSelectItem>
-                                            <BbSelectItem Value="@PermissionAllow">Allow</BbSelectItem>
-                                            <BbSelectItem Value="@PermissionDeny">Deny</BbSelectItem>
-                                        </BbFormFieldSelect>
-                                    }
-                                </div>
-                            </div>
-                        }
-                    </section>
+            <section class="identity-role-permissions-feature-panel" aria-label="Selected feature permissions">
+                <div>
+                    <h4 class="text-sm font-semibold">@(SelectedRolePermissionFeature?.DisplayName ?? "Select a Feature")</h4>
+                    <p class="text-xs text-muted-foreground">
+                        @(SelectedRolePermissionFeature?.Description ?? "Select a module or sub-feature to configure credential overrides.")
+                    </p>
+                </div>
+
+                @if (SelectedRolePermissionFeature is null)
+                {
+                    <BbEmpty Title="No feature selected" Description="Select a feature to configure credential permission overrides." />
                 }
-            </div>
-        }
+                else
+                {
+                    <p class="identity-role-permissions-inheritance-note">
+                        Capabilities inherit from the assigned role type unless an explicit allow or deny is selected.
+                    </p>
+                    <div class="identity-role-permissions-capabilities">
+                        @foreach (var capability in PermissionCapabilities)
+                        {
+                            <BbFormFieldSelect TValue="string"
+                                               Label="@FormatCapabilityLabel(capability)"
+                                               Value="@GetPermissionOverrideValue(SelectedRolePermissionFeature, capability)"
+                                               ValueChanged="@((string value) => SetPermissionOverrideValue(SelectedRolePermissionFeature, capability, value))">
+                                <BbSelectItem Value="@PermissionInherit">Inherit</BbSelectItem>
+                                <BbSelectItem Value="@PermissionAllow">Allow</BbSelectItem>
+                                <BbSelectItem Value="@PermissionDeny">Deny</BbSelectItem>
+                            </BbFormFieldSelect>
+                        }
+                    </div>
+                }
+            </section>
+        </div>
 
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => CloseRolePermissionsDialog(false))">Cancel</BbButton>
-            <BbButton OnClick="@SaveRolePermissionOverrides" Disabled="@(_saving || _loadingRolePermissions || !_rolePermissionOverridesLoaded)">
+            <BbButton OnClick="@SaveRolePermissionOverrides" Disabled="@(_saving || !_rolePermissionOverridesLoaded)">
                 @(_saving ? "Saving..." : "Save Overrides")
             </BbButton>
         </BbDialogFooter>
@@ -1046,15 +1097,20 @@ else
     private RoleForm _roleForm = new();
     private bool _rolePermissionDialogOpen;
     private bool _loadingRolePermissions;
+    private Guid? _loadingRolePermissionsRoleId;
     private bool _rolePermissionOverridesLoaded;
     private IdentityRole? _permissionRole;
     private Dictionary<string, string> _rolePermissionValues = new(StringComparer.OrdinalIgnoreCase);
+    private string _selectedRolePermissionFeatureKey = TenantModuleFeatureKeys.Identity;
+    private HashSet<string> _expandedRolePermissionFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
+    private List<PermissionFeatureTreeNode> _rolePermissionTreeNodes = [];
     private const string PermissionInherit = "inherit";
     private const string PermissionAllow = "allow";
     private const string PermissionDeny = "deny";
     private static readonly IReadOnlyList<string> PermissionCapabilities = IdentityAuthorizationConstants.CapabilityKeys;
-    private static IEnumerable<IGrouping<string, TenantModuleFeatureDefinition>> PermissionFeatureGroups =>
-        TenantModuleFeatureKeys.All.GroupBy(x => x.ModuleKey);
+
+    private TenantModuleFeatureDefinition? SelectedRolePermissionFeature =>
+        TenantModuleFeatureKeys.Find(_selectedRolePermissionFeatureKey);
 
     // Remove Role dialog
     private bool _removeRoleDialogOpen;
@@ -1741,14 +1797,18 @@ else
 
     private async Task OpenRolePermissionsDialog(IdentityRole role)
     {
-        _permissionRole = role;
-        _rolePermissionValues = BuildEmptyPermissionValueMap();
-        _rolePermissionDialogOpen = true;
+        if (_loadingRolePermissions)
+        {
+            return;
+        }
+
         _loadingRolePermissions = true;
+        _loadingRolePermissionsRoleId = role.Id;
         _rolePermissionOverridesLoaded = false;
 
         try
         {
+            var permissionValues = BuildEmptyPermissionValueMap();
             var result = await IdentityServer.GetCredentialRolePermissionOverrides(new GetCredentialRolePermissionOverridesRequest
             {
                 IdentityRoleId = role.Id,
@@ -1758,28 +1818,37 @@ else
             if (!result.IsSuccess || result.Response is null)
             {
                 ToastService.Error("Role permission overrides could not be loaded.", "Permissions failed");
-                CloseRolePermissionsDialog(false);
                 return;
             }
 
             foreach (var permission in result.Response.Overrides)
             {
                 var key = BuildPermissionKey(permission.ModuleKey, permission.SubFeatureKey, permission.CapabilityKey);
-                _rolePermissionValues[key] = permission.Effect == RoleCapabilityPermissionEffect.Allow
+                permissionValues[key] = permission.Effect == RoleCapabilityPermissionEffect.Allow
                     ? PermissionAllow
                     : PermissionDeny;
             }
 
+            _permissionRole = role;
+            _rolePermissionValues = permissionValues;
+            _rolePermissionTreeNodes = BuildPermissionTree();
+            _expandedRolePermissionFeatureKeys = _rolePermissionTreeNodes
+                .Select(x => x.Feature.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _selectedRolePermissionFeatureKey = TenantModuleFeatureKeys.Identity;
             _rolePermissionOverridesLoaded = true;
+            // BlazorBlueprint 3.12 can drop a portal refresh during the opening render.
+            // Open only after the dialog's content is complete so no loading fragment must be replaced.
+            _rolePermissionDialogOpen = true;
         }
         catch
         {
             ToastService.Error("Role permission overrides could not be loaded.", "Permissions failed");
-            CloseRolePermissionsDialog(false);
         }
         finally
         {
             _loadingRolePermissions = false;
+            _loadingRolePermissionsRoleId = null;
         }
     }
 
@@ -1793,7 +1862,9 @@ else
 
         _permissionRole = null;
         _rolePermissionValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        _loadingRolePermissions = false;
+        _rolePermissionTreeNodes = [];
+        _expandedRolePermissionFeatureKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        _selectedRolePermissionFeatureKey = TenantModuleFeatureKeys.Identity;
         _rolePermissionOverridesLoaded = false;
     }
 
@@ -1882,6 +1953,18 @@ else
         return values;
     }
 
+    private static List<PermissionFeatureTreeNode> BuildPermissionTree() =>
+        TenantModuleFeatureKeys.All
+            .Where(x => string.IsNullOrWhiteSpace(x.SubFeatureKey))
+            .Select(root => new PermissionFeatureTreeNode(
+                root,
+                TenantModuleFeatureKeys.All
+                    .Where(child => string.Equals(child.ModuleKey, root.ModuleKey, StringComparison.OrdinalIgnoreCase)
+                                    && !string.IsNullOrWhiteSpace(child.SubFeatureKey))
+                    .Select(child => new PermissionFeatureTreeNode(child, []))
+                    .ToList()))
+            .ToList();
+
     private string GetPermissionOverrideValue(TenantModuleFeatureDefinition feature, string capability) =>
         _rolePermissionValues.TryGetValue(BuildPermissionKey(feature, capability), out var value)
             ? value
@@ -1896,15 +1979,41 @@ else
             value == PermissionAllow || value == PermissionDeny ? value : PermissionInherit;
     }
 
+    private string GetPermissionOverrideBadge(TenantModuleFeatureDefinition feature)
+    {
+        var explicitCount = PermissionCapabilities.Count(capability =>
+            GetPermissionOverrideValue(feature, capability) is var value
+            && (value == PermissionAllow || value == PermissionDeny));
+
+        return explicitCount == 0 ? "Inherited" : $"{explicitCount} explicit";
+    }
+
+    private string GetRolePermissionTreeItemClass(TenantModuleFeatureDefinition feature) =>
+        string.Equals(feature.Key, _selectedRolePermissionFeatureKey, StringComparison.OrdinalIgnoreCase)
+            ? "tenant-module-tree-item-selected"
+            : string.Empty;
+
+    private Task OnRolePermissionFeatureSelected(string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            _selectedRolePermissionFeatureKey = value;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task OnRolePermissionTreeExpandedValuesChanged(HashSet<string> values)
+    {
+        _expandedRolePermissionFeatureKeys = new HashSet<string>(values, StringComparer.OrdinalIgnoreCase);
+        return Task.CompletedTask;
+    }
+
     private static string BuildPermissionKey(TenantModuleFeatureDefinition feature, string capability) =>
         BuildPermissionKey(feature.ModuleKey, feature.SubFeatureKey, capability);
 
     private static string BuildPermissionKey(string moduleKey, string? subFeatureKey, string capability) =>
         $"{moduleKey}|{subFeatureKey ?? string.Empty}|{capability}";
-
-    private static string GetModulePermissionHeading(IGrouping<string, TenantModuleFeatureDefinition> moduleGroup) =>
-        moduleGroup.FirstOrDefault(x => string.IsNullOrWhiteSpace(x.SubFeatureKey))?.DisplayName
-        ?? moduleGroup.Key;
 
     private static string FormatCapabilityLabel(string capability) =>
         CultureInfo.CurrentCulture.TextInfo.ToTitleCase(capability.Replace('_', ' '));
@@ -2311,6 +2420,10 @@ else
 
     private static bool IsRoleExpirationUnlimited(DateTime expiration) =>
         expiration >= NoRoleExpirationUtc.AddDays(-1);
+
+    private sealed record PermissionFeatureTreeNode(
+        TenantModuleFeatureDefinition Feature,
+        IReadOnlyList<PermissionFeatureTreeNode> Children);
 
     private class CredentialForm
     {
