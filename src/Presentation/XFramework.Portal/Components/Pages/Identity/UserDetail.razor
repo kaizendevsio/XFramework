@@ -1951,14 +1951,22 @@ else
 
     private string GetRolePermissionActionAriaLabel(IdentityRole role) =>
         IsLoadingRolePermissions(role)
-            ? "Loading role permission overrides"
-            : "Edit role permission overrides";
+            ? $"Loading permission overrides for {GetRolePermissionActionContext(role)}"
+            : $"Edit permission overrides for {GetRolePermissionActionContext(role)}";
+
+    private string GetRolePermissionActionContext(IdentityRole role) =>
+        $"{role.Type?.Name ?? "assigned role"}, {GetCredentialLabelById(role.CredentialId)}";
 
     private string GetRolePermissionAriaBusy(IdentityRole role) =>
         IsLoadingRolePermissions(role) ? "true" : "false";
 
     private async Task SaveRolePermissionOverrides()
     {
+        if (_savingRolePermissions)
+        {
+            return;
+        }
+
         if (_permissionRole is null || !_rolePermissionOverridesLoaded)
         {
             if (_permissionRole is not null)

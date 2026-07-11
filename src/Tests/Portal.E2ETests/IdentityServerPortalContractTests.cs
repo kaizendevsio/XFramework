@@ -302,12 +302,14 @@ public sealed class IdentityServerPortalContractTests
             saveMethodStart,
             StringComparison.Ordinal);
         var saveMethod = userDetail[saveMethodStart..saveMethodEnd];
+        saveMethod.Should().Contain("if (_savingRolePermissions)");
         saveMethod.Should().Contain("var operationVersion = _rolePermissionOperationVersion;");
         saveMethod.Should().Contain("IsRolePermissionSaveCurrent(operationVersion, permissionRole)");
         saveMethod.Should().Contain("_savingRolePermissions = true;");
 
         userDetail.Should().Contain("InvalidateRolePermissionDialogState();");
         userDetail.Should().Contain("AriaLabel=\"@GetRolePermissionActionAriaLabel(role)\"");
+        userDetail.Should().Contain("GetCredentialLabelById(role.CredentialId)");
     }
 
     [Test]
