@@ -180,7 +180,9 @@ else
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
                             <BbCardTitle>Assigned Roles</BbCardTitle>
-                            <BbButton Size="ButtonSize.Small" OnClick="@OpenAssignRoleDialog">
+                            <BbButton Size="ButtonSize.Small"
+                                      OnClick="@OpenAssignRoleDialog"
+                                      Disabled="@(_loadingRolePermissions || _savingRolePermissions)">
                                 <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                                 Assign Role
                             </BbButton>
@@ -227,9 +229,11 @@ else
                                     <ChildContent Context="role">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                   title="Edit role permission overrides"
-                                                  Disabled="@_loadingRolePermissions"
+                                                  AriaLabel="@GetRolePermissionActionAriaLabel(role)"
+                                                  aria-busy="@GetRolePermissionAriaBusy(role)"
+                                                  Disabled="@(_loadingRolePermissions || _savingRolePermissions)"
                                                   OnClick="@(() => OpenRolePermissionsDialog(role))">
-                                            @if (_loadingRolePermissions && _loadingRolePermissionsRoleId == role.Id)
+                                            @if (IsLoadingRolePermissions(role))
                                             {
                                                 <LucideIcon Name="loader-2" class="h-4 w-4 animate-spin" />
                                             }
@@ -240,6 +244,7 @@ else
                                         </BbButton>
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                   title="Remove assigned role"
+                                                  Disabled="@(_loadingRolePermissions || _savingRolePermissions)"
                                                   OnClick="@(() => OpenRemoveRoleDialog(role))">
                                             <LucideIcon Name="trash-2" class="h-4 w-4 text-destructive" />
                                         </BbButton>
@@ -795,7 +800,9 @@ else
 
 <!-- Credential Role Permission Overrides Dialog -->
 <BbDialog Open="@_rolePermissionDialogOpen" OpenChanged="@CloseRolePermissionsDialog">
-    <BbDialogContent TrapFocus="false" Class="identity-role-permissions-dialog">
+    <BbDialogContent TrapFocus="false"
+                     ShowClose="@(!_savingRolePermissions)"
+                     Class="identity-role-permissions-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Role Permission Overrides</BbDialogTitle>
             <BbDialogDescription>
@@ -877,6 +884,7 @@ else
                             <BbFormFieldSelect TValue="string"
                                                Label="@FormatCapabilityLabel(capability)"
                                                Value="@GetPermissionOverrideValue(SelectedRolePermissionFeature, capability)"
+                                               Disabled="@_savingRolePermissions"
                                                ValueChanged="@((string value) => SetPermissionOverrideValue(SelectedRolePermissionFeature, capability, value))">
                                 <BbSelectItem Value="@PermissionInherit">Inherit</BbSelectItem>
                                 <BbSelectItem Value="@PermissionAllow">Allow</BbSelectItem>
@@ -889,9 +897,13 @@ else
         </div>
 
         <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => CloseRolePermissionsDialog(false))">Cancel</BbButton>
-            <BbButton OnClick="@SaveRolePermissionOverrides" Disabled="@(_saving || !_rolePermissionOverridesLoaded)">
-                @(_saving ? "Saving..." : "Save Overrides")
+            <BbButton Variant="ButtonVariant.Outline"
+                      OnClick="@(() => CloseRolePermissionsDialog(false))"
+                      Disabled="@_savingRolePermissions">
+                Cancel
+            </BbButton>
+            <BbButton OnClick="@SaveRolePermissionOverrides" Disabled="@(_savingRolePermissions || !_rolePermissionOverridesLoaded)">
+                @(_savingRolePermissions ? "Saving..." : "Save Overrides")
             </BbButton>
         </BbDialogFooter>
     </BbDialogContent>
@@ -1098,6 +1110,8 @@ else
     private bool _rolePermissionDialogOpen;
     private bool _loadingRolePermissions;
     private Guid? _loadingRolePermissionsRoleId;
+    private bool _savingRolePermissions;
+    private long _rolePermissionOperationVersion;
     private bool _rolePermissionOverridesLoaded;
     private IdentityRole? _permissionRole;
     private Dictionary<string, string> _rolePermissionValues = new(StringComparer.OrdinalIgnoreCase);
@@ -1133,6 +1147,11 @@ else
     protected override async Task OnParametersSetAsync()
     {
         var normalizedSection = NormalizeSection(Section);
+        if (_loadedId != Id || !string.Equals(normalizedSection, "roles", StringComparison.OrdinalIgnoreCase))
+        {
+            InvalidateRolePermissionDialogState();
+        }
+
         if (ShouldCanonicalizeSection(normalizedSection))
         {
             Navigation.NavigateTo(GetSectionHref(normalizedSection), replace: true);
@@ -1178,6 +1197,7 @@ else
 
     private void OnTenantFilterChanged()
     {
+        InvalidateRolePermissionDialogState();
         _ = InvokeAsync(async () =>
         {
             await ReloadAllData();
@@ -1187,6 +1207,7 @@ else
 
     private async Task ReloadAllData()
     {
+        InvalidateRolePermissionDialogState();
         _loading = true;
         try
         {
@@ -1701,6 +1722,11 @@ else
 
     private void OpenAssignRoleDialog()
     {
+        if (_loadingRolePermissions || _savingRolePermissions)
+        {
+            return;
+        }
+
         _roleForm = new RoleForm();
         _assignRoleDialogOpen = true;
     }
@@ -1758,6 +1784,11 @@ else
 
     private void OpenRemoveRoleDialog(IdentityRole role)
     {
+        if (_loadingRolePermissions || _savingRolePermissions)
+        {
+            return;
+        }
+
         _removingRole = role;
         _removeRoleDialogOpen = true;
     }
@@ -1797,11 +1828,14 @@ else
 
     private async Task OpenRolePermissionsDialog(IdentityRole role)
     {
-        if (_loadingRolePermissions)
+        if (_loadingRolePermissions || _savingRolePermissions)
         {
             return;
         }
 
+        var operationVersion = ++_rolePermissionOperationVersion;
+        var userId = Id;
+        var section = CurrentSection;
         _loadingRolePermissions = true;
         _loadingRolePermissionsRoleId = role.Id;
         _rolePermissionOverridesLoaded = false;
@@ -1814,6 +1848,11 @@ else
                 IdentityRoleId = role.Id,
                 Metadata = CreateMetadata(role.TenantId)
             });
+
+            if (!IsRolePermissionLoadCurrent(operationVersion, userId, section, role))
+            {
+                return;
+            }
 
             if (!result.IsSuccess || result.Response is null)
             {
@@ -1843,23 +1882,43 @@ else
         }
         catch
         {
-            ToastService.Error("Role permission overrides could not be loaded.", "Permissions failed");
+            if (IsRolePermissionLoadCurrent(operationVersion, userId, section, role))
+            {
+                ToastService.Error("Role permission overrides could not be loaded.", "Permissions failed");
+            }
         }
         finally
         {
-            _loadingRolePermissions = false;
-            _loadingRolePermissionsRoleId = null;
+            if (_rolePermissionOperationVersion == operationVersion)
+            {
+                _loadingRolePermissions = false;
+                _loadingRolePermissionsRoleId = null;
+            }
         }
     }
 
     private void CloseRolePermissionsDialog(bool open)
     {
-        _rolePermissionDialogOpen = open;
         if (open)
+        {
+            _rolePermissionDialogOpen = true;
+            return;
+        }
+
+        if (_savingRolePermissions)
         {
             return;
         }
 
+        InvalidateRolePermissionDialogState();
+    }
+
+    private void InvalidateRolePermissionDialogState()
+    {
+        _rolePermissionOperationVersion++;
+        _rolePermissionDialogOpen = false;
+        _loadingRolePermissions = false;
+        _loadingRolePermissionsRoleId = null;
         _permissionRole = null;
         _rolePermissionValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _rolePermissionTreeNodes = [];
@@ -1867,6 +1926,36 @@ else
         _selectedRolePermissionFeatureKey = TenantModuleFeatureKeys.Identity;
         _rolePermissionOverridesLoaded = false;
     }
+
+    private bool IsRolePermissionLoadCurrent(
+        long operationVersion,
+        Guid userId,
+        string section,
+        IdentityRole role) =>
+        _rolePermissionOperationVersion == operationVersion
+        && Id == userId
+        && _loadedId == userId
+        && string.Equals(CurrentSection, section, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(section, "roles", StringComparison.OrdinalIgnoreCase)
+        && _roles.Any(candidate => candidate.Id == role.Id && candidate.TenantId == role.TenantId);
+
+    private bool IsRolePermissionSaveCurrent(long operationVersion, IdentityRole role) =>
+        _rolePermissionOperationVersion == operationVersion
+        && _rolePermissionDialogOpen
+        && _permissionRole is { } currentRole
+        && currentRole.Id == role.Id
+        && currentRole.TenantId == role.TenantId;
+
+    private bool IsLoadingRolePermissions(IdentityRole role) =>
+        _loadingRolePermissions && _loadingRolePermissionsRoleId == role.Id;
+
+    private string GetRolePermissionActionAriaLabel(IdentityRole role) =>
+        IsLoadingRolePermissions(role)
+            ? "Loading role permission overrides"
+            : "Edit role permission overrides";
+
+    private string GetRolePermissionAriaBusy(IdentityRole role) =>
+        IsLoadingRolePermissions(role) ? "true" : "false";
 
     private async Task SaveRolePermissionOverrides()
     {
@@ -1880,21 +1969,28 @@ else
             return;
         }
 
-        _saving = true;
+        var permissionRole = _permissionRole;
+        var operationVersion = _rolePermissionOperationVersion;
+        var overrides = BuildPermissionOverrides();
+        _savingRolePermissions = true;
         try
         {
-            var overrides = BuildPermissionOverrides();
             var result = await IdentityServer.SetCredentialRolePermissionOverrides(new SetCredentialRolePermissionOverridesRequest
             {
-                IdentityRoleId = _permissionRole.Id,
+                IdentityRoleId = permissionRole.Id,
                 Overrides = overrides,
-                Metadata = CreateMetadata(_permissionRole.TenantId)
+                Metadata = CreateMetadata(permissionRole.TenantId)
             });
+
+            if (!IsRolePermissionSaveCurrent(operationVersion, permissionRole))
+            {
+                return;
+            }
 
             if (result.IsSuccess)
             {
                 ToastService.Success("Role permission overrides saved.", "Permissions saved");
-                CloseRolePermissionsDialog(false);
+                InvalidateRolePermissionDialogState();
             }
             else
             {
@@ -1903,11 +1999,14 @@ else
         }
         catch
         {
-            ToastService.Error("Role permission overrides could not be saved.", "Permissions failed");
+            if (IsRolePermissionSaveCurrent(operationVersion, permissionRole))
+            {
+                ToastService.Error("Role permission overrides could not be saved.", "Permissions failed");
+            }
         }
         finally
         {
-            _saving = false;
+            _savingRolePermissions = false;
         }
     }
 
@@ -2460,6 +2559,7 @@ else
 
     public void Dispose()
     {
+        InvalidateRolePermissionDialogState();
         TenantFilter.OnChanged -= OnTenantFilterChanged;
         ModuleNavigation.OnChanged -= OnTenantFilterChanged;
     }

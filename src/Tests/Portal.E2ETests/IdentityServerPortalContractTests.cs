@@ -236,7 +236,8 @@ public sealed class IdentityServerPortalContractTests
         userDetail.Should().Contain("RoleCapabilityPermissionEffect.Allow");
         userDetail.Should().Contain("RoleCapabilityPermissionEffect.Deny");
         userDetail.Should().Contain("_rolePermissionOverridesLoaded");
-        userDetail.Should().Contain("<BbDialogContent TrapFocus=\"false\" Class=\"identity-role-permissions-dialog\">");
+        userDetail.Should().Contain("<BbDialogContent TrapFocus=\"false\"");
+        userDetail.Should().Contain("Class=\"identity-role-permissions-dialog\">");
         userDetail.Should().Contain("<div class=\"identity-role-permissions-dialog-body\">");
         userDetail.Should().NotContain("max-h-[65vh]");
         userDetail.Should().Contain("<BbDataGridTemplateColumn Title=\"Level\" Sortable=\"true\" Filterable=\"true\" FilterBy=\"@(role => GetRoleLevelFilter(role))\">");
@@ -264,6 +265,8 @@ public sealed class IdentityServerPortalContractTests
         var dialogSource = userDetail[dialogStart..dialogEnd];
         dialogSource.Should().Contain("<BbTreeView TItem=\"PermissionFeatureTreeNode\"");
         dialogSource.Should().Contain("SelectedRolePermissionFeature");
+        dialogSource.Should().Contain("ShowClose=\"@(!_savingRolePermissions)\"");
+        dialogSource.Should().Contain("Disabled=\"@_savingRolePermissions\"");
         dialogSource.Should().NotContain("<CenteredSpinner");
         dialogSource.Split("<BbFormFieldSelect", StringSplitOptions.None)
             .Should().HaveCount(2, "the selected feature should render one capability editor template");
@@ -284,11 +287,27 @@ public sealed class IdentityServerPortalContractTests
 
         loadIndex.Should().BeGreaterThanOrEqualTo(0);
         loadedIndex.Should().BeGreaterThan(loadIndex);
+        openMethod.Should().Contain("IsRolePermissionLoadCurrent(operationVersion, userId, section, role)");
         dialogOpenIndex.Should().BeGreaterThan(
             loadedIndex,
             "portaled dialog content must be complete before the dialog is registered as open");
         openMethod.Split("_rolePermissionDialogOpen = true;", StringSplitOptions.None)
             .Should().HaveCount(2, "the dialog should have one post-load open transition");
+
+        var saveMethodStart = userDetail.IndexOf(
+            "private async Task SaveRolePermissionOverrides",
+            StringComparison.Ordinal);
+        var saveMethodEnd = userDetail.IndexOf(
+            "private List<CapabilityPermissionDto> BuildPermissionOverrides",
+            saveMethodStart,
+            StringComparison.Ordinal);
+        var saveMethod = userDetail[saveMethodStart..saveMethodEnd];
+        saveMethod.Should().Contain("var operationVersion = _rolePermissionOperationVersion;");
+        saveMethod.Should().Contain("IsRolePermissionSaveCurrent(operationVersion, permissionRole)");
+        saveMethod.Should().Contain("_savingRolePermissions = true;");
+
+        userDetail.Should().Contain("InvalidateRolePermissionDialogState();");
+        userDetail.Should().Contain("AriaLabel=\"@GetRolePermissionActionAriaLabel(role)\"");
     }
 
     [Test]
