@@ -12,6 +12,8 @@ using IdentityServer.Integration.Drivers;
 using Inventario.Integration.Drivers;
 using Communications.Integration.Drivers;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using BlazorBlueprint.Primitives.Services;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using POS.Integration.Drivers;
 using Storage.Integration.Drivers;
@@ -54,6 +56,10 @@ builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
     options.DefaultRadius = 0.5;
     options.PersistToLocalStorage = true;
 });
+// Remove this compatibility layer after a BlazorBlueprint upgrade passes repeated dynamic-dialog tests.
+builder.Services.AddScoped<XfPortalService>();
+builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(
+    services => services.GetRequiredService<XfPortalService>()));
 
 // Bolt - thin binary RPC transport to microservices
 builder.Services.AddXFrameworkBoltClient(builder.Configuration);

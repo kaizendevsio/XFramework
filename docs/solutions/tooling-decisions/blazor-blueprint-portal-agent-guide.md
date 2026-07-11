@@ -45,9 +45,9 @@ The current Portal uses BlazorBlueprint `3.12.0`:
 - `Components/_Imports.razor` imports `BlazorBlueprint.Components`, `BlazorBlueprint.Primitives`, `BlazorBlueprint.Primitives.Services`, `BlazorBlueprint.Icons.Lucide.Components`, and `BlazorBlueprint.Icons.Lucide.Data`.
 - `Components/App.razor` loads `_content/BlazorBlueprint.Components/css/themes.css` and `_content/BlazorBlueprint.Components/blazorblueprint.css`.
 - `Components/App.razor` renders routes with `@rendermode="InteractiveServer"`.
-- `Components/Layout/MainLayout.razor` includes `BbToastProvider`, `BbDialogProvider`, and `BbPortalHost`.
+- `Components/Layout/MainLayout.razor` includes `BbToastProvider`, `BbDialogProvider`, `XfContainerPortalHost`, and `BbOverlayPortalHost`. `XfPortalService` preserves BlazorBlueprint's public portal contract while giving the custom container host the changed portal ID, allowing it to queue only dialog/sheet refreshes whose content already rendered in the active cycle.
 
-Do not remove `BbPortalHost`. The official installation docs state it is required for portal-based controls such as Popover, Dialog, Sheet, Dropdown Menu, Combobox, and Select.
+Do not remove the portal-host composition. Portal-based controls such as Popover, Dialog, Sheet, Dropdown Menu, Combobox, and Select require it. In `MainLayout`, do not replace `XfPortalService`, `XfContainerPortalHost`, and `BbOverlayPortalHost` with the stock service/combined host until a BlazorBlueprint version newer than `3.12.0` has a verified fix for dropped container refreshes and repeated dialog browser tests pass.
 
 ## Component Layering
 
@@ -151,6 +151,7 @@ For overlays inside dialogs, verify the nested overlay in both light and dark th
 ## Known Local Pitfalls
 
 - The profile switcher once used `CloseOnClickOutside` and `CloseOnEscape` on `BbPopover`; that caused runtime failures because those options belong on content components, not the `BbPopover` root.
+- BlazorBlueprint `3.12.0`'s category portal host ignores refresh notifications received while it is rendering. `XfPortalService` and `XfContainerPortalHost` queue a follow-up render only when the changed dialog/sheet portal already rendered in the current cycle; `MainLayout` retains the stock overlay host for popovers and selects. The Portal contract intentionally fails when the package version changes so this compatibility layer is reviewed instead of becoming permanent infrastructure.
 - A profile trigger using `AsChild=true` with plain HTML markup did not open because the raw child did not consume `TriggerContext`. Prefer documented trigger examples and verify the rendered DOM.
 - `LoginLayout` is intentionally plain. If a login page starts using Blueprint overlays, toasts, dialogs, or services, add the required providers or an interactive island.
 - Native OS dropdowns look out of place in Portal. Use BlazorBlueprint Combobox/Select components for tenant and entity selection.

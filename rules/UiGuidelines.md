@@ -18,7 +18,7 @@ Select-String -Path $xml -Pattern 'BbDataGrid|BbDynamicForm|BbFormWizard|BbFilte
 ## Portal Baseline
 
 - Preserve BlazorBlueprint setup: `AddInteractiveServerComponents`, `AddBlazorBlueprintComponents`, `_content/BlazorBlueprint.Components` CSS, `InteractiveServer` render mode, and shared imports.
-- Preserve `BbToastProvider`, `BbDialogProvider`, and `BbPortalHost` in layouts that use portal-based controls.
+- Preserve `BbToastProvider`, `BbDialogProvider`, `XfPortalService`, and the Portal host composition in layouts that use portal-based controls. `MainLayout` uses `XfContainerPortalHost` for dialogs/sheets plus `BbOverlayPortalHost` for popovers/selects because BlazorBlueprint `3.12.0` can discard dynamic container refreshes received during rendering. Re-evaluate and remove this compatibility layer when upgrading BlazorBlueprint.
 - Prefer styled `BlazorBlueprint.Components` controls. Use `BlazorBlueprint.Primitives` only when the styled component cannot support the workflow.
 - Use Lucide icon components from `BlazorBlueprint.Icons.Lucide.Components`; do not hand-draw common UI icons.
 

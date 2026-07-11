@@ -313,6 +313,53 @@ public sealed class IdentityServerPortalContractTests
     }
 
     [Test]
+    public void PortalContainerHost_QueuesAlreadyRenderedDialogRefreshes()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var portalRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal",
+            "Components");
+        var mainLayout = File.ReadAllText(Path.Combine(portalRoot, "Layout", "MainLayout.razor"));
+        var containerHost = File.ReadAllText(Path.Combine(portalRoot, "Shared", "XfContainerPortalHost.razor"));
+        var portalService = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal",
+            "Services",
+            "XfPortalService.cs"));
+        var program = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal",
+            "Program.cs"));
+        var packageVersions = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "Directory.Packages.props"));
+
+        mainLayout.Should().Contain("<XfContainerPortalHost />");
+        mainLayout.Should().Contain("<BbOverlayPortalHost />");
+        mainLayout.Should().NotContain("<BbPortalHost />");
+
+        program.Should().Contain("builder.Services.AddScoped<XfPortalService>();");
+        program.Should().Contain("ServiceDescriptor.Scoped<IPortalService>");
+        portalService.Should().Contain("internal event Action<XfPortalChange>? OnPortalChanged;");
+        portalService.Should().Contain("OnPortalChanged?.Invoke(new XfPortalChange(id, category));");
+
+        containerHost.Should().Contain("change.Category != PortalCategory.Container");
+        containerHost.Should().Contain("_renderedThisCycle.Contains(change.PortalId)");
+        containerHost.Should().Contain("_refreshRequestedDuringRender = true;");
+        containerHost.Should().Contain("if (refreshQueued)");
+        containerHost.Should().NotContain("_isDeferredRefreshRender");
+        containerHost.Should().Contain("await InvokeAsync(StateHasChanged);");
+
+        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Components\" Version=\"3.12.0\" />");
+        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Primitives\" Version=\"3.12.0\" />");
+    }
+
+    [Test]
     public void IdentityServerAuthorizationBackend_RequiresEndpointAndServiceLevelAuthorization()
     {
         var repositoryRoot = FindRepositoryRoot();
