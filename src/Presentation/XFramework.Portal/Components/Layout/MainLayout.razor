@@ -170,7 +170,8 @@
 
 <BbToastProvider Position="ToastPosition.BottomRight" />
 <BbDialogProvider />
-<BbPortalHost />
+<XfContainerPortalHost />
+<BbOverlayPortalHost />
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;

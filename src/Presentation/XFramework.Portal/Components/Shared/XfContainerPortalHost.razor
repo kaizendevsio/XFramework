@@ -1,0 +1,133 @@
+@namespace XFramework.Portal.Components.Shared
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject XfPortalService PortalService
+@inject IJSRuntime JSRuntime
+
+@* Compatibility host adapted from BlazorBlueprint 3.12.0 (Apache-2.0).
+   BlazorBlueprint drops container refreshes received during a host render.
+   Queue one follow-up render so dialogs and sheets receive their latest child content. *@
+@{
+    _isRendering = true;
+    _renderedThisCycle.Clear();
+}
+@foreach (var portal in PortalService.GetPortals(PortalCategory.Container))
+{
+    _renderedThisCycle.Add(portal.Key);
+    <div @key="portal.Key"
+         data-portal-id="@portal.Key"
+         data-portal-category="@PortalCategory.Container"
+         class="blazorblueprint-portal"
+         style="display: contents;">
+        @portal.Value
+    </div>
+}
+
+@code {
+    private readonly HashSet<string> _renderedThisCycle = [];
+    private IJSObjectReference? _portalModule;
+    private bool _isRendering;
+    private bool _isFirstCategoryHost;
+    private bool _refreshRequestedDuringRender;
+
+    protected override void OnInitialized()
+    {
+        if (!PortalService.HasHost)
+        {
+            PortalService.RegisterHost();
+            _isFirstCategoryHost = true;
+        }
+
+        PortalService.OnPortalChanged += HandlePortalChanged;
+    }
+
+    private void HandlePortalChanged(XfPortalChange change)
+    {
+        if (change.Category != PortalCategory.Container)
+        {
+            return;
+        }
+
+        if (_isRendering)
+        {
+            if (_renderedThisCycle.Contains(change.PortalId))
+            {
+                _refreshRequestedDuringRender = true;
+            }
+
+            return;
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _isRendering = false;
+
+        if (firstRender)
+        {
+            try
+            {
+                _portalModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/BlazorBlueprint.Primitives/js/primitives/portal.js");
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                // Expected while an interactive server circuit is disconnecting.
+            }
+            catch (InvalidOperationException)
+            {
+                // JS interop is unavailable during prerendering.
+            }
+        }
+
+        foreach (var portalId in _renderedThisCycle)
+        {
+            PortalService.NotifyPortalRendered(portalId);
+        }
+
+        var currentPortalKeys = PortalService.GetPortals(PortalCategory.Container)
+            .Select(portal => portal.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        var portalsChanged = !_renderedThisCycle.SetEquals(currentPortalKeys);
+        var refreshQueued = _refreshRequestedDuringRender;
+        _refreshRequestedDuringRender = false;
+
+        if (portalsChanged)
+        {
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (refreshQueued)
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_isFirstCategoryHost)
+        {
+            PortalService.UnregisterHost();
+        }
+
+        PortalService.OnPortalChanged -= HandlePortalChanged;
+
+        if (_portalModule is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _portalModule.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            // Expected while an interactive server circuit is disconnecting.
+        }
+    }
+}
