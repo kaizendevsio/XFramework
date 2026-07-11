@@ -829,16 +829,53 @@
 }
 
 .identity-role-permissions-dialog {
-    width: min(52rem, calc(100vw - 2rem));
-    max-width: min(52rem, calc(100vw - 2rem));
+    width: min(68rem, calc(100vw - 2rem));
+    max-width: min(68rem, calc(100vw - 2rem));
 }
 
 .identity-role-permissions-dialog-body {
     display: grid;
+    grid-template-columns: minmax(18rem, 0.9fr) minmax(24rem, 1.1fr);
+    gap: 1rem;
+    min-height: min(26rem, 62vh);
+    max-height: min(66vh, 38rem);
+    overflow: hidden;
+    padding-block: 0.5rem;
+}
+
+.identity-role-permissions-tree-panel,
+.identity-role-permissions-feature-panel {
+    min-width: 0;
+}
+
+.identity-role-permissions-tree-panel {
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    padding-right: 1rem;
+}
+
+.tenant-module-tree.identity-role-permissions-tree {
+    max-height: none;
+}
+
+.identity-role-permissions-feature-panel {
+    display: grid;
+    align-content: start;
     gap: 1rem;
     overflow-y: auto;
-    max-height: min(62vh, 34rem);
-    padding: 1rem 0.5rem 1rem 0;
+    padding-right: 0.25rem;
+}
+
+.identity-role-permissions-inheritance-note {
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+}
+
+.identity-role-permissions-capabilities {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
 }
 
 .xf-entity-picker-advanced-hint {
@@ -2341,6 +2378,28 @@
     }
 
     .tenant-module-preview-meta {
+        grid-template-columns: 1fr;
+    }
+
+    .identity-role-permissions-dialog-body {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+
+    .identity-role-permissions-tree-panel {
+        max-height: 18rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        padding-right: 0;
+        padding-bottom: 1rem;
+    }
+
+    .identity-role-permissions-feature-panel {
+        overflow: visible;
+        padding-right: 0;
+    }
+
+    .identity-role-permissions-capabilities {
         grid-template-columns: 1fr;
     }
 }
