@@ -828,7 +828,7 @@ jobs:
             operations-dashboard
           )
 
-          docker compose -f "$COMPOSE_FILE_PATH" config --format json > "$raw_compose_config"
+          docker compose -f "$COMPOSE_FILE_PATH" --profile "*" config --format json > "$raw_compose_config"
           python3 - "$raw_compose_config" "$build_inputs_file" "$IMAGE_TAG" "${services[@]}" <<'PY'
           import json, pathlib, re, sys
           source, output, commit, *expected_services = sys.argv[1:]
@@ -880,7 +880,7 @@ jobs:
           pathlib.Path(output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
           PY
 
-          docker compose -f "$COMPOSE_FILE_PATH" build "${services[@]}"
+          docker compose -f "$COMPOSE_FILE_PATH" --profile phase0-verification build "${services[@]}"
 
       - name: Push images to dev registry
         shell: bash
@@ -2481,36 +2481,51 @@ jobs:
           test ! -L "$REMOTE_ROTATION_STATE"
           REMOTE_SCRIPT
           local_evidence="$evidence_dir/root-activation-evidence.json"
-          local_temporary=""
-          cleanup_activation_temporary() {
+          receipt_fd=""
+          cleanup_activation_receipt() {
             status=$?
             trap - EXIT
-            if [ -n "$local_temporary" ]; then
-              case "$local_temporary" in
-                "$RUNNER_TEMP"/bolt-phase0-root-activation.*)
-                  metadata="$(stat -c '%u:%a:%h:%F' -- "$local_temporary" 2>/dev/null || true)"
-                  if [ "$metadata" = "$(id -u):600:1:regular file" ]; then
-                    rm -f -- "$local_temporary" || status=1
-                  else
-                    echo "refusing to clean an insecure activation evidence file" >&2
-                    status=1
-                  fi
-                  ;;
-                *)
-                  echo "refusing to clean an unexpected activation evidence path" >&2
-                  status=1
-                  ;;
-              esac
+            if [ -n "$receipt_fd" ]; then
+              receipt_fd_path="/proc/$$/fd/$receipt_fd"
+              fd_identity="$(stat -Lc '%d:%i' -- "$receipt_fd_path" 2>/dev/null || true)"
+              path_identity="$(stat -c '%d:%i' -- "$local_evidence" 2>/dev/null || true)"
+              fd_security="$(stat -Lc '%u:%a:%h' -- "$receipt_fd_path" 2>/dev/null || true)"
+              path_security="$(stat -c '%u:%a:%h' -- "$local_evidence" 2>/dev/null || true)"
+              expected="$(id -u):600:1"
+              if [ -f "$local_evidence" ] && [ ! -L "$local_evidence" ] && \
+                 [ -n "$fd_identity" ] && [ "$path_identity" = "$fd_identity" ] && \
+                 [ "$fd_security" = "$expected" ] && [ "$path_security" = "$expected" ]; then
+                :
+              else
+                echo "activation evidence path changed while its descriptor was open" >&2
+                status=1
+              fi
+              exec {receipt_fd}>&- || status=1
+              if [ "$status" -eq 0 ]; then
+                status=1
+              fi
             fi
             exit "$status"
           }
-          trap cleanup_activation_temporary EXIT
+          validate_activation_receipt() {
+            receipt_fd_path="/proc/$$/fd/$receipt_fd"
+            expected="$(id -u):600:1"
+            test -f "$local_evidence"
+            test ! -L "$local_evidence"
+            test -f "$receipt_fd_path"
+            test "$(stat -c '%u:%a:%h' -- "$local_evidence")" = "$expected"
+            test "$(stat -Lc '%u:%a:%h' -- "$receipt_fd_path")" = "$expected"
+            test "$(stat -c '%d:%i' -- "$local_evidence")" = \
+              "$(stat -Lc '%d:%i' -- "$receipt_fd_path")"
+          }
+          trap cleanup_activation_receipt EXIT
           test ! -e "$local_evidence"
           test ! -L "$local_evidence"
           umask 077
-          local_temporary="$(mktemp "$RUNNER_TEMP/bolt-phase0-root-activation.XXXXXXXX")"
-          test "$(stat -c '%u:%a:%h:%F' -- "$local_temporary")" = \
-            "$(id -u):600:1:regular file"
+          set -o noclobber
+          exec {receipt_fd}> "$local_evidence"
+          set +o noclobber
+          validate_activation_receipt
           request="$(
             python3 - "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$IMAGE_TAG" "$COMPOSE_PROJECT_NAME" <<'PY'
           import json
@@ -2532,10 +2547,11 @@ jobs:
           PY
           )"
           printf '%s\n' "$request" | ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
-            "$DEPLOY_HOST" "sudo -n '$REMOTE_ROOT_HELPER' activate" > "$local_temporary"
-          test -s "$local_temporary"
-          mv -- "$local_temporary" "$local_evidence"
-          local_temporary=""
+            "$DEPLOY_HOST" "sudo -n '$REMOTE_ROOT_HELPER' activate" >&"$receipt_fd"
+          test "$(stat -Lc '%s' -- "/proc/$$/fd/$receipt_fd")" -gt 0
+          validate_activation_receipt
+          exec {receipt_fd}>&-
+          receipt_fd=""
           trap - EXIT
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$REMOTE_RUN_DIR/qualification-evidence.json" "$evidence_dir/qualification-evidence.json"
@@ -2546,22 +2562,58 @@ jobs:
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
           local_evidence="$evidence_dir/deployment-lease-disarm.json"
-          local_temporary="$(mktemp "$RUNNER_TEMP/bolt-phase0-lease-disarm.XXXXXXXX")"
-          cleanup_disarm_temporary() {
+          receipt_fd=""
+          cleanup_disarm_receipt() {
             status=$?
             trap - EXIT
-            rm -f -- "$local_temporary" || status=1
+            if [ -n "$receipt_fd" ]; then
+              receipt_fd_path="/proc/$$/fd/$receipt_fd"
+              fd_identity="$(stat -Lc '%d:%i' -- "$receipt_fd_path" 2>/dev/null || true)"
+              path_identity="$(stat -c '%d:%i' -- "$local_evidence" 2>/dev/null || true)"
+              fd_security="$(stat -Lc '%u:%a:%h' -- "$receipt_fd_path" 2>/dev/null || true)"
+              path_security="$(stat -c '%u:%a:%h' -- "$local_evidence" 2>/dev/null || true)"
+              expected="$(id -u):600:1"
+              if [ -f "$local_evidence" ] && [ ! -L "$local_evidence" ] && \
+                 [ -n "$fd_identity" ] && [ "$path_identity" = "$fd_identity" ] && \
+                 [ "$fd_security" = "$expected" ] && [ "$path_security" = "$expected" ]; then
+                :
+              else
+                echo "disarm evidence path changed while its descriptor was open" >&2
+                status=1
+              fi
+              exec {receipt_fd}>&- || status=1
+              if [ "$status" -eq 0 ]; then
+                status=1
+              fi
+            fi
             exit "$status"
           }
-          trap cleanup_disarm_temporary EXIT
-          test "$(stat -c '%u:%a:%h:%F' -- "$local_temporary")" = \
-            "$(id -u):600:1:regular file"
+          validate_disarm_receipt() {
+            receipt_fd_path="/proc/$$/fd/$receipt_fd"
+            expected="$(id -u):600:1"
+            test -f "$local_evidence"
+            test ! -L "$local_evidence"
+            test -f "$receipt_fd_path"
+            test "$(stat -c '%u:%a:%h' -- "$local_evidence")" = "$expected"
+            test "$(stat -Lc '%u:%a:%h' -- "$receipt_fd_path")" = "$expected"
+            test "$(stat -c '%d:%i' -- "$local_evidence")" = \
+              "$(stat -Lc '%d:%i' -- "$receipt_fd_path")"
+          }
+          trap cleanup_disarm_receipt EXIT
+          test ! -e "$local_evidence"
+          test ! -L "$local_evidence"
+          umask 077
+          set -o noclobber
+          exec {receipt_fd}> "$local_evidence"
+          set +o noclobber
+          validate_disarm_receipt
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" disarm --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT'" \
-            > "$local_temporary"
-          test -s "$local_temporary"
-          mv -- "$local_temporary" "$local_evidence"
-          local_temporary=""
+            >&"$receipt_fd"
+          test "$(stat -Lc '%s' -- "/proc/$$/fd/$receipt_fd")" -gt 0
+          validate_disarm_receipt
+          exec {receipt_fd}>&-
+          receipt_fd=""
           trap - EXIT
 
       - name: Publish qualified develop channel tags
@@ -2648,13 +2700,55 @@ jobs:
           test -s "$DEPLOY_SSH_CONFIG"
           test -s "$DEPLOY_KNOWN_HOSTS"
           local_evidence="$evidence_dir/workflow-recovery-evidence.json"
-          local_temporary="$(mktemp "$RUNNER_TEMP/bolt-phase0-workflow-recovery.XXXXXXXX")"
-          test "$(stat -c '%u:%a:%h:%F' -- "$local_temporary")" = \
-            "$(id -u):600:1:regular file"
+          receipt_fd=""
+          cleanup_recovery_receipt() {
+            cleanup_status=$?
+            trap - EXIT
+            if [ -n "$receipt_fd" ]; then
+              receipt_fd_path="/proc/$$/fd/$receipt_fd"
+              fd_identity="$(stat -Lc '%d:%i' -- "$receipt_fd_path" 2>/dev/null || true)"
+              path_identity="$(stat -c '%d:%i' -- "$local_evidence" 2>/dev/null || true)"
+              fd_security="$(stat -Lc '%u:%a:%h' -- "$receipt_fd_path" 2>/dev/null || true)"
+              path_security="$(stat -c '%u:%a:%h' -- "$local_evidence" 2>/dev/null || true)"
+              expected="$(id -u):600:1"
+              if [ -f "$local_evidence" ] && [ ! -L "$local_evidence" ] && \
+                 [ -n "$fd_identity" ] && [ "$path_identity" = "$fd_identity" ] && \
+                 [ "$fd_security" = "$expected" ] && [ "$path_security" = "$expected" ]; then
+                :
+              else
+                echo "recovery evidence path changed while its descriptor was open" >&2
+                cleanup_status=1
+              fi
+              exec {receipt_fd}>&- || cleanup_status=1
+              if [ "$cleanup_status" -eq 0 ]; then
+                cleanup_status=1
+              fi
+            fi
+            exit "$cleanup_status"
+          }
+          validate_recovery_receipt() {
+            receipt_fd_path="/proc/$$/fd/$receipt_fd"
+            expected="$(id -u):600:1"
+            test -f "$local_evidence"
+            test ! -L "$local_evidence"
+            test -f "$receipt_fd_path"
+            test "$(stat -c '%u:%a:%h' -- "$local_evidence")" = "$expected"
+            test "$(stat -Lc '%u:%a:%h' -- "$receipt_fd_path")" = "$expected"
+            test "$(stat -c '%d:%i' -- "$local_evidence")" = \
+              "$(stat -Lc '%d:%i' -- "$receipt_fd_path")"
+          }
+          trap cleanup_recovery_receipt EXIT
+          test ! -e "$local_evidence"
+          test ! -L "$local_evidence"
+          umask 077
+          set -o noclobber
+          exec {receipt_fd}> "$local_evidence"
+          set +o noclobber
+          validate_recovery_receipt
           status=0
           ssh -F "$DEPLOY_SSH_CONFIG" -o BatchMode=yes -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS" "$DEPLOY_HOST" \
-            "REMOTE_WATCHDOG_RUNNER='$REMOTE_WATCHDOG_RUNNER' bash -s" > "$local_temporary" <<'REMOTE_SCRIPT' || status=$?
+            "REMOTE_WATCHDOG_RUNNER='$REMOTE_WATCHDOG_RUNNER' bash -s" >&"$receipt_fd" <<'REMOTE_SCRIPT' || status=$?
           set -euo pipefail
           recovery_status=0
           sudo -n /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog >/dev/null || recovery_status=$?
@@ -2674,13 +2768,17 @@ jobs:
           fi
           exit "$recovery_status"
           REMOTE_SCRIPT
-          if [ -s "$local_temporary" ]; then
-            mv -- "$local_temporary" "$local_evidence"
-          else
-            rm -f -- "$local_temporary"
-            printf '%s\n' '{"schema":"xframework.bolt.phase0.workflow-recovery.v1","status":"failed","reason_code":"recovery-evidence-capture-failed"}' > "$local_evidence"
-            chmod 600 "$local_evidence"
+          if [ "$(stat -Lc '%s' -- "/proc/$$/fd/$receipt_fd")" -eq 0 ]; then
+            printf '%s\n' '{"schema":"xframework.bolt.phase0.workflow-recovery.v1","status":"failed","reason_code":"recovery-evidence-capture-failed"}' >&"$receipt_fd"
+            if [ "$status" -eq 0 ]; then
+              status=1
+            fi
           fi
+          validate_recovery_receipt
+          test "$(stat -Lc '%s' -- "/proc/$$/fd/$receipt_fd")" -gt 0
+          exec {receipt_fd}>&-
+          receipt_fd=""
+          trap - EXIT
           exit "$status"
 
       - name: Deployment diagnostics
