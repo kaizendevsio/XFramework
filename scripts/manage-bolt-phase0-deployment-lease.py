@@ -29,6 +29,8 @@ LEASE_SCHEMA = "xframework.bolt.phase0.deployment-lease.v1"
 EVIDENCE_SCHEMA = "xframework.bolt.phase0.deployment-recovery.v1"
 RECOVERY_GATE_SCHEMA = "xframework.bolt.phase0.recovery-gate.v1"
 RUNTIME_SCHEMA = "xframework.bolt.phase0.runtime.v2"
+ROTATION_STATE_SCHEMA = "xframework.bolt.phase0.rotation-state.v1"
+ROTATION_CURRENT_ONLY_SCHEMA = "xframework.bolt.phase0.rotation-current-only.v1"
 
 DEPLOYMENT_ROOT = Path("/home/github-runner/xframework-deploy")
 APPROVED_RUN_ROOT = DEPLOYMENT_ROOT / "runs"
@@ -109,6 +111,7 @@ COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
 TIMESTAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
 SAFE_CONTAINER_NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}")
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+GENERATION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 
 MIN_STALE_SECONDS = 60
 MAX_STALE_SECONDS = 86_400
@@ -1711,27 +1714,32 @@ class DeploymentLeaseController:
         rotation_manager: Path | None = None,
     ) -> bool:
         state_file = lease.run_directory / ROTATION_STATE_NAME
-        if not state_file.exists() and not state_file.is_symlink():
-            return False
-        validate_file(
-            state_file,
-            self.config.deployment_uid,
-            require_mode_600=True,
-            max_bytes=MAX_JSON_BYTES,
-        )
+        state_present = state_file.exists() or state_file.is_symlink()
+        if state_present:
+            validate_file(
+                state_file,
+                self.config.deployment_uid,
+                require_mode_600=True,
+                max_bytes=MAX_JSON_BYTES,
+            )
         if (
             rotation_manager is not None
             and rotation_manager != lease.run_directory / ROTATION_MANAGER_NAME
         ):
             raise ControllerError("unbound-candidate-rotation-manager")
-        manager = rotation_manager or recovery.rotation_manager
+        manager = (
+            rotation_manager
+            if state_present and rotation_manager is not None
+            else recovery.rotation_manager
+        )
+        candidate_manager_used = manager == lease.run_directory / ROTATION_MANAGER_NAME
         manager_metadata = validate_file(
             manager,
             self.config.deployment_uid,
             max_bytes=MAX_ARTIFACT_BYTES,
         )
         if (
-            rotation_manager is not None
+            candidate_manager_used
             and self.config.enforce_production_paths
             and os.name != "nt"
             and (
@@ -1752,10 +1760,69 @@ class DeploymentLeaseController:
             ],
             recovery.subprocess_timeout_seconds,
             "rotation-abort",
+            capture=True,
         )
         if result.returncode != 0:
             raise ControllerError("rotation-abort-failed")
-        return True
+        try:
+            if not isinstance(result.stdout, str):
+                raise ControllerError("invalid-rotation-abort-output")
+            receipt = decode_json(result.stdout.encode("utf-8", errors="strict"))
+        except (ControllerError, UnicodeEncodeError) as error:
+            raise ControllerError("invalid-rotation-abort-output") from error
+        if not isinstance(receipt, dict):
+            raise ControllerError("invalid-rotation-abort-output")
+        phase = receipt.get("phase")
+        expected_keys = {"schema", "phase", "current_generation_id"}
+        if phase == "aborted":
+            expected_keys.add("rotation_id")
+        if (
+            phase not in {"aborted", "unprepared"}
+            or set(receipt) != expected_keys
+            or receipt.get("schema") != ROTATION_STATE_SCHEMA
+            or not isinstance(receipt.get("current_generation_id"), str)
+            or not GENERATION_ID.fullmatch(receipt["current_generation_id"])
+            or (
+                phase == "aborted"
+                and (
+                    not isinstance(receipt.get("rotation_id"), str)
+                    or not GENERATION_ID.fullmatch(receipt["rotation_id"])
+                )
+            )
+        ):
+            raise ControllerError("invalid-rotation-abort-output")
+        return phase == "aborted"
+
+    def _validate_current_only(self, recovery: RecoveryConfig) -> None:
+        result = self._invoke(
+            [
+                str(recovery.python_executable),
+                str(recovery.rotation_manager),
+                "validate-current-only",
+                "--env-file",
+                str(recovery.env_file),
+            ],
+            recovery.subprocess_timeout_seconds,
+            "current-only-validation",
+            capture=True,
+        )
+        if result.returncode != 0:
+            raise ControllerError("current-only-validation-failed")
+        try:
+            if not isinstance(result.stdout, str):
+                raise ControllerError("invalid-current-only-validation-output")
+            receipt = decode_json(result.stdout.encode("utf-8", errors="strict"))
+        except (ControllerError, UnicodeEncodeError) as error:
+            raise ControllerError("invalid-current-only-validation-output") from error
+        if (
+            not isinstance(receipt, dict)
+            or set(receipt) != {"schema", "status", "current_generation_id"}
+            or receipt.get("schema") != ROTATION_CURRENT_ONLY_SCHEMA
+            or receipt.get("status") != "passed"
+            or not isinstance(receipt.get("current_generation_id"), str)
+            or not GENERATION_ID.fullmatch(receipt["current_generation_id"])
+        ):
+            raise ControllerError("invalid-current-only-validation-output")
 
     def _fingerprint(self, path: Path) -> tuple[int, int, str]:
         path_stat = validate_file(
@@ -2073,14 +2140,32 @@ class DeploymentLeaseController:
         gates: dict[str, bool],
         *,
         stale: bool | None = True,
+        reconcile_prepared: bool = False,
+        rotation_manager: Path | None = None,
+        preserve_lease: bool = False,
     ) -> tuple[dict[str, Any], int]:
         try:
             stopped = self._stop_hub(recovery)
         except ControllerError:
             stopped = False
         gates["hub_stopped"] = stopped
-        if stopped:
-            secure_unlink(self.config.lease_file, self.config.deployment_uid)
+        if stopped and not preserve_lease:
+            if lease is not None and reconcile_prepared:
+                try:
+                    gates["rotation_aborted"] = (
+                        self._abort_prepared(
+                            recovery,
+                            lease,
+                            rotation_manager=rotation_manager,
+                        )
+                        or gates["rotation_aborted"]
+                    )
+                except ControllerError as error:
+                    reason_code = error.code
+                else:
+                    secure_unlink(self.config.lease_file, self.config.deployment_uid)
+            else:
+                secure_unlink(self.config.lease_file, self.config.deployment_uid)
         evidence = self._evidence(
             now=now,
             action="hub-stopped" if stopped else "hub-stop-unverified",
@@ -2149,9 +2234,9 @@ class DeploymentLeaseController:
                 evidence = self._evidence(
                     now=now,
                     action="hub-stopped" if gates["hub_stopped"] else "hub-stop-unverified",
-                    status="passed" if gates["hub_stopped"] else "failed",
+                    status="failed",
                     reason_code=(
-                        "no-active-lease-no-lkg-hub-stopped"
+                        "no-active-lease-no-lkg-credential-state-unverified"
                         if gates["hub_stopped"]
                         else "hub-stop-unverified"
                     ),
@@ -2160,7 +2245,7 @@ class DeploymentLeaseController:
                     gates=gates,
                 )
                 self._write_evidence(evidence)
-                return evidence, 0 if gates["hub_stopped"] else 1
+                return evidence, 1
             stale = self._is_stale(lease, now)
             if not force and not stale:
                 evidence = self._evidence(
@@ -2205,20 +2290,6 @@ class DeploymentLeaseController:
                 self._write_evidence(evidence)
                 return evidence, 1
 
-            if lease.mutation_began:
-                secure_unlink(self.config.lease_file, self.config.deployment_uid)
-                evidence = self._evidence(
-                    now=now,
-                    action="hub-stopped",
-                    status="failed",
-                    reason_code="no-qualified-lkg-after-mutation",
-                    lease=lease,
-                    stale=stale,
-                    gates=gates,
-                )
-                self._write_evidence(evidence)
-                return evidence, 1
-
             try:
                 gates["rotation_aborted"] = self._abort_prepared(
                     recovery,
@@ -2231,6 +2302,20 @@ class DeploymentLeaseController:
                     action="hub-stopped",
                     status="failed",
                     reason_code=error.code,
+                    lease=lease,
+                    stale=stale,
+                    gates=gates,
+                )
+                self._write_evidence(evidence)
+                return evidence, 1
+
+            if lease.mutation_began:
+                secure_unlink(self.config.lease_file, self.config.deployment_uid)
+                evidence = self._evidence(
+                    now=now,
+                    action="hub-stopped",
+                    status="failed",
+                    reason_code="no-qualified-lkg-after-mutation",
                     lease=lease,
                     stale=stale,
                     gates=gates,
@@ -2290,12 +2375,27 @@ class DeploymentLeaseController:
                 artifacts = self._resolve_lkg(recovery)
                 self._validate_bound_recovery_helpers(recovery, artifacts)
             except ControllerError as error:
-                return self._failed_recovery(now, lease, recovery, error.code, gates)
+                return self._failed_recovery(
+                    now,
+                    lease,
+                    recovery,
+                    error.code,
+                    gates,
+                    reconcile_prepared=True,
+                    rotation_manager=lease.run_directory / ROTATION_MANAGER_NAME,
+                )
             if not lease.mutation_began:
                 try:
                     gates["rotation_aborted"] = self._abort_prepared(recovery, lease)
                 except ControllerError as error:
-                    return self._failed_recovery(now, lease, recovery, error.code, gates)
+                    return self._failed_recovery(
+                        now,
+                        lease,
+                        recovery,
+                        error.code,
+                        gates,
+                        preserve_lease=True,
+                    )
                 secure_unlink(self.config.lease_file, self.config.deployment_uid)
                 evidence = self._evidence(
                     now=now,
@@ -2310,14 +2410,53 @@ class DeploymentLeaseController:
                 return evidence, 0
 
             try:
+                gates["hub_stopped"] = self._stop_hub(recovery)
+                if not gates["hub_stopped"]:
+                    raise ControllerError("hub-stop-unverified")
+                gates["rotation_aborted"] = self._abort_prepared(
+                    recovery,
+                    lease,
+                    rotation_manager=lease.run_directory / ROTATION_MANAGER_NAME,
+                )
+            except ControllerError as error:
+                evidence = self._evidence(
+                    now=now,
+                    action=(
+                        "hub-stopped"
+                        if gates["hub_stopped"]
+                        else "hub-stop-unverified"
+                    ),
+                    status="failed",
+                    reason_code=(
+                        error.code
+                        if gates["hub_stopped"]
+                        else "hub-stop-unverified"
+                    ),
+                    lease=lease,
+                    stale=True,
+                    gates=gates,
+                )
+                self._write_evidence(evidence)
+                return evidence, 1
+
+            try:
                 self._restore(recovery, artifacts)
                 gates["restore_applied"] = True
+                gates["hub_stopped"] = False
                 self._runtime_gate(recovery, artifacts)
                 gates["runtime_verified"] = True
                 self._recovery_gate(recovery, artifacts)
                 gates["recovery_gate_verified"] = True
             except ControllerError as error:
-                return self._failed_recovery(now, lease, recovery, error.code, gates)
+                return self._failed_recovery(
+                    now,
+                    lease,
+                    recovery,
+                    error.code,
+                    gates,
+                    reconcile_prepared=True,
+                    rotation_manager=lease.run_directory / ROTATION_MANAGER_NAME,
+                )
 
             secure_unlink(self.config.lease_file, self.config.deployment_uid)
             evidence = self._evidence(
@@ -2347,10 +2486,67 @@ class DeploymentLeaseController:
             try:
                 artifacts = self._resolve_lkg(recovery)
                 self._validate_bound_recovery_helpers(recovery, artifacts)
-                if lease is not None and not lease.mutation_began:
-                    gates["rotation_aborted"] = self._abort_prepared(recovery, lease)
+            except ControllerError as error:
+                return self._failed_recovery(
+                    now,
+                    lease,
+                    recovery,
+                    error.code,
+                    gates,
+                    stale=None if lease is None else self._is_stale(lease, now),
+                    reconcile_prepared=lease is not None,
+                    rotation_manager=(
+                        None
+                        if lease is None
+                        else lease.run_directory / ROTATION_MANAGER_NAME
+                    ),
+                )
+
+            if lease is None:
+                try:
+                    self._validate_current_only(recovery)
+                except ControllerError as error:
+                    return self._failed_recovery(
+                        now,
+                        None,
+                        recovery,
+                        error.code,
+                        gates,
+                        stale=None,
+                    )
+            else:
+                try:
+                    if lease.mutation_began:
+                        gates["hub_stopped"] = self._stop_hub(recovery)
+                        if not gates["hub_stopped"]:
+                            raise ControllerError("hub-stop-unverified")
+                        gates["rotation_aborted"] = self._abort_prepared(
+                            recovery,
+                            lease,
+                            rotation_manager=(
+                                lease.run_directory / ROTATION_MANAGER_NAME
+                            ),
+                        )
+                    else:
+                        gates["rotation_aborted"] = self._abort_prepared(
+                            recovery,
+                            lease,
+                        )
+                except ControllerError as error:
+                    return self._failed_recovery(
+                        now,
+                        lease,
+                        recovery,
+                        error.code,
+                        gates,
+                        stale=self._is_stale(lease, now),
+                        preserve_lease=True,
+                    )
+
+            try:
                 self._restore(recovery, artifacts)
                 gates["restore_applied"] = True
+                gates["hub_stopped"] = False
                 self._runtime_gate(recovery, artifacts)
                 gates["runtime_verified"] = True
                 self._recovery_gate(recovery, artifacts)
@@ -2363,6 +2559,12 @@ class DeploymentLeaseController:
                     error.code,
                     gates,
                     stale=None if lease is None else self._is_stale(lease, now),
+                    reconcile_prepared=lease is not None,
+                    rotation_manager=(
+                        None
+                        if lease is None
+                        else lease.run_directory / ROTATION_MANAGER_NAME
+                    ),
                 )
             if lease is not None:
                 secure_unlink(self.config.lease_file, self.config.deployment_uid)

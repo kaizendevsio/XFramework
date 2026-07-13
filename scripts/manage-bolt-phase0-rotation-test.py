@@ -404,6 +404,17 @@ class PrepareTests(RotationFixture):
 
 
 class ActivationTests(RotationFixture):
+    def test_validate_current_only_rejects_secondary_state(self) -> None:
+        clean = MODULE.validate_current_only(self.env_path)
+        self.assertEqual(MODULE.CURRENT_ONLY_SCHEMA, clean["schema"])
+        self.assertEqual("passed", clean["status"])
+
+        self.prepare()
+        before = self.env_path.read_bytes()
+        with self.assertRaisesRegex(MODULE.RotationError, "secondary state"):
+            MODULE.validate_current_only(self.env_path)
+        self.assertEqual(before, self.env_path.read_bytes())
+
     def test_abort_prepared_removes_only_secondary_credentials(self) -> None:
         self.prepare()
 
@@ -414,6 +425,25 @@ class ActivationTests(RotationFixture):
         self.assertFalse(self.state_path.exists())
         self.assertEqual("generation-g", document.values["CREDENTIAL_GENERATION_ID"])
         self.assertTrue(set(MODULE.SECONDARY_STATE_NAMES).isdisjoint(document.values))
+        validation = MODULE.validate_bootstrap_inputs(
+            self.env_path,
+            self.root / "fresh-run-rotation-state.json",
+        )
+        self.assertTrue(validation["generation_marker_present"])
+        self.assertFalse(validation["mutation_required"])
+        repeated = MODULE.abort_prepared(self.env_path, self.state_path)
+        self.assertEqual("unprepared", repeated["phase"])
+
+    def test_abort_prepared_rejects_orphaned_secondary_state(self) -> None:
+        self.prepare()
+        self.state_path.unlink()
+        before = self.env_path.read_bytes()
+
+        with self.assertRaisesRegex(MODULE.RotationError, "secondary state"):
+            MODULE.abort_prepared(self.env_path, self.state_path)
+
+        self.assertEqual(before, self.env_path.read_bytes())
+        self.assertFalse(self.state_path.exists())
 
     def test_abort_prepared_rejects_activated_rotation(self) -> None:
         self.prepare()

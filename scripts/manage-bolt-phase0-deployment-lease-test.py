@@ -29,6 +29,16 @@ MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
+ROTATION_SCRIPT = Path(__file__).with_name("manage-bolt-phase0-rotation.py")
+ROTATION_SPEC = importlib.util.spec_from_file_location(
+    "phase0_rotation_for_deployment_lease_tests",
+    ROTATION_SCRIPT,
+)
+assert ROTATION_SPEC and ROTATION_SPEC.loader
+ROTATION_MODULE = importlib.util.module_from_spec(ROTATION_SPEC)
+sys.modules[ROTATION_SPEC.name] = ROTATION_MODULE
+ROTATION_SPEC.loader.exec_module(ROTATION_MODULE)
+
 NOW = dt.datetime(2026, 7, 13, 10, 0, 0, tzinfo=dt.timezone.utc)
 
 
@@ -115,10 +125,16 @@ class FakeRunner:
         self.delay_restore = 0.0
         self.stop_running = False
         self.stop_failure = False
+        self.execute_rotation_function = False
+        self.execute_rotation_subprocess = False
+        self.rotation_output_override: str | None = None
         self.lock = threading.Lock()
 
     def _step(self, command: list[str]) -> str:
-        if len(command) > 1 and command[1] == str(self.fixture.rotation_manager):
+        if len(command) > 1 and command[1] in {
+            str(self.fixture.rotation_manager),
+            str(self.fixture.qualified_rotation_manager),
+        }:
             return "rotation"
         if len(command) > 1 and command[1] == str(self.fixture.runtime_verifier):
             return "runtime"
@@ -144,6 +160,33 @@ class FakeRunner:
         with self.lock:
             self.commands.append(command.copy())
         step = self._step(command)
+        if step == "rotation" and self.execute_rotation_function:
+            try:
+                if command[2] == "validate-current-only":
+                    result = ROTATION_MODULE.validate_current_only(
+                        Path(command[command.index("--env-file") + 1]),
+                    )
+                else:
+                    result = ROTATION_MODULE.abort_prepared(
+                        Path(command[command.index("--env-file") + 1]),
+                        Path(command[command.index("--state-file") + 1]),
+                    )
+            except (OSError, ROTATION_MODULE.RotationError) as error:
+                return subprocess.CompletedProcess(command, 1, "", str(error))
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                json.dumps(result) if capture else "",
+                "",
+            )
+        if step == "rotation" and self.execute_rotation_subprocess:
+            return subprocess.run(
+                command,
+                check=False,
+                capture_output=capture,
+                text=True,
+                timeout=timeout,
+            )
         if self.timeout_step == step:
             raise subprocess.TimeoutExpired(command, timeout)
         if step == "restore" and self.delay_restore:
@@ -178,10 +221,33 @@ class FakeRunner:
             self.stop_running = False
         if step == "kill":
             self.stop_running = False
+        output = "suppressed-secret-output" if capture else ""
+        if step == "rotation" and capture:
+            if command[2] == "validate-current-only":
+                receipt = {
+                    "schema": MODULE.ROTATION_CURRENT_ONLY_SCHEMA,
+                    "status": "passed",
+                    "current_generation_id": "generation-test",
+                }
+            else:
+                state_file = Path(command[command.index("--state-file") + 1])
+                phase = "aborted" if os.path.lexists(state_file) else "unprepared"
+                receipt = {
+                    "schema": MODULE.ROTATION_STATE_SCHEMA,
+                    "phase": phase,
+                    "current_generation_id": "generation-test",
+                }
+                if phase == "aborted":
+                    receipt["rotation_id"] = "rotation-test"
+            output = (
+                self.rotation_output_override
+                if self.rotation_output_override is not None
+                else json.dumps(receipt)
+            )
         return subprocess.CompletedProcess(
             command,
             1 if self.fail_step == step or (step == "stop" and self.stop_failure) else 0,
-            "suppressed-secret-output" if capture else "",
+            output,
             "suppressed-secret-error",
         )
 
@@ -230,6 +296,7 @@ class LeaseFixture(unittest.TestCase):
         )
         self.rotation_state = self.run_directory / MODULE.ROTATION_STATE_NAME
         self.rotation_manager = secure_file(self.root / "rotation.py")
+        self.qualified_rotation_manager = self.rotation_manager
         self.runtime_verifier = secure_file(self.root / "runtime.py")
         self.recovery_hook = secure_file(self.root / "recovery-hook", executable=True)
         self.python = secure_file(self.root / "python", executable=True)
@@ -278,6 +345,43 @@ class LeaseFixture(unittest.TestCase):
 
     def make_stale(self) -> None:
         self.current_time += dt.timedelta(seconds=61)
+
+    def prepare_real_rotation(self, *, subprocess_cli: bool = False) -> None:
+        values = {
+            "CREDENTIAL_GENERATION_ID": "generation-g",
+            **{
+                name: f"credential-{index:02d}-" + chr(ord("a") + index) * 52
+                for index, name in enumerate(ROTATION_MODULE.PRIMARY_SECRET_NAMES)
+            },
+        }
+        self.env_file.write_text(
+            "BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n"
+            + "".join(f"{name}={value}\n" for name, value in values.items()),
+            encoding="utf-8",
+        )
+        if os.name != "nt":
+            self.env_file.chmod(0o600)
+        ROTATION_MODULE.prepare(
+            self.env_file,
+            self.rotation_state,
+            3_600,
+            NOW,
+        )
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            ROTATION_SCRIPT.read_text(encoding="utf-8"),
+            executable=True,
+        )
+        secure_file(
+            self.qualified_rotation_manager,
+            ROTATION_SCRIPT.read_text(encoding="utf-8"),
+            executable=True,
+        )
+        if subprocess_cli:
+            self.python = Path(sys.executable).resolve()
+            self.runner.execute_rotation_subprocess = True
+        else:
+            self.runner.execute_rotation_function = True
 
     def read_evidence(self) -> dict[str, Any]:
         return json.loads(self.config.evidence_file.read_text(encoding="utf-8"))
@@ -559,7 +663,7 @@ class LifecycleTests(LeaseFixture):
         self.assertEqual(str(self.rotation_state), command[command.index("--state-file") + 1])
         self.assertNotIn("SECRET=not-emitted", " ".join(command))
 
-    def test_stale_pre_mutation_without_rotation_state_disarms_without_abort(self) -> None:
+    def test_stale_pre_mutation_without_state_validates_env_before_disarm(self) -> None:
         self.arm()
         self.make_stale()
 
@@ -567,7 +671,7 @@ class LifecycleTests(LeaseFixture):
 
         self.assertEqual(0, exit_code)
         self.assertFalse(evidence["gates"]["rotation_aborted"])
-        self.assertEqual(0, self.runner.count("rotation"))
+        self.assertEqual(1, self.runner.count("rotation"))
         self.assertFalse(self.config.lease_file.exists())
 
     def test_stale_pre_mutation_rejects_symlinked_lease_rotation_state(self) -> None:
@@ -872,10 +976,43 @@ class RecoveryTests(LeaseFixture):
             stop_timeout_seconds=10,
         )
 
-        self.assertEqual(0, exit_code)
-        self.assertEqual("no-active-lease-no-lkg-hub-stopped", evidence["reason_code"])
+        self.assertEqual(1, exit_code)
+        self.assertEqual(
+            "no-active-lease-no-lkg-credential-state-unverified",
+            evidence["reason_code"],
+        )
+        self.assertEqual("failed", evidence["status"])
         self.assertTrue(evidence["gates"]["hub_stopped"])
         self.assertEqual(1, self.runner.count("stop"))
+
+    def test_no_lkg_without_lease_never_claims_orphaned_credentials_are_clean(self) -> None:
+        self.lkg_pointer.unlink()
+        self.env_file.write_text(
+            "BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n"
+            "CREDENTIAL_SECONDARY_GENERATION_ID=orphaned-generation\n",
+            encoding="utf-8",
+        )
+        if os.name != "nt":
+            self.env_file.chmod(0o600)
+        before = self.env_file.read_bytes()
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual(
+            "no-active-lease-no-lkg-credential-state-unverified",
+            evidence["reason_code"],
+        )
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertEqual(before, self.env_file.read_bytes())
+        self.assertEqual(0, self.runner.count("rotation"))
 
     def test_no_lkg_without_lease_rejects_proxy_mode_drift(self) -> None:
         self.lkg_pointer.unlink()
@@ -923,6 +1060,212 @@ class RecoveryTests(LeaseFixture):
         self.assertTrue(evidence["gates"]["rotation_aborted"])
         self.assertEqual(1, self.runner.count("rotation"))
         self.assertFalse(self.config.lease_file.exists())
+
+    def test_no_lkg_after_mutation_aborts_prepared_state_before_disarm(self) -> None:
+        self.arm(mutation=True)
+        self.lkg_pointer.unlink()
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            executable=True,
+        )
+        secure_file(self.rotation_state, "{}")
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("no-qualified-lkg-after-mutation", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertTrue(evidence["gates"]["rotation_aborted"])
+        self.assertEqual(1, self.runner.count("rotation"))
+        self.assertFalse(self.config.lease_file.exists())
+
+    def test_no_lkg_after_mutation_keeps_lease_when_rotation_abort_fails(self) -> None:
+        self.arm(mutation=True)
+        self.lkg_pointer.unlink()
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            executable=True,
+        )
+        secure_file(self.rotation_state, "{}")
+        self.runner.fail_step = "rotation"
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("rotation-abort-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertFalse(evidence["gates"]["rotation_aborted"])
+        self.assertTrue(self.config.lease_file.exists())
+        self.assertEqual(1, self.runner.count("rotation"))
+
+    def test_no_lkg_invalid_rotation_receipt_keeps_lease(self) -> None:
+        self.arm(mutation=True)
+        self.lkg_pointer.unlink()
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            executable=True,
+        )
+        secure_file(self.rotation_state, "{}")
+        self.runner.rotation_output_override = json.dumps(
+            {
+                "schema": MODULE.ROTATION_STATE_SCHEMA,
+                "phase": "aborted",
+                "current_generation_id": "generation-test",
+                "rotation_id": "rotation-test",
+                "unexpected": "rejected",
+            }
+        )
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("invalid-rotation-abort-output", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertFalse(evidence["gates"]["rotation_aborted"])
+        self.assertTrue(self.config.lease_file.exists())
+
+    def test_no_lkg_duplicate_rotation_receipt_key_keeps_lease(self) -> None:
+        self.arm(mutation=True)
+        self.lkg_pointer.unlink()
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            executable=True,
+        )
+        secure_file(self.rotation_state, "{}")
+        self.runner.rotation_output_override = (
+            '{"schema":"xframework.bolt.phase0.rotation-state.v1",'
+            '"phase":"unprepared","phase":"aborted",'
+            '"current_generation_id":"generation-test",'
+            '"rotation_id":"rotation-test"}'
+        )
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("invalid-rotation-abort-output", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertTrue(self.config.lease_file.exists())
+
+    def test_no_lkg_recovery_with_real_rotation_allows_fresh_bootstrap(self) -> None:
+        self.arm(mutation=True)
+        self.prepare_real_rotation(subprocess_cli=True)
+        self.lkg_pointer.unlink()
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("no-qualified-lkg-after-mutation", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["rotation_aborted"])
+        self.assertFalse(self.rotation_state.exists())
+        command = next(
+            command
+            for command in self.runner.commands
+            if self.runner._step(command) == "rotation"
+        )
+        self.assertEqual(str(self.python), command[0])
+        self.assertEqual(str(self.rotation_manager), command[1])
+        self.assertEqual("abort-prepared", command[2])
+        validation = ROTATION_MODULE.validate_bootstrap_inputs(
+            self.env_file,
+            self.run_directory / "fresh-run-state.json",
+        )
+        self.assertFalse(validation["mutation_required"])
+        self.assertTrue(
+            set(ROTATION_MODULE.SECONDARY_STATE_NAMES).isdisjoint(
+                ROTATION_MODULE.parse_env(self.env_file).values
+            )
+        )
+
+    def test_no_lkg_recovery_retains_activated_rotation_and_lease(self) -> None:
+        self.arm(mutation=True)
+        self.prepare_real_rotation()
+        ROTATION_MODULE.activate(
+            self.env_file,
+            self.rotation_state,
+            900,
+            NOW + dt.timedelta(minutes=1),
+        )
+        activated_env = self.env_file.read_bytes()
+        activated_state = self.rotation_state.read_bytes()
+        self.lkg_pointer.unlink()
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("rotation-abort-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertFalse(evidence["gates"]["rotation_aborted"])
+        self.assertTrue(self.config.lease_file.exists())
+        self.assertEqual(activated_env, self.env_file.read_bytes())
+        self.assertEqual(activated_state, self.rotation_state.read_bytes())
+        self.assertEqual(0, self.runner.count("restore"))
+
+    def test_no_lkg_recovery_rejects_orphaned_secondary_state(self) -> None:
+        self.arm(mutation=True)
+        self.prepare_real_rotation()
+        self.rotation_state.unlink()
+        orphaned_env = self.env_file.read_bytes()
+        self.lkg_pointer.unlink()
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("rotation-abort-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertFalse(evidence["gates"]["rotation_aborted"])
+        self.assertTrue(self.config.lease_file.exists())
+        self.assertEqual(orphaned_env, self.env_file.read_bytes())
+        self.assertEqual(0, self.runner.count("restore"))
+
     def test_absent_leased_run_crash_window_restores_prior_lkg(self) -> None:
         self.arm(mutation=True)
         self.run_directory.rmdir()
@@ -961,13 +1304,147 @@ class RecoveryTests(LeaseFixture):
         self.assertEqual(1, self.runner.count("recovery"))
         self.assertFalse(self.config.lease_file.exists())
 
+    def test_qualified_lkg_after_mutation_aborts_prepared_before_restore(self) -> None:
+        self.arm(mutation=True)
+        self.make_stale()
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            executable=True,
+        )
+        secure_file(self.rotation_state, "{}")
+
+        evidence, exit_code = self.controller.reconcile(self.recovery)
+
+        self.assertEqual(0, exit_code)
+        self.assertEqual("security-qualified-lkg-restored", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["rotation_aborted"])
+        self.assertFalse(evidence["gates"]["hub_stopped"])
+        steps = [self.runner._step(command) for command in self.runner.commands]
+        self.assertLess(steps.index("stop"), steps.index("rotation"))
+        self.assertLess(steps.index("rotation"), steps.index("restore"))
+        self.assertFalse(self.config.lease_file.exists())
+
+    def test_qualified_lkg_abort_failure_keeps_lease_and_prevents_restore(self) -> None:
+        self.arm(mutation=True)
+        self.make_stale()
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            executable=True,
+        )
+        secure_file(self.rotation_state, "{}")
+        self.runner.fail_step = "rotation"
+
+        evidence, exit_code = self.controller.reconcile(self.recovery)
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("rotation-abort-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertTrue(self.config.lease_file.exists())
+        self.assertEqual(0, self.runner.count("restore"))
+
+    def test_qualified_lkg_rejects_orphaned_secondary_state(self) -> None:
+        self.arm(mutation=True)
+        self.prepare_real_rotation()
+        self.rotation_state.unlink()
+        orphaned_env = self.env_file.read_bytes()
+        self.make_stale()
+
+        evidence, exit_code = self.controller.reconcile(self.recovery)
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("rotation-abort-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertTrue(self.config.lease_file.exists())
+        self.assertEqual(orphaned_env, self.env_file.read_bytes())
+        self.assertEqual(0, self.runner.count("restore"))
+
+    def test_force_recovery_after_mutation_aborts_prepared_before_restore(self) -> None:
+        self.arm(mutation=True)
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            executable=True,
+        )
+        secure_file(self.rotation_state, "{}")
+
+        evidence, exit_code = self.controller.force_recovery(self.recovery)
+
+        self.assertEqual(0, exit_code)
+        self.assertEqual("forced-security-qualified-lkg-restored", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["rotation_aborted"])
+        self.assertFalse(evidence["gates"]["hub_stopped"])
+        steps = [self.runner._step(command) for command in self.runner.commands]
+        self.assertLess(steps.index("stop"), steps.index("rotation"))
+        self.assertLess(steps.index("rotation"), steps.index("restore"))
+        self.assertFalse(self.config.lease_file.exists())
+
+    def test_force_recovery_abort_failure_keeps_lease_and_prevents_restore(self) -> None:
+        self.arm(mutation=True)
+        self.rotation_manager = secure_file(
+            self.run_directory / "manage-bolt-phase0-rotation.py",
+            executable=True,
+        )
+        secure_file(self.rotation_state, "{}")
+        self.runner.fail_step = "rotation"
+
+        evidence, exit_code = self.controller.force_recovery(self.recovery)
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("rotation-abort-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertTrue(self.config.lease_file.exists())
+        self.assertEqual(0, self.runner.count("restore"))
+
+    def test_force_recovery_rejects_orphaned_secondary_state(self) -> None:
+        self.arm(mutation=True)
+        self.prepare_real_rotation()
+        self.rotation_state.unlink()
+        orphaned_env = self.env_file.read_bytes()
+
+        evidence, exit_code = self.controller.force_recovery(self.recovery)
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("rotation-abort-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertTrue(self.config.lease_file.exists())
+        self.assertEqual(orphaned_env, self.env_file.read_bytes())
+        self.assertEqual(0, self.runner.count("restore"))
+
+    def test_force_recovery_pre_mutation_abort_failure_keeps_lease(self) -> None:
+        self.arm()
+        secure_file(self.rotation_state, "{}")
+        self.runner.fail_step = "rotation"
+
+        evidence, exit_code = self.controller.force_recovery(self.recovery)
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("rotation-abort-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertTrue(self.config.lease_file.exists())
+        self.assertEqual(0, self.runner.count("restore"))
+
     def test_force_recovery_without_lease_still_restores_lkg(self) -> None:
         evidence, exit_code = self.controller.force_recovery(self.recovery)
 
         self.assertEqual(0, exit_code)
         self.assertEqual("force-restored", evidence["action"])
         self.assertIsNone(evidence["lease"])
+        self.assertEqual(1, self.runner.count("rotation"))
         self.assertEqual(1, self.runner.count("restore"))
+
+    def test_force_recovery_without_lease_rejects_orphaned_secondary_state(self) -> None:
+        self.prepare_real_rotation()
+        orphaned_env = self.env_file.read_bytes()
+        orphaned_state = self.rotation_state.read_bytes()
+
+        evidence, exit_code = self.controller.force_recovery(self.recovery)
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("current-only-validation-failed", evidence["reason_code"])
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertIsNone(evidence["lease"])
+        self.assertEqual(0, self.runner.count("restore"))
+        self.assertEqual(orphaned_env, self.env_file.read_bytes())
+        self.assertEqual(orphaned_state, self.rotation_state.read_bytes())
 
     def test_force_recovery_failure_stops_hub_immediately(self) -> None:
         self.arm(mutation=True)
@@ -1091,6 +1568,7 @@ class RecoveryTests(LeaseFixture):
         self.assertEqual(1, exit_code)
         self.assertEqual("rotation-abort-failed", evidence["reason_code"])
         self.assert_hub_stop_invoked()
+        self.assertTrue(self.config.lease_file.exists())
 
     def test_unverified_stop_keeps_stale_lease_for_retry(self) -> None:
         self.arm(mutation=True)

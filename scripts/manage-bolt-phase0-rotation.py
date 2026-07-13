@@ -22,6 +22,7 @@ from typing import Any, Iterator
 STATE_SCHEMA = "xframework.bolt.phase0.rotation-state.v1"
 BOOTSTRAP_SCHEMA = "xframework.bolt.phase0.rotation-bootstrap.v1"
 BOOTSTRAP_VALIDATION_SCHEMA = "xframework.bolt.phase0.rotation-bootstrap-validation.v1"
+CURRENT_ONLY_SCHEMA = "xframework.bolt.phase0.rotation-current-only.v1"
 INVENTORY_SCHEMA = "xframework.bolt.phase0.credential-generation-inventory.v1"
 CONVERGENCE_SCHEMA = "xframework.bolt.phase0.credential-convergence.v1"
 MIN_VALID_FOR_SECONDS = 300
@@ -866,8 +867,30 @@ def rotation_status(env_path: Path, state_path: Path) -> dict[str, Any]:
         return status_document(document, state)
 
 
+def validate_current_only(env_path: Path) -> dict[str, Any]:
+    with rotation_lock(env_path):
+        document = parse_env(env_path)
+        _validate_primary_values(document.values)
+        _assert_no_secondary(document.values)
+        return {
+            "schema": CURRENT_ONLY_SCHEMA,
+            "status": "passed",
+            "current_generation_id": document.values["CREDENTIAL_GENERATION_ID"],
+        }
+
+
 def abort_prepared(env_path: Path, state_path: Path) -> dict[str, Any]:
     with rotation_lock(env_path):
+        if not os.path.lexists(state_path):
+            document = parse_env(env_path)
+            _validate_primary_values(document.values)
+            _assert_no_secondary(document.values)
+            return {
+                "schema": STATE_SCHEMA,
+                "phase": "unprepared",
+                "current_generation_id": document.values["CREDENTIAL_GENERATION_ID"],
+            }
+
         state = _read_state(state_path)
         if state["phase"] not in {"preparing", "prepared"}:
             raise RotationError("only an unactivated prepared rotation can be aborted")
@@ -946,9 +969,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     status_parser = subparsers.add_parser("status", help="validate and report nonsecret rotation state")
     add_common(status_parser)
+    current_only_parser = subparsers.add_parser(
+        "validate-current-only",
+        help="validate a complete primary generation with no secondary state",
+    )
+    current_only_parser.add_argument("--env-file", required=True, type=Path)
     abort_parser = subparsers.add_parser(
         "abort-prepared",
-        help="remove an unactivated G+1 fallback after a pre-mutation failure",
+        help="remove an unactivated G+1 fallback during recovery",
     )
     add_common(abort_parser)
     return parser.parse_args(argv)
@@ -957,7 +985,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        if args.env_file.resolve() == args.state_file.resolve():
+        if (
+            hasattr(args, "state_file")
+            and args.env_file.resolve() == args.state_file.resolve()
+        ):
             raise RotationError("env file and state file must be different paths")
         if args.command == "validate-bootstrap":
             result = validate_bootstrap_inputs(args.env_file, args.state_file)
@@ -981,6 +1012,8 @@ def main(argv: list[str] | None = None) -> int:
             result = finalize(args.env_file, args.state_file)
         elif args.command == "abort-prepared":
             result = abort_prepared(args.env_file, args.state_file)
+        elif args.command == "validate-current-only":
+            result = validate_current_only(args.env_file)
         else:
             result = rotation_status(args.env_file, args.state_file)
     except (OSError, RotationError) as error:
