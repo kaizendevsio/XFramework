@@ -1166,6 +1166,49 @@ class WatchdogContractTests(unittest.TestCase):
         ):
             self.assertEqual(2, setup.count(name))
 
+    def test_active_workflow_writes_only_to_prepared_deployment_children(self) -> None:
+        content = WORKFLOW.read_text(encoding="utf-8")
+        direct_children = set(
+            re.findall(r"\$REMOTE_DEPLOY_DIR/([A-Za-z0-9_.${}-]+)", content)
+        )
+
+        self.assertEqual({"hooks"}, direct_children)
+        self.assertNotIn("mkdir -p '$REMOTE_DEPLOY_DIR'", content)
+        self.assertNotIn("install -d -m 700 '$REMOTE_RUN_DIR'", content)
+        self.assertNotIn('install -d -m 700 "$REMOTE_RUN_DIR"', content)
+        self.assertGreaterEqual(
+            content.count("stat -Lc '%u:%g:%a:%F' -- \"$REMOTE_RUN_DIR\""), 3
+        )
+        self.assertIn(
+            "REMOTE_ROTATION_STATE: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/phase0-rotation-state.json",
+            content,
+        )
+        self.assertNotIn(
+            "REMOTE_ROTATION_STATE: /home/github-runner/xframework-deploy/phase0-rotation-state.json",
+            content,
+        )
+        for required in (
+            'remote_candidate="$REMOTE_RUN_DIR/docker-compose.${IMAGE_TAG}.candidate.yml"',
+            'remote_compose_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-compose.py"',
+            'remote_tls_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-tls.sh"',
+            'remote_identity_tls_verifier="$REMOTE_RUN_DIR/verify-identityserver-phase0-tls.sh"',
+            'remote_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-observation.py"',
+            'remote_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-credential-convergence.py"',
+            '"rm -f \'$remote_compose_verifier\' \'$remote_tls_verifier\' \'$remote_identity_tls_verifier\' \'$remote_compose_evidence\'"',
+            '"rm -f \'$remote_verifier\' \'$remote_input\' \'$remote_samples\' \'$remote_started\'"',
+            '"rm -f \'$remote_verifier\'"',
+            'rm -f -- "$REMOTE_ROTATION_STATE"',
+        ):
+            self.assertIn(required, content)
+        self.assertNotIn("mutation-started", content)
+        self.assertNotIn(
+            "$REMOTE_DEPLOY_DIR/phase0-watchdog/deployment-lease-disarm.json", content
+        )
+        self.assertNotIn(
+            "$REMOTE_DEPLOY_DIR/phase0-watchdog/workflow-recovery-evidence.json",
+            content,
+        )
+
     def test_active_workflow_uses_checked_in_pinned_known_hosts_and_exact_ssh_config(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
         pinned_lines = [
@@ -1671,11 +1714,16 @@ class WatchdogContractTests(unittest.TestCase):
         for required in (
             "controller_command=watch-no-lkg",
             "controller_command=force-no-lkg",
-            '--rotation-state-file "$deploy_root/phase0-rotation-state.json"',
             '--python-executable "$python"',
             '--docker-executable "$docker"',
         ):
             self.assertIn(required, content)
+        self.assertNotIn("--rotation-state-file", content)
+        lease_manager = LEASE_MANAGER.read_text(encoding="utf-8")
+        self.assertIn('ROTATION_STATE_NAME = "phase0-rotation-state.json"', lease_manager)
+        self.assertIn(
+            "state_file = lease.run_directory / ROTATION_STATE_NAME", lease_manager
+        )
 
     def test_launcher_requires_root_sealed_modes_and_global_digest_binding(self) -> None:
         content = SCRIPT.read_text(encoding="utf-8")

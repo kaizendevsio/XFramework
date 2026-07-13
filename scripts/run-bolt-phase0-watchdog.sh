@@ -119,7 +119,6 @@ if [ ! -e "$lkg_pointer" ] && [ ! -L "$lkg_pointer" ]; then
     --deployment-uid "$(id -u)" \
     "$controller_command" \
     --env-file /opt/xframework/xeon-dev.env \
-    --rotation-state-file "$deploy_root/phase0-rotation-state.json" \
     --python-executable "$python" \
     --docker-executable "$docker" \
     --hub-container-name "$hub_container" \
@@ -321,7 +320,6 @@ status=0
   --deployment-uid "$(id -u)" \
   "$controller_command" \
   --env-file /opt/xframework/xeon-dev.env \
-  --rotation-state-file "$deploy_root/phase0-rotation-state.json" \
   --rotation-manager "$lkg_run/manage-bolt-phase0-rotation.py" \
   --runtime-verifier "$lkg_run/verify-bolt-phase0-runtime.py" \
   --recovery-gate-hook "$lkg_run/verify-bolt-phase0-qualification.py" \

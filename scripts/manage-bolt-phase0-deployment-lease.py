@@ -118,6 +118,8 @@ MAX_ENV_BYTES = 1024 * 1024
 MIN_SUPERVISED_TIMEOUT_SECONDS = 10
 MAX_SUPERVISED_TIMEOUT_SECONDS = 3_900
 SUPERVISOR_HEARTBEAT_SECONDS = 30
+ROTATION_STATE_NAME = "phase0-rotation-state.json"
+ROTATION_MANAGER_NAME = "manage-bolt-phase0-rotation.py"
 
 
 class ControllerError(RuntimeError):
@@ -157,7 +159,6 @@ class ControllerConfig:
 class RecoveryConfig:
     lkg_pointer: Path
     env_file: Path
-    rotation_state_file: Path
     rotation_manager: Path
     runtime_verifier: Path
     recovery_gate_hook: Path
@@ -1675,7 +1676,6 @@ class DeploymentLeaseController:
             deployment_gid=self._deployment_gid(),
             enforce_production_metadata=self.config.enforce_production_paths,
         )
-        validate_target(recovery.rotation_state_file, self.config.deployment_uid)
         validate_file(recovery.python_executable, self.config.deployment_uid, require_executable=True)
         validate_file(recovery.docker_executable, self.config.deployment_uid, require_executable=True)
         validate_file(recovery.rotation_manager, self.config.deployment_uid, max_bytes=MAX_ARTIFACT_BYTES)
@@ -1703,22 +1703,59 @@ class DeploymentLeaseController:
         except OSError as error:
             raise ControllerError(f"{step}-execution-failed") from error
 
-    def _abort_prepared(self, recovery: RecoveryConfig) -> None:
+    def _abort_prepared(
+        self,
+        recovery: RecoveryConfig,
+        lease: Lease,
+        *,
+        rotation_manager: Path | None = None,
+    ) -> bool:
+        state_file = lease.run_directory / ROTATION_STATE_NAME
+        if not state_file.exists() and not state_file.is_symlink():
+            return False
+        validate_file(
+            state_file,
+            self.config.deployment_uid,
+            require_mode_600=True,
+            max_bytes=MAX_JSON_BYTES,
+        )
+        if (
+            rotation_manager is not None
+            and rotation_manager != lease.run_directory / ROTATION_MANAGER_NAME
+        ):
+            raise ControllerError("unbound-candidate-rotation-manager")
+        manager = rotation_manager or recovery.rotation_manager
+        manager_metadata = validate_file(
+            manager,
+            self.config.deployment_uid,
+            max_bytes=MAX_ARTIFACT_BYTES,
+        )
+        if (
+            rotation_manager is not None
+            and self.config.enforce_production_paths
+            and os.name != "nt"
+            and (
+                manager_metadata.st_uid != self.config.deployment_uid
+                or stat.S_IMODE(manager_metadata.st_mode) != 0o700
+            )
+        ):
+            raise ControllerError("invalid-no-lkg-rotation-manager")
         result = self._invoke(
             [
                 str(recovery.python_executable),
-                str(recovery.rotation_manager),
+                str(manager),
                 "abort-prepared",
                 "--env-file",
                 str(recovery.env_file),
                 "--state-file",
-                str(recovery.rotation_state_file),
+                str(state_file),
             ],
             recovery.subprocess_timeout_seconds,
             "rotation-abort",
         )
         if result.returncode != 0:
             raise ControllerError("rotation-abort-failed")
+        return True
 
     def _fingerprint(self, path: Path) -> tuple[int, int, str]:
         path_stat = validate_file(
@@ -2061,7 +2098,6 @@ class DeploymentLeaseController:
         *,
         force: bool,
         env_file: Path,
-        rotation_state_file: Path,
         python_executable: Path,
         docker_executable: Path,
         hub_container_name: str,
@@ -2069,7 +2105,6 @@ class DeploymentLeaseController:
     ) -> tuple[dict[str, Any], int]:
         if self.config.enforce_production_paths and (
             env_file != Path("/opt/xframework/xeon-dev.env")
-            or rotation_state_file != DEPLOYMENT_ROOT / "phase0-rotation-state.json"
             or docker_executable != Path("/usr/bin/docker")
         ):
             raise ControllerError("unapproved-production-path")
@@ -2080,10 +2115,9 @@ class DeploymentLeaseController:
         recovery = RecoveryConfig(
             lkg_pointer=self.config.effective_lkg_pointer,
             env_file=env_file,
-            rotation_state_file=rotation_state_file,
-            rotation_manager=rotation_state_file,
-            runtime_verifier=rotation_state_file,
-            recovery_gate_hook=rotation_state_file,
+            rotation_manager=python_executable,
+            runtime_verifier=python_executable,
+            recovery_gate_hook=python_executable,
             python_executable=python_executable,
             docker_executable=docker_executable,
             services=PHASE0_SERVICES,
@@ -2140,7 +2174,7 @@ class DeploymentLeaseController:
                 self._write_evidence(evidence)
                 return evidence, 0
 
-            rotation_manager = lease.run_directory / "manage-bolt-phase0-rotation.py"
+            rotation_manager = lease.run_directory / ROTATION_MANAGER_NAME
             recovery = dataclasses.replace(
                 recovery,
                 rotation_manager=rotation_manager,
@@ -2186,18 +2220,11 @@ class DeploymentLeaseController:
                 return evidence, 1
 
             try:
-                metadata = validate_file(
-                    rotation_manager,
-                    self.config.deployment_uid,
-                    max_bytes=MAX_ARTIFACT_BYTES,
+                gates["rotation_aborted"] = self._abort_prepared(
+                    recovery,
+                    lease,
+                    rotation_manager=rotation_manager,
                 )
-                if os.name != "nt" and (
-                    metadata.st_uid != self.config.deployment_uid
-                    or stat.S_IMODE(metadata.st_mode) != 0o700
-                ):
-                    raise ControllerError("invalid-no-lkg-rotation-manager")
-                self._abort_prepared(recovery)
-                gates["rotation_aborted"] = True
             except ControllerError as error:
                 evidence = self._evidence(
                     now=now,
@@ -2266,8 +2293,7 @@ class DeploymentLeaseController:
                 return self._failed_recovery(now, lease, recovery, error.code, gates)
             if not lease.mutation_began:
                 try:
-                    self._abort_prepared(recovery)
-                    gates["rotation_aborted"] = True
+                    gates["rotation_aborted"] = self._abort_prepared(recovery, lease)
                 except ControllerError as error:
                     return self._failed_recovery(now, lease, recovery, error.code, gates)
                 secure_unlink(self.config.lease_file, self.config.deployment_uid)
@@ -2322,8 +2348,7 @@ class DeploymentLeaseController:
                 artifacts = self._resolve_lkg(recovery)
                 self._validate_bound_recovery_helpers(recovery, artifacts)
                 if lease is not None and not lease.mutation_began:
-                    self._abort_prepared(recovery)
-                    gates["rotation_aborted"] = True
+                    gates["rotation_aborted"] = self._abort_prepared(recovery, lease)
                 self._restore(recovery, artifacts)
                 gates["restore_applied"] = True
                 self._runtime_gate(recovery, artifacts)
@@ -2399,7 +2424,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
     def add_no_lkg_arguments(command: argparse.ArgumentParser) -> None:
         command.add_argument("--env-file", required=True, type=Path)
-        command.add_argument("--rotation-state-file", required=True, type=Path)
         command.add_argument("--python-executable", required=True, type=Path)
         command.add_argument("--docker-executable", required=True, type=Path)
         command.add_argument("--hub-container-name", default="xframework-bolt-hub")
@@ -2410,7 +2434,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
     def add_recovery_arguments(command: argparse.ArgumentParser) -> None:
         command.add_argument("--env-file", required=True, type=Path)
-        command.add_argument("--rotation-state-file", required=True, type=Path)
         command.add_argument("--rotation-manager", required=True, type=Path)
         command.add_argument("--runtime-verifier", required=True, type=Path)
         command.add_argument("--recovery-gate-hook", required=True, type=Path)
@@ -2475,7 +2498,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             evidence, exit_code = controller.reconcile_no_lkg(
                 force=args.command == "force-no-lkg",
                 env_file=args.env_file,
-                rotation_state_file=args.rotation_state_file,
                 python_executable=args.python_executable,
                 docker_executable=args.docker_executable,
                 hub_container_name=args.hub_container_name,
@@ -2485,7 +2507,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             recovery = RecoveryConfig(
                 lkg_pointer=APPROVED_LKG_POINTER,
                 env_file=args.env_file,
-                rotation_state_file=args.rotation_state_file,
                 rotation_manager=args.rotation_manager,
                 runtime_verifier=args.runtime_verifier,
                 recovery_gate_hook=args.recovery_gate_hook,
