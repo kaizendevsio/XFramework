@@ -473,11 +473,52 @@ jobs:
             exit 1
           fi
 
+          secure_test_tmp=""
+          cleanup_secure_test_tmp() {
+            status=$?
+            trap - EXIT
+            if [ -z "$secure_test_tmp" ]; then
+              exit "$status"
+            fi
+            case "$secure_test_tmp" in
+              /root/bolt-phase0-python-tests.*)
+                metadata="$(sudo --non-interactive stat -c '%u:%a:%F' -- "$secure_test_tmp" 2>/dev/null || true)"
+                if [ "$metadata" = "0:700:directory" ]; then
+                  if ! sudo --non-interactive rm -rf -- "$secure_test_tmp"; then
+                    echo "failed to clean the privileged test directory" >&2
+                    status=1
+                  fi
+                else
+                  echo "refusing to clean an insecure privileged test directory" >&2
+                  status=1
+                fi
+                ;;
+              *)
+                echo "refusing to clean an unexpected privileged test path" >&2
+                status=1
+                ;;
+            esac
+            exit "$status"
+          }
+          trap cleanup_secure_test_tmp EXIT
+          if ! secure_test_tmp="$(sudo --non-interactive mktemp -d /root/bolt-phase0-python-tests.XXXXXXXX)" || \
+             [ -z "$secure_test_tmp" ]; then
+            echo "failed to create the privileged Python test directory" >&2
+            exit 1
+          fi
+          if [ "$(sudo --non-interactive stat -c '%u:%a:%F' -- "$secure_test_tmp")" != "0:700:directory" ]; then
+            echo "privileged Python test directory is not root-owned mode 0700" >&2
+            exit 1
+          fi
+
           failed=0
           for test_file in "${test_files[@]}"; do
             echo "::group::$test_file"
             output="$(mktemp "$RUNNER_TEMP/bolt-phase0-python-test.XXXXXX")"
-            if sudo PYTHONDONTWRITEBYTECODE=1 python3 "$test_file" 2>&1 | tee "$output"; then
+            if sudo --non-interactive env \
+              TMPDIR="$secure_test_tmp" \
+              PYTHONDONTWRITEBYTECODE=1 \
+              python3 "$test_file" 2>&1 | tee "$output"; then
               if ! grep -Eq '^Ran [1-9][0-9]* tests? in ' "$output"; then
                 echo "$test_file did not execute any reported tests" >&2
                 failed=1
