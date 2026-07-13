@@ -56,6 +56,14 @@ status: current
 - [Bolt protocol, Hub, and Media remediation plan](workflow-issues/bolt-protocol-hub-media-remediation-plan-2026-07-12.md) - authoritative phased execution order, dependencies, acceptance gates, and certification requirements.
 - [Bolt Phase 0 deployment gate](workflow-issues/bolt-phase0-deployment-gate-2026-07-13.md) - current containment rollout, recovery, protected-input, and live-evidence contract.
 
+## Research And Proposed Decisions
+
+Documents in this section are non-authoritative design input, not current subsystem guidance or
+approval to implement. Their `historical` status classifies them as context-only under this
+knowledgebase's authority rules; an opening status note records any more specific proposal state.
+
+- [Bolt Phase 1 centralized asymmetric transport identity](architecture-patterns/bolt-phase1-centralized-asymmetric-transport-identity.md) - draft research-only ADR for transport tickets, JWKS, renewal, revocation, bootstrap, and migration; it remains non-authoritative and implementation remains blocked until Phase 0 is marked `Verified`.
+
 ## Current Vs Historical Guidance
 
 - Treat only docs with `status: current` or `status: active`, docs named as current authority in "Authority And Status", or docs explicitly listed under "Current Orientation Maps" or "Current Subsystem Guidance", as current implementation guidance.

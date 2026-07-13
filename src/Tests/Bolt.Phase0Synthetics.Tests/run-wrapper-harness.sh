@@ -5,9 +5,14 @@ runner="${1:?pass run-bolt-phase0-synthetics.sh as the first argument}"
 env_parser="${2:?pass verify-bolt-phase0-env.py as the second argument}"
 scenario="${3:-pass}"
 stage="${4:-canary}"
+proxy_mode="${5:-direct-kestrel}"
 case "$scenario" in
   pass|refresh-output|application-token-leak|application-marker-leak|tampered-report|hook-output|token-changed|missing-receipt) ;;
   *) echo "unknown harness scenario" >&2; exit 2 ;;
+esac
+case "$proxy_mode" in
+  logs|direct-kestrel) ;;
+  *) echo "unknown harness proxy mode" >&2; exit 2 ;;
 esac
 root="$(mktemp -d /tmp/bolt-phase0-synthetic-harness.XXXXXXXX)"
 cleanup() { rm -rf -- "$root"; }
@@ -49,8 +54,22 @@ import pathlib
 import sys
 
 kind, receipt_path, manifest_path = sys.argv[1:]
+values = dict(
+    line.split("=", 1)
+    for line in pathlib.Path(os.environ["XFRAMEWORK_ENV_FILE"]).read_text().splitlines()
+    if line.strip() and not line.lstrip().startswith("#")
+)
+proxy_assertions = (
+    {
+        "retainedStoreQueried": False,
+        "notApplicableReason": "direct-kestrel-publication",
+        "matches": 0,
+    }
+    if values.get("BOLT_SYNTHETIC_PROXY_MODE") == "direct-kestrel"
+    else {"retainedStoreQueried": True, "matches": 0}
+)
 assertions = {
-    "proxy-marker-scan": {"retainedStoreQueried": True, "matches": 0},
+    "proxy-marker-scan": proxy_assertions,
     "seq-marker-scan": {"retainedStoreQueried": True, "matches": 0},
     "trace-marker-scan": {"retainedStoreQueried": True, "matches": 0},
     "plaintext-rejection": {"plaintextRejected": True, "bearerSent": False},
@@ -255,6 +274,7 @@ chmod 700 "$root/bin/docker"
 printf '# harness comment with CRLF acceptance\r\n'
 cat <<ENV
 BOLT_SYNTHETIC_TOKEN_REFRESH_COMMAND_PATH=$refresh_hook
+BOLT_SYNTHETIC_PROXY_MODE=$proxy_mode
 BOLT_SYNTHETIC_PROXY_MARKER_SCAN_COMMAND_PATH=$root/proxy
 BOLT_SYNTHETIC_SEQ_MARKER_SCAN_COMMAND_PATH=$root/seq
 BOLT_SYNTHETIC_TRACE_MARKER_SCAN_COMMAND_PATH=$root/trace
@@ -268,6 +288,9 @@ BOLT_SYNTHETIC_MIN_TOKEN_LIFETIME_SECONDS=300
 HARNESS_SCENARIO=$scenario
 HARNESS_STAGE=$stage
 ENV
+if [ "$proxy_mode" = "logs" ]; then
+  printf 'BOLT_SYNTHETIC_PROXY_LOG_PATHS=%s\n' "$root/proxy.log"
+fi
 } >"$env_file"
 
 remote_body="$root/remote-body.sh"
@@ -337,18 +360,21 @@ else
   }
 fi
 
-python3 - "$REPORT" "$stage" <<'PY'
+python3 - "$REPORT" "$stage" "$proxy_mode" <<'PY'
 import json
 import pathlib
 import sys
 
 report = json.loads(pathlib.Path(sys.argv[1]).read_text())
-stage = sys.argv[2]
+stage, proxy_mode = sys.argv[2:]
 assert report["schemaVersion"] == "bolt-phase0-synthetic-evidence/v1"
 assert report["status"] == "passed"
 marker_absence = report["postRunEvidence"]["markerAbsence"]
-for source in ("application", "proxy", "seq", "trace"):
+for source in ("application", "seq", "trace"):
     assert marker_absence[source] == "passed"
+assert marker_absence["proxy"] == (
+    "not_applicable" if proxy_mode == "direct-kestrel" else "passed"
+)
 assert set(marker_absence["markerSha256Prefixes"]) == (
     {"communications", "user", "expiry"}
     if stage in {"canary", "finalized"}

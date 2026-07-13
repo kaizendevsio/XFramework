@@ -257,6 +257,7 @@ if (
     or evidence.get("status") != "passed"
     or evidence.get("run_id") != match.group(1)
     or evidence.get("run_attempt") != int(match.group(2))
+    or evidence.get("proxy_mode") != "direct-kestrel"
     or evidence.get("errors") != []
     or not isinstance(evidence.get("artifacts"), dict)
 ):

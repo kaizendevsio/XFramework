@@ -17,7 +17,7 @@ status: active
 
 ## Status
 
-Phase 0 containment and deployment automation are implemented locally and passed current local checks plus independent recovery and CI-definition reviews, including WSS, exact digest/provenance gates, staged rollout, bounded dual-generation rotation, authenticated synthetics, observation, rollback qualification, and root-sealed fail-closed recovery. The new CI workflow has not yet run from a committed branch. Phase 0 remains `Contained`, not `Verified`: xeon-dev has not received the one-time sealed watchdog bootstrap, the separate IdentityServer TLS material and protected synthetic inputs are not fully provisioned, and no complete staged run has produced live evidence. Do not run automatic or independent service deployment, disable `RequireSecureTransport`, restore Audit mode, or deploy a pre-containment image to bypass this gate. Production promotion remains blocked until Phase 1 removes the shared service-signing trust boundary.
+Phase 0 containment and deployment automation merged through PR [#352](https://github.com/kaizendevsio/XFramework/pull/352) at `fb169a530d6e80d64aeab7c73029fabea08d3152`. Committed Ubuntu run [29229428707](https://github.com/kaizendevsio/XFramework/actions/runs/29229428707) passed the Release build, Bolt Hub container build, all .NET and privileged Python gates, all 40 `Bolt.Phase0Synthetics.Tests`, and the Linux wrapper contract scenarios. It did not run authenticated WSS synthetics against xeon-dev. The runner deployment key, distinct IdentityServer TLS material, dedicated synthetic principal, and protected inputs are now provisioned. The P0-R21 and P0-R22 rollout corrections are implemented locally and await final independent review, committed Ubuntu CI, merge, and live execution. Phase 0 remains `Contained`, not `Verified`: xeon-dev has not received the one-time sealed watchdog bootstrap, the current Hub is unchanged, and no complete staged run has produced live evidence. Do not disable `RequireSecureTransport`, restore Audit mode, or deploy a pre-containment image to bypass this gate. Production promotion remains blocked until Phase 1 removes the shared service-signing trust boundary.
 
 ## Implemented Automation
 
@@ -129,17 +129,18 @@ BOLT_HUB_PUBLIC_HOSTNAME=bolt.example.internal
 IDENTITYSERVER_TLS_FULLCHAIN_PATH=/absolute/path/to/identity-fullchain.pem
 IDENTITYSERVER_TLS_PRIVATE_KEY_PATH=/absolute/path/to/identity-private-key.pem
 IDENTITYSERVER_TLS_CA_PATH=/absolute/path/to/identity-ca.crt
+BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel
 BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH=/home/github-runner/xframework-deploy/hooks/run-bolt-phase0-recovery-synthetic.py
 ```
 
-The complete protected contract is maintained in `.env.example` and enforced before any build or deployment mutation.
+Phase 0 promotion accepts only `BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel`; `BOLT_SYNTHETIC_PROXY_LOG_PATHS` must be absent. The manual workflow dispatch requires the operator to attest that the public route has no host reverse proxy, Tailscale Serve configuration, load balancer, or ingress. Reruns are rejected: every attempt requires a fresh dispatch, and the authorized manifest binds the GitHub actor name and stable actor ID, matching triggering actor, first attempt, workflow run, source commit, public hostname, published TLS port, exact Hub-only Compose publication, and TLS evidence. The verifier also requires every public-hostname DNS answer to identify an active non-loopback host interface and permits only an all-interface bind or an exact matched address. This trust statement assumes the protected self-hosted runner is trusted; a boundary that distrusts the runner requires a separate GitHub OIDC-signed authorization predicate. Root activation seals the result, while recovery and the steady-state watchdog reject mode drift even when no deployment lease is active, including the no-LKG/no-lease path. `logs` remains a scanner utility only and cannot qualify until the synthetic traverses the same proxy and the retained-store inventory is sealed.
 
 ## Required Inputs
 
 1. A certificate and private key accepted by the Bolt Hub endpoint, with a SAN matching the hostname used by every Bolt client. Provisioned for xeon-dev; other environments must supply their own material.
 2. A trust-distribution mechanism for every container or host connecting to the Hub, or an approved TLS terminator whose forwarded-protocol configuration is validated by the Hub. Implemented for Compose through the dedicated CA mount.
 3. Access to rotate `JWT_SECRET`, `BOLT_SIGNATURE`, the Bolt Hub service identity secret, and every service identity client secret consumed by Compose.
-4. Access to proxy/ingress, ASP.NET hosting, Seq, and OpenTelemetry logs for the suspected exposure window.
+4. Access to ASP.NET hosting, Seq, and OpenTelemetry logs for the suspected exposure window. Proxy/ingress retained-store evidence is required only when root-verified publication topology proves that layer exists; a root-sealed direct-Kestrel topology instead requires an explicit not-applicable receipt.
 5. An exact captured `repository@sha256:digest` for the contained Hub and clients.
 6. A dedicated revocable synthetic principal whose short-lived user and service tokens can be obtained through IdentityServer HTTPS without placing bearer values in command arguments, logs, reports, or artifacts.
 7. A checked-in service-to-approved-repository map and registry-confirmed digest for every deployed service.
@@ -149,7 +150,7 @@ The complete protected contract is maintained in `.env.example` and enforced bef
 
 ## Execution Order
 
-1. Freeze automatic push deployment and independent Hub/client deployment; preserve relevant application, proxy, ingress, Seq, and identity audit logs.
+1. Freeze automatic push deployment and independent Hub/client deployment; preserve relevant application, Seq, and identity audit logs plus proxy/ingress logs when root-verified publication topology includes those layers.
 2. Determine whether plaintext credentials or service-route takeover could have occurred and record the inspected sources/time range.
 3. Create run-scoped candidate and last-known-good full-stack manifests. Bind every service to its approved repository, registry-confirmed exact digest, reviewed source commit, trusted workflow/builder, Dockerfile, and base-image digests through verified signed provenance.
 4. Validate TLS files, resolved mount ownership, every effective Kestrel endpoint, every exact quota, one-Hub topology, and real public DNS/TLS routing without `--resolve`.
@@ -157,11 +158,11 @@ The complete protected contract is maintained in `.env.example` and enforced bef
 6. Run migrations, deploy only the Hub by exact digest, inspect actual listeners, reject plaintext `/bolt/ws` from a peer container, and verify trusted internal/public live and ready endpoints.
 7. Deploy only IdentityServer and Communications as the canary cohort.
 8. Obtain short-lived synthetic tokens through IdentityServer HTTPS. Run hostile registration, canonical generated-command RPC, transient pub/sub, publish-while-offline/reconnect/ordered durable replay/ack/no-redelivery, duplicate/out-of-order ack, Redis interruption, token expiry, and plaintext rejection.
-9. Query proxy, application, Seq, and trace data using a unique synthetic token marker; the marker must not appear in stored logs or telemetry.
+9. Query application, Seq, and trace data using a unique synthetic token marker. Query proxy/ingress retained stores only when root-verified publication topology includes them; otherwise retain the root-sealed direct-publication not-applicable receipt. The marker must not appear in any applicable stored log or telemetry source.
 10. Observe the canary for the recorded window and block promotion on authentication anomalies, reconnect storms, queue/pool growth, send-loop failure, or latency regression.
 11. Deploy remaining clients in bounded batches, rerunning runtime digest, health, and synthetic gates after each batch.
 12. Prove every runtime uses `G+1`, revoke `G`, and verify required HTTP and Bolt health plus rejection of old-generation credentials.
-13. Exercise the security-qualified rollback manifest with `G+1`. If it cannot be applied, stop Hub/ingress and keep Bolt unavailable.
+13. Exercise the security-qualified rollback manifest with `G+1`. If it cannot be applied, stop the Hub and every ingress layer present in verified publication topology, and keep Bolt unavailable.
 
 ## Required Evidence
 
@@ -174,7 +175,7 @@ The complete protected contract is maintained in `.env.example` and enforced bef
 - Synthetic command output with timestamps and target environment.
 - `/health/live` and `/health/ready` results.
 - Actual listener/socket evidence, peer plaintext `/bolt/ws` rejection, real public DNS/TLS result, resolved private-key mount evidence, exact configured quotas, and exactly one running Hub.
-- Query showing the synthetic token marker is absent from every log/trace store.
+- Queries showing the synthetic token marker is absent from every applicable log/trace store, plus either queried proxy/ingress receipts or a root-sealed direct-publication not-applicable receipt as dictated by verified topology.
 - Rejection counters for plaintext, identity mismatch, quota excess, oversized frames, and disabled Media.
 - Canary observation window and rollback decision.
 
@@ -190,38 +191,53 @@ The complete protected contract is maintained in `.env.example` and enforced bef
 ## Local Verification - 2026-07-13
 
 - Full `Bolt.Tests` with Redis mandatory against `xeon-dev:6379`: 303 passed, 0 failed, 0 skipped.
-- IdentityServer unit tests: 21 passed. Full Core tests: 195 passed.
+- PR #352 baseline IdentityServer unit tests: 21 passed. The current local correction passes 23/23 IdentityServer unit tests, including both generated HTTP adapter contracts; the IdentityServer integration project builds successfully, while its PostgreSQL/Testcontainers execution remains delegated to Linux CI. Full baseline Core tests: 195 passed.
 - Full Release solution build: 0 errors. Existing repository warnings remain outside this Phase 0 change.
-- `Bolt.Phase0Synthetics.Tests` passed 39 tests on Windows with one Linux-only symbolic-link test skipped; the committed Ubuntu run must execute all 40 without skips.
-- Nineteen Phase 0 Python test files passed 370 tests on Windows with 43 platform skips; the unchanged suites previously passed 370 tests on privileged Linux with 0 skips. Actionlint passed all 17 workflow YAML files; 75 workflow Bash blocks, 39 embedded Bash heredocs, and six Phase 0 shell files passed local syntax validation; all 35 Phase 0 Python files passed `py_compile`; `git diff --check` and explicit untracked-file whitespace checks passed.
-- The CI workflow defines a Bolt Hub container build, nonzero/no-skip gates for all four .NET projects and all 19 Python suites, plus one positive and seven negative Linux synthetic-wrapper scenarios. Its definition passed independent review, but its first committed Ubuntu execution remains pending.
+- `Bolt.Phase0Synthetics.Tests` passed 39 tests on Windows with one Linux-only symbolic-link test skipped. Committed Ubuntu run `29229428707` passed all 40 tests with zero skips.
+- The current local tree passes 399 tests across all 19 Phase 0 Python test files on Windows with 44 platform skips; the PR #352 committed privileged Ubuntu baseline passed all then-current 370 tests with zero skips. Actionlint passed all 17 workflow YAML files; workflow parsing, six Phase 0 shell files, all 35 Phase 0 Python files, and changed-line whitespace validation pass locally. A fresh privileged Ubuntu run is required for the new tests and Linux-only branches.
+- The committed CI run built the Bolt Hub container and enforced nonzero/no-skip gates for all four .NET projects and all 19 Python suites. One positive and seven negative Linux synthetic-wrapper scenarios passed.
 - The root-sealed recovery, forced failure recovery, systemd override rejection, indexed-scope bypass, bounded exact Redis ACK, send-loop retirement, large-RPC quota cleanup, and public health redaction regressions are covered.
-- Recovery regressions also cover strict future-heartbeat rejection, transient Docker inspection failure with a present container, exact proven container absence, daemon and empty-version failure, malformed inspection output, bounded stop/kill hangs, privileged bootstrap short reads and source races, root-owned lock replacement across the complete critical section, quarantine artifact replacement between validation and open, the exact systemd env-file write allowance, uninterrupted timer activation, explicit timer re-enablement in the pinned failure path, supervised synthetic heartbeats, and fsync-before-pointer ordering. A fresh independent privileged-Linux review passed the local recovery gate with no findings at any severity.
+- Recovery regressions also cover strict future-heartbeat rejection, transient Docker inspection failure with a present container, exact proven container absence, daemon and empty-version failure, malformed inspection output, bounded stop/kill hangs, privileged bootstrap short reads and source races, root-owned lock replacement across the complete critical section, quarantine artifact replacement between validation and open, the exact systemd env-file write allowance, uninterrupted timer activation, explicit timer re-enablement in the pinned failure path, supervised synthetic heartbeats, and fsync-before-pointer ordering. Targeted pre-final reviews informed these regressions; a formal independent review bound to the exact final tested tree remains open because PR #352 merged without a GitHub review.
+
+## Rollout Readiness Findings
+
+- **High - Synthetic token refresh expected the wrong HTTP response shape.** Generated IdentityServer HTTP adapters return exact bare DTOs, while the refresh hook expected a `Result` envelope. The mismatch would fail live synthetics before Bolt requests executed. The local worktree now validates exact bare user-token and service-token schemas and field semantics, rejects legacy envelopes and extra or missing fields, populates the generated authentication response contract, and covers the generated HTTP adapters. This fix is not yet merged, CI-validated on the target branch, or deployed.
+- **High - Direct Kestrel publication lacked an explicit proxy-proof N/A contract.** The retained proxy-log gate required paths even though xeon-dev publishes Kestrel directly, creating pressure to provide a non-evidentiary empty source. The local worktree now makes only `direct-kestrel` promotion-eligible, requires proxy log paths to be absent, rejects workflow reruns, and binds a fresh no-intermediary operator attestation to the stable actor ID, matching triggering actor, first attempt, run, commit, public hostname, active host-interface/DNS match, Compose publication, TLS port, qualification, root activation, recovery, and watchdog. This uses the existing trusted self-hosted runner threat model; distrusting that runner would require GitHub OIDC-signed authorization. The utility `logs` mode cannot qualify because its current synthetic target bypasses a proxy. The correction is not merged, CI-validated on the target branch, or deployed.
 
 ## xeon-dev Readiness Audit - 2026-07-13
 
-The read-only readiness audit is `NO-GO`. No host, service, secret, or deployment state was changed.
+The post-merge readiness remains `NO-GO`. The prerequisite repairs below changed protected host state, but no container was stopped, restarted, or replaced.
 
 - The self-hosted `xeon-dev` runner is online as `github-runner`, Docker is reachable, and the repository-level registry secret names are present.
 - The current Hub is healthy but still runs the pre-containment mutable image tag and publishes host port 7000 to container plaintext port 8080. It must remain the old deployment until the full staged gate is authorized; it is not Phase 0 evidence.
 - The fixed root helper, watchdog launcher, lease manager, root-owned lock, qualifier, systemd units, restricted sudoers file, bootstrap staging tree, LKG pointer, and bootstrap-managed deployment directories are absent.
 - `/home/github-runner/xframework-deploy` is still `github-runner:github-runner 0750`, and `/opt/xframework` is still `root:root 0755`; operator bootstrap must establish the documented root-owned metadata while the Hub is stopped.
-- The protected env contains 19 of the 58 mandatory preflight keys. Bolt certificate public-chain, hostname, and validity checks pass, but distinct IdentityServer TLS material, IdentityServer endpoint metadata, the synthetic principal, token and rejected-credential paths, probe hooks, and proxy/Seq/trace evidence inputs are absent.
-- The runner-owned deployment key `/home/github-runner/.ssh/xframework_xeon_dev_ed25519` is not provisioned. The active workflow now validates this exact path, owner, mode, link count, nonempty content, and descriptor identity without printing the key, and uses only the checked-in pinned host key.
-- The Phase 0 workflows, bootstrap, hooks, verifiers, and pinned host key are still modified or untracked. They cannot be bound to `github.sha`, signed build provenance, or an operator-reviewed bootstrap bundle until committed and reviewed.
-- The env parser now has safe implicit types for every workflow `read_env` key, including IdentityServer TLS paths, hostname, port, and canonical transport endpoint. A fresh independent review passed this readiness fix with no findings.
+- The runner-owned deployment key is provisioned at `/home/github-runner/.ssh/xframework_xeon_dev_ed25519`; strict pinned-host-key loopback SSH as `github-runner` succeeded. The active workflow validates the path, owner, mode, link count, nonempty content, and descriptor identity without printing the key.
+- A distinct IdentityServer CA and server certificate are provisioned. The repository verifier passed chain, key match, hostname, permission, and validity checks. IdentityServer has not yet been restarted onto HTTPS by the Phase 0 workflow.
+- The dedicated synthetic principal authenticated successfully against the currently deployed IdentityServer HTTP endpoint. This proves the principal and credentials, not the pending HTTPS or Bolt synthetic path.
+- The protected env was atomically provisioned with deployment inputs and currently declares `BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel`; proxy log paths are absent. The local correction binds that declaration to root-verified Hub-only TLS publication and sealed qualification evidence, but it is not authoritative on xeon-dev until merged and installed. The dedicated read-only Seq API query and Jaeger endpoints are reachable. No retained-store marker scan or complete live synthetic has run.
+- The PR #352 baseline workflows, bootstrap, hooks, verifiers, tests, evidence documents, and pinned host key are committed and merged. This removes the baseline source-binding blocker, but excludes the current local P0-R21/P0-R22 changes; no signed deployment provenance, exact deployed digest set, or operator-reviewed root staging hash has been produced.
+- The env parser in merged source has safe implicit types for the Phase 0 workflow inputs. The two newer rollout fixes remain local and require final-tree review and committed CI.
+- The merge-triggered per-service workflows ran only shared-ownership detection; the inspected Bolt Hub, IdentityServer, and Portal `deploy` jobs were skipped. The current Hub and protected host state therefore remain pre-rollout.
+
+## Completed Source Milestone
+
+PR #352 committed, CI-validated, and merged every Phase 0 workflow, pinned host key, bootstrap component, hook, verifier, test, and evidence document at `fb169a530d6e80d64aeab7c73029fabea08d3152`.
 
 ## Outstanding Live Prerequisites
 
-1. Create a reviewed commit containing every Phase 0 workflow, pinned host key, bootstrap component, hook, verifier, test, and evidence document. Build provenance and the root staging review must bind to those committed bytes.
-2. Provision the runner-owned deployment private key at the fixed path, authorize its public key for `github-runner@xeon-dev`, and verify the checked-in pinned host key against an independently trusted host fingerprint.
-3. Provision distinct IdentityServer certificate/key/CA material and all remaining protected variables, including the dedicated synthetic principal, token and rejected-credential paths, probe hooks, retained proxy-log source, Seq query credential, and trace endpoint. Do not manually pre-stage secondary rotation secrets.
-4. Copy the committed bootstrap bundle into a root-only staging tree, review and hash the staged bytes, stop the Hub, and run the one-time root bootstrap. An initial LKG is not required; the stable watchdog remains active and fail-closed until the first candidate qualifies.
-5. Confirm the installed metadata, fixed lock inode, enabled/active watchdog timer, and generated sudoers file with only the four documented root-helper command forms.
-6. Run the complete staged workflow and retain its signed provenance, runtime, synthetic, observation, rotation, rollback, qualification, and recovery evidence.
+1. Complete and independently review the token-response and direct-publication fixes, then merge them only after committed Ubuntu CI passes.
+2. Bind live build provenance and operator-reviewed root staging hashes to the exact new merge commit containing those fixes.
+3. Copy that commit's bootstrap bundle into a root-only staging tree, review and hash the staged bytes, stop the Hub, and run the one-time root bootstrap. An initial LKG is not required; the stable watchdog remains active and fail-closed until the first candidate qualifies.
+4. Confirm the installed metadata, fixed lock inode, enabled/active watchdog timer, and generated sudoers file with only the four documented root-helper command forms.
+5. Run the complete staged workflow and retain its signed provenance, runtime, synthetic, observation, rotation, rollback, qualification, and recovery evidence.
 
 The currently deployed Hub was not restarted, stopped, or replaced during the audit.
 
+## Current Authorization Boundary
+
+The operator authorized repair and retry. Non-service prerequisites were provisioned without changing a running container. The remaining boundary begins with merging the reviewed local fixes, staging their exact merged bootstrap bytes, stopping the current Hub, and running the root bootstrap. The subsequent workflow intentionally mutates Hub, canary, credentials, batched services, rollback state, qualification evidence, and forced-recovery state. Until the local fixes pass committed CI and the full workflow succeeds, Phase 0 remains `NO-GO` and Phase 1 production code remains gated.
+
 ## Failure Policy
 
-If trusted TLS, rotation, synthetics, observation, or batched rollout fails, first re-enable and validate the fixed watchdog timer, then apply only the run-scoped security-qualified full-stack manifest using the current rotated credential generation, and finally revalidate the timer. If recovery or timer validation fails, stop Hub/ingress and keep Bolt unavailable while retaining safe HTTP service surfaces. Fix trust, identity, configuration, or code; do not switch to `ws://`, Audit, Off, a mutable tag, old credentials, or a pre-containment image.
+If trusted TLS, rotation, synthetics, observation, or batched rollout fails, first re-enable and validate the fixed watchdog timer, then apply only the run-scoped security-qualified full-stack manifest using the current rotated credential generation, and finally revalidate the timer. If recovery or timer validation fails, stop the Hub and every ingress layer present in verified publication topology, and keep Bolt unavailable while retaining safe HTTP service surfaces. Fix trust, identity, configuration, or code; do not switch to `ws://`, Audit, Off, a mutable tag, old credentials, or a pre-containment image.

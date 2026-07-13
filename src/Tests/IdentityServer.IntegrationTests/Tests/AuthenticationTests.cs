@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using Microsoft.EntityFrameworkCore;
@@ -62,14 +64,31 @@ public class AuthenticationTests : IntegrationTestBase
         var body = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(HttpStatusCode.OK, $"Response body: {body}");
 
-        var result = System.Text.Json.JsonSerializer.Deserialize<AuthenticateIdentityResponse>(body,
-            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.EnumerateObject().Select(static property => property.Name).Should().BeEquivalentTo(
+            "identity",
+            "credential",
+            "accessToken",
+            "tokenType",
+            "expiresIn",
+            "refreshToken",
+            "sessionId");
+        document.RootElement.TryGetProperty("data", out _).Should().BeFalse();
+        document.RootElement.TryGetProperty("isSuccess", out _).Should().BeFalse();
+
+        var result = JsonSerializer.Deserialize<AuthenticateIdentityResponse>(body,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         result.Should().NotBeNull();
         result!.AccessToken.Should().NotBeNullOrEmpty();
+        result.TokenType.Should().Be("Bearer");
+        result.ExpiresIn.Should().BeGreaterThan(0);
         result.RefreshToken.Should().NotBeNullOrEmpty();
-        result.SessionId.Should().NotBeNull();
+        result.SessionId.Should().NotBeNull().And.NotBe(Guid.Empty);
         result.Credential.Should().NotBeNull();
         result.Credential!.Id.Should().Be(credential.Id);
+
+        var accessToken = new JwtSecurityTokenHandler().ReadJwtToken(result.AccessToken);
+        result.ExpiresIn.Should().Be((int)(accessToken.ValidTo - accessToken.ValidFrom).TotalSeconds);
 
         LogTiming("HTTP", elapsed);
     }

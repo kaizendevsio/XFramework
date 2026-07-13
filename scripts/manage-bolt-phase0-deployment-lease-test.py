@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+try:
+    import pwd
+except ImportError:  # pragma: no cover - Windows
+    pwd = None  # type: ignore[assignment]
+
 
 SCRIPT = Path(__file__).with_name("manage-bolt-phase0-deployment-lease.py")
 SPEC = importlib.util.spec_from_file_location("phase0_deployment_lease", SCRIPT)
@@ -39,6 +44,66 @@ def secure_file(path: Path, content: str = "helper\n", *, executable: bool = Fal
     if os.name != "nt":
         path.chmod(0o700 if executable else 0o600)
     return path
+
+
+def qualification_document(
+    run_id: str,
+    run_attempt: int,
+    *,
+    proxy_mode: Any = "direct-kestrel",
+) -> dict[str, Any]:
+    return {
+        "schema": "xframework.bolt.phase0.qualification.v1",
+        "status": "passed",
+        "generated_at_utc": "2026-07-13T10:00:00Z",
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "source_commit": "a" * 40,
+        "credential_generation_id": "generation-test",
+        "proxy_mode": proxy_mode,
+        "errors": [],
+        "artifacts": {"docker-compose.yml": {"path": "docker-compose.yml"}},
+        "runtime_stages": {},
+        "synthetic_stages": {},
+        "checks": {key: True for key in MODULE.QUALIFICATION_CHECK_KEYS},
+    }
+
+
+class QualificationValidationTests(unittest.TestCase):
+    def test_accepts_direct_kestrel_proxy_mode(self) -> None:
+        MODULE._validate_qualification(
+            qualification_document("123456789", 2),
+            run_id="123456789",
+            run_attempt=2,
+            source_commit="a" * 40,
+        )
+
+    def test_rejects_missing_proxy_mode(self) -> None:
+        qualification = qualification_document("123456789", 2)
+        del qualification["proxy_mode"]
+
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-sealed-run-qualification"
+        ):
+            MODULE._validate_qualification(
+                qualification,
+                run_id="123456789",
+                run_attempt=2,
+                source_commit="a" * 40,
+            )
+
+    def test_rejects_invalid_proxy_modes(self) -> None:
+        for proxy_mode in ("", "logs", "Logs", "direct_kestrel", None, True, ["logs"]):
+            with self.subTest(proxy_mode=proxy_mode):
+                with self.assertRaisesRegex(
+                    MODULE.ControllerError, "invalid-sealed-run-qualification"
+                ):
+                    MODULE._validate_qualification(
+                        qualification_document("123456789", 2, proxy_mode=proxy_mode),
+                        run_id="123456789",
+                        run_attempt=2,
+                        source_commit="a" * 40,
+                    )
 
 
 class FakeRunner:
@@ -159,7 +224,10 @@ class LeaseFixture(unittest.TestCase):
         self.lkg_pointer = secure_file(
             self.lkg_parent / "current", str(self.lkg_directory) + "\n"
         )
-        self.env_file = secure_file(self.root / "deployment.env", "SECRET=not-emitted\n")
+        self.env_file = secure_file(
+            self.root / "deployment.env",
+            "SECRET=not-emitted\nBOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n",
+        )
         self.rotation_state = self.root / "rotation-state.json"
         self.rotation_manager = secure_file(self.root / "rotation.py")
         self.runtime_verifier = secure_file(self.root / "runtime.py")
@@ -229,20 +297,7 @@ class LeaseFixture(unittest.TestCase):
     def _seal_active_run(self, *, bind_pointer: bool = True) -> MODULE.DeploymentLeaseController:
         owner_uid = os.getuid() if hasattr(os, "getuid") else 0
         deployment_gid = os.getgid() if hasattr(os, "getgid") else 0
-        qualification = {
-            "schema": "xframework.bolt.phase0.qualification.v1",
-            "status": "passed",
-            "generated_at_utc": "2026-07-13T10:00:00Z",
-            "run_id": self.run_id,
-            "run_attempt": self.run_attempt,
-            "source_commit": "a" * 40,
-            "credential_generation_id": "generation-test",
-            "errors": [],
-            "artifacts": {"docker-compose.yml": {"path": "docker-compose.yml"}},
-            "runtime_stages": {},
-            "synthetic_stages": {},
-            "checks": {key: True for key in MODULE.QUALIFICATION_CHECK_KEYS},
-        }
+        qualification = qualification_document(self.run_id, self.run_attempt)
         secure_file(self.run_directory / "security-qualified", "")
         secure_file(self.run_directory / "qualified-commit", "a" * 40 + "\n")
         secure_file(
@@ -701,6 +756,82 @@ class LifecycleTests(LeaseFixture):
 
 
 class RecoveryTests(LeaseFixture):
+    @unittest.skipUnless(
+        sys.platform.startswith("linux")
+        and hasattr(os, "geteuid")
+        and os.geteuid() == 0
+        and pwd is not None,
+        "requires Linux root to establish production protected-env metadata",
+    )
+    def test_production_protected_env_accepts_exact_bootstrap_metadata(self) -> None:
+        assert pwd is not None
+        sudo_uid = os.environ.get("SUDO_UID")
+        identity = (
+            pwd.getpwuid(int(sudo_uid))
+            if sudo_uid is not None and int(sudo_uid) != 0
+            else pwd.getpwnam("nobody")
+        )
+        protected = self.root / "protected"
+        protected.mkdir()
+        os.chown(protected, 0, identity.pw_gid)
+        protected.chmod(0o1770)
+        protected_env = protected / "xeon-dev.env"
+        protected_env.write_text(
+            "SECRET=not-emitted\nBOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n",
+            encoding="utf-8",
+        )
+        os.chown(protected_env, identity.pw_uid, identity.pw_gid)
+        protected_env.chmod(0o600)
+
+        self.assertEqual(
+            "direct-kestrel",
+            MODULE.validate_deployment_proxy_mode(
+                protected_env,
+                identity.pw_uid,
+                deployment_gid=identity.pw_gid,
+                enforce_production_metadata=True,
+            ),
+        )
+
+        protected.chmod(0o0770)
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "insecure-deployment-env-directory"
+        ):
+            MODULE.validate_deployment_proxy_mode(
+                protected_env,
+                identity.pw_uid,
+                deployment_gid=identity.pw_gid,
+                enforce_production_metadata=True,
+            )
+
+    def test_no_active_lease_rejects_proxy_mode_drift_before_noop(self) -> None:
+        self.env_file.write_text(
+            "SECRET=not-emitted\nBOLT_SYNTHETIC_PROXY_MODE=logs\n",
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "qualified-proxy-mode-changed"
+        ):
+            self.controller.reconcile(self.recovery)
+
+        self.assertEqual([], self.runner.commands)
+
+    def test_no_active_lease_rejects_hardlinked_deployment_env(self) -> None:
+        alias = self.root / "deployment-hardlink.env"
+        try:
+            os.link(self.env_file, alias)
+        except OSError as error:
+            self.skipTest(f"hard links are unavailable: {error}")
+        attacked = dataclasses_replace(self.recovery, env_file=alias)
+
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "insecure-deployment-env"
+        ):
+            self.controller.reconcile(attacked)
+
+        self.assertEqual([], self.runner.commands)
+
     def test_no_lkg_without_lease_stops_unowned_hub(self) -> None:
         self.lkg_pointer.unlink()
         self.runner.stop_running = True
@@ -719,6 +850,28 @@ class RecoveryTests(LeaseFixture):
         self.assertEqual("no-active-lease-no-lkg-hub-stopped", evidence["reason_code"])
         self.assertTrue(evidence["gates"]["hub_stopped"])
         self.assertEqual(1, self.runner.count("stop"))
+
+    def test_no_lkg_without_lease_rejects_proxy_mode_drift(self) -> None:
+        self.lkg_pointer.unlink()
+        self.env_file.write_text(
+            "SECRET=not-emitted\nBOLT_SYNTHETIC_PROXY_MODE=logs\n",
+            encoding="utf-8",
+        )
+        if os.name != "nt":
+            self.env_file.chmod(0o600)
+
+        with self.assertRaisesRegex(MODULE.ControllerError, "qualified-proxy-mode-changed"):
+            self.controller.reconcile_no_lkg(
+                force=False,
+                env_file=self.env_file,
+                rotation_state_file=self.rotation_state,
+                python_executable=self.python,
+                docker_executable=self.docker,
+                hub_container_name="xframework-bolt-hub",
+                stop_timeout_seconds=10,
+            )
+
+        self.assertEqual([], self.runner.commands)
 
     def test_no_lkg_force_recovery_aborts_prepared_state_before_disarm(self) -> None:
         self.arm()

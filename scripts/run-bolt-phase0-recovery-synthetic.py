@@ -78,6 +78,9 @@ SENSITIVE_ENV_NAME = re.compile(r"(?:SECRET|PASSWORD|API_KEY|TOKEN)$", re.IGNORE
 
 CURRENT_PURPOSES = ("communications", "user", "expiry")
 RETIRED_PURPOSES = ("rejected_communications", "rejected_user")
+PROXY_MODE_LOGS = "logs"
+PROXY_MODE_DIRECT_KESTREL = "direct-kestrel"
+PROXY_MODES = frozenset({PROXY_MODE_LOGS, PROXY_MODE_DIRECT_KESTREL})
 REQUIRED_OPERATIONS = {
     "user_registration",
     "hostile_reserved_registration",
@@ -92,34 +95,48 @@ REQUIRED_OPERATIONS = {
     "durable_unregister",
     "token_expiry_disconnect",
 }
-PROBE_ASSERTIONS: dict[str, dict[str, Any]] = {
-    "proxy-marker-scan": {
+
+
+def _retained_marker_assertions() -> dict[str, Any]:
+    return {
         "retainedStoreQueried": True,
         "matches": 0,
         "tokensSearched": 3,
         "markersSearched": 3,
-    },
-    "seq-marker-scan": {
-        "retainedStoreQueried": True,
-        "matches": 0,
-        "tokensSearched": 3,
-        "markersSearched": 3,
-    },
-    "trace-marker-scan": {
-        "retainedStoreQueried": True,
-        "matches": 0,
-        "tokensSearched": 3,
-        "markersSearched": 3,
-    },
-    "plaintext-rejection": {"plaintextRejected": True, "bearerSent": False},
-    "old-generation-rejection": {
-        "oldUserTokenRejected": True,
-        "oldServiceTokenRejected": True,
-        "oldClientSecretRejected": True,
-        "currentHttpHealthPassed": True,
-        "currentBoltHealthPassed": True,
-    },
-}
+    }
+
+
+def _proxy_marker_assertions(proxy_mode: str) -> dict[str, Any]:
+    if proxy_mode == PROXY_MODE_LOGS:
+        return _retained_marker_assertions()
+    if proxy_mode == PROXY_MODE_DIRECT_KESTREL:
+        return {
+            "retainedStoreQueried": False,
+            "notApplicableReason": "direct-kestrel-publication",
+            "matches": 0,
+            "tokensSearched": 3,
+            "markersSearched": 3,
+        }
+    _fail("PROXY_MODE")
+
+
+def _probe_assertions(proxy_mode: str) -> dict[str, dict[str, Any]]:
+    return {
+        "proxy-marker-scan": _proxy_marker_assertions(proxy_mode),
+        "seq-marker-scan": _retained_marker_assertions(),
+        "trace-marker-scan": _retained_marker_assertions(),
+        "plaintext-rejection": {"plaintextRejected": True, "bearerSent": False},
+        "old-generation-rejection": {
+            "oldUserTokenRejected": True,
+            "oldServiceTokenRejected": True,
+            "oldClientSecretRejected": True,
+            "currentHttpHealthPassed": True,
+            "currentBoltHealthPassed": True,
+        },
+    }
+
+
+PROBE_ASSERTIONS = _probe_assertions(PROXY_MODE_LOGS)
 
 HOOK_KEYS = {
     "refresh": "BOLT_SYNTHETIC_TOKEN_REFRESH_COMMAND_PATH",
@@ -1001,6 +1018,7 @@ def _validate_core(raw: bytes, tokens: Mapping[str, TokenEvidence]) -> tuple[dic
 def _load_probe_receipt(
     path: Path,
     kind: str,
+    expected_assertions: Mapping[str, Any],
     core_started: dt.datetime,
     core_completed: dt.datetime,
 ) -> dict[str, Any]:
@@ -1010,7 +1028,7 @@ def _load_probe_receipt(
         or receipt.get("schemaVersion") != PROBE_SCHEMA
         or receipt.get("probe") != kind
         or receipt.get("status") != "passed"
-        or receipt.get("assertions") != PROBE_ASSERTIONS[kind]
+        or receipt.get("assertions") != expected_assertions
     ):
         _fail("PROBE_RECEIPT")
     started = _parse_timestamp(receipt.get("startedAtUtc"), "PROBE_TIME")
@@ -1133,6 +1151,8 @@ def run_recovery_synthetic(
     values, env_snapshot = _parse_env(env_file)
     if _required(values, "BOLT_SYNTHETIC_COMPOSE_PROJECT_NAME") != project_name:
         _fail("PROJECT_BINDING")
+    proxy_mode = _required(values, "BOLT_SYNTHETIC_PROXY_MODE")
+    probe_assertions = _probe_assertions(proxy_mode)
 
     loaded_validator = qualification_module is None
     if loaded_validator:
@@ -1306,7 +1326,7 @@ def run_recovery_synthetic(
         ]
         core_environment = _clean_environment()
         receipt_paths = {
-            kind: workspace / f"probe-{kind}.json" for kind in PROBE_ASSERTIONS
+            kind: workspace / f"probe-{kind}.json" for kind in probe_assertions
         }
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as core_pool:
@@ -1355,7 +1375,9 @@ def run_recovery_synthetic(
             _fail("CORE_STDERR")
         core, core_started, core_completed = _validate_core(core_result.stdout, current_tokens)
         receipts = {
-            kind: _load_probe_receipt(path, kind, core_started, core_completed)
+            kind: _load_probe_receipt(
+                path, kind, probe_assertions[kind], core_started, core_completed
+            )
             for kind, path in receipt_paths.items()
         }
 
@@ -1441,7 +1463,11 @@ def run_recovery_synthetic(
                 },
                 "markerAbsence": {
                     "application": "passed",
-                    "proxy": "passed",
+                    "proxy": (
+                        "not_applicable"
+                        if proxy_mode == PROXY_MODE_DIRECT_KESTREL
+                        else "passed"
+                    ),
                     "seq": "passed",
                     "trace": "passed",
                     "markerSha256Prefixes": {
@@ -1471,6 +1497,7 @@ def run_recovery_synthetic(
                 completed_at,
                 CORE_TIMEOUT_SECONDS + PROBE_TIMEOUT_SECONDS,
                 not_before=started_at,
+                proxy_mode=proxy_mode,
             )
         except BaseException:
             _fail("SYNTHETIC_SCHEMA")

@@ -227,6 +227,51 @@ read_optional_path_into() {
   return "$status"
 }
 
+proxy_mode=""
+if ! proxy_mode="$(read_optional_value BOLT_SYNTHETIC_PROXY_MODE raw)"; then
+  echo "synthetic proxy mode is missing or invalid" >&2
+  exit 1
+fi
+case "$proxy_mode" in
+  logs|direct-kestrel) ;;
+  *) echo "synthetic proxy mode is missing or invalid" >&2; exit 1 ;;
+esac
+
+proxy_log_paths=""
+proxy_log_paths_present="$(python3 - "$ENV_PARSER" "$XFRAMEWORK_ENV_FILE" <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+module_path, env_path = sys.argv[1:]
+spec = importlib.util.spec_from_file_location("bolt_phase0_env_presence", module_path)
+if spec is None or spec.loader is None:
+    raise SystemExit("shared Phase 0 environment parser is unavailable")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+try:
+    values = module.parse_env(Path(env_path))
+except ValueError as error:
+    raise SystemExit(f"invalid protected setting: BOLT_SYNTHETIC_PROXY_LOG_PATHS: {error}")
+sys.stdout.write("true" if "BOLT_SYNTHETIC_PROXY_LOG_PATHS" in values else "false")
+PY
+)"
+if proxy_log_paths="$(read_optional_value BOLT_SYNTHETIC_PROXY_LOG_PATHS raw)"; then
+  :
+else
+  status=$?
+  if [ "$status" -ne 3 ]; then
+    echo "synthetic proxy log path configuration is invalid" >&2
+    exit 1
+  fi
+  proxy_log_paths=""
+fi
+if { [ "$proxy_mode" = logs ] && [ -z "$proxy_log_paths" ]; } || \
+   { [ "$proxy_mode" = direct-kestrel ] && [ "$proxy_log_paths_present" = true ]; }; then
+  echo "synthetic proxy mode and log path configuration are inconsistent" >&2
+  exit 1
+fi
+
 validate_private_executable() {
   python3 - "$1" <<'PY'
 import os
@@ -568,7 +613,7 @@ run_silent_hook() {
     echo "$label emitted output; output was suppressed" >&2
     exit 1
   fi
-  python3 - "$receipt" "$kind" "$probe_started_epoch" "$token_manifest" <<'PY'
+  python3 - "$receipt" "$kind" "$probe_started_epoch" "$token_manifest" "$proxy_mode" <<'PY'
 import datetime as dt
 import json
 import os
@@ -576,9 +621,19 @@ import stat
 import sys
 from pathlib import Path
 
-receipt_path, expected_kind, started_epoch_raw, manifest_path = sys.argv[1:]
+receipt_path, expected_kind, started_epoch_raw, manifest_path, proxy_mode = sys.argv[1:]
+proxy_assertions = {
+    "logs": {"retainedStoreQueried": True, "matches": 0},
+    "direct-kestrel": {
+        "retainedStoreQueried": False,
+        "notApplicableReason": "direct-kestrel-publication",
+        "matches": 0,
+    },
+}
+if proxy_mode not in proxy_assertions:
+    raise SystemExit("synthetic proxy mode is invalid")
 expected_assertions = {
-    "proxy-marker-scan": {"retainedStoreQueried": True, "matches": 0},
+    "proxy-marker-scan": proxy_assertions[proxy_mode],
     "seq-marker-scan": {"retainedStoreQueried": True, "matches": 0},
     "trace-marker-scan": {"retainedStoreQueried": True, "matches": 0},
     "plaintext-rejection": {"plaintextRejected": True, "bearerSent": False},
@@ -631,7 +686,7 @@ PY
 }
 
 last_probe_receipt=""
-run_silent_hook "proxy marker-absence query" "$proxy_scan_hook" "proxy-marker-scan"
+run_silent_hook "proxy marker-absence probe" "$proxy_scan_hook" "proxy-marker-scan"
 proxy_receipt="$last_probe_receipt"
 run_silent_hook "Seq marker-absence query" "$seq_scan_hook" "seq-marker-scan"
 seq_receipt="$last_probe_receipt"
@@ -685,7 +740,7 @@ PY
 temporary_report="$REPORT.tmp"
 python3 - "$core_report" "$token_manifest" "$temporary_report" "$STAGE" "$redis_status" \
   "$old_generation_status" "$expiry_enabled" "$proxy_receipt" "$seq_receipt" "$trace_receipt" \
-  "$plaintext_receipt" "$redis_receipt" "$old_generation_receipt" <<'PY'
+  "$plaintext_receipt" "$redis_receipt" "$old_generation_receipt" "$proxy_mode" <<'PY'
 import datetime as dt
 import hashlib
 import json
@@ -698,8 +753,10 @@ from urllib.parse import urlsplit
 (
     core_path, manifest_path, report_path, stage, redis_status, old_generation_status,
     expiry_enabled_raw, proxy_receipt_path, seq_receipt_path, trace_receipt_path,
-    plaintext_receipt_path, redis_receipt_path, old_generation_receipt_path,
+    plaintext_receipt_path, redis_receipt_path, old_generation_receipt_path, proxy_mode,
 ) = sys.argv[1:]
+if proxy_mode not in {"logs", "direct-kestrel"}:
+    raise SystemExit("synthetic proxy mode is invalid")
 expiry_enabled = expiry_enabled_raw == "true"
 core_bytes = Path(core_path).read_bytes()
 if not core_bytes or len(core_bytes) > 1024 * 1024:
@@ -842,7 +899,7 @@ evidence = {
         },
         "markerAbsence": {
             "application": "passed",
-            "proxy": "passed",
+            "proxy": "not_applicable" if proxy_mode == "direct-kestrel" else "passed",
             "seq": "passed",
             "trace": "passed",
             "markerSha256Prefixes": {

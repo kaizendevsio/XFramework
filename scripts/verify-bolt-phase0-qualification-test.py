@@ -60,7 +60,7 @@ class EvidenceFactory:
     def __init__(self, root: Path, now: dt.datetime | None = None) -> None:
         self.now = (now or dt.datetime.now(dt.timezone.utc)).replace(microsecond=0)
         self.run_id = "123456789"
-        self.attempt = 2
+        self.attempt = 1
         self.commit = "a" * 40
         self.project = "xframework"
         self.run = root / f"{self.run_id}-{self.attempt}"
@@ -105,7 +105,18 @@ class EvidenceFactory:
                     "BoltConfiguration__MediaEnabled": "false",
                 },
                 "security_secrets": [],
-                "ports": [],
+                "ports": (
+                    [
+                        {
+                            "target": 8443,
+                            "published": 7000,
+                            "protocol": "tcp",
+                            "host_ip": "",
+                        }
+                    ]
+                    if service == "bolt-hub"
+                    else []
+                ),
                 "healthcheck": None,
                 "replicas": 1 if service == "bolt-hub" else None,
             }
@@ -135,6 +146,56 @@ class EvidenceFactory:
                     },
                 },
                 "secure-transport": {"passed": True, "detail": "verified"},
+                "hub-only-tls-publication": {
+                    "passed": True,
+                    "detail": {
+                        "ports": [
+                            {
+                                "target": 8443,
+                                "published": 7000,
+                                "protocol": "tcp",
+                                "host_ip": "",
+                            }
+                        ],
+                        "expected": 7000,
+                    },
+                },
+                "direct-publication-host-interface": {
+                    "passed": True,
+                    "detail": {
+                        "binding": "",
+                        "resolved_addresses": ["100.64.0.10"],
+                        "host_interface_addresses": ["100.64.0.10"],
+                        "matched_addresses": ["100.64.0.10"],
+                    },
+                },
+                "operator-attested-direct-publication-topology": {
+                    "passed": True,
+                    "detail": {
+                        "attestation": MODULE.DIRECT_PUBLICATION_ATTESTATION,
+                        "attested_by": "phase0-operator",
+                        "attested_by_id": "1234567",
+                        "triggering_actor": "phase0-operator",
+                        "workflow_event": "workflow_dispatch",
+                        "run_id": self.run_id,
+                        "run_attempt": self.attempt,
+                        "source_commit": self.commit,
+                        "published_hostname": "bolt.example.internal",
+                        "published_port": 7000,
+                        "mode": MODULE.PROXY_MODE_DIRECT_KESTREL,
+                        "intermediaries": [],
+                        "binding": "",
+                        "resolved_addresses": ["100.64.0.10"],
+                        "host_interface_addresses": ["100.64.0.10"],
+                        "matched_addresses": ["100.64.0.10"],
+                        "scope": [
+                            "host-reverse-proxy",
+                            "tailscale-serve",
+                            "load-balancer",
+                            "ingress",
+                        ],
+                    },
+                },
             },
             "errors": [],
             "redacted_manifest": {"services": services},
@@ -336,7 +397,14 @@ class EvidenceFactory:
             "assertions": assertions,
         }
 
-    def synthetic(self, stage: str, minute: float, run_id: str | None = None) -> dict:
+    def synthetic(
+        self,
+        stage: str,
+        minute: float,
+        run_id: str | None = None,
+        *,
+        proxy_mode: str = MODULE.PROXY_MODE_DIRECT_KESTREL,
+    ) -> dict:
         started = self.now + dt.timedelta(minutes=minute)
         completed = started + dt.timedelta(seconds=30)
         run_id = run_id or str(uuid.uuid4())
@@ -345,14 +413,14 @@ class EvidenceFactory:
             names.add("token_expiry_disconnect")
         operations = [self.operation(name, started, completed) for name in sorted(names)]
         marker_count = 3 if stage in {"canary", "finalized"} else 2
-        marker_assertions = {
-            "retainedStoreQueried": True,
-            "matches": 0,
-            "tokensSearched": marker_count,
-            "markersSearched": marker_count,
-        }
+        marker_assertions = MODULE.retained_marker_assertions(marker_count)
         receipts = {
-            "proxyMarkerScan": self.probe("proxy-marker-scan", started, completed, marker_assertions),
+            "proxyMarkerScan": self.probe(
+                "proxy-marker-scan",
+                started,
+                completed,
+                MODULE.proxy_marker_assertions(proxy_mode, marker_count),
+            ),
             "seqMarkerScan": self.probe("seq-marker-scan", started, completed, marker_assertions),
             "traceMarkerScan": self.probe("trace-marker-scan", started, completed, marker_assertions),
             "plaintextRejection": self.probe(
@@ -392,7 +460,7 @@ class EvidenceFactory:
             "tokenSha256Prefixes": prefixes,
             "startedAtUtc": timestamp(started),
             "completedAtUtc": timestamp(completed),
-            "target": "wss://bolt.example.internal:7000/bolt/ws",
+            "target": MODULE.DIRECT_KESTREL_TARGET,
             "status": "passed",
             "timings": {"totalMs": 30000},
             "operations": operations,
@@ -416,7 +484,11 @@ class EvidenceFactory:
                 },
                 "markerAbsence": {
                     "application": "passed",
-                    "proxy": "passed",
+                    "proxy": (
+                        "not_applicable"
+                        if proxy_mode == MODULE.PROXY_MODE_DIRECT_KESTREL
+                        else "passed"
+                    ),
                     "seq": "passed",
                     "trace": "passed",
                     "markerSha256Prefixes": markers,
@@ -450,7 +522,7 @@ class EvidenceFactory:
             "errors": [],
         }
 
-    def create(self) -> None:
+    def create(self, *, proxy_mode: str = MODULE.PROXY_MODE_DIRECT_KESTREL) -> None:
         secure_bytes(self.run / "docker-compose.yml", b"services:\n  bolt-hub: {}\n")
         secure_json(
             self.run / "pinned-compose.override.json",
@@ -508,14 +580,17 @@ class EvidenceFactory:
         for name, stage in MODULE.SYNTHETIC_FILES.items():
             if name == "rollback-synthetics-finalized.json":
                 continue
-            secure_json(self.run / name, self.synthetic(stage, synthetic_minutes[stage]))
+            secure_json(
+                self.run / name,
+                self.synthetic(stage, synthetic_minutes[stage], proxy_mode=proxy_mode),
+            )
         secure_json(
             self.run / "rollback-runtime-evidence.json",
             self.runtime(MODULE.PHASE0_SERVICES, -5.5, "complete"),
         )
         secure_json(
             self.run / "rollback-synthetics-finalized.json",
-            self.synthetic("finalized", -5),
+            self.synthetic("finalized", -5, proxy_mode=proxy_mode),
         )
         digests = {
             name: MODULE.sha256_file(self.run / name)
@@ -553,7 +628,7 @@ class EvidenceFactory:
         for name in MODULE.RECOVERY_CONFIG_FILES:
             secure_bytes(self.run / name, f"# {name}\n".encode())
 
-    def verify(self) -> dict:
+    def verify(self, *, proxy_mode: str = MODULE.PROXY_MODE_DIRECT_KESTREL) -> dict:
         return MODULE.verify_qualification(
             self.run,
             self.commit,
@@ -561,6 +636,7 @@ class EvidenceFactory:
             self.attempt,
             self.project,
             MODULE.DEFAULT_MAXIMUM_AGE_SECONDS,
+            proxy_mode=proxy_mode,
             now=self.now,
         )
 
@@ -589,8 +665,232 @@ class QualificationTests(unittest.TestCase):
     def test_accepts_complete_bound_evidence(self) -> None:
         evidence = self.factory.verify()
         self.assertEqual("passed", evidence["status"])
+        self.assertEqual(MODULE.PROXY_MODE_DIRECT_KESTREL, evidence["proxy_mode"])
         self.assertEqual(set(MODULE.ARTIFACT_FILES), set(evidence["artifacts"]))
         self.assertNotIn("configured_image", json.dumps(evidence))
+
+    def test_rejects_logs_mode_for_promotion(self) -> None:
+        with self.assertRaisesRegex(MODULE.QualificationError, "invalid-proxy-mode"):
+            self.factory.verify(proxy_mode=MODULE.PROXY_MODE_LOGS)
+
+    def test_direct_kestrel_qualification_requires_sealed_publication_topology(self) -> None:
+        self.factory.create(proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL)
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"].pop("hub-only-tls-publication"),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-topology-unverified"
+        ):
+            self.factory.verify(proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL)
+
+    def test_direct_kestrel_qualification_requires_operator_topology_attestation(self) -> None:
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"].pop(
+                "operator-attested-direct-publication-topology"
+            ),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-topology-unattested"
+        ):
+            self.factory.verify()
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"][
+                "operator-attested-direct-publication-topology"
+            ]["detail"].update(run_attempt=2),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-topology-unattested"
+        ):
+            self.factory.verify()
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"][
+                "operator-attested-direct-publication-topology"
+            ]["detail"].update(run_id="999999999"),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-topology-unattested"
+        ):
+            self.factory.verify()
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"][
+                "operator-attested-direct-publication-topology"
+            ]["detail"].update(intermediaries=["tailscale-serve"]),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-topology-unattested"
+        ):
+            self.factory.verify()
+
+    def test_direct_kestrel_qualification_requires_live_host_interface_match(self) -> None:
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"]["direct-publication-host-interface"][
+                "detail"
+            ].update(matched_addresses=[]),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-host-interface-unverified"
+        ):
+            self.factory.verify()
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"]["direct-publication-host-interface"][
+                "detail"
+            ].update(resolved_addresses=["100.64.0.10", "100.64.0.12"]),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-host-interface-unverified"
+        ):
+            self.factory.verify()
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"]["direct-publication-host-interface"][
+                "detail"
+            ].update(binding="127.0.0.1"),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-host-interface-unverified"
+        ):
+            self.factory.verify()
+
+    def test_direct_kestrel_qualification_cross_binds_manifest_and_tls_publication(self) -> None:
+        self.factory.create(proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL)
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["redacted_manifest"]["services"]["bolt-hub"].update(
+                ports=[]
+            ),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-topology-unverified"
+        ):
+            self.factory.verify(proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL)
+
+        self.factory.create(proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL)
+        self.factory.mutate(
+            "bolt-tls-evidence.json",
+            lambda document: document.update(published_hostname="other.example.internal"),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-topology-unverified"
+        ):
+            self.factory.verify(proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL)
+
+        self.factory.create(proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL)
+        self.factory.mutate(
+            "bolt-tls-evidence.json",
+            lambda document: document.update(published_port=7001),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "direct-kestrel-topology-unverified"
+        ):
+            self.factory.verify(proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL)
+
+    def test_synthetic_validator_accepts_direct_kestrel_proxy_receipt_only(self) -> None:
+        document = self.factory.synthetic(
+            "finalized", -1, proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL
+        )
+
+        MODULE.validate_synthetic(
+            document,
+            "finalized",
+            self.factory.now,
+            MODULE.DEFAULT_MAXIMUM_AGE_SECONDS,
+            proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL,
+        )
+
+        receipts = document["postRunEvidence"]["probeReceipts"]
+        for name in ("seqMarkerScan", "traceMarkerScan"):
+            self.assertEqual(
+                MODULE.retained_marker_assertions(3), receipts[name]["assertions"]
+            )
+
+    def test_synthetic_validator_rejects_non_direct_kestrel_target(self) -> None:
+        document = self.factory.synthetic("finalized", -1)
+        document["synthetic"]["target"] = "wss://proxy.example.test/bolt/ws"
+        with self.assertRaisesRegex(MODULE.QualificationError, "invalid-synthetic-target"):
+            MODULE.validate_synthetic(
+                document,
+                "finalized",
+                self.factory.now,
+                MODULE.DEFAULT_MAXIMUM_AGE_SECONDS,
+                proxy_mode=MODULE.PROXY_MODE_LOGS,
+            )
+
+    def test_synthetic_validator_rejects_proxy_mode_receipt_mismatches(self) -> None:
+        cases = (
+            (MODULE.PROXY_MODE_LOGS, MODULE.PROXY_MODE_DIRECT_KESTREL),
+            (MODULE.PROXY_MODE_DIRECT_KESTREL, MODULE.PROXY_MODE_LOGS),
+        )
+        for receipt_mode, expected_mode in cases:
+            with self.subTest(receipt_mode=receipt_mode, expected_mode=expected_mode):
+                document = self.factory.synthetic(
+                    "finalized", -1, proxy_mode=expected_mode
+                )
+                document["postRunEvidence"]["probeReceipts"]["proxyMarkerScan"][
+                    "assertions"
+                ] = MODULE.proxy_marker_assertions(receipt_mode, 3)
+                with self.assertRaisesRegex(
+                    MODULE.QualificationError, "invalid-probe-receipt"
+                ):
+                    MODULE.validate_synthetic(
+                        document,
+                        "finalized",
+                        self.factory.now,
+                        MODULE.DEFAULT_MAXIMUM_AGE_SECONDS,
+                        proxy_mode=expected_mode,
+                    )
+
+    def test_direct_kestrel_mode_keeps_seq_and_trace_retained_store_requirements(self) -> None:
+        for receipt_name in ("seqMarkerScan", "traceMarkerScan"):
+            with self.subTest(receipt_name=receipt_name):
+                document = self.factory.synthetic(
+                    "finalized", -1, proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL
+                )
+                document["postRunEvidence"]["probeReceipts"][receipt_name][
+                    "assertions"
+                ] = MODULE.proxy_marker_assertions(
+                    MODULE.PROXY_MODE_DIRECT_KESTREL, 3
+                )
+                with self.assertRaisesRegex(
+                    MODULE.QualificationError, "invalid-probe-receipt"
+                ):
+                    MODULE.validate_synthetic(
+                        document,
+                        "finalized",
+                        self.factory.now,
+                        MODULE.DEFAULT_MAXIMUM_AGE_SECONDS,
+                        proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL,
+                    )
+
+    def test_synthetic_validator_rejects_non_exact_proxy_mode(self) -> None:
+        document = self.factory.synthetic("finalized", -1)
+        for proxy_mode in ("LOGS", "direct_kestrel", "direct-kestrelx"):
+            with self.subTest(proxy_mode=proxy_mode), self.assertRaisesRegex(
+                MODULE.QualificationError, "invalid-proxy-mode"
+            ):
+                MODULE.validate_synthetic(
+                    document,
+                    "finalized",
+                    self.factory.now,
+                    MODULE.DEFAULT_MAXIMUM_AGE_SECONDS,
+                    proxy_mode=proxy_mode,
+                )
 
     def test_sealed_json_reads_require_root_owner_and_mode_0440(self) -> None:
         path = self.factory.run / "sealed.json"
@@ -877,6 +1177,7 @@ class QualificationTests(unittest.TestCase):
             "--expected-run-id", self.factory.run_id,
             "--expected-run-attempt", str(self.factory.attempt),
             "--project-name", self.factory.project,
+            "--proxy-mode", MODULE.PROXY_MODE_DIRECT_KESTREL,
             "--lkg-pointer", str(lkg / "current"),
         ])
         self.assertEqual(1, exit_code)
@@ -896,6 +1197,7 @@ class QualificationTests(unittest.TestCase):
             "--expected-run-id", self.factory.run_id,
             "--expected-run-attempt", str(self.factory.attempt),
             "--project-name", self.factory.project,
+            "--proxy-mode", MODULE.PROXY_MODE_DIRECT_KESTREL,
             "--lkg-pointer", str(lkg / "current"),
         ])
         self.assertEqual(0, exit_code)
@@ -925,14 +1227,38 @@ class RecoveryGateTests(unittest.TestCase):
         self.env = self.root / "phase0.env"
         secure_bytes(
             self.env,
-            f"BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH={self.hook}\n".encode(),
+            (
+                f"BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH={self.hook}\n"
+                f"BOLT_SYNTHETIC_PROXY_MODE={MODULE.PROXY_MODE_DIRECT_KESTREL}\n"
+            ).encode(),
         )
         self.output = self.root / "recovery.json"
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def runner(self, stale_synthetic: bool = False, fail_runtime: bool = False):
+    def qualify_mode(self, proxy_mode: str) -> None:
+        self.factory.create(proxy_mode=proxy_mode)
+        evidence = self.factory.verify(proxy_mode=proxy_mode)
+        secure_json(self.factory.run / "qualification-evidence.json", evidence)
+        secure_bytes(
+            self.factory.run / "qualified-commit", (self.factory.commit + "\n").encode()
+        )
+        secure_bytes(self.factory.run / "security-qualified", b"")
+        lines = [
+            f"BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH={self.hook}",
+            f"BOLT_SYNTHETIC_PROXY_MODE={proxy_mode}",
+        ]
+        if proxy_mode == MODULE.PROXY_MODE_LOGS:
+            lines.append("BOLT_SYNTHETIC_PROXY_LOG_PATHS=/var/log/proxy/access.log")
+        secure_bytes(self.env, ("\n".join(lines) + "\n").encode())
+
+    def runner(
+        self,
+        stale_synthetic: bool = False,
+        fail_runtime: bool = False,
+        synthetic_proxy_mode: str | None = None,
+    ):
         def run(command: list[str], _: int) -> subprocess.CompletedProcess:
             self.commands.append(command)
             output = Path(command[command.index("--output") + 1])
@@ -945,7 +1271,22 @@ class RecoveryGateTests(unittest.TestCase):
                 )
             else:
                 minute = -10 if stale_synthetic else -0.005
-                secure_json(output, self.factory.synthetic("finalized", minute))
+                bound_env = Path(command[command.index("--env-file") + 1])
+                protected = MODULE.parse_env_file(bound_env)
+                proxy_mode = MODULE.require_proxy_mode(
+                    protected.get("BOLT_SYNTHETIC_PROXY_MODE")
+                )
+                document = self.factory.synthetic(
+                    "finalized", minute, proxy_mode=proxy_mode
+                )
+                if synthetic_proxy_mode is not None:
+                    document["postRunEvidence"]["probeReceipts"]["proxyMarkerScan"][
+                        "assertions"
+                    ] = MODULE.proxy_marker_assertions(synthetic_proxy_mode, 3)
+                secure_json(
+                    output,
+                    document,
+                )
             return subprocess.CompletedProcess(command, 0)
 
         return run
@@ -988,6 +1329,71 @@ class RecoveryGateTests(unittest.TestCase):
             Path(self.commands[1][0]),
         )
 
+    def test_recovery_gate_accepts_direct_kestrel_mode_and_matching_receipt(self) -> None:
+        self.qualify_mode(MODULE.PROXY_MODE_DIRECT_KESTREL)
+
+        evidence = self.call()
+
+        self.assertEqual("passed", evidence["status"])
+
+    def test_recovery_gate_rejects_proxy_mode_receipt_mismatches(self) -> None:
+        with self.assertRaisesRegex(MODULE.QualificationError, "invalid-probe-receipt"):
+            self.call(self.runner(synthetic_proxy_mode=MODULE.PROXY_MODE_LOGS))
+
+    def test_recovery_gate_rejects_proxy_mode_change_after_qualification(self) -> None:
+        secure_bytes(
+            self.env,
+            (
+                f"BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH={self.hook}\n"
+                f"BOLT_SYNTHETIC_PROXY_MODE={MODULE.PROXY_MODE_LOGS}\n"
+            ).encode(),
+        )
+        with self.assertRaisesRegex(
+            MODULE.QualificationError, "invalid-proxy-mode"
+        ):
+            self.call()
+        self.assertEqual([], self.commands)
+
+    def test_recovery_gate_rejects_proxy_mode_path_union_before_children(self) -> None:
+        cases = {
+            "logs-without-paths": (
+                f"BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH={self.hook}\n"
+                f"BOLT_SYNTHETIC_PROXY_MODE={MODULE.PROXY_MODE_LOGS}\n"
+            ),
+            "direct-with-paths": (
+                f"BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH={self.hook}\n"
+                f"BOLT_SYNTHETIC_PROXY_MODE={MODULE.PROXY_MODE_DIRECT_KESTREL}\n"
+                "BOLT_SYNTHETIC_PROXY_LOG_PATHS=/var/log/proxy/access.log\n"
+            ),
+            "direct-with-empty-path-key": (
+                f"BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH={self.hook}\n"
+                f"BOLT_SYNTHETIC_PROXY_MODE={MODULE.PROXY_MODE_DIRECT_KESTREL}\n"
+                "BOLT_SYNTHETIC_PROXY_LOG_PATHS=\n"
+            ),
+        }
+        for name, payload in cases.items():
+            with self.subTest(name=name):
+                secure_bytes(self.env, payload.encode())
+                with self.assertRaisesRegex(
+                    MODULE.QualificationError, "invalid-proxy-(?:mode|configuration)"
+                ):
+                    self.call()
+                self.assertEqual([], self.commands)
+
+    def test_recovery_gate_rejects_missing_or_non_exact_proxy_mode_before_children(self) -> None:
+        invalid_values = (None, "LOGS", "direct_kestrel", "direct-kestrelx")
+        for proxy_mode in invalid_values:
+            with self.subTest(proxy_mode=proxy_mode):
+                lines = [f"BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH={self.hook}"]
+                if proxy_mode is not None:
+                    lines.append(f"BOLT_SYNTHETIC_PROXY_MODE={proxy_mode}")
+                secure_bytes(self.env, ("\n".join(lines) + "\n").encode())
+                with self.assertRaisesRegex(
+                    MODULE.QualificationError, "invalid-proxy-mode"
+                ):
+                    self.call()
+                self.assertEqual([], self.commands)
+
     def test_recovery_gate_ignores_candidate_global_hook_and_binds_private_env(self) -> None:
         secure_executable(self.hook, b"#!/bin/sh\nexit 99\n")
 
@@ -996,12 +1402,23 @@ class RecoveryGateTests(unittest.TestCase):
             values = MODULE.parse_env_file(bound_env)
             for key, name in MODULE.RECOVERY_ENV_TOOL_BINDINGS.items():
                 self.assertEqual(str(self.factory.run / name), values[key])
+            self.assertEqual(
+                MODULE.PROXY_MODE_DIRECT_KESTREL,
+                values["BOLT_SYNTHETIC_PROXY_MODE"],
+            )
             output = Path(command[command.index("--output") + 1])
             if "--services" in command:
                 secure_json(output, self.factory.runtime(MODULE.PHASE0_SERVICES, -0.01, "complete"))
             else:
                 self.assertNotEqual(self.hook, Path(command[0]))
-                secure_json(output, self.factory.synthetic("finalized", -0.005))
+                secure_json(
+                    output,
+                    self.factory.synthetic(
+                        "finalized",
+                        -0.005,
+                        proxy_mode=MODULE.PROXY_MODE_DIRECT_KESTREL,
+                    ),
+                )
             return subprocess.CompletedProcess(command, 0)
 
         self.call(runner)

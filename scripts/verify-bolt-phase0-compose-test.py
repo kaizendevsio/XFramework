@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 
 SCRIPT = Path(__file__).with_name("verify-bolt-phase0-compose.py")
@@ -51,6 +53,7 @@ class Phase0ComposeTests(unittest.TestCase):
             expected_fullchain_path=str(self.fullchain),
             expected_private_key_path=str(self.private_key),
             expected_published_port=7443,
+            expected_public_hostname="bolt.example.test",
             expected_identityserver_ca_path=str(self.identity_ca),
             expected_identityserver_fullchain_path=str(self.identity_fullchain),
             expected_identityserver_private_key_path=str(self.identity_private_key),
@@ -65,6 +68,12 @@ class Phase0ComposeTests(unittest.TestCase):
             provenance_source_commit=None,
             provenance_verified=False,
             authorize_deployment=authorize,
+            publication_topology_attestation=MODULE.DIRECT_PUBLICATION_ATTESTATION,
+            publication_topology_attested_by="phase0-operator",
+            publication_topology_attested_by_id="1234567",
+            publication_topology_triggering_actor="phase0-operator",
+            publication_topology_run_id="123456789",
+            publication_topology_run_attempt=1,
         )
 
     def manifest(self) -> dict:
@@ -512,7 +521,16 @@ class Phase0ComposeTests(unittest.TestCase):
             )
         )
 
-    def test_digest_pin_requires_matching_verified_provenance(self) -> None:
+    @mock.patch.object(
+        MODULE,
+        "inspect_publication_topology",
+        return_value={
+            "resolved_addresses": ["100.64.0.10"],
+            "host_interface_addresses": ["100.64.0.10"],
+            "matched_addresses": ["100.64.0.10"],
+        },
+    )
+    def test_digest_pin_requires_matching_verified_provenance(self, _: mock.Mock) -> None:
         manifest = self.manifest()
         pin = "registry.example/xframework/bolt-hub@sha256:" + "d" * 64
         manifest["services"]["bolt-hub"]["image"] = pin
@@ -527,6 +545,74 @@ class Phase0ComposeTests(unittest.TestCase):
         args.provenance_verified = True
         self.assertEqual([], self.errors(manifest, args))
 
+        args.publication_topology_attestation = ""
+        self.assertTrue(
+            any(
+                error.startswith("operator-attested-direct-publication-topology:")
+                for error in self.errors(manifest, args)
+            )
+        )
+        args.publication_topology_attestation = MODULE.DIRECT_PUBLICATION_ATTESTATION
+
+        args.publication_topology_run_attempt = 2
+        self.assertTrue(
+            any(
+                error.startswith("operator-attested-direct-publication-topology:")
+                for error in self.errors(manifest, args)
+            )
+        )
+        args.publication_topology_run_attempt = 1
+
+        args.publication_topology_triggering_actor = "rerun-operator"
+        self.assertTrue(
+            any(
+                error.startswith("operator-attested-direct-publication-topology:")
+                for error in self.errors(manifest, args)
+            )
+        )
+        args.publication_topology_triggering_actor = args.publication_topology_attested_by
+
+        manifest["services"]["bolt-hub"]["ports"][0]["host_ip"] = "127.0.0.1"
+        self.assertTrue(
+            any(
+                error.startswith("direct-publication-host-interface:")
+                for error in self.errors(manifest, args)
+            )
+        )
+        del manifest["services"]["bolt-hub"]["ports"][0]["host_ip"]
+
+        with mock.patch.object(
+            MODULE,
+            "inspect_publication_topology",
+            return_value={
+                "resolved_addresses": ["100.64.0.10"],
+                "host_interface_addresses": ["100.64.0.11"],
+                "matched_addresses": [],
+            },
+        ):
+            self.assertTrue(
+                any(
+                    error.startswith("direct-publication-host-interface:")
+                    for error in self.errors(manifest, args)
+                )
+            )
+
+        with mock.patch.object(
+            MODULE,
+            "inspect_publication_topology",
+            return_value={
+                "resolved_addresses": ["100.64.0.10", "100.64.0.12"],
+                "host_interface_addresses": ["100.64.0.10"],
+                "matched_addresses": ["100.64.0.10"],
+            },
+        ):
+            self.assertTrue(
+                any(
+                    error.startswith("direct-publication-host-interface:")
+                    for error in self.errors(manifest, args)
+                )
+            )
+
         args.provenance_bindings = {}
         args.provenance_verified = False
         self.assertTrue(
@@ -535,6 +621,100 @@ class Phase0ComposeTests(unittest.TestCase):
                 for error in self.errors(manifest, args)
             )
         )
+
+    def test_publication_topology_inspector_normalizes_dns_and_host_inventory(self) -> None:
+        getaddrinfo = mock.patch.object(
+            MODULE.socket,
+            "getaddrinfo",
+            return_value=[
+                (2, 1, 6, "", ("100.64.0.10", 0)),
+                (2, 1, 6, "", ("100.64.0.10", 0)),
+            ],
+        )
+        is_file = mock.patch.object(MODULE.Path, "is_file", return_value=True)
+        run = mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=SimpleNamespace(
+                stdout=json.dumps(
+                    [
+                        {
+                            "addr_info": [
+                                {"family": "inet", "local": "100.64.0.10"},
+                                {"family": "inet6", "local": "fe80::1"},
+                            ]
+                        }
+                    ]
+                )
+            ),
+        )
+        with getaddrinfo, is_file, run as invoked:
+            observed = MODULE.inspect_publication_topology("bolt.example.test")
+
+        self.assertEqual(
+            {
+                "resolved_addresses": ["100.64.0.10"],
+                "host_interface_addresses": ["100.64.0.10"],
+                "matched_addresses": ["100.64.0.10"],
+            },
+            observed,
+        )
+        invoked.assert_called_once_with(
+            [str(MODULE.Path("/usr/sbin/ip")), "-json", "address", "show", "up", "scope", "global"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    def test_publication_topology_inspector_rejects_malformed_inventory(self) -> None:
+        with (
+            mock.patch.object(
+                MODULE.socket,
+                "getaddrinfo",
+                return_value=[(2, 1, 6, "", ("100.64.0.10", 0))],
+            ),
+            mock.patch.object(MODULE.Path, "is_file", return_value=True),
+            mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=SimpleNamespace(stdout="{}"),
+            ),
+            self.assertRaisesRegex(ValueError, "invalid-host-interface-inventory"),
+        ):
+            MODULE.inspect_publication_topology("bolt.example.test")
+
+    def test_publication_topology_inspector_requires_trusted_ip_command(self) -> None:
+        with (
+            mock.patch.object(
+                MODULE.socket,
+                "getaddrinfo",
+                return_value=[(2, 1, 6, "", ("100.64.0.10", 0))],
+            ),
+            mock.patch.object(MODULE.Path, "is_file", return_value=False),
+            self.assertRaisesRegex(RuntimeError, "trusted-ip-command-unavailable"),
+        ):
+            MODULE.inspect_publication_topology("bolt.example.test")
+
+    def test_publication_topology_inspector_reports_no_intersection(self) -> None:
+        with (
+            mock.patch.object(
+                MODULE.socket,
+                "getaddrinfo",
+                return_value=[(2, 1, 6, "", ("100.64.0.10", 0))],
+            ),
+            mock.patch.object(MODULE.Path, "is_file", return_value=True),
+            mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=SimpleNamespace(
+                    stdout=json.dumps([{"addr_info": [{"local": "100.64.0.11"}]}])
+                ),
+            ),
+        ):
+            observed = MODULE.inspect_publication_topology("bolt.example.test")
+
+        self.assertEqual([], observed["matched_addresses"])
 
 
 if __name__ == "__main__":

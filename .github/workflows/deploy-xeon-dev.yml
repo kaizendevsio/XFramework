@@ -7,6 +7,10 @@ on:
         description: Type PROMOTE_BOLT_PHASE0 to authorize the staged xeon-dev promotion
         required: true
         type: string
+      publication_topology_confirmation:
+        description: Type ATTEST_DIRECT_KESTREL_NO_INTERMEDIARY after verifying no host proxy, Tailscale Serve, load balancer, or ingress fronts Bolt Hub
+        required: true
+        type: string
       canary_observation_minutes:
         description: Canary observation window before the remaining services are promoted
         required: true
@@ -109,12 +113,22 @@ jobs:
         shell: bash
         env:
           PROMOTION_CONFIRMATION: ${{ inputs.confirmation }}
+          PUBLICATION_TOPOLOGY_CONFIRMATION: ${{ inputs.publication_topology_confirmation }}
           CANARY_OBSERVATION_MINUTES: ${{ inputs.canary_observation_minutes }}
+          PROMOTION_ACTOR: ${{ github.actor }}
+          PROMOTION_ACTOR_ID: ${{ github.actor_id }}
+          PROMOTION_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          PROMOTION_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -euo pipefail
           test "$PROMOTION_CONFIRMATION" = "PROMOTE_BOLT_PHASE0"
+          test "$PUBLICATION_TOPOLOGY_CONFIRMATION" = "ATTEST_DIRECT_KESTREL_NO_INTERMEDIARY"
           test "$GITHUB_REF" = "refs/heads/develop"
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PROMOTION_ACTOR" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]]
+          [[ "$PROMOTION_ACTOR_ID" =~ ^[1-9][0-9]{0,31}$ ]]
+          test "$PROMOTION_TRIGGERING_ACTOR" = "$PROMOTION_ACTOR"
+          test "$PROMOTION_RUN_ATTEMPT" = 1
           case "$CANARY_OBSERVATION_MINUTES" in
             ''|*[!0-9]*) echo "canary observation minutes must be an integer" >&2; exit 1 ;;
           esac
@@ -265,6 +279,7 @@ jobs:
             --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
             --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
             --expected-published-port "$BOLT_HUB_EXPOSE_PORT" \
+            --expected-public-hostname "$BOLT_HUB_PUBLIC_HOSTNAME" \
             --expected-identityserver-ca-path "$IDENTITYSERVER_TLS_CA_PATH" \
             --expected-identityserver-fullchain-path "$IDENTITYSERVER_TLS_FULLCHAIN_PATH" \
             --expected-identityserver-private-key-path "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH" \
@@ -324,7 +339,7 @@ jobs:
             BOLT_SYNTHETIC_OLD_GENERATION_REJECTION_COMMAND_PATH
             BOLT_SYNTHETIC_COMPOSE_PROJECT_NAME
             BOLT_SYNTHETIC_PLAINTEXT_PEER_SERVICE
-            BOLT_SYNTHETIC_PROXY_LOG_PATHS
+            BOLT_SYNTHETIC_PROXY_MODE
             BOLT_SYNTHETIC_SEQ_API_URL
             BOLT_SYNTHETIC_SEQ_API_KEY
             BOLT_SYNTHETIC_JAEGER_QUERY_API_URL
@@ -344,21 +359,118 @@ jobs:
             "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' bash -s -- $quoted_vars" <<'REMOTE_SCRIPT'
           set -euo pipefail
           python3 - "$XFRAMEWORK_ENV_FILE" "$@" <<'PY'
+          import errno
+          import os
           import re
           import stat
           import sys
-          from pathlib import Path
 
-          path = Path(sys.argv[1])
-          required = set(sys.argv[2:])
-          if not path.is_file():
-              raise SystemExit("protected deployment env file is missing")
-          if stat.S_IMODE(path.stat().st_mode) & 0o077:
-              raise SystemExit("protected deployment env file must not be group/world accessible")
+          env_path = sys.argv[1]
+          required_names = sys.argv[2:]
+          if len(required_names) != 58 or len(set(required_names)) != 58:
+              raise SystemExit("protected deployment variable inventory must contain exactly 58 unique names")
+          required = set(required_names)
+          maximum_protected_env_bytes = 1024 * 1024
+
+          for flag_name in ("O_NOFOLLOW", "O_CLOEXEC", "O_NONBLOCK"):
+              if not hasattr(os, flag_name):
+                  raise SystemExit(f"protected deployment preflight requires {flag_name}")
+
+          def metadata_fingerprint(metadata):
+              return (
+                  metadata.st_dev,
+                  metadata.st_ino,
+                  metadata.st_mode,
+                  metadata.st_uid,
+                  metadata.st_gid,
+                  metadata.st_nlink,
+                  metadata.st_size,
+                  metadata.st_mtime_ns,
+                  metadata.st_ctime_ns,
+              )
+
+          def validate_metadata(metadata):
+              if not stat.S_ISREG(metadata.st_mode):
+                  raise SystemExit("protected deployment env file must be a regular file")
+              if metadata.st_nlink != 1:
+                  raise SystemExit("protected deployment env file must have exactly one link")
+              if metadata.st_size > maximum_protected_env_bytes:
+                  raise SystemExit("protected deployment env file exceeds the size limit")
+              if stat.S_IMODE(metadata.st_mode) & 0o077:
+                  raise SystemExit("protected deployment env file must not be group/world accessible")
+
+          def path_metadata():
+              try:
+                  metadata = os.stat(env_path, follow_symlinks=False)
+              except FileNotFoundError:
+                  raise SystemExit("protected deployment env file is missing") from None
+              except OSError:
+                  raise SystemExit("protected deployment env file metadata cannot be read safely") from None
+              validate_metadata(metadata)
+              return metadata
+
+          def read_opened_file(descriptor):
+              os.lseek(descriptor, 0, os.SEEK_SET)
+              chunks = []
+              total = 0
+              while True:
+                  try:
+                      chunk = os.read(descriptor, 64 * 1024)
+                  except InterruptedError:
+                      continue
+                  if not chunk:
+                      return b"".join(chunks)
+                  total += len(chunk)
+                  if total > maximum_protected_env_bytes:
+                      raise SystemExit("protected deployment env file exceeds the size limit")
+                  chunks.append(chunk)
+
+          flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
+          try:
+              descriptor = os.open(env_path, flags)
+          except FileNotFoundError:
+              raise SystemExit("protected deployment env file is missing") from None
+          except OSError as error:
+              if error.errno == errno.ELOOP:
+                  raise SystemExit("protected deployment env file must not be a symlink") from None
+              raise SystemExit("protected deployment env file cannot be opened safely") from None
+
+          try:
+              opened = os.fstat(descriptor)
+              validate_metadata(opened)
+              before_path = path_metadata()
+              if (opened.st_dev, opened.st_ino) != (before_path.st_dev, before_path.st_ino):
+                  raise SystemExit("protected deployment env path does not identify the opened file")
+              if metadata_fingerprint(opened) != metadata_fingerprint(before_path):
+                  raise SystemExit("protected deployment env metadata changed before validation")
+
+              first_content = read_opened_file(descriptor)
+              between_reads = os.fstat(descriptor)
+              second_content = read_opened_file(descriptor)
+              after_opened = os.fstat(descriptor)
+              after_path = path_metadata()
+              expected_metadata = metadata_fingerprint(opened)
+              if (
+                  metadata_fingerprint(between_reads) != expected_metadata
+                  or metadata_fingerprint(after_opened) != expected_metadata
+                  or metadata_fingerprint(after_path) != expected_metadata
+                  or first_content != second_content
+                  or len(first_content) != opened.st_size
+              ):
+                  raise SystemExit("protected deployment env file changed during validation")
+          finally:
+              os.close(descriptor)
+
+          if first_content.startswith(b"\xef\xbb\xbf") or b"\x00" in first_content:
+              raise SystemExit("protected deployment env file must not contain a UTF-8 BOM or NUL")
+          try:
+              content = first_content.decode("utf-8")
+          except UnicodeDecodeError:
+              raise SystemExit("protected deployment env file must be valid UTF-8") from None
 
           names = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
           values = {}
-          for number, raw in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+          for number, raw in enumerate(content.splitlines(), 1):
               if not raw.strip() or raw.lstrip().startswith("#"):
                   continue
               name, separator, value = raw.partition("=")
@@ -372,6 +484,12 @@ jobs:
               value = values[name]
               if "change-me" in value.lower() or "placeholder" in value.lower():
                   raise SystemExit(f"protected deployment variable {name} contains a placeholder")
+
+          proxy_mode = values["BOLT_SYNTHETIC_PROXY_MODE"]
+          if proxy_mode != "direct-kestrel":
+              raise SystemExit("BOLT_SYNTHETIC_PROXY_MODE must be exactly direct-kestrel for Phase 0 promotion")
+          if "BOLT_SYNTHETIC_PROXY_LOG_PATHS" in values:
+              raise SystemExit("BOLT_SYNTHETIC_PROXY_LOG_PATHS must be absent in direct-kestrel mode")
           PY
           REMOTE_SCRIPT
 
@@ -799,6 +917,11 @@ jobs:
 
       - name: Authorize digest-pinned deployment manifest
         shell: bash
+        env:
+          PUBLICATION_TOPOLOGY_ATTESTATION: ${{ inputs.publication_topology_confirmation }}
+          PUBLICATION_TOPOLOGY_ATTESTED_BY: ${{ github.actor }}
+          PUBLICATION_TOPOLOGY_ATTESTED_BY_ID: ${{ github.actor_id }}
+          PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
@@ -837,6 +960,7 @@ jobs:
             --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
             --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
             --expected-published-port "$BOLT_HUB_EXPOSE_PORT" \
+            --expected-public-hostname "$BOLT_HUB_PUBLIC_HOSTNAME" \
             --expected-identityserver-ca-path "$IDENTITYSERVER_TLS_CA_PATH" \
             --expected-identityserver-fullchain-path "$IDENTITYSERVER_TLS_FULLCHAIN_PATH" \
             --expected-identityserver-private-key-path "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH" \
@@ -845,6 +969,12 @@ jobs:
             --expected-identityserver-token-path "$IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH" \
             --pins-file "$pins_file" \
             --provenance-file "$provenance_file" \
+            --publication-topology-attestation "$PUBLICATION_TOPOLOGY_ATTESTATION" \
+            --publication-topology-attested-by "$PUBLICATION_TOPOLOGY_ATTESTED_BY" \
+            --publication-topology-attested-by-id "$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID" \
+            --publication-topology-triggering-actor "$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR" \
+            --publication-topology-run-id "$GITHUB_RUN_ID" \
+            --publication-topology-run-attempt "$GITHUB_RUN_ATTEMPT" \
             "${authorize_args[@]}" \
             --authorize-deployment
 
@@ -857,7 +987,7 @@ jobs:
             "chmod 600 '$REMOTE_COMPOSE_FILE' '$remote_override' '$remote_pins' '$REMOTE_RUN_DIR/provenance-evidence.json' && rm -f '$remote_evidence'"
 
           service_args="$(printf '%q ' "${services[@]}")"
-          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' CREDENTIAL_GENERATION_ID='phase0-prelease-validation-g1' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' COMPOSE_VERIFIER='$REMOTE_DEPLOY_DIR/verify-bolt-phase0-compose.py' REMOTE_OVERRIDE='$remote_override' REMOTE_PINS='$remote_pins' REMOTE_PROVENANCE='$REMOTE_RUN_DIR/provenance-evidence.json' REMOTE_EVIDENCE='$remote_evidence' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' BOLT_HUB_EXPOSE_PORT='$BOLT_HUB_EXPOSE_PORT'"
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' CREDENTIAL_GENERATION_ID='phase0-prelease-validation-g1' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' COMPOSE_VERIFIER='$REMOTE_DEPLOY_DIR/verify-bolt-phase0-compose.py' REMOTE_OVERRIDE='$remote_override' REMOTE_PINS='$remote_pins' REMOTE_PROVENANCE='$REMOTE_RUN_DIR/provenance-evidence.json' REMOTE_EVIDENCE='$remote_evidence' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' PUBLICATION_TOPOLOGY_ATTESTATION='$PUBLICATION_TOPOLOGY_ATTESTATION' PUBLICATION_TOPOLOGY_ATTESTED_BY='$PUBLICATION_TOPOLOGY_ATTESTED_BY' PUBLICATION_TOPOLOGY_ATTESTED_BY_ID='$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID' PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR='$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR' PUBLICATION_TOPOLOGY_RUN_ID='$GITHUB_RUN_ID' PUBLICATION_TOPOLOGY_RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
           status=0
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "$remote_env bash -s -- $service_args" <<'REMOTE_SCRIPT' || status=$?
@@ -867,6 +997,7 @@ jobs:
           fullchain_path="$(read_env BOLT_HUB_TLS_FULLCHAIN_PATH)"
           private_key_path="$(read_env BOLT_HUB_TLS_PRIVATE_KEY_PATH)"
           published_port="$(read_env BOLT_HUB_EXPOSE_PORT)"
+          public_hostname="$(read_env BOLT_HUB_PUBLIC_HOSTNAME)"
           identity_ca_path="$(read_env IDENTITYSERVER_TLS_CA_PATH)"
           identity_fullchain_path="$(read_env IDENTITYSERVER_TLS_FULLCHAIN_PATH)"
           identity_private_key_path="$(read_env IDENTITYSERVER_TLS_PRIVATE_KEY_PATH)"
@@ -884,6 +1015,7 @@ jobs:
             --expected-fullchain-path "$fullchain_path" \
             --expected-private-key-path "$private_key_path" \
             --expected-published-port "$published_port" \
+            --expected-public-hostname "$public_hostname" \
             --expected-identityserver-ca-path "$identity_ca_path" \
             --expected-identityserver-fullchain-path "$identity_fullchain_path" \
             --expected-identityserver-private-key-path "$identity_private_key_path" \
@@ -892,11 +1024,22 @@ jobs:
             --expected-identityserver-token-path "$identity_token_path" \
             --pins-file "$REMOTE_PINS" \
             --provenance-file "$REMOTE_PROVENANCE" \
+            --publication-topology-attestation "$PUBLICATION_TOPOLOGY_ATTESTATION" \
+            --publication-topology-attested-by "$PUBLICATION_TOPOLOGY_ATTESTED_BY" \
+            --publication-topology-attested-by-id "$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID" \
+            --publication-topology-triggering-actor "$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR" \
+            --publication-topology-run-id "$PUBLICATION_TOPOLOGY_RUN_ID" \
+            --publication-topology-run-attempt "$PUBLICATION_TOPOLOGY_RUN_ATTEMPT" \
             "${authorize_args[@]}" \
             --authorize-deployment
           REMOTE_SCRIPT
-          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
-            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json" || true
+          if [ "$status" -eq 0 ]; then
+            scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+              "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json"
+          else
+            scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+              "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json" || true
+          fi
           exit "$status"
 
       - name: Pull candidate images without mutating services

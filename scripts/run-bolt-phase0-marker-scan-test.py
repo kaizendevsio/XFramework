@@ -21,6 +21,7 @@ from unittest import mock
 
 
 SCRIPT = Path(__file__).with_name("run-bolt-phase0-marker-scan.py")
+WRAPPER = Path(__file__).with_name("run-bolt-phase0-synthetics.sh")
 SPEC = importlib.util.spec_from_file_location("bolt_phase0_marker_scan", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("marker scan module unavailable")
@@ -111,13 +112,27 @@ class Workspace:
     def write_manifest(self) -> None:
         private_write(self.manifest, json.dumps(self.manifest_document, separators=(",", ":")))
 
-    def write_env(self, extra: str = "") -> None:
+    def write_env(
+        self,
+        extra: str = "",
+        *,
+        proxy_mode: str | None = "logs",
+        include_proxy_paths: bool = True,
+        proxy_paths_value: str | None = None,
+    ) -> None:
         values = {
-            "BOLT_SYNTHETIC_PROXY_LOG_PATHS": f"{self.proxy_one.as_posix()},{self.proxy_two.as_posix()}",
             "BOLT_SYNTHETIC_SEQ_API_URL": "http://127.0.0.1:5342/api/events",
             "BOLT_SYNTHETIC_SEQ_API_KEY": API_KEY,
             "BOLT_SYNTHETIC_JAEGER_QUERY_API_URL": "http://127.0.0.1:16686/api",
         }
+        if proxy_mode is not None:
+            values["BOLT_SYNTHETIC_PROXY_MODE"] = proxy_mode
+        if include_proxy_paths:
+            values["BOLT_SYNTHETIC_PROXY_LOG_PATHS"] = (
+                f"{self.proxy_one.as_posix()},{self.proxy_two.as_posix()}"
+                if proxy_paths_value is None
+                else proxy_paths_value
+            )
         content = "".join(f"{key}={value}\n" for key, value in values.items()) + extra
         private_write(self.env, content)
 
@@ -195,7 +210,71 @@ class MarkerScanTests(unittest.TestCase):
     def fixed_now(self) -> dt.datetime:
         return NOW
 
-    def assert_private_receipt(self, workspace: Workspace, kind: str) -> dict[str, Any]:
+    def wrapper_validator_source(self) -> str:
+        wrapper = WRAPPER.read_text(encoding="utf-8")
+        start_marker = (
+            '  python3 - "$receipt" "$kind" "$probe_started_epoch" '
+            '"$token_manifest" "$proxy_mode" <<\'PY\'\n'
+        )
+        end_marker = "\nPY\n  last_probe_receipt=\"$receipt\""
+        start = wrapper.find(start_marker)
+        if start < 0:
+            self.fail("wrapper receipt validator start marker is unavailable")
+        start += len(start_marker)
+        end = wrapper.find(end_marker, start)
+        if end < 0:
+            self.fail("wrapper receipt validator end marker is unavailable")
+        source = wrapper[start:end]
+        if not hasattr(os, "geteuid"):
+            source = source.replace(
+                "import sys\n",
+                (
+                    "import sys\n"
+                    "os.geteuid = lambda: os.stat(sys.argv[1]).st_uid\n"
+                    "stat.S_IRWXG = stat.S_IRWXO = 0\n"
+                ),
+                1,
+            )
+        return source
+
+    def run_wrapper_validator(
+        self,
+        workspace: Workspace,
+        proxy_mode: str,
+        assertions: dict[str, Any],
+    ) -> subprocess.CompletedProcess[str]:
+        now = dt.datetime.now(dt.timezone.utc)
+        receipt = {
+            "schemaVersion": "bolt-phase0-probe-receipt/v1",
+            "probe": "proxy-marker-scan",
+            "status": "passed",
+            "startedAtUtc": now.isoformat().replace("+00:00", "Z"),
+            "completedAtUtc": now.isoformat().replace("+00:00", "Z"),
+            "assertions": assertions,
+        }
+        private_write(workspace.receipt, json.dumps(receipt, separators=(",", ":")))
+        return subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                self.wrapper_validator_source(),
+                str(workspace.receipt),
+                "proxy-marker-scan",
+                str(int(now.timestamp()) - 1),
+                str(workspace.manifest),
+                proxy_mode,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def assert_private_receipt(
+        self,
+        workspace: Workspace,
+        kind: str,
+        expected_assertions: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         receipt = json.loads(workspace.receipt.read_text(encoding="utf-8"))
         self.assertEqual(
             {"schemaVersion", "probe", "status", "startedAtUtc", "completedAtUtc", "assertions"},
@@ -206,15 +285,13 @@ class MarkerScanTests(unittest.TestCase):
         self.assertEqual("passed", receipt["status"])
         self.assertEqual("2026-07-13T08:30:00Z", receipt["startedAtUtc"])
         self.assertEqual("2026-07-13T08:30:00Z", receipt["completedAtUtc"])
-        self.assertEqual(
-            {
-                "retainedStoreQueried": True,
-                "matches": 0,
-                "tokensSearched": len(workspace.tokens),
-                "markersSearched": len(workspace.tokens),
-            },
-            receipt["assertions"],
-        )
+        expected = expected_assertions or {
+            "retainedStoreQueried": True,
+            "matches": 0,
+            "tokensSearched": len(workspace.tokens),
+            "markersSearched": len(workspace.markers),
+        }
+        self.assertEqual(expected, receipt["assertions"])
         if scan.ENFORCE_POSIX_PERMISSIONS:
             self.assertEqual(0, stat.S_IMODE(workspace.receipt.stat().st_mode) & 0o077)
         return receipt
@@ -242,6 +319,110 @@ class MarkerScanTests(unittest.TestCase):
                 receipt_text = json.dumps(receipt)
                 for secret in [API_KEY, *workspace.markers, *(token.decode("ascii") for token in workspace.tokens)]:
                     self.assertNotIn(secret, receipt_text)
+
+    def test_direct_kestrel_mode_skips_log_scanning_and_writes_exact_receipt(self) -> None:
+        expected_assertions = {
+            "retainedStoreQueried": False,
+            "notApplicableReason": "direct-kestrel-publication",
+            "matches": 0,
+            "tokensSearched": 2,
+            "markersSearched": 2,
+        }
+        for path_configuration in ("absent", "empty"):
+            with self.subTest(path_configuration=path_configuration), tempfile.TemporaryDirectory() as temporary:
+                workspace = Workspace(Path(temporary))
+                workspace.write_env(
+                    proxy_mode="direct-kestrel",
+                    include_proxy_paths=path_configuration == "empty",
+                    proxy_paths_value="",
+                )
+                with mock.patch.object(scan, "scan_proxy_logs") as proxy_scan:
+                    result = scan.run_hook(
+                        workspace.environ("proxy-marker-scan"),
+                        now_factory=self.fixed_now,
+                    )
+                self.assertEqual(0, result)
+                proxy_scan.assert_not_called()
+                receipt = self.assert_private_receipt(
+                    workspace,
+                    "proxy-marker-scan",
+                    expected_assertions,
+                )
+                receipt_text = json.dumps(receipt)
+                secrets = [
+                    API_KEY,
+                    workspace.proxy_one.as_posix(),
+                    workspace.proxy_two.as_posix(),
+                    *workspace.markers,
+                    *(token.decode("ascii") for token in workspace.tokens),
+                ]
+                for secret in secrets:
+                    self.assertNotIn(secret, receipt_text)
+
+    def test_proxy_mode_and_log_path_combinations_fail_closed(self) -> None:
+        cases = {
+            "unknown-mode": {"proxy_mode": "unknown"},
+            "case-variant": {"proxy_mode": "LOGS"},
+            "missing-mode": {"proxy_mode": None},
+            "paths-present-in-direct-mode": {"proxy_mode": "direct-kestrel"},
+            "paths-absent-in-logs-mode": {"proxy_mode": "logs", "include_proxy_paths": False},
+            "paths-empty-in-logs-mode": {
+                "proxy_mode": "logs",
+                "include_proxy_paths": True,
+                "proxy_paths_value": "",
+            },
+        }
+        for name, configuration in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                workspace = Workspace(Path(temporary))
+                workspace.write_env(**configuration)
+                self.assertEqual(
+                    1,
+                    scan.run_hook(
+                        workspace.environ("proxy-marker-scan"),
+                        now_factory=self.fixed_now,
+                    ),
+                )
+                self.assertFalse(workspace.receipt.exists())
+
+    def test_wrapper_validator_accepts_only_the_mode_specific_proxy_assertion_union(self) -> None:
+        logs_assertions = {
+            "retainedStoreQueried": True,
+            "matches": 0,
+            "tokensSearched": 2,
+            "markersSearched": 2,
+        }
+        direct_assertions = {
+            "retainedStoreQueried": False,
+            "notApplicableReason": "direct-kestrel-publication",
+            "matches": 0,
+            "tokensSearched": 2,
+            "markersSearched": 2,
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Workspace(Path(temporary))
+            logs_success = self.run_wrapper_validator(workspace, "logs", logs_assertions)
+            logs_rejects_direct = self.run_wrapper_validator(workspace, "logs", direct_assertions)
+            direct_success = self.run_wrapper_validator(workspace, "direct-kestrel", direct_assertions)
+            direct_rejects_logs = self.run_wrapper_validator(workspace, "direct-kestrel", logs_assertions)
+            unknown_rejected = self.run_wrapper_validator(workspace, "unknown", logs_assertions)
+
+            self.assertEqual(0, logs_success.returncode)
+            self.assertEqual(1, logs_rejects_direct.returncode)
+            self.assertEqual(0, direct_success.returncode)
+            self.assertEqual(1, direct_rejects_logs.returncode)
+            self.assertEqual(1, unknown_rejected.returncode)
+            for result in (
+                logs_success,
+                logs_rejects_direct,
+                direct_success,
+                direct_rejects_logs,
+                unknown_rejected,
+            ):
+                self.assertEqual("", result.stdout)
+                output = result.stdout + result.stderr
+                for secret in [*workspace.markers, *(token.decode("ascii") for token in workspace.tokens)]:
+                    self.assertNotIn(secret, output)
 
     def test_proxy_detects_exact_token_and_boundary_spanning_jti_but_allows_near_matches(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

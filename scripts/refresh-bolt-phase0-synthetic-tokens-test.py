@@ -101,33 +101,21 @@ def user_claims(now: int, jti: str, **overrides: Any) -> dict[str, Any]:
     return claims
 
 
-def result(data: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "data": data,
-        "isSuccess": True,
-        "message": None,
-        "statusCode": 200,
-        "errors": None,
-    }
-
-
-def service_result(claims: dict[str, Any]) -> dict[str, Any]:
+def service_response(claims: dict[str, Any]) -> dict[str, Any]:
     expiration = refresh._format_expiration(claims["exp"])
-    return result({"accessToken": jwt(claims), "tokenType": "Bearer", "expiresAtUtc": expiration})
+    return {"accessToken": jwt(claims), "tokenType": "Bearer", "expiresAtUtc": expiration}
 
 
-def user_result(claims: dict[str, Any]) -> dict[str, Any]:
-    return result(
-        {
-            "identity": {"id": "44444444-4444-4444-8444-444444444444", "tenantId": TENANT_ID},
-            "credential": {"id": CREDENTIAL_ID, "tenantId": TENANT_ID, "userName": USERNAME},
-            "accessToken": jwt(claims),
-            "tokenType": "Bearer",
-            "expiresIn": 900,
-            "refreshToken": "refresh-secret-that-is-never-retained",
-            "sessionId": "55555555-5555-4555-8555-555555555555",
-        }
-    )
+def user_response(claims: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "identity": {"id": "44444444-4444-4444-8444-444444444444", "tenantId": TENANT_ID},
+        "credential": {"id": CREDENTIAL_ID, "tenantId": TENANT_ID, "userName": USERNAME},
+        "accessToken": jwt(claims),
+        "tokenType": "Bearer",
+        "expiresIn": 900,
+        "refreshToken": "refresh-secret-that-is-never-retained",
+        "sessionId": "55555555-5555-4555-8555-555555555555",
+    }
 
 
 class FakeResponse:
@@ -275,7 +263,7 @@ class RefreshTokenHookTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Workspace(Path(temporary))
             config = workspace.config()
-            factory = ConnectionFactory([FakeResponse(service_result(service_claims(now, uuid.uuid4().hex)))])
+            factory = ConnectionFactory([FakeResponse(service_response(service_claims(now, uuid.uuid4().hex)))])
             observed_ca: list[str] = []
 
             def context_factory(ca_path: str) -> FakeContext:
@@ -316,22 +304,64 @@ class RefreshTokenHookTests(unittest.TestCase):
                             context_factory=lambda _: FakeContext(),
                         )
 
-    def test_result_envelope_is_exact(self) -> None:
+    def test_bare_response_schemas_require_exact_key_sets(self) -> None:
         now = int(time.time())
         with tempfile.TemporaryDirectory() as temporary:
             config = Workspace(Path(temporary)).config()
-            valid = service_result(service_claims(now, uuid.uuid4().hex))
-            malformed = [
-                {**valid, "unexpected": True},
-                {**valid, "isSuccess": False},
-                {**valid, "statusCode": 201},
-                {**valid, "errors": {}},
-                {**valid, "data": {**valid["data"], "unexpected": True}},
-            ]
-            for document in malformed:
-                with self.subTest(document=document):
+            service = service_response(service_claims(now, uuid.uuid4().hex))
+            user = user_response(user_claims(now, str(uuid.uuid4())))
+
+            for name, document in {
+                "service-extra": {**service, "unexpected": True},
+                "service-missing": {key: value for key, value in service.items() if key != "tokenType"},
+            }.items():
+                with self.subTest(name=name):
                     with self.assertRaises(refresh.RefreshError):
                         refresh._parse_service_token(document, config, now=now, expiry=False)
+
+            for name, document in {
+                "user-extra": {**user, "unexpected": True},
+                "user-missing": {key: value for key, value in user.items() if key != "sessionId"},
+            }.items():
+                with self.subTest(name=name):
+                    with self.assertRaises(refresh.RefreshError):
+                        refresh._parse_user_token(document, config, now=now)
+
+    def test_user_response_fields_are_semantically_validated(self) -> None:
+        now = int(time.time())
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Workspace(Path(temporary)).config()
+            valid = user_response(user_claims(now, str(uuid.uuid4())))
+            cases = {
+                "token-type": {**valid, "tokenType": "bearer"},
+                "expires-bool": {**valid, "expiresIn": True},
+                "expires-zero": {**valid, "expiresIn": 0},
+                "expires-mismatch": {**valid, "expiresIn": 1},
+                "refresh-empty": {**valid, "refreshToken": ""},
+                "refresh-whitespace": {**valid, "refreshToken": "contains whitespace"},
+                "session-invalid": {**valid, "sessionId": "not-a-guid"},
+                "session-empty": {**valid, "sessionId": "00000000-0000-0000-0000-000000000000"},
+            }
+            for name, document in cases.items():
+                with self.subTest(name=name), self.assertRaisesRegex(
+                    refresh.RefreshError, "RESPONSE_SCHEMA"
+                ):
+                    refresh._parse_user_token(document, config, now=now)
+
+    def test_legacy_result_envelope_is_rejected(self) -> None:
+        now = int(time.time())
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Workspace(Path(temporary)).config()
+            legacy_envelope = {
+                "data": service_response(service_claims(now, uuid.uuid4().hex)),
+                "isSuccess": True,
+                "message": None,
+                "statusCode": 200,
+                "errors": None,
+            }
+
+            with self.assertRaisesRegex(refresh.RefreshError, "RESPONSE_SCHEMA"):
+                refresh._parse_service_token(legacy_envelope, config, now=now, expiry=False)
 
     def test_malformed_and_mismatched_tokens_are_rejected(self) -> None:
         now = int(time.time())
@@ -339,22 +369,19 @@ class RefreshTokenHookTests(unittest.TestCase):
             config = Workspace(Path(temporary)).config()
             cases = {
                 "shape": {"accessToken": "not-a-jwt", "tokenType": "Bearer", "expiresAtUtc": refresh._format_expiration(now + 120)},
-                "generation": service_result(service_claims(now, uuid.uuid4().hex)),
-                "identity": service_result(service_claims(now, uuid.uuid4().hex, service="XFramework.Portal")),
-                "issuer": service_result(service_claims(now, uuid.uuid4().hex, iss="https://wrong.test")),
-                "audience": service_result(service_claims(now, uuid.uuid4().hex, aud="wrong")),
-                "expired": service_result(service_claims(now, uuid.uuid4().hex, exp=now - 1)),
-                "future-nbf": service_result(service_claims(now, uuid.uuid4().hex, nbf=now + 120)),
+                "generation": service_response(service_claims(now, uuid.uuid4().hex)),
+                "identity": service_response(service_claims(now, uuid.uuid4().hex, service="XFramework.Portal")),
+                "issuer": service_response(service_claims(now, uuid.uuid4().hex, iss="https://wrong.test")),
+                "audience": service_response(service_claims(now, uuid.uuid4().hex, aud="wrong")),
+                "expired": service_response(service_claims(now, uuid.uuid4().hex, exp=now - 1)),
+                "future-nbf": service_response(service_claims(now, uuid.uuid4().hex, nbf=now + 120)),
             }
-            cases["shape"] = result(cases["shape"])
             generation_claims = service_claims(now, uuid.uuid4().hex, credential_generation="wrong-generation")
-            cases["generation"] = result(
-                {
-                    "accessToken": jwt(generation_claims, generation="wrong-generation"),
-                    "tokenType": "Bearer",
-                    "expiresAtUtc": refresh._format_expiration(generation_claims["exp"]),
-                }
-            )
+            cases["generation"] = {
+                "accessToken": jwt(generation_claims, generation="wrong-generation"),
+                "tokenType": "Bearer",
+                "expiresAtUtc": refresh._format_expiration(generation_claims["exp"]),
+            }
             for name, document in cases.items():
                 with self.subTest(name=name):
                     with self.assertRaises(refresh.RefreshError):
@@ -364,9 +391,9 @@ class RefreshTokenHookTests(unittest.TestCase):
         now = int(time.time())
         with tempfile.TemporaryDirectory() as temporary:
             config = Workspace(Path(temporary)).config()
-            wrong_claim = user_result(user_claims(now, uuid.uuid4().hex, credential_id=ROLE_ID))
-            wrong_response = user_result(user_claims(now, uuid.uuid4().hex))
-            wrong_response["data"]["credential"]["tenantId"] = ROLE_ID
+            wrong_claim = user_response(user_claims(now, uuid.uuid4().hex, credential_id=ROLE_ID))
+            wrong_response = user_response(user_claims(now, uuid.uuid4().hex))
+            wrong_response["credential"]["tenantId"] = ROLE_ID
             for document in (wrong_claim, wrong_response):
                 with self.assertRaises(refresh.RefreshError):
                     refresh._parse_user_token(document, config, now=now)
@@ -431,9 +458,9 @@ class RefreshTokenHookTests(unittest.TestCase):
             workspace.write_env()
             factory = ConnectionFactory(
                 [
-                    FakeResponse(service_result(communications_claims)),
-                    FakeResponse(service_result(expiry_claims)),
-                    FakeResponse(user_result(current_user_claims)),
+                    FakeResponse(service_response(communications_claims)),
+                    FakeResponse(service_response(expiry_claims)),
+                    FakeResponse(user_response(current_user_claims)),
                 ]
             )
             stdout = io.StringIO()
@@ -485,9 +512,9 @@ class RefreshTokenHookTests(unittest.TestCase):
             workspace.write_env()
             factory = ConnectionFactory(
                 [
-                    FakeResponse(service_result(service_claims(now, uuid.uuid4().hex))),
-                    FakeResponse(service_result(service_claims(now, uuid.uuid4().hex, exp=now + 90))),
-                    FakeResponse(user_result(user_claims(now, str(uuid.uuid4())))),
+                    FakeResponse(service_response(service_claims(now, uuid.uuid4().hex))),
+                    FakeResponse(service_response(service_claims(now, uuid.uuid4().hex, exp=now + 90))),
+                    FakeResponse(user_response(user_claims(now, str(uuid.uuid4())))),
                 ]
             )
             refresh.execute(
