@@ -147,7 +147,7 @@ class RootBoundaryTests(unittest.TestCase):
     def setUp(self) -> None:
         temporary_parent = None
         if os.name == "posix":
-            temporary_parent = Path("/opt") if os.geteuid() == 0 else Path.home()
+            temporary_parent = Path("/var/lib") if os.geteuid() == 0 else Path.home()
         self.temporary = tempfile.TemporaryDirectory(
             dir=temporary_parent
         )
@@ -329,7 +329,7 @@ class RootBoundaryTests(unittest.TestCase):
         assert pwd is not None
         deployment_uid = int(os.environ.get("SUDO_UID", pwd.getpwnam("nobody").pw_uid))
         deployment_gid = int(os.environ.get("SUDO_GID", pwd.getpwuid(deployment_uid).pw_gid))
-        with tempfile.TemporaryDirectory(prefix="phase0-lock-", dir="/opt") as temporary:
+        with tempfile.TemporaryDirectory(prefix="phase0-lock-", dir="/var/lib") as temporary:
             root = Path(temporary)
             root.chmod(0o755)
             trust = directory(root / "trust", 0o755)

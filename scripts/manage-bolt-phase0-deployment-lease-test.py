@@ -128,7 +128,7 @@ class LeaseFixture(unittest.TestCase):
     def setUp(self) -> None:
         temporary_parent = None
         if os.name == "posix":
-            temporary_parent = Path("/opt") if os.geteuid() == 0 else Path.home()
+            temporary_parent = Path("/root") if os.geteuid() == 0 else Path.home()
         self.temporary = tempfile.TemporaryDirectory(
             dir=temporary_parent
         )

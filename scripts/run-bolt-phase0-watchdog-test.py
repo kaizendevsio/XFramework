@@ -216,7 +216,7 @@ class WatchdogContractTests(unittest.TestCase):
         )
         deployment_gid = int(os.environ.get("SUDO_GID", os.getgid()))
         deployment_group = grp.getgrgid(deployment_gid).gr_name
-        with tempfile.TemporaryDirectory(prefix="phase0-bootstrap-lock-", dir="/opt") as temporary:
+        with tempfile.TemporaryDirectory(prefix="phase0-bootstrap-lock-", dir="/root") as temporary:
             trust = Path(temporary) / "trust"
             Path(temporary).chmod(0o755)
             trust.mkdir(mode=0o755)
@@ -250,7 +250,7 @@ class WatchdogContractTests(unittest.TestCase):
         deployment_group = grp.getgrgid(deployment_gid).gr_name
         for attack in ("symlink", "hardlink", "owner", "group", "mode"):
             with self.subTest(attack=attack), tempfile.TemporaryDirectory(
-                prefix="phase0-bootstrap-lock-", dir="/opt"
+                prefix="phase0-bootstrap-lock-", dir="/root"
             ) as temporary:
                 root = Path(temporary)
                 root.chmod(0o755)
