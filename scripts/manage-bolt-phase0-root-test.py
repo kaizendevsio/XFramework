@@ -595,6 +595,27 @@ class RootBoundaryTests(unittest.TestCase):
                     self.boundary._validate_systemd()
                 self.runner.overrides.clear()
 
+    def test_restrict_address_families_accepts_systemd_canonical_order(self) -> None:
+        service = "xframework-bolt-phase0-watchdog.service"
+        self.runner.overrides[(service, "RestrictAddressFamilies")] = (
+            "AF_INET AF_INET6 AF_UNIX"
+        )
+
+        self.boundary._validate_systemd()
+
+    def test_restrict_address_families_rejects_membership_drift(self) -> None:
+        service = "xframework-bolt-phase0-watchdog.service"
+        for value in (
+            "AF_UNIX AF_INET",
+            "AF_UNIX AF_INET AF_INET6 AF_NETLINK",
+            "AF_UNIX AF_INET AF_INET",
+        ):
+            with self.subTest(value=value):
+                self.runner.overrides[(service, "RestrictAddressFamilies")] = value
+                with self.assertRaisesRegex(MODULE.RootBoundaryError, "systemd-contract"):
+                    self.boundary._validate_systemd()
+                self.runner.overrides.clear()
+
     def test_quarantine_replacement_attempt_never_becomes_lkg(self) -> None:
         candidate = directory(self.paths.run_root / "123-1", 0o700)
         file(candidate / "docker-compose.yml", 0o600, b"services: {}\n")
