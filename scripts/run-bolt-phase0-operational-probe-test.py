@@ -255,7 +255,7 @@ class OperationalProbeTests(unittest.TestCase):
                 **kwargs,
             )
 
-    def test_protected_env_is_parsed_by_shared_verifier_and_unsafe_input_fails(self) -> None:
+    def test_protected_env_keeps_opaque_values_inert_and_typed_values_strict(self) -> None:
         values, parser = MODULE.load_protected_env(
             str(self.env_file), Path(__file__).with_name("verify-bolt-phase0-env.py").resolve()
         )
@@ -263,10 +263,12 @@ class OperationalProbeTests(unittest.TestCase):
         self.assertTrue(callable(parser.typed_value))
 
         private_file(self.env_file, "UNSAFE=$(id)\n")
-        with self.assertRaises(MODULE.ProbeError):
-            MODULE.load_protected_env(
-                str(self.env_file), Path(__file__).with_name("verify-bolt-phase0-env.py").resolve()
-            )
+        values, parser = MODULE.load_protected_env(
+            str(self.env_file), Path(__file__).with_name("verify-bolt-phase0-env.py").resolve()
+        )
+        self.assertEqual({"UNSAFE": "$(id)"}, values)
+        with self.assertRaises(ValueError):
+            parser.typed_value("UNSAFE", values["UNSAFE"], "absolute-path")
 
     def test_plaintext_probe_uses_peer_container_without_bearer_and_writes_exact_receipt(self) -> None:
         docker = DockerHarness(self.root)
