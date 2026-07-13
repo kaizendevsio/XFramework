@@ -39,7 +39,7 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
       CHANNEL_TAG: develop
       DEPLOY_HOST: github-runner@xeon-dev
-      DEPLOY_SSH_KEY: /home/github-runner/.ssh/xframework_xeon_dev_ed25519
+      DEPLOY_SSH_KEY: /home/xeon/.ssh/xframework_xeon_dev_ed25519
       DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 1800
       REMOTE_DEPLOY_DIR: /home/github-runner/xframework-deploy
       REMOTE_RUN_DIR: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}
@@ -151,7 +151,7 @@ jobs:
           known_hosts="$ssh_dir/known_hosts"
           wrapper_dir="$ssh_dir/bin"
           source_known_hosts=".github/known_hosts/xeon-dev"
-          runner_home="/home/github-runner"
+          runner_home="/home/xeon"
           runner_ssh_dir="$runner_home/.ssh"
           expected_deploy_ssh_key="$runner_ssh_dir/xframework_xeon_dev_ed25519"
           runner_uid="$(id -u)"

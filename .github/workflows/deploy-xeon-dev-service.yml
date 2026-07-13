@@ -41,7 +41,7 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
       CHANNEL_TAG: develop
       DEPLOY_HOST: github-runner@xeon-dev
-      DEPLOY_SSH_KEY: /home/github-runner/.ssh/xframework_xeon_dev_ed25519
+      DEPLOY_SSH_KEY: /home/xeon/.ssh/xframework_xeon_dev_ed25519
       REMOTE_DEPLOY_DIR: /home/github-runner/xframework-deploy
       REMOTE_COMPOSE_FILE: /home/github-runner/xframework-deploy/docker-compose.yml
       XFRAMEWORK_ENV_FILE: /opt/xframework/xeon-dev.env
