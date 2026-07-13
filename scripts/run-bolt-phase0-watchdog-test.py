@@ -912,10 +912,11 @@ class WatchdogContractTests(unittest.TestCase):
     def test_workflows_use_runner_home_ssh_key_and_legacy_path_stays_disabled(self) -> None:
         active = WORKFLOW.read_text(encoding="utf-8")
         legacy = LEGACY_WORKFLOW.read_text(encoding="utf-8")
-        expected = "DEPLOY_SSH_KEY: /home/github-runner/.ssh/xframework_xeon_dev_ed25519"
+        expected = "DEPLOY_SSH_KEY: /home/xeon/.ssh/xframework_xeon_dev_ed25519"
         self.assertEqual(1, active.count(expected))
         self.assertEqual(1, legacy.count(expected))
-        self.assertNotIn("/home/xeon/.ssh", active)
+        self.assertNotIn("/home/github-runner/.ssh", active)
+        self.assertNotIn("/home/github-runner/.ssh", legacy)
         self.assertNotIn("ssh-keyscan", active)
         self.assertIn("if: ${{ false }}", legacy)
 
@@ -926,7 +927,7 @@ class WatchdogContractTests(unittest.TestCase):
             content.index("- name: Verify build runner, Docker, registry, and deploy host")
         ]
         for required in (
-            'runner_home="/home/github-runner"',
+            'runner_home="/home/xeon"',
             'runner_ssh_dir="$runner_home/.ssh"',
             'expected_deploy_ssh_key="$runner_ssh_dir/xframework_xeon_dev_ed25519"',
             'test "$DEPLOY_SSH_KEY" = "$expected_deploy_ssh_key"',

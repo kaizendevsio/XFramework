@@ -199,12 +199,20 @@ Phase 0 promotion accepts only `BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel`; `BOLT
 - The root-sealed recovery, forced failure recovery, systemd override rejection, indexed-scope bypass, bounded exact Redis ACK, send-loop retirement, large-RPC quota cleanup, and public health redaction regressions are covered.
 - Recovery regressions also cover strict future-heartbeat rejection, transient Docker inspection failure with a present container, exact proven container absence, daemon and empty-version failure, malformed inspection output, bounded stop/kill hangs, privileged bootstrap short reads and source races, root-owned lock replacement across the complete critical section, quarantine artifact replacement between validation and open, the exact systemd env-file write allowance, uninterrupted timer activation, explicit timer re-enablement in the pinned failure path, supervised synthetic heartbeats, and fsync-before-pointer ordering. Targeted pre-final reviews informed these regressions; a formal independent review bound to the exact final tested tree remains open because PR #352 merged without a GitHub review.
 
+## Live Rollout Retry - 2026-07-13 UTC
+
+- The corrected root bootstrap from PR #355 passed on xeon-dev with state `bootstrap-no-lkg-hub-stopped`; the watchdog is enabled and active, and Bolt Hub remains stopped with no deployment lease or LKG pointer.
+- First-attempt workflow run `29242059314` was bound to merge `aa36cff54182ac472652564dea41f5a5af07d97d` and failed before SSH wrapper creation or remote mutation. The active `xeon-dev-deploy` runner is on `xeon-buildserver01` and runs as local user `xeon`, while the workflow incorrectly required local user `github-runner` and `/home/github-runner/.ssh/xframework_xeon_dev_ed25519`.
+- The dedicated key already exists on the active runner as `xeon:xeon` mode `0600` at `/home/xeon/.ssh/xframework_xeon_dev_ed25519`; its parent `.ssh` directory is mode `0700`, it has one link, and the runner has Docker access. The correction binds the workflow to that actual local runner identity while preserving remote SSH user `github-runner`, the checked-in host key, descriptor identity checks, and bounded `ssh`/`scp` wrappers.
+
 ## Rollout Readiness Findings
 
 - **High - Synthetic token refresh expected the wrong HTTP response shape.** Generated IdentityServer HTTP adapters return exact bare DTOs, while the refresh hook expected a `Result` envelope. The mismatch would fail live synthetics before Bolt requests executed. The local worktree now validates exact bare user-token and service-token schemas and field semantics, rejects legacy envelopes and extra or missing fields, populates the generated authentication response contract, and covers the generated HTTP adapters. This fix is not yet merged, CI-validated on the target branch, or deployed.
 - **High - Direct Kestrel publication lacked an explicit proxy-proof N/A contract.** The retained proxy-log gate required paths even though xeon-dev publishes Kestrel directly, creating pressure to provide a non-evidentiary empty source. The local worktree now makes only `direct-kestrel` promotion-eligible, requires proxy log paths to be absent, rejects workflow reruns, and binds a fresh no-intermediary operator attestation to the stable actor ID, matching triggering actor, first attempt, run, commit, public hostname, active host-interface/DNS match, Compose publication, TLS port, qualification, root activation, recovery, and watchdog. This uses the existing trusted self-hosted runner threat model; distrusting that runner would require GitHub OIDC-signed authorization. The utility `logs` mode cannot qualify because its current synthetic target bypasses a proxy. The correction is not merged, CI-validated on the target branch, or deployed.
 
-## xeon-dev Readiness Audit - 2026-07-13
+## Historical xeon-dev Readiness Audit - 2026-07-13
+
+This pre-bootstrap snapshot is retained for audit history and is superseded by the live rollout retry section above.
 
 The post-merge readiness remains `NO-GO`. The prerequisite repairs below changed protected host state, but no container was stopped, restarted, or replaced.
 
