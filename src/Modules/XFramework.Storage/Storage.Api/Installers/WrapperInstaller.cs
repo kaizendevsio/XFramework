@@ -10,6 +10,6 @@ public sealed class WrapperInstaller : IInstaller
         IConfiguration configuration,
         IHostEnvironment hostEnvironment)
     {
-        services.AddXFrameworkBoltClient(configuration);
+        services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
     }
 }

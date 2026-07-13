@@ -106,7 +106,8 @@ public class BoltRpcReadinessTests
 
         Func<Task> enqueueWhenFull = async () => await connection.SendAsync(new byte[20], CancellationToken.None).AsTask();
 
-        await enqueueWhenFull.Should().ThrowAsync<OperationCanceledException>();
+        await enqueueWhenFull.Should().ThrowAsync<BoltSendEnqueueTimeoutException>()
+            .WithMessage("*enqueue timed out*");
         connection.PendingBytes.Should().Be(10);
         connection.CompleteSendChannel();
     }
@@ -144,6 +145,94 @@ public class BoltRpcReadinessTests
         await enqueueWhenFull.Should().ThrowAsync<OperationCanceledException>();
         connection.PendingSends.Should().Be(1);
         connection.CompleteSendChannel();
+    }
+
+    [Test]
+    public async Task GetHealthSnapshot_AfterConnectionRemoval_RetainsPhaseZeroFailureWatermarks()
+    {
+        await using var client = new BoltClient(
+            new Uri($"ws://localhost:{_port}/bolt"),
+            "watermark_caller",
+            "WatermarkCaller",
+            new BoltClientOptions { SendEnqueueTimeoutMs = 25 },
+            _loggerFactory.CreateLogger<BoltClient>());
+
+        var enqueueTimeoutConnection = new BoltConnection(
+            new NoopBoltConnection(),
+            sendQueueCapacity: 1,
+            sendEnqueueTimeoutMs: 25);
+        ObserveClientConnection(client, enqueueTimeoutConnection);
+        await enqueueTimeoutConnection.SendAsync(new byte[] { 1 }, CancellationToken.None);
+        Func<Task> enqueueTimeout = async () =>
+            await enqueueTimeoutConnection.SendAsync(new byte[] { 2 }, CancellationToken.None);
+        await enqueueTimeout.Should().ThrowAsync<OperationCanceledException>();
+        enqueueTimeoutConnection.StartSendLoop(CancellationToken.None);
+        enqueueTimeoutConnection.CompleteSendChannel();
+        await enqueueTimeoutConnection.SendLoop!.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var sendTimeoutConnection = new BoltConnection(
+            new CancellationAwareBlockingSendBoltConnection(),
+            sendQueueCapacity: 1,
+            sendEnqueueTimeoutMs: 25);
+        ObserveClientConnection(client, sendTimeoutConnection);
+        using var sendTimeoutCts = new CancellationTokenSource();
+        sendTimeoutConnection.StartSendLoop(sendTimeoutCts.Token);
+        await sendTimeoutConnection.SendAsync(new byte[] { 3 }, CancellationToken.None);
+        await WaitForConditionAsync(() => client.GetHealthSnapshot().TotalSendTimeouts == 2, 2000);
+        sendTimeoutCts.Cancel();
+        sendTimeoutConnection.CompleteSendChannel();
+        await sendTimeoutConnection.SendLoop!.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var sendFailureConnection = new BoltConnection(new ThrowingSendBoltConnection());
+        ObserveClientConnection(client, sendFailureConnection);
+        using var sendFailureCts = new CancellationTokenSource();
+        sendFailureConnection.StartSendLoop(sendFailureCts.Token);
+        await sendFailureConnection.SendAsync(new byte[] { 4 }, CancellationToken.None);
+        await WaitForConditionAsync(() => client.GetHealthSnapshot().TotalSendFailures == 1);
+        sendFailureConnection.CompleteSendChannel();
+        await sendFailureConnection.SendLoop!.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var enqueueFailureConnection = new BoltConnection(new NoopBoltConnection());
+        ObserveClientConnection(client, enqueueFailureConnection);
+        enqueueFailureConnection.CompleteSendChannel();
+        Func<Task> enqueueFailure = async () =>
+            await enqueueFailureConnection.SendAsync(new byte[] { 5 }, CancellationToken.None);
+        await enqueueFailure.Should().ThrowAsync<InvalidOperationException>();
+
+        var loopConnection = new BoltConnection(new NoopBoltConnection());
+        ObserveClientConnection(client, loopConnection);
+        typeof(BoltConnection)
+            .GetMethod("RecordReceiveLoopFault", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(loopConnection, null);
+        typeof(BoltConnection)
+            .GetMethod("RecordUnexpectedDisconnect", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(loopConnection, null);
+
+        var snapshot = client.GetHealthSnapshot();
+        snapshot.ConnectionCount.Should().Be(0);
+        snapshot.TotalSendFailures.Should().Be(2);
+        snapshot.TotalSendTimeouts.Should().Be(2);
+        snapshot.TotalReceiveLoopFaults.Should().Be(1);
+        snapshot.TotalUnexpectedDisconnects.Should().Be(1);
+        snapshot.TotalSuccessfulReconnects.Should().Be(0);
+    }
+
+    [Test]
+    public async Task GetHealthSnapshot_AfterSuccessfulReconnect_RetainsReconnectWatermark()
+    {
+        await using var client = CreateClient("reconnect_watermark", "ReconnectWatermark");
+        var reconnect = typeof(BoltClient)
+            .GetMethod("ReconnectAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        await (Task)reconnect.Invoke(client, null)!;
+
+        var snapshot = client.GetHealthSnapshot();
+        snapshot.IsHealthy.Should().BeTrue();
+        snapshot.TotalSuccessfulReconnects.Should().Be(1);
+        snapshot.TotalSendFailures.Should().Be(0);
+        snapshot.TotalSendTimeouts.Should().Be(0);
+        snapshot.TotalReceiveLoopFaults.Should().Be(0);
+        snapshot.TotalUnexpectedDisconnects.Should().Be(0);
     }
 
     [Test]
@@ -224,6 +313,11 @@ public class BoltRpcReadinessTests
         new(new Uri($"ws://localhost:{_port}/bolt"), id, name,
             new BoltClientOptions { RpcTimeoutSeconds = 5 }, _loggerFactory.CreateLogger<BoltClient>());
 
+    private static void ObserveClientConnection(BoltClient client, BoltConnection connection) =>
+        typeof(BoltClient)
+            .GetMethod("ObserveConnection", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(client, [connection]);
+
     private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
     {
         using var client = new HttpClient();
@@ -284,5 +378,17 @@ public class BoltRpcReadinessTests
             new(_sendGate.Task);
 
         public void Release() => _sendGate.TrySetResult();
+    }
+
+    private sealed class CancellationAwareBlockingSendBoltConnection : NoopBoltConnection
+    {
+        public override ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+            new(Task.Delay(Timeout.InfiniteTimeSpan, ct));
+    }
+
+    private sealed class ThrowingSendBoltConnection : NoopBoltConnection
+    {
+        public override ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+            ValueTask.FromException(new IOException("transport send failed"));
     }
 }

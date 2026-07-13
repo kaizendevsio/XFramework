@@ -67,6 +67,17 @@ public static class XFrameworkHealthCheckExtensions
             }
         });
 
+        endpoints.MapHealthChecks("/health/internal", new HealthCheckOptions
+        {
+            ResponseWriter = HealthCheckResponseWriter.WriteInternalResponse,
+            ResultStatusCodes =
+            {
+                [HealthStatus.Healthy] = StatusCodes.Status200OK,
+                [HealthStatus.Degraded] = StatusCodes.Status200OK,
+                [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+            }
+        });
+
         // Liveness probe - basic checks (is the app running?)
         endpoints.MapHealthChecks("/health/live", new HealthCheckOptions
         {

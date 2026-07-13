@@ -1,8 +1,7 @@
-using System.Text.Json;
 using BlazorBlueprint.Components;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using XFramework.Core.Extensions;
+using XFramework.Core.Health;
 using XFramework.Integration.Extensions;
 using XFramework.Operations.Dashboard.Components;
 using XFramework.Operations.Dashboard.Health;
@@ -27,7 +26,7 @@ builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
 builder.Services.Configure<OperationsDashboardOptions>(
     builder.Configuration.GetSection(OperationsDashboardOptions.SectionName));
 
-builder.Services.AddXFrameworkBoltClient(builder.Configuration);
+builder.Services.AddXFrameworkBoltClient(builder.Configuration, hostEnvironment: builder.Environment);
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Operations.Dashboard");
 
 builder.Services.AddScoped<OperationsRegistryClient>();
@@ -79,74 +78,10 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 
-app.MapHealthChecks("/health", new HealthCheckOptions
-{
-    ResponseWriter = WriteHealthResponse,
-    ResultStatusCodes =
-    {
-        [HealthStatus.Healthy] = StatusCodes.Status200OK,
-        [HealthStatus.Degraded] = StatusCodes.Status200OK,
-        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
-    }
-});
-
-app.MapHealthChecks("/health/live", new HealthCheckOptions
-{
-    Predicate = check => check.Tags.Contains("live"),
-    ResponseWriter = WriteHealthResponse,
-    ResultStatusCodes =
-    {
-        [HealthStatus.Healthy] = StatusCodes.Status200OK,
-        [HealthStatus.Degraded] = StatusCodes.Status200OK,
-        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
-    }
-});
-
-app.MapHealthChecks("/health/ready", new HealthCheckOptions
-{
-    Predicate = check => check.Tags.Contains("ready"),
-    ResponseWriter = WriteHealthResponse,
-    ResultStatusCodes =
-    {
-        [HealthStatus.Healthy] = StatusCodes.Status200OK,
-        [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
-        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
-    }
-});
+app.MapXFrameworkHealthChecks("XFramework.Operations.Dashboard");
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
-
-static async Task WriteHealthResponse(HttpContext context, HealthReport report)
-{
-    context.Response.ContentType = "application/json";
-
-    var response = new
-    {
-        status = report.Status.ToString(),
-        duration = report.TotalDuration.TotalMilliseconds,
-        timestamp = DateTime.UtcNow,
-        checks = report.Entries.Select(entry => new
-        {
-            name = entry.Key,
-            status = entry.Value.Status.ToString(),
-            description = entry.Value.Description,
-            duration = entry.Value.Duration.TotalMilliseconds,
-            tags = entry.Value.Tags,
-            data = entry.Value.Data,
-            exception = entry.Value.Exception?.Message
-        })
-    };
-
-    await context.Response.WriteAsync(
-        JsonSerializer.Serialize(
-            response,
-            new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = true
-            }));
-}

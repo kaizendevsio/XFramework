@@ -17,6 +17,9 @@ builder.Logging.AddXFrameworkLogging(builder.Configuration);
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IIdentityAuthorizationService, IdentityAuthorizationService>();
 builder.Services.AddScoped<IServiceIdentityService, ServiceIdentityService>();
+builder.Services.AddSingleton(serviceProvider => ServiceIdentityConfiguration.FromConfiguration(
+    serviceProvider.GetRequiredService<IConfiguration>(),
+    serviceProvider.GetRequiredService<TimeProvider>().GetUtcNow()));
 builder.Services.AddSingleton<IIdentitySigningKeyProvider, IdentityServerLocalSigningKeyProvider>();
 
 // Register FluentValidation validators from this assembly
@@ -42,6 +45,7 @@ builder.Services.AddOpenApi("v1", options =>
 });
 
 var app = (WebApplication)builder.Build();
+_ = app.Services.GetRequiredService<ServiceIdentityConfiguration>();
 
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();

@@ -15,6 +15,9 @@ namespace IdentityServer.Api.Services;
 public sealed class ServiceIdentityService(
     IDataContext dataContext,
     IConfiguration configuration,
+    ServiceIdentityConfiguration serviceIdentityConfiguration,
+    JwtOptions jwtOptions,
+    TimeProvider timeProvider,
     ILogger<ServiceIdentityService> logger,
     IHttpContextAccessor? httpContextAccessor = null,
     ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
@@ -27,8 +30,9 @@ public sealed class ServiceIdentityService(
         IssueServiceTokenRequest request,
         CancellationToken ct = default)
     {
-        var client = ResolveClient(request.ClientId);
-        if (client is null || !FixedTimeEquals(client.ClientSecret, request.ClientSecret))
+        var now = timeProvider.GetUtcNow();
+        var client = serviceIdentityConfiguration.FindClient(request.ClientId);
+        if (client is null || !client.TryAuthenticate(request.ClientSecret, now, out var credentialGenerationId))
             return Result<ServiceTokenResponse>.Unauthorized("Invalid service client credentials");
 
         if (!XFrameworkServiceNames.All.Contains(request.Audience))
@@ -65,28 +69,30 @@ public sealed class ServiceIdentityService(
             }
         };
 
-        var now = DateTime.UtcNow;
-        var expires = now.AddMinutes(Math.Clamp(configuration.GetValue("ServiceIdentity:TokenLifetimeMinutes", 10), 1, 60));
+        var issuedAt = timeProvider.GetUtcNow().UtcDateTime;
+        var expires = issuedAt.AddMinutes(serviceIdentityConfiguration.TokenLifetimeMinutes);
         List<Claim> claims =
         [
             new("client_id", client.ClientId),
+            new("client_credential_generation", credentialGenerationId!),
             new("scope", string.Join(' ', requestedScopes)),
             new(JwtRegisteredClaimNames.Sub, client.ClientId),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64)
+            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(issuedAt).ToString(), ClaimValueTypes.Integer64)
         ];
 
         var token = new JwtSecurityToken(
             issuer: ResolveIssuer(),
             audience: request.Audience,
             claims: claims,
-            notBefore: now,
+            notBefore: issuedAt,
             expires: expires,
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.RsaSha256));
 
         logger.LogDebug(
-            "Issued service token. ClientId={ClientId} Audience={Audience} KeyId={KeyId}",
+            "Issued service token. ClientId={ClientId} ClientCredentialGenerationId={ClientCredentialGenerationId} Audience={Audience} KeyId={KeyId}",
             client.ClientId,
+            credentialGenerationId,
             request.Audience,
             signingKey.KeyId);
 
@@ -96,6 +102,73 @@ public sealed class ServiceIdentityService(
             ExpiresAtUtc = expires,
             TokenType = "Bearer"
         });
+    }
+
+    public Task<Result<ServiceTokenResponse>> IssueBoltTransportTokenAsync(
+        string? clientId,
+        string? clientSecret,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (!serviceIdentityConfiguration.BoltTransportTokenIssuerEnabled)
+        {
+            return Task.FromResult(
+                Result<ServiceTokenResponse>.Failure("Bolt transport token issuance is disabled", 503));
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var client = serviceIdentityConfiguration.FindClient(clientId);
+        if (client is null || !client.TryAuthenticate(clientSecret, now, out var clientCredentialGenerationId))
+        {
+            return Task.FromResult(
+                Result<ServiceTokenResponse>.Unauthorized("Invalid service client credentials"));
+        }
+
+        if (!client.AllowedScopes.Contains(XFrameworkServiceScopes.BoltService))
+        {
+            return Task.FromResult(
+                Result<ServiceTokenResponse>.Forbidden("Service client is not allowed to request Bolt transport access"));
+        }
+
+        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds()).UtcDateTime;
+        var expiresAt = issuedAt.AddSeconds(serviceIdentityConfiguration.BoltTransportTokenLifetimeSeconds);
+        List<Claim> claims =
+        [
+            new("client_id", client.ClientId),
+            new("service", client.ClientId),
+            new(JwtRegisteredClaimNames.Sub, client.ClientId),
+            new("scope", XFrameworkServiceScopes.BoltService),
+            new(JwtCredentialSet.GenerationClaim, jwtOptions.GenerationId.Trim()),
+            new("client_credential_generation", clientCredentialGenerationId!),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(issuedAt).ToString(), ClaimValueTypes.Integer64)
+        ];
+
+        var token = new JwtSecurityToken(
+            issuer: jwtOptions.ValidIssuer,
+            audience: jwtOptions.ValidAudience,
+            claims: claims,
+            notBefore: issuedAt,
+            expires: expiresAt,
+            signingCredentials: new SigningCredentials(
+                JwtCredentialSet.CreateCurrentSigningKey(jwtOptions),
+                SecurityAlgorithms.HmacSha512));
+
+        var accessToken = TokenHandler.WriteToken(token);
+        logger.LogDebug(
+            "Issued Bolt transport token. ClientId={ClientId} ClientCredentialGenerationId={ClientCredentialGenerationId} SigningGenerationId={SigningGenerationId} LifetimeSeconds={LifetimeSeconds}",
+            client.ClientId,
+            clientCredentialGenerationId,
+            jwtOptions.GenerationId.Trim(),
+            serviceIdentityConfiguration.BoltTransportTokenLifetimeSeconds);
+
+        return Task.FromResult(Result<ServiceTokenResponse>.Success(new ServiceTokenResponse
+        {
+            AccessToken = accessToken,
+            ExpiresAtUtc = expiresAt,
+            TokenType = "Bearer"
+        }));
     }
 
     public async Task<Result<ServiceSigningKeysResponse>> GetSigningKeysAsync(
@@ -206,27 +279,8 @@ public sealed class ServiceIdentityService(
         return newKey;
     }
 
-    private ServiceClientDefinition? ResolveClient(string clientId)
-    {
-        if (string.IsNullOrWhiteSpace(clientId))
-            return null;
-
-        var clients = configuration.GetSection("ServiceIdentity:Clients")
-            .GetChildren()
-            .Select(ServiceClientDefinition.FromConfiguration)
-            .Where(static client => !string.IsNullOrWhiteSpace(client.ClientId))
-            .ToList();
-
-        var client = clients.FirstOrDefault(client =>
-            string.Equals(client.ClientId, clientId, StringComparison.Ordinal));
-        if (client is not null)
-            return client;
-
-        return null;
-    }
-
     private string ResolveIssuer() =>
-        configuration["ServiceIdentity:Issuer"] ?? XFrameworkServiceNames.IdentityServer;
+        serviceIdentityConfiguration.Issuer;
 
     private async Task<Result> EnsureSigningKeyAdminAsync(
         RequestMetadata? metadata,
@@ -267,40 +321,4 @@ public sealed class ServiceIdentityService(
         IsActive = key.IsActive
     };
 
-    private static bool FixedTimeEquals(string? expected, string? supplied)
-    {
-        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(supplied))
-            return false;
-
-        var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
-        var suppliedBytes = System.Text.Encoding.UTF8.GetBytes(supplied);
-        return expectedBytes.Length == suppliedBytes.Length &&
-               CryptographicOperations.FixedTimeEquals(expectedBytes, suppliedBytes);
-    }
-
-    private sealed record ServiceClientDefinition(
-        string ClientId,
-        string ClientSecret,
-        HashSet<string> AllowedAudiences,
-        HashSet<string> AllowedScopes)
-    {
-        public static ServiceClientDefinition FromConfiguration(IConfiguration section)
-        {
-            var audiences = ParseList(section["AllowedAudiences"]);
-            var scopes = ParseList(section["AllowedScopes"]);
-
-            return new ServiceClientDefinition(
-                section["ClientId"] ?? string.Empty,
-                section["ClientSecret"] ?? string.Empty,
-                audiences.Count == 0 ? XFrameworkServiceNames.All.ToHashSet(StringComparer.Ordinal) : audiences,
-                scopes.Count == 0 ? XFrameworkServiceScopes.AdminDefaults.ToHashSet(StringComparer.OrdinalIgnoreCase) : scopes);
-        }
-
-        private static HashSet<string> ParseList(string? value) =>
-            string.IsNullOrWhiteSpace(value)
-                ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                : value
-                    .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    }
 }

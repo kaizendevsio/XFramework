@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -24,21 +25,37 @@ namespace Bolt.Server;
 public sealed class BoltServer : IDisposable
 {
     private const string DefaultRequiredServiceScope = "bolt.service";
+    private static readonly TimeSpan MaxMigrationAllowanceLifetime = TimeSpan.FromDays(7);
     private static readonly string[] DefaultServiceIdentityClaimTypes = ["client_id", "service", "azp", "sub"];
 
-    private sealed class DurableReplayState
+    private enum PendingInvocationAddResult
     {
+        Added,
+        Duplicate,
+        CapacityExceeded
+    }
+
+    private sealed class DurableReplayState(BoltHubConnection owner)
+    {
+        public BoltHubConnection Owner { get; } = owner;
         public object SyncRoot { get; } = new();
         public ConcurrentQueue<(long Sequence, byte[] Payload)> DeferredEvents { get; } = new();
         public bool AcceptingDeferredEvents { get; set; } = true;
     }
 
     private readonly ILogger<BoltServer> _logger;
+    private readonly ConcurrentDictionary<string, BoltHubConnection> _activeTransportConnections = new();
     private readonly ConcurrentDictionary<string, BoltHubConnection> _connectionsByStreamId = new();
     private readonly ConcurrentDictionary<int, ConcurrentBag<BoltHubConnection>> _connectionsByServiceHash = new();
     private readonly ConcurrentDictionary<int, string> _clientIdsByServiceHash = new();
     private readonly ConcurrentDictionary<Guid, PendingInvocation> _pendingInvocations = new();
     private readonly ConcurrentDictionary<int, int> _roundRobinIndex = new();
+    private readonly ConcurrentDictionary<string, int> _connectionCountsByPrincipal = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> _pendingInvocationsByPrincipal = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> _activeStreamsByPrincipal = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> _activeMediaStreamsByPrincipal = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> _subscriptionsByPrincipal = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _pendingInvocationSlots;
 
     // Stream routing: streamId → (sender connection, recipient connection)
     private readonly ConcurrentDictionary<Guid, StreamRoute> _activeStreams = new();
@@ -58,18 +75,31 @@ public sealed class BoltServer : IDisposable
     private readonly List<IMediaProcessor> _mediaProcessors = new();
     private readonly Channel<(Guid CallId, Guid StreamId, byte[] Data, uint Timestamp, uint Seq)> _mediaTapChannel;
     private readonly CancellationTokenSource _mediaTapCts = new();
+    private readonly CancellationTokenSource _shutdownCts = new();
+    private int _disposed;
 
     private readonly Timer _cleanupTimer;
     private readonly int _invocationTimeoutMs;
     private readonly int _maxFrameBytes;
     private readonly int _sendQueueCapacity;
     private readonly int _sendEnqueueTimeoutMs;
+    private readonly TimeSpan _transportCloseTimeout;
+    private readonly int _maxPendingRpcCalls;
+    private readonly int _maxPendingRpcCallsPerPrincipal;
+    private readonly int _maxConnectionsPerPrincipal;
+    private readonly int _maxActiveStreamsPerPrincipal;
+    private readonly int _maxMediaStreamsPerPrincipal;
+    private readonly int _maxSubscriptionsPerPrincipal;
+    private readonly int _maxDurableSubscribersPerTopic;
+    private readonly TimeSpan _maxConnectionLifetime;
+    private readonly bool _mediaEnabled;
     private readonly BoltRegistrationIdentityBindingMode _registrationIdentityBindingMode;
     private readonly string _requiredServiceScope;
     private readonly string[] _serviceIdentityClaimTypes;
     private readonly HashSet<string> _reservedServiceNames;
     private readonly string[] _reservedServiceNamePrefixes;
     private readonly HashSet<string> _reservedServiceClientIds;
+    private readonly BoltRegistrationMigrationAllowance[] _registrationMigrationAllowances;
     private static readonly int LargeRpcCommandHash = BoltCodec.Fnv1aHash("__bolt_large_rpc__");
     private static readonly int LargeRpcResponseHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response__");
     private static readonly int LargeRpcResponseStreamHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response_stream__");
@@ -81,7 +111,8 @@ public sealed class BoltServer : IDisposable
     // Pub/sub state — durable (persistent identity)
     private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), BoltHubConnection> _liveDurableConnections = new();
     private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), DurableReplayState> _replayingDurableSubscriptions = new();
-    private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), SemaphoreSlim> _durablePublishLocks = new();
+    private readonly SemaphoreSlim[] _durableSubscriptionGates =
+        Enumerable.Range(0, 64).Select(static _ => new SemaphoreSlim(1, 1)).ToArray();
     private readonly ConcurrentDictionary<int, string> _topicNamesByHash = new();
 
     // Durable queue backend (injected)
@@ -107,6 +138,21 @@ public sealed class BoltServer : IDisposable
         _sendEnqueueTimeoutMs = options.SendEnqueueTimeoutMs > 0
             ? options.SendEnqueueTimeoutMs
             : _invocationTimeoutMs;
+        _transportCloseTimeout = TimeSpan.FromMilliseconds(Math.Max(1, options.TransportCloseTimeoutMs));
+        _maxPendingRpcCalls = Math.Max(1, options.MaxPendingRpcCalls);
+        _maxPendingRpcCallsPerPrincipal = Math.Min(
+            _maxPendingRpcCalls,
+            Math.Max(1, options.MaxPendingRpcCallsPerPrincipal));
+        _pendingInvocationSlots = new SemaphoreSlim(_maxPendingRpcCalls, _maxPendingRpcCalls);
+        _maxConnectionsPerPrincipal = Math.Max(1, options.MaxConnectionsPerPrincipal);
+        _maxActiveStreamsPerPrincipal = Math.Max(1, options.MaxActiveStreamsPerPrincipal);
+        _maxMediaStreamsPerPrincipal = Math.Max(1, options.MaxMediaStreamsPerPrincipal);
+        _maxSubscriptionsPerPrincipal = Math.Max(1, options.MaxSubscriptionsPerPrincipal);
+        _maxDurableSubscribersPerTopic = Math.Max(1, options.MaxDurableSubscribersPerTopic);
+        _maxConnectionLifetime = options.MaxConnectionLifetimeSeconds > 0
+            ? TimeSpan.FromSeconds(options.MaxConnectionLifetimeSeconds)
+            : Timeout.InfiniteTimeSpan;
+        _mediaEnabled = options.MediaEnabled;
         if (!Enum.IsDefined(options.RegistrationIdentityBindingMode))
         {
             throw new InvalidOperationException(
@@ -130,6 +176,8 @@ public sealed class BoltServer : IDisposable
         _reservedServiceClientIds = NormalizeOptionSet(options.ReservedServiceClientIds, StringComparer.OrdinalIgnoreCase);
         foreach (var reservedServiceName in _reservedServiceNames)
             _reservedServiceClientIds.Add(Sha256Hex(reservedServiceName));
+        _registrationMigrationAllowances = options.RegistrationMigrationAllowances.ToArray();
+        ValidateMigrationAllowances(_registrationMigrationAllowances);
 
         var cleanupInterval = TimeSpan.FromSeconds(Math.Max(1, options.CleanupIntervalSeconds));
         _cleanupTimer = new Timer(CleanupStaleInvocations, null, cleanupInterval, cleanupInterval);
@@ -215,19 +263,31 @@ public sealed class BoltServer : IDisposable
 
     public async Task HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal? user, CancellationToken ct)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        using var connectionCts = CreateConnectionCancellation(user, ct);
+        var connectionCt = connectionCts.Token;
         var connection = new BoltHubConnection(transport, _sendQueueCapacity, _sendEnqueueTimeoutMs)
         {
             User = user
         };
-        connection.StartSendLoop(ct);
+        connection.StartSendLoop(connectionCt, ex =>
+        {
+            _logger.LogWarning(
+                ex,
+                "Retiring Bolt connection after transport send failure. client={ClientId} stream={StreamId}",
+                connection.ClientId ?? "unregistered",
+                connection.StreamId);
+            connectionCts.Cancel();
+        });
+        _activeTransportConnections[connection.StreamId] = connection;
         var receiveBuffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
         byte[]? largeBuffer = null;
 
         try
         {
-            while (transport.IsConnected && !ct.IsCancellationRequested)
+            while (transport.IsConnected && !connectionCt.IsCancellationRequested)
             {
-                var (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), ct);
+                var (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), connectionCt);
 
                 // (0, true) signals connection closed
                 if (bytesRead == 0 && endOfMessage)
@@ -238,6 +298,7 @@ public sealed class BoltServer : IDisposable
 
                 if (bytesRead > _maxFrameBytes)
                 {
+                    BoltServerMetrics.RecordOversizedFrameRejection("fragment");
                     _logger.LogWarning("Closing Bolt connection because frame fragment exceeded max size. bytes={Bytes} max={Max}", bytesRead, _maxFrameBytes);
                     break;
                 }
@@ -255,12 +316,13 @@ public sealed class BoltServer : IDisposable
 
                     while (!endOfMessage)
                     {
-                        (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), ct);
+                        (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), connectionCt);
                         if (bytesRead == 0 && endOfMessage)
                             break;
 
                         if (bytesRead > _maxFrameBytes || assembled > _maxFrameBytes - bytesRead)
                         {
+                            BoltServerMetrics.RecordOversizedFrameRejection("assembled");
                             _logger.LogWarning(
                                 "Closing Bolt connection because assembled frame exceeded max size. assembled={Assembled} next={Bytes} max={Max}",
                                 assembled,
@@ -291,11 +353,12 @@ public sealed class BoltServer : IDisposable
 
                 if (totalLength <= 0 || totalLength > _maxFrameBytes)
                 {
+                    BoltServerMetrics.RecordOversizedFrameRejection("complete");
                     _logger.LogWarning("Closing Bolt connection because frame size was invalid. size={Size} max={Max}", totalLength, _maxFrameBytes);
                     break;
                 }
 
-                await ProcessFrameAsync(connection, frameBytes, totalLength, ct);
+                await ProcessFrameAsync(connection, frameBytes, totalLength, connectionCt);
             }
         }
         catch (OperationCanceledException) { }
@@ -305,16 +368,81 @@ public sealed class BoltServer : IDisposable
         }
         finally
         {
+            connection.BeginClose();
+            connectionCts.Cancel();
             connection.CompleteSendChannel();
             if (connection.SendLoop is not null)
-                try { await connection.SendLoop; } catch { }
+            {
+                try { await connection.SendLoop.WaitAsync(_transportCloseTimeout); }
+                catch (TimeoutException)
+                {
+                    _logger.LogWarning(
+                        "Bolt send loop did not stop within the transport close deadline. client={ClientId} stream={StreamId}",
+                        connection.ClientId ?? "unregistered",
+                        connection.StreamId);
+                }
+                catch { }
+            }
             ArrayPool<byte>.Shared.Return(receiveBuffer);
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
-            await RemoveConnectionAsync(connection);
-
-            try { await transport.CloseAsync(); }
-            catch { }
+            await CloseTransportAsync(transport);
+            try
+            {
+                await RemoveConnectionAsync(connection);
+            }
+            finally
+            {
+                _activeTransportConnections.TryRemove(connection.StreamId, out _);
+            }
         }
+    }
+
+    private async ValueTask CloseTransportAsync(IBoltConnection transport)
+    {
+        using var closeCts = new CancellationTokenSource(_transportCloseTimeout);
+        try
+        {
+            await transport.CloseAsync(closeCts.Token);
+        }
+        catch (OperationCanceledException) when (closeCts.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+        }
+
+        try { await transport.DisposeAsync().AsTask().WaitAsync(_transportCloseTimeout); }
+        catch (TimeoutException) { }
+        catch { }
+    }
+
+    private CancellationTokenSource CreateConnectionCancellation(ClaimsPrincipal? user, CancellationToken ct)
+    {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _shutdownCts.Token);
+        var lifetime = _maxConnectionLifetime;
+
+        var expirationValue = user?.FindFirstValue("exp");
+        if (long.TryParse(expirationValue, NumberStyles.None, CultureInfo.InvariantCulture, out var expirationUnixSeconds))
+        {
+            try
+            {
+                var untilExpiration = DateTimeOffset.FromUnixTimeSeconds(expirationUnixSeconds) - DateTimeOffset.UtcNow;
+                if (untilExpiration < TimeSpan.Zero)
+                    untilExpiration = TimeSpan.Zero;
+
+                if (lifetime == Timeout.InfiniteTimeSpan || untilExpiration < lifetime)
+                    lifetime = untilExpiration;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                lifetime = TimeSpan.Zero;
+            }
+        }
+
+        if (lifetime != Timeout.InfiniteTimeSpan)
+            cts.CancelAfter(lifetime);
+
+        return cts;
     }
 
     private async Task ProcessFrameAsync(BoltHubConnection connection, byte[] buffer, int length, CancellationToken ct)
@@ -325,6 +453,16 @@ public sealed class BoltServer : IDisposable
         {
             _logger.LogWarning("Closing unregistered Bolt connection after {FrameType} frame", frameType);
             await connection.CloseAsync(ct);
+            return;
+        }
+
+        if (!_mediaEnabled && IsMediaFrame(frameType))
+        {
+            BoltServerMetrics.RecordDisabledMediaRejection(frameType);
+            _logger.LogWarning(
+                "Rejected disabled Bolt Media frame {FrameType} from {ClientId}",
+                frameType,
+                connection.ClientId);
             return;
         }
 
@@ -364,7 +502,7 @@ public sealed class BoltServer : IDisposable
                 break;
             case FrameType.StreamClose:
                 await RouteStreamFrameAsync(connection, buffer, length, ct);
-                CleanupStream(connection, buffer, length);
+                await CleanupStreamAsync(connection, buffer, length, ct);
                 break;
 
             // ── Media frame routing ──
@@ -407,6 +545,7 @@ public sealed class BoltServer : IDisposable
 
         if (!ValidateRegisterIdentity(connection, clientId, clientName))
         {
+            BoltServerMetrics.RecordRegistrationRejection("identity_mismatch");
             _logger.LogWarning(
                 "Rejected Bolt register identity. stream={StreamId} clientId={ClientId} clientName={ClientName}",
                 connection.StreamId,
@@ -415,8 +554,35 @@ public sealed class BoltServer : IDisposable
 
             var rejectWriter = new ArrayBufferWriter<byte>(2);
             BoltCodec.WriteRegisterAck(rejectWriter, false);
-            await connection.SendAsync(rejectWriter.WrittenMemory, ct);
-            await connection.CloseAsync(ct);
+            await connection.SendAndCloseAsync(rejectWriter.WrittenMemory, ct);
+            return;
+        }
+
+        var quotaKey = ResolvePrincipalQuotaKey(connection.User, clientId);
+        if (quotaKey is null)
+        {
+            BoltServerMetrics.RecordRegistrationRejection("missing_principal_identifier");
+            _logger.LogWarning(
+                "Rejected Bolt registration because the authenticated principal has no stable quota identity. clientId={ClientId}",
+                clientId);
+
+            var rejectWriter = new ArrayBufferWriter<byte>(2);
+            BoltCodec.WriteRegisterAck(rejectWriter, false);
+            await connection.SendAndCloseAsync(rejectWriter.WrittenMemory, ct);
+            return;
+        }
+
+        if (!TryReserveQuota(_connectionCountsByPrincipal, quotaKey, _maxConnectionsPerPrincipal))
+        {
+            BoltServerMetrics.RecordQuotaRejection("connections");
+            _logger.LogWarning(
+                "Rejected Bolt register identity because client connection limit was reached. clientId={ClientId} maxConnections={MaxConnections}",
+                clientId,
+                _maxConnectionsPerPrincipal);
+
+            var rejectWriter = new ArrayBufferWriter<byte>(2);
+            BoltCodec.WriteRegisterAck(rejectWriter, false);
+            await connection.SendAndCloseAsync(rejectWriter.WrittenMemory, ct);
             return;
         }
 
@@ -424,6 +590,8 @@ public sealed class BoltServer : IDisposable
         var existingClientId = _clientIdsByServiceHash.GetOrAdd(serviceHash, clientId);
         if (!string.Equals(existingClientId, clientId, StringComparison.Ordinal))
         {
+            ReleaseQuota(_connectionCountsByPrincipal, quotaKey);
+            BoltServerMetrics.RecordRegistrationRejection("service_hash_collision");
             _logger.LogWarning(
                 "Rejected Bolt register identity because service hash collision was detected. hash={ServiceHash} existingClientId={ExistingClientId} rejectedClientId={RejectedClientId}",
                 serviceHash,
@@ -432,13 +600,13 @@ public sealed class BoltServer : IDisposable
 
             var rejectWriter = new ArrayBufferWriter<byte>(2);
             BoltCodec.WriteRegisterAck(rejectWriter, false);
-            await connection.SendAsync(rejectWriter.WrittenMemory, ct);
-            await connection.CloseAsync(ct);
+            await connection.SendAndCloseAsync(rejectWriter.WrittenMemory, ct);
             return;
         }
 
         connection.ClientId = clientId;
         connection.ClientName = clientName;
+        connection.QuotaKey = quotaKey;
         connection.ServiceHash = serviceHash;
         connection.IsRegistered = true;
 
@@ -534,10 +702,17 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        if (!_pendingInvocations.TryAdd(frame.RequestId, new PendingInvocation(caller, recipient, Environment.TickCount64)))
+        var pending = new PendingInvocation(caller, recipient, Environment.TickCount64);
+        var addResult = TryAddPendingInvocation(frame.RequestId, pending);
+        if (addResult != PendingInvocationAddResult.Added)
         {
+            if (addResult == PendingInvocationAddResult.CapacityExceeded)
+                BoltServerMetrics.RecordQuotaRejection("pending_rpc");
             var errWriter = RentedBufferWriter.GetThreadLocal();
-            BoltCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.Conflict, ReadOnlySpan<byte>.Empty);
+            var statusCode = addResult == PendingInvocationAddResult.CapacityExceeded
+                ? HttpStatusCode.TooManyRequests
+                : HttpStatusCode.Conflict;
+            BoltCodec.WriteResponse(errWriter, frame.RequestId, statusCode, ReadOnlySpan<byte>.Empty);
             await caller.SendAsync(errWriter.WrittenMemory, ct);
             return;
         }
@@ -548,7 +723,7 @@ public sealed class BoltServer : IDisposable
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            _pendingInvocations.TryRemove(frame.RequestId, out _);
+            TryRemovePendingInvocation(frame.RequestId, pending, out _);
             _logger.LogWarning(
                 ex,
                 "Failed to enqueue routed request {RequestId} to recipient {Recipient}",
@@ -560,6 +735,16 @@ public sealed class BoltServer : IDisposable
             await caller.SendAsync(errWriter.WrittenMemory, ct);
         }
     }
+
+    private static bool IsMediaFrame(FrameType frameType) =>
+        frameType is
+            FrameType.MediaFrame or
+            FrameType.FecFrame or
+            FrameType.MediaConfig or
+            FrameType.MediaFeedback or
+            FrameType.MediaKeyRequest or
+            FrameType.NackRequest or
+            FrameType.CallSignal;
 
     private async Task HandleResponseAsync(BoltHubConnection responder, byte[] buffer, int length, CancellationToken ct)
     {
@@ -582,7 +767,7 @@ public sealed class BoltServer : IDisposable
                 return;
             }
 
-            if (_pendingInvocations.TryRemove(requestId, out var removed))
+            if (TryRemovePendingInvocation(requestId, pending, out var removed))
                 await removed.Caller.SendAsync(buffer.AsMemory(0, totalSize), ct);
         }
     }
@@ -667,12 +852,166 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        if (_pendingInvocations.TryRemove(requestId, out var removed))
+        if (TryRemovePendingInvocation(requestId, pending, out var removed))
             await removed.Caller.SendAsync(buffer.AsMemory(0, totalSize), ct);
     }
 
     /// <summary>Get the count of currently connected clients.</summary>
     public int ConnectedClientCount => _connectionsByStreamId.Count;
+
+    /// <summary>
+    /// Captures nonsecret runtime transport facts for readiness and rollout observation.
+    /// The snapshot is aggregate-only and does not expose client or principal identities.
+    /// </summary>
+    public BoltServerHealthSnapshot GetHealthSnapshot()
+    {
+        var connections = _activeTransportConnections.Values.ToArray();
+        var registeredConnections = _connectionsByStreamId.Count;
+        var liveConnections = 0;
+        var closingConnections = 0;
+        var unregisteredTrackedConnections = 0;
+        var runningSendLoops = 0;
+        var completedSendLoops = 0;
+        var faultedSendLoops = 0;
+        var liveConnectionsWithInactiveSendLoops = 0;
+        var connectionsUnderSendPressure = 0;
+        var negativeRuntimeCounters = 0;
+        long aggregateQueuedSendBytes = 0;
+        long maximumQueuedSendBytes = 0;
+
+        foreach (var connection in connections)
+        {
+            var isLive = connection.IsAlive;
+            var isClosing = connection.IsClosing;
+            if (isLive)
+                liveConnections++;
+            if (isClosing)
+                closingConnections++;
+
+            var pendingBytes = connection.PendingBytes;
+            if (pendingBytes < 0)
+            {
+                negativeRuntimeCounters++;
+            }
+            else
+            {
+                aggregateQueuedSendBytes = SaturatingAdd(aggregateQueuedSendBytes, pendingBytes);
+                maximumQueuedSendBytes = Math.Max(maximumQueuedSendBytes, pendingBytes);
+                if (pendingBytes > BoltHubConnection.BackpressureDropThreshold)
+                    connectionsUnderSendPressure++;
+            }
+
+            var sendLoopStatus = connection.SendLoop?.Status;
+            if (sendLoopStatus is null)
+            {
+                if (isLive && !isClosing)
+                    liveConnectionsWithInactiveSendLoops++;
+                continue;
+            }
+
+            if (sendLoopStatus == TaskStatus.Faulted)
+                faultedSendLoops++;
+
+            if (sendLoopStatus is TaskStatus.RanToCompletion or TaskStatus.Canceled or TaskStatus.Faulted)
+            {
+                completedSendLoops++;
+                if (isLive && !isClosing)
+                    liveConnectionsWithInactiveSendLoops++;
+            }
+            else
+            {
+                runningSendLoops++;
+            }
+        }
+
+        var connectionCounts = SummarizeRuntimeCounts(_connectionCountsByPrincipal.Values);
+        var pendingRpcCounts = SummarizeRuntimeCounts(_pendingInvocationsByPrincipal.Values);
+        var logicalStreamCounts = SummarizeRuntimeCounts(_activeStreamsByPrincipal.Values);
+        var mediaStreamCounts = SummarizeRuntimeCounts(_activeMediaStreamsByPrincipal.Values);
+        var subscriptionCounts = SummarizeRuntimeCounts(_subscriptionsByPrincipal.Values);
+        var liveTransientSubscriptions = SummarizeRuntimeCounts(
+            _liveSubscriptionsByConnection.Values.Select(static topics => topics.Count));
+        foreach (var connection in _connectionsByStreamId.Values)
+        {
+            if (!connection.IsRegistered)
+                unregisteredTrackedConnections++;
+        }
+
+        negativeRuntimeCounters += connectionCounts.NegativeCount +
+                                   pendingRpcCounts.NegativeCount +
+                                   logicalStreamCounts.NegativeCount +
+                                   mediaStreamCounts.NegativeCount +
+                                   subscriptionCounts.NegativeCount +
+                                   liveTransientSubscriptions.NegativeCount;
+
+        return new BoltServerHealthSnapshot(
+            connections.Length,
+            registeredConnections,
+            Math.Max(0, connections.Length - registeredConnections),
+            liveConnections,
+            closingConnections,
+            unregisteredTrackedConnections,
+            _pendingInvocations.Count,
+            _activeStreams.Count,
+            _activeMediaStreams.Count,
+            _activeCalls.Count,
+            subscriptionCounts.Total,
+            liveTransientSubscriptions.Total,
+            _liveDurableConnections.Count,
+            aggregateQueuedSendBytes,
+            maximumQueuedSendBytes,
+            connectionsUnderSendPressure,
+            runningSendLoops,
+            completedSendLoops,
+            faultedSendLoops,
+            liveConnectionsWithInactiveSendLoops,
+            negativeRuntimeCounters,
+            connectionCounts.Maximum,
+            pendingRpcCounts.Maximum,
+            logicalStreamCounts.Maximum,
+            mediaStreamCounts.Maximum,
+            subscriptionCounts.Maximum,
+            Volatile.Read(ref _disposed) != 0,
+            new BoltServerHealthBounds(
+                _maxFrameBytes,
+                _sendQueueCapacity,
+                _sendEnqueueTimeoutMs,
+                BoltHubConnection.BackpressureDropThreshold,
+                BoltHubConnection.BackpressureFeedbackThreshold,
+                _maxPendingRpcCalls,
+                _maxPendingRpcCallsPerPrincipal,
+                _maxConnectionsPerPrincipal,
+                _maxActiveStreamsPerPrincipal,
+                _maxMediaStreamsPerPrincipal,
+                _maxSubscriptionsPerPrincipal,
+                _maxDurableSubscribersPerTopic,
+                _mediaEnabled));
+    }
+
+    private static RuntimeCountSummary SummarizeRuntimeCounts(IEnumerable<int> counts)
+    {
+        long total = 0;
+        var maximum = 0;
+        var negativeCount = 0;
+        foreach (var count in counts)
+        {
+            if (count < 0)
+            {
+                negativeCount++;
+                continue;
+            }
+
+            total = SaturatingAdd(total, count);
+            maximum = Math.Max(maximum, count);
+        }
+
+        return new RuntimeCountSummary(total, maximum, negativeCount);
+    }
+
+    private static long SaturatingAdd(long left, long right) =>
+        left > long.MaxValue - right ? long.MaxValue : left + right;
+
+    private readonly record struct RuntimeCountSummary(long Total, int Maximum, int NegativeCount);
 
     /// <summary>Get all connected client IDs for presence queries.</summary>
     public IEnumerable<string> GetConnectedClientIds()
@@ -692,12 +1031,44 @@ public sealed class BoltServer : IDisposable
             return;
 
         var recipient = GetRecipient(recipientHash);
-        if (recipient is not null)
+        if (recipient is null)
+            return;
+
+        if (!TryReserveQuota(_activeStreamsByPrincipal, sender.QuotaKey, _maxActiveStreamsPerPrincipal))
         {
-            _activeStreams[streamId] = new StreamRoute(sender, recipient, commandHash);
-            _logger.LogDebug("Stream opened: {StreamId} from {Sender} to {Recipient}",
-                streamId, sender.ClientId, recipient.ClientId);
+            BoltServerMetrics.RecordQuotaRejection("logical_streams");
+            _logger.LogWarning(
+                "Rejected stream open because connection stream limit was reached. client={ClientId} maxStreams={MaxStreams}",
+                sender.ClientId,
+                _maxActiveStreamsPerPrincipal);
+            return;
         }
+
+        if (!_activeStreams.TryAdd(streamId, new StreamRoute(sender, recipient, commandHash)))
+        {
+            ReleaseQuota(_activeStreamsByPrincipal, sender.QuotaKey);
+            _logger.LogWarning(
+                "Rejected duplicate stream id {StreamId} from {ClientId}",
+                streamId,
+                sender.ClientId);
+            return;
+        }
+
+        if (!recipient.IsAlive || !_connectionsByStreamId.ContainsKey(recipient.StreamId))
+        {
+            if (_activeStreams.TryGetValue(streamId, out var route))
+            {
+                RemoveStreamRoute(
+                    streamId,
+                    route,
+                    releaseLargeRpcPendingInvocation: false,
+                    out _);
+            }
+            return;
+        }
+
+        _logger.LogDebug("Stream opened: {StreamId} from {Sender} to {Recipient}",
+            streamId, sender.ClientId, recipient.ClientId);
     }
 
     /// <summary>
@@ -732,16 +1103,50 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        BoltHubConnection? recipient = null;
+        BoltHubConnection recipient;
         if (peers.Sender.StreamId == sender.StreamId)
             recipient = peers.Recipient;
         else if (peers.Recipient.StreamId == sender.StreamId)
             recipient = peers.Sender;
-
-        if (recipient is not { IsAlive: true })
+        else
+        {
+            _logger.LogWarning(
+                "Rejected stream frame from nonparticipant. streamId={StreamId} client={ClientId}",
+                streamId,
+                sender.ClientId);
             return;
+        }
 
-        await recipient.SendAsync(buffer.AsMemory(0, length), ct);
+        if (!recipient.IsAlive)
+        {
+            if (RemoveStreamRoute(
+                    streamId,
+                    peers,
+                    releaseLargeRpcPendingInvocation: true,
+                    out var releasedOwnership) &&
+                releasedOwnership is not null)
+            {
+                await SendUnavailableResponseAsync(
+                    releasedOwnership.PendingInvocation.Caller,
+                    releasedOwnership.RequestId,
+                    ct);
+            }
+            return;
+        }
+
+        try
+        {
+            await recipient.SendAsync(buffer.AsMemory(0, length), ct);
+        }
+        catch
+        {
+            RemoveStreamRoute(
+                streamId,
+                peers,
+                releaseLargeRpcPendingInvocation: true,
+                out _);
+            throw;
+        }
     }
 
     private bool TryAuthorizeStreamData(BoltHubConnection sender, StreamRoute route, byte[] buffer, int length)
@@ -767,11 +1172,14 @@ public sealed class BoltServer : IDisposable
     {
         lock (route.SyncRoot)
         {
-            if (route.LargeRpcRequestTracked)
-                return true;
-
             if (!BoltCodec.TryReadStreamData(buffer.AsSpan(0, length), out _, out var payloadOffset, out var payloadLength, out _))
                 return false;
+
+            if (route.LargeRpcRequestTracked)
+            {
+                route.LargeRpcRequestBytesReceived += payloadLength;
+                return true;
+            }
 
             if (payloadLength < 28)
             {
@@ -781,6 +1189,7 @@ public sealed class BoltServer : IDisposable
 
             var payload = buffer.AsSpan(payloadOffset, payloadLength);
             var requestId = new Guid(payload[..16]);
+            var expectedPayloadBytes = BinaryPrimitives.ReadInt32LittleEndian(payload[20..]);
             var metadataSenderHash = BinaryPrimitives.ReadInt32LittleEndian(payload[24..]);
             if (metadataSenderHash != route.Sender.ServiceHash)
             {
@@ -791,16 +1200,21 @@ public sealed class BoltServer : IDisposable
                 return false;
             }
 
-            if (!_pendingInvocations.TryAdd(requestId, new PendingInvocation(route.Sender, route.Recipient, Environment.TickCount64)))
+            var pending = new PendingInvocation(route.Sender, route.Recipient, Environment.TickCount64);
+            var addResult = TryAddPendingInvocation(requestId, pending);
+            if (addResult != PendingInvocationAddResult.Added)
             {
                 _logger.LogWarning(
-                    "Rejected large RPC request with duplicate request id. requestId={RequestId} client={ClientId}",
+                    "Rejected large RPC request. reason={Reason} requestId={RequestId} client={ClientId}",
+                    addResult,
                     requestId,
                     route.Sender.ClientId);
                 return false;
             }
 
             route.LargeRpcRequestTracked = true;
+            route.LargeRpcRequestOwnership = new LargeRpcPendingInvocationOwnership(requestId, pending);
+            route.LargeRpcExpectedPayloadBytes = expectedPayloadBytes;
             return true;
         }
     }
@@ -842,7 +1256,7 @@ public sealed class BoltServer : IDisposable
                 return false;
             }
 
-            if (!_pendingInvocations.TryRemove(requestId, out _))
+            if (!TryRemovePendingInvocation(requestId, pending, out _))
                 return false;
 
             route.LargeRpcResponseValidated = true;
@@ -850,9 +1264,13 @@ public sealed class BoltServer : IDisposable
         }
     }
 
-    private void CleanupStream(BoltHubConnection sender, byte[] buffer, int length)
+    private async Task CleanupStreamAsync(
+        BoltHubConnection sender,
+        byte[] buffer,
+        int length,
+        CancellationToken ct)
     {
-        if (!BoltCodec.TryReadStreamClose(buffer.AsSpan(0, length), out var streamId, out _))
+        if (!BoltCodec.TryReadStreamClose(buffer.AsSpan(0, length), out var streamId, out var statusCode))
             return;
 
         if (!_activeStreams.TryGetValue(streamId, out var peers))
@@ -867,7 +1285,67 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        _activeStreams.TryRemove(streamId, out _);
+        var releasePendingInvocation = IsAbortedLargeRpcRequest(peers, sender, statusCode);
+        if (!RemoveStreamRoute(streamId, peers, releasePendingInvocation, out var releasedOwnership) ||
+            releasedOwnership is null)
+        {
+            return;
+        }
+
+        var terminalStatus = statusCode != HttpStatusCode.OK
+            ? statusCode
+            : sender.StreamId == peers.Sender.StreamId
+                ? HttpStatusCode.BadRequest
+                : HttpStatusCode.ServiceUnavailable;
+        await SendLargeRpcTerminalResponseAsync(releasedOwnership, terminalStatus, ct);
+    }
+
+    private static bool IsAbortedLargeRpcRequest(
+        StreamRoute route,
+        BoltHubConnection closingConnection,
+        HttpStatusCode statusCode)
+    {
+        if (route.CommandHash != LargeRpcCommandHash)
+            return false;
+
+        lock (route.SyncRoot)
+        {
+            return route.LargeRpcRequestOwnership is not null &&
+                   (closingConnection.StreamId != route.Sender.StreamId ||
+                    statusCode != HttpStatusCode.OK ||
+                    route.LargeRpcRequestBytesReceived != route.LargeRpcExpectedPayloadBytes);
+        }
+    }
+
+    private bool RemoveStreamRoute(
+        Guid streamId,
+        StreamRoute route,
+        bool releaseLargeRpcPendingInvocation,
+        out LargeRpcPendingInvocationOwnership? releasedOwnership)
+    {
+        releasedOwnership = null;
+        if (!_activeStreams.TryRemove(new KeyValuePair<Guid, StreamRoute>(streamId, route)))
+            return false;
+
+        ReleaseQuota(_activeStreamsByPrincipal, route.Sender.QuotaKey);
+        if (releaseLargeRpcPendingInvocation)
+            releasedOwnership = ReleaseLargeRpcPendingInvocation(route);
+        return true;
+    }
+
+    private LargeRpcPendingInvocationOwnership? ReleaseLargeRpcPendingInvocation(StreamRoute route)
+    {
+        LargeRpcPendingInvocationOwnership? ownership;
+        lock (route.SyncRoot)
+        {
+            ownership = route.LargeRpcRequestOwnership;
+            route.LargeRpcRequestOwnership = null;
+        }
+
+        return ownership is not null &&
+               TryRemovePendingInvocation(ownership.RequestId, ownership.PendingInvocation, out _)
+            ? ownership
+            : null;
     }
 
     // ── Media frame routing ──
@@ -941,6 +1419,12 @@ public sealed class BoltServer : IDisposable
             if (!callState.MediaStreamIds.Contains(streamId))
                 callState.MediaStreamIds.Add(streamId);
         }
+    }
+
+    private static void RemoveMediaStream(ServerCallState callState, Guid streamId)
+    {
+        lock (callState.MediaStreamIds)
+            callState.MediaStreamIds.Remove(streamId);
     }
 
     /// <summary>
@@ -1030,9 +1514,7 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        if (!_activeCalls.TryGetValue(config.CallId, out var callState) ||
-            !IsCallMediaActive(callState) ||
-            !IsCallParticipant(callState, sender))
+        if (!_activeCalls.TryGetValue(config.CallId, out var callState))
         {
             _logger.LogWarning(
                 "Rejected MediaConfig for inactive or unauthorized call. streamId={StreamId} call={CallId} sender={Sender}",
@@ -1042,31 +1524,80 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        // Register or update the media stream route.
-        var route = _activeMediaStreams.GetOrAdd(config.StreamId, _ => new MediaStreamRoute
+        MediaStreamRoute? route;
+        IReadOnlyList<BoltHubConnection> recipients;
+        lock (callState.SyncRoot)
         {
-            Sender = sender,
-            CallId = config.CallId,
-        });
+            if (!_activeCalls.TryGetValue(config.CallId, out var currentCallState) ||
+                !ReferenceEquals(currentCallState, callState) ||
+                !IsCallMediaActive(callState) ||
+                !IsCallParticipant(callState, sender))
+            {
+                _logger.LogWarning(
+                    "Rejected MediaConfig for inactive or unauthorized call. streamId={StreamId} call={CallId} sender={Sender}",
+                    config.StreamId,
+                    config.CallId,
+                    sender.ClientId);
+                return;
+            }
 
-        if (route.Sender.StreamId != sender.StreamId || route.CallId != config.CallId)
-        {
-            _logger.LogWarning(
-                "Rejected MediaConfig that attempted to reuse a stream route. streamId={StreamId} owner={Owner} sender={Sender}",
-                config.StreamId,
-                route.Sender.ClientId,
-                sender.ClientId);
-            return;
+            var reservedMediaSlot = false;
+            if (!_activeMediaStreams.TryGetValue(config.StreamId, out route))
+            {
+                if (!TryReserveQuota(_activeMediaStreamsByPrincipal, sender.QuotaKey, _maxMediaStreamsPerPrincipal))
+                {
+                    BoltServerMetrics.RecordQuotaRejection("media_streams");
+                    _logger.LogWarning(
+                        "Rejected MediaConfig because principal media stream limit was reached. client={ClientId} maxStreams={MaxStreams}",
+                        sender.ClientId,
+                        _maxMediaStreamsPerPrincipal);
+                    return;
+                }
+
+                reservedMediaSlot = true;
+                var candidate = new MediaStreamRoute
+                {
+                    Sender = sender,
+                    CallId = config.CallId,
+                };
+
+                if (!_activeMediaStreams.TryAdd(config.StreamId, candidate))
+                {
+                    ReleaseQuota(_activeMediaStreamsByPrincipal, sender.QuotaKey);
+                    reservedMediaSlot = false;
+                    if (!_activeMediaStreams.TryGetValue(config.StreamId, out route))
+                        return;
+                }
+                else
+                {
+                    route = candidate;
+                }
+            }
+
+            if (route is null)
+                return;
+
+            if (route.Sender.StreamId != sender.StreamId || route.CallId != config.CallId)
+            {
+                if (reservedMediaSlot && _activeMediaStreams.TryRemove(config.StreamId, out _))
+                    ReleaseQuota(_activeMediaStreamsByPrincipal, sender.QuotaKey);
+
+                _logger.LogWarning(
+                    "Rejected MediaConfig that attempted to reuse a stream route. streamId={StreamId} owner={Owner} sender={Sender}",
+                    config.StreamId,
+                    route.Sender.ClientId,
+                    sender.ClientId);
+                return;
+            }
+
+            AddMediaStream(callState, config.StreamId);
+            route.AddRecipients(GetParticipantSnapshot(callState));
+            recipients = route.GetRecipientSnapshot();
         }
-
-        AddMediaStream(callState, config.StreamId);
-
-        // Add all call participants (except sender) as recipients
-        route.AddRecipients(GetParticipantSnapshot(callState));
 
         // Forward config to all recipients
         var data = buffer.AsMemory(0, length);
-        foreach (var recipient in route.GetRecipientSnapshot())
+        foreach (var recipient in recipients)
         {
             if (recipient.IsAlive && IsCallParticipant(callState, recipient))
             {
@@ -1509,14 +2040,25 @@ public sealed class BoltServer : IDisposable
             return;
 
         // Remove from all media stream recipient lists
-        foreach (var streamId in GetMediaStreamSnapshot(callState))
+        lock (callState.SyncRoot)
         {
-            if (_activeMediaStreams.TryGetValue(streamId, out var route))
+            foreach (var streamId in GetMediaStreamSnapshot(callState))
             {
-                if (route.Sender.ServiceHash == recipientHash)
-                    _activeMediaStreams.TryRemove(streamId, out _);
-                else
-                    route.RemoveRecipientsWhere(r => r.ServiceHash == recipientHash);
+                if (_activeMediaStreams.TryGetValue(streamId, out var route))
+                {
+                    if (route.Sender.ServiceHash == recipientHash)
+                    {
+                        if (_activeMediaStreams.TryRemove(streamId, out var removedRoute))
+                        {
+                            ReleaseQuota(_activeMediaStreamsByPrincipal, removedRoute.Sender.QuotaKey);
+                            RemoveMediaStream(callState, streamId);
+                        }
+                    }
+                    else
+                    {
+                        route.RemoveRecipientsWhere(r => r.ServiceHash == recipientHash);
+                    }
+                }
             }
         }
 
@@ -1599,8 +2141,14 @@ public sealed class BoltServer : IDisposable
     {
         if (_activeCalls.TryRemove(callId, out var callState))
         {
-            foreach (var streamId in GetMediaStreamSnapshot(callState))
-                _activeMediaStreams.TryRemove(streamId, out _);
+            lock (callState.SyncRoot)
+            {
+                foreach (var streamId in GetMediaStreamSnapshot(callState))
+                {
+                    if (_activeMediaStreams.TryRemove(streamId, out var removedRoute))
+                        ReleaseQuota(_activeMediaStreamsByPrincipal, removedRoute.Sender.QuotaKey);
+                }
+            }
         }
     }
 
@@ -1609,9 +2157,6 @@ public sealed class BoltServer : IDisposable
     private async Task HandleSubscribeFrameAsync(BoltHubConnection conn, byte[] buffer, int length, CancellationToken ct)
     {
         if (!BoltCodec.TryReadSubscribe(buffer.AsSpan(0, length), out var topicHash, out var durable, out var subscriberId, out var topic, out var actorAccessToken, out _))
-            return;
-
-        if (!TryRegisterTopicName(topicHash, topic))
             return;
 
         if (!await AuthorizeTopicAsync(
@@ -1632,9 +2177,35 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
+        if (durable && _durableStore is not null)
+        {
+            await HandleDurableSubscribeAsync(conn, topicHash, subscriberId, topic, ct);
+            return;
+        }
+
+        var subscriptionAlreadyActive = IsLiveSubscriptionActive(conn, topicHash);
+        if (!subscriptionAlreadyActive &&
+            !TryReserveQuota(_subscriptionsByPrincipal, conn.QuotaKey, _maxSubscriptionsPerPrincipal))
+        {
+            BoltServerMetrics.RecordQuotaRejection("subscriptions");
+            _logger.LogWarning(
+                "Rejected Bolt subscription because principal subscription limit was reached. client={ClientId} maxSubscriptions={MaxSubscriptions}",
+                conn.ClientId,
+                _maxSubscriptionsPerPrincipal);
+            return;
+        }
+
+        if (!TryRegisterTopicName(topicHash, topic))
+        {
+            if (!subscriptionAlreadyActive)
+                ReleaseQuota(_subscriptionsByPrincipal, conn.QuotaKey);
+            return;
+        }
+
         if (!durable)
         {
-            AddLiveSubscription(conn, topicHash);
+            if (!AddLiveSubscription(conn, topicHash) && !subscriptionAlreadyActive)
+                ReleaseQuota(_subscriptionsByPrincipal, conn.QuotaKey);
             _logger.LogDebug("Transient subscribe: topic={Topic}", topic);
             return;
         }
@@ -1642,35 +2213,125 @@ public sealed class BoltServer : IDisposable
         if (_durableStore is null)
         {
             _logger.LogWarning("Durable subscribe requested but no IDurableQueueStore configured. Falling back to transient.");
-            AddLiveSubscription(conn, topicHash);
+            if (!AddLiveSubscription(conn, topicHash) && !subscriptionAlreadyActive)
+                ReleaseQuota(_subscriptionsByPrincipal, conn.QuotaKey);
             return;
         }
 
-        // Durable: register subscriber and mark this connection as the current
-        // session immediately, but buffer live publishes until replay drains so
-        // live frames cannot overtake older replay frames.
-        await _durableStore.RegisterDurableSubscriberAsync(topicHash, subscriberId, ct);
-        var durableKey = (topicHash, subscriberId);
-        _liveDurableConnections[durableKey] = conn;
-        _replayingDurableSubscriptions[durableKey] = new DurableReplayState();
+    }
 
-        var fromSequence = await _durableStore.GetLastAckedSequenceAsync(topicHash, subscriberId, ct);
+    private bool AddLiveSubscription(BoltHubConnection conn, int topicHash)
+    {
+        var topicSet = _liveSubscribersByTopic.GetOrAdd(topicHash, _ => new ConcurrentDictionary<BoltHubConnection, byte>());
+        topicSet.TryAdd(conn, 0);
+
+        var connSet = _liveSubscriptionsByConnection.GetOrAdd(conn, _ => new ConcurrentDictionary<int, byte>());
+        return connSet.TryAdd(topicHash, 0);
+    }
+
+    private bool IsLiveSubscriptionActive(BoltHubConnection connection, int topicHash) =>
+        _liveSubscriptionsByConnection.TryGetValue(connection, out var topics) &&
+        topics.ContainsKey(topicHash);
+
+    private async Task HandleDurableSubscribeAsync(
+        BoltHubConnection connection,
+        int topicHash,
+        string subscriberId,
+        string topic,
+        CancellationToken ct)
+    {
+        var durableStore = _durableStore!;
+        var durableKey = (topicHash, subscriberId);
+        var gate = GetDurableSubscriptionGate(durableKey);
+        await gate.WaitAsync(ct);
+        try
+        {
+            _liveDurableConnections.TryGetValue(durableKey, out var previousConnection);
+            var alreadyActive = ReferenceEquals(previousConnection, connection);
+            if (!alreadyActive &&
+                !TryReserveQuota(
+                    _subscriptionsByPrincipal,
+                    connection.QuotaKey,
+                    _maxSubscriptionsPerPrincipal))
+            {
+                BoltServerMetrics.RecordQuotaRejection("subscriptions");
+                _logger.LogWarning(
+                    "Rejected durable Bolt subscription because principal subscription limit was reached. client={ClientId} maxSubscriptions={MaxSubscriptions}",
+                    connection.ClientId,
+                    _maxSubscriptionsPerPrincipal);
+                return;
+            }
+
+            var reservationHeld = !alreadyActive;
+            try
+            {
+                if (!TryRegisterTopicName(topicHash, topic))
+                    return;
+
+                if (!await durableStore.TryRegisterDurableSubscriberAsync(
+                        topicHash,
+                        subscriberId,
+                        _maxDurableSubscribersPerTopic,
+                        ct))
+                {
+                    BoltServerMetrics.RecordQuotaRejection("durable_subscribers");
+                    _logger.LogWarning(
+                        "Rejected durable Bolt subscription because topic subscriber cardinality was reached. topic={Topic} maxSubscribers={MaxSubscribers}",
+                        topic,
+                        _maxDurableSubscribersPerTopic);
+                    return;
+                }
+
+                if (!connection.IsAlive)
+                    return;
+
+                _liveDurableConnections[durableKey] = connection;
+                _replayingDurableSubscriptions[durableKey] = new DurableReplayState(connection);
+                if (previousConnection is not null && !alreadyActive)
+                    ReleaseQuota(_subscriptionsByPrincipal, previousConnection.QuotaKey);
+                reservationHeld = false;
+            }
+            finally
+            {
+                if (reservationHeld)
+                    ReleaseQuota(_subscriptionsByPrincipal, connection.QuotaKey);
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
+
+        if (!_liveDurableConnections.TryGetValue(durableKey, out var mappedConnection) ||
+            !ReferenceEquals(mappedConnection, connection))
+        {
+            return;
+        }
+
+        var fromSequence = await durableStore.GetLastAckedSequenceAsync(topicHash, subscriberId, ct);
         var maxBatch = _durableOptions?.MaxReplayBatchSize ?? 1000;
         var replayCount = 0;
-        var replayedBatchCount = 0;
+        int replayedBatchCount;
         do
         {
             replayedBatchCount = 0;
-            await foreach (var (seq, payload) in _durableStore.ReadFromAsync(topicHash, subscriberId, fromSequence, maxBatch, ct))
+            await foreach (var (seq, payload) in durableStore.ReadFromAsync(
+                               topicHash,
+                               subscriberId,
+                               fromSequence,
+                               maxBatch,
+                               ct))
             {
-                if (!_liveDurableConnections.TryGetValue(durableKey, out var mappedConnection) ||
-                    !ReferenceEquals(mappedConnection, conn))
+                if (!_liveDurableConnections.TryGetValue(durableKey, out mappedConnection) ||
+                    !ReferenceEquals(mappedConnection, connection))
+                {
                     return;
+                }
 
-                var w = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteEvent(w, topicHash, subscriberId, seq, isReplay: true, payload);
-                await conn.SendAsync(w.WrittenMemory, ct);
-                w.Reset();
+                var writer = RentedBufferWriter.GetThreadLocal();
+                BoltCodec.WriteEvent(writer, topicHash, subscriberId, seq, isReplay: true, payload);
+                await connection.SendAsync(writer.WrittenMemory, ct);
+                writer.Reset();
                 fromSequence = seq;
                 replayCount++;
                 replayedBatchCount++;
@@ -1678,18 +2339,19 @@ public sealed class BoltServer : IDisposable
         }
         while (replayedBatchCount == maxBatch && !ct.IsCancellationRequested);
 
-        await CompleteDurableReplayAsync(conn, topicHash, subscriberId, fromSequence, ct);
-
-        _logger.LogDebug("Durable subscribe: topic={Topic} subscriber={Subscriber} replayed={Count}", topic, subscriberId, replayCount);
+        await CompleteDurableReplayAsync(connection, topicHash, subscriberId, fromSequence, ct);
+        _logger.LogDebug(
+            "Durable subscribe: topic={Topic} subscriber={Subscriber} replayed={Count}",
+            topic,
+            subscriberId,
+            replayCount);
     }
 
-    private void AddLiveSubscription(BoltHubConnection conn, int topicHash)
+    private SemaphoreSlim GetDurableSubscriptionGate((int TopicHash, string SubscriberId) key)
     {
-        var topicSet = _liveSubscribersByTopic.GetOrAdd(topicHash, _ => new ConcurrentDictionary<BoltHubConnection, byte>());
-        topicSet.TryAdd(conn, 0);
-
-        var connSet = _liveSubscriptionsByConnection.GetOrAdd(conn, _ => new ConcurrentDictionary<int, byte>());
-        connSet.TryAdd(topicHash, 0);
+        var index = (int)((uint)HashCode.Combine(key.TopicHash, key.SubscriberId) %
+                          (uint)_durableSubscriptionGates.Length);
+        return _durableSubscriptionGates[index];
     }
 
     private async Task CompleteDurableReplayAsync(
@@ -1700,46 +2362,69 @@ public sealed class BoltServer : IDisposable
         CancellationToken ct)
     {
         var durableKey = (topicHash, subscriberId);
+        var gate = GetDurableSubscriptionGate(durableKey);
         while (!ct.IsCancellationRequested)
         {
-            if (!_replayingDurableSubscriptions.TryGetValue(durableKey, out var state))
-                return;
-
-            var events = new List<(long Sequence, byte[] Payload)>();
-            lock (state.SyncRoot)
+            await gate.WaitAsync(ct);
+            try
             {
-                while (state.DeferredEvents.TryDequeue(out var item))
-                    events.Add(item);
-
-                if (events.Count == 0)
+                if (!_liveDurableConnections.TryGetValue(durableKey, out var mappedConnection) ||
+                    !ReferenceEquals(mappedConnection, conn) ||
+                    !_replayingDurableSubscriptions.TryGetValue(durableKey, out var state) ||
+                    !ReferenceEquals(state.Owner, conn))
                 {
-                    state.AcceptingDeferredEvents = false;
-                    _replayingDurableSubscriptions.TryRemove(durableKey, out _);
                     return;
                 }
+
+                var events = new List<(long Sequence, byte[] Payload)>();
+                lock (state.SyncRoot)
+                {
+                    while (state.DeferredEvents.TryDequeue(out var item))
+                        events.Add(item);
+
+                    if (events.Count == 0)
+                    {
+                        state.AcceptingDeferredEvents = false;
+                        _replayingDurableSubscriptions.TryRemove(
+                            new KeyValuePair<(int TopicHash, string SubscriberId), DurableReplayState>(
+                                durableKey,
+                                state));
+                        return;
+                    }
+                }
+
+                foreach (var (sequence, payload) in events
+                             .OrderBy(item => item.Sequence == 0 ? long.MaxValue : item.Sequence))
+                {
+                    if (sequence > 0 && sequence <= lastReplayedSequence)
+                        continue;
+
+                    var w = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteEvent(w, topicHash, subscriberId, sequence, isReplay: false, payload);
+                    await conn.SendAsync(w.WrittenMemory, ct);
+                    w.Reset();
+                    if (sequence > 0)
+                        lastReplayedSequence = sequence;
+                }
             }
-
-            if (!_liveDurableConnections.TryGetValue(durableKey, out var mappedConnection) ||
-                !ReferenceEquals(mappedConnection, conn))
-                return;
-
-            foreach (var (sequence, payload) in events
-                         .OrderBy(item => item.Sequence == 0 ? long.MaxValue : item.Sequence))
+            finally
             {
-                if (sequence > 0 && sequence <= lastReplayedSequence)
-                    continue;
-
-                if (!_liveDurableConnections.TryGetValue(durableKey, out mappedConnection) ||
-                    !ReferenceEquals(mappedConnection, conn))
-                    return;
-
-                var w = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteEvent(w, topicHash, subscriberId, sequence, isReplay: false, payload);
-                await conn.SendAsync(w.WrittenMemory, ct);
-                w.Reset();
-                if (sequence > 0)
-                    lastReplayedSequence = sequence;
+                gate.Release();
             }
+        }
+    }
+
+    private void RemoveDurableReplayState(
+        (int TopicHash, string SubscriberId) durableKey,
+        BoltHubConnection owner)
+    {
+        if (_replayingDurableSubscriptions.TryGetValue(durableKey, out var replayState) &&
+            ReferenceEquals(replayState.Owner, owner))
+        {
+            _replayingDurableSubscriptions.TryRemove(
+                new KeyValuePair<(int TopicHash, string SubscriberId), DurableReplayState>(
+                    durableKey,
+                    replayState));
         }
     }
 
@@ -1748,15 +2433,13 @@ public sealed class BoltServer : IDisposable
         if (!BoltCodec.TryReadUnsubscribe(buffer.AsSpan(0, length), out var topicHash, out var topic, out var subscriberId, out var permanent, out var actorAccessToken, out _))
             return;
 
-        if (!TryRegisterTopicName(topicHash, topic))
-            return;
-
+        var durable = !string.Equals(subscriberId, conn.ClientId, StringComparison.Ordinal);
         if (!await AuthorizeTopicAsync(
                 conn,
                 BoltTopicOperation.Unsubscribe,
                 topic,
                 topicHash,
-                durable: !string.Equals(subscriberId, conn.ClientId, StringComparison.Ordinal),
+                durable,
                 subscriberId,
                 actorAccessToken,
                 ct))
@@ -1769,20 +2452,49 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
+        if (!TryRegisterTopicName(topicHash, topic))
+            return;
+
+        if (durable)
+        {
+            var durableKey = (topicHash, subscriberId);
+            var gate = GetDurableSubscriptionGate(durableKey);
+            await gate.WaitAsync(ct);
+            try
+            {
+                if (_liveDurableConnections.TryGetValue(durableKey, out var mappedConnection) &&
+                    ReferenceEquals(mappedConnection, conn))
+                {
+                    if (permanent && _durableStore is not null)
+                        await _durableStore.UnregisterDurableSubscriberAsync(topicHash, subscriberId, ct);
+
+                    if (_liveDurableConnections.TryRemove(
+                            new KeyValuePair<(int TopicHash, string SubscriberId), BoltHubConnection>(
+                                durableKey,
+                                conn)))
+                    {
+                        ReleaseQuota(_subscriptionsByPrincipal, conn.QuotaKey);
+                    }
+
+                    RemoveDurableReplayState(durableKey, conn);
+                }
+            }
+            finally
+            {
+                gate.Release();
+            }
+
+            _logger.LogDebug("Unsubscribe: topic={Topic} subscriber={Subscriber}", topic, subscriberId);
+            return;
+        }
+
         if (_liveSubscribersByTopic.TryGetValue(topicHash, out var topicSet))
             topicSet.TryRemove(conn, out _);
 
-        if (_liveSubscriptionsByConnection.TryGetValue(conn, out var connSet))
-            connSet.TryRemove(topicHash, out _);
-
-        var durableKey = (topicHash, subscriberId);
-        if (_liveDurableConnections.TryGetValue(durableKey, out var mappedConnection) &&
-            ReferenceEquals(mappedConnection, conn))
+        if (_liveSubscriptionsByConnection.TryGetValue(conn, out var connSet) &&
+            connSet.TryRemove(topicHash, out _))
         {
-            _liveDurableConnections.TryRemove(durableKey, out _);
-            _replayingDurableSubscriptions.TryRemove(durableKey, out _);
-            if (permanent && _durableStore is not null)
-                await _durableStore.UnregisterDurableSubscriberAsync(topicHash, subscriberId, ct);
+            ReleaseQuota(_subscriptionsByPrincipal, conn.QuotaKey);
         }
 
         _logger.LogDebug("Unsubscribe: topic={Topic} subscriber={Subscriber}", topic, subscriberId);
@@ -1791,9 +2503,6 @@ public sealed class BoltServer : IDisposable
     private async Task HandlePublishFrameAsync(BoltHubConnection publisher, byte[] buffer, int length, CancellationToken ct)
     {
         if (!BoltCodec.TryReadPublish(buffer.AsSpan(0, length), out var topicHash, out var topic, out var durableEligible, out var payloadOffset, out var payloadLength, out _))
-            return;
-
-        if (!TryRegisterTopicName(topicHash, topic))
             return;
 
         if (!await AuthorizeTopicAsync(
@@ -1813,6 +2522,9 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
+        if (!TryRegisterTopicName(topicHash, topic))
+            return;
+
         var payload = new byte[payloadLength];
         buffer.AsSpan(payloadOffset, payloadLength).CopyTo(payload);
 
@@ -1825,11 +2537,19 @@ public sealed class BoltServer : IDisposable
             foreach (var subscriberId in durableSubs)
             {
                 var durableKey = (topicHash, subscriberId);
-                var publishLock = _durablePublishLocks.GetOrAdd(durableKey, _ => new SemaphoreSlim(1, 1));
+                var publishLock = GetDurableSubscriptionGate(durableKey);
 
                 await publishLock.WaitAsync(ct);
                 try
                 {
+                    if (!await _durableStore.IsDurableSubscriberRegisteredAsync(
+                            topicHash,
+                            subscriberId,
+                            ct))
+                    {
+                        continue;
+                    }
+
                     long seq;
                     try
                     {
@@ -1843,7 +2563,8 @@ public sealed class BoltServer : IDisposable
 
                     if (_liveDurableConnections.TryGetValue(durableKey, out var liveConn) && liveConn != publisher)
                     {
-                        if (_replayingDurableSubscriptions.TryGetValue(durableKey, out var replayState))
+                        if (_replayingDurableSubscriptions.TryGetValue(durableKey, out var replayState) &&
+                            ReferenceEquals(replayState.Owner, liveConn))
                         {
                             var deferred = false;
                             lock (replayState.SyncRoot)
@@ -1875,33 +2596,50 @@ public sealed class BoltServer : IDisposable
         }
         else
         {
-            foreach (var (durableKey, liveConn) in _liveDurableConnections)
+            foreach (var (durableKey, snapshotConnection) in _liveDurableConnections)
             {
-                if (durableKey.TopicHash != topicHash || liveConn == publisher)
+                if (durableKey.TopicHash != topicHash || snapshotConnection == publisher)
                     continue;
 
-                if (_replayingDurableSubscriptions.TryGetValue(durableKey, out var replayState))
+                var gate = GetDurableSubscriptionGate(durableKey);
+                await gate.WaitAsync(ct);
+                try
                 {
-                    var deferred = false;
-                    lock (replayState.SyncRoot)
+                    if (!_liveDurableConnections.TryGetValue(durableKey, out var liveConn) ||
+                        !ReferenceEquals(liveConn, snapshotConnection) ||
+                        liveConn == publisher)
                     {
-                        if (replayState.AcceptingDeferredEvents)
-                        {
-                            replayState.DeferredEvents.Enqueue((0, payload));
-                            deferred = true;
-                        }
+                        continue;
                     }
 
-                    if (deferred)
-                        continue;
-                }
+                    if (_replayingDurableSubscriptions.TryGetValue(durableKey, out var replayState) &&
+                        ReferenceEquals(replayState.Owner, liveConn))
+                    {
+                        var deferred = false;
+                        lock (replayState.SyncRoot)
+                        {
+                            if (replayState.AcceptingDeferredEvents)
+                            {
+                                replayState.DeferredEvents.Enqueue((0, payload));
+                                deferred = true;
+                            }
+                        }
 
-                var w = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteEvent(w, topicHash, durableKey.SubscriberId, sequenceNumber: 0, isReplay: false, payload);
-                try { await liveConn.SendAsync(w.WrittenMemory, ct); }
-                catch { }
-                w.Reset();
-                deliveredConnections.Add(liveConn);
+                        if (deferred)
+                            continue;
+                    }
+
+                    var w = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteEvent(w, topicHash, durableKey.SubscriberId, sequenceNumber: 0, isReplay: false, payload);
+                    try { await liveConn.SendAsync(w.WrittenMemory, ct); }
+                    catch { }
+                    w.Reset();
+                    deliveredConnections.Add(liveConn);
+                }
+                finally
+                {
+                    gate.Release();
+                }
             }
         }
 
@@ -1929,9 +2667,6 @@ public sealed class BoltServer : IDisposable
 
         if (_durableStore is null) return;
 
-        if (!TryRegisterTopicName(topicHash, topic))
-            return;
-
         if (!await AuthorizeTopicAsync(
                 conn,
                 BoltTopicOperation.Ack,
@@ -1949,6 +2684,9 @@ public sealed class BoltServer : IDisposable
                 subscriberId);
             return;
         }
+
+        if (!TryRegisterTopicName(topicHash, topic))
+            return;
 
         if (!_liveDurableConnections.TryGetValue((topicHash, subscriberId), out var mappedConnection) ||
             !ReferenceEquals(mappedConnection, conn))
@@ -2012,11 +2750,128 @@ public sealed class BoltServer : IDisposable
 
         foreach (var authorizer in _topicAuthorizers)
         {
-            if (!await authorizer.AuthorizeAsync(context, ct))
+            try
+            {
+                if (!await authorizer.AuthorizeAsync(context, ct))
+                    return false;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Rejected Bolt topic operation because authorizer {Authorizer} failed. client={ClientId} topic={Topic} operation={Operation}",
+                    authorizer.GetType().Name,
+                    connection.ClientId,
+                    topic,
+                    operation);
                 return false;
+            }
         }
 
         return true;
+    }
+
+    private PendingInvocationAddResult TryAddPendingInvocation(Guid requestId, PendingInvocation pending)
+    {
+        if (!_pendingInvocationSlots.Wait(0))
+            return PendingInvocationAddResult.CapacityExceeded;
+
+        if (!TryReserveQuota(
+                _pendingInvocationsByPrincipal,
+                pending.Caller.QuotaKey,
+                _maxPendingRpcCallsPerPrincipal))
+        {
+            _pendingInvocationSlots.Release();
+            return PendingInvocationAddResult.CapacityExceeded;
+        }
+
+        if (_pendingInvocations.TryAdd(requestId, pending))
+            return PendingInvocationAddResult.Added;
+
+        ReleaseQuota(_pendingInvocationsByPrincipal, pending.Caller.QuotaKey);
+        _pendingInvocationSlots.Release();
+        return PendingInvocationAddResult.Duplicate;
+    }
+
+    private bool TryRemovePendingInvocation(
+        Guid requestId,
+        PendingInvocation expected,
+        out PendingInvocation pending)
+    {
+        if (!_pendingInvocations.TryRemove(new KeyValuePair<Guid, PendingInvocation>(requestId, expected)))
+        {
+            pending = null!;
+            return false;
+        }
+
+        pending = expected;
+        ReleasePendingInvocationCapacity(pending);
+        return true;
+    }
+
+    private void ReleasePendingInvocationCapacity(PendingInvocation pending)
+    {
+        ReleaseQuota(_pendingInvocationsByPrincipal, pending.Caller.QuotaKey);
+        _pendingInvocationSlots.Release();
+    }
+
+    private string? ResolvePrincipalQuotaKey(ClaimsPrincipal? user, string clientId)
+    {
+        if (user?.Identity?.IsAuthenticated != true)
+            return $"anonymous-client:{clientId}";
+
+        var identityValue = user is not null && HasRequiredServiceScope(user)
+            ? ResolveServiceIdentityName(user)
+            : user?.FindFirst("sub")?.Value ??
+              user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+              user?.Identity?.Name;
+
+        return string.IsNullOrWhiteSpace(identityValue)
+            ? null
+            : $"principal:{identityValue}";
+    }
+
+    private static bool TryReserveQuota(
+        ConcurrentDictionary<string, int> counts,
+        string quotaKey,
+        int maximum)
+    {
+        while (true)
+        {
+            if (!counts.TryGetValue(quotaKey, out var current))
+            {
+                if (counts.TryAdd(quotaKey, 1))
+                    return true;
+
+                continue;
+            }
+
+            if (current >= maximum)
+                return false;
+
+            if (counts.TryUpdate(quotaKey, current + 1, current))
+                return true;
+        }
+    }
+
+    private static void ReleaseQuota(ConcurrentDictionary<string, int> counts, string quotaKey)
+    {
+        while (counts.TryGetValue(quotaKey, out var current))
+        {
+            if (current <= 1)
+            {
+                if (counts.TryRemove(new KeyValuePair<string, int>(quotaKey, current)))
+                    return;
+            }
+            else if (counts.TryUpdate(quotaKey, current - 1, current))
+            {
+                return;
+            }
+        }
     }
 
     private bool ValidateRegisterIdentity(BoltHubConnection connection, string clientId, string clientName)
@@ -2051,6 +2906,18 @@ public sealed class BoltServer : IDisposable
         if (rejectionReason is null)
             return true;
 
+        if (hasServiceScope &&
+            !string.IsNullOrWhiteSpace(serviceClaim) &&
+            IsRegistrationMigrationAllowed(serviceClaim, clientId, clientName))
+        {
+            _logger.LogWarning(
+                "Allowed Bolt registration through an expiring migration mapping. authenticatedService={AuthenticatedService} clientId={ClientId} clientName={ClientName}",
+                serviceClaim,
+                clientId,
+                clientName);
+            return true;
+        }
+
         if (_registrationIdentityBindingMode == BoltRegistrationIdentityBindingMode.Audit)
         {
             _logger.LogWarning(
@@ -2069,6 +2936,50 @@ public sealed class BoltServer : IDisposable
             clientName,
             serviceClaim);
         return false;
+    }
+
+    private static void ValidateMigrationAllowances(
+        IReadOnlyCollection<BoltRegistrationMigrationAllowance> allowances)
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var allowance in allowances)
+        {
+            if (string.IsNullOrWhiteSpace(allowance.AuthenticatedServiceName) ||
+                string.IsNullOrWhiteSpace(allowance.ClientId) ||
+                string.IsNullOrWhiteSpace(allowance.ClientName))
+            {
+                throw new InvalidOperationException(
+                    "Bolt registration migration allowances require AuthenticatedServiceName, ClientId, and ClientName.");
+            }
+
+            if (allowance.ExpiresAtUtc <= now)
+            {
+                throw new InvalidOperationException(
+                    $"Bolt registration migration allowance for '{allowance.ClientName}' is expired.");
+            }
+
+            if (allowance.ExpiresAtUtc > now.Add(MaxMigrationAllowanceLifetime))
+            {
+                throw new InvalidOperationException(
+                    $"Bolt registration migration allowance for '{allowance.ClientName}' exceeds the seven-day maximum lifetime.");
+            }
+        }
+    }
+
+    private bool IsRegistrationMigrationAllowed(
+        string authenticatedServiceName,
+        string clientId,
+        string clientName)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return _registrationMigrationAllowances.Any(allowance =>
+            allowance.ExpiresAtUtc > now &&
+            string.Equals(
+                allowance.AuthenticatedServiceName,
+                authenticatedServiceName,
+                StringComparison.Ordinal) &&
+            string.Equals(allowance.ClientId, clientId, StringComparison.Ordinal) &&
+            string.Equals(allowance.ClientName, clientName, StringComparison.Ordinal));
     }
 
     private bool IsReservedServiceIdentity(string clientId, string clientName) =>
@@ -2152,8 +3063,12 @@ public sealed class BoltServer : IDisposable
 
     private async Task RemoveConnectionAsync(BoltHubConnection connection)
     {
+        using var notificationCts = new CancellationTokenSource(_transportCloseTimeout);
+        var peerNotifications = new List<Task>();
+
         if (connection.ClientId is not null)
         {
+            ReleaseQuota(_connectionCountsByPrincipal, connection.QuotaKey);
             _connectionsByStreamId.TryRemove(connection.StreamId, out _);
 
             if (_connectionsByServiceHash.TryGetValue(connection.ServiceHash, out var bag))
@@ -2172,13 +3087,68 @@ public sealed class BoltServer : IDisposable
             }
 
             _logger.LogInformation("Client disconnected: {ClientId} ({ClientName})", connection.ClientId, connection.ClientName);
-            await NotifyClientDisconnectedAsync(connection, CancellationToken.None);
         }
 
         foreach (var (requestId, pending) in _pendingInvocations)
         {
-            if (pending.Caller.StreamId == connection.StreamId || pending.ExpectedResponder.StreamId == connection.StreamId)
-                _pendingInvocations.TryRemove(requestId, out _);
+            if (pending.Caller.StreamId != connection.StreamId &&
+                pending.ExpectedResponder.StreamId != connection.StreamId)
+            {
+                continue;
+            }
+
+            if (!TryRemovePendingInvocation(requestId, pending, out var removedPending))
+                continue;
+
+            if (removedPending.ExpectedResponder.StreamId == connection.StreamId &&
+                removedPending.Caller.StreamId != connection.StreamId &&
+                removedPending.Caller.IsAlive)
+            {
+                peerNotifications.Add(SendUnavailableResponseAsync(
+                    removedPending.Caller,
+                    requestId,
+                    notificationCts.Token));
+            }
+        }
+
+        foreach (var (streamId, route) in _activeStreams)
+        {
+            if (route.Sender.StreamId != connection.StreamId && route.Recipient.StreamId != connection.StreamId)
+                continue;
+
+            if (RemoveStreamRoute(
+                    streamId,
+                    route,
+                    releaseLargeRpcPendingInvocation: true,
+                    out var releasedOwnership))
+            {
+                if (releasedOwnership is not null &&
+                    releasedOwnership.PendingInvocation.ExpectedResponder.StreamId == connection.StreamId &&
+                    releasedOwnership.PendingInvocation.Caller.IsAlive)
+                {
+                    peerNotifications.Add(SendUnavailableResponseAsync(
+                        releasedOwnership.PendingInvocation.Caller,
+                        releasedOwnership.RequestId,
+                        notificationCts.Token));
+                }
+
+                var survivingPeer = route.Sender.StreamId == connection.StreamId
+                    ? route.Recipient
+                    : route.Sender;
+                if (survivingPeer.StreamId != connection.StreamId && survivingPeer.IsAlive)
+                {
+                    peerNotifications.Add(SendUnavailableStreamCloseAsync(
+                        survivingPeer,
+                        streamId,
+                        notificationCts.Token));
+                }
+            }
+        }
+
+        if (peerNotifications.Count > 0)
+        {
+            try { await Task.WhenAll(peerNotifications).WaitAsync(notificationCts.Token); }
+            catch (OperationCanceledException) when (notificationCts.IsCancellationRequested) { }
         }
 
         // End any active calls this connection is part of
@@ -2217,8 +3187,11 @@ public sealed class BoltServer : IDisposable
             route.RemoveRecipientsWhere(r => r.StreamId == connection.StreamId);
 
             // If sender disconnected, remove the whole route
-            if (route.Sender.StreamId == connection.StreamId)
-                _activeMediaStreams.TryRemove(streamId, out _);
+            if (route.Sender.StreamId == connection.StreamId &&
+                _activeMediaStreams.TryRemove(streamId, out var removedRoute))
+            {
+                ReleaseQuota(_activeMediaStreamsByPrincipal, removedRoute.Sender.QuotaKey);
+            }
         }
 
         // Clean up pub/sub subscriptions for this connection
@@ -2228,6 +3201,7 @@ public sealed class BoltServer : IDisposable
             {
                 if (_liveSubscribersByTopic.TryGetValue(topicHash, out var topicSet))
                     topicSet.TryRemove(connection, out _);
+                ReleaseQuota(_subscriptionsByPrincipal, connection.QuotaKey);
             }
         }
 
@@ -2235,9 +3209,154 @@ public sealed class BoltServer : IDisposable
         var keysToRemove = _liveDurableConnections.Where(kvp => kvp.Value == connection).Select(kvp => kvp.Key).ToList();
         foreach (var key in keysToRemove)
         {
-            _liveDurableConnections.TryRemove(key, out _);
-            _replayingDurableSubscriptions.TryRemove(key, out _);
+            var gate = GetDurableSubscriptionGate(key);
+            using var gateCts = new CancellationTokenSource(_transportCloseTimeout);
+            var lockTaken = false;
+            try
+            {
+                await gate.WaitAsync(gateCts.Token);
+                lockTaken = true;
+            }
+            catch (OperationCanceledException) when (gateCts.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    "Durable subscription cleanup gate timed out; cleanup will retry. topicHash={TopicHash} subscriber={Subscriber}",
+                    key.TopicHash,
+                    key.SubscriberId);
+                _ = CleanupDurableBindingWhenAvailableAsync(key, connection);
+                continue;
+            }
+
+            try
+            {
+                RemoveDurableBindingUnderGate(key, connection);
+            }
+            finally
+            {
+                if (lockTaken)
+                    gate.Release();
+            }
         }
+
+        await NotifyClientDisconnectedAsync(connection, CancellationToken.None);
+    }
+
+    private async Task SendUnavailableResponseAsync(
+        BoltHubConnection caller,
+        Guid requestId,
+        CancellationToken ct)
+    {
+        try
+        {
+            var writer = new ArrayBufferWriter<byte>(BoltCodec.ResponseHeaderSize);
+            BoltCodec.WriteResponse(
+                writer,
+                requestId,
+                HttpStatusCode.ServiceUnavailable,
+                ReadOnlySpan<byte>.Empty);
+            await caller.SendAsync(writer.WrittenMemory, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogDebug(ex, "Failed to notify caller that RPC {RequestId} lost its responder", requestId);
+        }
+    }
+
+    private async Task SendLargeRpcTerminalResponseAsync(
+        LargeRpcPendingInvocationOwnership ownership,
+        HttpStatusCode statusCode,
+        CancellationToken ct)
+    {
+        var pending = ownership.PendingInvocation;
+        if (!pending.Caller.IsAlive)
+            return;
+
+        try
+        {
+            var payload = new byte[18];
+            ownership.RequestId.TryWriteBytes(payload);
+            BinaryPrimitives.WriteInt16LittleEndian(payload.AsSpan(16), (short)statusCode);
+
+            var writer = new ArrayBufferWriter<byte>(64);
+            BoltCodec.WritePush(
+                writer,
+                Guid.NewGuid(),
+                pending.Caller.ServiceHash,
+                pending.ExpectedResponder.ServiceHash,
+                LargeRpcResponseHash,
+                payload);
+            await pending.Caller.SendAsync(writer.WrittenMemory, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogDebug(
+                ex,
+                "Failed to complete aborted large RPC {RequestId} with status {StatusCode}",
+                ownership.RequestId,
+                statusCode);
+        }
+    }
+
+    private async Task SendUnavailableStreamCloseAsync(
+        BoltHubConnection peer,
+        Guid streamId,
+        CancellationToken ct)
+    {
+        try
+        {
+            var writer = new ArrayBufferWriter<byte>(BoltCodec.StreamCloseSize);
+            BoltCodec.WriteStreamClose(writer, streamId, HttpStatusCode.ServiceUnavailable);
+            await peer.SendAsync(writer.WrittenMemory, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogDebug(ex, "Failed to close stream {StreamId} after its peer disconnected", streamId);
+        }
+    }
+
+    private async Task CleanupDurableBindingWhenAvailableAsync(
+        (int TopicHash, string SubscriberId) key,
+        BoltHubConnection connection)
+    {
+        var gate = GetDurableSubscriptionGate(key);
+        try
+        {
+            await gate.WaitAsync(_shutdownCts.Token);
+        }
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            RemoveDurableBindingUnderGate(key, connection);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Deferred durable subscription cleanup failed. topicHash={TopicHash} subscriber={Subscriber}",
+                key.TopicHash,
+                key.SubscriberId);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private void RemoveDurableBindingUnderGate(
+        (int TopicHash, string SubscriberId) key,
+        BoltHubConnection connection)
+    {
+        if (_liveDurableConnections.TryRemove(
+                new KeyValuePair<(int TopicHash, string SubscriberId), BoltHubConnection>(key, connection)))
+        {
+            ReleaseQuota(_subscriptionsByPrincipal, connection.QuotaKey);
+        }
+
+        RemoveDurableReplayState(key, connection);
     }
 
     private async Task NotifyClientRegisteredAsync(BoltHubConnection connection, CancellationToken ct)
@@ -2247,11 +3366,20 @@ public sealed class BoltServer : IDisposable
             return;
 
         var connectionEvent = BoltClientConnectionEvent.FromConnection(connection);
+        using var deadlineCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadlineCts.CancelAfter(_transportCloseTimeout);
         foreach (Func<BoltClientConnectionEvent, CancellationToken, Task> subscriber in handler.GetInvocationList())
         {
             try
             {
-                await subscriber(connectionEvent, ct);
+                await subscriber(connectionEvent, deadlineCts.Token).WaitAsync(deadlineCts.Token);
+            }
+            catch (OperationCanceledException) when (deadlineCts.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    "Client registered subscriber deadline elapsed for {ClientId}",
+                    connection.ClientId);
+                break;
             }
             catch (Exception ex)
             {
@@ -2267,11 +3395,20 @@ public sealed class BoltServer : IDisposable
             return;
 
         var connectionEvent = BoltClientConnectionEvent.FromConnection(connection);
+        using var deadlineCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadlineCts.CancelAfter(_transportCloseTimeout);
         foreach (Func<BoltClientConnectionEvent, CancellationToken, Task> subscriber in handler.GetInvocationList())
         {
             try
             {
-                await subscriber(connectionEvent, ct);
+                await subscriber(connectionEvent, deadlineCts.Token).WaitAsync(deadlineCts.Token);
+            }
+            catch (OperationCanceledException) when (deadlineCts.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    "Client disconnected subscriber deadline elapsed for {ClientId}",
+                    connection.ClientId);
+                break;
             }
             catch (Exception ex)
             {
@@ -2287,7 +3424,7 @@ public sealed class BoltServer : IDisposable
         {
             if (now - pending.Timestamp > _invocationTimeoutMs)
             {
-                if (_pendingInvocations.TryRemove(requestId, out _))
+                if (TryRemovePendingInvocation(requestId, pending, out _))
                     _logger.LogDebug("Cleaned up stale invocation {RequestId}", requestId);
             }
         }
@@ -2344,9 +3481,15 @@ public sealed class BoltServer : IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        _shutdownCts.Cancel();
         _mediaTapCts.Cancel();
         _mediaTapChannel.Writer.TryComplete();
         _cleanupTimer.Dispose();
+        foreach (var (requestId, pending) in _pendingInvocations)
+            TryRemovePendingInvocation(requestId, pending, out _);
         _mediaTapCts.Dispose();
     }
 }
@@ -2387,10 +3530,19 @@ public sealed record BoltClientConnectionEvent(
             DateTime.UtcNow);
 }
 
-internal sealed record PendingInvocation(
-    BoltHubConnection Caller,
-    BoltHubConnection ExpectedResponder,
-    long Timestamp);
+internal sealed class PendingInvocation(
+    BoltHubConnection caller,
+    BoltHubConnection expectedResponder,
+    long timestamp)
+{
+    public BoltHubConnection Caller { get; } = caller;
+    public BoltHubConnection ExpectedResponder { get; } = expectedResponder;
+    public long Timestamp { get; } = timestamp;
+}
+
+internal sealed record LargeRpcPendingInvocationOwnership(
+    Guid RequestId,
+    PendingInvocation PendingInvocation);
 
 internal sealed class StreamRoute(BoltHubConnection sender, BoltHubConnection recipient, int commandHash)
 {
@@ -2399,8 +3551,20 @@ internal sealed class StreamRoute(BoltHubConnection sender, BoltHubConnection re
     public int CommandHash { get; } = commandHash;
     public object SyncRoot { get; } = new();
     public bool LargeRpcRequestTracked { get; set; }
+    public LargeRpcPendingInvocationOwnership? LargeRpcRequestOwnership { get; set; }
+    public long LargeRpcExpectedPayloadBytes { get; set; }
+    public long LargeRpcRequestBytesReceived { get; set; }
     public bool LargeRpcResponseValidated { get; set; }
 }
+
+public sealed class BoltSendEnqueueTimeoutException(string message, Exception innerException)
+    : TimeoutException(message, innerException);
+
+public sealed class BoltTransportSendTimeoutException(string message, Exception innerException)
+    : TimeoutException(message, innerException);
+
+public sealed class BoltTransportSendException(string message, Exception? innerException = null)
+    : IOException(message, innerException);
 
 /// <summary>
 /// Server-side wrapper for a connected client's transport.
@@ -2411,19 +3575,38 @@ internal sealed class StreamRoute(BoltHubConnection sender, BoltHubConnection re
 /// </summary>
 public sealed class BoltHubConnection
 {
+    private sealed record PendingSend(
+        byte[] Buffer,
+        int Length,
+        TaskCompletionSource<bool>? TransportCompletion);
+
     private readonly IBoltConnection _transport;
-    private readonly Channel<(byte[] Buffer, int Length)> _sendChannel;
+    private readonly Channel<PendingSend> _sendChannel;
     private readonly TimeSpan _sendEnqueueTimeout;
+    private int _isClosing;
+    private Exception? _sendFailure;
     public Task? SendLoop { get; private set; }
 
     public string StreamId { get; } = Guid.NewGuid().ToString("N");
+    internal string QuotaKey { get; set; }
     public string? ClientId { get; set; }
     public string? ClientName { get; set; }
     public ClaimsPrincipal? User { get; set; }
     public int ServiceHash { get; set; }
     public bool IsRegistered { get; set; }
-    public bool IsAlive => _transport.IsConnected;
+    public bool IsAlive => !IsClosing && _transport.IsConnected;
+    internal bool IsClosing => Volatile.Read(ref _isClosing) != 0;
     public BoltTransport TransportType => _transport.TransportType;
+    public Exception? SendFailure => Volatile.Read(ref _sendFailure);
+
+    public long SendEnqueueTimeoutCount => Interlocked.Read(ref _sendEnqueueTimeoutCount);
+    private long _sendEnqueueTimeoutCount;
+
+    public long TransportSendTimeoutCount => Interlocked.Read(ref _transportSendTimeoutCount);
+    private long _transportSendTimeoutCount;
+
+    public long TransportSendFailureCount => Interlocked.Read(ref _transportSendFailureCount);
+    private long _transportSendFailureCount;
 
     /// <summary>Pending bytes queued for this connection. Used for backpressure decisions.</summary>
     public long PendingBytes => Interlocked.Read(ref _pendingBytes);
@@ -2441,10 +3624,11 @@ public sealed class BoltHubConnection
     public BoltHubConnection(IBoltConnection transport, int sendQueueCapacity = 4096, int sendEnqueueTimeoutMs = 0)
     {
         _transport = transport;
+        QuotaKey = StreamId;
         _sendEnqueueTimeout = sendEnqueueTimeoutMs > 0
             ? TimeSpan.FromMilliseconds(sendEnqueueTimeoutMs)
             : TimeSpan.Zero;
-        _sendChannel = Channel.CreateBounded<(byte[], int)>(
+        _sendChannel = Channel.CreateBounded<PendingSend>(
             new BoundedChannelOptions(Math.Max(1, sendQueueCapacity))
             {
                 FullMode = BoundedChannelFullMode.Wait,
@@ -2454,49 +3638,120 @@ public sealed class BoltHubConnection
     }
 
     /// <summary>Start the background send loop. Call once after construction.</summary>
-    public void StartSendLoop(CancellationToken ct)
+    public void StartSendLoop(CancellationToken ct, Action<Exception>? onFailure = null)
     {
+        if (SendLoop is not null)
+            throw new InvalidOperationException("The Bolt send loop has already been started.");
+
         SendLoop = Task.Run(async () =>
         {
+            Exception? terminalFailure = null;
             try
             {
-                await foreach (var (buf, len) in _sendChannel.Reader.ReadAllAsync(ct))
+                await foreach (var pending in _sendChannel.Reader.ReadAllAsync(ct))
                 {
+                    Task? transportSend = null;
+                    CancellationTokenSource? sendTimeoutCts = null;
+                    CancellationTokenSource? linkedSendCts = null;
                     try
                     {
-                        if (_transport.IsConnected)
-                        {
-                            using var sendTimeoutCts = _sendEnqueueTimeout > TimeSpan.Zero
-                                ? new CancellationTokenSource(_sendEnqueueTimeout)
-                                : null;
-                            using var linkedSendCts = sendTimeoutCts is null
-                                ? CancellationTokenSource.CreateLinkedTokenSource(ct)
-                                : CancellationTokenSource.CreateLinkedTokenSource(ct, sendTimeoutCts.Token);
-                            await _transport.SendAsync(buf.AsMemory(0, len), linkedSendCts.Token);
-                        }
+                        if (!_transport.IsConnected)
+                            throw CreateTransportFailure("Bolt transport disconnected before a queued send completed.");
+
+                        sendTimeoutCts = _sendEnqueueTimeout > TimeSpan.Zero
+                            ? new CancellationTokenSource(_sendEnqueueTimeout)
+                            : null;
+                        linkedSendCts = sendTimeoutCts is null
+                            ? CancellationTokenSource.CreateLinkedTokenSource(ct)
+                            : CancellationTokenSource.CreateLinkedTokenSource(ct, sendTimeoutCts.Token);
+
+                        transportSend = _transport
+                            .SendAsync(pending.Buffer.AsMemory(0, pending.Length), linkedSendCts.Token)
+                            .AsTask();
+                        await transportSend.WaitAsync(linkedSendCts.Token);
+                        pending.TransportCompletion?.TrySetResult(true);
                     }
-                    catch (OperationCanceledException) { }
-                    catch { /* Transport error — receive loop will detect disconnect */ }
+                    catch (OperationCanceledException ex) when (
+                        sendTimeoutCts?.IsCancellationRequested == true &&
+                        !ct.IsCancellationRequested)
+                    {
+                        Interlocked.Increment(ref _transportSendTimeoutCount);
+                        var timeout = new BoltTransportSendTimeoutException(
+                            $"Bolt transport send timed out after {_sendEnqueueTimeout.TotalMilliseconds:0} ms.",
+                            ex);
+                        pending.TransportCompletion?.TrySetException(timeout);
+                        throw timeout;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        pending.TransportCompletion?.TrySetCanceled(ct);
+                        throw;
+                    }
+                    catch (BoltTransportSendException ex)
+                    {
+                        pending.TransportCompletion?.TrySetException(ex);
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        var failure = CreateTransportFailure("Bolt transport send failed.", ex);
+                        pending.TransportCompletion?.TrySetException(failure);
+                        throw failure;
+                    }
                     finally
                     {
-                        ArrayPool<byte>.Shared.Return(buf);
-                        Interlocked.Add(ref _pendingBytes, -len);
+                        linkedSendCts?.Dispose();
+                        sendTimeoutCts?.Dispose();
+                        if (transportSend is { IsCompleted: false })
+                            _ = ReleaseWhenTransportCompletesAsync(transportSend, pending);
+                        else
+                            ReleasePendingSend(pending);
                     }
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                terminalFailure = ex;
+                Volatile.Write(ref _sendFailure, ex);
+                BeginClose();
+                _sendChannel.Writer.TryComplete(ex);
+                try { onFailure?.Invoke(ex); }
+                catch { }
+                throw;
+            }
             finally
             {
                 while (_sendChannel.Reader.TryRead(out var pending))
                 {
-                    ArrayPool<byte>.Shared.Return(pending.Buffer);
-                    Interlocked.Add(ref _pendingBytes, -pending.Length);
+                    if (terminalFailure is not null)
+                        pending.TransportCompletion?.TrySetException(terminalFailure);
+                    else
+                        pending.TransportCompletion?.TrySetCanceled(ct);
+                    ReleasePendingSend(pending);
                 }
             }
-        }, ct);
+        });
     }
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        ThrowIfUnavailable();
+        return EnqueueAsync(data, transportCompletion: null, ct);
+    }
+
+    private async ValueTask SendReliableAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        ThrowIfUnavailable();
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await EnqueueAsync(data, completion, ct);
+        await completion.Task.WaitAsync(ct);
+    }
+
+    private ValueTask EnqueueAsync(
+        ReadOnlyMemory<byte> data,
+        TaskCompletionSource<bool>? transportCompletion,
+        CancellationToken ct)
     {
         // Snapshot into a pooled buffer — the caller's buffer (thread-local RentedBufferWriter
         // or pooled receive buffer) may be reused before the async transport write completes.
@@ -2504,14 +3759,15 @@ public sealed class BoltHubConnection
         var buf = ArrayPool<byte>.Shared.Rent(len);
         data.Span.CopyTo(buf);
         Interlocked.Add(ref _pendingBytes, len);
+        var pending = new PendingSend(buf, len, transportCompletion);
 
         // All sends go through Channel (serialized single-writer)
-        if (_sendChannel.Writer.TryWrite((buf, len)))
+        if (_sendChannel.Writer.TryWrite(pending))
             return ValueTask.CompletedTask;
-        return SendSlowAsync(buf, len, ct);
+        return SendSlowAsync(pending, ct);
     }
 
-    private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)
+    private async ValueTask SendSlowAsync(PendingSend pending, CancellationToken ct)
     {
         CancellationTokenSource? timeoutCts = null;
         CancellationTokenSource? linkedCts = null;
@@ -2525,12 +3781,19 @@ public sealed class BoltHubConnection
                 enqueueToken = linkedCts.Token;
             }
 
-            await _sendChannel.Writer.WriteAsync((buf, len), enqueueToken);
+            await _sendChannel.Writer.WriteAsync(pending, enqueueToken);
+        }
+        catch (OperationCanceledException ex) when (timeoutCts?.IsCancellationRequested == true && !ct.IsCancellationRequested)
+        {
+            Interlocked.Increment(ref _sendEnqueueTimeoutCount);
+            ReleasePendingSend(pending);
+            throw new BoltSendEnqueueTimeoutException(
+                $"Bolt send queue enqueue timed out after {_sendEnqueueTimeout.TotalMilliseconds:0} ms.",
+                ex);
         }
         catch
         {
-            ArrayPool<byte>.Shared.Return(buf);
-            Interlocked.Add(ref _pendingBytes, -len);
+            ReleasePendingSend(pending);
             throw;
         }
         finally
@@ -2543,7 +3806,46 @@ public sealed class BoltHubConnection
     /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>
     public void CompleteSendChannel() => _sendChannel.Writer.TryComplete();
 
+    internal void BeginClose() => Interlocked.Exchange(ref _isClosing, 1);
+
+    internal async ValueTask SendAndCloseAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        await SendReliableAsync(data, ct);
+        BeginClose();
+        CompleteSendChannel();
+        if (SendLoop is not null)
+            await SendLoop.WaitAsync(ct);
+        await _transport.CloseAsync(ct);
+    }
+
     public ValueTask CloseAsync(CancellationToken ct = default) => _transport.CloseAsync(ct);
+
+    private BoltTransportSendException CreateTransportFailure(string message, Exception? innerException = null)
+    {
+        Interlocked.Increment(ref _transportSendFailureCount);
+        return new BoltTransportSendException(message, innerException);
+    }
+
+    private void ThrowIfUnavailable()
+    {
+        if (SendFailure is { } failure)
+            throw new BoltTransportSendException("The Bolt connection was retired after a transport send failure.", failure);
+        if (IsClosing)
+            throw new InvalidOperationException("The Bolt connection is closing and cannot accept sends.");
+    }
+
+    private void ReleasePendingSend(PendingSend pending)
+    {
+        ArrayPool<byte>.Shared.Return(pending.Buffer);
+        Interlocked.Add(ref _pendingBytes, -pending.Length);
+    }
+
+    private async Task ReleaseWhenTransportCompletesAsync(Task transportSend, PendingSend pending)
+    {
+        try { await transportSend; }
+        catch { }
+        finally { ReleasePendingSend(pending); }
+    }
 }
 
 /// <summary>
@@ -2625,6 +3927,7 @@ internal enum ServerCallStatus { Ringing, Active, Held, Ended, Rejected, Missed 
 /// </summary>
 internal sealed class ServerCallState
 {
+    public object SyncRoot { get; } = new();
     public Guid CallId { get; init; }
     public ServerCallStatus Status { get; set; }
     public BoltHubConnection CallerConnection { get; init; } = null!;

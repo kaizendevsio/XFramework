@@ -17,14 +17,39 @@ public sealed class CommunicationsBoltTopicAuthorizer(
 {
     private const string Prefix = "communications.tenant.";
     private const string CommunicationsServiceClientId = "XFramework.Communications";
+    private const int MaxTopicLength = 128;
+    private const int MaxSubscriberIdLength = 256;
+    private const int MaxTransientSubscriberIdLength = 128;
+    private const int MaxDeviceSegmentLength = 64;
+    private const int MaxActorAccessTokenLength = 16 * 1024;
 
     public async ValueTask<bool> AuthorizeAsync(BoltTopicAuthorizationContext context, CancellationToken ct = default)
     {
-        if (context.Topic is null || !context.Topic.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
-            return true;
+        try
+        {
+            return await AuthorizeCoreAsync(context, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Rejected Bolt topic access because authorization failed. topic={Topic} operation={Operation} client={ClientId}",
+                context.Topic,
+                context.Operation,
+                context.ClientId);
+            return false;
+        }
+    }
 
-        var segments = context.Topic.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Length < 4 || !Guid.TryParse(segments[2], out var topicTenantId))
+    private async ValueTask<bool> AuthorizeCoreAsync(BoltTopicAuthorizationContext context, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(context.Topic) ||
+            context.Topic.Length > MaxTopicLength ||
+            !context.Topic.StartsWith(Prefix, StringComparison.Ordinal))
+            return false;
+
+        var segments = context.Topic.Split('.');
+        if (!TryValidateTopicGrammar(context, segments, out var topicTenantId))
             return false;
 
         if (IsCommunicationsServiceIdentity(context))
@@ -87,30 +112,54 @@ public sealed class CommunicationsBoltTopicAuthorizer(
         {
             return segments.Count == 5 &&
                    segments[3] == "user" &&
-                   Guid.TryParse(segments[4], out _);
+                   IsCanonicalGuid(segments[4]);
         }
 
         return segments.Count == 4 && segments[3] == "presence" ||
-               segments.Count == 6 && segments[3] == "thread" && segments[5] == "typing" && Guid.TryParse(segments[4], out _);
+               segments.Count == 6 && segments[3] == "thread" && segments[5] == "typing" && IsCanonicalGuid(segments[4]);
     }
 
     private static bool AuthorizeUserTopic(IReadOnlyList<string> segments, Guid credentialId) =>
         segments.Count == 5 &&
-        Guid.TryParse(segments[4], out var topicCredentialId) &&
+        TryParseCanonicalGuid(segments[4], out var topicCredentialId) &&
         topicCredentialId == credentialId;
 
     private static bool AuthorizeUserSubscriberId(string? subscriberId, Guid tenantId, Guid credentialId)
     {
-        if (string.IsNullOrWhiteSpace(subscriberId))
+        if (string.IsNullOrWhiteSpace(subscriberId) || subscriberId.Length > MaxSubscriberIdLength)
             return false;
 
-        var segments = subscriberId.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return segments.Length >= 3 &&
+        var segments = subscriberId.Split(':');
+        if (segments.Length is not (6 or 7) ||
+            segments[0] != "communications" ||
+            !TryParseCanonicalGuid(segments[1], out var subscriberTenantId) ||
+            subscriberTenantId != tenantId ||
+            !TryParseCanonicalGuid(segments[2], out var subscriberCredentialId) ||
+            subscriberCredentialId != credentialId ||
+            segments[3] != "device" ||
+            !IsValidDeviceSegment(segments[4]))
+            return false;
+
+        return segments.Length == 6
+            ? segments[5] == "user"
+            : segments[5] == "thread" && IsCanonicalGuid(segments[6]);
+    }
+
+    private static bool HasValidSubscriberGrammar(string? subscriberId)
+    {
+        if (string.IsNullOrWhiteSpace(subscriberId) || subscriberId.Length > MaxSubscriberIdLength)
+            return false;
+
+        var segments = subscriberId.Split(':');
+        return segments.Length is 6 or 7 &&
                segments[0] == "communications" &&
-               Guid.TryParse(segments[1], out var subscriberTenantId) &&
-               subscriberTenantId == tenantId &&
-               Guid.TryParse(segments[2], out var subscriberCredentialId) &&
-               subscriberCredentialId == credentialId;
+               IsCanonicalGuid(segments[1]) &&
+               IsCanonicalGuid(segments[2]) &&
+               segments[3] == "device" &&
+               IsValidDeviceSegment(segments[4]) &&
+               (segments.Length == 6
+                   ? segments[5] == "user"
+                   : segments[5] == "thread" && IsCanonicalGuid(segments[6]));
     }
 
     private static async Task<bool> AuthorizeThreadTopicAsync(
@@ -122,7 +171,7 @@ public sealed class CommunicationsBoltTopicAuthorizer(
     {
         if (segments.Count != 6 ||
             segments[5] != "typing" ||
-            !Guid.TryParse(segments[4], out var threadId))
+            !TryParseCanonicalGuid(segments[4], out var threadId))
             return false;
 
         return await db.Set<MessageThreadMember>()
@@ -152,7 +201,8 @@ public sealed class CommunicationsBoltTopicAuthorizer(
         if (credentialId is not null)
             return credentialId;
 
-        if (string.IsNullOrWhiteSpace(context.ActorAccessToken))
+        if (string.IsNullOrWhiteSpace(context.ActorAccessToken) ||
+            context.ActorAccessToken.Length > MaxActorAccessTokenLength)
             return null;
 
         try
@@ -179,4 +229,54 @@ public sealed class CommunicationsBoltTopicAuthorizer(
             ? credentialId
             : null;
     }
+
+    private static bool TryValidateTopicGrammar(
+        BoltTopicAuthorizationContext context,
+        IReadOnlyList<string> segments,
+        out Guid tenantId)
+    {
+        tenantId = default;
+        if (segments.Count < 4 ||
+            segments[0] != "communications" ||
+            segments[1] != "tenant" ||
+            !TryParseCanonicalGuid(segments[2], out tenantId))
+            return false;
+
+        var validTopic = segments[3] switch
+        {
+            "user" => segments.Count == 5 && IsCanonicalGuid(segments[4]),
+            "presence" => segments.Count == 4,
+            "thread" => segments.Count == 6 && IsCanonicalGuid(segments[4]) && segments[5] == "typing",
+            _ => false
+        };
+
+        if (!validTopic)
+            return false;
+
+        return context.Operation switch
+        {
+            BoltTopicOperation.Publish => context.SubscriberId is null,
+            BoltTopicOperation.Subscribe or BoltTopicOperation.Unsubscribe =>
+                context.Durable == (segments[3] == "user") &&
+                (context.Durable ? HasValidSubscriberGrammar(context.SubscriberId) : HasValidTransientSubscriber(context)),
+            BoltTopicOperation.Ack =>
+                context.Durable && segments[3] == "user" && HasValidSubscriberGrammar(context.SubscriberId),
+            _ => false
+        };
+    }
+
+    private static bool IsCanonicalGuid(string value) =>
+        Guid.TryParseExact(value, "N", out _);
+
+    private static bool TryParseCanonicalGuid(string value, out Guid result) =>
+        Guid.TryParseExact(value, "N", out result);
+
+    private static bool IsValidDeviceSegment(string value) =>
+        value.Length is > 0 and <= MaxDeviceSegmentLength &&
+        value.All(static ch => char.IsAsciiLetterOrDigit(ch) || ch is '-' or '_');
+
+    private static bool HasValidTransientSubscriber(BoltTopicAuthorizationContext context) =>
+        !string.IsNullOrWhiteSpace(context.SubscriberId) &&
+        context.SubscriberId.Length <= MaxTransientSubscriberIdLength &&
+        string.Equals(context.SubscriberId, context.ClientId, StringComparison.Ordinal);
 }

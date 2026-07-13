@@ -9,7 +9,7 @@ public class WrapperInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddXFrameworkBoltClient(configuration);
+        services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
         services.AddSingleton<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
     }
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
+using Bolt.Hub.Security;
 using Bolt.Server;
 using MemoryPack;
 
@@ -71,6 +72,15 @@ public sealed class BoltServiceDiscoveryHostedService(
         ReadOnlyMemory<byte> payload,
         Guid requestId)
     {
+        if (!BoltAuthorizationPolicies.IsServiceDiscoveryReader(context.User))
+        {
+            logger.LogWarning(
+                "Rejected Bolt-local service registry read. client={ClientId} connection={ConnectionId}",
+                context.ClientId,
+                context.ConnectionId);
+            return (HttpStatusCode.Forbidden, ReadOnlyMemory<byte>.Empty);
+        }
+
         var request = payload.IsEmpty
             ? new BoltServiceRegistryRequest()
             : MemoryPackSerializer.Deserialize<BoltServiceRegistryRequest>(payload.Span) ?? new BoltServiceRegistryRequest();
@@ -87,6 +97,15 @@ public sealed class BoltServiceDiscoveryHostedService(
         ReadOnlyMemory<byte> payload,
         Guid requestId)
     {
+        if (!BoltAuthorizationPolicies.IsServiceDiscoveryReader(context.User))
+        {
+            logger.LogWarning(
+                "Rejected Bolt-local module registry read. client={ClientId} connection={ConnectionId}",
+                context.ClientId,
+                context.ConnectionId);
+            return (HttpStatusCode.Forbidden, ReadOnlyMemory<byte>.Empty);
+        }
+
         var request = payload.IsEmpty
             ? new BoltModuleRegistryRequest()
             : MemoryPackSerializer.Deserialize<BoltModuleRegistryRequest>(payload.Span) ?? new BoltModuleRegistryRequest();

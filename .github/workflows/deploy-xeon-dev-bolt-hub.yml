@@ -6,6 +6,10 @@ on:
     paths:
       - src/Modules/XFramework.Bolt/Bolt.Hub/**
       - src/Modules/XFramework.Bolt/Bolt.Domain.Shared/**
+      - docker-compose.yml
+      - scripts/verify-bolt-phase0-*
+      - .github/workflows/deploy-xeon-dev-service.yml
+      - .github/workflows/deploy-xeon-dev-bolt-hub.yml
   workflow_dispatch:
 
 permissions:
@@ -19,7 +23,7 @@ jobs:
       has_shared: ${{ steps.shared.outputs.has_shared }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
@@ -33,6 +37,6 @@ jobs:
     uses: ./.github/workflows/deploy-xeon-dev-service.yml
     with:
       service: bolt-hub
-      health_url: http://localhost:7000/health/ready
+      health_url: https://bolt-hub/health/ready
       diagnostics_services: migrate bolt-hub
     secrets: inherit

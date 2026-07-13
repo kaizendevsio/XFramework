@@ -2,11 +2,17 @@
 
 ## Overview
 
-Bolt Media extends the Bolt binary RPC protocol with real-time audio/video call support. Unlike WebRTC, Bolt handles media transport natively — no browser dependency, no STUN/TURN infrastructure, and full server-side access to media streams for recording, transcription, and AI processing.
+Bolt Media is an experimental extension of the Bolt binary RPC protocol for audio/video call research. The repository contains protocol and processing primitives, but the audited end-to-end media path is not production-ready and is not a replacement for WebRTC.
 
 For standard XFramework module RPC, prefer the generated `[BoltHandler]` plus `IBoltRequest<TRequest, TResponse>` pattern documented in `BOLT.md`. Bolt Media is the specialized media-streaming layer, not the default pattern for CRUD or feature-command handlers.
 
-**Current status:** Phase 1-5 implemented, critical bugs fixed, 37 tests passing.
+**Current status:** quarantined pending remediation. The audit identified broken browser stream wiring, unbounded peer-controlled work, incomplete FEC/NACK behavior, unauthenticated key exchange, and lifecycle leaks. Existing unit tests do not establish a secure or operational end-to-end media path.
+
+### Deployment Containment
+
+Bolt Hub enforces `BoltConfiguration:MediaEnabled`, which defaults to `false` and is explicitly disabled in every XFramework Hub environment and Compose deployment. While quarantined, deployments must not override it, instantiate `BoltMediaClient` or `BoltMediaService`, expose media UI, route production media clients to the Hub, or advertise Bolt Media capability. Recognition of media frame types by the protocol does not constitute production enablement.
+
+QUIC/WebTransport and direct P2P are not wired as supported end-to-end transports. They must remain absent from negotiated capabilities and production documentation until secure browser and server integration tests pass.
 
 ---
 
@@ -44,7 +50,7 @@ Caller                    Bolt Hub (SFU)                    Callee
                                          ──MediaFrame──> Participant B
 ```
 
-The hub forwards each participant's media to all other participants (zero-decode, raw byte forwarding).
+The intended SFU path forwards encoded payloads without codec decoding. The current implementation still performs copies and has not passed the required bounded-memory fanout tests.
 
 ---
 
@@ -84,8 +90,8 @@ The hub forwards each participant's media to all other participants (zero-decode
 | Unhold | 0x07 | Resume media |
 | AddParticipant | 0x08 | Group call: add member |
 | RemoveParticipant | 0x09 | Group call: remove member |
-| DirectOffer | 0x0A | P2P upgrade offer |
-| DirectAnswer | 0x0B | P2P upgrade accept |
+| DirectOffer | 0x0A | Reserved for a future P2P upgrade; not operational |
+| DirectAnswer | 0x0B | Reserved for a future P2P upgrade; not operational |
 
 ---
 
@@ -105,7 +111,9 @@ Initiating --> Ringing --> Active --> Ended
 
 ---
 
-## Features
+## Experimental Components
+
+The sections below describe implementation primitives, not production-ready capabilities. Their behavior remains subject to the deployment containment above.
 
 ### Adaptive Bitrate
 
@@ -171,19 +179,21 @@ services.AddBoltServer(options =>
 
 | Codec | ID | Status | Notes |
 |-------|----|--------|-------|
-| Opus | 0x01 | Supported | Default. Hardware accelerated via WebCodecs. |
+| Opus | 0x01 | Quarantined | Wire ID and partial codec path exist; end-to-end browser media is not release-qualified. |
 
 ### Video
 
 | Codec | ID | Status | Notes |
 |-------|----|--------|-------|
-| H.264 | 0x02 | Supported | Default. Universal hardware acceleration. |
+| H.264 | 0x02 | Quarantined | Wire ID and partial codec path exist; end-to-end browser media is not release-qualified. |
 | VP9 | 0x03 | Defined | Not yet integrated |
 | AV1 | 0x04 | Defined | Not yet integrated |
 
 ---
 
 ## Usage
+
+The following snippets are design sketches and are not a supported production quick start. The audited high-level browser path does not currently complete encode-to-remote-decode media flow. Use these APIs only in isolated remediation tests until the quarantine is lifted.
 
 ### .NET Client
 
@@ -247,14 +257,14 @@ audioStream.onFrame = (event) => decoder.decode(event.data, event.timestamp);
 
 ## Comparison vs WebRTC
 
-### Where Bolt Media is ahead
+### Intended architectural properties
 
 | Feature | Details |
 |---------|---------|
-| Server-side media access | Hub sees every frame — recording, transcription, AI without extra infrastructure |
-| Unified protocol | RPC + streaming + media on one connection |
+| Server-side media access | The design permits processing encoded frames, but processor filtering and cleanup require remediation |
+| Unified protocol | The design shares Bolt framing and connections; isolation and head-of-line behavior require remediation |
 | .NET-native | No 50MB libwebrtc dependency, pure managed code |
-| Simple deployment | Single hub binary, no STUN/TURN servers |
+| Deployment model | Hub-routed media avoids STUN/TURN but does not currently provide a secure supported P2P fallback |
 | Custom compression | Bolt-level LZ4/Zstd for non-media frames |
 | Built-in SFU | Group calls without separate media server |
 
@@ -275,9 +285,7 @@ audioStream.onFrame = (event) => decoder.decode(event.data, event.timestamp);
 
 ### Overall Assessment
 
-**Bolt Media: ~40-50% feature parity with WebRTC for call quality.**
-
-Bolt is ahead on server-side features (recording, transcription, AI hooks) and developer experience (.NET-native, unified protocol, simple deployment). The biggest quality gaps are P2P direct connections, media encryption, and NACK retransmission.
+No defensible feature-parity percentage is currently available. WebRTC provides mature mandatory encryption, congestion control, NAT traversal, interoperability, and browser validation that Bolt Media has not demonstrated. Bolt Media remains experimental until its security, correctness, browser, loss/reordering, and soak gates pass.
 
 ---
 
@@ -285,20 +293,20 @@ Bolt is ahead on server-side features (recording, transcription, AI hooks) and d
 
 | Phase | Status | What |
 |-------|--------|------|
-| 1. Core Protocol + 1:1 Audio | Done | 6 frame types, call state machine, BoltMediaStream |
-| 2. Video + ABR + FEC | Done | AdaptiveBitrateController, FEC wiring, 256KB buffers |
-| 3. Group Calls + Server Hooks | Done | SFU fan-out, IMediaProcessor, media tap channel |
-| 4. QUIC Datagrams | Done | QuicDatagramHelper, QUIC server frame recognition |
-| 5. Browser Client | Done | TypeScript client with WebCodecs (Opus + H.264) |
-| Bug Fixes | Done | 8 critical+high bugs from audit |
-| Tests | Done | 37 tests (protocol, FEC, jitter, calls, media exchange) |
+| 1. Core protocol primitives | Experimental | Frame codecs, call state, and stream types exist; end-to-end correctness is not established |
+| 2. Video, ABR, and FEC | Remediation required | Control loops, FEC grouping, sequence bounds, and cleanup are incomplete |
+| 3. Group calls and server hooks | Remediation required | Membership, processor input, fanout budgets, and cleanup are incomplete |
+| 4. QUIC/WebTransport datagrams | Not integrated | Helpers or frame recognition do not provide a working negotiated transport |
+| 5. Browser client | Non-operational end to end | Stream registration, playback wiring, encryption isolation, and browser tests are incomplete |
+| Security and reliability | Quarantined | Critical and high audit findings remain open |
+| Tests | Insufficient for release | Primitive tests exist; adversarial, browser, multi-peer, and soak coverage is missing |
 
 ### Remaining Work
 
-- P2P direct connection upgrade (hub-first, then direct QUIC attempt)
-- Media encryption (DTLS or application-level)
-- NACK retransmission for video keyframes
-- Delay-based congestion control
-- Simulcast (multi-resolution encoding)
-- Wire QUIC datagrams into BoltMediaStream
-- Opus in-band FEC integration
+- Keep the server-enforced, disabled-by-default media gate closed until all release gates pass.
+- Repair the bounded NACK/FEC/sequence pipeline and deterministic resource cleanup.
+- Implement authenticated, transcript-bound, fail-closed per-call and group encryption.
+- Repair browser stream registration, answer-side setup, timestamps, codec metadata, and playback.
+- Validate congestion control, jitter, probing, simulcast, and hold behavior end to end.
+- Either implement secure negotiated QUIC/WebTransport and P2P transports or keep them unadvertised.
+- Pass real-browser, multi-peer, adversarial, loss/reordering, and long-running soak gates before release.

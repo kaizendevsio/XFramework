@@ -1,3 +1,4 @@
+using Bolt.Hub.Health;
 using Bolt.Hub.Services;
 using Bolt.Hub.Security;
 using Bolt.Server;
@@ -34,16 +35,35 @@ public sealed class BoltInstaller : IInstaller
                     ? boltConfiguration.QueueDepth
                     : options.SendQueueCapacity;
             options.SendEnqueueTimeoutMs = boltConfiguration.SendEnqueueTimeoutMs;
+            options.RequireSecureTransport = !hostEnvironment.IsDevelopment() ||
+                                             boltConfiguration.RequireSecureTransport;
+            options.MediaEnabled = boltConfiguration.MediaEnabled;
+            options.MaxPendingRpcCalls = boltConfiguration.MaxPendingRpcCalls;
+            options.MaxPendingRpcCallsPerPrincipal = boltConfiguration.MaxPendingRpcCallsPerPrincipal;
+            options.MaxConnectionsPerPrincipal = boltConfiguration.MaxConnectionsPerPrincipal;
+            options.MaxActiveStreamsPerPrincipal = boltConfiguration.MaxActiveStreamsPerPrincipal;
+            options.MaxMediaStreamsPerPrincipal = boltConfiguration.MaxMediaStreamsPerPrincipal;
+            options.MaxSubscriptionsPerPrincipal = boltConfiguration.MaxSubscriptionsPerPrincipal;
+            options.MaxDurableSubscribersPerTopic = boltConfiguration.MaxDurableSubscribersPerTopic;
+            options.MaxConnectionLifetimeSeconds = boltConfiguration.MaxConnectionLifetimeSeconds;
             options.RegistrationIdentityBindingMode = ResolveRegistrationIdentityBindingMode(
-                boltConfiguration.RegistrationIdentityBindingMode);
+                boltConfiguration.RegistrationIdentityBindingMode,
+                hostEnvironment);
             options.ReservedServiceNames.AddRange(XFrameworkServiceNames.All);
             options.ReservedServiceNamePrefixes.Add("XFramework.");
+            configuration
+                .GetSection("BoltConfiguration:RegistrationMigrationAllowances")
+                .Bind(options.RegistrationMigrationAllowances);
         });
         services.AddSingleton<IBoltTopicAuthorizer, CommunicationsBoltTopicAuthorizer>();
         services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         services.AddHostedService<BoltServiceDiscoveryHostedService>();
         services.AddAuthorization(BoltAuthorizationPolicies.AddServiceDiscoveryReaderPolicy);
+        services.AddHealthChecks().AddCheck<BoltTransportHealthCheck>(
+            "Bolt-transport",
+            failureStatus: HealthStatus.Unhealthy,
+            tags: ["bolt", "transport", "ready"]);
 
         // Durable queue store (Redis required outside Development)
         services.Configure<Bolt.Server.Durable.DurableQueueOptions>(configuration.GetSection("BoltConfiguration:Durable"));
@@ -75,18 +95,25 @@ public sealed class BoltInstaller : IInstaller
         });
     }
 
-    private static BoltRegistrationIdentityBindingMode ResolveRegistrationIdentityBindingMode(string? value)
+    private static BoltRegistrationIdentityBindingMode ResolveRegistrationIdentityBindingMode(
+        string? value,
+        IHostEnvironment hostEnvironment)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return BoltRegistrationIdentityBindingMode.Audit;
-
-        if (Enum.TryParse<BoltRegistrationIdentityBindingMode>(value, ignoreCase: true, out var mode) &&
-            Enum.IsDefined(mode))
+        var mode = BoltRegistrationIdentityBindingMode.Enforce;
+        if (!string.IsNullOrWhiteSpace(value) &&
+            (!Enum.TryParse(value, ignoreCase: true, out mode) || !Enum.IsDefined(mode)))
         {
-            return mode;
+            throw new InvalidOperationException(
+                "BoltConfiguration:RegistrationIdentityBindingMode must be one of: Off, Audit, Enforce.");
         }
 
-        throw new InvalidOperationException(
-            "BoltConfiguration:RegistrationIdentityBindingMode must be one of: Off, Audit, Enforce.");
+        if (!hostEnvironment.IsDevelopment() && mode != BoltRegistrationIdentityBindingMode.Enforce)
+        {
+            throw new InvalidOperationException(
+                $"BoltConfiguration:RegistrationIdentityBindingMode '{mode}' is allowed only in Development. " +
+                $"Environment '{hostEnvironment.EnvironmentName}' requires Enforce.");
+        }
+
+        return mode;
     }
 }

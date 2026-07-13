@@ -12,7 +12,8 @@ namespace XFramework.Integration.Security;
 public sealed class IdentityServerServiceTokenProvider(
     BoltClient boltClient,
     IOptions<ServiceIdentityOptions> serviceIdentityOptions,
-    IOptions<BoltConfiguration> boltConfigurationOptions)
+    IOptions<BoltConfiguration> boltConfigurationOptions,
+    TimeProvider timeProvider)
     : IServiceTokenProvider
 {
     private readonly ConcurrentDictionary<string, CachedToken> _cache = new(StringComparer.Ordinal);
@@ -28,7 +29,7 @@ public sealed class IdentityServerServiceTokenProvider(
 
         var requestedScopes = NormalizeScopes(scopes);
         var cacheKey = $"{audience}|{string.Join(' ', requestedScopes)}";
-        var now = DateTime.UtcNow;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var options = serviceIdentityOptions.Value;
         var refreshSkew = TimeSpan.FromSeconds(Math.Clamp(options.TokenRefreshSkewSeconds, 10, 600));
 
@@ -77,7 +78,7 @@ public sealed class IdentityServerServiceTokenProvider(
         string cacheKey,
         CancellationToken ct)
     {
-        var now = DateTime.UtcNow;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var options = serviceIdentityOptions.Value;
         var refreshSkew = TimeSpan.FromSeconds(Math.Clamp(options.TokenRefreshSkewSeconds, 10, 600));
 
@@ -88,25 +89,12 @@ public sealed class IdentityServerServiceTokenProvider(
         }
 
         var clientId = ResolveClientId();
-        var clientSecret = options.ClientSecret;
-        if (string.IsNullOrWhiteSpace(clientSecret))
-        {
-            throw new InvalidOperationException(
-                $"ServiceIdentity:ClientSecret is required for service client '{clientId}'.");
-        }
-
-        var request = new IssueServiceTokenRequest
-        {
-            ClientId = clientId,
-            ClientSecret = clientSecret,
-            Audience = audience,
-            Scopes = requestedScopes.ToList(),
-            Metadata = new RequestMetadata
-            {
-                Name = clientId,
-                RequestId = Guid.NewGuid()
-            }
-        };
+        var request = CreateCurrentCredentialRequest(
+            options,
+            clientId,
+            audience,
+            requestedScopes,
+            timeProvider.GetUtcNow());
 
         var targetClient = XFrameworkServiceNames.IdentityServer.ToSha256();
         var (status, data) = await boltClient.InvokeAsync(
@@ -155,6 +143,40 @@ public sealed class IdentityServerServiceTokenProvider(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(static scope => scope, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    internal static IssueServiceTokenRequest CreateCurrentCredentialRequest(
+        ServiceIdentityOptions options,
+        string clientId,
+        string audience,
+        IReadOnlyCollection<string> scopes,
+        DateTimeOffset nowUtc)
+    {
+        CredentialGenerationValidator.Validate(
+            ServiceIdentityOptions.SectionName,
+            new CredentialGenerationDescriptor(
+                options.GenerationId ?? string.Empty,
+                options.ClientSecret ?? string.Empty),
+            validationFallback: null,
+            nowUtc);
+        if (string.IsNullOrWhiteSpace(options.ClientSecret))
+        {
+            throw new InvalidOperationException(
+                $"ServiceIdentity:ClientSecret is required for service client '{clientId}'.");
+        }
+
+        return new IssueServiceTokenRequest
+        {
+            ClientId = clientId,
+            ClientSecret = options.ClientSecret,
+            Audience = audience,
+            Scopes = scopes.ToList(),
+            Metadata = new RequestMetadata
+            {
+                Name = clientId,
+                RequestId = Guid.NewGuid()
+            }
+        };
     }
 
     private sealed record CachedToken(string AccessToken, DateTime ExpiresAtUtc);

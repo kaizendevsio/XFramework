@@ -52,6 +52,9 @@ status: current
 - [Decentralized remote data context](architecture-patterns/decentralized-remote-data-context.md) - remote `IDataContext` architecture over generated service wrappers.
 - [Portal service wrapper and integration test contract](developer-experience/portal-service-wrapper-and-integration-test-contract.md) - wrapper-first Portal business operations, direct `IDataContext` mutation rules, and standard/extended integration-test tiers.
 - [UI guidelines](../../rules/UiGuidelines.md) - primary Portal and Blazor UI rules, with links to BlazorBlueprint component details.
+- [Bolt protocol, Hub, and Media audit](workflow-issues/bolt-protocol-hub-media-audit-2026-07-12.md) - active correctness, security, performance, scalability, and Media finding inventory.
+- [Bolt protocol, Hub, and Media remediation plan](workflow-issues/bolt-protocol-hub-media-remediation-plan-2026-07-12.md) - authoritative phased execution order, dependencies, acceptance gates, and certification requirements.
+- [Bolt Phase 0 deployment gate](workflow-issues/bolt-phase0-deployment-gate-2026-07-13.md) - current containment rollout, recovery, protected-input, and live-evidence contract.
 
 ## Current Vs Historical Guidance
 

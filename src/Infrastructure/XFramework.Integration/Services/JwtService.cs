@@ -1,16 +1,26 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.IdentityModel.Tokens;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Security;
 
 namespace XFramework.Integration.Services;
 
-public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
+public sealed class JwtService : IJwtService
 {
+    private readonly JwtOptions _jwtOptions;
+    private readonly TimeProvider _timeProvider;
+
+    public JwtService(JwtOptions jwtOptions, TimeProvider? timeProvider = null)
+    {
+        _jwtOptions = jwtOptions;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        JwtCredentialSet.Validate(jwtOptions, _timeProvider.GetUtcNow());
+    }
+
     public async Task<JwtToken> GenerateToken(string username, Guid id, List<Guid> Type, Guid? tenantId = null)
     {
         List<Claim> authClaims =
@@ -19,8 +29,9 @@ public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
             new(ClaimTypes.Role, JsonSerializer.Serialize(Type, new JsonSerializerOptions { ReferenceHandler = ReferenceHandler.IgnoreCycles })),
             new(ClaimTypes.Name, id.ToString()),
             new("credential_id", id.ToString("D")),
+            new(JwtCredentialSet.GenerationClaim, _jwtOptions.GenerationId.Trim()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new(JwtRegisteredClaimNames.AuthTime, DateTime.UtcNow.ToString())
+            new(JwtRegisteredClaimNames.AuthTime, _timeProvider.GetUtcNow().UtcDateTime.ToString("O"))
         ];
 
         if (tenantId is Guid resolvedTenantId && resolvedTenantId != Guid.Empty)
@@ -29,12 +40,14 @@ public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
             authClaims.Add(new("tenantId", resolvedTenantId.ToString("D")));
         }
 
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret));
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var securityKey = JwtCredentialSet.CreateCurrentSigningKey(_jwtOptions);
 
         var token = new JwtSecurityToken(
-            issuer: jwtOptions.ValidIssuer,
-            audience: jwtOptions.ValidAudience,
-            expires: DateTime.UtcNow.AddMinutes(DateTime.Parse(jwtOptions.AccessTokenLifespan).Minute),
+            issuer: _jwtOptions.ValidIssuer,
+            audience: _jwtOptions.ValidAudience,
+            notBefore: now,
+            expires: now.Add(ParseLifespan(_jwtOptions.AccessTokenLifespan, TimeSpan.FromMinutes(30))),
             claims: authClaims,
             signingCredentials: new(securityKey, SecurityAlgorithms.HmacSha512)
         );
@@ -43,7 +56,7 @@ public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
         {
             Cuid = id,
             Token = GenerateRefreshToken(),
-            ExpireAt = DateTime.UtcNow.AddMinutes(DateTime.Parse(jwtOptions.RefreshTokenLifespan).Minute)
+            ExpireAt = now.Add(ParseLifespan(_jwtOptions.RefreshTokenLifespan, TimeSpan.FromMinutes(30)))
         };
 
         return new()
@@ -56,20 +69,27 @@ public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
 
     public async Task<JwtToken> GenerateToken(List<Claim> claims)
     {
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret));
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var tokenClaims = claims
+            .Where(static claim => claim.Type != JwtCredentialSet.GenerationClaim)
+            .ToList();
+        tokenClaims.Add(new Claim(JwtCredentialSet.GenerationClaim, _jwtOptions.GenerationId.Trim()));
+
+        var securityKey = JwtCredentialSet.CreateCurrentSigningKey(_jwtOptions);
 
         var token = new JwtSecurityToken(
-            issuer: jwtOptions.ValidIssuer,
-            audience: jwtOptions.ValidAudience,
-            expires: DateTime.UtcNow.AddMinutes(DateTime.Parse(jwtOptions.AccessTokenLifespan).Minute),
-            claims: claims,
+            issuer: _jwtOptions.ValidIssuer,
+            audience: _jwtOptions.ValidAudience,
+            notBefore: now,
+            expires: now.Add(ParseLifespan(_jwtOptions.AccessTokenLifespan, TimeSpan.FromMinutes(30))),
+            claims: tokenClaims,
             signingCredentials: new(securityKey, SecurityAlgorithms.HmacSha512)
         );
 
         var refreshToken = new RefreshToken
         {
             Token = GenerateRefreshToken(),
-            ExpireAt = DateTime.UtcNow.AddMinutes(DateTime.Parse(jwtOptions.RefreshTokenLifespan).Minute)
+            ExpireAt = now.Add(ParseLifespan(_jwtOptions.RefreshTokenLifespan, TimeSpan.FromMinutes(30)))
         };
 
         return new()
@@ -108,20 +128,12 @@ public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
 
         var principal = new JwtSecurityTokenHandler()
             .ValidateToken(token,
-                new()
-                {
-                    ValidateIssuerSigningKey = true,
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidAudience = jwtOptions.ValidAudience,
-                    ValidIssuer = jwtOptions.ValidIssuer,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtOptions.Secret)),
-                    RequireExpirationTime = false,
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.FromMinutes(1)
-                },
+                JwtCredentialSet.CreateValidationParameters(_jwtOptions, validateLifetime: true, _timeProvider),
                 out var validatedToken);
-        return (principal, validatedToken as JwtSecurityToken);
+        if (validatedToken is not JwtSecurityToken jwtToken)
+            throw new SecurityTokenException("Validated token is not a JWT.");
+
+        return (principal, jwtToken);
     }
 
     public async Task<(ClaimsPrincipal, JwtSecurityToken)> DecodeExpiredToken(string token)
@@ -133,19 +145,14 @@ public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
 
         var principal = new JwtSecurityTokenHandler()
             .ValidateToken(token,
-                new()
-                {
-                    ValidateIssuerSigningKey = true,
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidAudience = jwtOptions.ValidAudience,
-                    ValidIssuer = jwtOptions.ValidIssuer,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtOptions.Secret)),
-                    RequireExpirationTime = false,
-                    ValidateLifetime = false,
-                    ClockSkew = TimeSpan.FromMinutes(1)
-                },
+                JwtCredentialSet.CreateValidationParameters(_jwtOptions, validateLifetime: false, _timeProvider),
                 out var validatedToken);
-        return (principal, validatedToken as JwtSecurityToken);
+        if (validatedToken is not JwtSecurityToken jwtToken)
+            throw new SecurityTokenException("Validated token is not a JWT.");
+
+        return (principal, jwtToken);
     }
+
+    private static TimeSpan ParseLifespan(string value, TimeSpan fallback) =>
+        TimeSpan.TryParse(value, out var parsed) && parsed > TimeSpan.Zero ? parsed : fallback;
 }

@@ -2,9 +2,27 @@
 
 public class JwtOptions
 {
-    public string Secret { get; set; }
-    public string ValidIssuer { get; set; }
-    public string ValidAudience { get; set; }
-    public string AccessTokenLifespan  { get; set; }
-    public string RefreshTokenLifespan  { get; set; }
+    public string GenerationId { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
+    public JwtValidationFallbackOptions? ValidationFallback { get; set; }
+    public string ValidIssuer { get; set; } = string.Empty;
+    public string ValidAudience { get; set; } = string.Empty;
+    public string AccessTokenLifespan { get; set; } = string.Empty;
+    public string RefreshTokenLifespan { get; set; } = string.Empty;
+
+    public bool HasValidationFallback => ValidationFallback is { } fallback
+        && (!string.IsNullOrWhiteSpace(fallback.GenerationId)
+            || !string.IsNullOrWhiteSpace(fallback.Secret)
+            || fallback.ValidUntilUtc.HasValue);
+
+    public IReadOnlyList<string> ValidationGenerationIds => !HasValidationFallback
+        ? [GenerationId]
+        : [GenerationId, ValidationFallback!.GenerationId];
+}
+
+public sealed class JwtValidationFallbackOptions
+{
+    public string GenerationId { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
+    public DateTimeOffset? ValidUntilUtc { get; set; }
 }

@@ -45,6 +45,9 @@ not ordinary CRUD.
 
 - Prefer generated `IWalletsServiceWrapper` methods from `IBoltRequest`
   contracts for cross-module and Portal calls.
+- Pass `hostEnvironment` to `AddXFrameworkBoltClient` so non-Development
+  startup validates secure `wss://` transport configuration. Do not bypass that
+  validation with the environment-free overload or a plaintext client URL.
 - Add new workflow actions as request/response DTOs under
   `Wallets.Domain.Shared.Contracts.Requests` and `Responses`, then expose them
   with `[BoltHandler]` and `[MapPost]`/`[MapGet]` endpoint slices.

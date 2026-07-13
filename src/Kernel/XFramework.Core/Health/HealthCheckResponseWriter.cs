@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -20,6 +21,24 @@ public static class HealthCheckResponseWriter
     /// </summary>
     public static async Task WriteResponse(HttpContext context, HealthReport report)
     {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync(
+            JsonSerializer.Serialize(new
+            {
+                status = report.Status.ToString(),
+                timestamp = DateTime.UtcNow
+            }, JsonOptions));
+    }
+
+    public static async Task WriteInternalResponse(HttpContext context, HealthReport report)
+    {
+        if (context.Connection.RemoteIpAddress is not { } remoteAddress ||
+            !IPAddress.IsLoopback(remoteAddress))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
         context.Response.ContentType = "application/json";
 
         var result = new

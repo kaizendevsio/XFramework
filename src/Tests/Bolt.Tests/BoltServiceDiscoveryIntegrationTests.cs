@@ -1,5 +1,6 @@
 using Bolt.Client;
 using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
+using Bolt.Hub.Security;
 using Bolt.Hub.Services;
 using Bolt.Server;
 using FluentAssertions;
@@ -44,6 +45,7 @@ public sealed class BoltServiceDiscoveryIntegrationTests
         builder.Services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         builder.Services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         builder.Services.AddHostedService<BoltServiceDiscoveryHostedService>();
+        builder.Services.AddAuthorization(BoltAuthorizationPolicies.AddServiceDiscoveryReaderPolicy);
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
         _hubApp = builder.Build();

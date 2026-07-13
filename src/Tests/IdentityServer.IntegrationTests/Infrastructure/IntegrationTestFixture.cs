@@ -176,6 +176,9 @@ public class IntegrationTestFixture
         builder.Services.AddScoped<IStorageServiceWrapper, TestStorageServiceWrapper>();
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddScoped<IServiceIdentityService, ServiceIdentityService>();
+        builder.Services.AddSingleton(serviceProvider => ServiceIdentityConfiguration.FromConfiguration(
+            serviceProvider.GetRequiredService<IConfiguration>(),
+            serviceProvider.GetRequiredService<TimeProvider>().GetUtcNow()));
         builder.Services.AddSingleton<IIdentitySigningKeyProvider, IdentityServerLocalSigningKeyProvider>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
@@ -184,6 +187,7 @@ public class IntegrationTestFixture
         builder.Services.AddDataContextHandler(typeof(AuthService).Assembly);
 
         var app = (WebApplication)builder.Build();
+        _ = app.Services.GetRequiredService<ServiceIdentityConfiguration>();
         RegisterIdentityServerBoltHandlers(app);
         app.UseCorrelationId();
         app.MapGeneratedEndpoints();
@@ -220,12 +224,14 @@ public class IntegrationTestFixture
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["ServiceIdentity:ClientId"] = TestServiceClientId,
+            ["ServiceIdentity:GenerationId"] = "test-client-g1",
             ["ServiceIdentity:ClientSecret"] = TestServiceClientSecret,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Kestrel:Endpoints:Http:Url"] = TestClientUrl,
             ["urls"] = TestClientUrl,
             ["JwtOptions:ValidAudience"] = "http://localhost:18261",
             ["JwtOptions:ValidIssuer"] = "http://localhost:18261",
+            ["JwtOptions:GenerationId"] = "test-jwt-g1",
             ["JwtOptions:Secret"] = "Mm1VFHaqZ7MoVJyZd1zrAKxTpsXbYG6RqSMKYG2cV7RBBUdmsm97HOfKyA7MZ1LUl77ZklJPJfnegohyHqJIoQ983fTKmJcY",
             ["JwtOptions:AccessTokenLifespan"] = "00:30:00",
             ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",
@@ -321,12 +327,14 @@ public class IntegrationTestFixture
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
             ["ServiceIdentity:Clients:0:ClientId"] = TestServiceClientId,
+            ["ServiceIdentity:Clients:0:GenerationId"] = "test-client-g1",
             ["ServiceIdentity:Clients:0:ClientSecret"] = TestServiceClientSecret,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Kestrel:Endpoints:Http:Url"] = serverUrl,
             ["urls"] = serverUrl,
             ["JwtOptions:ValidAudience"] = "http://localhost:18261",
             ["JwtOptions:ValidIssuer"] = "http://localhost:18261",
+            ["JwtOptions:GenerationId"] = "test-jwt-g1",
             ["JwtOptions:Secret"] = "Mm1VFHaqZ7MoVJyZd1zrAKxTpsXbYG6RqSMKYG2cV7RBBUdmsm97HOfKyA7MZ1LUl77ZklJPJfnegohyHqJIoQ983fTKmJcY",
             ["JwtOptions:AccessTokenLifespan"] = "00:30:00",
             ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",

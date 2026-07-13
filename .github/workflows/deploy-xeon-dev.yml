@@ -1,30 +1,22 @@
 name: Deploy Xeon Dev - All Services
 
 on:
-  push:
-    branches: [develop]
-    paths:
-      - Dockerfile
-      - docker-compose.yml
-      - Directory.Build.props
-      - Directory.Build.targets
-      - Directory.Packages.props
-      - Version.props
-      - XFramework.slnx
-      - global.json
-      - NuGet.config
-      - src/Kernel/**
-      - src/Infrastructure/**
-      - src/Shared/**
-      - src/SourceGenerators/**
-      - src/Libraries/**
-      - src/Tools/XFramework.MigrationRunner/**
-      - src/Modules/**/Migrations/**
-      - src/Modules/XFramework.Bolt/Bolt.Domain.Shared/**
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type PROMOTE_BOLT_PHASE0 to authorize the staged xeon-dev promotion
+        required: true
+        type: string
+      canary_observation_minutes:
+        description: Canary observation window before the remaining services are promoted
+        required: true
+        default: "15"
+        type: string
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
   group: xeon-dev-deploy
@@ -32,9 +24,9 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy all services to xeon-dev
+    name: Staged Bolt Phase 0 promotion to xeon-dev
     runs-on: [self-hosted, Linux, xeon-dev-deploy]
-    timeout-minutes: 75
+    timeout-minutes: 480
     env:
       COMPOSE_FILE_PATH: docker-compose.yml
       COMPOSE_PROJECT_NAME: xframework
@@ -43,13 +35,30 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
       CHANNEL_TAG: develop
       DEPLOY_HOST: github-runner@xeon-dev
-      DEPLOY_SSH_KEY: /home/xeon/.ssh/xframework_xeon_dev_ed25519
+      DEPLOY_SSH_KEY: /home/github-runner/.ssh/xframework_xeon_dev_ed25519
+      DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 1800
       REMOTE_DEPLOY_DIR: /home/github-runner/xframework-deploy
-      REMOTE_COMPOSE_FILE: /home/github-runner/xframework-deploy/docker-compose.yml
+      REMOTE_RUN_DIR: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}
+      REMOTE_COMPOSE_FILE: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/docker-compose.yml
+      REMOTE_PIN_OVERRIDE: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/pinned-compose.override.json
+      REMOTE_PINS_FILE: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/image-pins.json
+      REMOTE_LKG_DIR: /home/github-runner/xframework-deploy/phase0-last-known-good
+      REMOTE_ROTATION_STATE: /home/github-runner/xframework-deploy/phase0-rotation-state.json
+      REMOTE_LEASE_MANAGER: /usr/local/libexec/xframework-bolt-phase0/manage-bolt-phase0-deployment-lease.py
+      BOLT_PHASE0_LEASE_RUN_ID: ${{ github.run_id }}
+      BOLT_PHASE0_LEASE_RUN_ATTEMPT: ${{ github.run_attempt }}
+      BOLT_PHASE0_LEASE_HEARTBEAT_SECONDS: 30
+      REMOTE_ROTATION_MANAGER: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/manage-bolt-phase0-rotation.py
+      REMOTE_RUNTIME_VERIFIER: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/verify-bolt-phase0-runtime.py
+      REMOTE_ENV_PARSER: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/verify-bolt-phase0-env.py
+      REMOTE_QUALIFICATION_VERIFIER: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/verify-bolt-phase0-qualification.py
+      REMOTE_ROOT_HELPER: /usr/local/sbin/xframework-bolt-phase0-root
+      REMOTE_WATCHDOG_RUNNER: /usr/local/sbin/xframework-bolt-phase0-watchdog
       XFRAMEWORK_ENV_FILE: /opt/xframework/xeon-dev.env
       DB_PASSWORD: compose-validation-placeholder
       JWT_SECRET: compose-validation-placeholder
       BOLT_SIGNATURE: compose-validation-placeholder
+      CREDENTIAL_GENERATION_ID: compose-validation-g1
       IDENTITYSERVER_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       BOLT_HUB_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
@@ -63,12 +72,161 @@ jobs:
       PORTAL_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_TRUSTED_METADATA_SECRET: compose-validation-placeholder
+      BOLT_HUB_TLS_FULLCHAIN_PATH: /tmp/bolt-phase0-validation/fullchain.pem
+      BOLT_HUB_TLS_PRIVATE_KEY_PATH: /tmp/bolt-phase0-validation/private-key.pem
+      BOLT_HUB_TLS_CA_PATH: /tmp/bolt-phase0-validation/ca.crt
+      BOLT_HUB_EXPOSE_PORT: 7000
+      BOLT_HUB_PUBLIC_HOSTNAME: xeon-dev.tailed40e.ts.net
+      IDENTITYSERVER_TLS_FULLCHAIN_PATH: /tmp/bolt-phase0-validation/identityserver-fullchain.pem
+      IDENTITYSERVER_TLS_PRIVATE_KEY_PATH: /tmp/bolt-phase0-validation/identityserver-private-key.pem
+      IDENTITYSERVER_TLS_CA_PATH: /tmp/bolt-phase0-validation/identityserver-ca.crt
+      IDENTITYSERVER_PUBLIC_HOSTNAME: xeon-dev.tailed40e.ts.net
+      IDENTITYSERVER_PUBLIC_HTTPS_PORT: 8261
+      IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH: /api/service-identity/bolt-transport-token
+      BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL: https://xeon-dev.tailed40e.ts.net:8261
+      BOLT_SYNTHETIC_IDENTITYSERVER_CA_PATH: /tmp/bolt-phase0-validation/identityserver-ca.crt
+      BOLT_SYNTHETIC_TENANT_ID: 00000000-0000-0000-0000-000000000001
+      BOLT_SYNTHETIC_CREDENTIAL_ID: 00000000-0000-0000-0000-000000000002
+      BOLT_SYNTHETIC_DEVICE_ID: phase0-compose-validation
+      BOLT_SYNTHETIC_USER_USERNAME: phase0-compose-validation
+      BOLT_SYNTHETIC_USER_PASSWORD: compose-validation-placeholder
+      BOLT_SYNTHETIC_USER_ROLE_ID: 00000000-0000-0000-0000-000000000003
+      BOLT_SYNTHETIC_USER_AUTHORIZATION_TYPE: Default
+      BOLT_SYNTHETIC_MIN_TOKEN_LIFETIME_SECONDS: 60
+      BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_PATH: /tmp/bolt-phase0-validation/communications-token
+      BOLT_SYNTHETIC_USER_TOKEN_PATH: /tmp/bolt-phase0-validation/user-token
+      BOLT_SYNTHETIC_EXPIRY_TOKEN_PATH: /tmp/bolt-phase0-validation/expiry-token
+      BOLT_SYNTHETIC_REJECTED_COMMUNICATIONS_TOKEN_PATH: /tmp/bolt-phase0-validation/retired-communications-token
+      BOLT_SYNTHETIC_REJECTED_USER_TOKEN_PATH: /tmp/bolt-phase0-validation/retired-user-token
+      MAX_JWT_LIFETIME_SECONDS: 1800
+      PRE_ACTIVATION_STAGING_BUDGET_SECONDS: 7200
+      POST_ACTIVATION_ROLLOUT_BUDGET_SECONDS: 2700
+      POST_ACTIVATION_OBSERVATION_BUDGET_SECONDS: 900
+      ROLLBACK_BUDGET_SECONDS: 1800
 
     steps:
+      - name: Authorize manual Phase 0 promotion
+        shell: bash
+        env:
+          PROMOTION_CONFIRMATION: ${{ inputs.confirmation }}
+          CANARY_OBSERVATION_MINUTES: ${{ inputs.canary_observation_minutes }}
+        run: |
+          set -euo pipefail
+          test "$PROMOTION_CONFIRMATION" = "PROMOTE_BOLT_PHASE0"
+          test "$GITHUB_REF" = "refs/heads/develop"
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          case "$CANARY_OBSERVATION_MINUTES" in
+            ''|*[!0-9]*) echo "canary observation minutes must be an integer" >&2; exit 1 ;;
+          esac
+          test "$CANARY_OBSERVATION_MINUTES" -ge 5
+          test "$CANARY_OBSERVATION_MINUTES" -le 60
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
+
+      - name: Configure pinned SSH trust and operation bounds
+        id: ssh_setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          ssh_dir="$RUNNER_TEMP/bolt-phase0-ssh"
+          deploy_ssh_config="$ssh_dir/config"
+          known_hosts="$ssh_dir/known_hosts"
+          wrapper_dir="$ssh_dir/bin"
+          source_known_hosts=".github/known_hosts/xeon-dev"
+          runner_home="/home/github-runner"
+          runner_ssh_dir="$runner_home/.ssh"
+          expected_deploy_ssh_key="$runner_ssh_dir/xframework_xeon_dev_ed25519"
+          runner_uid="$(id -u)"
+          runner_gid="$(id -g)"
+          system_ssh="$(command -v ssh)"
+          system_scp="$(command -v scp)"
+          system_timeout="$(command -v timeout)"
+
+          test -s "$source_known_hosts"
+          test "$(grep -cve '^[[:space:]]*$' "$source_known_hosts")" -eq 1
+          grep -Eq '^xeon-dev ssh-ed25519 [A-Za-z0-9+/]+={0,2}$' "$source_known_hosts"
+          test "$DEPLOY_SSH_KEY" = "$expected_deploy_ssh_key"
+          test -d "$runner_home"
+          test ! -L "$runner_home"
+          test "$(readlink -e -- "$runner_home")" = "$runner_home"
+          test -d "$runner_ssh_dir"
+          test ! -L "$runner_ssh_dir"
+          test "$(readlink -e -- "$runner_ssh_dir")" = "$runner_ssh_dir"
+          IFS=: read -r ssh_dir_uid ssh_dir_gid ssh_dir_mode < <(
+            stat -Lc '%u:%g:%a' -- "$runner_ssh_dir"
+          )
+          test "$ssh_dir_uid" = "$runner_uid"
+          test "$ssh_dir_gid" = "$runner_gid"
+          test "$ssh_dir_mode" = 700
+          test ! -L "$DEPLOY_SSH_KEY"
+          test "$(readlink -e -- "$DEPLOY_SSH_KEY")" = "$DEPLOY_SSH_KEY"
+          exec {deploy_key_fd}< "$DEPLOY_SSH_KEY"
+          deploy_key_fd_path="/proc/$$/fd/$deploy_key_fd"
+          test -f "$deploy_key_fd_path"
+          test "$(stat -Lc '%d:%i' -- "$DEPLOY_SSH_KEY")" = "$(stat -Lc '%d:%i' -- "$deploy_key_fd_path")"
+          IFS=: read -r key_uid key_gid key_mode key_nlink key_size < <(
+            stat -Lc '%u:%g:%a:%h:%s' -- "$deploy_key_fd_path"
+          )
+          test "$key_uid" = "$runner_uid"
+          test "$key_gid" = "$runner_gid"
+          test "$key_mode" = 600
+          test "$key_nlink" = 1
+          test "$key_size" -gt 0
+          exec {deploy_key_fd}<&-
+
+          install -d -m 700 "$ssh_dir" "$wrapper_dir"
+          install -m 600 "$source_known_hosts" "$known_hosts"
+          cat > "$deploy_ssh_config" <<EOF
+          Host xeon-dev
+            HostName xeon-dev
+            User github-runner
+            IdentityFile $DEPLOY_SSH_KEY
+            IdentitiesOnly yes
+            BatchMode yes
+            PreferredAuthentications publickey
+            PasswordAuthentication no
+            KbdInteractiveAuthentication no
+            StrictHostKeyChecking yes
+            UserKnownHostsFile $known_hosts
+            GlobalKnownHostsFile /dev/null
+            HostKeyAlgorithms ssh-ed25519
+            ConnectTimeout 10
+            ConnectionAttempts 2
+            ServerAliveInterval 15
+            ServerAliveCountMax 3
+            ControlMaster no
+            ClearAllForwardings yes
+            RequestTTY no
+          EOF
+          chmod 600 "$deploy_ssh_config"
+
+          cat > "$wrapper_dir/ssh" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          duration="\${DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS:-1800}"
+          case "\$duration" in ''|*[!0-9]*) exit 64 ;; esac
+          exec "$system_timeout" --foreground --signal=TERM --kill-after=15s "\${duration}s" \
+            "$system_ssh" -F "$deploy_ssh_config" "\$@"
+          EOF
+          cat > "$wrapper_dir/scp" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          duration="\${DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS:-1800}"
+          case "\$duration" in ''|*[!0-9]*) exit 64 ;; esac
+          exec "$system_timeout" --foreground --signal=TERM --kill-after=15s "\${duration}s" \
+            "$system_scp" -F "$deploy_ssh_config" "\$@"
+          EOF
+          chmod 700 "$wrapper_dir/ssh" "$wrapper_dir/scp"
+          printf '%s\n' "$wrapper_dir" >> "$GITHUB_PATH"
+          printf 'DEPLOY_SSH_CONFIG=%s\n' "$deploy_ssh_config" >> "$GITHUB_ENV"
+          printf 'DEPLOY_KNOWN_HOSTS=%s\n' "$known_hosts" >> "$GITHUB_ENV"
+          printf 'DEPLOY_SSH_READY=true\n' >> "$GITHUB_ENV"
+
+          "$system_ssh" -F "$deploy_ssh_config" -G xeon-dev >/dev/null
 
       - name: Verify build runner, Docker, registry, and deploy host
         shell: bash
@@ -83,31 +241,47 @@ jobs:
           test -S /var/run/docker.sock
           docker info --format 'Docker daemon: {{.Name}} {{.ServerVersion}}'
 
-          test -r "$DEPLOY_SSH_KEY"
-          mkdir -p ~/.ssh
-          ssh-keyscan -H xeon-dev >> ~/.ssh/known_hosts 2>/dev/null || true
-
           registry_headers="$(mktemp)"
-          registry_status="$(curl -sS -o "$registry_headers" -w "%{http_code}" -I "https://${REGISTRY_HOST}/v2/" || true)"
+          registry_status="$(curl -sS --connect-timeout 5 --max-time 15 \
+            -o "$registry_headers" -w "%{http_code}" -I "https://${REGISTRY_HOST}/v2/" || true)"
           cat "$registry_headers"
           test "$registry_status" = "401"
           grep -qi '^Docker-Distribution-Api-Version: registry/2.0' "$registry_headers"
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "test -r '$XFRAMEWORK_ENV_FILE' && docker --version && docker compose version && curl -sSI 'https://${REGISTRY_HOST}/v2/' | sed -n '1,8p'"
+            "test -r '$XFRAMEWORK_ENV_FILE' && docker --version && docker compose version && curl -sSI --connect-timeout 5 --max-time 15 'https://${REGISTRY_HOST}/v2/' | sed -n '1,8p'"
 
-      - name: Validate compose
+      - name: Validate Phase 0 Compose semantics
         shell: bash
         run: |
           set -euo pipefail
-          docker compose -f "$COMPOSE_FILE_PATH" config >/tmp/xframework-compose.yml
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          mkdir -p "$evidence_dir"
+          rm -f "$evidence_dir"/*.json
+          python3 scripts/verify-bolt-phase0-compose.py \
+            --compose-file "$COMPOSE_FILE_PATH" \
+            --output "$evidence_dir/local-compose.json" \
+            --expected-ca-path "$BOLT_HUB_TLS_CA_PATH" \
+            --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
+            --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
+            --expected-published-port "$BOLT_HUB_EXPOSE_PORT" \
+            --expected-identityserver-ca-path "$IDENTITYSERVER_TLS_CA_PATH" \
+            --expected-identityserver-fullchain-path "$IDENTITYSERVER_TLS_FULLCHAIN_PATH" \
+            --expected-identityserver-private-key-path "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH" \
+            --expected-identityserver-published-port "$IDENTITYSERVER_PUBLIC_HTTPS_PORT" \
+            --expected-identityserver-public-hostname "$IDENTITYSERVER_PUBLIC_HOSTNAME" \
+            --expected-identityserver-token-path "$IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH"
 
-      - name: Ensure xeon-dev service identity secrets
+      - name: Validate protected deployment inputs without mutation
         shell: bash
         run: |
           set -euo pipefail
 
           required_vars=(
+            JWT_SECRET
+            JWT_ISSUER
+            JWT_AUDIENCE
+            BOLT_SIGNATURE
             IDENTITYSERVER_SERVICE_IDENTITY_SECRET
             BOLT_HUB_SERVICE_IDENTITY_SECRET
             COMMUNICATIONS_SERVICE_IDENTITY_SECRET
@@ -120,6 +294,48 @@ jobs:
             POS_SERVICE_IDENTITY_SECRET
             PORTAL_SERVICE_IDENTITY_SECRET
             OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET
+            BOLT_HUB_TLS_FULLCHAIN_PATH
+            BOLT_HUB_TLS_PRIVATE_KEY_PATH
+            BOLT_HUB_TLS_CA_PATH
+            BOLT_HUB_EXPOSE_PORT
+            BOLT_HUB_PUBLIC_HOSTNAME
+            IDENTITYSERVER_TLS_FULLCHAIN_PATH
+            IDENTITYSERVER_TLS_PRIVATE_KEY_PATH
+            IDENTITYSERVER_TLS_CA_PATH
+            IDENTITYSERVER_PUBLIC_HOSTNAME
+            IDENTITYSERVER_PUBLIC_HTTPS_PORT
+            IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH
+            BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL
+            BOLT_SYNTHETIC_IDENTITYSERVER_CA_PATH
+            BOLT_SYNTHETIC_TENANT_ID
+            BOLT_SYNTHETIC_CREDENTIAL_ID
+            BOLT_SYNTHETIC_DEVICE_ID
+            BOLT_SYNTHETIC_USER_USERNAME
+            BOLT_SYNTHETIC_USER_PASSWORD
+            BOLT_SYNTHETIC_USER_ROLE_ID
+            BOLT_SYNTHETIC_USER_AUTHORIZATION_TYPE
+            BOLT_SYNTHETIC_MIN_TOKEN_LIFETIME_SECONDS
+            BOLT_SYNTHETIC_TOKEN_REFRESH_COMMAND_PATH
+            BOLT_SYNTHETIC_PROXY_MARKER_SCAN_COMMAND_PATH
+            BOLT_SYNTHETIC_SEQ_MARKER_SCAN_COMMAND_PATH
+            BOLT_SYNTHETIC_TRACE_MARKER_SCAN_COMMAND_PATH
+            BOLT_SYNTHETIC_PLAINTEXT_REJECTION_COMMAND_PATH
+            BOLT_SYNTHETIC_REDIS_INTERRUPTION_COMMAND_PATH
+            BOLT_SYNTHETIC_OLD_GENERATION_REJECTION_COMMAND_PATH
+            BOLT_SYNTHETIC_COMPOSE_PROJECT_NAME
+            BOLT_SYNTHETIC_PLAINTEXT_PEER_SERVICE
+            BOLT_SYNTHETIC_PROXY_LOG_PATHS
+            BOLT_SYNTHETIC_SEQ_API_URL
+            BOLT_SYNTHETIC_SEQ_API_KEY
+            BOLT_SYNTHETIC_JAEGER_QUERY_API_URL
+            BOLT_SYNTHETIC_REDIS_POST_RECOVERY_COMMAND_PATH
+            BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH
+            BOLT_SYNTHETIC_REJECTED_CLIENT_SECRET_PATH
+            BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_PATH
+            BOLT_SYNTHETIC_USER_TOKEN_PATH
+            BOLT_SYNTHETIC_EXPIRY_TOKEN_PATH
+            BOLT_SYNTHETIC_REJECTED_COMMUNICATIONS_TOKEN_PATH
+            BOLT_SYNTHETIC_REJECTED_USER_TOKEN_PATH
           )
 
           quoted_vars="$(printf '%q ' "${required_vars[@]}")"
@@ -127,28 +343,222 @@ jobs:
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' bash -s -- $quoted_vars" <<'REMOTE_SCRIPT'
           set -euo pipefail
+          python3 - "$XFRAMEWORK_ENV_FILE" "$@" <<'PY'
+          import re
+          import stat
+          import sys
+          from pathlib import Path
 
-          env_file="$XFRAMEWORK_ENV_FILE"
-          test -f "$env_file"
+          path = Path(sys.argv[1])
+          required = set(sys.argv[2:])
+          if not path.is_file():
+              raise SystemExit("protected deployment env file is missing")
+          if stat.S_IMODE(path.stat().st_mode) & 0o077:
+              raise SystemExit("protected deployment env file must not be group/world accessible")
 
-          tmp_file="$(mktemp)"
-          trap 'rm -f "$tmp_file"' EXIT
-
-          grep -v '^SERVICE_IDENTITY_DEVELOPMENT_SECRET=' "$env_file" > "$tmp_file" || true
-
-          changed=0
-          for variable_name in "$@"; do
-            if ! grep -q "^${variable_name}=" "$tmp_file"; then
-              secret_value="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
-              printf '%s=%s\n' "$variable_name" "$secret_value" >> "$tmp_file"
-              changed=1
-            fi
-          done
-
-          if [ "$changed" -eq 1 ] || grep -q '^SERVICE_IDENTITY_DEVELOPMENT_SECRET=' "$env_file"; then
-            install -m 600 "$tmp_file" "$env_file"
-          fi
+          names = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+          values = {}
+          for number, raw in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+              if not raw.strip() or raw.lstrip().startswith("#"):
+                  continue
+              name, separator, value = raw.partition("=")
+              if not separator or not names.fullmatch(name) or name in values:
+                  raise SystemExit(f"invalid or duplicate env entry on line {number}")
+              values[name] = value
+          missing = sorted(name for name in required if not values.get(name))
+          if missing:
+              raise SystemExit("missing protected deployment variables: " + ", ".join(missing))
+          for name in required:
+              value = values[name]
+              if "change-me" in value.lower() or "placeholder" in value.lower():
+                  raise SystemExit(f"protected deployment variable {name} contains a placeholder")
+          PY
           REMOTE_SCRIPT
+
+      - name: Verify sealed watchdog bootstrap prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "sudo -n '$REMOTE_ROOT_HELPER' verify-bootstrap && sudo -n '$REMOTE_ROOT_HELPER' prepare-run '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT'"
+
+      - name: Install reviewed Phase 0 synthetic hooks
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_parser="$REMOTE_ENV_PARSER"
+          remote_hook_dir="$REMOTE_DEPLOY_DIR/hooks"
+          remote_hook_parser="$remote_hook_dir/verify-bolt-phase0-env.py"
+          remote_refresh_hook="$remote_hook_dir/refresh-bolt-phase0-synthetic-tokens.py"
+          remote_marker_hook="$remote_hook_dir/run-bolt-phase0-marker-scan.py"
+          remote_operational_hook="$remote_hook_dir/run-bolt-phase0-operational-probe.py"
+          remote_post_recovery_hook="$remote_hook_dir/run-bolt-phase0-post-recovery-durable.py"
+          remote_recovery_synthetic_hook="$remote_hook_dir/run-bolt-phase0-recovery-synthetic.py"
+          remote_refresh_stage="$REMOTE_RUN_DIR/refresh-bolt-phase0-synthetic-tokens.py"
+          remote_marker_stage="$REMOTE_RUN_DIR/run-bolt-phase0-marker-scan.py"
+          remote_operational_stage="$REMOTE_RUN_DIR/run-bolt-phase0-operational-probe.py"
+          remote_post_recovery_stage="$REMOTE_RUN_DIR/run-bolt-phase0-post-recovery-durable.py"
+          remote_recovery_synthetic_stage="$REMOTE_RUN_DIR/run-bolt-phase0-recovery-synthetic.py"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "test -d '$REMOTE_RUN_DIR' && test -d '$remote_hook_dir'"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-env.py "$DEPLOY_HOST:$remote_parser"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/refresh-bolt-phase0-synthetic-tokens.py "$DEPLOY_HOST:$remote_refresh_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/run-bolt-phase0-marker-scan.py "$DEPLOY_HOST:$remote_marker_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/run-bolt-phase0-operational-probe.py "$DEPLOY_HOST:$remote_operational_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/run-bolt-phase0-post-recovery-durable.py "$DEPLOY_HOST:$remote_post_recovery_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/run-bolt-phase0-recovery-synthetic.py "$DEPLOY_HOST:$remote_recovery_synthetic_stage"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' PARSER='$remote_parser' HOOK_PARSER='$remote_hook_parser' REFRESH_STAGED='$remote_refresh_stage' REFRESH_DESTINATION='$remote_refresh_hook' MARKER_STAGED='$remote_marker_stage' MARKER_DESTINATION='$remote_marker_hook' OPERATIONAL_STAGED='$remote_operational_stage' OPERATIONAL_DESTINATION='$remote_operational_hook' POST_RECOVERY_STAGED='$remote_post_recovery_stage' POST_RECOVERY_DESTINATION='$remote_post_recovery_hook' RECOVERY_SYNTHETIC_STAGED='$remote_recovery_synthetic_stage' RECOVERY_SYNTHETIC_DESTINATION='$remote_recovery_synthetic_hook' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          read_path() { python3 "$PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1" --type absolute-path; }
+          test "$(read_path BOLT_SYNTHETIC_TOKEN_REFRESH_COMMAND_PATH)" = "$REFRESH_DESTINATION"
+          for key in BOLT_SYNTHETIC_PROXY_MARKER_SCAN_COMMAND_PATH BOLT_SYNTHETIC_SEQ_MARKER_SCAN_COMMAND_PATH BOLT_SYNTHETIC_TRACE_MARKER_SCAN_COMMAND_PATH; do
+            test "$(read_path "$key")" = "$MARKER_DESTINATION"
+          done
+          for key in BOLT_SYNTHETIC_PLAINTEXT_REJECTION_COMMAND_PATH BOLT_SYNTHETIC_REDIS_INTERRUPTION_COMMAND_PATH BOLT_SYNTHETIC_OLD_GENERATION_REJECTION_COMMAND_PATH; do
+            test "$(read_path "$key")" = "$OPERATIONAL_DESTINATION"
+          done
+          test "$(read_path BOLT_SYNTHETIC_REDIS_POST_RECOVERY_COMMAND_PATH)" = "$POST_RECOVERY_DESTINATION"
+          test "$(read_path BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH)" = "$RECOVERY_SYNTHETIC_DESTINATION"
+          for staged in "$PARSER" "$REFRESH_STAGED" "$MARKER_STAGED" "$OPERATIONAL_STAGED" "$POST_RECOVERY_STAGED" "$RECOVERY_SYNTHETIC_STAGED"; do
+            PYTHONPYCACHEPREFIX=/tmp/xframework-phase0-pycache python3 -m py_compile "$staged"
+            chmod 700 "$staged"
+          done
+          install -m 700 "$PARSER" "$HOOK_PARSER"
+          install -m 700 "$REFRESH_STAGED" "$REFRESH_DESTINATION"
+          install -m 700 "$MARKER_STAGED" "$MARKER_DESTINATION"
+          install -m 700 "$OPERATIONAL_STAGED" "$OPERATIONAL_DESTINATION"
+          install -m 700 "$POST_RECOVERY_STAGED" "$POST_RECOVERY_DESTINATION"
+          install -m 700 "$RECOVERY_SYNTHETIC_STAGED" "$RECOVERY_SYNTHETIC_DESTINATION"
+          for destination in "$HOOK_PARSER" "$REFRESH_DESTINATION" "$MARKER_DESTINATION" "$OPERATIONAL_DESTINATION" "$POST_RECOVERY_DESTINATION" "$RECOVERY_SYNTHETIC_DESTINATION"; do
+            test "$(stat -c '%a' "$destination")" = 700
+          done
+          REMOTE_SCRIPT
+
+      - name: Validate credential bootstrap inputs without mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_manager="$REMOTE_ROTATION_MANAGER"
+          remote_evidence="$REMOTE_RUN_DIR/rotation-bootstrap-validation-evidence.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "test -d '$REMOTE_RUN_DIR' && test -d '$REMOTE_DEPLOY_DIR'"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/manage-bolt-phase0-rotation.py "$DEPLOY_HOST:$remote_manager"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_EVIDENCE='$remote_evidence' REMOTE_MANAGER='$remote_manager' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          PYTHONPYCACHEPREFIX=/tmp/xframework-phase0-pycache python3 -m py_compile "$REMOTE_MANAGER"
+          chmod 700 "$REMOTE_MANAGER"
+          /usr/bin/timeout --foreground --kill-after=10s 60s python3 "$REMOTE_MANAGER" validate-bootstrap \
+            --env-file "$XFRAMEWORK_ENV_FILE" \
+            --state-file "$REMOTE_ROTATION_STATE" > "$REMOTE_EVIDENCE.tmp"
+          mv "$REMOTE_EVIDENCE.tmp" "$REMOTE_EVIDENCE"
+          chmod 600 "$REMOTE_EVIDENCE"
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/rotation-bootstrap-validation.json"
+
+      - name: Validate actual xeon-dev Phase 0 TLS and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          mkdir -p "$evidence_dir"
+
+          remote_candidate="$REMOTE_DEPLOY_DIR/docker-compose.${IMAGE_TAG}.candidate.yml"
+          remote_compose_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-compose.py"
+          remote_env_parser="$REMOTE_ENV_PARSER"
+          remote_tls_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-tls.sh"
+          remote_identity_tls_verifier="$REMOTE_DEPLOY_DIR/verify-identityserver-phase0-tls.sh"
+          remote_compose_evidence="$REMOTE_DEPLOY_DIR/bolt-phase0-compose-evidence.json"
+          remote_tls_evidence="$REMOTE_RUN_DIR/bolt-tls-evidence.json"
+          remote_identity_tls_evidence="$REMOTE_RUN_DIR/identityserver-tls-evidence.json"
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "mkdir -p '$REMOTE_DEPLOY_DIR'"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$COMPOSE_FILE_PATH" "$DEPLOY_HOST:$remote_candidate"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-compose.py "$DEPLOY_HOST:$remote_compose_verifier"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-env.py "$DEPLOY_HOST:$remote_env_parser"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-tls.sh "$DEPLOY_HOST:$remote_tls_verifier"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-identityserver-phase0-tls.sh "$DEPLOY_HOST:$remote_identity_tls_verifier"
+
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' CREDENTIAL_GENERATION_ID='phase0-prelease-validation-g1' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_CANDIDATE='$remote_candidate' REMOTE_COMPOSE_VERIFIER='$remote_compose_verifier' REMOTE_ENV_PARSER='$remote_env_parser' REMOTE_TLS_VERIFIER='$remote_tls_verifier' REMOTE_IDENTITY_TLS_VERIFIER='$remote_identity_tls_verifier' REMOTE_COMPOSE_EVIDENCE='$remote_compose_evidence' REMOTE_TLS_EVIDENCE='$remote_tls_evidence' REMOTE_IDENTITY_TLS_EVIDENCE='$remote_identity_tls_evidence'"
+
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "$remote_env bash -s" <<'REMOTE_SCRIPT' || status=$?
+          set -euo pipefail
+          rm -f "$REMOTE_COMPOSE_EVIDENCE" "$REMOTE_TLS_EVIDENCE" "$REMOTE_IDENTITY_TLS_EVIDENCE"
+          trap 'rm -f "$REMOTE_CANDIDATE"' EXIT
+          read_env() {
+            python3 "$REMOTE_ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"
+          }
+          BOLT_HUB_TLS_FULLCHAIN_PATH="$(read_env BOLT_HUB_TLS_FULLCHAIN_PATH)"
+          BOLT_HUB_TLS_PRIVATE_KEY_PATH="$(read_env BOLT_HUB_TLS_PRIVATE_KEY_PATH)"
+          BOLT_HUB_TLS_CA_PATH="$(read_env BOLT_HUB_TLS_CA_PATH)"
+          BOLT_HUB_EXPOSE_PORT="$(read_env BOLT_HUB_EXPOSE_PORT)"
+          BOLT_HUB_PUBLIC_HOSTNAME="$(read_env BOLT_HUB_PUBLIC_HOSTNAME)"
+          IDENTITYSERVER_TLS_CA_PATH="$(read_env IDENTITYSERVER_TLS_CA_PATH)"
+          IDENTITYSERVER_PUBLIC_HTTPS_PORT="$(read_env IDENTITYSERVER_PUBLIC_HTTPS_PORT)"
+          IDENTITYSERVER_PUBLIC_HOSTNAME="$(read_env IDENTITYSERVER_PUBLIC_HOSTNAME)"
+          IDENTITYSERVER_TLS_FULLCHAIN_PATH="$(read_env IDENTITYSERVER_TLS_FULLCHAIN_PATH)"
+          IDENTITYSERVER_TLS_PRIVATE_KEY_PATH="$(read_env IDENTITYSERVER_TLS_PRIVATE_KEY_PATH)"
+          IDENTITYSERVER_TLS_CA_PATH="$(read_env IDENTITYSERVER_TLS_CA_PATH)"
+          IDENTITYSERVER_PUBLIC_HOSTNAME="$(read_env IDENTITYSERVER_PUBLIC_HOSTNAME)"
+          IDENTITYSERVER_PUBLIC_HTTPS_PORT="$(read_env IDENTITYSERVER_PUBLIC_HTTPS_PORT)"
+          IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH="$(read_env IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH)"
+
+          bash "$REMOTE_TLS_VERIFIER" \
+            "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
+            "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
+            "$BOLT_HUB_TLS_CA_PATH" \
+            "wss://bolt-hub:8443/bolt/ws" \
+            "$BOLT_HUB_PUBLIC_HOSTNAME" \
+            "$BOLT_HUB_EXPOSE_PORT" \
+            "$REMOTE_TLS_EVIDENCE"
+
+          bash "$REMOTE_IDENTITY_TLS_VERIFIER" \
+            "$IDENTITYSERVER_TLS_FULLCHAIN_PATH" \
+            "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH" \
+            "$IDENTITYSERVER_TLS_CA_PATH" \
+            "$IDENTITYSERVER_PUBLIC_HOSTNAME" \
+            "$IDENTITYSERVER_PUBLIC_HTTPS_PORT" \
+            "$IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH" \
+            "$REMOTE_IDENTITY_TLS_EVIDENCE"
+
+          python3 "$REMOTE_COMPOSE_VERIFIER" \
+            --compose-file "$REMOTE_CANDIDATE" \
+            --env-file "$XFRAMEWORK_ENV_FILE" \
+            --output "$REMOTE_COMPOSE_EVIDENCE" \
+            --expected-ca-path "$BOLT_HUB_TLS_CA_PATH" \
+            --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
+            --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
+            --expected-published-port "$BOLT_HUB_EXPOSE_PORT" \
+            --expected-identityserver-ca-path "$IDENTITYSERVER_TLS_CA_PATH" \
+            --expected-identityserver-fullchain-path "$IDENTITYSERVER_TLS_FULLCHAIN_PATH" \
+            --expected-identityserver-private-key-path "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH" \
+            --expected-identityserver-published-port "$IDENTITYSERVER_PUBLIC_HTTPS_PORT" \
+            --expected-identityserver-public-hostname "$IDENTITYSERVER_PUBLIC_HOSTNAME" \
+            --expected-identityserver-token-path "$IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH"
+          REMOTE_SCRIPT
+
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_compose_evidence" "$evidence_dir/remote-compose.json" || true
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_tls_evidence" "$evidence_dir/bolt-tls-evidence.json" || true
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_identity_tls_evidence" "$evidence_dir/identityserver-tls-evidence.json" || true
+          exit "$status"
 
       - name: Login to dev registry
         shell: bash
@@ -167,12 +577,25 @@ jobs:
             | ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
                 "docker login '$REGISTRY_HOST' --username '$XSYSTEMS_DEV_REGISTRY_USERNAME' --password-stdin"
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
+
       - name: Build images on buildserver
         shell: bash
         run: |
           set -euo pipefail
+          umask 077
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          build_inputs_file="$evidence_dir/build-inputs.json"
+          raw_compose_config="$RUNNER_TEMP/bolt-phase0-compose-build-config.json"
+          mkdir -p "$evidence_dir"
+          trap 'rm -f "$raw_compose_config"' EXIT
+          test "$(git rev-parse HEAD)" = "$IMAGE_TAG"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test -z "$(git submodule status 2>/dev/null)"
           services=(
             migrate
+            bolt-phase0-synthetics
             bolt-hub
             identityserver
             communications
@@ -186,6 +609,58 @@ jobs:
             portal
             operations-dashboard
           )
+
+          docker compose -f "$COMPOSE_FILE_PATH" config --format json > "$raw_compose_config"
+          python3 - "$raw_compose_config" "$build_inputs_file" "$IMAGE_TAG" "${services[@]}" <<'PY'
+          import json, pathlib, re, sys
+          source, output, commit, *expected_services = sys.argv[1:]
+          document = json.loads(pathlib.Path(source).read_text(encoding="utf-8"))
+          services = document.get("services")
+          if not isinstance(services, dict) or set(expected_services) - set(services):
+              raise SystemExit("Compose build-input coverage is incomplete")
+          root = pathlib.Path.cwd().resolve()
+
+          def normalize_path(value):
+              path = pathlib.Path(value)
+              if path.is_absolute():
+                  try:
+                      path = path.resolve().relative_to(root)
+                  except ValueError as error:
+                      raise SystemExit("Compose build path escapes the reviewed repository") from error
+              normalized = path.as_posix()
+              return normalized or "."
+
+          result = {}
+          for service in expected_services:
+              build = services[service].get("build")
+              if not isinstance(build, dict):
+                  raise SystemExit(f"{service}: Compose build definition is missing")
+              args = build.get("args")
+              if (
+                  not isinstance(args, dict)
+                  or set(args) != {"PROJECT_PATH"}
+                  or not isinstance(args["PROJECT_PATH"], str)
+                  or not re.fullmatch(r"[A-Za-z0-9._/-]+\.csproj", args["PROJECT_PATH"])
+              ):
+                  raise SystemExit(f"{service}: Compose build args are not the nonsecret PROJECT_PATH contract")
+              context = normalize_path(build.get("context", "."))
+              dockerfile = normalize_path(build.get("dockerfile", "Dockerfile"))
+              target = build.get("target")
+              if context != "." or dockerfile != "Dockerfile" or target is not None:
+                  raise SystemExit(f"{service}: Compose build context, Dockerfile, or target is not approved")
+              result[service] = {
+                  "context": context,
+                  "dockerfile": dockerfile,
+                  "args": dict(sorted(args.items())),
+                  "target": target,
+              }
+          evidence = {
+              "schema": "xframework.bolt.phase0.build-inputs.v1",
+              "source_commit": commit,
+              "services": result,
+          }
+          pathlib.Path(output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
 
           docker compose -f "$COMPOSE_FILE_PATH" build "${services[@]}"
 
@@ -193,8 +668,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          override_file="$evidence_dir/pinned-compose.override.json"
+          pins_file="$evidence_dir/image-pins.json"
           services=(
             migrate
+            bolt-phase0-synthetics
             bolt-hub
             identityserver
             communications
@@ -209,24 +688,129 @@ jobs:
             operations-dashboard
           )
 
+          expected_args=()
+          manifest_args=()
           for service in "${services[@]}"; do
             image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${service}:${IMAGE_TAG}"
-            channel_image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${service}:${CHANNEL_TAG}"
-            docker tag "$image" "$channel_image"
             docker push "$image"
-            docker push "$channel_image"
+            manifest_file="$RUNNER_TEMP/bolt-phase0-manifest-${service}.json"
+            docker manifest inspect --verbose "$image" > "$manifest_file"
+            expected_args+=(--expected-service "$service")
+            manifest_args+=(--registry-manifest "$service" "$image" "$manifest_file")
           done
 
-      - name: Deploy stack on xeon-dev
+          python3 scripts/verify-bolt-phase0-image-pin.py \
+            --expected-image-tag "$IMAGE_TAG" \
+            --approved-repository-prefix "$REGISTRY_HOST/$REGISTRY_NAMESPACE" \
+            "${expected_args[@]}" \
+            "${manifest_args[@]}" \
+            --output-override "$override_file" \
+            --output-evidence "$pins_file"
+
+      - name: Sign and verify build provenance
         shell: bash
         run: |
           set -euo pipefail
-          pull_services=(
-            postgres
-            minio
-            seq
-            jaeger
+          umask 077
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          pins_file="$evidence_dir/image-pins.json"
+          provenance_file="$evidence_dir/provenance-evidence.json"
+          build_inputs_file="$evidence_dir/build-inputs.json"
+          source_repository="https://github.com/${GITHUB_REPOSITORY}"
+          workflow_identity="https://github.com/${GITHUB_WORKFLOW_REF}"
+          builder_id="$workflow_identity"
+          workflow_invocation="${source_repository}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
+          sdk_base="mcr.microsoft.com/dotnet/sdk@sha256:493fca072aac81307027cbb7b7c9a82b6e87d222af315504d05dc6530e69b519"
+          runtime_base="mcr.microsoft.com/dotnet/aspnet@sha256:68abecb063cf367fdce0a7f0ab5678beaa99f60c7f616df862ca2a51c387d4e7"
+          record_args=()
+
+          while IFS=$'\t' read -r service subject; do
+            predicate="$evidence_dir/provenance-predicate-${service}.json"
+            verification="$evidence_dir/cosign-verification-${service}.json"
+            bundle="$evidence_dir/cosign-bundle-${service}.json"
+            python3 - "$predicate" "$service" "$source_repository" "$workflow_identity" "$builder_id" \
+              "$workflow_invocation" "$sdk_base" "$runtime_base" "$build_inputs_file" <<'PY'
+          import hashlib, json, pathlib, sys
+          (output, service, source_repository, workflow_identity, builder_id,
+           invocation_id, sdk_base, runtime_base, build_inputs_path) = sys.argv[1:]
+          dockerfile_digest = "sha256:" + hashlib.sha256(pathlib.Path("Dockerfile").read_bytes()).hexdigest()
+          build_inputs = json.loads(pathlib.Path(build_inputs_path).read_text(encoding="utf-8"))
+          build = build_inputs["services"].get(service)
+          if not isinstance(build, dict):
+              raise SystemExit(f"{service}: reviewed build input is missing")
+          predicate = {
+              "buildDefinition": {
+                  "buildType": "https://xframework.dev/build-types/compose-dotnet-v1",
+                  "externalParameters": {
+                      "service": service,
+                      "source_repository": source_repository,
+                      "source_commit": __import__('os').environ["GITHUB_SHA"],
+                      "workflow_ref": workflow_identity,
+                      "dockerfile": {"path": "Dockerfile", "digest": dockerfile_digest},
+                      "build": build,
+                  },
+                  "resolvedDependencies": [
+                      {"uri": sdk_base.split("@")[0], "digest": {"sha256": sdk_base.split("sha256:", 1)[1]}},
+                      {"uri": runtime_base.split("@")[0], "digest": {"sha256": runtime_base.split("sha256:", 1)[1]}},
+                  ],
+              },
+              "runDetails": {
+                  "builder": {"id": builder_id},
+                  "metadata": {"invocationId": invocation_id},
+              },
+          }
+          pathlib.Path(output).write_text(json.dumps(predicate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+            cosign attest --yes --new-bundle-format=true --type slsaprovenance1 \
+              --predicate "$predicate" --bundle "$bundle" "$subject"
+            cosign verify-attestation \
+              --new-bundle-format=true \
+              --type slsaprovenance1 \
+              --certificate-identity "$workflow_identity" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
+              --certificate-github-workflow-ref "$GITHUB_REF" \
+              --certificate-github-workflow-sha "$GITHUB_SHA" \
+              --certificate-github-workflow-trigger "$GITHUB_EVENT_NAME" \
+              "$subject" > "$verification"
+            record_args+=(--provenance-record "$service" "$verification" "$bundle")
+          done < <(python3 - "$pins_file" <<'PY'
+          import json, sys
+          pins = json.load(open(sys.argv[1], encoding="utf-8"))["pins"]
+          for service, subject in sorted(pins.items()):
+              print(f"{service}\t{subject}")
+          PY
+          )
+
+          python3 scripts/verify-bolt-phase0-provenance.py \
+            --pins-file "$pins_file" \
+            --source-commit "$GITHUB_SHA" \
+            --source-repository "$source_repository" \
+            --dockerfile Dockerfile \
+            --build-inputs-file "$build_inputs_file" \
+            --expected-base-image "$sdk_base" \
+            --expected-base-image "$runtime_base" \
+            --trusted-builder-id "$builder_id" \
+            --trusted-workflow-ref "$workflow_identity" \
+            --workflow-invocation "$workflow_invocation" \
+            "${record_args[@]}" \
+            --output "$provenance_file"
+
+      - name: Authorize digest-pinned deployment manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          override_file="$evidence_dir/pinned-compose.override.json"
+          pins_file="$evidence_dir/image-pins.json"
+          provenance_file="$evidence_dir/provenance-evidence.json"
+          remote_override="$REMOTE_PIN_OVERRIDE"
+          remote_pins="$REMOTE_PINS_FILE"
+          remote_evidence="$REMOTE_RUN_DIR/pinned-manifest-evidence.json"
+          services=(
             migrate
+            bolt-phase0-synthetics
             bolt-hub
             identityserver
             communications
@@ -241,28 +825,756 @@ jobs:
             operations-dashboard
           )
 
-          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "mkdir -p '$REMOTE_DEPLOY_DIR'"
+          authorize_args=()
+          for service in "${services[@]}"; do
+            authorize_args+=(--authorized-service "$service")
+          done
+          python3 scripts/verify-bolt-phase0-compose.py \
+            --compose-file "$COMPOSE_FILE_PATH" \
+            --compose-file "$override_file" \
+            --output "$evidence_dir/pinned-manifest-local.json" \
+            --expected-ca-path "$BOLT_HUB_TLS_CA_PATH" \
+            --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
+            --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
+            --expected-published-port "$BOLT_HUB_EXPOSE_PORT" \
+            --expected-identityserver-ca-path "$IDENTITYSERVER_TLS_CA_PATH" \
+            --expected-identityserver-fullchain-path "$IDENTITYSERVER_TLS_FULLCHAIN_PATH" \
+            --expected-identityserver-private-key-path "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH" \
+            --expected-identityserver-published-port "$IDENTITYSERVER_PUBLIC_HTTPS_PORT" \
+            --expected-identityserver-public-hostname "$IDENTITYSERVER_PUBLIC_HOSTNAME" \
+            --expected-identityserver-token-path "$IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH" \
+            --pins-file "$pins_file" \
+            --provenance-file "$provenance_file" \
+            "${authorize_args[@]}" \
+            --authorize-deployment
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "install -d -m 700 '$REMOTE_RUN_DIR'"
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$COMPOSE_FILE_PATH" "$DEPLOY_HOST:$REMOTE_COMPOSE_FILE"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$override_file" "$DEPLOY_HOST:$remote_override"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$pins_file" "$DEPLOY_HOST:$remote_pins"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$provenance_file" "$DEPLOY_HOST:$REMOTE_RUN_DIR/provenance-evidence.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "chmod 600 '$REMOTE_COMPOSE_FILE' '$remote_override' '$remote_pins' '$REMOTE_RUN_DIR/provenance-evidence.json' && rm -f '$remote_evidence'"
 
-          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
+          service_args="$(printf '%q ' "${services[@]}")"
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' CREDENTIAL_GENERATION_ID='phase0-prelease-validation-g1' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' COMPOSE_VERIFIER='$REMOTE_DEPLOY_DIR/verify-bolt-phase0-compose.py' REMOTE_OVERRIDE='$remote_override' REMOTE_PINS='$remote_pins' REMOTE_PROVENANCE='$REMOTE_RUN_DIR/provenance-evidence.json' REMOTE_EVIDENCE='$remote_evidence' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' BOLT_HUB_EXPOSE_PORT='$BOLT_HUB_EXPOSE_PORT'"
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env bash -s -- $service_args" <<'REMOTE_SCRIPT' || status=$?
+          set -euo pipefail
+          read_env() { python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"; }
+          ca_path="$(read_env BOLT_HUB_TLS_CA_PATH)"
+          fullchain_path="$(read_env BOLT_HUB_TLS_FULLCHAIN_PATH)"
+          private_key_path="$(read_env BOLT_HUB_TLS_PRIVATE_KEY_PATH)"
+          published_port="$(read_env BOLT_HUB_EXPOSE_PORT)"
+          identity_ca_path="$(read_env IDENTITYSERVER_TLS_CA_PATH)"
+          identity_fullchain_path="$(read_env IDENTITYSERVER_TLS_FULLCHAIN_PATH)"
+          identity_private_key_path="$(read_env IDENTITYSERVER_TLS_PRIVATE_KEY_PATH)"
+          identity_published_port="$(read_env IDENTITYSERVER_PUBLIC_HTTPS_PORT)"
+          identity_public_hostname="$(read_env IDENTITYSERVER_PUBLIC_HOSTNAME)"
+          identity_token_path="$(read_env IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH)"
+          authorize_args=()
+          for service in "$@"; do authorize_args+=(--authorized-service "$service"); done
+          python3 "$COMPOSE_VERIFIER" \
+            --compose-file "$REMOTE_COMPOSE_FILE" \
+            --compose-file "$REMOTE_OVERRIDE" \
+            --env-file "$XFRAMEWORK_ENV_FILE" \
+            --output "$REMOTE_EVIDENCE" \
+            --expected-ca-path "$ca_path" \
+            --expected-fullchain-path "$fullchain_path" \
+            --expected-private-key-path "$private_key_path" \
+            --expected-published-port "$published_port" \
+            --expected-identityserver-ca-path "$identity_ca_path" \
+            --expected-identityserver-fullchain-path "$identity_fullchain_path" \
+            --expected-identityserver-private-key-path "$identity_private_key_path" \
+            --expected-identityserver-published-port "$identity_published_port" \
+            --expected-identityserver-public-hostname "$identity_public_hostname" \
+            --expected-identityserver-token-path "$identity_token_path" \
+            --pins-file "$REMOTE_PINS" \
+            --provenance-file "$REMOTE_PROVENANCE" \
+            "${authorize_args[@]}" \
+            --authorize-deployment
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json" || true
+          exit "$status"
+
+      - name: Pull candidate images without mutating services
+        shell: bash
+        env:
+          DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 2700
+        run: |
+          set -euo pipefail
+          pull_services=(
+            migrate
+            bolt-phase0-synthetics
+            bolt-hub
+            identityserver
+            communications
+            notifications
+            storage
+            attendance
+            smsgateway
+            wallets
+            inventario
+            pos
+            portal
+            operations-dashboard
+          )
+
+          remote_override="$REMOTE_PIN_OVERRIDE"
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' CREDENTIAL_GENERATION_ID='phase0-prelease-validation-g1'"
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' pull ${pull_services[*]}"
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' -f '$remote_override' pull ${pull_services[*]}"
+
+      - name: Arm external deployment watchdog
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_stage="$REMOTE_RUN_DIR/manage-bolt-phase0-deployment-lease.py"
+          remote_qualifier_stage="$REMOTE_QUALIFICATION_VERIFIER"
+          remote_watchdog_stage="$REMOTE_RUN_DIR/run-bolt-phase0-watchdog.sh"
+          remote_runtime_stage="$REMOTE_RUNTIME_VERIFIER"
+          remote_service_stage="$REMOTE_RUN_DIR/xframework-bolt-phase0-watchdog.service"
+          remote_timer_stage="$REMOTE_RUN_DIR/xframework-bolt-phase0-watchdog.timer"
+          remote_evidence="$REMOTE_RUN_DIR/deployment-lease-arm.json"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/manage-bolt-phase0-deployment-lease.py "$DEPLOY_HOST:$remote_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-qualification.py "$DEPLOY_HOST:$remote_qualifier_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/run-bolt-phase0-watchdog.sh "$DEPLOY_HOST:$remote_watchdog_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-runtime.py "$DEPLOY_HOST:$remote_runtime_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            deploy/systemd/xframework-bolt-phase0-watchdog.service "$DEPLOY_HOST:$remote_service_stage"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            deploy/systemd/xframework-bolt-phase0-watchdog.timer "$DEPLOY_HOST:$remote_timer_stage"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_STAGE='$remote_stage' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' REMOTE_QUALIFIER_STAGE='$remote_qualifier_stage' REMOTE_WATCHDOG_STAGE='$remote_watchdog_stage' REMOTE_RUNTIME_STAGE='$remote_runtime_stage' REMOTE_SERVICE_STAGE='$remote_service_stage' REMOTE_TIMER_STAGE='$remote_timer_stage' REMOTE_EVIDENCE='$remote_evidence' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          /usr/bin/bash -n "$REMOTE_WATCHDOG_STAGE"
+          PYTHONPYCACHEPREFIX=/tmp/xframework-phase0-pycache python3 -m py_compile "$REMOTE_STAGE"
+          PYTHONPYCACHEPREFIX=/tmp/xframework-phase0-pycache python3 -m py_compile "$REMOTE_QUALIFIER_STAGE"
+          PYTHONPYCACHEPREFIX=/tmp/xframework-phase0-pycache python3 -m py_compile "$REMOTE_RUNTIME_STAGE"
+          chmod 700 "$REMOTE_STAGE" "$REMOTE_QUALIFIER_STAGE" "$REMOTE_WATCHDOG_STAGE" "$REMOTE_RUNTIME_STAGE"
+          chmod 600 "$REMOTE_SERVICE_STAGE" "$REMOTE_TIMER_STAGE"
+          deployment_uid="$(id -u)"
+          recovery_status=0
+          /usr/bin/python3 "$REMOTE_LEASE_MANAGER" \
+            --project-name "$COMPOSE_PROJECT_NAME" \
+            --deployment-uid "$deployment_uid" \
+            arm \
+            --run-id "$RUN_ID" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --phase credential-preparation \
+            --stale-timeout-seconds 600 > "$REMOTE_EVIDENCE.tmp"
+          mv "$REMOTE_EVIDENCE.tmp" "$REMOTE_EVIDENCE"
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/deployment-lease-arm.json"
+
+      - name: Bootstrap current credential generation under lease
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_manager="$REMOTE_ROTATION_MANAGER"
+          remote_evidence="$REMOTE_RUN_DIR/rotation-bootstrap-evidence.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_EVIDENCE='$remote_evidence' REMOTE_MANAGER='$remote_manager' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-bootstrap --mutation-began \
+            --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            python3 "$REMOTE_MANAGER" bootstrap --env-file "$XFRAMEWORK_ENV_FILE" \
+              --state-file "$REMOTE_ROTATION_STATE" > "$REMOTE_EVIDENCE.tmp"
+          mv "$REMOTE_EVIDENCE.tmp" "$REMOTE_EVIDENCE"
+          chmod 600 "$REMOTE_EVIDENCE"
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/rotation-bootstrap.json"
+
+      - name: Prepare bounded validation-only credential generation G+1
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_manager="$REMOTE_ROTATION_MANAGER"
+          remote_evidence="$REMOTE_RUN_DIR/rotation-prepare-evidence.json"
+          minimum_remaining_seconds=$((
+            MAX_JWT_LIFETIME_SECONDS +
+            POST_ACTIVATION_ROLLOUT_BUDGET_SECONDS +
+            POST_ACTIVATION_OBSERVATION_BUDGET_SECONDS +
+            ROLLBACK_BUDGET_SECONDS
+          ))
+          prepare_validity_seconds=$((
+            PRE_ACTIVATION_STAGING_BUDGET_SECONDS + minimum_remaining_seconds
+          ))
+          test "$minimum_remaining_seconds" -eq 7200
+          test "$prepare_validity_seconds" -eq 14400
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' up -d --no-build"
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_EVIDENCE='$remote_evidence' REMOTE_MANAGER='$remote_manager' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' PREPARE_VALIDITY_SECONDS='$prepare_validity_seconds' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-preparation >/dev/null
+          }
+          heartbeat
+          if [ -e "$REMOTE_ROTATION_STATE" ] || [ -L "$REMOTE_ROTATION_STATE" ]; then
+            /usr/bin/timeout --foreground --kill-after=10s 30s python3 "$REMOTE_MANAGER" status \
+              --env-file "$XFRAMEWORK_ENV_FILE" \
+              --state-file "$REMOTE_ROTATION_STATE" > "$REMOTE_EVIDENCE" || true
+            echo "Credential preparation cannot resume implicitly; deployment is blocked." >&2
+            exit 1
+          fi
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-preparation \
+            --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            python3 "$REMOTE_MANAGER" prepare --env-file "$XFRAMEWORK_ENV_FILE" \
+              --state-file "$REMOTE_ROTATION_STATE" --valid-for-seconds "$PREPARE_VALIDITY_SECONDS" > "$REMOTE_EVIDENCE.tmp"
+          mv "$REMOTE_EVIDENCE.tmp" "$REMOTE_EVIDENCE"
+          chmod 600 "$REMOTE_EVIDENCE"
+          heartbeat
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/rotation-prepare.json"
+
+      - name: Run migration before service mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          install -d -m 700 "$REMOTE_RUN_DIR"
+          : > "$REMOTE_RUN_DIR/mutation-started"
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase migration --mutation-began >/dev/null
+          }
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE")
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase migration --mutation-began \
+            --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            "${compose[@]}" up --no-build --no-deps --force-recreate --abort-on-container-exit --exit-code-from migrate migrate
+          REMOTE_SCRIPT
+
+      - name: Deploy Bolt Hub only
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          install -d -m 700 "$REMOTE_RUN_DIR"
+          : > "$REMOTE_RUN_DIR/mutation-started"
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase hub-rollout --mutation-began >/dev/null
+          }
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE")
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase hub-rollout --mutation-began \
+            --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            "${compose[@]}" up -d --no-build --no-deps bolt-hub
+          REMOTE_SCRIPT
+
+      - name: Verify Hub TLS and plaintext boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' REMOTE_PINS_FILE='$REMOTE_PINS_FILE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat_parent_pid=$$
+          heartbeat_failed="$(mktemp)"
+          heartbeat_ready="$(mktemp)"
+          rm -f "$heartbeat_failed" "$heartbeat_ready"
+          heartbeat_pid=
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase hub-readiness --mutation-began >/dev/null
+          }
+          heartbeat_loop() {
+            trap 'exit 0' TERM INT HUP
+            while true; do
+              if ! heartbeat; then
+                : > "$heartbeat_failed"
+                kill -TERM "$heartbeat_parent_pid" >/dev/null 2>&1 || true
+                return 1
+              fi
+              : > "$heartbeat_ready"
+              sleep 30 & wait $! || return 0
+            done
+          }
+          cleanup_heartbeat() {
+            status=$?
+            heartbeat_was_alive=false
+            trap - EXIT TERM INT HUP
+            if [ -n "$heartbeat_pid" ]; then
+              if kill -0 "$heartbeat_pid" >/dev/null 2>&1; then
+                heartbeat_was_alive=true
+                kill "$heartbeat_pid" >/dev/null 2>&1 || true
+              fi
+              wait "$heartbeat_pid" 2>/dev/null || true
+              if [ "$status" -eq 0 ] && { [ "$heartbeat_was_alive" != true ] || [ -e "$heartbeat_failed" ]; }; then
+                echo "Hub readiness lease heartbeat stopped unexpectedly" >&2
+                status=1
+              fi
+            fi
+            rm -f "$heartbeat_failed" "$heartbeat_ready"
+            exit "$status"
+          }
+          trap cleanup_heartbeat EXIT
+          trap 'exit 1' TERM INT HUP
+          heartbeat_loop & heartbeat_pid=$!
+          for _ in $(seq 1 100); do
+            [ -e "$heartbeat_ready" ] && break
+            if [ -e "$heartbeat_failed" ] || ! kill -0 "$heartbeat_pid" >/dev/null 2>&1; then
+              echo "Hub readiness lease heartbeat failed to start" >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
+          test -e "$heartbeat_ready"
+          read_env() { python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"; }
+          ca_path="$(read_env BOLT_HUB_TLS_CA_PATH)"
+          published_port="$(read_env BOLT_HUB_EXPOSE_PORT)"
+          public_hostname="$(read_env BOLT_HUB_PUBLIC_HOSTNAME)"
+
+          for endpoint in live ready; do
+            ready=0
+            for attempt in $(seq 1 60); do
+              status="$(curl -sS --connect-timeout 5 --max-time 15 \
+                --noproxy "$public_hostname" --cacert "$ca_path" \
+                -o /tmp/bolt-phase0-health.json -w '%{http_code}' \
+                "https://${public_hostname}:${published_port}/health/${endpoint}" || true)"
+              if [ "$status" = 200 ]; then ready=1; break; fi
+              sleep 5
+            done
+            test "$ready" -eq 1
+          done
+
+          hub_ref="$(python3 - "$REMOTE_PINS_FILE" <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding="utf-8"))["pins"]["bolt-hub"])
+          PY
+          )"
+          network="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{end}}' xframework-bolt-hub)"
+          test -n "$network"
+          if /usr/bin/timeout --foreground --kill-after=10s 30s docker run --rm --network "$network" --entrypoint curl "$hub_ref" \
+            -fsS --connect-timeout 3 --max-time 10 http://bolt-hub:8080/bolt/ws >/dev/null 2>&1; then
+            echo "plaintext Bolt endpoint was reachable from a peer container" >&2
+            exit 1
+          fi
+          REMOTE_SCRIPT
+
+      - name: Verify staged runtime after Hub deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_verifier="$REMOTE_RUNTIME_VERIFIER"
+          remote_evidence="$REMOTE_RUN_DIR/runtime-staged-hub.json"
+          services=(migrate bolt-hub)
+          service_args="$(printf '%q ' "${services[@]}")"
+
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-runtime.py "$DEPLOY_HOST:$remote_verifier"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "rm -f '$remote_evidence'"
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" supervise --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT' --phase runtime-staged-hub --mutation-began --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s python3 '$remote_verifier' --compose-file '$REMOTE_COMPOSE_FILE' --compose-file '$REMOTE_PIN_OVERRIDE' --env-file '$XFRAMEWORK_ENV_FILE' --project-name '$COMPOSE_PROJECT_NAME' --output '$remote_evidence' --pins-file '$REMOTE_PINS_FILE' --allow-staged-inventory --services $service_args" || status=$?
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/runtime-staged-hub.json" || true
+          exit "$status"
+
+      - name: Deploy IdentityServer and Communications canary
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase canary-rollout --mutation-began >/dev/null
+          }
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE")
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase canary-rollout --mutation-began \
+            --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            "${compose[@]}" up -d --no-build --no-deps identityserver communications
+          REMOTE_SCRIPT
+
+      - name: Wait for canary readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat_parent_pid=$$
+          heartbeat_failed="$(mktemp)"
+          heartbeat_ready="$(mktemp)"
+          rm -f "$heartbeat_failed" "$heartbeat_ready"
+          heartbeat_pid=
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase canary-readiness --mutation-began >/dev/null
+          }
+          heartbeat_loop() {
+            trap 'exit 0' TERM INT HUP
+            while true; do
+              if ! heartbeat; then
+                : > "$heartbeat_failed"
+                kill -TERM "$heartbeat_parent_pid" >/dev/null 2>&1 || true
+                return 1
+              fi
+              : > "$heartbeat_ready"
+              sleep 30 & wait $! || return 0
+            done
+          }
+          cleanup_heartbeat() {
+            status=$?
+            heartbeat_was_alive=false
+            trap - EXIT TERM INT HUP
+            if [ -n "$heartbeat_pid" ]; then
+              if kill -0 "$heartbeat_pid" >/dev/null 2>&1; then
+                heartbeat_was_alive=true
+                kill "$heartbeat_pid" >/dev/null 2>&1 || true
+              fi
+              wait "$heartbeat_pid" 2>/dev/null || true
+              if [ "$status" -eq 0 ] && { [ "$heartbeat_was_alive" != true ] || [ -e "$heartbeat_failed" ]; }; then
+                echo "Canary readiness lease heartbeat stopped unexpectedly" >&2
+                status=1
+              fi
+            fi
+            rm -f "$heartbeat_failed" "$heartbeat_ready"
+            exit "$status"
+          }
+          trap cleanup_heartbeat EXIT
+          trap 'exit 1' TERM INT HUP
+          heartbeat_loop & heartbeat_pid=$!
+          for _ in $(seq 1 100); do
+            [ -e "$heartbeat_ready" ] && break
+            if [ -e "$heartbeat_failed" ] || ! kill -0 "$heartbeat_pid" >/dev/null 2>&1; then
+              echo "Canary readiness lease heartbeat failed to start" >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
+          test -e "$heartbeat_ready"
+          read_env() { python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"; }
+          identity_host="$(read_env IDENTITYSERVER_PUBLIC_HOSTNAME)"
+          identity_port="$(read_env IDENTITYSERVER_PUBLIC_HTTPS_PORT)"
+          identity_ca="$(read_env IDENTITYSERVER_TLS_CA_PATH)"
+          for attempt in $(seq 1 60); do
+            identity_status="$(curl -sS --connect-timeout 5 --max-time 15 --noproxy "$identity_host" \
+              --cacert "$identity_ca" -o /dev/null -w '%{http_code}' \
+              "https://${identity_host}:${identity_port}/health/ready" || true)"
+            communications_status="$(curl -sS --connect-timeout 5 --max-time 15 \
+              -o /dev/null -w '%{http_code}' http://127.0.0.1:5148/health/ready || true)"
+            if [ "$identity_status" = 200 ] && [ "$communications_status" = 200 ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+          REMOTE_SCRIPT
+
+      - name: Verify staged runtime after canary deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_verifier="$REMOTE_RUNTIME_VERIFIER"
+          remote_evidence="$REMOTE_RUN_DIR/runtime-staged-canary.json"
+          services=(migrate bolt-hub identityserver communications)
+          service_args="$(printf '%q ' "${services[@]}")"
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "rm -f '$remote_evidence'"
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" supervise --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT' --phase runtime-staged-canary --mutation-began --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s python3 '$remote_verifier' --compose-file '$REMOTE_COMPOSE_FILE' --compose-file '$REMOTE_PIN_OVERRIDE' --env-file '$XFRAMEWORK_ENV_FILE' --project-name '$COMPOSE_PROJECT_NAME' --output '$remote_evidence' --pins-file '$REMOTE_PINS_FILE' --allow-staged-inventory --services $service_args" || status=$?
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/runtime-staged-canary.json" || true
+          exit "$status"
+
+      - name: Run authenticated canary synthetics
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_STARTED='$REMOTE_RUN_DIR/canary-observation-started' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY' > "$REMOTE_STARTED"
+          import datetime
+          print(datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"))
+          PY
+          REMOTE_SCRIPT
+          bash scripts/run-bolt-phase0-synthetics.sh canary
+
+      - name: Observe canary before promotion
+        shell: bash
+        env:
+          CANARY_OBSERVATION_MINUTES: ${{ inputs.canary_observation_minutes }}
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-observation.py"
+          remote_input="$REMOTE_RUN_DIR/canary-observation-input.json"
+          remote_samples="$REMOTE_RUN_DIR/canary-observation-samples.jsonl"
+          remote_started="$REMOTE_RUN_DIR/canary-observation-started"
+          remote_output="$REMOTE_RUN_DIR/observation-evidence.json"
+          minimum_duration=$((CANARY_OBSERVATION_MINUTES * 60))
+          minimum_samples=$((CANARY_OBSERVATION_MINUTES * 2 + 1))
+          test "$minimum_samples" -ge 11
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-observation.py "$DEPLOY_HOST:$remote_verifier"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_SAMPLES='$remote_samples' REMOTE_STARTED='$remote_started' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 077
+          : > "$REMOTE_SAMPLES"
+          test -s "$REMOTE_STARTED"
+          REMOTE_SCRIPT
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps"
+            "REMOTE_SAMPLES='$remote_samples' MINIMUM_SAMPLES='$minimum_samples' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 077
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase canary-observation --mutation-began >/dev/null
+          }
+          containers=(xframework-bolt-hub xframework-identityserver xframework-communications)
+          services=(bolt-hub identityserver communications)
+          for sample_number in $(seq 1 "$MINIMUM_SAMPLES"); do
+            heartbeat
+            sample_dir="$(mktemp -d /dev/shm/bolt-phase0-observation.XXXXXXXX)"
+            cleanup() { rm -rf -- "$sample_dir"; }
+            trap cleanup EXIT
+            for index in 0 1 2; do
+              status="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker exec "${containers[$index]}" curl -sS --connect-timeout 3 --max-time 10 \
+                -o /tmp/phase0-health.json -w '%{http_code}' http://127.0.0.1:8080/health/internal || true)"
+              test "$status" = 200
+              /usr/bin/timeout --foreground --kill-after=10s 30s docker cp "${containers[$index]}:/tmp/phase0-health.json" "$sample_dir/${services[$index]}.json"
+              /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "${containers[$index]}" rm -f /tmp/phase0-health.json
+            done
+            python3 - "$sample_dir" >> "$REMOTE_SAMPLES" <<'PY'
+          import datetime, json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          services = {}
+          for service in ("bolt-hub", "identityserver", "communications"):
+              health = json.loads((root / f"{service}.json").read_text(encoding="utf-8"))
+              services[service] = {"http_status": 200, "health": health}
+          sample = {
+              "sampled_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+              "services": services,
+          }
+          print(json.dumps(sample, separators=(",", ":"), sort_keys=True))
+          PY
+            cleanup
+            trap - EXIT
+            if [ "$sample_number" -lt "$MINIMUM_SAMPLES" ]; then sleep 30; fi
+          done
+          REMOTE_SCRIPT
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_STARTED='$remote_started' REMOTE_SAMPLES='$remote_samples' REMOTE_INPUT='$remote_input' REMOTE_SYNTHETIC='$REMOTE_RUN_DIR/synthetics-canary.json' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          python3 - "$REMOTE_STARTED" "$REMOTE_SAMPLES" "$REMOTE_SYNTHETIC" "$REMOTE_INPUT" <<'PY'
+          import datetime, json, os, pathlib, sys
+          started_path, samples_path, synthetic_path, output_path = map(pathlib.Path, sys.argv[1:])
+          document = {
+              "schema": "xframework.bolt.phase0.observation-input.v1",
+              "observation_started_at_utc": started_path.read_text(encoding="utf-8").strip(),
+              "observation_completed_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+              "health_samples": [json.loads(line) for line in samples_path.read_text(encoding="utf-8").splitlines()],
+              "synthetic_reports": [json.loads(synthetic_path.read_text(encoding="utf-8"))],
+          }
+          temporary = output_path.with_suffix(".tmp")
+          temporary.write_text(json.dumps(document, separators=(",", ":"), sort_keys=True), encoding="utf-8")
+          os.chmod(temporary, 0o600)
+          os.replace(temporary, output_path)
+          PY
+          REMOTE_SCRIPT
+
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "python3 '$remote_verifier' --input '$remote_input' --output '$remote_output' --minimum-duration-seconds '$minimum_duration' --minimum-samples '$minimum_samples' --maximum-sample-gap-seconds 45 --maximum-health-age-seconds 15 --pressure-persistence-samples 3 --growth-window-samples 5 --maximum-connection-count-churn 10 --maximum-estimated-reconnects 10 --latency-budget '*=5000,10000'" || status=$?
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_output" "$evidence_dir/observation-evidence.json" || true
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "rm -f '$remote_input' '$remote_samples' '$remote_started'"
+          exit "$status"
+
+      - name: Promote remaining clients in bounded batches
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
+          batches=(
+            "notifications storage attendance smsgateway"
+            "wallets inventario pos"
+            "portal operations-dashboard"
+          )
+          cumulative_services=(migrate bolt-hub identityserver communications)
+          remote_verifier="$REMOTE_RUNTIME_VERIFIER"
+          batch_number=0
+          for batch in "${batches[@]}"; do
+            batch_number=$((batch_number + 1))
+            ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+              "$remote_env bash -s -- $batch" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase client-batch-rollout --mutation-began >/dev/null
+          }
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE")
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase client-batch-rollout --mutation-began \
+            --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            "${compose[@]}" up -d --no-build --no-deps "$@"
+          for service in "$@"; do
+            container_id="$(/usr/bin/timeout --foreground --kill-after=10s 30s "${compose[@]}" ps --quiet "$service")"
+            test -n "$container_id"
+            for attempt in $(seq 1 60); do
+              heartbeat
+              health="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")"
+              if [ "$health" = healthy ]; then break; fi
+              sleep 5
+            done
+            test "$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")" = healthy
+          done
+          REMOTE_SCRIPT
+            read -r -a promoted_services <<< "$batch"
+            cumulative_services+=("${promoted_services[@]}")
+            service_args="$(printf '%q ' "${cumulative_services[@]}")"
+            remote_evidence="$REMOTE_RUN_DIR/runtime-staged-batch-${batch_number}.json"
+            local_evidence="$RUNNER_TEMP/bolt-phase0-evidence/runtime-staged-batch-${batch_number}.json"
+            ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "rm -f '$remote_evidence'"
+            status=0
+            ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+              "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" supervise --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT' --phase runtime-staged-batch --mutation-began --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s python3 '$remote_verifier' --compose-file '$REMOTE_COMPOSE_FILE' --compose-file '$REMOTE_PIN_OVERRIDE' --env-file '$XFRAMEWORK_ENV_FILE' --project-name '$COMPOSE_PROJECT_NAME' --output '$remote_evidence' --pins-file '$REMOTE_PINS_FILE' --allow-staged-inventory --services $service_args" || status=$?
+            scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+              "$DEPLOY_HOST:$remote_evidence" "$local_evidence" || true
+            test "$status" -eq 0
+            bash scripts/run-bolt-phase0-synthetics.sh "batch-${batch_number}"
+          done
 
       - name: Wait for readiness
         shell: bash
         run: |
           set -euo pipefail
 
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat_parent_pid=$$
+          heartbeat_failed="$(mktemp)"
+          heartbeat_ready="$(mktemp)"
+          rm -f "$heartbeat_failed" "$heartbeat_ready"
+          heartbeat_pid=
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase full-readiness --mutation-began >/dev/null
+          }
+          heartbeat_loop() {
+            trap 'exit 0' TERM INT HUP
+            while true; do
+              if ! heartbeat; then
+                : > "$heartbeat_failed"
+                kill -TERM "$heartbeat_parent_pid" >/dev/null 2>&1 || true
+                return 1
+              fi
+              : > "$heartbeat_ready"
+              sleep 30 & wait $! || return 0
+            done
+          }
+          cleanup_heartbeat() {
+            status=$?
+            heartbeat_was_alive=false
+            trap - EXIT TERM INT HUP
+            if [ -n "$heartbeat_pid" ]; then
+              if kill -0 "$heartbeat_pid" >/dev/null 2>&1; then
+                heartbeat_was_alive=true
+                kill "$heartbeat_pid" >/dev/null 2>&1 || true
+              fi
+              wait "$heartbeat_pid" 2>/dev/null || true
+              if [ "$status" -eq 0 ] && { [ "$heartbeat_was_alive" != true ] || [ -e "$heartbeat_failed" ]; }; then
+                echo "Full readiness lease heartbeat stopped unexpectedly" >&2
+                status=1
+              fi
+            fi
+            rm -f "$heartbeat_failed" "$heartbeat_ready"
+            exit "$status"
+          }
+          trap cleanup_heartbeat EXIT
+          trap 'exit 1' TERM INT HUP
+          heartbeat_loop & heartbeat_pid=$!
+          for _ in $(seq 1 100); do
+            [ -e "$heartbeat_ready" ] && break
+            if [ -e "$heartbeat_failed" ] || ! kill -0 "$heartbeat_pid" >/dev/null 2>&1; then
+              echo "Full readiness lease heartbeat failed to start" >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
+          test -e "$heartbeat_ready"
+          read_env() { python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"; }
+          BOLT_HUB_TLS_CA_PATH="$(read_env BOLT_HUB_TLS_CA_PATH)"
+          BOLT_HUB_EXPOSE_PORT="$(read_env BOLT_HUB_EXPOSE_PORT)"
+          BOLT_HUB_PUBLIC_HOSTNAME="$(read_env BOLT_HUB_PUBLIC_HOSTNAME)"
+          IDENTITYSERVER_PUBLIC_HOSTNAME="$(read_env IDENTITYSERVER_PUBLIC_HOSTNAME)"
+          IDENTITYSERVER_PUBLIC_HTTPS_PORT="$(read_env IDENTITYSERVER_PUBLIC_HTTPS_PORT)"
+          IDENTITYSERVER_TLS_CA_PATH="$(read_env IDENTITYSERVER_TLS_CA_PATH)"
+          for endpoint in live ready; do
+            body="/tmp/xframework-bolt-hub-health-${endpoint}.json"
+            ready=0
+            for attempt in {1..60}; do
+              status="$(curl -sS --connect-timeout 5 --max-time 15 \
+                --noproxy "$BOLT_HUB_PUBLIC_HOSTNAME" --cacert "$BOLT_HUB_TLS_CA_PATH" \
+                -o "$body" -w '%{http_code}' \
+                "https://${BOLT_HUB_PUBLIC_HOSTNAME}:${BOLT_HUB_EXPOSE_PORT}/health/${endpoint}" || true)"
+              if [ "$status" = "200" ]; then
+                ready=1
+                break
+              fi
+              echo "bolt-hub ${endpoint} not ready; attempt ${attempt}/60 returned ${status:-no response}"
+              sleep 5
+            done
+            if [ "$ready" -ne 1 ]; then
+              echo "bolt-hub failed trusted HTTPS ${endpoint} check" >&2
+              cat "$body" || true
+              exit 1
+            fi
+          done
+          identity_status="$(curl -sS --connect-timeout 5 --max-time 15 \
+            --noproxy "$IDENTITYSERVER_PUBLIC_HOSTNAME" --cacert "$IDENTITYSERVER_TLS_CA_PATH" \
+            -o /tmp/xframework-identityserver-ready.json -w '%{http_code}' \
+            "https://${IDENTITYSERVER_PUBLIC_HOSTNAME}:${IDENTITYSERVER_PUBLIC_HTTPS_PORT}/health/ready" || true)"
+          test "$identity_status" = 200
           checks=(
-            "bolt-hub=http://localhost:7000/health/ready"
-            "identityserver=http://localhost:8261/health/ready"
             "communications=http://localhost:5148/health/ready"
             "notifications=http://localhost:5166/health/ready"
             "storage=http://localhost:5190/health/ready"
@@ -283,10 +1595,7 @@ jobs:
 
             ready=0
             for attempt in {1..60}; do
-              status="$(
-                ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-                  "curl -sS -o '$body' -w '%{http_code}' '$url' || true"
-              )"
+              status="$(curl -sS --connect-timeout 5 --max-time 15 -o "$body" -w '%{http_code}' "$url" || true)"
               if [ "$status" = "200" ]; then
                 ready=1
                 break
@@ -297,18 +1606,736 @@ jobs:
             done
 
             if [ "$ready" -ne 1 ]; then
-              echo "::error::${name} failed readiness check at ${url}"
-              ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "cat '$body' || true"
+              echo "${name} failed readiness check at ${url}" >&2
+              cat "$body" || true
               exit 1
             fi
           done
+          REMOTE_SCRIPT
+
+      - name: Capture retiring generation token evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/run-bolt-phase0-synthetics.sh pre-activation
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 077
+          read_path() { python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1" --type absolute-path; }
+          current_service="$(read_path BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_PATH)"
+          current_user="$(read_path BOLT_SYNTHETIC_USER_TOKEN_PATH)"
+          retired_service="$(read_path BOLT_SYNTHETIC_REJECTED_COMMUNICATIONS_TOKEN_PATH)"
+          retired_user="$(read_path BOLT_SYNTHETIC_REJECTED_USER_TOKEN_PATH)"
+          retired_client_secret="$(read_path BOLT_SYNTHETIC_REJECTED_CLIENT_SECRET_PATH)"
+          python3 - "$current_service" "$retired_service" "$current_user" "$retired_user" <<'PY'
+          import os, pathlib, stat, sys, tempfile
+          for source_text, destination_text in zip(sys.argv[1::2], sys.argv[2::2], strict=True):
+              source = pathlib.Path(source_text)
+              destination = pathlib.Path(destination_text)
+              metadata = source.lstat()
+              if source.is_symlink() or not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.geteuid():
+                  raise SystemExit("retiring token source is not a private owned file")
+              value = source.read_bytes()
+              if not 32 < len(value) <= 16 * 1024:
+                  raise SystemExit("retiring token source size is invalid")
+              destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+              descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", dir=destination.parent)
+              try:
+                  os.fchmod(descriptor, 0o600)
+                  with os.fdopen(descriptor, "wb", closefd=True) as stream:
+                      stream.write(value)
+                      stream.flush()
+                      os.fsync(stream.fileno())
+                  os.replace(temporary_name, destination)
+              finally:
+                  try: os.unlink(temporary_name)
+                  except FileNotFoundError: pass
+          PY
+          python3 - "$ENV_PARSER" "$XFRAMEWORK_ENV_FILE" "$retired_client_secret" <<'PY'
+          import importlib.util, os, pathlib, stat, sys, tempfile
+          parser_path, env_path, destination_text = sys.argv[1:]
+          spec = importlib.util.spec_from_file_location("phase0_env", parser_path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("protected environment parser is unavailable")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          secret = module.parse_env(pathlib.Path(env_path)).get("COMMUNICATIONS_SERVICE_IDENTITY_SECRET", "")
+          if len(secret) < 32 or len(secret) > 4096 or any(character.isspace() for character in secret):
+              raise SystemExit("retiring client secret is invalid")
+          destination = pathlib.Path(destination_text)
+          destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+          descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", dir=destination.parent)
+          try:
+              os.fchmod(descriptor, 0o600)
+              with os.fdopen(descriptor, "w", encoding="utf-8", closefd=True) as stream:
+                  stream.write(secret)
+                  stream.flush()
+                  os.fsync(stream.fileno())
+              os.replace(temporary_name, destination)
+          finally:
+              try: os.unlink(temporary_name)
+              except FileNotFoundError: pass
+          PY
+          rm -f "$REMOTE_RUN_DIR/synthetics-pre-activation.json"
+          REMOTE_SCRIPT
+
+      - name: Activate credential generation G+1
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_manager="$REMOTE_ROTATION_MANAGER"
+          remote_evidence="$REMOTE_RUN_DIR/rotation-activate-evidence.json"
+          minimum_remaining_seconds=$((
+            MAX_JWT_LIFETIME_SECONDS +
+            POST_ACTIVATION_ROLLOUT_BUDGET_SECONDS +
+            POST_ACTIVATION_OBSERVATION_BUDGET_SECONDS +
+            ROLLBACK_BUDGET_SECONDS
+          ))
+          test "$minimum_remaining_seconds" -eq 7200
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_MANAGER='$remote_manager' REMOTE_EVIDENCE='$remote_evidence' MINIMUM_REMAINING='$minimum_remaining_seconds' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-activation --mutation-began >/dev/null
+          }
+          heartbeat
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-activation --mutation-began \
+            --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            python3 "$REMOTE_MANAGER" activate --env-file "$XFRAMEWORK_ENV_FILE" \
+              --state-file "$REMOTE_ROTATION_STATE" --minimum-remaining-seconds "$MINIMUM_REMAINING" > "$REMOTE_EVIDENCE.tmp"
+          mv "$REMOTE_EVIDENCE.tmp" "$REMOTE_EVIDENCE"
+          chmod 600 "$REMOTE_EVIDENCE"
+          heartbeat
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/rotation-activate.json"
+
+      - name: Roll G+1 through Hub, canary, and client batches
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
+          stages=(
+            "hub:bolt-hub"
+            "canary:identityserver communications"
+            "batch-1:notifications storage attendance smsgateway"
+            "batch-2:wallets inventario pos"
+            "batch-3:portal operations-dashboard"
+          )
+          cumulative_services=(migrate)
+          for item in "${stages[@]}"; do
+            label="${item%%:*}"
+            services="${item#*:}"
+            ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+              "$remote_env bash -s -- $services" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-rollout --mutation-began >/dev/null
+          }
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE" --project-name "$COMPOSE_PROJECT_NAME")
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-rollout --mutation-began \
+            --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            "${compose[@]}" up -d --no-build --no-deps "$@"
+          for service in "$@"; do
+            container_id="$(/usr/bin/timeout --foreground --kill-after=10s 30s "${compose[@]}" ps --quiet "$service")"
+            test -n "$container_id"
+            for attempt in $(seq 1 60); do
+              heartbeat
+              health="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")"
+              if [ "$health" = healthy ]; then break; fi
+              sleep 5
+            done
+            test "$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")" = healthy
+          done
+          REMOTE_SCRIPT
+            read -r -a restarted_services <<< "$services"
+            cumulative_services+=("${restarted_services[@]}")
+            runtime_services="$(printf '%q ' "${cumulative_services[@]}")"
+            remote_runtime="$REMOTE_RUN_DIR/runtime-rotation-${label}.json"
+            local_runtime="$RUNNER_TEMP/bolt-phase0-evidence/runtime-rotation-${label}.json"
+            status=0
+            ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+              "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" supervise --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT' --phase runtime-credential-rollout --mutation-began --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s python3 '$REMOTE_RUNTIME_VERIFIER' --compose-file '$REMOTE_COMPOSE_FILE' --compose-file '$REMOTE_PIN_OVERRIDE' --env-file '$XFRAMEWORK_ENV_FILE' --project-name '$COMPOSE_PROJECT_NAME' --output '$remote_runtime' --pins-file '$REMOTE_PINS_FILE' --allow-staged-inventory --services $runtime_services" || status=$?
+            scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+              "$DEPLOY_HOST:$remote_runtime" "$local_runtime" || true
+            test "$status" -eq 0
+            if [ "$label" != hub ]; then
+              bash scripts/run-bolt-phase0-synthetics.sh "rotation-${label}"
+            fi
+            if [ "$label" = canary ]; then
+              for observation in $(seq 1 10); do
+                ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+                  "REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_OBSERVATION'
+          set -euo pipefail
+          for container in xframework-identityserver xframework-communications; do
+            status="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container" curl -sS --connect-timeout 3 --max-time 10 \
+              -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health/ready || true)"
+            test "$status" = 200
+          done
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$(id -u)" \
+            heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-canary-observation --mutation-began >/dev/null
+          REMOTE_OBSERVATION
+                sleep 30
+              done
+            fi
+          done
+
+      - name: Prove G+1 runtime convergence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_manager="$REMOTE_ROTATION_MANAGER"
+          remote_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-credential-convergence.py"
+          remote_input="$REMOTE_RUN_DIR/credential-convergence-dual-input.json"
+          remote_inventory="$REMOTE_RUN_DIR/rotation-generation-inventory.json"
+          remote_evidence="$REMOTE_RUN_DIR/credential-convergence-dual-validation.json"
+          remote_rotation_evidence="$REMOTE_RUN_DIR/rotation-convergence-evidence.json"
+          services=(bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          service_args="$(printf '%q ' "${services[@]}")"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-credential-convergence.py "$DEPLOY_HOST:$remote_verifier"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_MANAGER='$remote_manager' INPUT='$remote_input' INVENTORY='$remote_inventory' EVIDENCE='$remote_evidence' VERIFIER='$remote_verifier' ROTATION_EVIDENCE='$remote_rotation_evidence' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s -- $service_args" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 077
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE" --project-name "$COMPOSE_PROJECT_NAME")
+          deployment_uid="$(id -u)"
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-convergence --mutation-began >/dev/null
+          state_status="$(/usr/bin/timeout --foreground --kill-after=10s 30s python3 "$REMOTE_MANAGER" status --env-file "$XFRAMEWORK_ENV_FILE" --state-file "$REMOTE_ROTATION_STATE")"
+          health_dir="$(mktemp -d /dev/shm/bolt-phase0-convergence.XXXXXXXX)"
+          trap 'rm -rf -- "$health_dir"' EXIT
+          for service in "$@"; do
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-convergence --mutation-began >/dev/null
+            container_id="$(/usr/bin/timeout --foreground --kill-after=10s 30s "${compose[@]}" ps --quiet "$service")"
+            test -n "$container_id"
+            status="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" curl -sS --connect-timeout 3 --max-time 10 \
+              -o /tmp/phase0-credential-health.json -w '%{http_code}' http://127.0.0.1:8080/health/internal || true)"
+            test "$status" = 200
+            /usr/bin/timeout --foreground --kill-after=10s 30s docker cp "$container_id:/tmp/phase0-credential-health.json" "$health_dir/$service.json"
+            /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" rm -f /tmp/phase0-credential-health.json
+          done
+          current_service="$(python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_PATH --type absolute-path)"
+          current_user="$(python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key BOLT_SYNTHETIC_USER_TOKEN_PATH --type absolute-path)"
+          retired_service="$(python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key BOLT_SYNTHETIC_REJECTED_COMMUNICATIONS_TOKEN_PATH --type absolute-path)"
+          retired_user="$(python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key BOLT_SYNTHETIC_REJECTED_USER_TOKEN_PATH --type absolute-path)"
+          python3 - "$health_dir" "$state_status" "$INPUT" "$INVENTORY" "$@" <<'PY'
+          import datetime, json, os, pathlib, sys
+          health_dir = pathlib.Path(sys.argv[1])
+          state = json.loads(sys.argv[2])
+          output = pathlib.Path(sys.argv[3])
+          inventory = pathlib.Path(sys.argv[4])
+          services = sys.argv[5:]
+          clients = [
+              "XFramework.IdentityServer", "XFramework.Portal", "XFramework.Bolt.Hub",
+              "XFramework.Communications", "XFramework.Notifications", "XFramework.Storage",
+              "XFramework.Attendance", "XFramework.SmsGateway", "XFramework.Wallets",
+              "XFramework.Inventario", "XFramework.POS", "XFramework.Operations.Dashboard",
+          ]
+          now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+          document = {
+              "schema": "xframework.bolt.phase0.credential-convergence-input.v1",
+              "collected_at_utc": now,
+              "target_generation_id": state["target_generation_id"],
+              "retiring_generation_id": state["previous_generation_id"],
+              "phase": "dual-validation",
+              "identityserver_service": "identityserver",
+              "expected_services": services,
+              "expected_identityserver_clients": clients,
+              "services": [
+                  {"name": service, "http_status": 200, "health": json.loads((health_dir / f"{service}.json").read_text(encoding="utf-8"))}
+                  for service in services
+              ],
+          }
+          output.write_text(json.dumps(document, separators=(",", ":"), sort_keys=True), encoding="utf-8")
+          os.chmod(output, 0o600)
+          inventory.write_text(json.dumps({
+              "schema": "xframework.bolt.phase0.credential-generation-inventory.v1",
+              "generated_at_utc": now,
+              "services": {service: state["target_generation_id"] for service in services},
+          }, separators=(",", ":"), sort_keys=True), encoding="utf-8")
+          os.chmod(inventory, 0o600)
+          PY
+          python3 "$VERIFIER" --input "$INPUT" --output "$EVIDENCE" --maximum-health-age-seconds 30 \
+            --current-jwt service "$current_service" --current-jwt jwt "$current_user" \
+            --retired-jwt service "$retired_service" --retired-jwt jwt "$retired_user"
+          python3 - "$EVIDENCE" <<'PY'
+          import json, sys
+          evidence = json.load(open(sys.argv[1], encoding="utf-8"))
+          if evidence.get("schema") != "xframework.bolt.phase0.credential-convergence.v1" or evidence.get("status") != "passed" or evidence.get("phase") != "dual-validation":
+              raise SystemExit("strict credential convergence did not pass")
+          PY
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-convergence --mutation-began \
+            --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            python3 "$REMOTE_MANAGER" verify-convergence-input --env-file "$XFRAMEWORK_ENV_FILE" \
+              --state-file "$REMOTE_ROTATION_STATE" --inventory-file "$INVENTORY" > "$ROTATION_EVIDENCE.tmp"
+          mv "$ROTATION_EVIDENCE.tmp" "$ROTATION_EVIDENCE"
+          rm -f "$INPUT"
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/credential-convergence-dual-validation.json"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST:$remote_rotation_evidence" "$evidence_dir/rotation-convergence.json"
+
+      - name: Retire G after its bounded validation window
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_manager="$REMOTE_ROTATION_MANAGER"
+          remote_evidence="$REMOTE_RUN_DIR/rotation-finalized-evidence.json"
+          while true; do
+            status_json="$(ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+              "/usr/bin/timeout --foreground --kill-after=10s 30s python3 '$remote_manager' status --env-file '$XFRAMEWORK_ENV_FILE' --state-file '$REMOTE_ROTATION_STATE'")"
+            remaining="$(python3 - "$status_json" <<'PY'
+          import datetime, json, sys
+          document = json.loads(sys.argv[1])
+          expiry = datetime.datetime.fromisoformat(document["secondary_valid_until_utc"].replace("Z", "+00:00"))
+          print(max(0, int((expiry - datetime.datetime.now(datetime.timezone.utc)).total_seconds())))
+          PY
+          )"
+            if [ "$remaining" -le 0 ]; then break; fi
+            ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+              "REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          for container in xframework-identityserver xframework-communications; do
+            http_status="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container" curl -sS --connect-timeout 3 --max-time 10 \
+              -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health/ready || true)"
+            test "$http_status" = 200
+          done
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$(id -u)" \
+            heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase retiring-generation-wait --mutation-began >/dev/null
+          REMOTE_SCRIPT
+            sleep_for=30
+            if [ "$remaining" -lt "$sleep_for" ]; then sleep_for="$remaining"; fi
+            sleep "$sleep_for"
+          done
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_MANAGER='$remote_manager' REMOTE_EVIDENCE='$remote_evidence' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-finalization --mutation-began >/dev/null
+          }
+          heartbeat
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase credential-finalization --mutation-began \
+            --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            python3 "$REMOTE_MANAGER" finalize --env-file "$XFRAMEWORK_ENV_FILE" \
+              --state-file "$REMOTE_ROTATION_STATE" > "$REMOTE_EVIDENCE.tmp"
+          mv "$REMOTE_EVIDENCE.tmp" "$REMOTE_EVIDENCE"
+          chmod 600 "$REMOTE_EVIDENCE"
+          heartbeat
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/rotation-finalized.json"
+
+      - name: Restart without fallback credentials and rerun synthetics
+        shell: bash
+        env:
+          DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 3900
+        run: |
+          set -euo pipefail
+          services=(bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          service_args="$(printf '%q ' "${services[@]}")"
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env bash -s -- $service_args" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase fallback-removal-rollout --mutation-began >/dev/null
+          }
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE" --project-name "$COMPOSE_PROJECT_NAME")
+          for service in "$@"; do
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase fallback-removal-rollout --mutation-began \
+              --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+              "${compose[@]}" up -d --no-build --no-deps "$service"
+            container_id="$(/usr/bin/timeout --foreground --kill-after=10s 30s "${compose[@]}" ps --quiet "$service")"
+            for attempt in $(seq 1 60); do
+              heartbeat
+              health="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")"
+              if [ "$health" = healthy ]; then break; fi
+              sleep 5
+            done
+            test "$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")" = healthy
+          done
+          REMOTE_SCRIPT
+          bash scripts/run-bolt-phase0-synthetics.sh finalized
+
+      - name: Prove finalized credential convergence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-credential-convergence.py"
+          remote_input="$REMOTE_RUN_DIR/credential-convergence-finalized-input.json"
+          remote_evidence="$REMOTE_RUN_DIR/credential-convergence-finalized.json"
+          services=(bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          service_args="$(printf '%q ' "${services[@]}")"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_MANAGER='$REMOTE_ROTATION_MANAGER' INPUT='$remote_input' EVIDENCE='$remote_evidence' VERIFIER='$remote_verifier' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s -- $service_args" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 077
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE" --project-name "$COMPOSE_PROJECT_NAME")
+          deployment_uid="$(id -u)"
+          state_status="$(/usr/bin/timeout --foreground --kill-after=10s 30s python3 "$REMOTE_MANAGER" status --env-file "$XFRAMEWORK_ENV_FILE" --state-file "$REMOTE_ROTATION_STATE")"
+          health_dir="$(mktemp -d /dev/shm/bolt-phase0-convergence-finalized.XXXXXXXX)"
+          trap 'rm -rf -- "$health_dir"' EXIT
+          for service in "$@"; do
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase finalized-convergence --mutation-began >/dev/null
+            container_id="$(/usr/bin/timeout --foreground --kill-after=10s 30s "${compose[@]}" ps --quiet "$service")"
+            test -n "$container_id"
+            status="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" curl -sS --connect-timeout 3 --max-time 10 \
+              -o /tmp/phase0-credential-health.json -w '%{http_code}' http://127.0.0.1:8080/health/internal || true)"
+            test "$status" = 200
+            /usr/bin/timeout --foreground --kill-after=10s 30s docker cp "$container_id:/tmp/phase0-credential-health.json" "$health_dir/$service.json"
+            /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" rm -f /tmp/phase0-credential-health.json
+          done
+          current_service="$(python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_PATH --type absolute-path)"
+          current_user="$(python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key BOLT_SYNTHETIC_USER_TOKEN_PATH --type absolute-path)"
+          python3 - "$health_dir" "$state_status" "$INPUT" "$@" <<'PY'
+          import datetime, json, os, pathlib, sys
+          health_dir = pathlib.Path(sys.argv[1])
+          state = json.loads(sys.argv[2])
+          output = pathlib.Path(sys.argv[3])
+          services = sys.argv[4:]
+          clients = [
+              "XFramework.IdentityServer", "XFramework.Portal", "XFramework.Bolt.Hub",
+              "XFramework.Communications", "XFramework.Notifications", "XFramework.Storage",
+              "XFramework.Attendance", "XFramework.SmsGateway", "XFramework.Wallets",
+              "XFramework.Inventario", "XFramework.POS", "XFramework.Operations.Dashboard",
+          ]
+          document = {
+              "schema": "xframework.bolt.phase0.credential-convergence-input.v1",
+              "collected_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+              "target_generation_id": state["target_generation_id"],
+              "retiring_generation_id": state["previous_generation_id"],
+              "phase": "finalized",
+              "identityserver_service": "identityserver",
+              "expected_services": services,
+              "expected_identityserver_clients": clients,
+              "services": [
+                  {"name": service, "http_status": 200, "health": json.loads((health_dir / f"{service}.json").read_text(encoding="utf-8"))}
+                  for service in services
+              ],
+          }
+          output.write_text(json.dumps(document, separators=(",", ":"), sort_keys=True), encoding="utf-8")
+          os.chmod(output, 0o600)
+          PY
+          python3 "$VERIFIER" --input "$INPUT" --output "$EVIDENCE" --maximum-health-age-seconds 30 \
+            --current-jwt service "$current_service" --current-jwt jwt "$current_user"
+          rm -f "$INPUT"
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/credential-convergence-finalized.json"
+
+      - name: Collect deployed runtime image evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_verifier="$REMOTE_RUNTIME_VERIFIER"
+          remote_evidence="$REMOTE_RUN_DIR/runtime-evidence.json"
+          remote_override="$REMOTE_PIN_OVERRIDE"
+          remote_pins="$REMOTE_PINS_FILE"
+          services=(
+            migrate
+            bolt-hub
+            identityserver
+            communications
+            notifications
+            storage
+            attendance
+            smsgateway
+            wallets
+            inventario
+            pos
+            portal
+            operations-dashboard
+          )
+
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-runtime.py "$DEPLOY_HOST:$remote_verifier"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "rm -f '$remote_evidence'"
+
+          service_args="$(printf '%q ' "${services[@]}")"
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" supervise --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT' --phase runtime-final --mutation-began --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s python3 '$remote_verifier' --compose-file '$REMOTE_COMPOSE_FILE' --compose-file '$remote_override' --env-file '$XFRAMEWORK_ENV_FILE' --project-name '$COMPOSE_PROJECT_NAME' --output '$remote_evidence' --pins-file '$remote_pins' --services $service_args" || status=$?
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/runtime.json" || true
+          exit "$status"
+
+      - name: Exercise digest-pinned rollback under G+1
+        shell: bash
+        env:
+          DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 3900
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_runtime_verifier="$REMOTE_RUNTIME_VERIFIER"
+          remote_runtime="$REMOTE_RUN_DIR/rollback-runtime-evidence.json"
+          remote_drill="$REMOTE_RUN_DIR/rollback-drill-evidence.json"
+          services=(migrate bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          service_args="$(printf '%q ' "${services[@]}")"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_PINS_FILE='$REMOTE_PINS_FILE' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_RUNTIME='$remote_runtime' REMOTE_DRILL='$remote_drill' REMOTE_RUNTIME_VERIFIER='$remote_runtime_verifier' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_ROTATION_MANAGER='$REMOTE_ROTATION_MANAGER' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' SOURCE_COMMIT='$GITHUB_SHA' bash -s -- $service_args" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 077
+          started_at="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"))')"
+          printf '%s\n' "$started_at" > "$REMOTE_RUN_DIR/rollback-drill-started"
+          deployment_uid="$(id -u)"
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase rollback-drill --mutation-began >/dev/null
+          }
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE" --project-name "$COMPOSE_PROJECT_NAME")
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase rollback-drill --mutation-began \
+            --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            "${compose[@]}" up -d --no-build --no-deps --force-recreate \
+            bolt-hub identityserver communications notifications storage attendance \
+            smsgateway wallets inventario pos portal operations-dashboard
+          for service in "${@:2}"; do
+            container_id="$(/usr/bin/timeout --foreground --kill-after=10s 30s "${compose[@]}" ps --quiet "$service")"
+            test -n "$container_id"
+            for attempt in $(seq 1 60); do
+              heartbeat
+              health="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")"
+              if [ "$health" = healthy ]; then break; fi
+              sleep 5
+            done
+            test "$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")" = healthy
+          done
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase rollback-verification --mutation-began \
+            --timeout-seconds 900 -- /usr/bin/timeout --foreground --kill-after=30s 870s \
+            python3 "$REMOTE_RUNTIME_VERIFIER" --compose-file "$REMOTE_COMPOSE_FILE" --compose-file "$REMOTE_PIN_OVERRIDE" \
+              --env-file "$XFRAMEWORK_ENV_FILE" --project-name "$COMPOSE_PROJECT_NAME" --output "$REMOTE_RUNTIME" \
+              --pins-file "$REMOTE_PINS_FILE" --services "$@"
+          test -s "$REMOTE_RUN_DIR/synthetics-finalized.json"
+          cp --reflink=auto --preserve=mode,timestamps "$REMOTE_RUN_DIR/synthetics-finalized.json" \
+            "$REMOTE_RUN_DIR/synthetics-finalized.pre-rollback.json"
+          REMOTE_SCRIPT
+
+          bash scripts/run-bolt-phase0-synthetics.sh finalized
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_PINS_FILE='$REMOTE_PINS_FILE' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_RUNTIME='$remote_runtime' REMOTE_DRILL='$remote_drill' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_ROTATION_MANAGER='$REMOTE_ROTATION_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' SOURCE_COMMIT='$GITHUB_SHA' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          mv "$REMOTE_RUN_DIR/synthetics-finalized.json" "$REMOTE_RUN_DIR/rollback-synthetics-finalized.json"
+          mv "$REMOTE_RUN_DIR/synthetics-finalized.pre-rollback.json" "$REMOTE_RUN_DIR/synthetics-finalized.json"
+          generation="$(python3 "$REMOTE_ROTATION_MANAGER" status --env-file "$XFRAMEWORK_ENV_FILE" --state-file "$REMOTE_ROTATION_STATE" | python3 -c 'import json,sys; document=json.load(sys.stdin); assert document["phase"] == "finalized"; print(document["target_generation_id"])')"
+          python3 - "$REMOTE_RUN_DIR" "$REMOTE_RUNTIME" "$REMOTE_DRILL" "$RUN_ID" "$RUN_ATTEMPT" "$SOURCE_COMMIT" "$COMPOSE_PROJECT_NAME" "$generation" <<'PY'
+          import datetime, hashlib, json, os, pathlib, sys, tempfile
+          root, runtime_text, output_text, run_id, attempt, commit, project, generation = sys.argv[1:]
+          root = pathlib.Path(root)
+          runtime = pathlib.Path(runtime_text)
+          synthetic = root / "rollback-synthetics-finalized.json"
+          def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+          document = {
+              "schema": "xframework.bolt.phase0.rollback-drill.v1",
+              "status": "passed",
+              "run_id": run_id,
+              "run_attempt": int(attempt),
+              "source_commit": commit,
+              "project_name": project,
+              "started_at_utc": (root / "rollback-drill-started").read_text(encoding="utf-8").strip(),
+              "completed_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+              "credential_generation_id": generation,
+              "manifest_sha256": digest(root / "docker-compose.yml"),
+              "override_sha256": digest(root / "pinned-compose.override.json"),
+              "pins_sha256": digest(root / "image-pins.json"),
+              "runtime_evidence_sha256": digest(runtime),
+              "synthetic_evidence_sha256": digest(synthetic),
+              "checks": {
+                  "restore_applied": True,
+                  "full_runtime_verified": True,
+                  "authenticated_finalized_synthetic": True,
+                  "current_generation_preserved": True,
+              },
+              "errors": [],
+          }
+          output = pathlib.Path(output_text)
+          descriptor, temporary_name = tempfile.mkstemp(prefix=f".{output.name}.", dir=output.parent)
+          with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+              os.fchmod(stream.fileno(), 0o600)
+              json.dump(document, stream, separators=(",", ":"), sort_keys=True)
+              stream.write("\n")
+              stream.flush(); os.fsync(stream.fileno())
+          os.replace(temporary_name, output)
+          (root / "rollback-drill-started").unlink()
+          PY
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST:$remote_runtime" "$evidence_dir/rollback-runtime-evidence.json"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST:$REMOTE_RUN_DIR/rollback-synthetics-finalized.json" "$evidence_dir/rollback-synthetics-finalized.json"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST:$remote_drill" "$evidence_dir/rollback-drill-evidence.json"
+
+      - name: Quarantine, root-qualify, seal, and activate recovery bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_evidence="$REMOTE_DEPLOY_DIR/phase0-watchdog/root-activation-evidence.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "sudo -n '$REMOTE_ROOT_HELPER' activate '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT' '$IMAGE_TAG' '$COMPOSE_PROJECT_NAME' > '$remote_evidence.tmp' && mv '$remote_evidence.tmp' '$remote_evidence'"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/root-activation-evidence.json"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$REMOTE_RUN_DIR/qualification-evidence.json" "$evidence_dir/qualification-evidence.json"
+
+      - name: Disarm external deployment watchdog after activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_evidence="$REMOTE_DEPLOY_DIR/phase0-watchdog/deployment-lease-disarm.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" disarm --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT' > '$remote_evidence.tmp' && mv '$remote_evidence.tmp' '$remote_evidence'"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/deployment-lease-disarm.json"
+
+      - name: Publish qualified develop channel tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          pins_file="$evidence_dir/image-pins.json"
+          rows="$RUNNER_TEMP/bolt-phase0-channel-publication.tsv"
+          : > "$rows"
+          trap 'rm -f "$rows"' EXIT
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_RUN_DIR='$REMOTE_RUN_DIR' IMAGE_TAG='$IMAGE_TAG' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          test -f "$REMOTE_RUN_DIR/security-qualified"
+          test "$(cat "$REMOTE_RUN_DIR/qualified-commit")" = "$IMAGE_TAG"
+          REMOTE_SCRIPT
+
+          while IFS=$'\t' read -r service pin; do
+            repository="${pin%@*}"
+            channel_image="${repository}:${CHANNEL_TAG}"
+            docker pull "$pin"
+            image_id="$(docker image inspect --format '{{.Id}}' "$pin")"
+            test -n "$image_id"
+            docker tag "$image_id" "$channel_image"
+            docker push "$channel_image"
+            manifest_file="$RUNNER_TEMP/bolt-phase0-channel-manifest-${service}.json"
+            docker manifest inspect --verbose "$channel_image" > "$manifest_file"
+            python3 - "$manifest_file" "$channel_image" "$pin" <<'PY'
+          import importlib.util, json, pathlib, sys
+          manifest_path, channel_image, expected_pin = sys.argv[1:]
+          script = pathlib.Path("scripts/verify-bolt-phase0-image-pin.py")
+          spec = importlib.util.spec_from_file_location("phase0_image_pin", script)
+          if not spec or not spec.loader:
+              raise SystemExit("unable to load the image-pin verifier")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          manifest = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))
+          digest = module.select_manifest_digest(channel_image, manifest)
+          if f"{channel_image.rsplit(':', 1)[0]}@{digest}" != expected_pin:
+              raise SystemExit("published channel tag does not resolve to its qualified digest")
+          PY
+            printf '%s\t%s\t%s\n' "$service" "$channel_image" "$pin" >> "$rows"
+          done < <(python3 - "$pins_file" <<'PY'
+          import json, sys
+          pins = json.load(open(sys.argv[1], encoding="utf-8"))["pins"]
+          for service, pin in sorted(pins.items()):
+              print(f"{service}\t{pin}")
+          PY
+          )
+
+          python3 - "$rows" "$evidence_dir/channel-publication.json" "$IMAGE_TAG" <<'PY'
+          import datetime, json, pathlib, sys
+          rows, output, commit = sys.argv[1:]
+          publications = {}
+          for line in pathlib.Path(rows).read_text(encoding="utf-8").splitlines():
+              service, channel, pin = line.split("\t", 2)
+              if service in publications:
+                  raise SystemExit("duplicate channel publication evidence")
+              publications[service] = {"channel": channel, "qualified_pin": pin}
+          if not publications:
+              raise SystemExit("no qualified channel tags were published")
+          evidence = {
+              "schema": "xframework.bolt.phase0.channel-publication.v1",
+              "generated_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "status": "passed",
+              "source_commit": commit,
+              "publications": publications,
+          }
+          pathlib.Path(output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+      - name: Restore security-qualified deployment or stop Bolt
+        if: ${{ (failure() || cancelled()) && steps.ssh_setup.outcome == 'success' }}
+        shell: bash
+        env:
+          DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 4500
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          mkdir -p "$evidence_dir"
+          test "$DEPLOY_SSH_READY" = true
+          test -s "$DEPLOY_SSH_CONFIG"
+          test -s "$DEPLOY_KNOWN_HOSTS"
+          remote_evidence="$REMOTE_DEPLOY_DIR/phase0-watchdog/workflow-recovery-evidence.json"
+          status=0
+          ssh -F "$DEPLOY_SSH_CONFIG" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS" "$DEPLOY_HOST" \
+            "REMOTE_WATCHDOG_RUNNER='$REMOTE_WATCHDOG_RUNNER' REMOTE_EVIDENCE='$remote_evidence' bash -s" <<'REMOTE_SCRIPT' || status=$?
+          set -euo pipefail
+          recovery_status=0
+          sudo -n /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog || recovery_status=$?
+          if [ "$recovery_status" -eq 0 ]; then
+            "$REMOTE_WATCHDOG_RUNNER" force-recovery || recovery_status=$?
+          fi
+          watchdog_status=0
+          sudo -n /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog || watchdog_status=$?
+          if [ "$watchdog_status" -ne 0 ]; then
+            recovery_status="$watchdog_status"
+          fi
+          controller_evidence=/home/github-runner/xframework-deploy/phase0-watchdog/deployment-recovery-evidence.json
+          if [ -s "$controller_evidence" ]; then
+            cp --reflink=auto --preserve=mode,timestamps "$controller_evidence" "$REMOTE_EVIDENCE"
+          else
+            printf '%s\n' '{"schema":"xframework.bolt.phase0.workflow-recovery.v1","status":"failed","reason_code":"watchdog-bootstrap-failed"}' > "$REMOTE_EVIDENCE"
+            chmod 600 "$REMOTE_EVIDENCE"
+          fi
+          exit "$recovery_status"
+          REMOTE_SCRIPT
+          scp -F "$DEPLOY_SSH_CONFIG" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS" \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/workflow-recovery-evidence.json" || true
+          exit "$status"
 
       - name: Deployment diagnostics
-        if: failure()
+        if: ${{ (failure() || cancelled()) && steps.ssh_setup.outcome == 'success' }}
         shell: bash
         run: |
           remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
+          remote_override="$REMOTE_PIN_OVERRIDE"
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps" || true
-          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' logs --tail=200 migrate bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard minio seq jaeger" || true
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' -f '$remote_override' ps" || true
+
+      - name: Upload Phase 0 deployment evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bolt-phase0-all-services-${{ github.run_id }}
+          path: ${{ runner.temp }}/bolt-phase0-evidence
+          if-no-files-found: warn
+          retention-days: 30

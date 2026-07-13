@@ -20,6 +20,8 @@ public interface IDurableQueueStore
 
     /// <summary>
     /// Mark all messages up to and including upToSequence as acked. They are removed from the queue.
+    /// Duplicate and stale acknowledgements are idempotent. Acknowledgements above the highest
+    /// sequence assigned to this subscriber are rejected without changing queue state.
     /// </summary>
     Task AckAsync(int topicHash, string subscriberId, long upToSequence, CancellationToken ct = default);
 
@@ -28,6 +30,16 @@ public interface IDurableQueueStore
     /// Future publishes to this topic will enqueue for this subscriber.
     /// </summary>
     Task RegisterDurableSubscriberAsync(int topicHash, string subscriberId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Atomically register a durable subscriber only when the topic's retained subscriber
+    /// cardinality is below the supplied maximum. Existing registrations remain idempotent.
+    /// </summary>
+    Task<bool> TryRegisterDurableSubscriberAsync(
+        int topicHash,
+        string subscriberId,
+        int maxSubscribers,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Remove a durable subscriber registration for this topic.
@@ -40,6 +52,12 @@ public interface IDurableQueueStore
     /// Used by publish to know which queues to enqueue into.
     /// </summary>
     Task<IReadOnlyList<string>> GetDurableSubscribersAsync(int topicHash, CancellationToken ct = default);
+
+    /// <summary>Check whether a durable subscriber is still registered for the topic.</summary>
+    Task<bool> IsDurableSubscriberRegisteredAsync(
+        int topicHash,
+        string subscriberId,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Get the last sequence number this subscriber acked. Returns 0 if no ack yet.
