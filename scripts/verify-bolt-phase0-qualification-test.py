@@ -669,6 +669,11 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(set(MODULE.ARTIFACT_FILES), set(evidence["artifacts"]))
         self.assertNotIn("configured_image", json.dumps(evidence))
 
+    def test_rejects_unbound_extra_artifact(self) -> None:
+        secure_json(self.factory.run / "unbound-extra.json", {"status": "passed"})
+
+        self.assert_code("unexpected-artifact-inventory")
+
     def test_rejects_logs_mode_for_promotion(self) -> None:
         with self.assertRaisesRegex(MODULE.QualificationError, "invalid-proxy-mode"):
             self.factory.verify(proxy_mode=MODULE.PROXY_MODE_LOGS)
@@ -1238,6 +1243,12 @@ class RecoveryGateTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def qualify_mode(self, proxy_mode: str) -> None:
+        for name in (
+            "qualification-evidence.json",
+            "qualified-commit",
+            "security-qualified",
+        ):
+            (self.factory.run / name).unlink(missing_ok=True)
         self.factory.create(proxy_mode=proxy_mode)
         evidence = self.factory.verify(proxy_mode=proxy_mode)
         secure_json(self.factory.run / "qualification-evidence.json", evidence)

@@ -47,7 +47,7 @@ jobs:
       REMOTE_PIN_OVERRIDE: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/pinned-compose.override.json
       REMOTE_PINS_FILE: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/image-pins.json
       REMOTE_LKG_DIR: /home/github-runner/xframework-deploy/phase0-last-known-good
-      REMOTE_ROTATION_STATE: /home/github-runner/xframework-deploy/phase0-rotation-state.json
+      REMOTE_ROTATION_STATE: /home/github-runner/xframework-deploy/runs/${{ github.run_id }}-${{ github.run_attempt }}/phase0-rotation-state.json
       REMOTE_LEASE_MANAGER: /usr/local/libexec/xframework-bolt-phase0/manage-bolt-phase0-deployment-lease.py
       BOLT_PHASE0_LEASE_RUN_ID: ${{ github.run_id }}
       BOLT_PHASE0_LEASE_RUN_ATTEMPT: ${{ github.run_attempt }}
@@ -677,6 +677,8 @@ jobs:
           REMOTE_SCRIPT
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/rotation-bootstrap-validation.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "rm -f '$remote_evidence'"
 
       - name: Validate actual xeon-dev Phase 0 TLS and manifest
         shell: bash
@@ -685,16 +687,17 @@ jobs:
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
           mkdir -p "$evidence_dir"
 
-          remote_candidate="$REMOTE_DEPLOY_DIR/docker-compose.${IMAGE_TAG}.candidate.yml"
-          remote_compose_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-compose.py"
+          remote_candidate="$REMOTE_RUN_DIR/docker-compose.${IMAGE_TAG}.candidate.yml"
+          remote_compose_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-compose.py"
           remote_env_parser="$REMOTE_ENV_PARSER"
-          remote_tls_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-tls.sh"
-          remote_identity_tls_verifier="$REMOTE_DEPLOY_DIR/verify-identityserver-phase0-tls.sh"
-          remote_compose_evidence="$REMOTE_DEPLOY_DIR/bolt-phase0-compose-evidence.json"
+          remote_tls_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-tls.sh"
+          remote_identity_tls_verifier="$REMOTE_RUN_DIR/verify-identityserver-phase0-tls.sh"
+          remote_compose_evidence="$REMOTE_RUN_DIR/bolt-phase0-compose-evidence.json"
           remote_tls_evidence="$REMOTE_RUN_DIR/bolt-tls-evidence.json"
           remote_identity_tls_evidence="$REMOTE_RUN_DIR/identityserver-tls-evidence.json"
 
-          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "mkdir -p '$REMOTE_DEPLOY_DIR'"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "test -d '$REMOTE_DEPLOY_DIR' && test -d '$REMOTE_RUN_DIR'"
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$COMPOSE_FILE_PATH" "$DEPLOY_HOST:$remote_candidate"
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
@@ -771,6 +774,8 @@ jobs:
             "$DEPLOY_HOST:$remote_tls_evidence" "$evidence_dir/bolt-tls-evidence.json" || true
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$remote_identity_tls_evidence" "$evidence_dir/identityserver-tls-evidence.json" || true
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "rm -f '$remote_compose_verifier' '$remote_tls_verifier' '$remote_identity_tls_verifier' '$remote_compose_evidence'"
           exit "$status"
 
       - name: Login to dev registry
@@ -1026,6 +1031,7 @@ jobs:
           remote_override="$REMOTE_PIN_OVERRIDE"
           remote_pins="$REMOTE_PINS_FILE"
           remote_evidence="$REMOTE_RUN_DIR/pinned-manifest-evidence.json"
+          remote_compose_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-compose.py"
           services=(
             migrate
             bolt-phase0-synthetics
@@ -1073,16 +1079,26 @@ jobs:
             "${authorize_args[@]}" \
             --authorize-deployment
 
-          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "install -d -m 700 '$REMOTE_RUN_DIR'"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_RUN_DIR='$REMOTE_RUN_DIR' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          test -d "$REMOTE_RUN_DIR"
+          test ! -L "$REMOTE_RUN_DIR"
+          test "$(readlink -e -- "$REMOTE_RUN_DIR")" = "$REMOTE_RUN_DIR"
+          test "$(stat -Lc '%u:%g:%a:%F' -- "$REMOTE_RUN_DIR")" = \
+            "$(id -u):$(id -g):700:directory"
+          REMOTE_SCRIPT
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$COMPOSE_FILE_PATH" "$DEPLOY_HOST:$REMOTE_COMPOSE_FILE"
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$override_file" "$DEPLOY_HOST:$remote_override"
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$pins_file" "$DEPLOY_HOST:$remote_pins"
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$provenance_file" "$DEPLOY_HOST:$REMOTE_RUN_DIR/provenance-evidence.json"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-compose.py "$DEPLOY_HOST:$remote_compose_verifier"
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "chmod 600 '$REMOTE_COMPOSE_FILE' '$remote_override' '$remote_pins' '$REMOTE_RUN_DIR/provenance-evidence.json' && rm -f '$remote_evidence'"
+            "chmod 600 '$REMOTE_COMPOSE_FILE' '$remote_override' '$remote_pins' '$REMOTE_RUN_DIR/provenance-evidence.json' '$remote_compose_verifier' && rm -f '$remote_evidence'"
 
           service_args="$(printf '%q ' "${services[@]}")"
-          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' CREDENTIAL_GENERATION_ID='phase0-prelease-validation-g1' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' COMPOSE_VERIFIER='$REMOTE_DEPLOY_DIR/verify-bolt-phase0-compose.py' REMOTE_OVERRIDE='$remote_override' REMOTE_PINS='$remote_pins' REMOTE_PROVENANCE='$REMOTE_RUN_DIR/provenance-evidence.json' REMOTE_EVIDENCE='$remote_evidence' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' PUBLICATION_TOPOLOGY_ATTESTATION='$PUBLICATION_TOPOLOGY_ATTESTATION' PUBLICATION_TOPOLOGY_ATTESTED_BY='$PUBLICATION_TOPOLOGY_ATTESTED_BY' PUBLICATION_TOPOLOGY_ATTESTED_BY_ID='$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID' PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR='$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR' PUBLICATION_TOPOLOGY_RUN_ID='$GITHUB_RUN_ID' PUBLICATION_TOPOLOGY_RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' CREDENTIAL_GENERATION_ID='phase0-prelease-validation-g1' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' COMPOSE_VERIFIER='$remote_compose_verifier' REMOTE_OVERRIDE='$remote_override' REMOTE_PINS='$remote_pins' REMOTE_PROVENANCE='$REMOTE_RUN_DIR/provenance-evidence.json' REMOTE_EVIDENCE='$remote_evidence' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' PUBLICATION_TOPOLOGY_ATTESTATION='$PUBLICATION_TOPOLOGY_ATTESTATION' PUBLICATION_TOPOLOGY_ATTESTED_BY='$PUBLICATION_TOPOLOGY_ATTESTED_BY' PUBLICATION_TOPOLOGY_ATTESTED_BY_ID='$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID' PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR='$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR' PUBLICATION_TOPOLOGY_RUN_ID='$GITHUB_RUN_ID' PUBLICATION_TOPOLOGY_RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
           status=0
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "$remote_env bash -s -- $service_args" <<'REMOTE_SCRIPT' || status=$?
@@ -1135,6 +1151,8 @@ jobs:
             scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
               "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json" || true
           fi
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "rm -f '$remote_compose_verifier'"
           exit "$status"
 
       - name: Pull candidate images without mutating services
@@ -1213,6 +1231,8 @@ jobs:
           REMOTE_SCRIPT
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/deployment-lease-arm.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "rm -f '$remote_evidence'"
 
       - name: Bootstrap current credential generation under lease
         shell: bash
@@ -1235,6 +1255,8 @@ jobs:
           REMOTE_SCRIPT
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/rotation-bootstrap.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "rm -f '$remote_evidence'"
 
       - name: Prepare bounded validation-only credential generation G+1
         shell: bash
@@ -1291,8 +1313,11 @@ jobs:
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "$remote_env bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
-          install -d -m 700 "$REMOTE_RUN_DIR"
-          : > "$REMOTE_RUN_DIR/mutation-started"
+          test -d "$REMOTE_RUN_DIR"
+          test ! -L "$REMOTE_RUN_DIR"
+          test "$(readlink -e -- "$REMOTE_RUN_DIR")" = "$REMOTE_RUN_DIR"
+          test "$(stat -Lc '%u:%g:%a:%F' -- "$REMOTE_RUN_DIR")" = \
+            "$(id -u):$(id -g):700:directory"
           deployment_uid="$(id -u)"
           heartbeat() {
             python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
@@ -1313,8 +1338,11 @@ jobs:
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "$remote_env bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
-          install -d -m 700 "$REMOTE_RUN_DIR"
-          : > "$REMOTE_RUN_DIR/mutation-started"
+          test -d "$REMOTE_RUN_DIR"
+          test ! -L "$REMOTE_RUN_DIR"
+          test "$(readlink -e -- "$REMOTE_RUN_DIR")" = "$REMOTE_RUN_DIR"
+          test "$(stat -Lc '%u:%g:%a:%F' -- "$REMOTE_RUN_DIR")" = \
+            "$(id -u):$(id -g):700:directory"
           deployment_uid="$(id -u)"
           heartbeat() {
             python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
@@ -1575,7 +1603,7 @@ jobs:
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
-          remote_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-observation.py"
+          remote_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-observation.py"
           remote_input="$REMOTE_RUN_DIR/canary-observation-input.json"
           remote_samples="$REMOTE_RUN_DIR/canary-observation-samples.jsonl"
           remote_started="$REMOTE_RUN_DIR/canary-observation-started"
@@ -1661,7 +1689,7 @@ jobs:
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$remote_output" "$evidence_dir/observation-evidence.json" || true
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "rm -f '$remote_input' '$remote_samples' '$remote_started'"
+            "rm -f '$remote_verifier' '$remote_input' '$remote_samples' '$remote_started'"
           exit "$status"
 
       - name: Promote remaining clients in bounded batches
@@ -2032,7 +2060,7 @@ jobs:
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
           remote_manager="$REMOTE_ROTATION_MANAGER"
-          remote_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-credential-convergence.py"
+          remote_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-credential-convergence.py"
           remote_input="$REMOTE_RUN_DIR/credential-convergence-dual-input.json"
           remote_inventory="$REMOTE_RUN_DIR/rotation-generation-inventory.json"
           remote_evidence="$REMOTE_RUN_DIR/credential-convergence-dual-validation.json"
@@ -2217,7 +2245,7 @@ jobs:
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
-          remote_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-credential-convergence.py"
+          remote_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-credential-convergence.py"
           remote_input="$REMOTE_RUN_DIR/credential-convergence-finalized-input.json"
           remote_evidence="$REMOTE_RUN_DIR/credential-convergence-finalized.json"
           services=(bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
@@ -2279,6 +2307,8 @@ jobs:
           REMOTE_SCRIPT
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/credential-convergence-finalized.json"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "rm -f '$remote_verifier'"
 
       - name: Collect deployed runtime image evidence
         shell: bash
@@ -2428,6 +2458,28 @@ jobs:
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_ROTATION_MANAGER='$REMOTE_ROTATION_MANAGER' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          state_status="$(python3 "$REMOTE_ROTATION_MANAGER" status \
+            --env-file "$XFRAMEWORK_ENV_FILE" --state-file "$REMOTE_ROTATION_STATE")"
+          python3 - "$state_status" <<'PY'
+          import json
+          import sys
+
+          document = json.loads(sys.argv[1])
+          if (
+              document.get("schema") != "xframework.bolt.phase0.rotation-state.v1"
+              or document.get("phase") != "finalized"
+              or not document.get("finalized_at_utc")
+              or not document.get("target_generation_id")
+          ):
+              raise SystemExit("rotation state is not finalized")
+          PY
+          rm -f -- "$REMOTE_ROTATION_STATE"
+          test ! -e "$REMOTE_ROTATION_STATE"
+          test ! -L "$REMOTE_ROTATION_STATE"
+          REMOTE_SCRIPT
           local_evidence="$evidence_dir/root-activation-evidence.json"
           local_temporary=""
           cleanup_activation_temporary() {
@@ -2493,11 +2545,24 @@ jobs:
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
-          remote_evidence="$REMOTE_DEPLOY_DIR/phase0-watchdog/deployment-lease-disarm.json"
+          local_evidence="$evidence_dir/deployment-lease-disarm.json"
+          local_temporary="$(mktemp "$RUNNER_TEMP/bolt-phase0-lease-disarm.XXXXXXXX")"
+          cleanup_disarm_temporary() {
+            status=$?
+            trap - EXIT
+            rm -f -- "$local_temporary" || status=1
+            exit "$status"
+          }
+          trap cleanup_disarm_temporary EXIT
+          test "$(stat -c '%u:%a:%h:%F' -- "$local_temporary")" = \
+            "$(id -u):600:1:regular file"
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" disarm --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT' > '$remote_evidence.tmp' && mv '$remote_evidence.tmp' '$remote_evidence'"
-          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
-            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/deployment-lease-disarm.json"
+            "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" disarm --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT'" \
+            > "$local_temporary"
+          test -s "$local_temporary"
+          mv -- "$local_temporary" "$local_evidence"
+          local_temporary=""
+          trap - EXIT
 
       - name: Publish qualified develop channel tags
         shell: bash
@@ -2582,34 +2647,40 @@ jobs:
           test "$DEPLOY_SSH_READY" = true
           test -s "$DEPLOY_SSH_CONFIG"
           test -s "$DEPLOY_KNOWN_HOSTS"
-          remote_evidence="$REMOTE_DEPLOY_DIR/phase0-watchdog/workflow-recovery-evidence.json"
+          local_evidence="$evidence_dir/workflow-recovery-evidence.json"
+          local_temporary="$(mktemp "$RUNNER_TEMP/bolt-phase0-workflow-recovery.XXXXXXXX")"
+          test "$(stat -c '%u:%a:%h:%F' -- "$local_temporary")" = \
+            "$(id -u):600:1:regular file"
           status=0
           ssh -F "$DEPLOY_SSH_CONFIG" -o BatchMode=yes -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS" "$DEPLOY_HOST" \
-            "REMOTE_WATCHDOG_RUNNER='$REMOTE_WATCHDOG_RUNNER' REMOTE_EVIDENCE='$remote_evidence' bash -s" <<'REMOTE_SCRIPT' || status=$?
+            "REMOTE_WATCHDOG_RUNNER='$REMOTE_WATCHDOG_RUNNER' bash -s" > "$local_temporary" <<'REMOTE_SCRIPT' || status=$?
           set -euo pipefail
           recovery_status=0
-          sudo -n /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog || recovery_status=$?
+          sudo -n /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog >/dev/null || recovery_status=$?
           if [ "$recovery_status" -eq 0 ]; then
-            "$REMOTE_WATCHDOG_RUNNER" force-recovery || recovery_status=$?
+            "$REMOTE_WATCHDOG_RUNNER" force-recovery >/dev/null || recovery_status=$?
           fi
           watchdog_status=0
-          sudo -n /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog || watchdog_status=$?
+          sudo -n /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog >/dev/null || watchdog_status=$?
           if [ "$watchdog_status" -ne 0 ]; then
             recovery_status="$watchdog_status"
           fi
           controller_evidence=/home/github-runner/xframework-deploy/phase0-watchdog/deployment-recovery-evidence.json
           if [ -s "$controller_evidence" ]; then
-            cp --reflink=auto --preserve=mode,timestamps "$controller_evidence" "$REMOTE_EVIDENCE"
+            cat -- "$controller_evidence"
           else
-            printf '%s\n' '{"schema":"xframework.bolt.phase0.workflow-recovery.v1","status":"failed","reason_code":"watchdog-bootstrap-failed"}' > "$REMOTE_EVIDENCE"
-            chmod 600 "$REMOTE_EVIDENCE"
+            printf '%s\n' '{"schema":"xframework.bolt.phase0.workflow-recovery.v1","status":"failed","reason_code":"watchdog-bootstrap-failed"}'
           fi
           exit "$recovery_status"
           REMOTE_SCRIPT
-          scp -F "$DEPLOY_SSH_CONFIG" -o BatchMode=yes -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS" \
-            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/workflow-recovery-evidence.json" || true
+          if [ -s "$local_temporary" ]; then
+            mv -- "$local_temporary" "$local_evidence"
+          else
+            rm -f -- "$local_temporary"
+            printf '%s\n' '{"schema":"xframework.bolt.phase0.workflow-recovery.v1","status":"failed","reason_code":"recovery-evidence-capture-failed"}' > "$local_evidence"
+            chmod 600 "$local_evidence"
+          fi
           exit "$status"
 
       - name: Deployment diagnostics

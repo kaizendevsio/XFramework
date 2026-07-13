@@ -1599,6 +1599,9 @@ def verify_qualification(
         )
         for name, path in paths.items()
     }
+    artifact_names = {path.name for path in run_directory.iterdir()}
+    if artifact_names != set(ARTIFACT_FILES):
+        raise QualificationError("unexpected-artifact-inventory")
     digests = {name: sha256_bytes(content) for name, content in raw.items()}
     documents = {
         name: decode_json(content)

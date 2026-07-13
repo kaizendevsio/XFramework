@@ -228,7 +228,7 @@ class LeaseFixture(unittest.TestCase):
             self.root / "deployment.env",
             "SECRET=not-emitted\nBOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n",
         )
-        self.rotation_state = self.root / "rotation-state.json"
+        self.rotation_state = self.run_directory / MODULE.ROTATION_STATE_NAME
         self.rotation_manager = secure_file(self.root / "rotation.py")
         self.runtime_verifier = secure_file(self.root / "runtime.py")
         self.recovery_hook = secure_file(self.root / "recovery-hook", executable=True)
@@ -254,7 +254,6 @@ class LeaseFixture(unittest.TestCase):
         self.recovery = MODULE.RecoveryConfig(
             lkg_pointer=self.lkg_pointer,
             env_file=self.env_file,
-            rotation_state_file=self.rotation_state,
             rotation_manager=self.rotation_manager,
             runtime_verifier=self.runtime_verifier,
             recovery_gate_hook=self.recovery_hook,
@@ -544,6 +543,7 @@ class LifecycleTests(LeaseFixture):
             self.controller.heartbeat("999", 1, "canary", False)
 
     def test_stale_pre_mutation_calls_fixed_abort_and_disarms(self) -> None:
+        secure_file(self.rotation_state, "{}")
         self.arm()
         self.make_stale()
         evidence, exit_code = self.controller.reconcile(self.recovery)
@@ -556,7 +556,34 @@ class LifecycleTests(LeaseFixture):
         command = next(command for command in self.runner.commands if self.runner._step(command) == "rotation")
         self.assertEqual(str(self.python), command[0])
         self.assertEqual(str(self.rotation_manager), command[1])
+        self.assertEqual(str(self.rotation_state), command[command.index("--state-file") + 1])
         self.assertNotIn("SECRET=not-emitted", " ".join(command))
+
+    def test_stale_pre_mutation_without_rotation_state_disarms_without_abort(self) -> None:
+        self.arm()
+        self.make_stale()
+
+        evidence, exit_code = self.controller.reconcile(self.recovery)
+
+        self.assertEqual(0, exit_code)
+        self.assertFalse(evidence["gates"]["rotation_aborted"])
+        self.assertEqual(0, self.runner.count("rotation"))
+        self.assertFalse(self.config.lease_file.exists())
+
+    def test_stale_pre_mutation_rejects_symlinked_lease_rotation_state(self) -> None:
+        outside = secure_file(self.root / "outside-rotation-state.json", "{}")
+        try:
+            self.rotation_state.symlink_to(outside)
+        except OSError as error:
+            self.skipTest(f"symlinks are unavailable: {error}")
+        self.arm()
+        self.make_stale()
+
+        evidence, exit_code = self.controller.reconcile(self.recovery)
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("symlink-rejected", evidence["reason_code"])
+        self.assert_hub_stop_invoked()
 
     def test_stale_heartbeat_cannot_resurrect_failed_runner(self) -> None:
         self.arm()
@@ -839,7 +866,6 @@ class RecoveryTests(LeaseFixture):
         evidence, exit_code = self.controller.reconcile_no_lkg(
             force=False,
             env_file=self.env_file,
-            rotation_state_file=self.rotation_state,
             python_executable=self.python,
             docker_executable=self.docker,
             hub_container_name="xframework-bolt-hub",
@@ -864,7 +890,6 @@ class RecoveryTests(LeaseFixture):
             self.controller.reconcile_no_lkg(
                 force=False,
                 env_file=self.env_file,
-                rotation_state_file=self.rotation_state,
                 python_executable=self.python,
                 docker_executable=self.docker,
                 hub_container_name="xframework-bolt-hub",
@@ -881,11 +906,11 @@ class RecoveryTests(LeaseFixture):
             self.run_directory / "manage-bolt-phase0-rotation.py",
             executable=True,
         )
+        secure_file(self.rotation_state, "{}")
 
         evidence, exit_code = self.controller.reconcile_no_lkg(
             force=True,
             env_file=self.env_file,
-            rotation_state_file=self.rotation_state,
             python_executable=self.python,
             docker_executable=self.docker,
             hub_container_name="xframework-bolt-hub",
@@ -1057,6 +1082,7 @@ class RecoveryTests(LeaseFixture):
         self.assertFalse(self.config.lease_file.exists())
 
     def test_abort_failure_also_fails_closed(self) -> None:
+        secure_file(self.rotation_state, "{}")
         self.arm()
         self.make_stale()
         self.runner.fail_step = "rotation"
