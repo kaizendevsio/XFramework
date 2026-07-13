@@ -237,6 +237,46 @@ jobs:
           harness="src/Tests/Bolt.Phase0Synthetics.Tests/run-wrapper-harness.sh"
           runner="scripts/run-bolt-phase0-synthetics.sh"
           env_parser="scripts/verify-bolt-phase0-env.py"
+          lease_mock="src/Tests/Bolt.Phase0Synthetics.Tests/mock-lease-manager.py"
+          lease_fixture_parent="/usr/local/libexec"
+          lease_fixture_dir="$lease_fixture_parent/xframework-bolt-phase0"
+          lease_fixture="$lease_fixture_dir/manage-bolt-phase0-deployment-lease.py"
+          lease_fixture_parent_created=false
+          lease_fixture_dir_created=false
+          lease_fixture_installed=false
+          cleanup_lease_fixture() {
+            status=$?
+            trap - EXIT
+            if [ "$lease_fixture_installed" = true ]; then
+              sudo --non-interactive rm -f -- "$lease_fixture"
+            fi
+            if [ "$lease_fixture_dir_created" = true ]; then
+              sudo --non-interactive rmdir -- "$lease_fixture_dir" 2>/dev/null || true
+            fi
+            if [ "$lease_fixture_parent_created" = true ]; then
+              sudo --non-interactive rmdir -- "$lease_fixture_parent" 2>/dev/null || true
+            fi
+            exit "$status"
+          }
+          trap cleanup_lease_fixture EXIT
+          if [ -L "$lease_fixture_parent" ] || { [ -e "$lease_fixture_parent" ] && [ ! -d "$lease_fixture_parent" ]; }; then
+            echo "Phase 0 lease fixture parent is not a real directory" >&2
+            exit 1
+          fi
+          if [ ! -d "$lease_fixture_parent" ]; then
+            sudo --non-interactive mkdir --mode=0755 -- "$lease_fixture_parent"
+            lease_fixture_parent_created=true
+          fi
+          if [ -e "$lease_fixture_dir" ] || [ -L "$lease_fixture_dir" ]; then
+            echo "refusing to replace an existing Phase 0 lease fixture directory" >&2
+            exit 1
+          fi
+          sudo --non-interactive mkdir --mode=0755 -- "$lease_fixture_dir"
+          lease_fixture_dir_created=true
+          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/bolt-phase0-wrapper-pycache" \
+            python3 -m py_compile "$lease_mock"
+          sudo --non-interactive install -o root -g root -m 0555 "$lease_mock" "$lease_fixture"
+          lease_fixture_installed=true
           bash "$harness" "$runner" "$env_parser" pass canary
           negative_scenarios=(
             refresh-output
