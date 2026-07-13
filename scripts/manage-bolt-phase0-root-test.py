@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import importlib.util
 import io
 import json
@@ -214,6 +216,10 @@ class RootBoundaryTests(unittest.TestCase):
         )
 
     def lease_config(self, **changes: object) -> LEASE_MODULE.ControllerConfig:
+        source_components = tuple(
+            (field, getattr(self.paths, path_attribute), mode)
+            for field, (path_attribute, mode) in MODULE.SOURCE_BINDING_FIELDS.items()
+        )
         values = {
             "state_root": self.paths.state_root,
             "run_root": self.paths.run_root,
@@ -223,9 +229,48 @@ class RootBoundaryTests(unittest.TestCase):
             "lock_owner_uid": self.boundary.deployment_uid,
             "lock_owner_gid": self.boundary.deployment_gid,
             "lock_parent_uid": self.boundary.deployment_uid,
+            "source_binding_owner_uid": self.boundary.deployment_uid,
+            "source_binding_owner_gid": self.boundary.deployment_gid,
+            "source_binding_component_owner_uid": self.boundary.deployment_uid,
+            "source_binding_component_owner_gid": self.boundary.deployment_gid,
+            "source_binding_components": source_components,
+            "require_source_binding_on_arm": True,
         }
         values.update(changes)
         return LEASE_MODULE.ControllerConfig(**values)  # type: ignore[arg-type]
+
+    def source_binding_request(self) -> dict[str, str]:
+        return {
+            field: "sha256:"
+            + hashlib.sha256(
+                getattr(self.paths, path_attribute).read_bytes()
+            ).hexdigest()
+            for field, (path_attribute, _) in MODULE.SOURCE_BINDING_FIELDS.items()
+        }
+
+    def arm_activation_lease(
+        self,
+        candidate: Path,
+    ) -> LEASE_MODULE.DeploymentLeaseController:
+        marker = {
+            "schema": LEASE_MODULE.SOURCE_BINDING_SCHEMA,
+            "run_id": "123",
+            "run_attempt": 1,
+            "source_binding": self.source_binding_request(),
+        }
+        self.boundary._write_marker(
+            candidate / LEASE_MODULE.SOURCE_BINDING_MARKER,
+            (
+                json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n"
+            ).encode("ascii"),
+            owner_uid=self.boundary.deployment_uid,
+            owner_gid=self.boundary.deployment_gid,
+            mode=0o600 if os.name == "nt" else 0o440,
+        )
+        lease = LEASE_MODULE.DeploymentLeaseController(self.lease_config())
+        lease.arm("123", 1, "preflight", 600, True)
+        lease.heartbeat("123", 1, "activation", True)
+        return lease
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux flock identity contract")
     def test_lease_lock_replacement_after_flock_fails_closed(self) -> None:
@@ -410,6 +455,95 @@ class RootBoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.RootBoundaryError, "bootstrap-hub-running"):
             self.boundary.verify_bootstrap()
 
+    def test_source_binding_requires_every_exact_installed_bootstrap_component(self) -> None:
+        request = self.source_binding_request()
+        evidence = self.boundary.verify_source_binding(request)
+        self.assertEqual("passed", evidence["source_binding"])
+
+        for field, (path_attribute, mode) in MODULE.SOURCE_BINDING_FIELDS.items():
+            with self.subTest(field=field):
+                path = getattr(self.paths, path_attribute)
+                original = path.read_bytes()
+                if os.name == "posix":
+                    path.chmod(mode | 0o200)
+                path.write_bytes(original + b"stale\n")
+                if os.name == "posix":
+                    path.chmod(mode)
+                with self.assertRaisesRegex(
+                    MODULE.RootBoundaryError, "source-binding-mismatch"
+                ):
+                    self.boundary.verify_source_binding(request)
+                if os.name == "posix":
+                    path.chmod(mode | 0o200)
+                path.write_bytes(original)
+                if os.name == "posix":
+                    path.chmod(mode)
+
+    def test_source_binding_rejects_malformed_digest(self) -> None:
+        request = self.source_binding_request()
+        request["lease_manager_sha256"] = "sha256:not-a-digest"
+        with self.assertRaisesRegex(MODULE.RootBoundaryError, "invalid-source-binding"):
+            self.boundary.verify_source_binding(request)
+
+    @unittest.skipUnless(os.name == "posix", "requires POSIX replace-open semantics")
+    def test_file_read_rejects_path_replacement_after_open(self) -> None:
+        path = self.paths.lease_manager
+        replacement = file(
+            path.parent / "replacement-manager.py",
+            0o555,
+            b"replacement\n",
+        )
+        original_read = MODULE.os.read
+        replaced = False
+
+        def replace_after_first_read(descriptor: int, amount: int) -> bytes:
+            nonlocal replaced
+            chunk = original_read(descriptor, amount)
+            if chunk and not replaced:
+                os.replace(replacement, path)
+                replaced = True
+            return chunk
+
+        with (
+            mock.patch.object(MODULE.os, "read", side_effect=replace_after_first_read),
+            self.assertRaisesRegex(MODULE.RootBoundaryError, "file-changed"),
+        ):
+            MODULE._file(path, self.boundary.deployment_uid, 0o555)
+        self.assertTrue(replaced)
+
+    def test_source_binding_request_requires_exact_fields(self) -> None:
+        request = {
+            **self.source_binding_request(),
+            "run_attempt": "1",
+            "run_id": "29244847846",
+        }
+        fields = {"run_id", "run_attempt", *MODULE.SOURCE_BINDING_FIELDS}
+        raw = json.dumps(
+            request,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("ascii") + b"\n"
+        self.assertEqual(
+            request,
+            MODULE.decode_root_request(raw, fields),
+        )
+
+        missing = dict(request)
+        missing.pop("lease_manager_sha256")
+        extra = {**request, "unexpected_sha256": "sha256:" + "0" * 64}
+        for candidate in (missing, extra):
+            encoded = json.dumps(
+                candidate,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("ascii") + b"\n"
+            with self.assertRaisesRegex(MODULE.RootBoundaryError, "invalid-root-request"):
+                MODULE.decode_root_request(
+                    encoded, fields
+                )
+
     def test_no_lkg_bootstrap_rejects_unqualified_proxy_mode(self) -> None:
         self.paths.protected_env.write_bytes(b"BOLT_SYNTHETIC_PROXY_MODE=logs\n")
         with self.assertRaisesRegex(
@@ -553,16 +687,221 @@ class RootBoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.RootBoundaryError, "docker-inspection-failed"):
             self.boundary.verify_bootstrap()
 
-    def test_prepare_run_rejects_invalid_identity_and_existing_path(self) -> None:
+    def test_prepare_bound_run_rejects_invalid_identity_and_existing_path(self) -> None:
+        binding = self.source_binding_request()
         for run_id, attempt in (("0", "1"), ("123/escape", "1"), ("123", "0"), ("123", "2")):
             with self.subTest(run_id=run_id, attempt=attempt), self.assertRaisesRegex(
                 MODULE.RootBoundaryError, "invalid-run-identity"
             ):
-                self.boundary.prepare_run(run_id, attempt)
-        evidence = self.boundary.prepare_run("123", "1")
+                self.boundary.prepare_bound_run(run_id, attempt, binding)
+        evidence = self.boundary.prepare_bound_run("123", "1", binding)
         self.assertEqual("candidate-run-prepared", evidence["state"])
+        self.assertEqual("passed", evidence["source_binding"])
+        marker = self.paths.run_root / "123-1" / MODULE.SOURCE_BINDING_MARKER
+        document = json.loads(marker.read_text(encoding="ascii"))
+        self.assertEqual(MODULE.SOURCE_BINDING_SCHEMA, document["schema"])
+        self.assertEqual("123", document["run_id"])
+        self.assertEqual(1, document["run_attempt"])
+        self.assertEqual(binding, document["source_binding"])
+        if os.name == "posix":
+            metadata = marker.stat()
+            self.assertEqual(0o440, stat.S_IMODE(metadata.st_mode))
+            self.assertEqual(self.boundary.deployment_uid, metadata.st_uid)
+            self.assertEqual(self.boundary.deployment_gid, metadata.st_gid)
         with self.assertRaisesRegex(MODULE.RootBoundaryError, "run-exists"):
-            self.boundary.prepare_run("123", "1")
+            self.boundary.prepare_bound_run("123", "1", binding)
+
+    def test_prepare_bound_run_holds_installation_lock_through_creation(self) -> None:
+        events: list[str] = []
+        target = self.paths.run_root / "123-1"
+        original_verify = self.boundary.verify_source_binding
+
+        @contextlib.contextmanager
+        def tracked_lock(*_: object, **__: object):
+            events.append("lock-acquired")
+            yield
+            self.assertTrue(target.is_dir())
+            self.assertTrue((target / MODULE.SOURCE_BINDING_MARKER).is_file())
+            events.append("lock-released")
+
+        def tracked_verify(
+            expected: dict[str, str], *, lease_lock_held: bool = False
+        ) -> dict[str, object]:
+            self.assertTrue(lease_lock_held)
+            self.assertEqual(["lock-acquired"], events)
+            events.append("source-bound")
+            return original_verify(expected, lease_lock_held=True)
+
+        with (
+            mock.patch.object(MODULE, "exclusive_lease_lock", tracked_lock),
+            mock.patch.object(
+                self.boundary,
+                "verify_source_binding",
+                side_effect=tracked_verify,
+            ),
+        ):
+            evidence = self.boundary.prepare_bound_run(
+                "123", "1", self.source_binding_request()
+            )
+
+        self.assertEqual("candidate-run-prepared", evidence["state"])
+        self.assertEqual(
+            ["lock-acquired", "source-bound", "lock-released"], events
+        )
+
+    @unittest.skipUnless(os.name == "posix", "POSIX operator recovery contract")
+    def test_abandon_bound_run_validates_and_removes_only_the_bound_marker(self) -> None:
+        binding = self.source_binding_request()
+        self.boundary.prepare_bound_run("123", "1", binding)
+        marker = self.paths.run_root / "123-1" / MODULE.SOURCE_BINDING_MARKER
+
+        evidence = self.boundary.abandon_bound_run("123", "1", binding)
+
+        self.assertEqual("candidate-source-binding-abandoned", evidence["state"])
+        self.assertEqual("passed", evidence["source_binding"])
+        self.assertFalse(marker.exists())
+        self.assertTrue(marker.parent.is_dir())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX operator recovery contract")
+    def test_abandon_bound_run_rejects_active_state_without_removing_marker(self) -> None:
+        binding = self.source_binding_request()
+        self.boundary.prepare_bound_run("123", "1", binding)
+        marker = self.paths.run_root / "123-1" / MODULE.SOURCE_BINDING_MARKER
+        lease = file(
+            self.paths.state_root / "deployment-lease.json",
+            0o600,
+            b"{}\n",
+        )
+
+        with self.assertRaisesRegex(MODULE.RootBoundaryError, "active-deployment-state"):
+            self.boundary.abandon_bound_run("123", "1", binding)
+
+        self.assertTrue(marker.is_file())
+        lease.unlink()
+
+    def test_abandon_bound_run_rejects_non_posix_before_state_access(self) -> None:
+        with (
+            mock.patch.object(MODULE.os, "name", "nt"),
+            mock.patch.object(
+                MODULE,
+                "exclusive_lease_lock",
+                side_effect=AssertionError("lock must not be accessed"),
+            ),
+            self.assertRaisesRegex(MODULE.RootBoundaryError, "unsupported-platform"),
+        ):
+            self.boundary.abandon_bound_run("123", "1", {})
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux")
+        and hasattr(os, "geteuid")
+        and os.geteuid() == 0,
+        "requires Linux root to exercise deployment-user marker replacement",
+    )
+    def test_abandon_bound_run_freezes_directory_before_marker_unlink(self) -> None:
+        assert pwd is not None
+        identity = pwd.getpwnam("daemon")
+        for path in (self.paths.state_root, self.paths.hooks_root, self.paths.protected_env):
+            os.chown(path, identity.pw_uid, identity.pw_gid)
+        os.chown(self.paths.protected_env.parent, 0, identity.pw_gid)
+        os.chown(self.paths.lease_lock, 0, identity.pw_gid)
+        replacement_attempts: list[subprocess.CompletedProcess[str]] = []
+
+        def try_replacement(marker: Path) -> None:
+            result = subprocess.run(
+                [
+                    "/usr/sbin/runuser",
+                    "-u",
+                    identity.pw_name,
+                    "--",
+                    "/usr/bin/mv",
+                    str(marker),
+                    str(marker.with_name("hidden-source-binding.json")),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            replacement_attempts.append(result)
+
+        boundary = MODULE.RootBoundary(
+            self.paths,
+            runner=self.runner,
+            deployment_user=identity.pw_name,
+            after_abandon_marker_validation=try_replacement,
+        )
+        binding = self.source_binding_request()
+        boundary.prepare_bound_run("123", "1", binding)
+
+        evidence = boundary.abandon_bound_run("123", "1", binding)
+
+        self.assertEqual("candidate-source-binding-abandoned", evidence["state"])
+        self.assertEqual(1, len(replacement_attempts))
+        self.assertNotEqual(0, replacement_attempts[0].returncode)
+        target = self.paths.run_root / "123-1"
+        metadata = target.stat()
+        self.assertEqual(identity.pw_uid, metadata.st_uid)
+        self.assertEqual(identity.pw_gid, metadata.st_gid)
+        self.assertEqual(0o700, stat.S_IMODE(metadata.st_mode))
+        self.assertFalse((target / MODULE.SOURCE_BINDING_MARKER).exists())
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux")
+        and hasattr(os, "geteuid")
+        and os.geteuid() == 0,
+        "requires Linux root to exercise partial directory freezes",
+    )
+    def test_abandon_bound_run_restores_directory_after_freeze_mode_failure(self) -> None:
+        self._assert_abandon_freeze_failure_restores_directory("fchmod")
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux")
+        and hasattr(os, "geteuid")
+        and os.geteuid() == 0,
+        "requires Linux root to exercise partial directory freezes",
+    )
+    def test_abandon_bound_run_restores_directory_after_freeze_sync_failure(self) -> None:
+        self._assert_abandon_freeze_failure_restores_directory("fsync")
+
+    def _assert_abandon_freeze_failure_restores_directory(self, operation: str) -> None:
+        assert pwd is not None
+        identity = pwd.getpwnam("daemon")
+        for path in (self.paths.state_root, self.paths.hooks_root, self.paths.protected_env):
+            os.chown(path, identity.pw_uid, identity.pw_gid)
+        os.chown(self.paths.protected_env.parent, 0, identity.pw_gid)
+        os.chown(self.paths.lease_lock, 0, identity.pw_gid)
+        boundary = MODULE.RootBoundary(
+            self.paths,
+            runner=self.runner,
+            deployment_user=identity.pw_name,
+        )
+        binding = self.source_binding_request()
+        boundary.prepare_bound_run("123", "1", binding)
+        target = self.paths.run_root / "123-1"
+        marker = target / MODULE.SOURCE_BINDING_MARKER
+        target_inode = target.stat().st_ino
+        original = getattr(MODULE.os, operation)
+        injected = False
+
+        def fail_once(descriptor: int, *args: object) -> object:
+            nonlocal injected
+            metadata = os.fstat(descriptor)
+            if not injected and metadata.st_ino == target_inode:
+                injected = True
+                raise OSError(f"injected-{operation}-failure")
+            return original(descriptor, *args)
+
+        with (
+            mock.patch.object(MODULE.os, operation, side_effect=fail_once),
+            self.assertRaisesRegex(OSError, f"injected-{operation}-failure"),
+        ):
+            boundary.abandon_bound_run("123", "1", binding)
+
+        self.assertTrue(injected)
+        metadata = target.stat()
+        self.assertEqual(identity.pw_uid, metadata.st_uid)
+        self.assertEqual(identity.pw_gid, metadata.st_gid)
+        self.assertEqual(0o700, stat.S_IMODE(metadata.st_mode))
+        self.assertTrue(marker.is_file())
 
     def test_effective_dropins_and_redirected_exec_are_rejected(self) -> None:
         service = "xframework-bolt-phase0-watchdog.service"
@@ -620,11 +959,7 @@ class RootBoundaryTests(unittest.TestCase):
     def test_quarantine_replacement_attempt_never_becomes_lkg(self) -> None:
         candidate = directory(self.paths.run_root / "123-1", 0o700)
         file(candidate / "docker-compose.yml", 0o600, b"services: {}\n")
-        lease = LEASE_MODULE.DeploymentLeaseController(
-            self.lease_config()
-        )
-        lease.arm("123", 1, "preflight", 600)
-        lease.heartbeat("123", 1, "activation", True)
+        lease = self.arm_activation_lease(candidate)
 
         def replace_original(source: Path, _: Path) -> None:
             self.assertTrue(source.is_dir())
@@ -730,11 +1065,7 @@ class RootBoundaryTests(unittest.TestCase):
 
         boundary._qualify = qualify  # type: ignore[method-assign]
         boundary._validate_sealed_run = lambda _: None  # type: ignore[method-assign]
-        lease = LEASE_MODULE.DeploymentLeaseController(
-            self.lease_config()
-        )
-        lease.arm("123", 1, "preflight", 600)
-        lease.heartbeat("123", 1, "activation", True)
+        lease = self.arm_activation_lease(candidate)
         evidence = boundary.activate("123", "1", "a" * 40, "xframework")
         self.assertEqual("qualified-lkg-activated", evidence["state"])
 
@@ -751,11 +1082,7 @@ class RootBoundaryTests(unittest.TestCase):
     def test_final_activation_rejects_a_lease_removed_during_qualification(self) -> None:
         candidate = directory(self.paths.run_root / "123-1", 0o700)
         file(candidate / "docker-compose.yml", 0o600, b"services: {}\n")
-        lease = LEASE_MODULE.DeploymentLeaseController(
-            self.lease_config()
-        )
-        lease.arm("123", 1, "preflight", 600)
-        lease.heartbeat("123", 1, "activation", True)
+        lease = self.arm_activation_lease(candidate)
 
         def remove_lease(_: Path, __: Path) -> None:
             self.paths.state_root.joinpath("deployment-lease.json").unlink()
@@ -774,11 +1101,7 @@ class RootBoundaryTests(unittest.TestCase):
 
     def test_activation_lease_parser_rejects_duplicate_keys(self) -> None:
         candidate = directory(self.paths.run_root / "123-1", 0o700)
-        lease = LEASE_MODULE.DeploymentLeaseController(
-            self.lease_config()
-        )
-        lease.arm("123", 1, "preflight", 600)
-        lease.heartbeat("123", 1, "activation", True)
+        lease = self.arm_activation_lease(candidate)
         lease_path = self.paths.state_root / "deployment-lease.json"
         raw = lease_path.read_text(encoding="utf-8").rstrip()
         duplicate = raw[:-1] + ',"run_attempt":1}\n'
@@ -794,14 +1117,39 @@ class RootBoundaryTests(unittest.TestCase):
                 "123", 1, candidate, "xframework"
             )
 
+    def test_activation_lease_parser_rejects_legacy_or_unbound_lease(self) -> None:
+        candidate = directory(self.paths.run_root / "123-1", 0o700)
+        lease = self.arm_activation_lease(candidate)
+        lease_path = self.paths.state_root / "deployment-lease.json"
+        current = json.loads(lease_path.read_text(encoding="utf-8"))
+
+        invalid_documents = []
+        legacy = dict(current)
+        legacy["schema"] = "xframework.bolt.phase0.deployment-lease.v1"
+        legacy.pop("bootstrap_source_bound")
+        invalid_documents.append(legacy)
+        unbound = dict(current)
+        unbound["bootstrap_source_bound"] = False
+        invalid_documents.append(unbound)
+
+        for document in invalid_documents:
+            with self.subTest(schema=document["schema"]):
+                LEASE_MODULE.atomic_write_json(
+                    lease_path,
+                    document,
+                    self.boundary.deployment_uid,
+                )
+                with self.assertRaisesRegex(
+                    MODULE.RootBoundaryError, "invalid-activation-lease"
+                ):
+                    self.boundary._validate_activation_lease(
+                        "123", 1, candidate, "xframework"
+                    )
+
     def test_final_activation_rejects_a_lease_that_stales_during_qualification(self) -> None:
         candidate = directory(self.paths.run_root / "123-1", 0o700)
         file(candidate / "docker-compose.yml", 0o600, b"services: {}\n")
-        lease = LEASE_MODULE.DeploymentLeaseController(
-            self.lease_config()
-        )
-        lease.arm("123", 1, "preflight", 600)
-        lease.heartbeat("123", 1, "activation", True)
+        lease = self.arm_activation_lease(candidate)
         lease_path = self.paths.state_root / "deployment-lease.json"
 
         def stale_lease(_: Path, __: Path) -> None:
@@ -869,10 +1217,16 @@ class RootBoundaryTests(unittest.TestCase):
             MODULE.resolve_system_python(link, require_root=False)
 
     def test_cli_has_only_fixed_root_boundary_commands(self) -> None:
-        for command in ("verify-bootstrap", "ensure-watchdog", "prepare-run", "activate"):
+        for command in (
+            "verify-bootstrap",
+            "ensure-watchdog",
+            "prepare-bound-run",
+            "abandon-bound-run",
+            "activate",
+        ):
             self.assertEqual(command, MODULE.parse_args([command]).command)
         with self.assertRaises(SystemExit):
-            MODULE.parse_args(["prepare-run", "123", "1"])
+            MODULE.parse_args(["prepare-bound-run", "123", "1"])
         with self.assertRaises(SystemExit):
             MODULE.parse_args(["activate", "123", "1", "a" * 40, "xframework"])
         with self.assertRaises(SystemExit):

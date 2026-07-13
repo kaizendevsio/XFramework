@@ -265,7 +265,7 @@ class WatchdogContractTests(unittest.TestCase):
             "Cmnd_Alias XFRAMEWORK_BOLT_PHASE0_ROOT = "
             "/usr/local/sbin/xframework-bolt-phase0-root verify-bootstrap, "
             "/usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog, "
-            "/usr/local/sbin/xframework-bolt-phase0-root prepare-run, "
+            "/usr/local/sbin/xframework-bolt-phase0-root prepare-bound-run, "
             "/usr/local/sbin/xframework-bolt-phase0-root activate"
         )
 
@@ -284,8 +284,9 @@ class WatchdogContractTests(unittest.TestCase):
             ["github-runner ALL=(root) NOPASSWD: XFRAMEWORK_BOLT_PHASE0_ROOT"],
             authorizations,
         )
-        self.assertNotIn("prepare-run *", bootstrap)
+        self.assertNotIn("prepare-bound-run *", bootstrap)
         self.assertNotIn("activate *", bootstrap)
+        self.assertNotIn("abandon-bound-run", bootstrap)
 
         parser_commands = {
             node.args[0].value
@@ -299,7 +300,13 @@ class WatchdogContractTests(unittest.TestCase):
         }
         self.assertEqual(
             parser_commands,
-            {"verify-bootstrap", "ensure-watchdog", "prepare-run", "activate"},
+            {
+                "verify-bootstrap",
+                "ensure-watchdog",
+                "prepare-bound-run",
+                "abandon-bound-run",
+                "activate",
+            },
         )
 
     @unittest.skipUnless(
@@ -391,7 +398,7 @@ class WatchdogContractTests(unittest.TestCase):
             for command, payload in (
                 ("verify-bootstrap", b""),
                 ("ensure-watchdog", b""),
-                ("prepare-run", b'{"run_attempt":"1","run_id":"1"}\n'),
+                ("prepare-bound-run", b'{"run_attempt":"1","run_id":"1"}\n'),
                 ("activate", b'{"expected_commit":"a","project_name":"x"}\n'),
             ):
                 result = subprocess.run(
@@ -404,7 +411,8 @@ class WatchdogContractTests(unittest.TestCase):
                 self.assertEqual(payload, result.stdout)
             for arguments in (
                 (),
-                ("prepare-run", "unexpected"),
+                ("prepare-bound-run", "unexpected"),
+                ("abandon-bound-run",),
                 ("activate", "unexpected"),
                 ("future-command",),
             ):
@@ -457,6 +465,8 @@ class WatchdogContractTests(unittest.TestCase):
         ):
             self.assertIn(required, content)
         for required in (
+            "#!/usr/bin/bash",
+            "PATH=/usr/sbin:/usr/bin:/sbin:/bin",
             "systemctl daemon-reload",
             "systemctl enable --now xframework-bolt-phase0-watchdog.timer",
             'source_root="${1:-}"',
@@ -484,6 +494,15 @@ class WatchdogContractTests(unittest.TestCase):
             "os.fchmod(env_fd, 0o600)",
             'os.stat("xeon-dev.env", dir_fd=parent_fd, follow_symlinks=False)',
             'lease_lock="$libexec_root/deployment-lease.lock"',
+            'deployment_lease="$deploy_root/phase0-watchdog/deployment-lease.json"',
+            'lkg_pointer="$deploy_root/phase0-last-known-good/current"',
+            'source_binding_marker=bootstrap-source-binding.json',
+            'exec {bootstrap_lock_fd}< "$lease_lock"',
+            '/usr/bin/flock --exclusive --timeout 30 "$bootstrap_lock_fd"',
+            'for active_state in "$deployment_lease" "$lkg_pointer"',
+            '/usr/bin/python3 - "$deploy_root/runs" "$source_binding_marker" "$deployment_user"',
+            'fail("Phase 0 bootstrap requires no prepared source-binding marker")',
+            "/usr/bin/flock --unlock \"$bootstrap_lock_fd\"",
             '/usr/bin/python3 - "$lease_lock" "$deployment_group"',
             "os.O_WRONLY",
             "os.O_CREAT",
@@ -500,6 +519,65 @@ class WatchdogContractTests(unittest.TestCase):
         self.assertIn("0o1770", content)
         self.assertIn("protected_parent.st_gid != self.deployment_gid", content)
         self.assertNotIn("systemctl cat", content + bootstrap)
+        lock_acquired = bootstrap.index(
+            '/usr/bin/flock --exclusive --timeout 30 "$bootstrap_lock_fd"'
+        )
+        state_checked = bootstrap.index(
+            'for active_state in "$deployment_lease" "$lkg_pointer"'
+        )
+        marker_checked = bootstrap.index(
+            '/usr/bin/python3 - "$deploy_root/runs" "$source_binding_marker" "$deployment_user"'
+        )
+        fixed_copy = bootstrap.index('/usr/bin/python3 - "$source_root" <<\'PY\'')
+        units_enabled = bootstrap.index(
+            "systemctl enable --now xframework-bolt-phase0-watchdog.timer"
+        )
+        lock_released = bootstrap.index(
+            '/usr/bin/flock --unlock "$bootstrap_lock_fd"'
+        )
+        self_validation = bootstrap.index('"$root_helper" verify-bootstrap')
+        self.assertLess(lock_acquired, state_checked)
+        self.assertLess(state_checked, marker_checked)
+        self.assertLess(marker_checked, fixed_copy)
+        self.assertLess(fixed_copy, units_enabled)
+        self.assertLess(units_enabled, lock_released)
+        self.assertLess(lock_released, self_validation)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX bootstrap marker scan")
+    def test_bootstrap_rejects_prepared_source_binding_marker(self) -> None:
+        assert pwd is not None
+        scanner = self._bootstrap_python_body(
+            r'/usr/bin/python3 - "\$deploy_root/runs" "\$source_binding_marker" "\$deployment_user" <<\'PY\''
+        )
+        temporary_parent = Path("/root") if os.geteuid() == 0 else Path.home()
+        with tempfile.TemporaryDirectory(
+            prefix="phase0-bootstrap-marker-", dir=temporary_parent
+        ) as temporary:
+            run_root = Path(temporary) / "runs"
+            run_root.mkdir(mode=0o700)
+            run = run_root / "123-1"
+            run.mkdir(mode=0o700)
+            user = pwd.getpwuid(os.getuid()).pw_name
+            command = [
+                sys.executable,
+                "-c",
+                scanner,
+                str(run_root),
+                "bootstrap-source-binding.json",
+                user,
+            ]
+            accepted = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(0, accepted.returncode, accepted.stderr)
+
+            (run / "bootstrap-source-binding.json").write_text(
+                "{}\n", encoding="ascii"
+            )
+            rejected = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn(
+                "Phase 0 bootstrap requires no prepared source-binding marker",
+                rejected.stderr,
+            )
 
     @unittest.skipUnless(
         sys.platform.startswith("linux") and hasattr(os, "geteuid") and os.geteuid() == 0,
@@ -838,11 +916,14 @@ class WatchdogContractTests(unittest.TestCase):
 
     def test_prequalification_preserves_installed_launcher_and_units(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
+        helper = ROOT_HELPER.read_text(encoding="utf-8")
         verify = content.index("- name: Verify sealed watchdog bootstrap prerequisite")
+        prepare_bound_run = content.index("prepare-bound-run", verify)
         arm = content.index("- name: Arm external deployment watchdog")
         activate = content.index("- name: Quarantine, root-qualify, seal, and activate recovery bundle")
         disarm = content.index("- name: Disarm external deployment watchdog after activation")
         self.assertLess(verify, arm)
+        self.assertLess(prepare_bound_run, arm)
         self.assertLess(arm, activate)
         self.assertLess(activate, disarm)
         self.assertNotIn("install -o root", content)
@@ -851,6 +932,32 @@ class WatchdogContractTests(unittest.TestCase):
             "REMOTE_LEASE_MANAGER: /usr/local/libexec/xframework-bolt-phase0/manage-bolt-phase0-deployment-lease.py",
             content,
         )
+        for required in (
+            '"lease_manager_sha256": Path("scripts/manage-bolt-phase0-deployment-lease.py")',
+            '"qualifier_sha256": Path("scripts/verify-bolt-phase0-qualification.py")',
+            '"root_helper_sha256": Path("scripts/manage-bolt-phase0-root.py")',
+            '"service_fragment_sha256": Path("deploy/systemd/xframework-bolt-phase0-watchdog.service")',
+            '"timer_fragment_sha256": Path("deploy/systemd/xframework-bolt-phase0-watchdog.timer")',
+            '"watchdog_sha256": Path("scripts/run-bolt-phase0-watchdog.sh")',
+            'evidence.get("source_binding") != "passed"',
+        ):
+            self.assertIn(required, content)
+        prepare_method = helper[
+            helper.index("    def prepare_bound_run(") : helper.index(
+                "    def _copy_quarantined("
+            )
+        ]
+        lock = prepare_method.index("with exclusive_lease_lock(")
+        binding = prepare_method.index(
+            "self.verify_source_binding(expected, lease_lock_held=True)"
+        )
+        creation = prepare_method.index("os.mkdir(target, 0o700)")
+        self.assertLess(lock, binding)
+        self.assertLess(binding, creation)
+        marker = prepare_method.index("target / SOURCE_BINDING_MARKER")
+        self.assertLess(creation, marker)
+        arm_step = content[arm:activate]
+        self.assertIn("--require-bootstrap-source-binding", arm_step)
 
     def test_proxy_mode_is_preflighted_after_direct_publication_and_root_bound(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -1361,7 +1468,7 @@ class WatchdogContractTests(unittest.TestCase):
     def test_rotation_bootstrap_mutation_occurs_only_after_prepare_and_lease_arm(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         prepare_run = workflow.index(
-            '"$DEPLOY_HOST" "sudo -n \'$REMOTE_ROOT_HELPER\' prepare-run"'
+            '"sudo -n \'$REMOTE_ROOT_HELPER\' prepare-bound-run"'
         )
         validation = workflow.index("- name: Validate credential bootstrap inputs without mutation")
         arm = workflow.index("- name: Arm external deployment watchdog")
@@ -1391,10 +1498,10 @@ class WatchdogContractTests(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         helper = ROOT_HELPER.read_text(encoding="utf-8")
 
-        self.assertNotIn("prepare-run '$GITHUB_RUN_ID'", workflow)
+        self.assertNotIn("prepare-bound-run '$GITHUB_RUN_ID'", workflow)
         self.assertNotIn("activate '$GITHUB_RUN_ID'", workflow)
         self.assertIn(
-            '"$DEPLOY_HOST" "sudo -n \'$REMOTE_ROOT_HELPER\' prepare-run"',
+            '"sudo -n \'$REMOTE_ROOT_HELPER\' prepare-bound-run"',
             workflow,
         )
         self.assertIn(
@@ -1414,7 +1521,11 @@ class WatchdogContractTests(unittest.TestCase):
         ):
             self.assertIn(required, workflow)
         self.assertNotIn("root-activation-evidence.json.tmp", workflow)
-        self.assertGreaterEqual(workflow.count("printf '%s\\n' \"$request\" | ssh"), 2)
+        self.assertEqual(
+            1,
+            workflow.count("printf '%s\\n' \"$source_binding_request\" | ssh"),
+        )
+        self.assertEqual(1, workflow.count("printf '%s\\n' \"$request\" | ssh"))
         for required in (
             "ROOT_REQUEST_MAX_BYTES = 2048",
             "ROOT_REQUEST_TIMEOUT_SECONDS = 5.0",
@@ -1422,7 +1533,7 @@ class WatchdogContractTests(unittest.TestCase):
             "object_pairs_hook=exact_object",
             'separators=(",", ":")',
             "sort_keys=True",
-            'request = read_root_request({"run_id", "run_attempt"})',
+            '{"run_id", "run_attempt", *SOURCE_BINDING_FIELDS}',
         ):
             self.assertIn(required, helper)
 
@@ -1436,7 +1547,7 @@ class WatchdogContractTests(unittest.TestCase):
     def test_workflow_sudo_is_limited_to_fixed_root_helper_and_failure_ssh_is_pinned(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
         sudo_lines = [line.strip() for line in content.splitlines() if "sudo -n" in line]
-        self.assertEqual(5, len(sudo_lines))
+        self.assertEqual(4, len(sudo_lines))
         self.assertTrue(
             all(
                 "$REMOTE_ROOT_HELPER" in line
@@ -1464,6 +1575,8 @@ class WatchdogContractTests(unittest.TestCase):
             self.assertIn(required, workflow)
         for required in (
             "lease_heartbeat_loop &",
+            "REMOTE_ENV_PARSER",
+            '"$XFRAMEWORK_ENV_FILE" "$REMOTE_ENV_PARSER" "$REMOTE_RUN_DIR"',
             'kill -TERM "$synthetic_parent_pid"',
             'if [ -e "$heartbeat_failed" ] || ! kill -0 "$heartbeat_pid"',
             '"synthetic-$STAGE"',
@@ -1476,6 +1589,7 @@ class WatchdogContractTests(unittest.TestCase):
             "/usr/bin/timeout --signal=TERM --kill-after=5s 300s",
         ):
             self.assertIn(required, synthetic)
+        self.assertNotIn("REMOTE_DEPLOY_DIR", synthetic)
         self.assertLess(synthetic.index("lease_heartbeat_loop &"), synthetic.index("lock_file="))
 
     def test_every_long_readiness_stage_has_a_fail_closed_heartbeat_supervisor(self) -> None:

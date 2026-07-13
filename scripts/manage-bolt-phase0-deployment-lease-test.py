@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
+import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -273,6 +276,17 @@ class LeaseFixture(unittest.TestCase):
             self.lock_file.chmod(0o440)
         self.owner_uid = os.getuid() if hasattr(os, "getuid") else 0
         self.owner_gid = os.getgid() if hasattr(os, "getgid") else 0
+        self.source_component_root = secure_directory(self.root / "source-components")
+        source_components: list[tuple[str, Path, int]] = []
+        for field, _, mode in MODULE.SOURCE_BINDING_COMPONENTS:
+            component = secure_file(
+                self.source_component_root / field,
+                f"{field}-installed\n",
+            )
+            if os.name != "nt":
+                component.chmod(mode)
+            source_components.append((field, component, mode))
+        self.source_components = tuple(source_components)
         self.lkg_parent = secure_directory(self.root / "last-known-good")
         self.run_id = "123456789"
         self.run_attempt = 2
@@ -311,6 +325,11 @@ class LeaseFixture(unittest.TestCase):
             lock_owner_uid=self.owner_uid,
             lock_owner_gid=self.owner_gid,
             lock_parent_uid=self.owner_uid,
+            source_binding_owner_uid=self.owner_uid,
+            source_binding_owner_gid=self.owner_gid,
+            source_binding_component_owner_uid=self.owner_uid,
+            source_binding_component_owner_gid=self.owner_gid,
+            source_binding_components=self.source_components,
         )
         self.runner = FakeRunner(self)
         self.controller = MODULE.DeploymentLeaseController(
@@ -342,6 +361,25 @@ class LeaseFixture(unittest.TestCase):
                 "hub-deployed",
                 True,
             )
+
+    def write_source_binding_marker(self, document: dict[str, Any] | None = None) -> Path:
+        marker = self.run_directory / MODULE.SOURCE_BINDING_MARKER
+        payload = document or {
+            "schema": MODULE.SOURCE_BINDING_SCHEMA,
+            "run_id": self.run_id,
+            "run_attempt": self.run_attempt,
+            "source_binding": {
+                field: "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+                for field, path, _ in self.source_components
+            },
+        }
+        marker = secure_file(
+            marker,
+            json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+        )
+        if os.name != "nt":
+            marker.chmod(0o440)
+        return marker
 
     def make_stale(self) -> None:
         self.current_time += dt.timedelta(seconds=61)
@@ -434,6 +472,51 @@ class LeaseFixture(unittest.TestCase):
 
 
 class LifecycleTests(LeaseFixture):
+    def test_source_binding_policy_rejects_unbound_arm_and_lease_state(self) -> None:
+        config = dataclasses.replace(
+            self.config,
+            require_source_binding_on_arm=True,
+        )
+        controller = MODULE.DeploymentLeaseController(
+            config,
+            runner=self.runner,
+            clock=lambda: self.current_time,
+        )
+
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "bootstrap-source-binding-required"
+        ):
+            controller.arm(self.run_id, self.run_attempt, "preflight", 60)
+        self.assertFalse(config.lease_file.exists())
+
+        self.write_source_binding_marker()
+        controller.arm(self.run_id, self.run_attempt, "preflight", 60, True)
+        document = json.loads(config.lease_file.read_text(encoding="utf-8"))
+        self.assertEqual(MODULE.LEASE_SCHEMA, document["schema"])
+        self.assertIs(True, document["bootstrap_source_bound"])
+
+        document["bootstrap_source_bound"] = False
+        MODULE.atomic_write_json(config.lease_file, document, self.owner_uid)
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-source-binding-state"
+        ):
+            controller.require_fresh()
+
+    def test_current_manager_rejects_legacy_lease_schema(self) -> None:
+        self.arm()
+        document = json.loads(self.config.lease_file.read_text(encoding="utf-8"))
+        self.assertIs(False, document["bootstrap_source_bound"])
+        document["schema"] = "xframework.bolt.phase0.deployment-lease.v1"
+        document.pop("bootstrap_source_bound")
+        MODULE.atomic_write_json(
+            self.config.lease_file,
+            document,
+            self.owner_uid,
+        )
+
+        with self.assertRaisesRegex(MODULE.ControllerError, "invalid-lease-schema"):
+            self.controller.require_fresh()
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux flock identity contract")
     def test_lock_replacement_after_flock_fails_closed(self) -> None:
         import fcntl
@@ -539,6 +622,370 @@ class LifecycleTests(LeaseFixture):
             self.assertEqual(self.config.lock_owner_uid, metadata.st_uid)
             self.assertEqual(self.owner_gid, metadata.st_gid)
             self.assertEqual(0o440, stat.S_IMODE(metadata.st_mode))
+
+    def test_source_bound_arm_persists_lease_before_consuming_marker(self) -> None:
+        marker = self.write_source_binding_marker()
+        events: list[str] = []
+        original_write = MODULE.atomic_write_json
+        original_consume = MODULE.consume_bootstrap_source_binding_marker
+
+        def tracked_write(path: Path, document: dict[str, Any], deployment_uid: int) -> None:
+            if path == self.config.lease_file:
+                events.append("lease-written")
+            elif path == self.config.evidence_file:
+                events.append("evidence-written")
+            original_write(path, document, deployment_uid)
+
+        def tracked_consume(path: Path, **kwargs: Any) -> None:
+            self.assertTrue(self.config.lease_file.is_file())
+            events.append("marker-consumed")
+            original_consume(path, **kwargs)
+
+        with (
+            mock.patch.object(MODULE, "atomic_write_json", side_effect=tracked_write),
+            mock.patch.object(
+                MODULE,
+                "consume_bootstrap_source_binding_marker",
+                side_effect=tracked_consume,
+            ),
+        ):
+            evidence, exit_code = self.controller.arm(
+                self.run_id,
+                self.run_attempt,
+                "preflight",
+                60,
+                True,
+            )
+
+        self.assertEqual(0, exit_code)
+        self.assertEqual("lease-armed", evidence["reason_code"])
+        self.assertEqual(
+            ["lease-written", "marker-consumed", "evidence-written"],
+            events,
+        )
+        self.assertTrue(self.config.lease_file.is_file())
+        self.assertFalse(marker.exists())
+
+    def test_source_bound_arm_rejects_missing_or_invalid_marker_before_lease(self) -> None:
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "missing-source-binding-marker"
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+        self.assertFalse(self.config.lease_file.exists())
+
+        marker = self.write_source_binding_marker(
+            {
+                "schema": MODULE.SOURCE_BINDING_SCHEMA,
+                "run_id": "wrong-run",
+                "run_attempt": self.run_attempt,
+                "source_binding": {
+                    field: "sha256:" + "a" * 64
+                    for field in MODULE.SOURCE_BINDING_FIELDS
+                },
+            }
+        )
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-source-binding-marker"
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+        self.assertTrue(marker.exists())
+        self.assertFalse(self.config.lease_file.exists())
+
+    def test_source_binding_change_after_lease_persistence_fails_closed(self) -> None:
+        marker = self.write_source_binding_marker()
+        original_consume = MODULE.consume_bootstrap_source_binding_marker
+
+        def replace_then_consume(path: Path, **kwargs: Any) -> None:
+            content = path.read_text(encoding="utf-8")
+            path.unlink()
+            replacement = secure_file(path, content)
+            if os.name != "nt":
+                replacement.chmod(0o440)
+            original_consume(path, **kwargs)
+
+        with (
+            mock.patch.object(
+                MODULE,
+                "consume_bootstrap_source_binding_marker",
+                side_effect=replace_then_consume,
+            ),
+            self.assertRaisesRegex(
+                MODULE.ControllerError, "source-binding-marker-changed"
+            ),
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+
+        self.assertTrue(self.config.lease_file.is_file())
+        self.assertTrue(marker.is_file())
+
+    def test_restored_marker_cannot_cross_an_installed_component_update(self) -> None:
+        marker = self.write_source_binding_marker()
+        hidden = self.run_directory / "hidden-source-binding.json"
+        for field, component, mode in self.source_components:
+            with self.subTest(field=field):
+                original = component.read_bytes()
+                marker.rename(hidden)
+                if os.name != "nt":
+                    component.chmod(0o600)
+                component.write_text(f"{field}-replacement\n", encoding="ascii")
+                if os.name != "nt":
+                    component.chmod(mode)
+                hidden.rename(marker)
+
+                with self.assertRaisesRegex(
+                    MODULE.ControllerError, "source-binding-component-mismatch"
+                ):
+                    self.controller.arm(
+                        self.run_id, self.run_attempt, "preflight", 60, True
+                    )
+                if os.name != "nt":
+                    component.chmod(0o600)
+                component.write_bytes(original)
+                if os.name != "nt":
+                    component.chmod(mode)
+
+        self.assertTrue(marker.is_file())
+        self.assertFalse(self.config.lease_file.exists())
+
+    @unittest.skipIf(os.name == "nt", "POSIX component metadata contract")
+    def test_source_bound_arm_rejects_component_mode_hardlink_and_symlink(self) -> None:
+        marker = self.write_source_binding_marker()
+        _, component, mode = self.source_components[0]
+
+        component.chmod(0o600)
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-source-binding-component"
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+        component.chmod(mode)
+
+        alias = component.with_name(component.name + ".hardlink")
+        os.link(component, alias)
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-source-binding-component"
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+        alias.unlink()
+
+        original = component.with_name(component.name + ".original")
+        component.rename(original)
+        component.symlink_to(original.name)
+        try:
+            with self.assertRaisesRegex(
+                MODULE.ControllerError, "invalid-source-binding-component"
+            ):
+                self.controller.arm(
+                    self.run_id, self.run_attempt, "preflight", 60, True
+                )
+        finally:
+            component.unlink()
+            original.rename(component)
+
+        self.assertTrue(marker.is_file())
+        self.assertFalse(self.config.lease_file.exists())
+
+    @unittest.skipIf(os.name == "nt", "POSIX pathname identity contract")
+    def test_component_replacement_during_digest_fails_closed(self) -> None:
+        _, component, mode = self.source_components[0]
+        original_bytes = component.read_bytes()
+        original_inode = component.stat().st_ino
+        hidden = component.with_name(component.name + ".opened")
+        real_read = os.read
+        replaced = False
+
+        def replace_after_read(descriptor: int, count: int) -> bytes:
+            nonlocal replaced
+            chunk = real_read(descriptor, count)
+            if not replaced and os.fstat(descriptor).st_ino == original_inode:
+                component.rename(hidden)
+                replacement = secure_file(
+                    component,
+                    original_bytes.decode("utf-8"),
+                )
+                replacement.chmod(mode)
+                replaced = True
+            return chunk
+
+        try:
+            with (
+                mock.patch.object(MODULE.os, "read", side_effect=replace_after_read),
+                self.assertRaisesRegex(
+                    MODULE.ControllerError, "source-binding-component-changed"
+                ),
+            ):
+                MODULE.digest_installed_source_binding_component(
+                    component,
+                    owner_uid=self.owner_uid,
+                    owner_gid=self.owner_gid,
+                    mode=mode,
+                )
+        finally:
+            if replaced:
+                component.unlink()
+                hidden.rename(component)
+
+        self.assertTrue(replaced)
+
+    @unittest.skipIf(os.name == "nt", "POSIX marker mode contract")
+    def test_source_bound_arm_rejects_wrong_mode_and_hardlink(self) -> None:
+        marker = self.write_source_binding_marker()
+        marker.chmod(0o640)
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-source-binding-marker"
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+        marker.chmod(0o440)
+        alias = self.run_directory / "binding-alias"
+        os.link(marker, alias)
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-source-binding-marker"
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+        self.assertFalse(self.config.lease_file.exists())
+
+    def test_source_bound_arm_rejects_symlink_marker(self) -> None:
+        outside = secure_file(self.root / "source-binding.json", "{}\n")
+        marker = self.run_directory / MODULE.SOURCE_BINDING_MARKER
+        try:
+            marker.symlink_to(outside)
+        except OSError as error:
+            self.skipTest(f"symlinks are unavailable: {error}")
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-source-binding-marker"
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+        self.assertFalse(self.config.lease_file.exists())
+
+    @unittest.skipUnless(
+        os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() == 0,
+        "requires root to create a wrong-owner marker",
+    )
+    def test_source_bound_arm_rejects_wrong_owner(self) -> None:
+        marker = self.write_source_binding_marker()
+        wrong_uid = 65534 if self.owner_uid != 65534 else 65533
+        os.chown(marker, wrong_uid, self.owner_gid)
+        with self.assertRaisesRegex(
+            MODULE.ControllerError, "invalid-source-binding-marker"
+        ):
+            self.controller.arm(
+                self.run_id, self.run_attempt, "preflight", 60, True
+            )
+        self.assertFalse(self.config.lease_file.exists())
+
+    @unittest.skipUnless(
+        os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() == 0,
+        "requires root to exercise the deployment-user marker read",
+    )
+    def test_deployment_user_reads_root_owned_group_marker(self) -> None:
+        assert pwd is not None
+        runuser = shutil.which("runuser")
+        if runuser is None:
+            self.skipTest("runuser is unavailable")
+        identity = pwd.getpwnam("nobody")
+        with tempfile.TemporaryDirectory(
+            prefix="bolt-phase0-marker-reader-", dir="/home"
+        ) as temporary:
+            root = Path(temporary)
+            root.chmod(0o755)
+            run_root = secure_directory(root / "runs")
+            run_root.chmod(0o755)
+            state_root = secure_directory(root / "state")
+            os.chown(state_root, identity.pw_uid, identity.pw_gid)
+            run = secure_directory(run_root / "123456789-1")
+            os.chown(run, identity.pw_uid, identity.pw_gid)
+            marker = run / MODULE.SOURCE_BINDING_MARKER
+            payload = {
+                "schema": MODULE.SOURCE_BINDING_SCHEMA,
+                "run_id": "123456789",
+                "run_attempt": 1,
+                "source_binding": {
+                    field: "sha256:" + "a" * 64
+                    for field in MODULE.SOURCE_BINDING_FIELDS
+                },
+            }
+            marker.write_text(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="ascii",
+            )
+            os.chown(marker, 0, identity.pw_gid)
+            marker.chmod(0o440)
+            module_copy = root / "manage-bolt-phase0-deployment-lease.py"
+            shutil.copyfile(SCRIPT, module_copy)
+            module_copy.chmod(0o555)
+            probe = root / "probe.py"
+            probe.write_text(
+                """import importlib.util
+import sys
+from pathlib import Path
+
+module_path, marker_path, state_root, run_root, deployment_uid, expected_gid = sys.argv[1:]
+spec = importlib.util.spec_from_file_location("phase0_marker_probe", module_path)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+marker = Path(marker_path)
+hidden = marker.with_name("hidden-source-binding.json")
+marker.rename(hidden)
+hidden.rename(marker)
+config = module.ControllerConfig(
+    state_root=Path(state_root),
+    run_root=Path(run_root),
+    project_name="xframework",
+    deployment_uid=int(deployment_uid),
+)
+controller = module.DeploymentLeaseController(config)
+owner_gid = controller._source_binding_gid()
+if owner_gid != int(expected_gid):
+    raise SystemExit("derived deployment group mismatch")
+module.read_bootstrap_source_binding_marker(
+    marker,
+    deployment_uid=int(deployment_uid),
+    owner_uid=0,
+    owner_gid=int(owner_gid),
+    run_id="123456789",
+    run_attempt=1,
+)
+""",
+                encoding="ascii",
+            )
+            probe.chmod(0o555)
+
+            result = subprocess.run(
+                [
+                    runuser,
+                    "-u",
+                    identity.pw_name,
+                    "--",
+                    sys.executable,
+                    str(probe),
+                    str(module_copy),
+                    str(marker),
+                    str(state_root),
+                    str(run_root),
+                    str(identity.pw_uid),
+                    str(identity.pw_gid),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
 
     def test_process_supervision_uses_ready_subreaper_launcher(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")

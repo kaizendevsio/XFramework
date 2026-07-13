@@ -25,12 +25,29 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Sequence
 
 
-LEASE_SCHEMA = "xframework.bolt.phase0.deployment-lease.v1"
+LEASE_SCHEMA = "xframework.bolt.phase0.deployment-lease.v2"
 EVIDENCE_SCHEMA = "xframework.bolt.phase0.deployment-recovery.v1"
 RECOVERY_GATE_SCHEMA = "xframework.bolt.phase0.recovery-gate.v1"
 RUNTIME_SCHEMA = "xframework.bolt.phase0.runtime.v2"
 ROTATION_STATE_SCHEMA = "xframework.bolt.phase0.rotation-state.v1"
 ROTATION_CURRENT_ONLY_SCHEMA = "xframework.bolt.phase0.rotation-current-only.v1"
+SOURCE_BINDING_SCHEMA = "xframework.bolt.phase0.bootstrap-source-binding.v1"
+SOURCE_BINDING_MARKER = "bootstrap-source-binding.json"
+SOURCE_BINDING_FIELDS = frozenset(
+    {
+        "root_helper_sha256",
+        "watchdog_sha256",
+        "lease_manager_sha256",
+        "qualifier_sha256",
+        "service_fragment_sha256",
+        "timer_fragment_sha256",
+    }
+)
+SOURCE_BINDING_KEYS = frozenset(
+    {"schema", "run_id", "run_attempt", "source_binding"}
+)
+SOURCE_BINDING_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+MAX_SOURCE_BINDING_BYTES = 4096
 
 DEPLOYMENT_ROOT = Path("/home/github-runner/xframework-deploy")
 APPROVED_RUN_ROOT = DEPLOYMENT_ROOT / "runs"
@@ -38,6 +55,30 @@ APPROVED_STATE_ROOT = DEPLOYMENT_ROOT / "phase0-watchdog"
 APPROVED_LKG_POINTER = DEPLOYMENT_ROOT / "phase0-last-known-good" / "current"
 APPROVED_LEASE_LOCK = Path(
     "/usr/local/libexec/xframework-bolt-phase0/deployment-lease.lock"
+)
+SOURCE_BINDING_COMPONENTS = (
+    ("root_helper_sha256", Path("/usr/local/sbin/xframework-bolt-phase0-root"), 0o555),
+    ("watchdog_sha256", Path("/usr/local/sbin/xframework-bolt-phase0-watchdog"), 0o555),
+    (
+        "lease_manager_sha256",
+        Path("/usr/local/libexec/xframework-bolt-phase0/manage-bolt-phase0-deployment-lease.py"),
+        0o555,
+    ),
+    (
+        "qualifier_sha256",
+        Path("/usr/local/libexec/xframework-bolt-phase0/verify-bolt-phase0-qualification.py"),
+        0o444,
+    ),
+    (
+        "service_fragment_sha256",
+        Path("/etc/systemd/system/xframework-bolt-phase0-watchdog.service"),
+        0o644,
+    ),
+    (
+        "timer_fragment_sha256",
+        Path("/etc/systemd/system/xframework-bolt-phase0-watchdog.timer"),
+        0o644,
+    ),
 )
 
 PHASE0_SERVICES = (
@@ -69,6 +110,7 @@ LEASE_KEYS = {
     "heartbeat_utc",
     "stale_timeout_seconds",
     "mutation_began",
+    "bootstrap_source_bound",
 }
 GATE_KEYS = {
     "schema",
@@ -144,6 +186,12 @@ class ControllerConfig:
     lock_owner_uid: int = 0
     lock_owner_gid: int | None = None
     lock_parent_uid: int = 0
+    source_binding_owner_uid: int = 0
+    source_binding_owner_gid: int | None = None
+    source_binding_component_owner_uid: int = 0
+    source_binding_component_owner_gid: int = 0
+    source_binding_components: tuple[tuple[str, Path, int], ...] = SOURCE_BINDING_COMPONENTS
+    require_source_binding_on_arm: bool = False
 
     @property
     def lease_file(self) -> Path:
@@ -183,6 +231,7 @@ class Lease:
     heartbeat: dt.datetime
     stale_timeout_seconds: int
     mutation_began: bool
+    bootstrap_source_bound: bool
 
     def document(self) -> dict[str, Any]:
         return {
@@ -195,7 +244,14 @@ class Lease:
             "heartbeat_utc": format_utc(self.heartbeat),
             "stale_timeout_seconds": self.stale_timeout_seconds,
             "mutation_began": self.mutation_began,
+            "bootstrap_source_bound": self.bootstrap_source_bound,
         }
+
+
+@dataclasses.dataclass(frozen=True)
+class SourceBindingMarker:
+    signature: tuple[int, ...]
+    digests: dict[str, str]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -369,6 +425,222 @@ def validate_file(
     if max_bytes is not None and path_stat.st_size > max_bytes:
         raise ControllerError("oversized-file")
     return path_stat
+
+
+def _source_binding_signature(metadata: os.stat_result) -> tuple[int, ...]:
+    signature = (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+    )
+    if os.name == "posix":
+        return (*signature, metadata.st_ctime_ns)
+    return signature
+
+
+def read_bootstrap_source_binding_marker(
+    path: Path,
+    *,
+    deployment_uid: int,
+    owner_uid: int,
+    owner_gid: int,
+    run_id: str,
+    run_attempt: int,
+) -> SourceBindingMarker:
+    path = _lexical_absolute(path)
+    try:
+        validate_directory(path.parent, deployment_uid)
+    except ControllerError as error:
+        raise ControllerError("invalid-source-binding-marker") from error
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_BINARY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        descriptor = os.open(path, flags)
+    except FileNotFoundError as error:
+        raise ControllerError("missing-source-binding-marker") from error
+    except OSError as error:
+        raise ControllerError("invalid-source-binding-marker") from error
+    try:
+        before = os.fstat(descriptor)
+
+        def validate_metadata(metadata: os.stat_result) -> None:
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_nlink != 1
+                or metadata.st_size <= 0
+                or metadata.st_size > MAX_SOURCE_BINDING_BYTES
+                or (
+                    os.name == "posix"
+                    and (
+                        metadata.st_uid != owner_uid
+                        or metadata.st_gid != owner_gid
+                        or stat.S_IMODE(metadata.st_mode) != 0o440
+                    )
+                )
+            ):
+                raise ControllerError("invalid-source-binding-marker")
+
+        validate_metadata(before)
+        chunks: list[bytes] = []
+        total = 0
+        while total <= MAX_SOURCE_BINDING_BYTES:
+            chunk = os.read(
+                descriptor,
+                min(4096, MAX_SOURCE_BINDING_BYTES + 1 - total),
+            )
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+        try:
+            current = path.lstat()
+        except OSError as error:
+            raise ControllerError("source-binding-marker-changed") from error
+        if (
+            len(raw) != before.st_size
+            or _source_binding_signature(after) != _source_binding_signature(before)
+            or _source_binding_signature(current) != _source_binding_signature(before)
+        ):
+            raise ControllerError("source-binding-marker-changed")
+        validate_metadata(after)
+        validate_metadata(current)
+    finally:
+        os.close(descriptor)
+
+    try:
+        document = decode_json(raw)
+    except ControllerError as error:
+        raise ControllerError("invalid-source-binding-marker") from error
+    source_binding = document.get("source_binding") if isinstance(document, dict) else None
+    if (
+        not isinstance(document, dict)
+        or set(document) != SOURCE_BINDING_KEYS
+        or document.get("schema") != SOURCE_BINDING_SCHEMA
+        or document.get("run_id") != run_id
+        or document.get("run_attempt") != run_attempt
+        or not isinstance(source_binding, dict)
+        or set(source_binding) != SOURCE_BINDING_FIELDS
+        or any(
+            not isinstance(digest, str) or not SOURCE_BINDING_DIGEST.fullmatch(digest)
+            for digest in source_binding.values()
+        )
+    ):
+        raise ControllerError("invalid-source-binding-marker")
+    return SourceBindingMarker(_source_binding_signature(before), dict(source_binding))
+
+
+def consume_bootstrap_source_binding_marker(
+    path: Path,
+    *,
+    deployment_uid: int,
+    owner_uid: int,
+    owner_gid: int,
+    run_id: str,
+    run_attempt: int,
+    expected_marker: SourceBindingMarker,
+) -> None:
+    current_marker = read_bootstrap_source_binding_marker(
+        path,
+        deployment_uid=deployment_uid,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        run_id=run_id,
+        run_attempt=run_attempt,
+    )
+    if current_marker != expected_marker:
+        raise ControllerError("source-binding-marker-changed")
+    try:
+        path.unlink()
+    except OSError as error:
+        raise ControllerError("source-binding-marker-changed") from error
+    fsync_directory(path.parent)
+    if path.exists() or path.is_symlink():
+        raise ControllerError("source-binding-marker-changed")
+
+
+def digest_installed_source_binding_component(
+    path: Path,
+    *,
+    owner_uid: int,
+    owner_gid: int,
+    mode: int,
+) -> str:
+    path = _lexical_absolute(path)
+    try:
+        validate_directory(path.parent, owner_uid)
+    except ControllerError as error:
+        raise ControllerError("invalid-source-binding-component") from error
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_BINARY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise ControllerError("invalid-source-binding-component") from error
+    try:
+        before = os.fstat(descriptor)
+
+        def validate_metadata(metadata: os.stat_result) -> None:
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_nlink != 1
+                or metadata.st_size <= 0
+                or metadata.st_size > 4 * 1024 * 1024
+                or (
+                    os.name == "posix"
+                    and (
+                        metadata.st_uid != owner_uid
+                        or metadata.st_gid != owner_gid
+                        or stat.S_IMODE(metadata.st_mode) != mode
+                    )
+                )
+            ):
+                raise ControllerError("invalid-source-binding-component")
+
+        validate_metadata(before)
+        chunks: list[bytes] = []
+        total = 0
+        maximum_bytes = 4 * 1024 * 1024
+        while total <= maximum_bytes:
+            chunk = os.read(
+                descriptor,
+                min(64 * 1024, maximum_bytes + 1 - total),
+            )
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+        try:
+            current = path.lstat()
+        except OSError as error:
+            raise ControllerError("source-binding-component-changed") from error
+        if (
+            len(raw) != before.st_size
+            or _source_binding_signature(after) != _source_binding_signature(before)
+            or _source_binding_signature(current) != _source_binding_signature(before)
+        ):
+            raise ControllerError("source-binding-component-changed")
+        validate_metadata(after)
+        validate_metadata(current)
+    finally:
+        os.close(descriptor)
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
 def validate_protected_env_file(
@@ -1163,6 +1435,23 @@ class DeploymentLeaseController:
             raise ControllerError("invalid-lock-owner")
         if self.config.lock_owner_gid is not None and self.config.lock_owner_gid < 0:
             raise ControllerError("invalid-lock-group")
+        if self.config.source_binding_owner_uid < 0 or (
+            self.config.source_binding_owner_gid is not None
+            and self.config.source_binding_owner_gid < 0
+        ):
+            raise ControllerError("invalid-source-binding-owner")
+        if (
+            self.config.source_binding_component_owner_uid < 0
+            or self.config.source_binding_component_owner_gid < 0
+            or len(self.config.source_binding_components) != len(SOURCE_BINDING_FIELDS)
+            or {field for field, _, _ in self.config.source_binding_components}
+            != SOURCE_BINDING_FIELDS
+            or any(
+                mode not in {0o444, 0o555, 0o644}
+                for _, _, mode in self.config.source_binding_components
+            )
+        ):
+            raise ControllerError("invalid-source-binding-components")
         validate_directory(self.config.state_root, self.config.deployment_uid)
         validate_directory(self.config.run_root, self.config.deployment_uid)
         if self.config.enforce_production_paths:
@@ -1174,6 +1463,12 @@ class DeploymentLeaseController:
                 or self.config.lock_file != APPROVED_LEASE_LOCK
                 or self.config.lock_owner_uid != 0
                 or self.config.lock_parent_uid != 0
+                or self.config.source_binding_owner_uid != 0
+                or self.config.source_binding_owner_gid is not None
+                or self.config.source_binding_component_owner_uid != 0
+                or self.config.source_binding_component_owner_gid != 0
+                or self.config.source_binding_components != SOURCE_BINDING_COMPONENTS
+                or not self.config.require_source_binding_on_arm
             ):
                 raise ControllerError("unapproved-production-path")
         for target in (self.config.lease_file, self.config.evidence_file):
@@ -1205,6 +1500,24 @@ class DeploymentLeaseController:
             return pwd.getpwuid(self.config.deployment_uid).pw_gid
         except (KeyError, ImportError) as error:
             raise ControllerError("invalid-deployment-identity") from error
+
+    def _source_binding_gid(self) -> int:
+        return (
+            self.config.source_binding_owner_gid
+            if self.config.source_binding_owner_gid is not None
+            else self._deployment_gid()
+        )
+
+    def _verify_installed_source_binding(self, expected: dict[str, str]) -> None:
+        for field, path, mode in self.config.source_binding_components:
+            actual = digest_installed_source_binding_component(
+                path,
+                owner_uid=self.config.source_binding_component_owner_uid,
+                owner_gid=self.config.source_binding_component_owner_gid,
+                mode=mode,
+            )
+            if not secrets.compare_digest(actual, expected[field]):
+                raise ControllerError("source-binding-component-mismatch")
 
     @contextlib.contextmanager
     def _lease_lock(self) -> Iterator[None]:
@@ -1378,6 +1691,7 @@ class DeploymentLeaseController:
         phase = document["phase"]
         stale_timeout = document["stale_timeout_seconds"]
         mutation_began = document["mutation_began"]
+        bootstrap_source_bound = document["bootstrap_source_bound"]
         if not isinstance(run_id, str) or isinstance(run_attempt, bool) or not isinstance(run_attempt, int):
             raise ControllerError("invalid-run-identity")
         self._validate_run_identity(run_id, run_attempt)
@@ -1392,6 +1706,10 @@ class DeploymentLeaseController:
             raise ControllerError("invalid-stale-timeout")
         if not isinstance(mutation_began, bool):
             raise ControllerError("invalid-mutation-state")
+        if not isinstance(bootstrap_source_bound, bool) or (
+            self.config.require_source_binding_on_arm and not bootstrap_source_bound
+        ):
+            raise ControllerError("invalid-source-binding-state")
         if document["project_name"] != self.config.project_name:
             raise ControllerError("lease-project-mismatch")
         expected_directory = self._expected_run_directory(run_id, run_attempt)
@@ -1412,6 +1730,7 @@ class DeploymentLeaseController:
             heartbeat=parse_utc(document["heartbeat_utc"]),
             stale_timeout_seconds=stale_timeout,
             mutation_began=mutation_began,
+            bootstrap_source_bound=bootstrap_source_bound,
         )
 
     def _is_stale(self, lease: Lease, now: dt.datetime) -> bool:
@@ -1468,14 +1787,29 @@ class DeploymentLeaseController:
         run_attempt: int,
         phase: str,
         stale_timeout_seconds: int,
+        require_bootstrap_source_binding: bool = False,
     ) -> tuple[dict[str, Any], int]:
         self._validate_run_identity(run_id, run_attempt)
         self._validate_phase(phase)
         if not MIN_STALE_SECONDS <= stale_timeout_seconds <= MAX_STALE_SECONDS:
             raise ControllerError("invalid-stale-timeout")
+        if self.config.require_source_binding_on_arm and not require_bootstrap_source_binding:
+            raise ControllerError("bootstrap-source-binding-required")
         run_directory = self._expected_run_directory(run_id, run_attempt)
         validate_directory(run_directory, self.config.deployment_uid)
         with self._lease_lock():
+            source_binding_marker = run_directory / SOURCE_BINDING_MARKER
+            bound_source = None
+            if require_bootstrap_source_binding:
+                bound_source = read_bootstrap_source_binding_marker(
+                    source_binding_marker,
+                    deployment_uid=self.config.deployment_uid,
+                    owner_uid=self.config.source_binding_owner_uid,
+                    owner_gid=self._source_binding_gid(),
+                    run_id=run_id,
+                    run_attempt=run_attempt,
+                )
+                self._verify_installed_source_binding(bound_source.digests)
             now = self._now()
             current = self._read_lease()
             lease = Lease(
@@ -1487,6 +1821,7 @@ class DeploymentLeaseController:
                 now,
                 stale_timeout_seconds,
                 False,
+                bound_source is not None,
             )
             if current is not None:
                 if (
@@ -1500,6 +1835,16 @@ class DeploymentLeaseController:
                     raise ControllerError("stale-lease-requires-reconcile")
             secure_unlink(self.config.evidence_file, self.config.deployment_uid)
             atomic_write_json(self.config.lease_file, lease.document(), self.config.deployment_uid)
+            if bound_source is not None:
+                consume_bootstrap_source_binding_marker(
+                    source_binding_marker,
+                    deployment_uid=self.config.deployment_uid,
+                    owner_uid=self.config.source_binding_owner_uid,
+                    owner_gid=self._source_binding_gid(),
+                    run_id=run_id,
+                    run_attempt=run_attempt,
+                    expected_marker=bound_source,
+                )
             evidence = self._evidence(
                 now=now,
                 action="armed",
@@ -2592,6 +2937,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     arm.add_argument("--run-attempt", required=True, type=int)
     arm.add_argument("--phase", required=True)
     arm.add_argument("--stale-timeout-seconds", required=True, type=int)
+    arm.add_argument(
+        "--require-bootstrap-source-binding",
+        action="store_true",
+        required=True,
+    )
 
     heartbeat = subparsers.add_parser("heartbeat")
     heartbeat.add_argument("--run-id", required=True)
@@ -2661,6 +3011,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         deployment_uid=args.deployment_uid,
         enforce_production_paths=True,
         lkg_pointer=APPROVED_LKG_POINTER,
+        require_source_binding_on_arm=True,
     )
     try:
         controller = DeploymentLeaseController(config)
@@ -2670,6 +3021,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.run_attempt,
                 args.phase,
                 args.stale_timeout_seconds,
+                args.require_bootstrap_source_binding,
             )
         elif args.command == "heartbeat":
             evidence, exit_code = controller.heartbeat(

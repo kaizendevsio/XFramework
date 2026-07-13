@@ -17,7 +17,7 @@ status: active
 
 ## Status
 
-Phase 0 containment and rollout corrections through PR [#364](https://github.com/kaizendevsio/XFramework/pull/364) are merged at `d0ad8050f1ed12561a82ea536c7100faca412cb4`. The corrected root bootstrap is installed on xeon-dev, its watchdog is enabled and active, and Bolt Hub remains stopped with no deployment lease or LKG pointer. Ten first-attempt workflow runs have failed closed; the latest proved the corrected deployment-host authorization boundary and reached staged Hub deployment before exposing three runtime-verifier defects. Phase 0 remains `Contained`, not `Verified`, until a complete staged run produces live authenticated WSS, rotation, rollback, qualification, and recovery evidence. Do not disable `RequireSecureTransport`, restore Audit mode, or deploy a pre-containment image to bypass this gate. Production promotion remains blocked until Phase 1 removes the shared service-signing trust boundary.
+Phase 0 containment and rollout corrections through PR [#366](https://github.com/kaizendevsio/XFramework/pull/366) are merged at `b44fe3213d2d355e3b66c3f0571af8be222e61d2`. The watchdog is enabled and active, and Bolt Hub remains stopped with no deployment lease or LKG pointer. The latest first-attempt workflow reached authenticated canary synthetics before exposing a run-scoped env-parser path defect; its stale installed recovery controller still stopped Hub but could not apply the newly merged no-LKG credential cleanup. The prepared secondary generation was subsequently removed with the exact checksum-verified run manager, and fresh validation proved current-only credential state. Phase 0 remains `Contained`, not `Verified`, until the current correction is merged, its exact bootstrap bundle is installed, and a complete staged run produces live authenticated WSS, rotation, rollback, qualification, and recovery evidence. Do not disable `RequireSecureTransport`, restore Audit mode, or deploy a pre-containment image to bypass this gate. Production promotion remains blocked until Phase 1 removes the shared service-signing trust boundary.
 
 ## Implemented Automation
 
@@ -30,53 +30,69 @@ Phase 0 containment and rollout corrections through PR [#364](https://github.com
 - The full xeon-dev workflow freezes legacy service deployment and enforces Hub-only promotion, IdentityServer/Communications canary, authenticated synthetics, observation, bounded batches, credential finalization, rollback drill, qualification, and immediate fail-closed recovery.
 - Recovery tools, manifests, pins, TLS evidence, launcher, and systemd fragments are digest-bound into a root-owned LKG bundle. A stable operator-installed launcher and root activation helper are never overwritten by the workflow; failure recovery bypasses lease freshness and restores immediately or stops Hub.
 - Every synthetic stage starts a supervised 30-second heartbeat against the fixed root-owned lease manager before acquiring its evidence lock. A failed or unexpectedly terminated heartbeat makes the synthetic fail and signals its parent, keeping the 600-second first-rollout lease fresh through the longest bounded synthetic execution.
+- `prepare-bound-run` submits SHA-256 bindings for the exact checked-out root helper, recovery controller, watchdog, qualifier, and systemd units together with the run identity. The helper holds the installation/deployment lock while it validates path identity and metadata, checks every digest twice, creates the bound run directory, and fsyncs a root-owned source-binding marker. Bootstrap rejects any such marker. Lease arm validates the marker and independently reopens, metadata-checks, and rehashes all six currently installed components under the same lock before it durably writes the lease, then removes and fsyncs the marker. Temporarily renaming and replaying a marker across bootstrap therefore fails on installed-byte mismatch, and the transition never exposes an authorized bootstrap gap. A missing command, malformed request, installed-byte mismatch, invalid marker, or concurrent operator bootstrap fails before credential or service mutation; only the operator bootstrap can update those files.
 - The watchdog timer remains enabled and active throughout candidate quarantine, qualification, sealing, and pointer publication. The root helper uses the deployment lease lock only for the two candidate-path swaps, and the pinned failure handler invokes the fixed `ensure-watchdog` command before and after forced recovery.
 
-## One-Time Root Bootstrap
+## Root Bootstrap and Fixed-Component Updates
 
-The workflow cannot bootstrap or update its own root trust boundary, and the root bootstrap refuses an ordinary `github-runner` checkout. Before execution, an operator must copy only the reviewed bootstrap bundle into a root-only staging tree. The copy is intentionally performed before review and hashing; the operator reviews the staged bytes and records/compares their hashes afterward, when the deployment user can no longer change them.
+The workflow cannot bootstrap or update its own root trust boundary, and the root bootstrap refuses an ordinary `github-runner` checkout. Before execution, an operator must extract only the approved merge commit's Git blobs into a temporary source tree, copy that exact bundle into a root-only staging tree, and compare every staged hash back to the Git object. Repeat this procedure before the next deployment whenever any installed root helper, watchdog, lease manager, qualifier, service, or timer source changes; `prepare-bound-run` rejects an older installation. Bootstrap is allowed only with dispatch frozen, Hub stopped, and the deployment lease, LKG pointer, and every prepared source-binding marker absent. Once an LKG exists, fixed-component replacement requires a separate reviewed maintenance procedure rather than invalidating active recovery trust.
+
+**Known P2 maintenance blocker:** the post-LKG fixed-component replacement procedure is not implemented. After the first qualified LKG is published, do not remove or rename its pointer and do not bootstrap changed fixed components. A future reviewed maintenance slice must provide an outage-bound suspend/update/requalify/rollback state machine that preserves a usable old recovery bundle until a replacement LKG is qualified. This does not block the current first qualification because xeon-dev has no LKG, but it blocks every later root-helper, watchdog, lease-manager, qualifier, or unit update and remains an explicit follow-on issue.
 
 ```bash
-stage=/root/xframework-bolt-phase0-bootstrap-20260713
-sudo install -d -o root -g root -m 0700 \
+set -euo pipefail
+commit=<approved-40-character-merge-sha>
+stage="/root/xframework-bolt-phase0-bootstrap-$commit"
+source_root="$(/usr/bin/mktemp -d)"
+trap '/usr/bin/rm -rf -- "$source_root"' EXIT
+bundle=(
+  deploy/bootstrap-xframework-bolt-phase0-root.sh
+  deploy/systemd/xframework-bolt-phase0-watchdog.service
+  deploy/systemd/xframework-bolt-phase0-watchdog.timer
+  scripts/manage-bolt-phase0-root.py
+  scripts/run-bolt-phase0-watchdog.sh
+  scripts/manage-bolt-phase0-deployment-lease.py
+  scripts/verify-bolt-phase0-qualification.py
+)
+
+/usr/bin/git fetch --no-tags origin develop
+test "$(/usr/bin/git rev-parse "$commit^{commit}")" = "$commit"
+/usr/bin/git merge-base --is-ancestor "$commit" origin/develop
+/usr/bin/git archive --format=tar "$commit" -- "${bundle[@]}" \
+  | /usr/bin/tar -xf - -C "$source_root"
+
+! /usr/bin/sudo /usr/bin/test -e "$stage"
+! /usr/bin/sudo /usr/bin/test -L "$stage"
+/usr/bin/sudo /usr/bin/install -d -o root -g root -m 0700 \
   "$stage/deploy/systemd" "$stage/scripts"
+for path in "${bundle[@]}"; do
+  /usr/bin/sudo /usr/bin/cp --no-dereference -- "$source_root/$path" "$stage/$path"
+done
+/usr/bin/sudo /usr/bin/chown -R root:root "$stage"
+/usr/bin/sudo /usr/bin/find "$stage" -xdev -type d -exec /usr/bin/chmod 0700 {} +
+/usr/bin/sudo /usr/bin/find "$stage" -xdev -type f -exec /usr/bin/chmod 0400 {} +
+/usr/bin/sudo /usr/bin/chmod 0500 "$stage/deploy/bootstrap-xframework-bolt-phase0-root.sh"
+test -z "$(/usr/bin/sudo /usr/bin/find "$stage" -xdev -type l -print -quit)"
 
-sudo cp --no-dereference -- \
-  deploy/bootstrap-xframework-bolt-phase0-root.sh \
-  "$stage/deploy/bootstrap-xframework-bolt-phase0-root.sh"
-sudo cp --no-dereference -- \
-  deploy/systemd/xframework-bolt-phase0-watchdog.service \
-  deploy/systemd/xframework-bolt-phase0-watchdog.timer \
-  "$stage/deploy/systemd/"
-sudo cp --no-dereference -- \
-  scripts/manage-bolt-phase0-root.py \
-  scripts/run-bolt-phase0-watchdog.sh \
-  scripts/manage-bolt-phase0-deployment-lease.py \
-  scripts/verify-bolt-phase0-qualification.py \
-  "$stage/scripts/"
+for path in "${bundle[@]}"; do
+  expected="$(/usr/bin/git cat-file blob "$commit:$path" | /usr/bin/sha256sum | /usr/bin/awk '{print $1}')"
+  actual="$(/usr/bin/sudo /usr/bin/sha256sum "$stage/$path" | /usr/bin/awk '{print $1}')"
+  test "$actual" = "$expected"
+  printf '%s  %s\n' "$actual" "$path"
+done | /usr/bin/sudo /usr/bin/tee "$stage.reviewed.sha256"
+/usr/bin/sudo /usr/bin/chmod 0400 "$stage.reviewed.sha256"
 
-sudo chown -R root:root "$stage"
-sudo find "$stage" -xdev -type d -exec chmod 0700 {} +
-sudo find "$stage" -xdev -type f -exec chmod 0400 {} +
-sudo chmod 0500 "$stage/deploy/bootstrap-xframework-bolt-phase0-root.sh"
-test -z "$(sudo find "$stage" -xdev -type l -print -quit)"
-
-# Review these staged files and compare these post-copy hashes with the approved release.
-sudo sha256sum \
-  "$stage/deploy/bootstrap-xframework-bolt-phase0-root.sh" \
-  "$stage/deploy/systemd/xframework-bolt-phase0-watchdog.service" \
-  "$stage/deploy/systemd/xframework-bolt-phase0-watchdog.timer" \
-  "$stage/scripts/manage-bolt-phase0-root.py" \
-  "$stage/scripts/run-bolt-phase0-watchdog.sh" \
-  "$stage/scripts/manage-bolt-phase0-deployment-lease.py" \
-  "$stage/scripts/verify-bolt-phase0-qualification.py" \
-  | sudo tee "$stage.reviewed.sha256"
+! /usr/bin/sudo /usr/bin/test -e /home/github-runner/xframework-deploy/phase0-watchdog/deployment-lease.json
+! /usr/bin/sudo /usr/bin/test -L /home/github-runner/xframework-deploy/phase0-watchdog/deployment-lease.json
+! /usr/bin/sudo /usr/bin/test -e /home/github-runner/xframework-deploy/phase0-last-known-good/current
+! /usr/bin/sudo /usr/bin/test -L /home/github-runner/xframework-deploy/phase0-last-known-good/current
 
 # Stop xframework-bolt-hub, then execute only the absolute staged bootstrap.
-sudo "$stage/deploy/bootstrap-xframework-bolt-phase0-root.sh" "$stage"
+/usr/bin/sudo /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+  /usr/bin/bash "$stage/deploy/bootstrap-xframework-bolt-phase0-root.sh" "$stage"
 ```
 
-The bootstrap requires itself to be the exact absolute file under the supplied staging root. It opens every staging path component descriptor-relatively and rejects a non-root owner, group/world-writable parent, symlink, non-regular component, hard link, or any writable component. Companion bytes are copied through `O_NOFOLLOW` descriptors, read completely to EOF under a 4 MiB ceiling despite short reads or `EINTR`, checked twice for exact size, stable identity, metadata, and content, then atomically installed without following a source pathname. The bootstrap refuses to proceed while `xframework-bolt-hub` is running. A nonzero container inspection is accepted as an absent container only when a separate bounded `docker container ls -a --no-trunc --filter name=^/xframework-bolt-hub$ --format '{{.Names}}'` returns successfully with exactly no names and a bounded `docker info --format '{{.ServerVersion}}'` returns a nonempty version. A present named container, daemon, socket, permission, empty-version, malformed-state, timeout, or other inspection failure aborts bootstrap. The root helper and no-LKG watchdog branch enforce the same proof. It installs these fixed root-owned files:
+The bootstrap requires itself to be the exact absolute file under the supplied staging root. It opens every staging path component descriptor-relatively and rejects a non-root owner, group/world-writable parent, symlink, non-regular component, hard link, or any writable component. Companion bytes are copied through `O_NOFOLLOW` descriptors, read completely to EOF under a 4 MiB ceiling despite short reads or `EINTR`, checked twice for exact size, stable identity, metadata, and content, then atomically installed without following a source pathname. The bootstrap refuses to proceed while `xframework-bolt-hub` is running. A nonzero container inspection is accepted as an absent container only when a separate bounded `docker container ls -a --no-trunc --filter name=^/xframework-bolt-hub$ --format '{{.Names}}'` returns successfully with exactly no names and a bounded `docker info --format '{{.ServerVersion}}'` returns a nonempty version. A present named container, daemon, socket, permission, empty-version, malformed-state, timeout, or other inspection failure aborts bootstrap. It then takes the fixed deployment lock with a 30-second bound, rejects any lease, LKG pointer, or `bootstrap-source-binding.json` entry in a prepared run, and holds the lock until all fixed files, sudoers policy, and systemd state are installed. The lock is released immediately before final root-helper self-validation to avoid recursive acquisition; dispatch must remain frozen through that final check. The root helper and no-LKG watchdog branch enforce the same stopped-Hub proof. It installs these fixed root-owned files:
 
 ```text
 /usr/local/sbin/xframework-bolt-phase0-root                         root:root 0555
@@ -99,20 +115,56 @@ It also creates the exact state layout:
 /home/github-runner/xframework-deploy/hooks                        github-runner:github-runner 0700
 ```
 
-The fixed lease manager owns the external deployment lease and failure controller. The root helper owns candidate preparation and activation. Both open the same pre-created `root:github-runner 0440` deployment lock read-only with `O_NOFOLLOW`; its complete parent chain is root-owned and nonwritable. They verify descriptor, directory-entry, pathname, parent, and inode identity before and after `flock` and again before unlock. The deployment user cannot create, rename, unlink, or replace this lock, including while either critical section is active. Bootstrap reruns preserve its inode.
+The fixed lease manager owns the external deployment lease and failure controller. The root helper owns candidate preparation and activation. Both open the same pre-created `root:github-runner 0440` deployment lock read-only with `O_NOFOLLOW`; its complete parent chain is root-owned and nonwritable. They verify descriptor, directory-entry, pathname, parent, and inode identity before and after `flock` and again before unlock. The deployment user cannot create, rename, unlink, or replace this lock, including while either critical section is active. Bootstrap reruns preserve its inode. The protected self-hosted runner remains part of the deployment trust boundary because its account owns lease state and has Docker access; these controls fail closed for stale or mixed-version installed controllers, but they do not claim to contain a malicious runner account.
 
 The generated `/etc/sudoers.d/xframework-bolt-phase0-root` permits only these exact no-wildcard command forms:
 
 ```text
 /usr/local/sbin/xframework-bolt-phase0-root verify-bootstrap
 /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog
-/usr/local/sbin/xframework-bolt-phase0-root prepare-run
+/usr/local/sbin/xframework-bolt-phase0-root prepare-bound-run
 /usr/local/sbin/xframework-bolt-phase0-root activate
 ```
 
-sudo-rs 0.2.8 does not support wildcards in command arguments, so dynamic run IDs cannot be expressed safely in the sudoers entry. `prepare-run` and `activate` instead accept a canonical exact-schema JSON request on stdin, capped at 2 KiB with a five-second read deadline. The helper rejects malformed UTF-8, duplicate/missing/extra fields, non-string values, noncanonical encoding, trailing data, invalid identities, attempts other than `1`, unexpected commits, and projects other than `xframework`; the root boundary is initialized before this read so every malformed, oversized, or timed-out privileged request invokes the immediate Hub stop path. No interpreter, shell, file utility, or `systemctl` command is allowed through sudo. The fixed helper's non-abbreviating parser exposes exactly the four documented commands and rejects positional arguments. Privileged CI executes the generated policy behavior under both traditional sudo and the checksum-pinned sudo-rs 0.2.8 binary, proving exact positive forms, positional/unknown/bare denial, non-PTY stdin preservation, and EOF propagation. Contract tests fail if another parser command is added without a corresponding security review. With no LKG pointer, bootstrap is valid only while the Hub is verified stopped. During the first rollout, the stable watchdog permits a running Hub only while the fixed root-owned lease manager validates a fresh, schema-complete lease bound to the prepared run directory; an absent, stale, any-future-dated, malformed, wrongly owned, or incorrectly permissioned lease stops Hub. Its fail-closed path bounds stop at 40 seconds plus a 5-second kill grace, always verifies state, then bounds kill at 10 seconds plus a 5-second grace and verifies again. Even the worst inspection/list/daemon fallback path keeps this escalation below 270 seconds, well under the 4,200-second service ceiling. Every workflow lease operation uses the fixed manager, and the candidate copy must match it byte-for-byte before activation.
+sudo-rs 0.2.8 does not support wildcards in command arguments, so dynamic run IDs cannot be expressed safely in the sudoers entry. `prepare-bound-run` and `activate` instead accept canonical exact-schema JSON requests on stdin, capped at 2 KiB with a five-second read deadline. The bound-run request contains the run identity and exactly six lowercase SHA-256 digests for the checked-out bootstrap sources. The helper takes the same lock used by bootstrap and lease operations, validates every opened file against its pathname after reading, checks the complete installed bundle twice, creates the run directory, and writes a `root:<deployment-group> 0440`, single-link marker containing the exact run identity and six nonsecret digests before releasing the lock. The deployment user can read but cannot forge that marker. Production `arm` requires it and validates its schema, content, owner, group, mode, link count, size, descriptor/path identity, and stability under the same lock. It then independently opens all six installed fixed paths with `O_NOFOLLOW`, requires exact root ownership, group, mode, link count, bounded size, and stable descriptor/path identity, and compares their SHA-256 digests to the marker. Only then does it persist and fsync a v2 lease carrying `bootstrap_source_bound=true` before unlinking and fsyncing the marker directory. The current manager rejects production arm calls that omit binding, and the current watchdog and activation helper reject legacy v1 leases, missing binding state, and v2 leases marked unbound. This makes retained old-manager/current-controller combinations fail closed. A deployment user that renames the marker away for bootstrap and later restores it cannot replay it against the changed installation. A crash before lease persistence leaves the marker blocking bootstrap; a crash after persistence leaves the lease, or both states, blocking bootstrap. The helper rejects malformed UTF-8, duplicate/missing/extra fields, non-string values, noncanonical encoding, trailing data, malformed digests, invalid identities, attempts other than `1`, unexpected commits, and projects other than `xframework`; the root boundary is initialized before this read so every malformed, oversized, or timed-out privileged request invokes the immediate Hub stop path. No interpreter, shell, file utility, or `systemctl` command is allowed through sudo. The fixed helper's non-abbreviating parser exposes exactly five reviewed commands and rejects positional arguments; the generated `github-runner` sudoers policy delegates only the four deployment commands and denies operator-only `abandon-bound-run`. Privileged CI executes that policy behavior under both traditional sudo and the checksum-pinned sudo-rs 0.2.8 binary, proving exact positive forms, positional/unknown/bare/operator-command denial, non-PTY stdin preservation, and EOF propagation. Contract tests fail if another parser command is added without a corresponding security review. With no LKG pointer, bootstrap is valid only while the Hub is verified stopped. During the first rollout, the stable watchdog permits a running Hub only while the fixed root-owned lease manager validates a fresh, schema-complete lease bound to the prepared run directory; an absent, stale, any-future-dated, malformed, wrongly owned, or incorrectly permissioned lease stops Hub. Its fail-closed path bounds stop at 40 seconds plus a 5-second kill grace, always verifies state, then bounds kill at 10 seconds plus a 5-second grace and verifies again. Even the worst inspection/list/daemon fallback path keeps this escalation below 270 seconds, well under the 4,200-second service ceiling. Every workflow lease operation uses the fixed manager, and the candidate copy must match it byte-for-byte before activation.
 
-Pre-lease credential bootstrap checks use the read-only `validate-bootstrap` command. It does not create the adjacent rotation lock and accepts a missing nonsecret generation marker as a declared mutation requirement. The build controller validates the candidate Compose, pins, and provenance without claiming deployment authority. The xeon-dev deployment host repeats those checks and exclusively authorizes publication after binding every public DNS answer to its own active interfaces, before candidate image pulls. Both use an explicit validation-only generation value rather than rewriting the protected env. The actual `bootstrap` mutation runs only after root `prepare-run` and successful lease arm, through fixed-manager `supervise` with a 540-second outer deadline and a 510-second inner timeout.
+Pre-lease credential bootstrap checks use the read-only `validate-bootstrap` command. It does not create the adjacent rotation lock and accepts a missing nonsecret generation marker as a declared mutation requirement. The build controller validates the candidate Compose, pins, and provenance without claiming deployment authority. The xeon-dev deployment host repeats those checks and exclusively authorizes publication after binding every public DNS answer to its own active interfaces, before candidate image pulls. Both use an explicit validation-only generation value rather than rewriting the protected env. The actual `bootstrap` mutation runs only after root `prepare-bound-run` and marker-required lease arm, through fixed-manager `supervise` with a 540-second outer deadline and a 510-second inner timeout. If a workflow terminates after `prepare-bound-run` but before lease arm, the marker is intentionally orphaned and bootstrap remains blocked. The installed root helper provides operator-only `abandon-bound-run`; it is deliberately absent from the `github-runner` sudoers alias. Freeze dispatches, prove there is no active or queued workflow, and generate its exact request from the approved installed commit:
+
+```bash
+set -euo pipefail
+commit=<approved-40-character-merge-sha>
+run_id=<abandoned-first-attempt-run-id>
+request="$(/usr/bin/mktemp)"
+trap '/usr/bin/rm -f -- "$request"' EXIT
+/usr/bin/python3 - "$commit" "$run_id" >"$request" <<'PY'
+import hashlib
+import json
+import subprocess
+import sys
+
+commit, run_id = sys.argv[1:]
+sources = {
+    "root_helper_sha256": "scripts/manage-bolt-phase0-root.py",
+    "watchdog_sha256": "scripts/run-bolt-phase0-watchdog.sh",
+    "lease_manager_sha256": "scripts/manage-bolt-phase0-deployment-lease.py",
+    "qualifier_sha256": "scripts/verify-bolt-phase0-qualification.py",
+    "service_fragment_sha256": "deploy/systemd/xframework-bolt-phase0-watchdog.service",
+    "timer_fragment_sha256": "deploy/systemd/xframework-bolt-phase0-watchdog.timer",
+}
+request = {"run_id": run_id, "run_attempt": "1"}
+for field, path in sources.items():
+    raw = subprocess.run(
+        ["/usr/bin/git", "cat-file", "blob", f"{commit}:{path}"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    request[field] = "sha256:" + hashlib.sha256(raw).hexdigest()
+print(json.dumps(request, sort_keys=True, separators=(",", ":")))
+PY
+/usr/bin/sudo /usr/local/sbin/xframework-bolt-phase0-root abandon-bound-run <"$request"
+```
+
+The Linux-only command acquires the fixed deployment lock, rejects any lease or LKG, revalidates stopped-Hub bootstrap state and all six installed hashes, requires the exact deployment-owned run directory and root-owned group-readable marker content, then opens and temporarily changes that directory to root-only mode before revalidating and unlinking the marker. It assumes restoration responsibility before the first ownership mutation, fsyncs the directory, restores the exact deployment ownership and mode through the open descriptor on both success and failure, verifies pathname identity, and fsyncs both directory levels. The deployment account therefore cannot swap the authenticated marker during abandonment. Non-POSIX invocation fails closed. The command leaves the abandoned run and all other evidence intact. Never invoke it merely to make bootstrap proceed.
 
 During activation the helper keeps the timer active, takes the lease lock while atomically renaming the candidate into root-only quarantine and replacing it with a `github-runner:github-runner 0700` placeholder, copies regular single-link files into a second root-only tree, runs the stable qualifier, verifies every evidence digest and fixed component, and seals the result. The copy retains an opened quarantine-directory descriptor, performs entry lookup with directory-relative operations, and compares each opened source file's device, inode, type/mode, owner, link count, and size with the validated entry before creating its destination; observed directory, inventory, metadata, or content mutation aborts activation. Normal lease operations accept the exact deployment-owned candidate/placeholder state, while `disarm` additionally requires a root-owned `root:github-runner 0550` post-activation directory exactly bound by the root-owned current LKG pointer with exact root-owned `0440` qualification evidence, commit marker, and security marker. Recovery-only parsing also recognizes the bounded absent and sealed-but-not-yet-pointer-bound crash windows so it can restore the prior LKG. Marker contents, qualification evidence, every artifact after ownership/mode changes, the sealed directory, and both source/destination parents are fsynced before the second lease-locked rename. Only then is the root-owned pointer written, fsynced, atomically replaced, and its parent fsynced. The final sealed rename remains inside the same lease lock; the watchdog and subsequent `disarm` accept the pointer-bound sealed state without opening acceptance to an alternate directory. Leased runtime verification and rotation mutations execute through the fixed manager with a hard deadline and recurring heartbeats. On Linux, a fixed child launcher becomes a subreaper, reports readiness before work is accepted, owns the target's dedicated process group, reacts to control-pipe or parent death, and reaps every adopted descendant before reporting the original leader status. The parent never performs delayed signaling against a recycled numeric process-group ID. The effective timer contract is revalidated without an inactive interval. Quarantined source directories are retained for operator audit and must be removed only through a separately reviewed root maintenance procedure.
 
@@ -194,7 +246,7 @@ Phase 0 promotion accepts only `BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel`; `BOLT
 - PR #352 baseline IdentityServer unit tests: 21 passed. The current local correction passes 23/23 IdentityServer unit tests, including both generated HTTP adapter contracts; the IdentityServer integration project builds successfully, while its PostgreSQL/Testcontainers execution remains delegated to Linux CI. Full baseline Core tests: 195 passed.
 - Full Release solution build: 0 errors. Existing repository warnings remain outside this Phase 0 change.
 - `Bolt.Phase0Synthetics.Tests` passed 39 tests on Windows with one Linux-only symbolic-link test skipped. Committed Ubuntu run `29229428707` passed all 40 tests with zero skips.
-- PR #365 passed 446 tests across all 19 Phase 0 Python test files on Windows with 49 platform skips. The current recovery correction passes 464 tests across the same 19 files with the same 49 expected platform skips; the PR #352 committed privileged Ubuntu baseline passed all then-current 370 tests with zero skips. Checksum-verified actionlint v1.7.8 passes all workflow YAML files; workflow parsing, all Phase 0 Python files, and changed-line whitespace validation pass locally. A fresh privileged Ubuntu run is required for the new tests and Linux-only branches.
+- PR #365 passed 446 tests across all 19 Phase 0 Python test files on Windows with 49 platform skips. PR #366 passed 464 tests across the same 19 files with the same 49 expected platform skips. The current parser/source-binding/bootstrap correction passes 489 tests locally with 62 Windows platform skips and all 489 tests in a fresh privileged Linux replay with zero skips. That replay also passed checksum-verified actionlint v1.7.8, all 17 workflow YAML parses, all 35 Phase 0 Python compilations, six shell-file syntax checks, and the checksum-pinned sudo-rs 0.2.8 policy contract. Committed CI must reproduce those gates before merge.
 - The committed CI run built the Bolt Hub container and enforced nonzero/no-skip gates for all four .NET projects and all 19 Python suites. One positive and seven negative Linux synthetic-wrapper scenarios passed.
 - The root-sealed recovery, forced failure recovery, systemd override rejection, indexed-scope bypass, bounded exact Redis ACK, send-loop retirement, large-RPC quota cleanup, and public health redaction regressions are covered.
 - Recovery regressions also cover strict future-heartbeat rejection, transient Docker inspection failure with a present container, exact proven container absence, daemon and empty-version failure, malformed inspection output, bounded stop/kill hangs, privileged bootstrap short reads and source races, root-owned lock replacement across the complete critical section, quarantine artifact replacement between validation and open, the exact systemd env-file write allowance, uninterrupted timer activation, explicit timer re-enablement in the pinned failure path, supervised synthetic heartbeats, and fsync-before-pointer ordering. Targeted pre-final reviews informed these regressions; a formal independent review bound to the exact final tested tree remains open because PR #352 merged without a GitHub review.
@@ -225,6 +277,8 @@ Phase 0 promotion accepts only `BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel`; `BOLT
 - PR #365 merged the indexed optional-health, exact listener ownership, Docker DNS, and runtime publication correction as `736e1f945a0480c316ccc1ce944c1b40eb8d8ed4`. Its committed CI passed, including all Phase 0 suites and independent final review.
 - Fresh first-attempt workflow run `29269040262` was bound to that merge and passed authorization, SSH, Compose, protected-input, watchdog-bootstrap, and synthetic-hook gates. It then failed before image build, lease acquisition, migration, or service mutation because the complete prepared secondary credential generation from run `29266243859` remained in the protected env after no-LKG recovery had stopped Hub and deleted the lease without invoking `abort-prepared`. Recovery again proved Hub stopped, no port 7000 listener, no lease/LKG, and an active watchdog; artifact `8286639449` independently matched GitHub SHA-256 `80e90ad9d4b53958a6d9208d2b57968b79cda96b276575994cb338db1e9daf51`.
 - With no active or queued deployment, no lease, Hub stopped, port 7000 closed, and the originating run manager checksum-matched to its merged source, the operator-authorized repair invoked that exact manager's `abort-prepared`. The owner-only receipt reported an aborted unactivated rotation, the old state file was removed, and a fresh bootstrap validation reported `mutation_required: false`. The recovery correction now invokes the lease-bound run manager after verified Hub shutdown and before lease removal even when service mutation has begun. A failed or phase-ineligible abort retains the lease and keeps Hub stopped, preserving a recoverable fail-closed pointer instead of orphaning secondary state. Missing journals are accepted only after locked current-only env validation; orphaned secondary fields fail closed in no-LKG, qualified-LKG, forced, and lease-less forced recovery, and no restore is attempted. When both lease and LKG are absent, there is no trusted rotation manager to prove credential shape, so recovery verifies Hub shutdown but returns `credential-state-unverified` instead of claiming success.
+- PR #366 merged that recovery correction as `b44fe3213d2d355e3b66c3f0571af8be222e61d2` after committed CI and independent final review. Fresh first-attempt workflow run [29272901969](https://github.com/kaizendevsio/XFramework/actions/runs/29272901969) passed authorization, protected input validation, both provenance gates, all 14 image builds and pulls, lease arm, G+1 preparation, migration, Hub TLS/plaintext and staged-runtime checks, IdentityServer/Communications canary deployment, readiness, and staged canary runtime. It failed before observation and broader promotion because `run-bolt-phase0-synthetics.sh` reconstructed `/home/github-runner/xframework-deploy/verify-bolt-phase0-env.py` instead of using the verifier staged in its run directory. Artifact `8288262631` independently matched GitHub SHA-256 `e372e493e444f7e02da2c4f6d4bd4386a0d73b1429bf2b3d74c91e56747b1829`.
+- Failure recovery used the still-installed pre-PR #366 fixed controller: it stopped Hub and removed the lease but reported the older no-LKG outcome without aborting the prepared generation. With no active or queued deployment, no lease/LKG, Hub stopped, port 7000 closed, and the run manager checksum exactly matching merged source, the operator-authorized cleanup invoked that run manager's `abort-prepared`. The state file was removed and a fresh read-only validation reported `mutation_required: false`; named volumes were not changed. The current correction passes the explicit run-scoped `REMOTE_ENV_PARSER` into every synthetic and adds atomic `prepare-bound-run` source binding for all six installed bootstrap components. The next retry is forbidden until the correction is merged and that exact merged bootstrap bundle is installed through the root-only operator procedure above.
 
 ## Rollout Readiness Findings
 

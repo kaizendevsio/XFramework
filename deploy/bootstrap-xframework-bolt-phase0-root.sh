@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 set -euo pipefail
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
 
 test "$(id -u)" -eq 0
 source_root="${1:-}"
@@ -109,6 +111,9 @@ root_helper=/usr/local/sbin/xframework-bolt-phase0-root
 watchdog=/usr/local/sbin/xframework-bolt-phase0-watchdog
 lease_manager="$libexec_root/manage-bolt-phase0-deployment-lease.py"
 lease_lock="$libexec_root/deployment-lease.lock"
+deployment_lease="$deploy_root/phase0-watchdog/deployment-lease.json"
+lkg_pointer="$deploy_root/phase0-last-known-good/current"
+source_binding_marker=bootstrap-source-binding.json
 service=/etc/systemd/system/xframework-bolt-phase0-watchdog.service
 timer=/etc/systemd/system/xframework-bolt-phase0-watchdog.timer
 sudoers=/etc/sudoers.d/xframework-bolt-phase0-root
@@ -239,6 +244,69 @@ finally:
     if descriptor >= 0:
         os.close(descriptor)
     os.close(parent_fd)
+PY
+exec {bootstrap_lock_fd}< "$lease_lock"
+if ! /usr/bin/flock --exclusive --timeout 30 "$bootstrap_lock_fd"; then
+  echo "unable to acquire the Phase 0 deployment lease lock for bootstrap" >&2
+  exit 1
+fi
+for active_state in "$deployment_lease" "$lkg_pointer"; do
+  if [ -e "$active_state" ] || [ -L "$active_state" ]; then
+    echo "Phase 0 bootstrap requires no deployment lease or LKG pointer" >&2
+    exit 1
+  fi
+done
+/usr/bin/python3 - "$deploy_root/runs" "$source_binding_marker" "$deployment_user" <<'PY'
+import os
+import pwd
+import stat
+import sys
+
+run_root, marker_name, deployment_user = sys.argv[1:]
+deployment_uid = pwd.getpwnam(deployment_user).pw_uid
+
+def fail(message: str) -> None:
+    raise SystemExit(message)
+
+try:
+    metadata = os.lstat(run_root)
+except FileNotFoundError:
+    raise SystemExit(0)
+if (
+    not stat.S_ISDIR(metadata.st_mode)
+    or metadata.st_uid not in {0, deployment_uid}
+    or stat.S_IMODE(metadata.st_mode) & 0o022
+):
+    fail("Phase 0 run root is insecure")
+
+root_fd = os.open(
+    run_root,
+    os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+)
+try:
+    for name in os.listdir(root_fd):
+        try:
+            run_fd = os.open(
+                name,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=root_fd,
+            )
+        except FileNotFoundError:
+            continue
+        except NotADirectoryError:
+            continue
+        except OSError as error:
+            fail(f"unable to inspect Phase 0 run directory: {error}")
+        try:
+            try:
+                os.stat(marker_name, dir_fd=run_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            fail("Phase 0 bootstrap requires no prepared source-binding marker")
+        finally:
+            os.close(run_fd)
+finally:
+    os.close(root_fd)
 PY
 /usr/bin/python3 - "$source_root" <<'PY'
 import hashlib
@@ -487,7 +555,7 @@ install -d -o "$deployment_user" -g "$deployment_group" -m 0700 "$deploy_root/ph
 sudoers_tmp="$(mktemp /etc/sudoers.d/.xframework-bolt-phase0-root.XXXXXX)"
 trap 'rm -f "$sudoers_tmp"' EXIT
 cat > "$sudoers_tmp" <<'EOF'
-Cmnd_Alias XFRAMEWORK_BOLT_PHASE0_ROOT = /usr/local/sbin/xframework-bolt-phase0-root verify-bootstrap, /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog, /usr/local/sbin/xframework-bolt-phase0-root prepare-run, /usr/local/sbin/xframework-bolt-phase0-root activate
+Cmnd_Alias XFRAMEWORK_BOLT_PHASE0_ROOT = /usr/local/sbin/xframework-bolt-phase0-root verify-bootstrap, /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog, /usr/local/sbin/xframework-bolt-phase0-root prepare-bound-run, /usr/local/sbin/xframework-bolt-phase0-root activate
 github-runner ALL=(root) NOPASSWD: XFRAMEWORK_BOLT_PHASE0_ROOT
 EOF
 chmod 0440 "$sudoers_tmp"
@@ -498,4 +566,6 @@ trap - EXIT
 
 systemctl daemon-reload
 systemctl enable --now xframework-bolt-phase0-watchdog.timer
+/usr/bin/flock --unlock "$bootstrap_lock_fd"
+exec {bootstrap_lock_fd}<&-
 "$root_helper" verify-bootstrap

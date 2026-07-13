@@ -45,7 +45,7 @@ MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 MAX_FILES = 256
 WATCHDOG_TIMEOUT_SECONDS = 4_200
 WATCHDOG_TIMEOUT_SYSTEMD = "1h 10min"
-LEASE_SCHEMA = "xframework.bolt.phase0.deployment-lease.v1"
+LEASE_SCHEMA = "xframework.bolt.phase0.deployment-lease.v2"
 LEASE_KEYS = {
     "schema",
     "run_id",
@@ -56,6 +56,7 @@ LEASE_KEYS = {
     "heartbeat_utc",
     "stale_timeout_seconds",
     "mutation_began",
+    "bootstrap_source_bound",
 }
 MIN_STALE_SECONDS = 60
 MAX_STALE_SECONDS = 86_400
@@ -95,6 +96,17 @@ FIXED_COMPONENT_MODES = {
     "xframework-bolt-phase0-watchdog.service": 0o644,
     "xframework-bolt-phase0-watchdog.timer": 0o644,
 }
+SOURCE_BINDING_FIELDS = {
+    "root_helper_sha256": ("root_helper", 0o555),
+    "watchdog_sha256": ("watchdog", 0o555),
+    "lease_manager_sha256": ("lease_manager", 0o555),
+    "qualifier_sha256": ("qualifier", 0o444),
+    "service_fragment_sha256": ("service_fragment", 0o644),
+    "timer_fragment_sha256": ("timer_fragment", 0o644),
+}
+SOURCE_BINDING_MARKER = "bootstrap-source-binding.json"
+SOURCE_BINDING_SCHEMA = "xframework.bolt.phase0.bootstrap-source-binding.v1"
+SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 class RootBoundaryError(RuntimeError):
@@ -471,7 +483,12 @@ def _file(path: Path, uid: int, mode: int, maximum: int = MAX_FILE_BYTES) -> byt
         or (os.name == "posix" and stat.S_IMODE(metadata.st_mode) != mode)
     ):
         raise RootBoundaryError("insecure-file")
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    descriptor = os.open(
+        path,
+        os.O_RDONLY
+        | getattr(os, "O_BINARY", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+    )
     try:
         current = os.fstat(descriptor)
         if (current.st_dev, current.st_ino) != (metadata.st_dev, metadata.st_ino):
@@ -483,12 +500,27 @@ def _file(path: Path, uid: int, mode: int, maximum: int = MAX_FILE_BYTES) -> byt
                 break
             raw.extend(chunk)
         after = os.fstat(descriptor)
+        path_after = path.lstat()
     finally:
         os.close(descriptor)
+    def signature(value: os.stat_result) -> tuple[int, ...]:
+        stable = (
+            value.st_dev,
+            value.st_ino,
+            value.st_mode,
+            value.st_nlink,
+            value.st_size,
+            value.st_uid,
+            value.st_gid,
+            value.st_mtime_ns,
+        )
+        return stable + ((value.st_ctime_ns,) if os.name == "posix" else ())
     if (
         len(raw) != current.st_size
         or len(raw) > maximum
-        or (current.st_size, current.st_mtime_ns) != (after.st_size, after.st_mtime_ns)
+        or signature(metadata) != signature(current)
+        or signature(metadata) != signature(after)
+        or signature(metadata) != signature(path_after)
     ):
         raise RootBoundaryError("file-changed")
     return bytes(raw)
@@ -524,6 +556,7 @@ class RootBoundary:
         enforce_root: bool = True,
         after_quarantine: Callable[[Path, Path], None] | None = None,
         after_artifact_lstat: Callable[[Path], None] | None = None,
+        after_abandon_marker_validation: Callable[[Path], None] | None = None,
         sync_path: SyncPath = durable_sync,
         operation_trace: OperationTrace | None = None,
         clock: Clock = utc_now,
@@ -533,6 +566,7 @@ class RootBoundary:
         self.enforce_root = enforce_root
         self.after_quarantine = after_quarantine
         self.after_artifact_lstat = after_artifact_lstat
+        self.after_abandon_marker_validation = after_abandon_marker_validation
         self.sync_path = sync_path
         self.operation_trace = operation_trace
         self.clock = clock
@@ -761,6 +795,7 @@ class RootBoundary:
             or not isinstance(stale_timeout, int)
             or not MIN_STALE_SECONDS <= stale_timeout <= MAX_STALE_SECONDS
             or mutation_began is not True
+            or document.get("bootstrap_source_bound") is not True
         ):
             raise RootBoundaryError("invalid-activation-lease")
         heartbeat_text = document.get("heartbeat_utc")
@@ -776,7 +811,7 @@ class RootBoundary:
         if heartbeat > now or now - heartbeat >= dt.timedelta(seconds=stale_timeout):
             raise RootBoundaryError("stale-activation-lease")
 
-    def _validate_fixed_files(self) -> None:
+    def _validate_fixed_files(self, *, lease_lock_held: bool = False) -> None:
         root_uid = 0 if self.enforce_root else self.deployment_uid
         for parent in {
             self.paths.root_helper.parent,
@@ -793,13 +828,14 @@ class RootBoundary:
         _file(self.paths.qualifier, root_uid, 0o444)
         _file(self.paths.service_fragment, root_uid, 0o644, 1024 * 1024)
         _file(self.paths.timer_fragment, root_uid, 0o644, 1024 * 1024)
-        with exclusive_lease_lock(
-            self.paths.lease_lock,
-            owner_uid=root_uid,
-            owner_gid=self.deployment_gid,
-            trusted_parent_uid=root_uid,
-        ):
-            pass
+        if not lease_lock_held:
+            with exclusive_lease_lock(
+                self.paths.lease_lock,
+                owner_uid=root_uid,
+                owner_gid=self.deployment_gid,
+                trusted_parent_uid=root_uid,
+            ):
+                pass
 
     def _validate_roots(self) -> None:
         root_uid = 0 if self.enforce_root else self.deployment_uid
@@ -916,9 +952,9 @@ class RootBoundary:
             ):
                 raise RootBoundaryError("fixed-component-mismatch")
 
-    def verify_bootstrap(self) -> dict[str, object]:
+    def _verify_bootstrap(self, *, lease_lock_held: bool) -> dict[str, object]:
         self._validate_roots()
-        self._validate_fixed_files()
+        self._validate_fixed_files(lease_lock_held=lease_lock_held)
         self._validate_systemd()
         pointer = self._read_pointer()
         if pointer is None:
@@ -928,6 +964,30 @@ class RootBoundary:
             return {"status": "passed", "state": "bootstrap-no-lkg-hub-stopped"}
         self._validate_sealed_run(pointer)
         return {"status": "passed", "state": "qualified-lkg-active"}
+
+    def verify_bootstrap(self) -> dict[str, object]:
+        return self._verify_bootstrap(lease_lock_held=False)
+
+    def verify_source_binding(
+        self,
+        expected: dict[str, str],
+        *,
+        lease_lock_held: bool = False,
+    ) -> dict[str, object]:
+        evidence = self._verify_bootstrap(lease_lock_held=lease_lock_held)
+        root_uid = 0 if self.enforce_root else self.deployment_uid
+        for _ in range(2):
+            for field, (path_attribute, mode) in SOURCE_BINDING_FIELDS.items():
+                expected_digest = expected.get(field)
+                if expected_digest is None or not SHA256_DIGEST.fullmatch(expected_digest):
+                    raise RootBoundaryError("invalid-source-binding")
+                path = cast(Path, getattr(self.paths, path_attribute))
+                actual_digest = "sha256:" + hashlib.sha256(
+                    _file(path, root_uid, mode)
+                ).hexdigest()
+                if not secrets.compare_digest(actual_digest, expected_digest):
+                    raise RootBoundaryError("source-binding-mismatch")
+        return {**evidence, "source_binding": "passed"}
 
     def ensure_watchdog(self) -> dict[str, object]:
         self._validate_roots()
@@ -950,17 +1010,171 @@ class RootBoundary:
             raise RootBoundaryError("invalid-run-identity")
         return f"{run_id}-{attempt}"
 
-    def prepare_run(self, run_id: str, attempt: str) -> dict[str, object]:
-        self.verify_bootstrap()
+    def prepare_bound_run(
+        self,
+        run_id: str,
+        attempt: str,
+        expected: dict[str, str],
+    ) -> dict[str, object]:
         name = self._identity(run_id, attempt)
-        target = self.paths.run_root / name
-        if target.exists() or target.is_symlink():
-            raise RootBoundaryError("run-exists")
-        os.mkdir(target, 0o700)
-        if os.name == "posix":
-            os.chown(target, self.deployment_uid, self.deployment_gid)
-            os.chmod(target, 0o700)
-        return {"status": "passed", "state": "candidate-run-prepared", "run": name}
+        root_uid = 0 if self.enforce_root else self.deployment_uid
+        with exclusive_lease_lock(
+            self.paths.lease_lock,
+            owner_uid=root_uid,
+            owner_gid=self.deployment_gid,
+            trusted_parent_uid=root_uid,
+        ):
+            binding = self.verify_source_binding(expected, lease_lock_held=True)
+            target = self.paths.run_root / name
+            if target.exists() or target.is_symlink():
+                raise RootBoundaryError("run-exists")
+            os.mkdir(target, 0o700)
+            if os.name == "posix":
+                os.chown(target, self.deployment_uid, self.deployment_gid)
+                os.chmod(target, 0o700)
+            marker = {
+                "schema": SOURCE_BINDING_SCHEMA,
+                "run_id": run_id,
+                "run_attempt": int(attempt),
+                "source_binding": {
+                    field: expected[field] for field in sorted(SOURCE_BINDING_FIELDS)
+                },
+            }
+            self._write_marker(
+                target / SOURCE_BINDING_MARKER,
+                (
+                    json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n"
+                ).encode("ascii"),
+                owner_uid=root_uid,
+                owner_gid=self.deployment_gid,
+                mode=0o440,
+            )
+            self._sync(target.parent, True)
+        return {
+            **binding,
+            "state": "candidate-run-prepared",
+            "run": name,
+        }
+
+    def abandon_bound_run(
+        self,
+        run_id: str,
+        attempt: str,
+        expected: dict[str, str],
+    ) -> dict[str, object]:
+        if os.name != "posix":
+            raise RootBoundaryError("unsupported-platform")
+        name = self._identity(run_id, attempt)
+        root_uid = 0 if self.enforce_root else self.deployment_uid
+        lease = self.paths.state_root / "deployment-lease.json"
+        with exclusive_lease_lock(
+            self.paths.lease_lock,
+            owner_uid=root_uid,
+            owner_gid=self.deployment_gid,
+            trusted_parent_uid=root_uid,
+        ):
+            for active_state in (lease, self.paths.pointer):
+                if active_state.exists() or active_state.is_symlink():
+                    raise RootBoundaryError("active-deployment-state")
+            binding = self.verify_source_binding(expected, lease_lock_held=True)
+            target = self.paths.run_root / name
+            target_metadata = target.lstat()
+            if (
+                not stat.S_ISDIR(target_metadata.st_mode)
+                or stat.S_ISLNK(target_metadata.st_mode)
+                or (
+                    os.name == "posix"
+                    and (
+                        target_metadata.st_uid != self.deployment_uid
+                        or target_metadata.st_gid != self.deployment_gid
+                        or stat.S_IMODE(target_metadata.st_mode) != 0o700
+                    )
+                )
+            ):
+                raise RootBoundaryError("invalid-candidate-directory")
+            directory_fd = os.open(
+                target,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+            )
+            restore_required = False
+            try:
+                opened_target = os.fstat(directory_fd)
+                if (opened_target.st_dev, opened_target.st_ino) != (
+                    target_metadata.st_dev,
+                    target_metadata.st_ino,
+                ):
+                    raise RootBoundaryError("candidate-directory-changed")
+                restore_required = True
+                os.fchown(directory_fd, root_uid, 0)
+                os.fchmod(directory_fd, 0o700)
+                os.fsync(directory_fd)
+                frozen_target = target.lstat()
+                if (
+                    (frozen_target.st_dev, frozen_target.st_ino)
+                    != (opened_target.st_dev, opened_target.st_ino)
+                    or frozen_target.st_uid != root_uid
+                    or frozen_target.st_gid != 0
+                    or stat.S_IMODE(frozen_target.st_mode) != 0o700
+                ):
+                    raise RootBoundaryError("candidate-directory-changed")
+
+                marker = target / SOURCE_BINDING_MARKER
+                marker_metadata = marker.lstat()
+                if os.name == "posix" and marker_metadata.st_gid != self.deployment_gid:
+                    raise RootBoundaryError("invalid-source-binding-marker")
+                raw = _file(marker, root_uid, 0o440, 4096)
+                try:
+                    document = json.loads(raw.decode("ascii", errors="strict"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                    raise RootBoundaryError("invalid-source-binding-marker") from error
+                expected_document = {
+                    "schema": SOURCE_BINDING_SCHEMA,
+                    "run_id": run_id,
+                    "run_attempt": int(attempt),
+                    "source_binding": {
+                        field: expected[field]
+                        for field in sorted(SOURCE_BINDING_FIELDS)
+                    },
+                }
+                current_marker = marker.lstat()
+                if (
+                    document != expected_document
+                    or (current_marker.st_dev, current_marker.st_ino)
+                    != (marker_metadata.st_dev, marker_metadata.st_ino)
+                ):
+                    raise RootBoundaryError("invalid-source-binding-marker")
+                if self.after_abandon_marker_validation is not None:
+                    self.after_abandon_marker_validation(marker)
+                marker.unlink()
+                os.fsync(directory_fd)
+            finally:
+                try:
+                    if restore_required:
+                        current_target = target.lstat()
+                        opened_target = os.fstat(directory_fd)
+                        if (current_target.st_dev, current_target.st_ino) != (
+                            opened_target.st_dev,
+                            opened_target.st_ino,
+                        ):
+                            raise RootBoundaryError("candidate-directory-changed")
+                        os.fchown(
+                            directory_fd,
+                            self.deployment_uid,
+                            self.deployment_gid,
+                        )
+                        os.fchmod(directory_fd, 0o700)
+                        os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+                self._sync(target, True)
+                self._sync(self.paths.run_root, True)
+        return {
+            **binding,
+            "state": "candidate-source-binding-abandoned",
+            "run": name,
+        }
 
     def _copy_quarantined(self, source: Path, destination: Path) -> None:
         source_stat = source.lstat()
@@ -1127,13 +1341,28 @@ class RootBoundary:
             if source_directory_fd is not None:
                 os.close(source_directory_fd)
 
-    def _write_marker(self, path: Path, content: bytes) -> None:
+    def _write_marker(
+        self,
+        path: Path,
+        content: bytes,
+        *,
+        owner_uid: int | None = None,
+        owner_gid: int | None = None,
+        mode: int = 0o600,
+    ) -> None:
         descriptor = os.open(
             path,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
-            0o600,
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+            mode,
         )
         try:
+            if os.name == "posix" and owner_uid is not None and owner_gid is not None:
+                os.fchown(descriptor, owner_uid, owner_gid)
+                os.fchmod(descriptor, mode)
             view = memoryview(content)
             while view:
                 written = os.write(descriptor, view)
@@ -1329,7 +1558,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("verify-bootstrap")
     commands.add_parser("ensure-watchdog")
-    commands.add_parser("prepare-run")
+    commands.add_parser("prepare-bound-run")
+    commands.add_parser("abandon-bound-run")
     commands.add_parser("activate")
     return parser.parse_args(argv)
 
@@ -1340,8 +1570,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         args = parse_args(argv)
         boundary = RootBoundary()
         request: dict[str, str] = {}
-        if args.command == "prepare-run":
-            request = read_root_request({"run_id", "run_attempt"})
+        if args.command in {"prepare-bound-run", "abandon-bound-run"}:
+            request = read_root_request(
+                {"run_id", "run_attempt", *SOURCE_BINDING_FIELDS}
+            )
         elif args.command == "activate":
             request = read_root_request(
                 {"run_id", "run_attempt", "expected_commit", "project_name"}
@@ -1350,8 +1582,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             evidence = boundary.verify_bootstrap()
         elif args.command == "ensure-watchdog":
             evidence = boundary.ensure_watchdog()
-        elif args.command == "prepare-run":
-            evidence = boundary.prepare_run(request["run_id"], request["run_attempt"])
+        elif args.command == "prepare-bound-run":
+            evidence = boundary.prepare_bound_run(
+                request["run_id"],
+                request["run_attempt"],
+                {field: request[field] for field in SOURCE_BINDING_FIELDS},
+            )
+        elif args.command == "abandon-bound-run":
+            evidence = boundary.abandon_bound_run(
+                request["run_id"],
+                request["run_attempt"],
+                {field: request[field] for field in SOURCE_BINDING_FIELDS},
+            )
         else:
             evidence = boundary.activate(
                 request["run_id"],
