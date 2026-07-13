@@ -27,6 +27,9 @@ concurrency:
 
 jobs:
   deploy:
+    # Phase 0 requires one run-scoped, full-stack promotion. Re-enabling this
+    # legacy path requires a reviewed source change after the Phase 0 gate passes.
+    if: ${{ false }}
     name: Deploy ${{ inputs.service }} to xeon-dev
     runs-on: [self-hosted, Linux, xeon-dev-deploy]
     timeout-minutes: 50
@@ -38,13 +41,14 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
       CHANNEL_TAG: develop
       DEPLOY_HOST: github-runner@xeon-dev
-      DEPLOY_SSH_KEY: /home/xeon/.ssh/xframework_xeon_dev_ed25519
+      DEPLOY_SSH_KEY: /home/github-runner/.ssh/xframework_xeon_dev_ed25519
       REMOTE_DEPLOY_DIR: /home/github-runner/xframework-deploy
       REMOTE_COMPOSE_FILE: /home/github-runner/xframework-deploy/docker-compose.yml
       XFRAMEWORK_ENV_FILE: /opt/xframework/xeon-dev.env
       DB_PASSWORD: compose-validation-placeholder
       JWT_SECRET: compose-validation-placeholder
       BOLT_SIGNATURE: compose-validation-placeholder
+      CREDENTIAL_GENERATION_ID: compose-validation-g1
       IDENTITYSERVER_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       BOLT_HUB_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
@@ -58,13 +62,24 @@ jobs:
       PORTAL_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_TRUSTED_METADATA_SECRET: compose-validation-placeholder
+      BOLT_HUB_TLS_FULLCHAIN_PATH: /tmp/bolt-phase0-validation/fullchain.pem
+      BOLT_HUB_TLS_PRIVATE_KEY_PATH: /tmp/bolt-phase0-validation/private-key.pem
+      BOLT_HUB_TLS_CA_PATH: /tmp/bolt-phase0-validation/ca.crt
+      BOLT_HUB_EXPOSE_PORT: 7000
+      BOLT_HUB_PUBLIC_HOSTNAME: xeon-dev.tailed40e.ts.net
+      BOLT_SYNTHETIC_TENANT_ID: 00000000-0000-0000-0000-000000000001
+      BOLT_SYNTHETIC_CREDENTIAL_ID: 00000000-0000-0000-0000-000000000002
+      BOLT_SYNTHETIC_DEVICE_ID: phase0-compose-validation
+      BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_PATH: /tmp/bolt-phase0-validation/communications-token
+      BOLT_SYNTHETIC_USER_TOKEN_PATH: /tmp/bolt-phase0-validation/user-token
+      BOLT_SYNTHETIC_EXPIRY_TOKEN_PATH: /tmp/bolt-phase0-validation/expiry-token
       SERVICE_NAME: ${{ inputs.service }}
       HEALTH_URL: ${{ inputs.health_url }}
       DIAGNOSTICS_SERVICES: ${{ inputs.diagnostics_services }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
@@ -94,11 +109,20 @@ jobs:
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "test -r '$XFRAMEWORK_ENV_FILE' && docker --version && docker compose version && curl -sSI 'https://${REGISTRY_HOST}/v2/' | sed -n '1,8p'"
 
-      - name: Validate compose
+      - name: Validate Phase 0 Compose semantics
         shell: bash
         run: |
           set -euo pipefail
-          docker compose -f "$COMPOSE_FILE_PATH" config >/tmp/xframework-compose.yml
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          mkdir -p "$evidence_dir"
+          rm -f "$evidence_dir"/*.json
+          python3 scripts/verify-bolt-phase0-compose.py \
+            --compose-file "$COMPOSE_FILE_PATH" \
+            --output "$evidence_dir/local-compose.json" \
+            --expected-ca-path "$BOLT_HUB_TLS_CA_PATH" \
+            --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
+            --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
+            --expected-published-port "$BOLT_HUB_EXPOSE_PORT"
 
       - name: Ensure xeon-dev service identity secrets
         shell: bash
@@ -148,6 +172,71 @@ jobs:
           fi
           REMOTE_SCRIPT
 
+      - name: Validate actual xeon-dev Phase 0 TLS and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          mkdir -p "$evidence_dir"
+
+          remote_candidate="$REMOTE_DEPLOY_DIR/docker-compose.${IMAGE_TAG}.candidate.yml"
+          remote_compose_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-compose.py"
+          remote_env_parser="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-env.py"
+          remote_tls_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-tls.sh"
+          remote_compose_evidence="$REMOTE_DEPLOY_DIR/bolt-phase0-compose-evidence.json"
+          remote_tls_evidence="$REMOTE_DEPLOY_DIR/bolt-phase0-tls-evidence.json"
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "mkdir -p '$REMOTE_DEPLOY_DIR'"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$COMPOSE_FILE_PATH" "$DEPLOY_HOST:$remote_candidate"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-compose.py "$DEPLOY_HOST:$remote_compose_verifier"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-env.py "$DEPLOY_HOST:$remote_env_parser"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-tls.sh "$DEPLOY_HOST:$remote_tls_verifier"
+
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_CANDIDATE='$remote_candidate' REMOTE_COMPOSE_VERIFIER='$remote_compose_verifier' REMOTE_ENV_PARSER='$remote_env_parser' REMOTE_TLS_VERIFIER='$remote_tls_verifier' REMOTE_COMPOSE_EVIDENCE='$remote_compose_evidence' REMOTE_TLS_EVIDENCE='$remote_tls_evidence'"
+
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "$remote_env bash -s" <<'REMOTE_SCRIPT' || status=$?
+          set -euo pipefail
+          rm -f "$REMOTE_COMPOSE_EVIDENCE" "$REMOTE_TLS_EVIDENCE"
+          trap 'rm -f "$REMOTE_CANDIDATE"' EXIT
+          read_env() {
+            python3 "$REMOTE_ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"
+          }
+          BOLT_HUB_TLS_FULLCHAIN_PATH="$(read_env BOLT_HUB_TLS_FULLCHAIN_PATH)"
+          BOLT_HUB_TLS_PRIVATE_KEY_PATH="$(read_env BOLT_HUB_TLS_PRIVATE_KEY_PATH)"
+          BOLT_HUB_TLS_CA_PATH="$(read_env BOLT_HUB_TLS_CA_PATH)"
+          BOLT_HUB_EXPOSE_PORT="$(read_env BOLT_HUB_EXPOSE_PORT)"
+          BOLT_HUB_PUBLIC_HOSTNAME="$(read_env BOLT_HUB_PUBLIC_HOSTNAME)"
+
+          bash "$REMOTE_TLS_VERIFIER" \
+            "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
+            "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
+            "$BOLT_HUB_TLS_CA_PATH" \
+            "wss://bolt-hub:8443/bolt/ws" \
+            "$BOLT_HUB_PUBLIC_HOSTNAME" \
+            "$BOLT_HUB_EXPOSE_PORT" \
+            "$REMOTE_TLS_EVIDENCE"
+
+          python3 "$REMOTE_COMPOSE_VERIFIER" \
+            --compose-file "$REMOTE_CANDIDATE" \
+            --env-file "$XFRAMEWORK_ENV_FILE" \
+            --output "$REMOTE_COMPOSE_EVIDENCE" \
+            --expected-ca-path "$BOLT_HUB_TLS_CA_PATH" \
+            --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
+            --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
+            --expected-published-port "$BOLT_HUB_EXPOSE_PORT"
+          REMOTE_SCRIPT
+
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_compose_evidence" "$evidence_dir/remote-compose.json" || true
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_tls_evidence" "$evidence_dir/remote-tls.json" || true
+          exit "$status"
+
       - name: Login to dev registry
         shell: bash
         env:
@@ -175,35 +264,135 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          override_file="$evidence_dir/pinned-compose.override.json"
+          pins_file="$evidence_dir/image-pins.json"
           image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${SERVICE_NAME}:${IMAGE_TAG}"
           channel_image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${SERVICE_NAME}:${CHANNEL_TAG}"
+          push_log="$RUNNER_TEMP/bolt-phase0-push-${SERVICE_NAME}.log"
 
           docker tag "$image" "$channel_image"
-          docker push "$image"
+          docker push "$image" 2>&1 | tee "$push_log"
           docker push "$channel_image"
+
+          python3 scripts/verify-bolt-phase0-image-pin.py \
+            --expected-image-tag "$IMAGE_TAG" \
+            --expected-service "$SERVICE_NAME" \
+            --push-record "$SERVICE_NAME" "$image" "$push_log" \
+            --output-override "$override_file" \
+            --output-evidence "$pins_file"
+
+      - name: Authorize digest-pinned deployment manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          override_file="$evidence_dir/pinned-compose.override.json"
+          pins_file="$evidence_dir/image-pins.json"
+          remote_override="$REMOTE_DEPLOY_DIR/docker-compose.phase0-pinned.json"
+          remote_pins="$REMOTE_DEPLOY_DIR/bolt-phase0-image-pins.json"
+          remote_evidence="$REMOTE_DEPLOY_DIR/bolt-phase0-pinned-manifest-evidence.json"
+
+          python3 scripts/verify-bolt-phase0-compose.py \
+            --compose-file "$COMPOSE_FILE_PATH" \
+            --compose-file "$override_file" \
+            --output "$evidence_dir/pinned-manifest-local.json" \
+            --expected-ca-path "$BOLT_HUB_TLS_CA_PATH" \
+            --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
+            --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
+            --expected-published-port "$BOLT_HUB_EXPOSE_PORT" \
+            --pins-file "$pins_file" \
+            --authorized-service "$SERVICE_NAME" \
+            --authorize-deployment
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "mkdir -p '$REMOTE_DEPLOY_DIR'"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$COMPOSE_FILE_PATH" "$DEPLOY_HOST:$REMOTE_COMPOSE_FILE"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$override_file" "$DEPLOY_HOST:$remote_override"
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$pins_file" "$DEPLOY_HOST:$remote_pins"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "rm -f '$remote_evidence'"
+
+          service_arg="$(printf '%q' "$SERVICE_NAME")"
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_DEPLOY_DIR/verify-bolt-phase0-env.py' COMPOSE_VERIFIER='$REMOTE_DEPLOY_DIR/verify-bolt-phase0-compose.py' REMOTE_OVERRIDE='$remote_override' REMOTE_PINS='$remote_pins' REMOTE_EVIDENCE='$remote_evidence' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE'"
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env bash -s -- $service_arg" <<'REMOTE_SCRIPT' || status=$?
+          set -euo pipefail
+          service="$1"
+          read_env() { python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"; }
+          ca_path="$(read_env BOLT_HUB_TLS_CA_PATH)"
+          fullchain_path="$(read_env BOLT_HUB_TLS_FULLCHAIN_PATH)"
+          private_key_path="$(read_env BOLT_HUB_TLS_PRIVATE_KEY_PATH)"
+          published_port="$(read_env BOLT_HUB_EXPOSE_PORT)"
+          python3 "$COMPOSE_VERIFIER" \
+            --compose-file "$REMOTE_COMPOSE_FILE" \
+            --compose-file "$REMOTE_OVERRIDE" \
+            --env-file "$XFRAMEWORK_ENV_FILE" \
+            --output "$REMOTE_EVIDENCE" \
+            --expected-ca-path "$ca_path" \
+            --expected-fullchain-path "$fullchain_path" \
+            --expected-private-key-path "$private_key_path" \
+            --expected-published-port "$published_port" \
+            --pins-file "$REMOTE_PINS" \
+            --authorized-service "$service" \
+            --authorize-deployment
+          REMOTE_SCRIPT
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json" || true
+          exit "$status"
 
       - name: Deploy service on xeon-dev
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "mkdir -p '$REMOTE_DEPLOY_DIR'"
-          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$COMPOSE_FILE_PATH" "$DEPLOY_HOST:$REMOTE_COMPOSE_FILE"
-
+          remote_override="$REMOTE_DEPLOY_DIR/docker-compose.phase0-pinned.json"
           remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' pull '$SERVICE_NAME'"
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' -f '$remote_override' pull '$SERVICE_NAME'"
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' up -d --no-build --no-deps '$SERVICE_NAME'"
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' -f '$remote_override' up -d --no-build --no-deps '$SERVICE_NAME'"
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps '$SERVICE_NAME'"
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' -f '$remote_override' ps '$SERVICE_NAME'"
 
       - name: Wait for readiness
         shell: bash
         run: |
           set -euo pipefail
+
+          if [ "$SERVICE_NAME" = "bolt-hub" ]; then
+            ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+              "XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_DEPLOY_DIR/verify-bolt-phase0-env.py' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          read_env() { python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"; }
+          BOLT_HUB_TLS_CA_PATH="$(read_env BOLT_HUB_TLS_CA_PATH)"
+          BOLT_HUB_EXPOSE_PORT="$(read_env BOLT_HUB_EXPOSE_PORT)"
+          BOLT_HUB_PUBLIC_HOSTNAME="$(read_env BOLT_HUB_PUBLIC_HOSTNAME)"
+          for endpoint in live ready; do
+            body="/tmp/xframework-bolt-hub-health-${endpoint}.json"
+            ready=0
+            for attempt in {1..60}; do
+              status="$(curl -sS --noproxy "$BOLT_HUB_PUBLIC_HOSTNAME" --cacert "$BOLT_HUB_TLS_CA_PATH" \
+                --resolve "${BOLT_HUB_PUBLIC_HOSTNAME}:${BOLT_HUB_EXPOSE_PORT}:127.0.0.1" \
+                -o "$body" -w '%{http_code}' \
+                "https://${BOLT_HUB_PUBLIC_HOSTNAME}:${BOLT_HUB_EXPOSE_PORT}/health/${endpoint}" || true)"
+              if [ "$status" = "200" ]; then
+                ready=1
+                break
+              fi
+              echo "bolt-hub ${endpoint} not ready; attempt ${attempt}/60 returned ${status:-no response}"
+              sleep 5
+            done
+            if [ "$ready" -ne 1 ]; then
+              echo "bolt-hub failed trusted HTTPS ${endpoint} check" >&2
+              cat "$body" || true
+              exit 1
+            fi
+          done
+          REMOTE_SCRIPT
+            exit 0
+          fi
 
           body="/tmp/xframework-${SERVICE_NAME}-health.json"
           echo "Waiting for ${SERVICE_NAME}: ${HEALTH_URL}"
@@ -229,12 +418,45 @@ jobs:
             exit 1
           fi
 
+      - name: Collect deployed runtime image evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_verifier="$REMOTE_DEPLOY_DIR/verify-bolt-phase0-runtime.py"
+          remote_evidence="$REMOTE_DEPLOY_DIR/bolt-phase0-runtime-evidence.json"
+          remote_override="$REMOTE_DEPLOY_DIR/docker-compose.phase0-pinned.json"
+          remote_pins="$REMOTE_DEPLOY_DIR/bolt-phase0-image-pins.json"
+
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-runtime.py "$DEPLOY_HOST:$remote_verifier"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "rm -f '$remote_evidence'"
+
+          service_arg="$(printf '%q' "$SERVICE_NAME")"
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env python3 '$remote_verifier' --compose-file '$REMOTE_COMPOSE_FILE' --compose-file '$remote_override' --env-file '$XFRAMEWORK_ENV_FILE' --project-name '$COMPOSE_PROJECT_NAME' --output '$remote_evidence' --pins-file '$remote_pins' --services $service_arg" || status=$?
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/runtime.json" || true
+          exit "$status"
+
       - name: Deployment diagnostics
         if: failure()
         shell: bash
         run: |
           remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
+          remote_override="$REMOTE_DEPLOY_DIR/docker-compose.phase0-pinned.json"
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps" || true
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' -f '$remote_override' ps" || true
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' logs --tail=200 $DIAGNOSTICS_SERVICES" || true
+            "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' -f '$remote_override' logs --tail=200 $DIAGNOSTICS_SERVICES" || true
+
+      - name: Upload Phase 0 deployment evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bolt-phase0-${{ inputs.service }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/bolt-phase0-evidence
+          if-no-files-found: warn
+          retention-days: 30

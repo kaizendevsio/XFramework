@@ -1,3 +1,4 @@
+using Bolt.Protocol;
 using Bolt.Protocol.Transport;
 
 namespace Bolt.Client;
@@ -21,8 +22,8 @@ public class BoltClientOptions
     /// <summary>RPC call timeout in seconds. Default: 30.</summary>
     public int RpcTimeoutSeconds { get; set; } = 30;
 
-    /// <summary>Maximum complete Bolt frame size accepted by receive loops. Default: 100MB.</summary>
-    public int MaxFrameBytes { get; set; } = 100 * 1024 * 1024;
+    /// <summary>Maximum complete Bolt frame size accepted by receive loops.</summary>
+    public int MaxFrameBytes { get; set; } = BoltCodec.DefaultMaxFrameBytes;
 
     /// <summary>
     /// Static bearer token sent during the Bolt WebSocket handshake.

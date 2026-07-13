@@ -113,7 +113,8 @@ public static class OpenTelemetryExtensions
                     // .AddRuntimeInstrumentation()
                     
                     // Custom metrics meter
-                    .AddMeter("XFramework");
+                    .AddMeter("XFramework")
+                    .AddMeter("Bolt.Server");
 
                 // Configure exporters
                 if (consoleExporterEnabled)

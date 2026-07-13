@@ -66,6 +66,7 @@ The mental model is:
 - Remote `IDataContext.Query<T>()` is acceptable only for tenant-scoped read projections that are covered by integration or Portal contract tests.
 - Keep `Attendance.Api/Program.cs` explicit generated Bolt registration:
   `BoltHandlerRegistry.RegisterAll(client, logger, scopeFactory)`.
+- Pass `hostEnvironment` to `AddXFrameworkBoltClient` so non-Development startup validates secure `wss://` transport configuration. Do not bypass that validation with the environment-free overload or a plaintext client URL.
 - Do not remove the explicit registration just because REST endpoints still work. Production wrapper calls can fail even when HTTP routes are healthy if Bolt handlers are not registered.
 
 ## Time, Events, And Status

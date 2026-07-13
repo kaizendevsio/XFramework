@@ -30,6 +30,7 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 
 ## Realtime Rules
 
+- Pass `hostEnvironment` to `AddXFrameworkBoltClient` so non-Development startup validates secure `wss://` transport configuration. Do not bypass that validation with the environment-free overload or a plaintext client URL.
 - Publish committed chat events through the Communications outbox and realtime publisher; do not publish durable user/thread events directly from endpoint handlers before the database commit is complete.
 - Durable topics must be tenant/user/thread scoped and authorized. Avoid public thread-only topics.
 - Typing and presence are transient Bolt events. Do not persist every typing event.

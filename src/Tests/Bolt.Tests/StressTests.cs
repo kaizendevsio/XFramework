@@ -774,22 +774,32 @@ public class RpcStressTests
         var receiver = CreateClient("stream_recipient", "StreamRecipient");
         var attacker = CreateClient("stream_close_attacker", "StreamCloseAttacker");
         var received = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var streamOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         receiver.RegisterStreamHandler("upload", async stream =>
         {
+            streamOpened.TrySetResult();
             var (hasData, data) = await stream.ReadAsync();
             if (hasData)
                 received.TrySetResult(data.ToArray());
         });
+        receiver.RegisterHandler("barrier", (payload, _) =>
+            Task.FromResult((HttpStatusCode.OK, payload)));
 
         await sender.ConnectAsync();
         await receiver.ConnectAsync();
         await attacker.ConnectAsync();
 
         var stream = await sender.OpenStreamAsync("stream_recipient", "upload");
+        await streamOpened.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var closeWriter = new RentedBufferWriter(64);
         BoltCodec.WriteStreamClose(closeWriter, stream.StreamId);
         await attacker.GetPrimaryConnection().SendAsync(closeWriter.WrittenMemory, CancellationToken.None);
+        var (barrierStatus, _) = await attacker.InvokeAsync(
+            "stream_recipient",
+            "barrier",
+            ReadOnlyMemory<byte>.Empty);
+        barrierStatus.Should().Be(HttpStatusCode.OK);
 
         var payload = "still-routed"u8.ToArray();
         await stream.SendAsync(payload);
@@ -874,6 +884,225 @@ public class RpcStressTests
 // ═══════════════════════════════════════════════════════════════════
 // Media Stress Tests — Voice/Video Simulation
 // ═══════════════════════════════════════════════════════════════════
+
+[TestFixture]
+[CancelAfter(60000)]
+public class LargeRpcPendingInvocationLifecycleTests
+{
+    private WebApplication _serverApp = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private static int _portCounter = 19600;
+    private int _port;
+
+    [SetUp]
+    public async Task SetUp()
+    {
+        _port = Interlocked.Increment(ref _portCounter);
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls($"http://localhost:{_port}");
+        builder.Services.AddSingleton(sp => new BoltServer(
+            sp.GetRequiredService<ILogger<BoltServer>>(),
+            new BoltServerOptions
+            {
+                InvocationTimeoutMs = 60_000,
+                CleanupIntervalSeconds = 60,
+                MaxPendingRpcCalls = 4,
+                MaxPendingRpcCallsPerPrincipal = 1
+            }));
+        builder.Logging.SetMinimumLevel(LogLevel.Warning);
+        _serverApp = builder.Build();
+        _serverApp.UseWebSockets();
+        _serverApp.MapBolt("/bolt");
+        await _serverApp.StartAsync();
+        _loggerFactory = _serverApp.Services.GetRequiredService<ILoggerFactory>();
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        try { await _serverApp.StopAsync(); } catch { }
+    }
+
+    [Test]
+    public async Task LargeRpcPendingInvocation_EarlyStreamClose_ReleasesCountAndPrincipalQuotaImmediately()
+    {
+        var caller = CreateClient("pending_close_caller", "PendingCloseCaller");
+        var recipient = CreateClient("pending_close_recipient", "PendingCloseRecipient");
+        var releaseRecipient = BlockLargeRpcResponses(recipient);
+
+        await caller.ConnectAsync();
+        await recipient.ConnectAsync();
+
+        await using var firstStream = await OpenPendingLargeRpcAsync(
+            caller,
+            "pending_close_recipient",
+            "pending_close_caller",
+            Guid.NewGuid(),
+            expectedPayloadBytes: 64);
+        await firstStream.CloseAsync();
+
+        await WaitForPendingCountAsync(0);
+
+        var secondRequestId = Guid.NewGuid();
+        await using var secondStream = await OpenPendingLargeRpcAsync(
+            caller,
+            "pending_close_recipient",
+            "pending_close_caller",
+            secondRequestId,
+            expectedPayloadBytes: 64);
+
+        ServerHasPendingInvocation(secondRequestId).Should().BeTrue();
+        GetServer().GetHealthSnapshot().PendingRpcCalls.Should().Be(1);
+
+        await secondStream.CloseAsync(HttpStatusCode.BadRequest);
+        await WaitForPendingCountAsync(0);
+        releaseRecipient.TrySetResult();
+        await caller.DisposeAsync();
+        await recipient.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargeRpcPendingInvocation_CancelledStream_ReleasesCountAndPrincipalQuotaImmediately()
+    {
+        var caller = CreateClient("pending_cancel_caller", "PendingCancelCaller");
+        var recipient = CreateClient("pending_cancel_recipient", "PendingCancelRecipient");
+        var releaseRecipient = BlockLargeRpcResponses(recipient);
+
+        await caller.ConnectAsync();
+        await recipient.ConnectAsync();
+
+        await using var firstStream = await OpenPendingLargeRpcAsync(
+            caller,
+            "pending_cancel_recipient",
+            "pending_cancel_caller",
+            Guid.NewGuid(),
+            expectedPayloadBytes: 1);
+        await firstStream.SendAsync(new byte[1]);
+        await firstStream.CloseAsync(HttpStatusCode.RequestTimeout);
+
+        await WaitForPendingCountAsync(0);
+
+        var secondRequestId = Guid.NewGuid();
+        await using var secondStream = await OpenPendingLargeRpcAsync(
+            caller,
+            "pending_cancel_recipient",
+            "pending_cancel_caller",
+            secondRequestId,
+            expectedPayloadBytes: 64);
+
+        ServerHasPendingInvocation(secondRequestId).Should().BeTrue();
+        GetServer().GetHealthSnapshot().PendingRpcCalls.Should().Be(1);
+
+        await secondStream.CloseAsync(HttpStatusCode.RequestTimeout);
+        await WaitForPendingCountAsync(0);
+        releaseRecipient.TrySetResult();
+        await caller.DisposeAsync();
+        await recipient.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargeRpcPendingInvocation_CallerDisconnect_ReleasesCountAndPrincipalQuotaImmediately()
+    {
+        var caller = CreateClient("pending_disconnect_caller", "PendingDisconnectCaller");
+        var recipient = CreateClient("pending_disconnect_recipient", "PendingDisconnectRecipient");
+        var releaseRecipient = BlockLargeRpcResponses(recipient);
+
+        await caller.ConnectAsync();
+        await recipient.ConnectAsync();
+
+        _ = await OpenPendingLargeRpcAsync(
+            caller,
+            "pending_disconnect_recipient",
+            "pending_disconnect_caller",
+            Guid.NewGuid(),
+            expectedPayloadBytes: 64);
+        await caller.DisposeAsync();
+
+        await WaitForPendingCountAsync(0);
+        await WaitForConditionAsync(() => GetServer().ConnectedClientCount == 1);
+
+        var replacementCaller = CreateClient("pending_disconnect_caller", "PendingDisconnectCallerReplacement");
+        await replacementCaller.ConnectAsync();
+
+        var secondRequestId = Guid.NewGuid();
+        await using var secondStream = await OpenPendingLargeRpcAsync(
+            replacementCaller,
+            "pending_disconnect_recipient",
+            "pending_disconnect_caller",
+            secondRequestId,
+            expectedPayloadBytes: 64);
+
+        ServerHasPendingInvocation(secondRequestId).Should().BeTrue();
+        GetServer().GetHealthSnapshot().PendingRpcCalls.Should().Be(1);
+
+        await secondStream.CloseAsync(HttpStatusCode.RequestTimeout);
+        await WaitForPendingCountAsync(0);
+        releaseRecipient.TrySetResult();
+        await replacementCaller.DisposeAsync();
+        await recipient.DisposeAsync();
+    }
+
+    private BoltClient CreateClient(string id, string name) =>
+        new(
+            new Uri($"ws://localhost:{_port}/bolt"),
+            id,
+            name,
+            new BoltClientOptions { RpcTimeoutSeconds = 15 },
+            _loggerFactory.CreateLogger<BoltClient>());
+
+    private static TaskCompletionSource BlockLargeRpcResponses(BoltClient recipient)
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        recipient.RegisterStreamHandler("__bolt_large_rpc__", async _ => await release.Task);
+        return release;
+    }
+
+    private async Task<BoltStream> OpenPendingLargeRpcAsync(
+        BoltClient caller,
+        string recipientId,
+        string callerId,
+        Guid requestId,
+        int expectedPayloadBytes)
+    {
+        var stream = await caller.OpenStreamAsync(recipientId, "__bolt_large_rpc__");
+        var header = new byte[28];
+        requestId.TryWriteBytes(header);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(
+            header.AsSpan(16),
+            BoltCodec.Fnv1aHash("blocked-target"));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(20), expectedPayloadBytes);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(
+            header.AsSpan(24),
+            BoltCodec.Fnv1aHash(callerId));
+        await stream.SendAsync((ReadOnlyMemory<byte>)header);
+        await WaitForConditionAsync(() => ServerHasPendingInvocation(requestId));
+        return stream;
+    }
+
+    private BoltServer GetServer() => _serverApp.Services.GetRequiredService<BoltServer>();
+
+    private bool ServerHasPendingInvocation(Guid requestId)
+    {
+        var field = typeof(BoltServer).GetField("_pendingInvocations", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("BoltServer pending-invocation field not found.");
+        var pendingInvocations = field.GetValue(GetServer())!;
+        var containsKey = pendingInvocations.GetType().GetMethod("ContainsKey")
+            ?? throw new InvalidOperationException("BoltServer pending-invocation collection does not expose ContainsKey.");
+        return (bool)containsKey.Invoke(pendingInvocations, [requestId])!;
+    }
+
+    private Task WaitForPendingCountAsync(int expected) =>
+        WaitForConditionAsync(() => GetServer().GetHealthSnapshot().PendingRpcCalls == expected);
+
+    private static async Task WaitForConditionAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        while (!condition() && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
+
+        condition().Should().BeTrue("the server state should change without stale-invocation cleanup");
+    }
+}
 
 [TestFixture]
 [CancelAfter(30000)]

@@ -95,6 +95,7 @@
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\Attendance.IntegrationTests\Attendance.IntegrationTests.csproj" />
+    <Project Path="src\Tests\Bolt.Phase0Synthetics.Tests\Bolt.Phase0Synthetics.Tests.csproj" />
     <Project Path="src\Tests\Portal.E2ETests\Portal.E2ETests.csproj" />
     <Project Path="src\Tests\Inventario.Api.Tests\Inventario.Api.Tests.csproj" />
     <Project Path="src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.csproj" />
@@ -106,11 +107,13 @@
     <Project Path="src\Tests\XFramework.SourceGenerators.Tests\XFramework.SourceGenerators.Tests.csproj" />
     <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     <Project Path="src\Tests\IdentityServer.IntegrationTests\IdentityServer.IntegrationTests.csproj" />
+    <Project Path="src\Tests\IdentityServer.UnitTests\IdentityServer.UnitTests.csproj" />
     <Project Path="src\Tests\IdentityServer.Benchmarks\IdentityServer.Benchmarks.csproj" />
     <Project Path="src\Tests\Wallets.IntegrationTests\Wallets.IntegrationTests.csproj" />
     <Project Path="src\Tests\SerializerPerfTest\SerializerPerfTest.csproj" />
   </Folder>
   <Folder Name="/Tools/">
+    <Project Path="src\Tools\XFramework.Bolt.Phase0Synthetics\XFramework.Bolt.Phase0Synthetics.csproj" />
     <Project Path="src\Tools\XFramework.MigrationRunner\XFramework.MigrationRunner.csproj" />
   </Folder>
 </Solution>

@@ -33,6 +33,11 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly object _connectionsLock = new();
     private volatile bool _isRegistered;
     private volatile bool _disposed;
+    private long _totalSendFailures;
+    private long _totalSendTimeouts;
+    private long _totalReceiveLoopFaults;
+    private long _totalUnexpectedDisconnects;
+    private long _totalSuccessfulReconnects;
 
     private readonly ConcurrentDictionary<Guid, PooledRpcCall> _pendingCalls = new();
     private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _handlers = new();
@@ -125,7 +130,12 @@ public sealed class BoltClient : IAsyncDisposable
             faultedSendLoops,
             faultedReceiveLoops,
             pendingSendsUnhealthyThreshold,
-            activeSendUnhealthyThresholdMs);
+            activeSendUnhealthyThresholdMs,
+            Interlocked.Read(ref _totalSendFailures),
+            Interlocked.Read(ref _totalSendTimeouts),
+            Interlocked.Read(ref _totalReceiveLoopFaults),
+            Interlocked.Read(ref _totalUnexpectedDisconnects),
+            Interlocked.Read(ref _totalSuccessfulReconnects));
     }
 
     public BoltClient(Uri serverUri, string clientId, string clientName, BoltClientOptions config, ILogger logger)
@@ -384,29 +394,74 @@ public sealed class BoltClient : IAsyncDisposable
     private async Task<BoltConnection> CreateConnectionAsync(CancellationToken ct)
     {
         var transport = await _negotiator.ConnectAsync(_serverUri, _config, ct);
-        var sendEnqueueTimeoutMs = _config.SendEnqueueTimeoutMs > 0
-            ? _config.SendEnqueueTimeoutMs
-            : (int)Math.Min(int.MaxValue, _rpcTimeout.TotalMilliseconds);
-        var conn = new BoltConnection(transport, _config.SendQueueCapacity, sendEnqueueTimeoutMs);
+        using var registrationCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        registrationCts.CancelAfter(Math.Max(1, _config.TransportAttemptTimeoutMs));
 
-        // Send registration frame (same for all transports)
-        var regWriter = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteRegister(regWriter, _clientId, _clientName);
-        await transport.SendAsync(regWriter.WrittenMemory, ct);
+        try
+        {
+            var sendEnqueueTimeoutMs = _config.SendEnqueueTimeoutMs > 0
+                ? _config.SendEnqueueTimeoutMs
+                : (int)Math.Min(int.MaxValue, _rpcTimeout.TotalMilliseconds);
+            var conn = new BoltConnection(transport, _config.SendQueueCapacity, sendEnqueueTimeoutMs);
+            ObserveConnection(conn);
 
-        // Read registration ack
-        var ackBuffer = ArrayPool<byte>.Shared.Rent(2);
-        var (ackBytes, _) = await transport.ReceiveAsync(ackBuffer, ct);
-        var ackValid = ackBytes >= 2 && (FrameType)ackBuffer[0] == FrameType.RegisterAck && ackBuffer[1] == 1;
-        ArrayPool<byte>.Shared.Return(ackBuffer);
-        if (!ackValid)
-            throw new InvalidOperationException("Server rejected registration");
+            // Registration send and ACK share one transport-attempt deadline.
+            var regWriter = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteRegister(regWriter, _clientId, _clientName);
+            await transport.SendAsync(regWriter.WrittenMemory, registrationCts.Token);
 
-        var receiveCts = new CancellationTokenSource();
-        conn.ReceiveCts = receiveCts;
-        conn.StartSendLoop(receiveCts.Token);
-        conn.ReceiveLoop = Task.Run(() => ReceiveLoopAsync(conn, receiveCts.Token));
-        return conn;
+            var ackBuffer = ArrayPool<byte>.Shared.Rent(2);
+            try
+            {
+                var (ackBytes, _) = await transport.ReceiveAsync(ackBuffer, registrationCts.Token);
+                var ackValid = ackBytes >= 2 &&
+                               (FrameType)ackBuffer[0] == FrameType.RegisterAck &&
+                               ackBuffer[1] == 1;
+                if (!ackValid)
+                    throw new InvalidOperationException("Server rejected registration");
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(ackBuffer);
+            }
+
+            var receiveCts = new CancellationTokenSource();
+            conn.ReceiveCts = receiveCts;
+            conn.StartSendLoop(receiveCts.Token);
+            conn.ReceiveLoop = Task.Run(() => ReceiveLoopAsync(conn, receiveCts.Token));
+            return conn;
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            await DisposeFailedTransportAsync(transport, registrationCts.Token);
+            throw new TimeoutException(
+                $"Bolt registration timed out after {_config.TransportAttemptTimeoutMs} ms.",
+                ex);
+        }
+        catch
+        {
+            await DisposeFailedTransportAsync(transport, registrationCts.Token);
+            throw;
+        }
+    }
+
+    private static async ValueTask DisposeFailedTransportAsync(
+        IBoltConnection transport,
+        CancellationToken deadlineToken)
+    {
+        try
+        {
+            var disposal = transport.DisposeAsync();
+            if (disposal.IsCompletedSuccessfully)
+            {
+                disposal.GetAwaiter().GetResult();
+                return;
+            }
+
+            await disposal.AsTask().WaitAsync(deadlineToken);
+        }
+        catch (OperationCanceledException) when (deadlineToken.IsCancellationRequested) { }
+        catch { }
     }
 
     private async Task ScaleUpAsync()
@@ -1156,22 +1211,30 @@ public sealed class BoltClient : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { _logger.LogWarning("Bolt {Transport} receive error: {Error}", conn.TransportType, ex.Message); }
+        catch (Exception ex)
+        {
+            conn.RecordReceiveLoopFault();
+            _logger.LogWarning("Bolt {Transport} receive error: {Error}", conn.TransportType, ex.Message);
+        }
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             if (!_disposed)
             {
-                var noConnections = RemoveConnection(conn);
-                if (noConnections)
+                var noConnections = RemoveConnection(conn, out var removed);
+                if (removed && _isRegistered)
                 {
-                    _isRegistered = false;
-                    RaiseLifecycleEvent(Disconnected);
-                    foreach (var (id, _) in _pendingCalls)
-                        if (_pendingCalls.TryRemove(id, out var call))
-                            call.SetException(new InvalidOperationException("Connection lost"));
-                    _ = Task.Run(() => ReconnectAsync());
+                    conn.RecordUnexpectedDisconnect();
+                    if (noConnections)
+                    {
+                        _isRegistered = false;
+                        RaiseLifecycleEvent(Disconnected);
+                        foreach (var (id, _) in _pendingCalls)
+                            if (_pendingCalls.TryRemove(id, out var call))
+                                call.SetException(new InvalidOperationException("Connection lost"));
+                        _ = Task.Run(() => ReconnectAsync());
+                    }
                 }
             }
         }
@@ -1343,6 +1406,7 @@ public sealed class BoltClient : IAsyncDisposable
         {
             RaiseLifecycleEvent(Reconnecting);
             await ConnectWithRetryAsync(CancellationToken.None);
+            Interlocked.Increment(ref _totalSuccessfulReconnects);
             RaiseLifecycleEvent(Reconnected);
 
             // Re-send all active subscriptions after reconnect
@@ -1421,11 +1485,11 @@ public sealed class BoltClient : IAsyncDisposable
         }
     }
 
-    private bool RemoveConnection(BoltConnection conn)
+    private bool RemoveConnection(BoltConnection conn, out bool removed)
     {
         lock (_connectionsLock)
         {
-            _connections.Remove(conn);
+            removed = _connections.Remove(conn);
             return _connections.Count == 0;
         }
     }
@@ -1437,6 +1501,32 @@ public sealed class BoltClient : IAsyncDisposable
             var connections = _connections.ToArray();
             _connections.Clear();
             return connections;
+        }
+    }
+
+    private void ObserveConnection(BoltConnection connection) =>
+        connection.FailureObserver = RecordConnectionFailure;
+
+    private void RecordConnectionFailure(BoltConnectionFailureKind failure)
+    {
+        switch (failure)
+        {
+            case BoltConnectionFailureKind.SendFailure:
+            case BoltConnectionFailureKind.EnqueueFailure:
+                Interlocked.Increment(ref _totalSendFailures);
+                break;
+            case BoltConnectionFailureKind.SendTimeout:
+            case BoltConnectionFailureKind.EnqueueTimeout:
+                Interlocked.Increment(ref _totalSendTimeouts);
+                break;
+            case BoltConnectionFailureKind.ReceiveLoopFault:
+                Interlocked.Increment(ref _totalReceiveLoopFaults);
+                break;
+            case BoltConnectionFailureKind.UnexpectedDisconnect:
+                Interlocked.Increment(ref _totalUnexpectedDisconnects);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(failure), failure, null);
         }
     }
 
@@ -1491,6 +1581,16 @@ public sealed class BoltClient : IAsyncDisposable
     }
 }
 
+internal enum BoltConnectionFailureKind
+{
+    SendFailure,
+    SendTimeout,
+    EnqueueFailure,
+    EnqueueTimeout,
+    ReceiveLoopFault,
+    UnexpectedDisconnect
+}
+
 /// <summary>
 /// A single transport connection in the Bolt client pool.
 /// Uses a Channel-based send queue with a dedicated background send loop
@@ -1533,6 +1633,7 @@ public sealed class BoltConnection
     public CancellationTokenSource? ReceiveCts { get; set; }
     public Task? ReceiveLoop { get; set; }
     public Task? SendLoop { get; set; }
+    internal Action<BoltConnectionFailureKind>? FailureObserver { get; set; }
     public int PendingSends => _pendingSends;
     public int ActiveSends => _activeSends;
     public long ActiveSendElapsedMs
@@ -1595,8 +1696,17 @@ public sealed class BoltConnection
                             await Transport.SendAsync(buf.AsMemory(0, len), linkedSendCts.Token);
                         }
                     }
+                    catch (OperationCanceledException) when (
+                        !ct.IsCancellationRequested &&
+                        !sendCt.IsCancellationRequested)
+                    {
+                        FailureObserver?.Invoke(BoltConnectionFailureKind.SendTimeout);
+                    }
                     catch (OperationCanceledException) { }
-                    catch { /* Transport error — receive loop will detect disconnect */ }
+                    catch
+                    {
+                        FailureObserver?.Invoke(BoltConnectionFailureKind.SendFailure);
+                    }
                     finally
                     {
                         if (Interlocked.Decrement(ref _activeSends) <= 0)
@@ -1649,8 +1759,24 @@ public sealed class BoltConnection
 
             await _sendChannel.Writer.WriteAsync((buf, len, ct), enqueueToken);
         }
+        catch (OperationCanceledException) when (
+            !ct.IsCancellationRequested &&
+            timeoutCts is { IsCancellationRequested: true })
+        {
+            FailureObserver?.Invoke(BoltConnectionFailureKind.EnqueueTimeout);
+            ArrayPool<byte>.Shared.Return(buf);
+            Interlocked.Decrement(ref _pendingSends);
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            ArrayPool<byte>.Shared.Return(buf);
+            Interlocked.Decrement(ref _pendingSends);
+            throw;
+        }
         catch
         {
+            FailureObserver?.Invoke(BoltConnectionFailureKind.EnqueueFailure);
             ArrayPool<byte>.Shared.Return(buf);
             Interlocked.Decrement(ref _pendingSends);
             throw;
@@ -1664,6 +1790,12 @@ public sealed class BoltConnection
 
     /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>
     public void CompleteSendChannel() => _sendChannel.Writer.TryComplete();
+
+    internal void RecordReceiveLoopFault() =>
+        FailureObserver?.Invoke(BoltConnectionFailureKind.ReceiveLoopFault);
+
+    internal void RecordUnexpectedDisconnect() =>
+        FailureObserver?.Invoke(BoltConnectionFailureKind.UnexpectedDisconnect);
 }
 
 /// <summary>Response data from an RPC call.</summary>
@@ -1685,7 +1817,12 @@ public sealed record BoltClientHealthSnapshot(
     int FaultedSendLoops,
     int FaultedReceiveLoops,
     int PendingSendsUnhealthyThreshold,
-    int ActiveSendUnhealthyThresholdMs)
+    int ActiveSendUnhealthyThresholdMs,
+    long TotalSendFailures,
+    long TotalSendTimeouts,
+    long TotalReceiveLoopFaults,
+    long TotalUnexpectedDisconnects,
+    long TotalSuccessfulReconnects)
 {
     public bool IsHealthy =>
         IsRegistered &&

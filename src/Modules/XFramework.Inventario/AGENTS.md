@@ -79,6 +79,7 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 - Direct remote mutation is acceptable only for intentionally allowlisted simple catalog/admin entities and only when no richer wrapper request exists.
 - Keep wrapper completeness coverage current. When adding a new `IBoltRequest`, add a direct `IInventarioServiceWrapper` integration test and keep `WrapperCoverageCompletenessTests` green.
 - Do not assume HTTP health means wrapper health. Bolt handler registration and generated wrapper routing must be covered by integration tests for wrapper changes.
+- Pass `hostEnvironment` to `AddXFrameworkBoltClient` so non-Development startup validates secure `wss://` transport configuration. Do not bypass that validation with the environment-free overload or a plaintext client URL.
 - POS and sales modules must consume Inventario through wrappers, not cross-module writes. Use `SearchSellableProducts`, `GetSellableProduct`, and `GetProductVariations` for POS catalog line selection, then use the reservation, stock movement, balance, and movement query wrappers with stable `ReferenceType`/`ReferenceId` values for inventory effects and follow-up reads. Do not add POS-owned sale, payment, tax, or receipt behavior to Inventario.
 
 ## Feature Gates And Tenant Modules

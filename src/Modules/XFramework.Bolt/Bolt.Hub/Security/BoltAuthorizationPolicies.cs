@@ -12,11 +12,14 @@ public static class BoltAuthorizationPolicies
         options.AddPolicy(ServiceDiscoveryReader, policy =>
         {
             policy.RequireAuthenticatedUser();
-            policy.RequireAssertion(context =>
-                HasScope(context.User, XFrameworkServiceScopes.BoltService) ||
-                HasAdminScope(context.User) ||
-                context.User.IsInRole("Admin"));
+            policy.RequireAssertion(context => IsServiceDiscoveryReader(context.User));
         });
+
+    public static bool IsServiceDiscoveryReader(ClaimsPrincipal? user) =>
+        user?.Identity?.IsAuthenticated == true &&
+        (HasScope(user, XFrameworkServiceScopes.BoltService) ||
+         HasAdminScope(user) ||
+         user.IsInRole("Admin"));
 
     private static bool HasAdminScope(ClaimsPrincipal user) =>
         XFrameworkServiceScopes.AdminDefaults

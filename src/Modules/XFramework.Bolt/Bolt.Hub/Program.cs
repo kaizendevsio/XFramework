@@ -16,6 +16,9 @@ builder.Services.AddXFrameworkRateLimiting();
 
 var app = (WebApplication)builder.Build();
 
+// Consume and remove Bolt query tokens before application logging and request telemetry.
+app.UseMiddleware<BoltAccessTokenRedactionMiddleware>();
+
 // Add correlation ID middleware early in the pipeline for request tracing
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();

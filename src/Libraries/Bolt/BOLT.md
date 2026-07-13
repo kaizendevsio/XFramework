@@ -1,6 +1,6 @@
 # Bolt
 
-A high-performance binary RPC and streaming protocol for .NET. Faster than gRPC, leaner than SignalR, with bidirectional streaming and zero GC pressure.
+A compact binary RPC and streaming protocol for .NET with Hub routing, bidirectional calls, and streaming support.
 
 ## Why Bolt?
 
@@ -9,12 +9,15 @@ Bolt was built to answer a simple question: *what if we stripped away every laye
 The result is a protocol that:
 - Uses a compact **33-byte request header** instead of HTTP/2 frames, HPACK headers, and Protobuf encoding
 - Routes messages through a hub by reading only the header — **the payload is never decoded** during routing
-- Achieves **zero Gen0 garbage collections** under any load level
 - Scales via **connection pooling** — multiple WebSocket connections per client, distributed round-robin
 
 ## Performance
 
-All benchmarks run on .NET 10, Windows 11. "Hub" means the message is routed through a central server (Client -> Hub -> Service -> Hub -> Client). "Direct" means client connects straight to the service. All transports use the same hub architecture for fair comparison.
+The tables below are retained only as historical local microbenchmark observations. They are not an equivalent or production-grade comparison: the Bolt and gRPC cases use different connection counts and response-processing work, concurrent batch results are not request-level latency measurements, and the tests run in-process over plaintext localhost. They must not be cited as evidence that Bolt is universally faster or more memory-efficient than gRPC or SignalR.
+
+Current benchmarks are useful for regression detection within a fixed workload. Performance certification requires equivalent typed and raw work, tuned transports, TLS or mTLS, request-level latency histograms, open- and closed-loop load, allocations and retained memory, network impairment, failure injection, and reproducible raw artifacts.
+
+"Hub" means the message is routed through a central server (Client -> Hub -> Service -> Hub -> Client). "Direct" means the client connects straight to the service.
 
 ### Sequential Latency (single request)
 
@@ -56,11 +59,13 @@ Each Bolt client uses 2 WebSocket connections. Each gRPC client uses 1 HTTP/2 ch
 | 50 | 1,148 us | 64 KB | 2,523 us | 1,002 KB |
 | 100 | 2,131 us | 126 KB | 4,869 us | 2,001 KB |
 
-At 100 clients, Bolt is 56% faster and uses 94% less memory than gRPC.
+This historical result excludes important setup and retained-memory costs and is not a general scalability claim.
 
-## Head-to-Head: Bolt vs gRPC
+## Historical Bolt and gRPC Observations
 
-| Metric | Bolt | gRPC | Winner |
+This table summarizes the same non-equivalent localhost run and does not identify a universal winner.
+
+| Metric | Bolt | gRPC | Historical local delta |
 |--------|------|------|--------|
 | Sequential latency (hub) | 121 us | 279 us | Bolt by 57% |
 | Concurrent latency (hub) | 1,329 us | 1,679 us | Bolt by 21% |
@@ -68,10 +73,10 @@ At 100 clients, Bolt is 56% faster and uses 94% less memory than gRPC.
 | Peak throughput (direct) | 78,709 ops/s | 57,659 ops/s | Bolt by 37% |
 | Memory per request | 1.3 KB | 20 KB | Bolt by 94% |
 | Memory at 100 clients | 126 KB | 2,001 KB | Bolt by 94% |
-| GC pressure | Zero | Zero | Tie |
+| GC pressure | Allocations observed | Allocations observed | Not established |
 | Streaming | IAsyncEnumerable | IAsyncEnumerable | Tie |
 | Browser support | WebSocket (native) | gRPC-Web (proxy) | Bolt |
-| Serialization | MemoryPack (binary) | Protobuf (binary) | Bolt (faster) |
+| Serialization | MemoryPack (binary) | Protobuf (binary) | Workload-dependent |
 | Schema required | No | Yes (.proto) | Bolt (simpler) |
 | Hub routing | Built-in | Not built-in | Bolt |
 
@@ -80,6 +85,8 @@ At 100 clients, Bolt is 56% faster and uses 94% less memory than gRPC.
 ### Wire Protocol
 
 Every Bolt frame starts with a 1-byte type followed by a fixed-size header. The hub only reads the header for routing — the payload bytes are forwarded without decoding.
+
+XFramework Hub currently caps each frame at 8 MiB as a provisional containment limit. Large logical RPC responses remain supported through Bolt's chunked streaming path; callers must not send a single frame above the negotiated or configured limit.
 
 ```
 RPC Request:  [1:type] [16:requestId] [4:recipientHash] [4:senderHash] [4:commandHash] [4:payloadLen] [payload]   33B header
@@ -93,11 +100,17 @@ Routing uses FNV-1a hashes (4-byte integer comparison) instead of string matchin
 
 ### Registration Identity Binding
 
-Authenticated service connections can bind the Bolt register identity to the service identity from the authenticated principal. The reusable server exposes `BoltServerOptions.RegistrationIdentityBindingMode` with `Off`, `Audit`, and `Enforce` modes. XFramework Bolt Hub configures this through `BoltConfiguration:RegistrationIdentityBindingMode`, reserves the central `XFrameworkServiceNames.All` identities, and defaults to `Audit` so mismatches are visible before rollout switches to `Enforce`.
+Authenticated service connections can bind the Bolt register identity to the service identity from the authenticated principal. The reusable server exposes `BoltServerOptions.RegistrationIdentityBindingMode` with `Off`, `Audit`, and `Enforce` modes. XFramework Bolt Hub configures this through `BoltConfiguration:RegistrationIdentityBindingMode`, reserves the central `XFrameworkServiceNames.All` identities, and explicitly uses `Enforce` in every non-Development configuration. Development explicitly uses `Audit` only for compatibility diagnostics.
 
 For service clients, the expected Bolt registration is `clientName == authenticated service name` and `clientId == SHA256(clientName)`. Non-service user/browser clients keep the normal registration path unless they attempt to claim a reserved service identity by name, prefix, or reserved deterministic service client ID.
 
-XFramework Hub intentionally fixes the required service scope to `bolt.service` and resolves service identity from `client_id`, `service`, `azp`, then `sub`. Set `BoltConfiguration:RegistrationIdentityBindingMode` to `Audit` during rollout and watch for `Bolt registration identity mismatch allowed in audit mode` warnings. Switch to `Enforce` once all callers register with their authenticated service identity.
+XFramework Hub intentionally fixes the required service scope to `bolt.service` and resolves service identity from `client_id`, `service`, `azp`, then `sub`. Non-Development deployments must not override `BoltConfiguration:RegistrationIdentityBindingMode=Enforce`. An identity mismatch is a deployment or caller defect and must fail closed.
+
+### WebSocket Query Tokens
+
+The XFramework Hub accepts `access_token` from the query string only on `/bolt/ws`. Its first application middleware removes that parameter before authentication continues and sanitizes the request surfaces used by downstream application logs and telemetry while preserving all other query parameters.
+
+This sanitation cannot protect logs emitted before the first application middleware, including web-server request-line diagnostics. Reverse proxies, ingress controllers, load balancers, WAFs, and CDN access logs must disable query-string capture for `/bolt/ws` or explicitly redact `access_token`. Bolt WebSocket connections carrying query tokens must use TLS (`wss://`) outside local development.
 
 ### Architecture
 
@@ -119,7 +132,7 @@ For direct mode (no hub), the client connects straight to the service:
   Client ───WS──▶ Service (handles requests locally)
 ```
 
-### Why Bolt Beats gRPC
+### Transport Design Compared with gRPC
 
 **gRPC's overhead at each hop:**
 1. HTTP/2 HPACK header encode/decode
@@ -127,13 +140,13 @@ For direct mode (no hub), the client connects straight to the service:
 3. HTTP/2 stream frame management
 4. gRPC status and trailer processing
 
-**Bolt eliminates all of this:**
+**Bolt uses different framing and routing work:**
 1. Compact binary headers — no HTTP framing
-2. MemoryPack payload — faster than Protobuf, no schema required
+2. MemoryPack payloads in the current .NET typed API; relative serializer performance is workload-dependent
 3. Hub forwards raw bytes — zero decode at the routing layer
 4. FNV-1a hash routing — 4-byte integer comparison
 
-**Why Bolt Beats SignalR**
+**Transport design compared with SignalR**
 
 SignalR adds overhead from:
 1. MessagePack encoding for the SignalR protocol layer (on top of your payload)
@@ -141,7 +154,7 @@ SignalR adds overhead from:
 3. Connection management overhead
 4. No native connection pooling — single connection per client
 
-SignalR also collapses under high concurrent load (5,129 us at 64 concurrent vs Bolt's 1,329 us).
+The historical concurrent result is not a fair basis for a general SignalR performance claim.
 
 ## Features
 

@@ -7,6 +7,6 @@ public sealed class WrapperInstaller : IInstaller
 {
     public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddXFrameworkBoltClient(configuration);
+        services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
     }
 }

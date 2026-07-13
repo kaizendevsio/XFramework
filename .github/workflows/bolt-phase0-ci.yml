@@ -1,0 +1,455 @@
+name: Bolt Phase 0 CI
+
+on:
+  pull_request:
+    paths:
+      - .dockerignore
+      - .env.example
+      - .github/actions/**
+      - .github/actionlint.yaml
+      - .github/known_hosts/**
+      - .github/workflows/**
+      - deploy/**
+      - scripts/**
+      - src/**
+      - Directory.Build.props
+      - Directory.Packages.props
+      - Dockerfile*
+      - NuGet.config
+      - Version.props
+      - XFramework.slnx
+      - docker-compose.yml
+      - global.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bolt-phase0-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Phase 0
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Compile Phase 0 Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' phase0_python < <(
+            find scripts -maxdepth 1 -type f -name '*phase0*.py' -print0 | sort -z
+          )
+          if [ "${#phase0_python[@]}" -ne 35 ]; then
+            printf 'Expected exactly 35 Phase 0 Python files, found %s\n' "${#phase0_python[@]}" >&2
+            printf '  %s\n' "${phase0_python[@]}" >&2
+            exit 1
+          fi
+          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/bolt-phase0-pycache" \
+            python3 -m py_compile "${phase0_python[@]}"
+
+      - name: Validate workflow schema and expressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="1.7.8"
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          binary="$RUNNER_TEMP/actionlint"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
+          printf '%s  %s\n' \
+            'be92c2652ab7b6d08425428797ceabeb16e31a781c07bc388456b4e592f3e36a' \
+            "$archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP" actionlint
+          "$binary" -color -shellcheck= -pyflakes=
+
+      - name: Extract and syntax-check workflow Bash
+        shell: bash
+        run: |
+          set -euo pipefail
+          venv="$RUNNER_TEMP/bolt-phase0-yaml-venv"
+          python3 -m venv "$venv"
+          "$venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir PyYAML==6.0.2
+          "$venv/bin/python" - <<'PY'
+          import re
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          import yaml
+
+          workflow_paths = sorted(Path(".github/workflows").glob("*.y*ml"))
+          if not workflow_paths:
+              raise SystemExit("No workflow YAML files found")
+
+          expression = re.compile(r"\$\{\{.*?\}\}", re.DOTALL)
+          heredoc = re.compile(
+              r"(?<!<)<<(?P<strip>-?)(?!<)\s*(?P<quote>['\"]?)"
+              r"(?P<delimiter>[A-Za-z_][A-Za-z0-9_]*)(?P=quote)"
+          )
+          bash_delimiters = {"EOF", "REMOTE_SCRIPT", "REMOTE_OBSERVATION"}
+          non_bash_delimiters = {"PY"}
+          bash_blocks = []
+          embedded_bash_blocks = []
+
+          def effective_shell(document, job, step):
+              workflow_run = (document.get("defaults") or {}).get("run") or {}
+              job_run = (job.get("defaults") or {}).get("run") or {}
+              return step.get("shell") or job_run.get("shell") or workflow_run.get("shell")
+
+          def is_bash_step(document, job, step):
+              shell = effective_shell(document, job, step)
+              if shell is not None:
+                  return str(shell).split()[0] == "bash"
+              runs_on = job.get("runs-on")
+              return isinstance(runs_on, str) and "ubuntu" in runs_on
+
+          def extract_embedded_bash(label, script):
+              lines = script.splitlines()
+              index = 0
+              while index < len(lines):
+                  match = heredoc.search(lines[index])
+                  if match is None:
+                      index += 1
+                      continue
+
+                  delimiter = match.group("delimiter")
+                  strip_tabs = match.group("strip") == "-"
+                  end = index + 1
+                  while end < len(lines):
+                      candidate = lines[end].lstrip("\t") if strip_tabs else lines[end]
+                      if candidate == delimiter:
+                          break
+                      end += 1
+                  if end == len(lines):
+                      raise SystemExit(f"{label}: unterminated heredoc {delimiter}")
+
+                  body = "\n".join(lines[index + 1 : end]) + "\n"
+                  if delimiter in bash_delimiters:
+                      embedded_bash_blocks.append((f"{label}:{delimiter}", body))
+                  elif delimiter not in non_bash_delimiters:
+                      raise SystemExit(f"{label}: unclassified heredoc delimiter {delimiter}")
+                  index = end + 1
+
+          for path in workflow_paths:
+              document = yaml.load(
+                  path.read_text(encoding="utf-8"),
+                  Loader=yaml.BaseLoader,
+              )
+              if not isinstance(document, dict):
+                  raise SystemExit(f"{path}: workflow root must be a mapping")
+              jobs = document.get("jobs")
+              if not isinstance(jobs, dict):
+                  raise SystemExit(f"{path}: jobs must be a mapping")
+
+              for job_id, job in jobs.items():
+                  if not isinstance(job, dict):
+                      raise SystemExit(f"{path}: job {job_id} must be a mapping")
+                  for step_number, step in enumerate(job.get("steps") or (), start=1):
+                      if not isinstance(step, dict) or "run" not in step:
+                          continue
+                      if not is_bash_step(document, job, step):
+                          continue
+                      script = step["run"]
+                      if not isinstance(script, str):
+                          raise SystemExit(f"{path}: {job_id} step {step_number} run must be text")
+                      label = f"{path}:{job_id}:step-{step_number}"
+                      bash_blocks.append((label, script))
+                      extract_embedded_bash(label, script)
+
+          def check_bash(label, script, directory, number):
+              sanitized = expression.sub("GITHUB_EXPRESSION", script)
+              candidate = Path(directory) / f"block-{number}.sh"
+              candidate.write_text(sanitized, encoding="utf-8")
+              result = subprocess.run(
+                  ["bash", "-n", str(candidate)],
+                  check=False,
+                  capture_output=True,
+                  text=True,
+              )
+              if result.returncode:
+                  raise SystemExit(f"{label}: bash -n failed\n{result.stderr}")
+
+          with tempfile.TemporaryDirectory(prefix="bolt-phase0-bash-") as directory:
+              for number, (label, script) in enumerate(
+                  bash_blocks + embedded_bash_blocks,
+                  start=1,
+              ):
+                  check_bash(label, script, directory, number)
+
+          print(
+              f"Parsed {len(workflow_paths)} workflows; checked "
+              f"{len(bash_blocks)} run blocks and "
+              f"{len(embedded_bash_blocks)} embedded Bash heredocs."
+          )
+          PY
+
+      - name: Syntax-check Phase 0 shell files
+        shell: bash
+        run: |
+          set -euo pipefail
+          shell_files=(
+            deploy/bootstrap-xframework-bolt-phase0-root.sh
+            scripts/run-bolt-phase0-synthetics.sh
+            scripts/run-bolt-phase0-watchdog.sh
+            scripts/verify-bolt-phase0-tls.sh
+            scripts/verify-identityserver-phase0-tls.sh
+            src/Tests/Bolt.Phase0Synthetics.Tests/run-wrapper-harness.sh
+          )
+          if [ "${#shell_files[@]}" -ne 6 ]; then
+            echo "Phase 0 shell inventory must contain exactly six files" >&2
+            exit 1
+          fi
+          for shell_file in "${shell_files[@]}"; do
+            echo "Checking $shell_file"
+            bash -n "$shell_file"
+          done
+
+      - name: Exercise Phase 0 synthetic wrapper contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          harness="src/Tests/Bolt.Phase0Synthetics.Tests/run-wrapper-harness.sh"
+          runner="scripts/run-bolt-phase0-synthetics.sh"
+          env_parser="scripts/verify-bolt-phase0-env.py"
+          bash "$harness" "$runner" "$env_parser" pass canary
+          negative_scenarios=(
+            refresh-output
+            application-token-leak
+            application-marker-leak
+            tampered-report
+            hook-output
+            token-changed
+            missing-receipt
+          )
+          for scenario in "${negative_scenarios[@]}"; do
+            bash "$harness" "$runner" "$env_parser" "$scenario" canary
+          done
+
+      - name: Check changed lines for whitespace errors
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$BASE_SHA" ]; then
+            git diff --check "$BASE_SHA...HEAD"
+          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^..HEAD
+          else
+            echo "Cannot determine a comparison commit for whitespace validation" >&2
+            exit 1
+          fi
+
+      - name: Restore solution
+        run: dotnet restore XFramework.slnx
+
+      - name: Build solution and Bolt Hub container
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet build XFramework.slnx --configuration Release --no-restore
+          docker build \
+            --file Dockerfile \
+            --build-arg PROJECT_PATH=src/Modules/XFramework.Bolt/Bolt.Hub/Bolt.Hub.csproj \
+            --tag xframework/bolt-hub:phase0-ci \
+            .
+
+      - name: Test Bolt with required Redis
+        shell: bash
+        env:
+          BOLT_TEST_REDIS_CONNECTION: localhost:6379,abortConnect=false
+          BOLT_TEST_REDIS_REQUIRED: "true"
+        run: |
+          set -euo pipefail
+          results="$RUNNER_TEMP/bolt-tests"
+          mkdir -p "$results"
+          dotnet test src/Tests/Bolt.Tests/Bolt.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --no-restore \
+            --logger "trx;LogFileName=bolt-tests.trx" \
+            --results-directory "$results"
+          python3 - "$results/bolt-tests.trx" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          counters = next(
+              node
+              for node in ET.parse(sys.argv[1]).getroot().iter()
+              if node.tag.rsplit("}", 1)[-1] == "Counters"
+          )
+          total = int(counters.attrib.get("total", "0"))
+          passed = int(counters.attrib.get("passed", "0"))
+          if total <= 0 or passed != total:
+              raise SystemExit(
+                  f"Bolt.Tests must execute and pass at least one test: {counters.attrib}"
+              )
+          unexpected = {
+              name: int(counters.attrib.get(name, "0"))
+              for name in ("notExecuted", "notRunnable", "inconclusive", "pending")
+              if int(counters.attrib.get(name, "0"))
+          }
+          if unexpected:
+              raise SystemExit(f"Bolt.Tests must have zero skips: {unexpected}")
+          print(f"Bolt.Tests passed with zero skips: {counters.attrib}")
+          PY
+
+      - name: Test IdentityServer
+        shell: bash
+        run: |
+          set -euo pipefail
+          results="$RUNNER_TEMP/identityserver-tests"
+          mkdir -p "$results"
+          dotnet test src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj \
+            --configuration Release \
+            --no-build \
+            --no-restore \
+            --logger "trx;LogFileName=identityserver-tests.trx" \
+            --results-directory "$results"
+          python3 - "$results/identityserver-tests.trx" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          counters = next(
+              node
+              for node in ET.parse(sys.argv[1]).getroot().iter()
+              if node.tag.rsplit("}", 1)[-1] == "Counters"
+          )
+          total = int(counters.attrib.get("total", "0"))
+          passed = int(counters.attrib.get("passed", "0"))
+          if total <= 0 or passed != total:
+              raise SystemExit(
+                  "IdentityServer.UnitTests must execute and pass at least one test: "
+                  f"{counters.attrib}"
+              )
+          print(f"IdentityServer.UnitTests passed: {counters.attrib}")
+          PY
+
+      - name: Test XFramework Core
+        shell: bash
+        run: |
+          set -euo pipefail
+          results="$RUNNER_TEMP/xframework-core-tests"
+          mkdir -p "$results"
+          dotnet test src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --no-restore \
+            --logger "trx;LogFileName=xframework-core-tests.trx" \
+            --results-directory "$results"
+          python3 - "$results/xframework-core-tests.trx" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          counters = next(
+              node
+              for node in ET.parse(sys.argv[1]).getroot().iter()
+              if node.tag.rsplit("}", 1)[-1] == "Counters"
+          )
+          total = int(counters.attrib.get("total", "0"))
+          passed = int(counters.attrib.get("passed", "0"))
+          if total <= 0 or passed != total:
+              raise SystemExit(
+                  "XFramework.Core.Tests must execute and pass at least one test: "
+                  f"{counters.attrib}"
+              )
+          print(f"XFramework.Core.Tests passed: {counters.attrib}")
+          PY
+
+      - name: Test Phase 0 synthetics
+        shell: bash
+        run: |
+          set -euo pipefail
+          results="$RUNNER_TEMP/bolt-phase0-synthetics-tests"
+          mkdir -p "$results"
+          dotnet test src/Tests/Bolt.Phase0Synthetics.Tests/Bolt.Phase0Synthetics.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --no-restore \
+            --logger "trx;LogFileName=bolt-phase0-synthetics-tests.trx" \
+            --results-directory "$results"
+          python3 - "$results/bolt-phase0-synthetics-tests.trx" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          counters = next(
+              node
+              for node in ET.parse(sys.argv[1]).getroot().iter()
+              if node.tag.rsplit("}", 1)[-1] == "Counters"
+          )
+          total = int(counters.attrib.get("total", "0"))
+          passed = int(counters.attrib.get("passed", "0"))
+          if total <= 0 or passed != total:
+              raise SystemExit(
+                  "Bolt.Phase0Synthetics.Tests must execute and pass at least one test: "
+                  f"{counters.attrib}"
+              )
+          unexpected = {
+              name: int(counters.attrib.get(name, "0"))
+              for name in ("notExecuted", "notRunnable", "inconclusive", "pending")
+              if int(counters.attrib.get(name, "0"))
+          }
+          if unexpected:
+              raise SystemExit(f"Bolt.Phase0Synthetics.Tests must have zero skips: {unexpected}")
+          print(f"Bolt.Phase0Synthetics.Tests passed with zero skips: {counters.attrib}")
+          PY
+
+      - name: Run privileged Phase 0 Python contracts
+        shell: bash
+        run: |
+          set -uo pipefail
+          mapfile -d '' test_files < <(
+            find scripts -maxdepth 1 -type f -name '*-test.py' -print0 | sort -z
+          )
+          if [ "${#test_files[@]}" -ne 19 ]; then
+            printf 'Expected exactly 19 Phase 0 Python test files, found %s\n' "${#test_files[@]}" >&2
+            printf '  %s\n' "${test_files[@]}" >&2
+            exit 1
+          fi
+
+          failed=0
+          for test_file in "${test_files[@]}"; do
+            echo "::group::$test_file"
+            output="$(mktemp "$RUNNER_TEMP/bolt-phase0-python-test.XXXXXX")"
+            if sudo PYTHONDONTWRITEBYTECODE=1 python3 "$test_file" 2>&1 | tee "$output"; then
+              if ! grep -Eq '^Ran [1-9][0-9]* tests? in ' "$output"; then
+                echo "$test_file did not execute any reported tests" >&2
+                failed=1
+              elif grep -Eiq 'skipped[=[:space:]]+[1-9][0-9]*' "$output"; then
+                echo "$test_file reported skipped tests" >&2
+                failed=1
+              fi
+            else
+              echo "$test_file failed" >&2
+              failed=1
+            fi
+            rm -f "$output"
+            echo "::endgroup::"
+          done
+          exit "$failed"

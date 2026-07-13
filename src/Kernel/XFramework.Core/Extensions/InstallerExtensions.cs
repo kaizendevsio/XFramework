@@ -12,12 +12,12 @@ using Microsoft.AspNetCore.OData;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using XFramework.Core.Middlewares;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Security;
 using XFramework.Integration.Services;
 
 namespace XFramework.Core.Extensions;
@@ -108,14 +108,14 @@ public static class InstallerExtensions
     
     public static void InstallJwt(this IServiceCollection services, IConfiguration configuration)
     {
-        // JWT
         var jwtOptions = new JwtOptions();
         configuration.Bind(nameof(jwtOptions), jwtOptions);
-        services.AddSingleton(jwtOptions);
+        JwtCredentialSet.Validate(jwtOptions, TimeProvider.System.GetUtcNow());
 
-        // Install JWT Authentication
-        ArgumentException.ThrowIfNullOrEmpty(jwtOptions.Secret);
-        
+        services.AddSingleton(jwtOptions);
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddCredentialGenerationHealthCheck();
+
         services.AddAuthentication(x =>
             {
                 x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -129,7 +129,8 @@ public static class InstallerExtensions
                 {
                     OnMessageReceived = context =>
                     {
-                        var accessToken = context.Request.Query["access_token"];
+                        var accessToken = BoltAccessTokenRedactionMiddleware.TakeAccessToken(context.HttpContext)
+                            ?? context.Request.Query["access_token"].ToString();
                         var path = context.HttpContext.Request.Path;
                         if (!string.IsNullOrWhiteSpace(accessToken)
                             && path.StartsWithSegments("/bolt/ws"))
@@ -140,18 +141,7 @@ public static class InstallerExtensions
                         return Task.CompletedTask;
                     }
                 };
-                x.TokenValidationParameters = new TokenValidationParameters()
-                {
-                    ValidateIssuerSigningKey = true,
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidAudience = jwtOptions.ValidAudience,
-                    ValidIssuer = jwtOptions.ValidIssuer,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtOptions.Secret)),
-                    RequireExpirationTime = false,
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.FromMinutes(1)
-                };
+                x.TokenValidationParameters = JwtCredentialSet.CreateValidationParameters(jwtOptions, validateLifetime: true);
             });
     }
     

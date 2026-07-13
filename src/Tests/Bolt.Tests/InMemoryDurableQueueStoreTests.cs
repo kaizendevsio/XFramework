@@ -72,6 +72,57 @@ public class InMemoryDurableQueueStoreTests
     }
 
     [Test]
+    public async Task Ack_ForgedFutureSequence_DoesNotSuppressReconnectReplay()
+    {
+        var store = CreateStore();
+        await store.RegisterDurableSubscriberAsync(1, "sub-a");
+        var first = await store.AppendAsync(1, "sub-a", new byte[] { 1 });
+
+        await store.AckAsync(1, "sub-a", long.MaxValue);
+
+        (await store.GetLastAckedSequenceAsync(1, "sub-a")).Should().Be(0);
+        var second = await store.AppendAsync(1, "sub-a", new byte[] { 2 });
+
+        var reconnectFrom = await store.GetLastAckedSequenceAsync(1, "sub-a");
+        var replay = await ReadAllAsync(store, 1, "sub-a", reconnectFrom);
+        replay.Select(message => message.Sequence).Should().Equal(first, second);
+    }
+
+    [Test]
+    public async Task Ack_DuplicateAndStaleSequences_AreIdempotent()
+    {
+        var store = CreateStore();
+        var first = await store.AppendAsync(1, "sub-a", new byte[] { 1 });
+        var second = await store.AppendAsync(1, "sub-a", new byte[] { 2 });
+        var third = await store.AppendAsync(1, "sub-a", new byte[] { 3 });
+
+        await store.AckAsync(1, "sub-a", second);
+        await store.AckAsync(1, "sub-a", second);
+        await store.AckAsync(1, "sub-a", first);
+
+        (await store.GetLastAckedSequenceAsync(1, "sub-a")).Should().Be(second);
+        var remaining = await ReadAllAsync(store, 1, "sub-a", 0);
+        remaining.Select(message => message.Sequence).Should().Equal(third);
+    }
+
+    [Test]
+    public async Task Ack_ConcurrentValidStaleDuplicateAndFutureSequences_OnlyAdvancesToIssuedMaximum()
+    {
+        var store = CreateStore();
+        var sequences = new List<long>();
+        foreach (var value in Enumerable.Range(1, 32))
+            sequences.Add(await store.AppendAsync(1, "sub-a", new byte[] { (byte)value }));
+
+        await Task.WhenAll(
+            sequences.Select(sequence => store.AckAsync(1, "sub-a", sequence))
+                .Concat(sequences.Select(sequence => store.AckAsync(1, "sub-a", sequence)))
+                .Append(store.AckAsync(1, "sub-a", long.MaxValue)));
+
+        (await store.GetLastAckedSequenceAsync(1, "sub-a")).Should().Be(sequences[^1]);
+        (await ReadAllAsync(store, 1, "sub-a", 0)).Should().BeEmpty();
+    }
+
+    [Test]
     public async Task MaxQueueSize_DropsOldestMessages()
     {
         var store = CreateStore(maxQueueSize: 3);
@@ -102,6 +153,18 @@ public class InMemoryDurableQueueStoreTests
     }
 
     [Test]
+    public async Task TryRegisterDurableSubscriber_RejectsNewSubscriberAtCardinalityLimit()
+    {
+        var store = CreateStore();
+
+        (await store.TryRegisterDurableSubscriberAsync(42, "sub-a", 1)).Should().BeTrue();
+        (await store.TryRegisterDurableSubscriberAsync(42, "sub-a", 1)).Should().BeTrue();
+        (await store.TryRegisterDurableSubscriberAsync(42, "sub-b", 1)).Should().BeFalse();
+
+        (await store.GetDurableSubscribersAsync(42)).Should().Equal("sub-a");
+    }
+
+    [Test]
     public async Task GetLastAckedSequence_ReturnsZeroForUnknownSubscriber()
     {
         var store = CreateStore();
@@ -119,5 +182,17 @@ public class InMemoryDurableQueueStoreTests
 
         var seq = await store.GetLastAckedSequenceAsync(1, "sub-a");
         seq.Should().Be(2);
+    }
+
+    private static async Task<List<(long Sequence, byte[] Payload)>> ReadAllAsync(
+        IDurableQueueStore store,
+        int topicHash,
+        string subscriberId,
+        long fromSequence)
+    {
+        var messages = new List<(long Sequence, byte[] Payload)>();
+        await foreach (var message in store.ReadFromAsync(topicHash, subscriberId, fromSequence, 100))
+            messages.Add(message);
+        return messages;
     }
 }

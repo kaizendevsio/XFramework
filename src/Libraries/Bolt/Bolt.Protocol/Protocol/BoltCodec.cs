@@ -21,7 +21,7 @@ namespace Bolt.Protocol;
 /// </summary>
 public static class BoltCodec
 {
-    public const int DefaultMaxFrameBytes = 100 * 1024 * 1024;
+    public const int DefaultMaxFrameBytes = 8 * 1024 * 1024;
     private const int DefaultMaxStringBytes = 64 * 1024;
 
     public const int RequestHeaderSize = 1 + 16 + 4 + 4 + 4 + 4;   // 33 bytes (added senderHash)
@@ -980,7 +980,7 @@ public static class BoltCodec
         if (Fnv1aHash(topic) != topicHash) return false;
 
         payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(10 + topicLen));
-        if (payloadLength < 0 || payloadLength > 100 * 1024 * 1024) return false;
+        if (payloadLength < 0 || payloadLength > DefaultMaxFrameBytes) return false;
 
         payloadOffset = 14 + topicLen;
         totalSize = payloadOffset + payloadLength;
@@ -1026,7 +1026,7 @@ public static class BoltCodec
 
         subscriberId = Encoding.UTF8.GetString(buffer.Slice(18, idLen));
         payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(18 + idLen));
-        if (payloadLength < 0 || payloadLength > 100 * 1024 * 1024) return false;
+        if (payloadLength < 0 || payloadLength > DefaultMaxFrameBytes) return false;
 
         payloadOffset = EventHeaderSize + idLen;
         totalSize = payloadOffset + payloadLength;

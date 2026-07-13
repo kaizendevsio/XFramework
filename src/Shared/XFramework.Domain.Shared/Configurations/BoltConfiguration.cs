@@ -1,4 +1,4 @@
-﻿namespace XFramework.Domain.Shared.Configurations;
+namespace XFramework.Domain.Shared.Configurations;
 
 public class BoltConfiguration
 {
@@ -16,11 +16,20 @@ public class BoltConfiguration
     public bool SendAccessTokenAsQueryString { get; set; }
     public bool GenerateServiceAccessToken { get; set; } = true;
     public int RpcTimeoutSeconds { get; set; } = 30;
-    public int MaxFrameBytes { get; set; } = 100 * 1024 * 1024;
+    public int MaxFrameBytes { get; set; } = 8 * 1024 * 1024;
     public int SendQueueCapacity { get; set; }
     public int SendEnqueueTimeoutMs { get; set; }
-    public string RegistrationIdentityBindingMode { get; set; } = "Audit";
+    public bool RequireSecureTransport { get; set; }
+    public bool MediaEnabled { get; set; }
+    public string RegistrationIdentityBindingMode { get; set; } = "Enforce";
     public int MaxPendingRpcCalls { get; set; } = 1000;
+    public int MaxPendingRpcCallsPerPrincipal { get; set; } = 128;
+    public int MaxConnectionsPerPrincipal { get; set; } = 16;
+    public int MaxActiveStreamsPerPrincipal { get; set; } = 64;
+    public int MaxMediaStreamsPerPrincipal { get; set; } = 8;
+    public int MaxSubscriptionsPerPrincipal { get; set; } = 128;
+    public int MaxDurableSubscribersPerTopic { get; set; } = 128;
+    public int MaxConnectionLifetimeSeconds { get; set; } = 1800;
     public int DeadLetterQueueCapacity { get; set; } = 100_000;
     public int MaxParallelInvocationsPerClient { get; set; } = 64;
 

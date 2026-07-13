@@ -353,6 +353,7 @@ MigrationBackup/
 .env
 .env.*
 !.env.example
+.secrets/
 
 # NuGet pack output
 nupkgs/

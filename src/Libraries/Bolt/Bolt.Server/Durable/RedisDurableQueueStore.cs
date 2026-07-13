@@ -16,6 +16,62 @@ namespace Bolt.Server.Durable;
 /// </summary>
 public sealed class RedisDurableQueueStore : IDurableQueueStore
 {
+    private const string AcknowledgeScript = """
+        local ackKey = KEYS[1]
+        local messageKey = KEYS[2]
+        local sequenceKey = KEYS[3]
+        local requested = ARGV[1]
+        local ttl = tonumber(ARGV[2])
+        local current = redis.call('GET', ackKey) or '0'
+        local highestIssued = redis.call('GET', sequenceKey) or '0'
+
+        local function compareUnsigned(left, right)
+            local leftLength = string.len(left)
+            local rightLength = string.len(right)
+            if leftLength < rightLength then
+                return -1
+            end
+            if leftLength > rightLength then
+                return 1
+            end
+            if left < right then
+                return -1
+            end
+            if left > right then
+                return 1
+            end
+            return 0
+        end
+
+        if string.sub(requested, 1, 1) == '-' or compareUnsigned(requested, current) <= 0 then
+            return { 0, current }
+        end
+
+        if compareUnsigned(requested, highestIssued) > 0 then
+            return { -1, current }
+        end
+
+        redis.call('SET', ackKey, requested, 'EX', ttl)
+        redis.call('EXPIRE', messageKey, ttl)
+        redis.call('EXPIRE', sequenceKey, ttl)
+        return { 1, requested }
+        """;
+    private const string RegisterSubscriberScript = """
+        local key = KEYS[1]
+        local subscriber = ARGV[1]
+        local maximum = tonumber(ARGV[2])
+        local ttl = tonumber(ARGV[3])
+        if redis.call('SISMEMBER', key, subscriber) == 1 then
+            redis.call('EXPIRE', key, ttl)
+            return 1
+        end
+        if redis.call('SCARD', key) >= maximum then
+            return 0
+        end
+        redis.call('SADD', key, subscriber)
+        redis.call('EXPIRE', key, ttl)
+        return 1
+        """;
     private const string FirstStreamId = "-";
     private const string LastStreamId = "+";
 
@@ -110,61 +166,48 @@ public sealed class RedisDurableQueueStore : IDurableQueueStore
 
     public async Task AckAsync(int topicHash, string subscriberId, long upToSequence, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         var db = _redis.GetDatabase();
-
-        // Update last acked
-        var ackKey = AckKey(topicHash, subscriberId);
         var msgKey = MsgKey(topicHash, subscriberId);
-        await db.StringSetAsync(ackKey, upToSequence);
-        await db.KeyExpireAsync(ackKey, MessageTtl);
+        var result = await db.ScriptEvaluateAsync(
+            AcknowledgeScript,
+            [AckKey(topicHash, subscriberId), msgKey, SeqKey(topicHash, subscriberId)],
+            [upToSequence, (long)MessageTtl.TotalSeconds]).WaitAsync(ct);
+        var gate = (RedisResult[]?)result
+            ?? throw new RedisServerException("Durable ACK validation returned an invalid response.");
+        if (gate.Length != 2)
+            throw new RedisServerException("Durable ACK validation returned an invalid response.");
 
-        var toDelete = new List<RedisValue>();
-        RedisValue minId = FirstStreamId;
+        var gateStatus = (long)gate[0];
+        if (gateStatus < 0)
+            return;
+        if (gateStatus > 1)
+            throw new RedisServerException("Durable ACK validation returned an unknown status.");
 
-        while (true)
+        var effectiveAck = (long)gate[1];
+        var entries = await db.StreamRangeAsync(
+            msgKey,
+            FirstStreamId,
+            LastStreamId,
+            StreamScanBatchSize,
+            Order.Ascending).WaitAsync(ct);
+        if (entries.Length == 0)
+            return;
+
+        var deleteIds = new List<RedisValue>(entries.Length);
+        foreach (var entry in entries)
         {
             ct.ThrowIfCancellationRequested();
-
-            var entries = await db.StreamRangeAsync(
-                msgKey,
-                minId,
-                LastStreamId,
-                StreamScanBatchSize,
-                Order.Ascending);
-
-            if (entries.Length == 0)
+            if (!TryReadSequence(entry, out var sequence))
+                continue;
+            if (sequence > effectiveAck)
                 break;
 
-            foreach (var entry in entries)
-            {
-                minId = ExcludeStreamId(entry.Id);
-
-                if (!TryReadSequence(entry, out var seq))
-                    continue;
-
-                if (seq > upToSequence)
-                {
-                    if (toDelete.Count > 0)
-                        await db.StreamDeleteAsync(msgKey, toDelete.ToArray());
-
-                    await db.KeyExpireAsync(msgKey, MessageTtl);
-                    return;
-                }
-
-                toDelete.Add(entry.Id);
-            }
-
-            if (toDelete.Count > 0)
-            {
-                await db.StreamDeleteAsync(msgKey, toDelete.ToArray());
-                toDelete.Clear();
-            }
-
-            if (entries.Length < StreamScanBatchSize)
-                break;
+            deleteIds.Add(entry.Id);
         }
 
-        await db.KeyExpireAsync(msgKey, MessageTtl);
+        if (deleteIds.Count > 0)
+            await db.StreamDeleteAsync(msgKey, deleteIds.ToArray()).WaitAsync(ct);
     }
 
     public async Task RegisterDurableSubscriberAsync(int topicHash, string subscriberId, CancellationToken ct = default)
@@ -173,6 +216,20 @@ public sealed class RedisDurableQueueStore : IDurableQueueStore
         var subsKey = SubsKey(topicHash);
         await db.SetAddAsync(subsKey, subscriberId);
         await db.KeyExpireAsync(subsKey, MessageTtl);
+    }
+
+    public async Task<bool> TryRegisterDurableSubscriberAsync(
+        int topicHash,
+        string subscriberId,
+        int maxSubscribers,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var result = await _redis.GetDatabase().ScriptEvaluateAsync(
+            RegisterSubscriberScript,
+            [SubsKey(topicHash)],
+            [subscriberId, Math.Max(1, maxSubscribers), (long)MessageTtl.TotalSeconds]);
+        return (long)result == 1;
     }
 
     public async Task UnregisterDurableSubscriberAsync(int topicHash, string subscriberId, CancellationToken ct = default)
@@ -189,6 +246,15 @@ public sealed class RedisDurableQueueStore : IDurableQueueStore
         var db = _redis.GetDatabase();
         var members = await db.SetMembersAsync(SubsKey(topicHash));
         return members.Select(m => m.ToString()).ToList();
+    }
+
+    public async Task<bool> IsDurableSubscriberRegisteredAsync(
+        int topicHash,
+        string subscriberId,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return await _redis.GetDatabase().SetContainsAsync(SubsKey(topicHash), subscriberId);
     }
 
     public async Task<long> GetLastAckedSequenceAsync(int topicHash, string subscriberId, CancellationToken ct = default)

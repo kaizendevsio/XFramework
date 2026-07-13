@@ -63,6 +63,7 @@ Historical compatibility note: moved `StorageFile*` entity namespaces currently 
 - `docker-compose.yml` must keep the `storage` service dependent on `bolt-hub`, `postgres`, and `minio`.
 - MinIO uses the published `minio/minio` image; there is no local MinIO Dockerfile.
 - Storage should use the repo generic `Dockerfile` with `PROJECT_PATH=src/Modules/XFramework.Storage/Storage.Api/Storage.Api.csproj`.
+- Pass `hostEnvironment` to `AddXFrameworkBoltClient` so non-Development startup validates secure `wss://` transport configuration. Do not bypass that validation with the environment-free overload or a plaintext client URL.
 - If Storage endpoints, providers, ports, or health behavior change, update compose, `.env.example`, and xeon-dev workflows in the same PR.
 - Portal navigation should expose Storage only when `TenantModuleFeatureKeys.Storage` is enabled.
 

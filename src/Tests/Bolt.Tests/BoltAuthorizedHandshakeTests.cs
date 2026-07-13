@@ -25,6 +25,7 @@ public sealed class BoltAuthorizedHandshakeTests
     private const string TestScheme = "BoltHandshakeTest";
     private static int _portCounter = 20700;
     private WebApplication _app = null!;
+    private TaskCompletionSource _stalledConnectionClosed = null!;
     private int _port;
 
     [SetUp]
@@ -222,6 +223,28 @@ public sealed class BoltAuthorizedHandshakeTests
         await connect.Should().ThrowAsync<WebSocketException>();
     }
 
+    [Test]
+    public async Task BoltHandshake_RegistrationAckNeverArrives_TimesOutAndDisposesTransport()
+    {
+        await using var client = new BoltClient(
+            new Uri($"ws://localhost:{_port}/bolt/ws/stall"),
+            "stall-client",
+            "StallClient",
+            new BoltClientOptions
+            {
+                AccessToken = "valid-query-token",
+                SendAccessTokenAsQueryString = true,
+                TransportAttemptTimeoutMs = 100
+            },
+            NullLogger<BoltClient>.Instance);
+
+        var connect = async () => await client.ConnectAsync();
+
+        await connect.Should().ThrowAsync<TimeoutException>()
+            .WithMessage("*registration timed out after 100 ms*");
+        await _stalledConnectionClosed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
     private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
     {
         using var client = new HttpClient();
@@ -253,6 +276,8 @@ public sealed class BoltAuthorizedHandshakeTests
     private async Task StartServerAsync(BoltRegistrationIdentityBindingMode bindingMode)
     {
         _port = Interlocked.Increment(ref _portCounter);
+        _stalledConnectionClosed = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
 
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls($"http://localhost:{_port}");
@@ -275,6 +300,27 @@ public sealed class BoltAuthorizedHandshakeTests
         _app.UseWebSockets();
         _app.MapBolt("/bolt/ws").RequireAuthorization();
         _app.MapBolt("/other/ws").RequireAuthorization();
+        _app.Map("/bolt/ws/stall", async context =>
+        {
+            if (!context.WebSockets.IsWebSocketRequest)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
+            using var socket = await context.WebSockets.AcceptWebSocketAsync();
+            var buffer = new byte[256];
+            try
+            {
+                await socket.ReceiveAsync(buffer, context.RequestAborted);
+                await Task.Delay(Timeout.InfiniteTimeSpan, context.RequestAborted);
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
+            finally
+            {
+                _stalledConnectionClosed.TrySetResult();
+            }
+        }).RequireAuthorization();
         _app.MapGet("/health", () => Results.Ok("ok"));
 
         _ = Task.Run(() => _app.RunAsync());

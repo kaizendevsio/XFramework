@@ -69,9 +69,11 @@ public sealed class InMemoryDurableQueueStore : IDurableQueueStore
         {
             lock (state.Lock)
             {
+                if (upToSequence <= state.LastAckedSequence || upToSequence > state.NextSequence)
+                    return Task.CompletedTask;
+
                 state.Messages.RemoveAll(m => m.Sequence <= upToSequence);
-                if (upToSequence > state.LastAckedSequence)
-                    state.LastAckedSequence = upToSequence;
+                state.LastAckedSequence = upToSequence;
             }
         }
         return Task.CompletedTask;
@@ -84,6 +86,27 @@ public sealed class InMemoryDurableQueueStore : IDurableQueueStore
         // Ensure queue state exists
         _queues.GetOrAdd((topicHash, subscriberId), _ => new QueueState());
         return Task.CompletedTask;
+    }
+
+    public Task<bool> TryRegisterDurableSubscriberAsync(
+        int topicHash,
+        string subscriberId,
+        int maxSubscribers,
+        CancellationToken ct = default)
+    {
+        var set = _subscribers.GetOrAdd(topicHash, _ => new ConcurrentDictionary<string, byte>());
+        lock (set)
+        {
+            if (set.ContainsKey(subscriberId))
+                return Task.FromResult(true);
+
+            if (set.Count >= Math.Max(1, maxSubscribers))
+                return Task.FromResult(false);
+
+            set.TryAdd(subscriberId, 0);
+            _queues.GetOrAdd((topicHash, subscriberId), _ => new QueueState());
+            return Task.FromResult(true);
+        }
     }
 
     public Task UnregisterDurableSubscriberAsync(int topicHash, string subscriberId, CancellationToken ct = default)
@@ -101,6 +124,14 @@ public sealed class InMemoryDurableQueueStore : IDurableQueueStore
             return Task.FromResult<IReadOnlyList<string>>(set.Keys.ToList());
         return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
     }
+
+    public Task<bool> IsDurableSubscriberRegisteredAsync(
+        int topicHash,
+        string subscriberId,
+        CancellationToken ct = default) =>
+        Task.FromResult(
+            _subscribers.TryGetValue(topicHash, out var set) &&
+            set.ContainsKey(subscriberId));
 
     public Task<long> GetLastAckedSequenceAsync(int topicHash, string subscriberId, CancellationToken ct = default)
     {
