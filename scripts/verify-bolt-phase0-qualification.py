@@ -723,6 +723,16 @@ def validate_preflight(
         exact_object(check, {"passed", "detail"}, "invalid-compose-check")
         if check["passed"] is not True:
             raise QualificationError("failed-compose-check")
+    context = checks.get("publication-host-context")
+    if not isinstance(context, dict):
+        raise QualificationError("invalid-compose-authorization-context")
+    context_detail = exact_object(
+        context["detail"],
+        {"context"},
+        "invalid-compose-authorization-context",
+    )
+    if context_detail["context"] != "deployment-host":
+        raise QualificationError("invalid-compose-authorization-context")
     manifest = exact_object(document["redacted_manifest"], {"services"}, "invalid-redacted-manifest")
     services = exact_object(manifest["services"], set(IMAGE_SERVICES), "invalid-compose-inventory")
     for service, pin in pins.items():

@@ -97,6 +97,15 @@ GITHUB_ACTOR = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 GITHUB_ACTOR_ID = re.compile(r"^[1-9][0-9]{0,31}$")
 DIRECT_PUBLICATION_ATTESTATION = "ATTEST_DIRECT_KESTREL_NO_INTERMEDIARY"
 ALL_INTERFACE_BINDINGS = frozenset({"", "0.0.0.0", "::"})
+BUILD_CONTROLLER_CONTEXT = "build-controller"
+DEPLOYMENT_HOST_CONTEXT = "deployment-host"
+DEPLOYMENT_AUTHORIZATION_CHECKS = (
+    "publication-host-context",
+    "hub-only-tls-publication",
+    "direct-publication-host-interface",
+    "operator-attested-direct-publication-topology",
+    "digest-pinned-provenance-authorized-images",
+)
 CA_SECRET = "bolt-hub-ca"
 FULLCHAIN_SECRET = "bolt-hub-tls-fullchain"
 PRIVATE_KEY_SECRET = "bolt-hub-tls-private-key"
@@ -194,6 +203,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--publication-topology-triggering-actor")
     parser.add_argument("--publication-topology-run-id")
     parser.add_argument("--publication-topology-run-attempt", type=int)
+    parser.add_argument(
+        "--publication-host-context",
+        choices=(BUILD_CONTROLLER_CONTEXT, DEPLOYMENT_HOST_CONTEXT),
+    )
     return parser.parse_args()
 
 
@@ -411,12 +424,16 @@ def canonical_host_address(value: Any) -> str | None:
     return address.compressed
 
 
-def inspect_publication_topology(hostname: str) -> dict[str, list[str]]:
-    resolved = {
+def resolve_publication_addresses(hostname: str) -> list[str]:
+    return sorted({
         address
         for result in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
         if (address := canonical_host_address(result[4][0])) is not None
-    }
+    })
+
+
+def inspect_publication_topology(hostname: str) -> dict[str, list[str]]:
+    resolved = set(resolve_publication_addresses(hostname))
     ip_executable = next(
         (candidate for candidate in (Path("/usr/sbin/ip"), Path("/usr/bin/ip")) if candidate.is_file()),
         None,
@@ -449,6 +466,21 @@ def inspect_publication_topology(hostname: str) -> dict[str, list[str]]:
         "host_interface_addresses": sorted(host_addresses),
         "matched_addresses": sorted(matched),
     }
+
+
+def deployment_is_authorized(args: argparse.Namespace, gate: Gate) -> bool:
+    context_check = gate.checks.get("publication-host-context")
+    return bool(
+        args.authorize_deployment
+        and args.publication_host_context == DEPLOYMENT_HOST_CONTEXT
+        and context_check
+        == {"passed": True, "detail": {"context": DEPLOYMENT_HOST_CONTEXT}}
+        and all(
+            (gate.checks.get(name) or {}).get("passed") is True
+            for name in DEPLOYMENT_AUTHORIZATION_CHECKS
+        )
+        and not gate.errors
+    )
 
 
 def load_identityserver_environment(args: argparse.Namespace) -> tuple[dict[str, str | int | None], dict[str, Any]]:
@@ -895,69 +927,86 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
     gate.check("hub-only-tls-publication", only_tls_port, {"ports": hub_ports, "expected": args.expected_published_port})
 
     if args.authorize_deployment:
-        try:
-            live_topology = inspect_publication_topology(args.expected_public_hostname)
-        except (OSError, RuntimeError, ValueError, socket.gaierror, subprocess.SubprocessError, json.JSONDecodeError):
-            live_topology = {
-                "resolved_addresses": [],
-                "host_interface_addresses": [],
-                "matched_addresses": [],
-            }
-        host_binding = hub_ports[0]["host_ip"] if len(hub_ports) == 1 else None
-        canonical_binding = canonical_host_address(host_binding)
-        binding_is_direct = (
-            host_binding in ALL_INTERFACE_BINDINGS
-            or canonical_binding in live_topology["matched_addresses"]
-        )
-        live_topology_verified = (
-            bool(live_topology["resolved_addresses"])
-            and live_topology["matched_addresses"] == live_topology["resolved_addresses"]
-            and binding_is_direct
-        )
-        gate.check(
-            "direct-publication-host-interface",
-            live_topology_verified,
-            {"binding": host_binding, **live_topology},
-        )
-        topology_detail = {
-            "attestation": args.publication_topology_attestation,
-            "attested_by": args.publication_topology_attested_by,
-            "attested_by_id": args.publication_topology_attested_by_id,
-            "triggering_actor": args.publication_topology_triggering_actor,
-            "workflow_event": "workflow_dispatch",
-            "run_id": args.publication_topology_run_id,
-            "run_attempt": args.publication_topology_run_attempt,
-            "source_commit": args.expected_source_commit,
-            "published_hostname": args.expected_public_hostname,
-            "published_port": args.expected_published_port,
-            "mode": "direct-kestrel",
-            "intermediaries": [],
-            "scope": ["host-reverse-proxy", "tailscale-serve", "load-balancer", "ingress"],
-            "binding": host_binding,
-            **live_topology,
+        publication_context_valid = args.publication_host_context in {
+            BUILD_CONTROLLER_CONTEXT,
+            DEPLOYMENT_HOST_CONTEXT,
         }
-        topology_attested = (
-            args.publication_topology_attestation == DIRECT_PUBLICATION_ATTESTATION
-            and isinstance(args.publication_topology_attested_by, str)
-            and GITHUB_ACTOR.fullmatch(args.publication_topology_attested_by) is not None
-            and isinstance(args.publication_topology_attested_by_id, str)
-            and GITHUB_ACTOR_ID.fullmatch(args.publication_topology_attested_by_id) is not None
-            and args.publication_topology_triggering_actor == args.publication_topology_attested_by
-            and isinstance(args.publication_topology_run_id, str)
-            and WORKFLOW_RUN_ID.fullmatch(args.publication_topology_run_id) is not None
-            and args.publication_topology_run_attempt == 1
-            and isinstance(args.expected_source_commit, str)
-            and COMMIT_SHA.fullmatch(args.expected_source_commit) is not None
-            and canonical_hostname(args.expected_public_hostname)
-            and isinstance(args.expected_published_port, int)
-            and 1 <= args.expected_published_port <= 65_535
-            and live_topology_verified
-        )
         gate.check(
-            "operator-attested-direct-publication-topology",
-            topology_attested,
-            topology_detail,
+            "publication-host-context",
+            publication_context_valid,
+            {"context": args.publication_host_context},
         )
+        if args.publication_host_context == DEPLOYMENT_HOST_CONTEXT:
+            host_binding = hub_ports[0]["host_ip"] if len(hub_ports) == 1 else None
+            canonical_binding = canonical_host_address(host_binding)
+            try:
+                live_topology = inspect_publication_topology(args.expected_public_hostname)
+            except (
+                OSError,
+                RuntimeError,
+                ValueError,
+                socket.gaierror,
+                subprocess.SubprocessError,
+                json.JSONDecodeError,
+            ):
+                live_topology = {
+                    "resolved_addresses": [],
+                    "host_interface_addresses": [],
+                    "matched_addresses": [],
+                }
+            binding_is_direct = (
+                host_binding in ALL_INTERFACE_BINDINGS
+                or canonical_binding in live_topology["matched_addresses"]
+            )
+            live_topology_verified = (
+                bool(live_topology["resolved_addresses"])
+                and live_topology["matched_addresses"] == live_topology["resolved_addresses"]
+                and binding_is_direct
+            )
+            gate.check(
+                "direct-publication-host-interface",
+                live_topology_verified,
+                {"binding": host_binding, **live_topology},
+            )
+            topology_detail = {
+                "attestation": args.publication_topology_attestation,
+                "attested_by": args.publication_topology_attested_by,
+                "attested_by_id": args.publication_topology_attested_by_id,
+                "triggering_actor": args.publication_topology_triggering_actor,
+                "workflow_event": "workflow_dispatch",
+                "run_id": args.publication_topology_run_id,
+                "run_attempt": args.publication_topology_run_attempt,
+                "source_commit": args.expected_source_commit,
+                "published_hostname": args.expected_public_hostname,
+                "published_port": args.expected_published_port,
+                "mode": "direct-kestrel",
+                "intermediaries": [],
+                "scope": ["host-reverse-proxy", "tailscale-serve", "load-balancer", "ingress"],
+                "binding": host_binding,
+                **live_topology,
+            }
+            topology_attested = (
+                args.publication_topology_attestation == DIRECT_PUBLICATION_ATTESTATION
+                and isinstance(args.publication_topology_attested_by, str)
+                and GITHUB_ACTOR.fullmatch(args.publication_topology_attested_by) is not None
+                and isinstance(args.publication_topology_attested_by_id, str)
+                and GITHUB_ACTOR_ID.fullmatch(args.publication_topology_attested_by_id) is not None
+                and args.publication_topology_triggering_actor == args.publication_topology_attested_by
+                and isinstance(args.publication_topology_run_id, str)
+                and WORKFLOW_RUN_ID.fullmatch(args.publication_topology_run_id) is not None
+                and args.publication_topology_run_attempt == 1
+                and isinstance(args.expected_source_commit, str)
+                and COMMIT_SHA.fullmatch(args.expected_source_commit) is not None
+                and canonical_hostname(args.expected_public_hostname)
+                and isinstance(args.expected_published_port, int)
+                and 1 <= args.expected_published_port <= 65_535
+                and live_topology_verified
+            )
+            gate.check(
+                "operator-attested-direct-publication-topology",
+                topology_attested,
+                topology_detail,
+            )
 
     identity_ports = ports(identityserver)
     expected_identity_port = identity_inputs.get("IDENTITYSERVER_PUBLIC_HTTPS_PORT")
@@ -1252,6 +1301,22 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
     }
 
 
+def build_preflight_evidence(
+    args: argparse.Namespace,
+    gate: Gate,
+    redacted_manifest: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema": "xframework.bolt.phase0.preflight.v2",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "status": "passed" if not gate.errors else "failed",
+        "deployment_authorized": deployment_is_authorized(args, gate),
+        "checks": gate.checks,
+        "errors": gate.errors,
+        "redacted_manifest": {"services": redacted_manifest},
+    }
+
+
 def main() -> int:
     args = parse_args()
     gate = Gate()
@@ -1268,15 +1333,7 @@ def main() -> int:
     except Exception as error:
         gate.check("compose-render", False, str(error))
 
-    evidence = {
-        "schema": "xframework.bolt.phase0.preflight.v2",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "status": "passed" if not gate.errors else "failed",
-        "deployment_authorized": args.authorize_deployment and not gate.errors,
-        "checks": gate.checks,
-        "errors": gate.errors,
-        "redacted_manifest": {"services": redacted_manifest},
-    }
+    evidence = build_preflight_evidence(args, gate, redacted_manifest)
     output = Path(args.output)
     write_private_json(output, evidence)
 

@@ -885,7 +885,7 @@ class WatchdogContractTests(unittest.TestCase):
         self.assertIn('"--proxy-mode",', root_helper)
         self.assertIn("self._protected_proxy_mode()", root_helper)
 
-    def test_publication_topology_dispatch_is_bound_to_both_authorized_verifiers(self) -> None:
+    def test_controller_validation_precedes_remote_publication_authorization(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("publication_topology_confirmation:", workflow)
         self.assertIn(
@@ -908,15 +908,16 @@ class WatchdogContractTests(unittest.TestCase):
         remote_invocation = step[remote_start:step.index("REMOTE_SCRIPT", remote_start)]
 
         local_fields = (
-            '--publication-topology-attestation "$PUBLICATION_TOPOLOGY_ATTESTATION"',
-            '--publication-topology-attested-by "$PUBLICATION_TOPOLOGY_ATTESTED_BY"',
-            '--publication-topology-attested-by-id "$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID"',
-            '--publication-topology-triggering-actor "$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR"',
-            '--publication-topology-run-id "$GITHUB_RUN_ID"',
-            '--publication-topology-run-attempt "$GITHUB_RUN_ATTEMPT"',
+            '--pins-file "$pins_file"',
+            '--provenance-file "$provenance_file"',
+            "--publication-host-context build-controller",
+            "--authorize-deployment",
         )
         for field in local_fields:
             self.assertIn(field, local_invocation)
+        self.assertNotIn("--publication-host-context deployment-host", local_invocation)
+        self.assertNotIn("--publication-topology-", local_invocation)
+        self.assertNotIn("--expected-public-hostname", local_invocation)
 
         remote_environment_fields = (
             "PUBLICATION_TOPOLOGY_ATTESTATION='$PUBLICATION_TOPOLOGY_ATTESTATION'",
@@ -936,16 +937,41 @@ class WatchdogContractTests(unittest.TestCase):
             '--publication-topology-triggering-actor "$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR"',
             '--publication-topology-run-id "$PUBLICATION_TOPOLOGY_RUN_ID"',
             '--publication-topology-run-attempt "$PUBLICATION_TOPOLOGY_RUN_ATTEMPT"',
+            "--publication-host-context deployment-host",
         )
         for field in remote_fields:
             self.assertIn(field, remote_invocation)
+        self.assertNotIn("--publication-host-context build-controller", remote_invocation)
 
+        self.assertIn('remote_evidence="$REMOTE_RUN_DIR/pinned-manifest-evidence.json"', step)
+        self.assertIn('document.get("deployment_authorized") is not False', step)
+        self.assertIn('context.get("detail") != {"context": "build-controller"}', step)
+        self.assertIn('"direct-publication-host-interface" in checks', step)
+        self.assertIn('document.get("deployment_authorized") is not True', step)
+        self.assertIn('context.get("detail") != {"context": "deployment-host"}', step)
+        self.assertIn('"direct-publication-host-interface",', step)
+        self.assertIn('"operator-attested-direct-publication-topology",', step)
         self.assertIn('if [ "$status" -eq 0 ]; then', step)
         self.assertIn(
             '"$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json"\n'
-            "          else",
+            '            python3 - "$evidence_dir/pinned-manifest-remote.json"',
             step,
         )
+        self.assertLess(
+            step.index('python3 - "$evidence_dir/pinned-manifest-local.json"'),
+            step.index('python3 "$COMPOSE_VERIFIER"'),
+        )
+        self.assertLess(
+            step.index('python3 "$COMPOSE_VERIFIER"'),
+            step.index('python3 - "$evidence_dir/pinned-manifest-remote.json"'),
+        )
+
+        pull = workflow.index("- name: Pull candidate images without mutating services")
+        watchdog = workflow.index("- name: Arm external deployment watchdog")
+        first_mutation = workflow.index("--mutation-began")
+        self.assertLess(step_start, pull)
+        self.assertLess(pull, watchdog)
+        self.assertLess(watchdog, first_mutation)
 
     @unittest.skipUnless(
         sys.platform.startswith("linux")
