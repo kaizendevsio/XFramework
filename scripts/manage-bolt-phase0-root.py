@@ -525,7 +525,6 @@ class RootBoundary:
             (service, "RestrictSUIDSGID"): "yes",
             (service, "UMask"): "0077",
             (service, "ReadWritePaths"): f"{self.paths.deploy_root} {self.paths.protected_env.parent}",
-            (service, "RestrictAddressFamilies"): "AF_UNIX AF_INET AF_INET6",
             (service, "TimeoutStartUSec"): WATCHDOG_TIMEOUT_SYSTEMD,
             (timer, "AccuracyUSec"): "1s",
             (timer, "Persistent"): "yes",
@@ -535,6 +534,13 @@ class RootBoundary:
         for (unit, prop), value in expected.items():
             if self._show(unit, prop) != value:
                 raise RootBoundaryError("systemd-contract")
+        address_families = self._show(service, "RestrictAddressFamilies").split()
+        if len(address_families) != 3 or set(address_families) != {
+            "AF_UNIX",
+            "AF_INET",
+            "AF_INET6",
+        }:
+            raise RootBoundaryError("systemd-contract")
         exec_start = self._show(service, "ExecStart")
         launcher = re.escape(str(self.paths.watchdog))
         if len(re.findall(r"\{\s*path=", exec_start)) != 1 or not re.search(
