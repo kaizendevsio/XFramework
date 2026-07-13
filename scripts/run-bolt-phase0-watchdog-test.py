@@ -1209,6 +1209,50 @@ class WatchdogContractTests(unittest.TestCase):
             content,
         )
 
+    def test_build_and_local_receipts_use_profile_and_open_fd_contracts(self) -> None:
+        content = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'docker compose -f "$COMPOSE_FILE_PATH" --profile "*" config --format json',
+            content,
+        )
+        self.assertIn(
+            'docker compose -f "$COMPOSE_FILE_PATH" --profile phase0-verification build "${services[@]}"',
+            content,
+        )
+        self.assertNotIn(
+            'docker compose -f "$COMPOSE_FILE_PATH" config --format json',
+            content,
+        )
+        self.assertNotIn(
+            "stat -c '%u:%a:%h:%F'",
+            content,
+        )
+        self.assertNotIn("local_temporary", content)
+        self.assertEqual(3, content.count("set -o noclobber"))
+        self.assertEqual(3, content.count("set +o noclobber"))
+        self.assertEqual(3, content.count('exec {receipt_fd}> "$local_evidence"'))
+        self.assertGreaterEqual(content.count('>&"$receipt_fd"'), 4)
+        self.assertGreaterEqual(
+            content.count("stat -Lc '%d:%i' -- \"$receipt_fd_path\""),
+            6,
+        )
+        self.assertGreaterEqual(
+            content.count("stat -c '%d:%i' -- \"$local_evidence\""),
+            6,
+        )
+        self.assertGreaterEqual(content.count("exec {receipt_fd}>&-"), 6)
+        for name in ("activation", "disarm", "recovery"):
+            self.assertIn(f"validate_{name}_receipt()", content)
+            self.assertIn(f"cleanup_{name}_receipt()", content)
+            self.assertIn(
+                f"{name} evidence path changed while its descriptor was open",
+                content,
+            )
+        self.assertNotIn('rm -f -- "$local_evidence"', content)
+        self.assertIn("recovery-evidence-capture-failed", content)
+        self.assertIn("}' >&\"$receipt_fd\"", content)
+
     def test_active_workflow_uses_checked_in_pinned_known_hosts_and_exact_ssh_config(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
         pinned_lines = [
@@ -1283,16 +1327,18 @@ class WatchdogContractTests(unittest.TestCase):
         )
         self.assertIn(
             '"$DEPLOY_HOST" "sudo -n \'$REMOTE_ROOT_HELPER\' activate" '
-            '> "$local_temporary"',
+            '>&"$receipt_fd"',
             workflow,
         )
         for required in (
-            'local_temporary="$(mktemp "$RUNNER_TEMP/bolt-phase0-root-activation.XXXXXXXX")"',
-            '"$(id -u):600:1:regular file"',
+            'exec {receipt_fd}> "$local_evidence"',
+            "set -o noclobber",
+            '"$(id -u):600:1"',
             'test ! -L "$local_evidence"',
-            'test -s "$local_temporary"',
-            'mv -- "$local_temporary" "$local_evidence"',
-            'case "$local_temporary" in',
+            "validate_activation_receipt",
+            "stat -Lc '%d:%i' -- \"$receipt_fd_path\"",
+            "stat -c '%d:%i' -- \"$local_evidence\"",
+            "exec {receipt_fd}>&-",
         ):
             self.assertIn(required, workflow)
         self.assertNotIn("root-activation-evidence.json.tmp", workflow)
