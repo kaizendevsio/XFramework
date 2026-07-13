@@ -128,6 +128,10 @@ class EvidenceFactory:
             "status": "passed",
             "deployment_authorized": True,
             "checks": {
+                "publication-host-context": {
+                    "passed": True,
+                    "detail": {"context": "deployment-host"},
+                },
                 "digest-pinned-provenance-authorized-images": {
                     "passed": True,
                     "detail": {
@@ -668,6 +672,57 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(MODULE.PROXY_MODE_DIRECT_KESTREL, evidence["proxy_mode"])
         self.assertEqual(set(MODULE.ARTIFACT_FILES), set(evidence["artifacts"]))
         self.assertNotIn("configured_image", json.dumps(evidence))
+
+    def test_rejects_build_controller_or_forged_deferred_publication_receipts(self) -> None:
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document.update(deployment_authorized=False),
+        )
+        self.assert_code("compose-not-authorized")
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"].update(
+                {
+                    "direct-publication-host-interface-deferred-to-deployment-host":
+                        document["checks"].pop("direct-publication-host-interface")
+                }
+            ),
+        )
+        self.assert_code("direct-kestrel-host-interface-unverified")
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"].pop("direct-publication-host-interface"),
+        )
+        self.assert_code("direct-kestrel-host-interface-unverified")
+
+    def test_requires_exact_deployment_host_authorization_context(self) -> None:
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"].pop("publication-host-context"),
+        )
+        self.assert_code("invalid-compose-authorization-context")
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"]["publication-host-context"]["detail"].update(
+                context="build-controller"
+            ),
+        )
+        self.assert_code("invalid-compose-authorization-context")
+
+        self.factory.create()
+        self.factory.mutate(
+            "pinned-manifest-evidence.json",
+            lambda document: document["checks"]["publication-host-context"]["detail"].update(
+                unexpected="value"
+            ),
+        )
+        self.assert_code("invalid-compose-authorization-context")
 
     def test_rejects_unbound_extra_artifact(self) -> None:
         secure_json(self.factory.run / "unbound-extra.json", {"status": "passed"})

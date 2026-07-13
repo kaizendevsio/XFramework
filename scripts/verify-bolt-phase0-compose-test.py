@@ -74,6 +74,9 @@ class Phase0ComposeTests(unittest.TestCase):
             publication_topology_triggering_actor="phase0-operator",
             publication_topology_run_id="123456789",
             publication_topology_run_attempt=1,
+            publication_host_context=(
+                MODULE.DEPLOYMENT_HOST_CONTEXT if authorize else None
+            ),
         )
 
     def manifest(self) -> dict:
@@ -621,6 +624,133 @@ class Phase0ComposeTests(unittest.TestCase):
                 for error in self.errors(manifest, args)
             )
         )
+
+    def test_build_controller_validates_artifacts_without_topology_claims(self) -> None:
+        manifest = self.manifest()
+        pin = "registry.example/xframework/bolt-hub@sha256:" + "d" * 64
+        manifest["services"]["bolt-hub"]["image"] = pin
+        args = self.args(authorize=True)
+        args.authorized_service = ["bolt-hub"]
+        args.expected_image_pins = {"bolt-hub": pin}
+        args.expected_source_commit = SHA
+        args.provenance_bindings = {
+            "bolt-hub": {"pin": pin, "source_commit": SHA, "signature_verified": True}
+        }
+        args.provenance_source_commit = SHA
+        args.provenance_verified = True
+        args.publication_host_context = MODULE.BUILD_CONTROLLER_CONTEXT
+
+        gate = MODULE.Gate()
+        with (
+            mock.patch.object(
+                MODULE,
+                "resolve_publication_addresses",
+                side_effect=AssertionError("controller must not resolve the deployment host"),
+            ),
+            mock.patch.object(
+                MODULE,
+                "inspect_publication_topology",
+                side_effect=AssertionError("controller must not inspect its own interfaces"),
+            ),
+        ):
+            MODULE.verify(manifest, args, gate)
+
+        self.assertEqual([], gate.errors)
+        self.assertTrue(gate.checks["publication-host-context"]["passed"])
+        self.assertNotIn("direct-publication-host-interface", gate.checks)
+        self.assertNotIn("operator-attested-direct-publication-topology", gate.checks)
+        self.assertFalse(MODULE.deployment_is_authorized(args, gate))
+
+        evidence = MODULE.build_preflight_evidence(args, gate, {})
+        self.assertEqual("passed", evidence["status"])
+        self.assertIs(False, evidence["deployment_authorized"])
+
+        original_binding = args.provenance_bindings["bolt-hub"]
+        invalid_cases = {
+            "missing-pin": ({}, args.provenance_bindings, args.expected_source_commit),
+            "source-mismatch": (
+                args.expected_image_pins,
+                args.provenance_bindings,
+                "b" * 40,
+            ),
+            "signature-unverified": (
+                args.expected_image_pins,
+                {
+                    "bolt-hub": {
+                        **original_binding,
+                        "signature_verified": False,
+                    }
+                },
+                args.expected_source_commit,
+            ),
+        }
+        for name, (pins, bindings, source_commit) in invalid_cases.items():
+            with self.subTest(name=name):
+                args.expected_image_pins = pins
+                args.provenance_bindings = bindings
+                args.expected_source_commit = source_commit
+                self.assertTrue(
+                    any(
+                        error.startswith("digest-pinned-provenance-authorized-images:")
+                        for error in self.errors(manifest, args)
+                    )
+                )
+
+    def test_only_deployment_host_context_can_authorize_deployment(self) -> None:
+        args = self.args(authorize=True)
+        gate = MODULE.Gate()
+        for name in MODULE.DEPLOYMENT_AUTHORIZATION_CHECKS:
+            detail = (
+                {"context": MODULE.DEPLOYMENT_HOST_CONTEXT}
+                if name == "publication-host-context"
+                else "verified"
+            )
+            gate.check(name, True, detail)
+
+        self.assertTrue(MODULE.deployment_is_authorized(args, gate))
+        evidence = MODULE.build_preflight_evidence(args, gate, {})
+        self.assertEqual("passed", evidence["status"])
+        self.assertIs(True, evidence["deployment_authorized"])
+        gate.check(
+            "publication-host-context",
+            True,
+            {"context": MODULE.BUILD_CONTROLLER_CONTEXT},
+        )
+        self.assertFalse(MODULE.deployment_is_authorized(args, gate))
+        gate.check(
+            "publication-host-context",
+            True,
+            {"context": MODULE.DEPLOYMENT_HOST_CONTEXT},
+        )
+        args.publication_host_context = MODULE.BUILD_CONTROLLER_CONTEXT
+        self.assertFalse(MODULE.deployment_is_authorized(args, gate))
+        args.publication_host_context = MODULE.DEPLOYMENT_HOST_CONTEXT
+        del gate.checks["direct-publication-host-interface"]
+        self.assertFalse(MODULE.deployment_is_authorized(args, gate))
+        gate.check("direct-publication-host-interface", True, "verified")
+        gate.check("failed", False, "failure")
+        self.assertFalse(MODULE.deployment_is_authorized(args, gate))
+
+    def test_deployment_authorization_requires_explicit_publication_context(self) -> None:
+        manifest = self.manifest()
+        args = self.args(authorize=True)
+        args.publication_host_context = None
+        gate = MODULE.Gate()
+
+        with mock.patch.object(
+            MODULE,
+            "inspect_publication_topology",
+            side_effect=AssertionError("missing context must not inspect interfaces"),
+        ):
+            MODULE.verify(manifest, args, gate)
+
+        self.assertFalse(gate.checks["publication-host-context"]["passed"])
+        self.assertTrue(
+            any(error.startswith("publication-host-context:") for error in gate.errors)
+        )
+        evidence = MODULE.build_preflight_evidence(args, gate, {})
+        self.assertEqual("failed", evidence["status"])
+        self.assertIs(False, evidence["deployment_authorized"])
 
     def test_publication_topology_inspector_normalizes_dns_and_host_inventory(self) -> None:
         getaddrinfo = mock.patch.object(

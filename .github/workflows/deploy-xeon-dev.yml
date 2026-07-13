@@ -357,7 +357,6 @@ jobs:
             --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
             --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
             --expected-published-port "$BOLT_HUB_EXPOSE_PORT" \
-            --expected-public-hostname "$BOLT_HUB_PUBLIC_HOSTNAME" \
             --expected-identityserver-ca-path "$IDENTITYSERVER_TLS_CA_PATH" \
             --expected-identityserver-fullchain-path "$IDENTITYSERVER_TLS_FULLCHAIN_PATH" \
             --expected-identityserver-private-key-path "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH" \
@@ -1116,7 +1115,6 @@ jobs:
             --expected-fullchain-path "$BOLT_HUB_TLS_FULLCHAIN_PATH" \
             --expected-private-key-path "$BOLT_HUB_TLS_PRIVATE_KEY_PATH" \
             --expected-published-port "$BOLT_HUB_EXPOSE_PORT" \
-            --expected-public-hostname "$BOLT_HUB_PUBLIC_HOSTNAME" \
             --expected-identityserver-ca-path "$IDENTITYSERVER_TLS_CA_PATH" \
             --expected-identityserver-fullchain-path "$IDENTITYSERVER_TLS_FULLCHAIN_PATH" \
             --expected-identityserver-private-key-path "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH" \
@@ -1125,14 +1123,32 @@ jobs:
             --expected-identityserver-token-path "$IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH" \
             --pins-file "$pins_file" \
             --provenance-file "$provenance_file" \
-            --publication-topology-attestation "$PUBLICATION_TOPOLOGY_ATTESTATION" \
-            --publication-topology-attested-by "$PUBLICATION_TOPOLOGY_ATTESTED_BY" \
-            --publication-topology-attested-by-id "$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID" \
-            --publication-topology-triggering-actor "$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR" \
-            --publication-topology-run-id "$GITHUB_RUN_ID" \
-            --publication-topology-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --publication-host-context build-controller \
             "${authorize_args[@]}" \
             --authorize-deployment
+
+          python3 - "$evidence_dir/pinned-manifest-local.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              document = json.load(stream)
+          checks = document.get("checks")
+          context = checks.get("publication-host-context") if isinstance(checks, dict) else None
+          if (
+              document.get("status") != "passed"
+              or document.get("deployment_authorized") is not False
+              or not isinstance(checks, dict)
+              or not isinstance(context, dict)
+              or context.get("passed") is not True
+              or context.get("detail") != {"context": "build-controller"}
+              or (checks.get("digest-pinned-provenance-authorized-images") or {}).get("passed")
+              is not True
+              or "direct-publication-host-interface" in checks
+              or "operator-attested-direct-publication-topology" in checks
+          ):
+              raise SystemExit("build-controller candidate receipt is invalid")
+          PY
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "REMOTE_RUN_DIR='$REMOTE_RUN_DIR' bash -s" <<'REMOTE_SCRIPT'
@@ -1196,12 +1212,38 @@ jobs:
             --publication-topology-triggering-actor "$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR" \
             --publication-topology-run-id "$PUBLICATION_TOPOLOGY_RUN_ID" \
             --publication-topology-run-attempt "$PUBLICATION_TOPOLOGY_RUN_ATTEMPT" \
+            --publication-host-context deployment-host \
             "${authorize_args[@]}" \
             --authorize-deployment
           REMOTE_SCRIPT
           if [ "$status" -eq 0 ]; then
             scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
               "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json"
+            python3 - "$evidence_dir/pinned-manifest-remote.json" <<'PY' || status=$?
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              document = json.load(stream)
+          checks = document.get("checks")
+          context = checks.get("publication-host-context") if isinstance(checks, dict) else None
+          required = (
+              "publication-host-context",
+              "hub-only-tls-publication",
+              "direct-publication-host-interface",
+              "operator-attested-direct-publication-topology",
+              "digest-pinned-provenance-authorized-images",
+          )
+          if (
+              document.get("status") != "passed"
+              or document.get("deployment_authorized") is not True
+              or not isinstance(checks, dict)
+              or not isinstance(context, dict)
+              or context.get("detail") != {"context": "deployment-host"}
+              or any((checks.get(name) or {}).get("passed") is not True for name in required)
+          ):
+              raise SystemExit("deployment-host authorization receipt is invalid")
+          PY
           else
             scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
               "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json" || true
