@@ -1253,6 +1253,52 @@ class WatchdogContractTests(unittest.TestCase):
         self.assertIn("recovery-evidence-capture-failed", content)
         self.assertIn("}' >&\"$receipt_fd\"", content)
 
+    def test_workflow_pins_compatible_cosign_contract_before_build(self) -> None:
+        content = WORKFLOW.read_text(encoding="utf-8")
+        install_start = content.index("- name: Install Cosign")
+        contract_start = content.index("- name: Verify Cosign CLI contract")
+        build_start = content.index("- name: Build images on buildserver")
+        provenance_start = content.index("- name: Sign and verify build provenance")
+        provenance_end = content.index(
+            "- name: Authorize digest-pinned deployment manifest",
+            provenance_start,
+        )
+
+        self.assertLess(install_start, contract_start)
+        self.assertLess(contract_start, build_start)
+        install_block = content[install_start:contract_start]
+        self.assertIn(
+            "sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6",
+            install_block,
+        )
+        self.assertIn("# v4.1.2", install_block)
+        self.assertIn("cosign-release: v3.1.1", install_block)
+
+        contract_block = content[contract_start:build_start]
+        for required in (
+            'expected_version = "v3.1.1"',
+            '["cosign", "version", "--json"]',
+            '"attest": ("--bundle", "--predicate", "--type", "--yes")',
+            '"verify-attestation": (',
+            '"--certificate-identity"',
+            '"--certificate-oidc-issuer"',
+            '"--certificate-github-workflow-repository"',
+            '"--certificate-github-workflow-ref"',
+            '"--certificate-github-workflow-sha"',
+            '"--certificate-github-workflow-trigger"',
+            'for command in ("attest", "verify-attestation"):',
+            '["cosign", command, "--new-bundle-format=true", "--help"]',
+        ):
+            self.assertIn(required, contract_block)
+
+        provenance_block = content[provenance_start:provenance_end]
+        self.assertIn(
+            'cosign attest --yes --new-bundle-format=true --type slsaprovenance1',
+            provenance_block,
+        )
+        self.assertIn('cosign verify-attestation \\', provenance_block)
+        self.assertEqual(2, provenance_block.count("--new-bundle-format=true"))
+
     def test_active_workflow_uses_checked_in_pinned_known_hosts_and_exact_ssh_config(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
         pinned_lines = [

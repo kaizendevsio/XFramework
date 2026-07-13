@@ -796,7 +796,62 @@ jobs:
                 "docker login '$REGISTRY_HOST' --username '$XSYSTEMS_DEV_REGISTRY_USERNAME' --password-stdin"
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.1
+
+      - name: Verify Cosign CLI contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess
+
+          expected_version = "v3.1.1"
+          version = json.loads(
+              subprocess.check_output(["cosign", "version", "--json"], text=True)
+          )
+          if version.get("gitVersion") != expected_version:
+              raise SystemExit(
+                  f"Expected Cosign {expected_version}, got {version.get('gitVersion')!r}"
+              )
+
+          contracts = {
+              "attest": ("--bundle", "--predicate", "--type", "--yes"),
+              "verify-attestation": (
+                  "--certificate-identity",
+                  "--certificate-oidc-issuer",
+                  "--certificate-github-workflow-repository",
+                  "--certificate-github-workflow-ref",
+                  "--certificate-github-workflow-sha",
+                  "--certificate-github-workflow-trigger",
+                  "--type",
+              ),
+          }
+          for command, required_flags in contracts.items():
+              result = subprocess.run(
+                  ["cosign", command, "--help"],
+                  check=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+                  text=True,
+              )
+              missing = [flag for flag in required_flags if flag not in result.stdout]
+              if missing:
+                  raise SystemExit(
+                      f"Cosign {command} is missing required flags: {', '.join(missing)}"
+                  )
+
+          # Cosign v3.1.1 deprecates and hides this selector but still supports it.
+          # Exercise the parser directly because v2.4.3 failed on this exact argument.
+          for command in ("attest", "verify-attestation"):
+              subprocess.run(
+                  ["cosign", command, "--new-bundle-format=true", "--help"],
+                  check=True,
+                  stdout=subprocess.DEVNULL,
+                  stderr=subprocess.STDOUT,
+              )
+          PY
 
       - name: Build images on buildserver
         shell: bash
