@@ -143,6 +143,16 @@ class DockerHarness:
         raise AssertionError(f"unexpected command: {command}")
 
 
+class DockerInspectTemplateTests(unittest.TestCase):
+    def test_optional_health_lookup_is_missing_key_safe(self) -> None:
+        self.assertIn(
+            '"health":{{with index .State "Health"}}'
+            '{{json (index . "Status")}}{{else}}null{{end}}',
+            MODULE.DOCKER_INSPECT_FORMAT,
+        )
+        self.assertNotIn(".State.Health", MODULE.DOCKER_INSPECT_FORMAT)
+
+
 class RequestHarness:
     def __init__(self, current_user: str, old_user: str, old_service: str) -> None:
         self.current_user = current_user

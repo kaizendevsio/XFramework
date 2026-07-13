@@ -46,23 +46,43 @@ class SubprocessBoundTests(unittest.TestCase):
         self.assertIn("timed out", result.stderr)
 
 
-def proc_tcp(health_scope: str = "loopback", extra_port: int | None = None) -> str:
+def proc_tcp(
+    health_scope: str = "loopback",
+    extra_port: int | None = None,
+    extra_address: str = "0100007F",
+    include_docker_dns: bool = True,
+) -> str:
     health_address = "0100007F" if health_scope == "loopback" else "00000000"
     lines = [
         TCP_HEADER.rstrip("\n"),
         f"   0: {health_address}:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 1",
         "   1: 00000000:20FB 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 2",
     ]
+    if include_docker_dns:
+        lines.append(
+            "   2: 0B00007F:AF95 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 3"
+        )
     if extra_port is not None:
         lines.append(
-            f"   2: 0100007F:{extra_port:04X} 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 3"
+            f"   3: {extra_address}:{extra_port:04X} 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 4"
         )
     return "\n".join(lines) + "\n"
 
 
-def listener_runner(tcp: str):
+def listener_runner(
+    tcp: str,
+    resolv_conf: str = "nameserver 127.0.0.11\n",
+    process_sockets: str = "socket:[1]\nsocket:[2]\n",
+):
     def run(command: list[str]) -> subprocess.CompletedProcess[str]:
-        content = tcp if command[-1] == "/proc/net/tcp" else TCP_HEADER
+        if command[-1] == "/proc/net/tcp":
+            content = tcp
+        elif command[-1] == "/proc/net/tcp6":
+            content = TCP_HEADER
+        elif command[-1] == "/etc/resolv.conf":
+            content = resolv_conf
+        else:
+            content = process_sockets
         return subprocess.CompletedProcess(command, 0, content, "")
 
     return run
@@ -75,9 +95,24 @@ def inspector(
     health: str | None = "healthy",
     running: bool = True,
     ports: dict | None = None,
+    port_bindings: dict | None = None,
     mounts: list[dict] | None = None,
 ):
-    bindings = {"8443/tcp": [{"HostIp": "0.0.0.0", "HostPort": "7443"}]}
+    network_bindings = {
+        "8080/tcp": None,
+        "8443/tcp": [
+            {"HostIp": "0.0.0.0", "HostPort": "7443"},
+            {"HostIp": "::", "HostPort": "7443"},
+        ],
+    }
+    configured_bindings = {"8443/tcp": [{"HostIp": "", "HostPort": "7443"}]}
+    actual_ports = ports if ports is not None else network_bindings
+    if port_bindings is not None:
+        actual_port_bindings = port_bindings
+    elif ports is not None:
+        actual_port_bindings = ports
+    else:
+        actual_port_bindings = configured_bindings
 
     def inspect(command: list[str]) -> dict:
         if command[1:3] == ["image", "inspect"]:
@@ -93,8 +128,8 @@ def inspector(
             "exit_code": 0,
             "health": health,
             "labels": {"com.docker.compose.project": PROJECT, "com.docker.compose.service": "bolt-hub"},
-            "ports": ports if ports is not None else bindings,
-            "port_bindings": ports if ports is not None else bindings,
+            "ports": actual_ports,
+            "port_bindings": actual_port_bindings,
             "mounts": mounts
             if mounts is not None
             else [
@@ -122,6 +157,8 @@ class Phase0RuntimeTests(unittest.TestCase):
 
     def collect(self, **kwargs):
         tcp = kwargs.pop("tcp", proc_tcp())
+        resolv_conf = kwargs.pop("resolv_conf", "nameserver 127.0.0.11\n")
+        process_sockets = kwargs.pop("process_sockets", "socket:[1]\nsocket:[2]\n")
         return MODULE.collect_service(
             "bolt-hub",
             CONTAINER_ID,
@@ -130,8 +167,45 @@ class Phase0RuntimeTests(unittest.TestCase):
             self.private_key,
             7443,
             inspector(self.private_key, **kwargs),
-            listener_runner(tcp),
+            listener_runner(tcp, resolv_conf, process_sockets),
         )
+
+    def test_inspect_template_handles_a_missing_health_object_without_dot_lookup(self) -> None:
+        self.assertIn(
+            '"health":{{with index .State "Health"}}'
+            '{{json (index . "Status")}}{{else}}null{{end}}',
+            MODULE.CONTAINER_FORMAT,
+        )
+        self.assertNotIn(".State.Health", MODULE.CONTAINER_FORMAT)
+
+    def test_successful_migration_accepts_absent_health_without_listener_inspection(self) -> None:
+        base = inspector(self.private_key, health=None, running=False, mounts=[])
+
+        def migrate_inspector(command: list[str]) -> dict:
+            result = base(command)
+            if command[1:2] == ["inspect"]:
+                result["container_name"] = "/xframework-migrate"
+                result["labels"]["com.docker.compose.service"] = "migrate"
+            return result
+
+        command_runner = mock.Mock(side_effect=AssertionError("listener inspection is unexpected"))
+        evidence, errors = MODULE.collect_service(
+            "migrate",
+            CONTAINER_ID,
+            EXPECTED,
+            PROJECT,
+            self.private_key,
+            7443,
+            migrate_inspector,
+            command_runner,
+        )
+
+        self.assertEqual([], errors)
+        self.assertIsNone(evidence["health"])
+        self.assertFalse(evidence["running"])
+        self.assertEqual("exited", evidence["status"])
+        self.assertEqual(0, evidence["exit_code"])
+        command_runner.assert_not_called()
 
     def test_valid_runtime_boundary_evidence_passes_without_environment_inspection(self) -> None:
         evidence, errors = self.collect()
@@ -169,8 +243,34 @@ class Phase0RuntimeTests(unittest.TestCase):
     def test_public_health_listener_and_extra_listener_fail_closed(self) -> None:
         _, public_errors = self.collect(tcp=proc_tcp(health_scope="wildcard"))
         _, extra_errors = self.collect(tcp=proc_tcp(extra_port=9000))
+        _, duplicate_errors = self.collect(tcp=proc_tcp(extra_port=8080))
         self.assertTrue(any("8080" in error for error in public_errors))
         self.assertTrue(any("unexpected actual" in error for error in extra_errors))
+        self.assertTrue(any("unexpected actual" in error for error in duplicate_errors))
+
+    def test_embedded_dns_listener_is_ignored_only_for_the_configured_docker_resolver(self) -> None:
+        evidence, errors = self.collect()
+        self.assertEqual([], errors)
+        self.assertEqual({8080, 8443}, {item["port"] for item in evidence["listeners"]})
+
+        _, unconfigured = self.collect(resolv_conf="nameserver 1.1.1.1\n")
+        self.assertTrue(any("unexpected actual" in error for error in unconfigured))
+
+        with self.assertRaisesRegex(RuntimeError, "embedded DNS listener topology"):
+            self.collect(tcp=proc_tcp(extra_port=9000, extra_address="0B00007F"))
+
+        with self.assertRaisesRegex(RuntimeError, "embedded DNS listener topology"):
+            self.collect(
+                tcp=proc_tcp(
+                    extra_port=9000,
+                    extra_address="0B00007F",
+                    include_docker_dns=False,
+                ),
+                process_sockets="socket:[1]\nsocket:[2]\nsocket:[4]\n",
+            )
+
+        with self.assertRaisesRegex(RuntimeError, "embedded DNS listener topology"):
+            self.collect(tcp=proc_tcp(include_docker_dns=False))
 
     def test_wrong_or_plaintext_published_port_fails_closed(self) -> None:
         wrong = {"8443/tcp": [{"HostIp": "0.0.0.0", "HostPort": "7000"}]}
@@ -180,8 +280,40 @@ class Phase0RuntimeTests(unittest.TestCase):
         }
         for ports in (wrong, plaintext):
             with self.subTest(ports=ports):
-                _, errors = self.collect(ports=ports)
+                evidence, errors = self.collect(ports=ports)
                 self.assertTrue(any("port" in error for error in errors))
+                self.assertIsNone(evidence["published_port"])
+
+    def test_bound_plaintext_port_fails_even_when_configured_binding_is_tls_only(self) -> None:
+        runtime_ports = {
+            "8080/tcp": [{"HostIp": "0.0.0.0", "HostPort": "8080"}],
+            "8443/tcp": [
+                {"HostIp": "0.0.0.0", "HostPort": "7443"},
+                {"HostIp": "::", "HostPort": "7443"},
+            ],
+        }
+        configured = {"8443/tcp": [{"HostIp": "", "HostPort": "7443"}]}
+        _, errors = self.collect(ports=runtime_ports, port_bindings=configured)
+        self.assertTrue(any("runtime network publication" in error for error in errors))
+
+    def test_loopback_or_duplicate_tls_host_bindings_fail_closed(self) -> None:
+        configured = {"8443/tcp": [{"HostIp": "", "HostPort": "7443"}]}
+        invalid_runtime_bindings = (
+            [
+                {"HostIp": "127.0.0.1", "HostPort": "7443"},
+                {"HostIp": "::", "HostPort": "7443"},
+            ],
+            [
+                {"HostIp": "0.0.0.0", "HostPort": "7443"},
+                {"HostIp": "0.0.0.0", "HostPort": "7443"},
+            ],
+        )
+        for bindings in invalid_runtime_bindings:
+            with self.subTest(bindings=bindings):
+                ports = {"8080/tcp": None, "8443/tcp": bindings}
+                evidence, errors = self.collect(ports=ports, port_bindings=configured)
+                self.assertTrue(any("runtime network publication" in error for error in errors))
+                self.assertIsNone(evidence["published_port"])
 
     def test_parent_directory_and_symlink_key_mount_bypasses_fail_closed(self) -> None:
         parent_mount = [
@@ -208,6 +340,16 @@ class Phase0RuntimeTests(unittest.TestCase):
         self.assertEqual("exact", evidence["private_key_mounts"][0]["relation"])
 
     def test_identityserver_requires_its_distinct_key_and_tls_only_publication(self) -> None:
+        identity_runtime_ports = {
+            "8080/tcp": None,
+            "8443/tcp": [
+                {"HostIp": "0.0.0.0", "HostPort": "8261"},
+                {"HostIp": "::", "HostPort": "8261"},
+            ],
+        }
+        identity_configured_ports = {
+            "8443/tcp": [{"HostIp": "", "HostPort": "8261"}]
+        }
         base = inspector(
             self.private_key,
             mounts=[
@@ -218,7 +360,8 @@ class Phase0RuntimeTests(unittest.TestCase):
                     "RW": False,
                 }
             ],
-            ports={"8443/tcp": [{"HostIp": "0.0.0.0", "HostPort": "8261"}]},
+            ports=identity_runtime_ports,
+            port_bindings=identity_configured_ports,
         )
 
         def identity_inspector(command: list[str]) -> dict:
@@ -253,7 +396,8 @@ class Phase0RuntimeTests(unittest.TestCase):
                     "RW": False,
                 }
             ],
-            ports={"8443/tcp": [{"HostIp": "0.0.0.0", "HostPort": "8261"}]},
+            ports=identity_runtime_ports,
+            port_bindings=identity_configured_ports,
         )
 
         def cross_inspector(command: list[str]) -> dict:
@@ -346,6 +490,10 @@ class Phase0RuntimeTests(unittest.TestCase):
     def test_proc_listener_parser_ignores_non_listening_sockets(self) -> None:
         content = TCP_HEADER + "   0: 0100007F:1F90 00000000:0000 01 00000000:00000000 00:00000000 00000000 0 0 1\n"
         self.assertEqual([], MODULE.parse_proc_net(content, "ipv4"))
+
+    def test_proc_listener_parser_rejects_malformed_records(self) -> None:
+        with self.assertRaisesRegex(ValueError, "malformed /proc TCP record"):
+            MODULE.parse_proc_net(TCP_HEADER + "   0: 0100007F:1F90 00000000:0000 0A\n", "ipv4")
 
 
 if __name__ == "__main__":

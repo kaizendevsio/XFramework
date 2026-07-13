@@ -38,17 +38,19 @@ IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 REPO_DIGEST = re.compile(r"^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$")
 CONTAINER_ID = re.compile(r"^[0-9a-f]{64}$")
 PROJECT_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+PROCESS_SOCKET = re.compile(r"^socket:\[([0-9]+)\]$")
 CONTAINER_FORMAT = (
     '{"container_name":{{json .Name}},"container_id":{{json .Id}},'
     '"configured_image":{{json .Config.Image}},"local_image_id":{{json .Image}},'
     '"started_at":{{json .State.StartedAt}},"running":{{json .State.Running}},'
     '"status":{{json .State.Status}},"exit_code":{{json .State.ExitCode}},'
-    '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},'
+    '"health":{{with index .State "Health"}}{{json (index . "Status")}}{{else}}null{{end}},'
     '"labels":{{json .Config.Labels}},"ports":{{json .NetworkSettings.Ports}},'
     '"port_bindings":{{json .HostConfig.PortBindings}},"mounts":{{json .Mounts}}}'
 )
 IMAGE_FORMAT = '{"local_image_id":{{json .Id}},"repo_digests":{{json .RepoDigests}}}'
 SUBPROCESS_TIMEOUT_SECONDS = 30
+DOCKER_EMBEDDED_DNS_ADDRESS = "127.0.0.11"
 
 
 def write_private_json(path: Path, value: Any) -> None:
@@ -168,15 +170,49 @@ def parse_proc_net(content: str, family: str) -> list[dict[str, Any]]:
     listeners: list[dict[str, Any]] = []
     for line in content.splitlines()[1:]:
         fields = line.split()
-        if len(fields) < 4 or fields[3] != "0A":
+        if not fields:
+            continue
+        if len(fields) < 10:
+            raise ValueError("malformed /proc TCP record")
+        if fields[3] != "0A":
             continue
         address_hex, separator, port_hex = fields[1].partition(":")
         if not separator:
             raise ValueError("malformed /proc TCP listener record")
         address = decode_address(family, address_hex)
         scope = "wildcard" if address.is_unspecified else "loopback" if address.is_loopback else "other"
-        listeners.append({"family": family, "scope": scope, "port": int(port_hex, 16)})
+        listeners.append(
+            {
+                "address": str(address),
+                "family": family,
+                "inode": int(fields[9]),
+                "scope": scope,
+                "port": int(port_hex, 16),
+            }
+        )
     return listeners
+
+
+def docker_embedded_dns_is_configured(content: str) -> bool:
+    for line in content.splitlines():
+        fields = line.partition("#")[0].split()
+        if (
+            len(fields) >= 2
+            and fields[0] == "nameserver"
+            and fields[1] == DOCKER_EMBEDDED_DNS_ADDRESS
+        ):
+            return True
+    return False
+
+
+def parse_process_socket_inodes(content: str) -> set[int]:
+    inodes: set[int] = set()
+    for line in content.splitlines():
+        match = PROCESS_SOCKET.fullmatch(line.strip())
+        if not match:
+            raise ValueError("malformed process socket record")
+        inodes.add(int(match.group(1)))
+    return inodes
 
 
 def collect_listeners(
@@ -189,45 +225,127 @@ def collect_listeners(
         if result.returncode != 0:
             raise RuntimeError(f"could not inspect Hub {family} listeners")
         listeners.extend(parse_proc_net(result.stdout, family))
-    return sorted(listeners, key=lambda item: (item["port"], item["family"], item["scope"]))
+    resolver = runner(["docker", "exec", container_id, "cat", "/etc/resolv.conf"])
+    if resolver.returncode != 0:
+        raise RuntimeError("could not inspect container DNS configuration")
+    owned_sockets = runner(
+        [
+            "docker",
+            "exec",
+            container_id,
+            "sh",
+            "-c",
+            'for fd in /proc/[0-9]*/fd/*; do target=$(readlink "$fd" 2>/dev/null) || continue; '
+            'case "$target" in socket:\\[*\\]) printf \'%s\\n\' "$target";; esac; done',
+        ]
+    )
+    if owned_sockets.returncode != 0:
+        raise RuntimeError("could not inspect process-owned container sockets")
+    process_socket_inodes = parse_process_socket_inodes(owned_sockets.stdout)
+    embedded_dns = [
+        item
+        for item in listeners
+        if item["address"] == DOCKER_EMBEDDED_DNS_ADDRESS
+        and item["inode"] not in process_socket_inodes
+    ]
+    if docker_embedded_dns_is_configured(resolver.stdout):
+        if len(embedded_dns) != 1:
+            raise RuntimeError("Docker embedded DNS listener topology is not exact")
+        listeners.remove(embedded_dns[0])
+    return sorted(
+        listeners,
+        key=lambda item: (item["port"], item["family"], item["address"], item["inode"]),
+    )
 
 
 def verify_tls_service_listeners(service: str, listeners: list[dict[str, Any]]) -> list[str]:
     errors: list[str] = []
-    health = [item for item in listeners if item["port"] == 8080]
-    tls = [item for item in listeners if item["port"] == 8443]
-    unexpected = [item for item in listeners if item["port"] not in {8080, 8443}]
-    if not health or any(item["scope"] != "loopback" for item in health):
-        errors.append(f"{service}: actual port 8080 listeners are missing or not loopback-only")
-    if not tls or any(item["scope"] != "wildcard" for item in tls):
-        errors.append(f"{service}: actual port 8443 listeners are missing or not wildcard TLS listeners")
-    if unexpected:
-        errors.append(f"{service}: unexpected actual TCP listener ports are present")
+    normalized = [
+        {
+            "address": item["address"],
+            "family": item["family"],
+            "scope": item["scope"],
+            "port": item["port"],
+        }
+        for item in listeners
+    ]
+    expected_health = {
+        "address": "127.0.0.1",
+        "family": "ipv4",
+        "scope": "loopback",
+        "port": 8080,
+    }
+    expected_tls = {
+        "address": "0.0.0.0",
+        "family": "ipv4",
+        "scope": "wildcard",
+        "port": 8443,
+    }
+    health = [item for item in normalized if item["port"] == 8080]
+    tls = [item for item in normalized if item["port"] == 8443]
+    if health != [expected_health]:
+        errors.append(f"{service}: actual port 8080 listener is not exactly IPv4 127.0.0.1")
+    if tls != [expected_tls]:
+        errors.append(f"{service}: actual port 8443 listener is not exactly IPv4 wildcard TLS")
+    if len(normalized) != 2 or any(
+        item not in (expected_health, expected_tls) for item in normalized
+    ):
+        errors.append(f"{service}: unexpected actual TCP listener topology is present")
     return errors
 
 
-def binding_ports(value: Any) -> tuple[set[str], bool]:
-    if not isinstance(value, dict) or set(value) != {"8443/tcp"}:
+def binding_ports(
+    value: Any,
+    expected_host_ips: set[str],
+    *,
+    allow_unbound_exposed_ports: bool = False,
+) -> tuple[set[str], bool]:
+    if not isinstance(value, dict) or "8443/tcp" not in value:
+        return set(), False
+    other_ports = {key: bindings for key, bindings in value.items() if key != "8443/tcp"}
+    if (
+        any(bindings is not None for bindings in other_ports.values())
+        if allow_unbound_exposed_ports
+        else bool(other_ports)
+    ):
         return set(), False
     bindings = value.get("8443/tcp")
     if not isinstance(bindings, list) or not bindings:
         return set(), False
-    ports = {str(item.get("HostPort", "")) for item in bindings if isinstance(item, dict)}
-    return ports, len(ports) == 1 and all(isinstance(item, dict) and item.get("HostPort") for item in bindings)
+    if any(not isinstance(item, dict) or set(item) != {"HostIp", "HostPort"} for item in bindings):
+        return set(), False
+    normalized = [(str(item["HostIp"]), str(item["HostPort"])) for item in bindings]
+    ports = {port for _, port in normalized}
+    host_ips = {host_ip for host_ip, _ in normalized}
+    return (
+        ports,
+        len(normalized) == len(expected_host_ips)
+        and len(set(normalized)) == len(normalized)
+        and host_ips == expected_host_ips,
+    )
 
 
 def verify_published_port(
     service: str, container: dict[str, Any], expected_port: int
-) -> tuple[dict[str, Any], list[str]]:
-    network_ports, network_ok = binding_ports(container.get("ports"))
-    host_ports, host_ok = binding_ports(container.get("port_bindings"))
+) -> tuple[dict[str, Any] | None, list[str]]:
+    network_ports, network_ok = binding_ports(
+        container.get("ports"),
+        {"0.0.0.0", "::"},
+        allow_unbound_exposed_ports=True,
+    )
+    host_ports, host_ok = binding_ports(container.get("port_bindings"), {""})
     expected = {str(expected_port)}
     errors: list[str] = []
     if not network_ok or network_ports != expected:
         errors.append(f"{service}: runtime network publication is not exactly the expected 8443/tcp host port")
     if not host_ok or host_ports != expected:
         errors.append(f"{service}: configured port binding is not exactly the expected 8443/tcp host port")
-    return {"container_port": 8443, "published_port": expected_port, "protocol": "tcp"}, errors
+    evidence = (
+        {"container_port": 8443, "published_port": expected_port, "protocol": "tcp"}
+        if not errors
+        else None
+    )
+    return evidence, errors
 
 
 def resolve_path(value: str) -> Path:
@@ -349,8 +467,13 @@ def collect_service(
     listener_evidence: list[dict[str, Any]] = []
     publication_evidence: dict[str, Any] | None = None
     if service in {"bolt-hub", "identityserver"}:
-        listener_evidence = collect_listeners(container_id, command_runner)
-        errors.extend(verify_tls_service_listeners(service, listener_evidence))
+        observed_listeners = collect_listeners(container_id, command_runner)
+        errors.extend(verify_tls_service_listeners(service, observed_listeners))
+        # The sealed runtime.v2 contract retains redacted topology after exact raw validation.
+        listener_evidence = [
+            {"family": item["family"], "scope": item["scope"], "port": item["port"]}
+            for item in observed_listeners
+        ]
         service_published_port = (
             expected_published_port
             if service == "bolt-hub"

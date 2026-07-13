@@ -42,7 +42,7 @@ ENFORCE_POSIX_PERMISSIONS = os.name == "posix" and hasattr(os, "geteuid")
 DOCKER_INSPECT_FORMAT = (
     '{"id":{{json .Id}},"running":{{json .State.Running}},'
     '"paused":{{json .State.Paused}},"status":{{json .State.Status}},'
-    '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},'
+    '"health":{{with index .State "Health"}}{{json (index . "Status")}}{{else}}null{{end}},'
     '"labels":{{json .Config.Labels}}}'
 )
 
