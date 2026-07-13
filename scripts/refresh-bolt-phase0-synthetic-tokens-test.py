@@ -222,6 +222,22 @@ class RefreshTokenHookTests(unittest.TestCase):
 
             self.assertEqual(parsed["LITERAL_VALUE"], "$(must-not-run)")
 
+    def test_env_parser_accepts_compose_and_dotnet_mixed_case_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Workspace(Path(temporary))
+            values = workspace.values()
+            values["ControlPanel__BootstrapAdmin__Password"] = "opaque-secret"
+            values["_COMPOSE_PRIVATE_SETTING"] = "literal"
+            workspace.write_env(values)
+
+            parsed = refresh.parse_protected_env(str(workspace.env))
+
+            self.assertEqual(
+                parsed["ControlPanel__BootstrapAdmin__Password"], "opaque-secret"
+            )
+            self.assertEqual(parsed["_COMPOSE_PRIVATE_SETTING"], "literal")
+            refresh.load_config(parsed)
+
     def test_env_parser_rejects_duplicate_ambiguous_and_control_syntax(self) -> None:
         cases = {
             "duplicate": "KEY=value\nKEY=second\n",
