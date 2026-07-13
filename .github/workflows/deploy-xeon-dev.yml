@@ -574,25 +574,47 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "sudo -n '$REMOTE_ROOT_HELPER' verify-bootstrap"
-          request="$(
+          source_binding_request="$(
             python3 - "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          components = {
+              "lease_manager_sha256": Path("scripts/manage-bolt-phase0-deployment-lease.py"),
+              "qualifier_sha256": Path("scripts/verify-bolt-phase0-qualification.py"),
+              "root_helper_sha256": Path("scripts/manage-bolt-phase0-root.py"),
+              "service_fragment_sha256": Path("deploy/systemd/xframework-bolt-phase0-watchdog.service"),
+              "timer_fragment_sha256": Path("deploy/systemd/xframework-bolt-phase0-watchdog.timer"),
+              "watchdog_sha256": Path("scripts/run-bolt-phase0-watchdog.sh"),
+          }
+          request = {"run_attempt": sys.argv[2], "run_id": sys.argv[1]}
+          for field, path in components.items():
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit(f"invalid local bootstrap source: {path}")
+              request[field] = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+          print(json.dumps(request, ensure_ascii=True, separators=(",", ":"), sort_keys=True))
+          PY
+          )"
+          prepare_evidence="$(
+            printf '%s\n' "$source_binding_request" | ssh -i "$DEPLOY_SSH_KEY" \
+              -o BatchMode=yes "$DEPLOY_HOST" \
+              "sudo -n '$REMOTE_ROOT_HELPER' prepare-bound-run"
+          )"
+          python3 - "$prepare_evidence" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
           import json
           import sys
 
-          print(
-              json.dumps(
-                  {"run_attempt": sys.argv[2], "run_id": sys.argv[1]},
-                  ensure_ascii=True,
-                  separators=(",", ":"),
-                  sort_keys=True,
-              )
-          )
+          evidence = json.loads(sys.argv[1])
+          if (
+              evidence.get("status") != "passed"
+              or evidence.get("state") != "candidate-run-prepared"
+              or evidence.get("source_binding") != "passed"
+              or evidence.get("run") != f"{sys.argv[2]}-{sys.argv[3]}"
+          ):
+              raise SystemExit("bound Phase 0 run preparation failed")
           PY
-          )"
-          printf '%s\n' "$request" | ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
-            "$DEPLOY_HOST" "sudo -n '$REMOTE_ROOT_HELPER' prepare-run"
 
       - name: Install reviewed Phase 0 synthetic hooks
         shell: bash
@@ -1323,6 +1345,7 @@ jobs:
             --run-id "$RUN_ID" \
             --run-attempt "$RUN_ATTEMPT" \
             --phase credential-preparation \
+            --require-bootstrap-source-binding \
             --stale-timeout-seconds 600 > "$REMOTE_EVIDENCE.tmp"
           mv "$REMOTE_EVIDENCE.tmp" "$REMOTE_EVIDENCE"
           REMOTE_SCRIPT
