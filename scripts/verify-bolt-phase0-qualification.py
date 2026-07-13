@@ -7,6 +7,7 @@ import argparse
 import contextlib
 import datetime as dt
 import hashlib
+import ipaddress
 import json
 import math
 import os
@@ -18,7 +19,7 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 from urllib.parse import urlsplit
 
 
@@ -39,6 +40,15 @@ SYNTHETIC_CORE_SCHEMA = "bolt-phase0-synthetic-report/v1"
 POST_RUN_SCHEMA = "bolt-phase0-post-run-evidence/v1"
 PROBE_SCHEMA = "bolt-phase0-probe-receipt/v1"
 ROLLBACK_DRILL_SCHEMA = "xframework.bolt.phase0.rollback-drill.v1"
+PROXY_MODE_LOGS = "logs"
+PROXY_MODE_DIRECT_KESTREL = "direct-kestrel"
+SYNTHETIC_PROXY_MODES = frozenset({PROXY_MODE_LOGS, PROXY_MODE_DIRECT_KESTREL})
+PROXY_MODES = frozenset({PROXY_MODE_DIRECT_KESTREL})
+DIRECT_KESTREL_TARGET = "wss://bolt-hub:8443/bolt/ws"
+DIRECT_PUBLICATION_ATTESTATION = "ATTEST_DIRECT_KESTREL_NO_INTERMEDIARY"
+GITHUB_ACTOR = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
+GITHUB_ACTOR_ID = re.compile(r"^[1-9][0-9]{0,31}$")
+ALL_INTERFACE_BINDINGS = frozenset({"", "0.0.0.0", "::"})
 
 PHASE0_SERVICES = (
     "migrate",
@@ -260,6 +270,32 @@ class QualificationError(RuntimeError):
         self.code = code
 
 
+def require_proxy_mode(value: Any) -> str:
+    if not isinstance(value, str) or value not in PROXY_MODES:
+        raise QualificationError("invalid-proxy-mode")
+    return value
+
+
+def require_synthetic_proxy_mode(value: Any) -> str:
+    if not isinstance(value, str) or value not in SYNTHETIC_PROXY_MODES:
+        raise QualificationError("invalid-proxy-mode")
+    return value
+
+
+def require_proxy_configuration(values: Mapping[str, str]) -> str:
+    proxy_mode = require_proxy_mode(values.get("BOLT_SYNTHETIC_PROXY_MODE"))
+    has_proxy_log_paths = "BOLT_SYNTHETIC_PROXY_LOG_PATHS" in values
+    proxy_log_paths = values.get("BOLT_SYNTHETIC_PROXY_LOG_PATHS", "")
+    if (
+        (proxy_mode == PROXY_MODE_LOGS and (
+            not proxy_log_paths or proxy_log_paths != proxy_log_paths.strip()
+        ))
+        or (proxy_mode == PROXY_MODE_DIRECT_KESTREL and has_proxy_log_paths)
+    ):
+        raise QualificationError("invalid-proxy-configuration")
+    return proxy_mode
+
+
 def utc_now() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
@@ -280,10 +316,62 @@ def require_string(value: Any, pattern: re.Pattern[str], code: str) -> str:
     return value
 
 
-def require_int(value: Any, code: str, *, minimum: int = 0) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+def require_int(
+    value: Any,
+    code: str,
+    *,
+    minimum: int = 0,
+    maximum: int | None = None,
+) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < minimum
+        or (maximum is not None and value > maximum)
+    ):
         raise QualificationError(code)
     return value
+
+
+def require_hostname(value: Any, code: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) > 253
+        or value.endswith(".")
+        or len(value.split(".")) < 2
+        or not all(
+            re.fullmatch(
+                r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?",
+                label,
+            )
+            for label in value.split(".")
+        )
+    ):
+        raise QualificationError(code)
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return value
+    raise QualificationError(code)
+
+
+def require_host_addresses(value: Any, code: str, *, allow_empty: bool = False) -> list[str]:
+    if not isinstance(value, list) or (not value and not allow_empty):
+        raise QualificationError(code)
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item or "%" in item:
+            raise QualificationError(code)
+        try:
+            address = ipaddress.ip_address(item)
+        except ValueError as error:
+            raise QualificationError(code) from error
+        if address.is_loopback or address.is_link_local or address.is_unspecified or address.is_multicast:
+            raise QualificationError(code)
+        normalized.append(address.compressed)
+    if normalized != sorted(set(normalized)):
+        raise QualificationError(code)
+    return normalized
 
 
 def parse_timestamp(value: Any, code: str) -> dt.datetime:
@@ -615,8 +703,16 @@ def validate_override(document: dict[str, Any], pins: dict[str, str]) -> None:
 
 
 def validate_preflight(
-    document: dict[str, Any], pins: dict[str, str], now: dt.datetime, maximum_age_seconds: int
-) -> dt.datetime:
+    document: dict[str, Any],
+    pins: dict[str, str],
+    now: dt.datetime,
+    maximum_age_seconds: int,
+    proxy_mode: str,
+    expected_commit: str,
+    expected_run_id: str,
+    expected_attempt: int,
+) -> tuple[dt.datetime, tuple[str, int] | None]:
+    proxy_mode = require_proxy_mode(proxy_mode)
     generated = require_fresh_root(document, PREFLIGHT_SCHEMA, now, maximum_age_seconds, "invalid-compose-evidence")
     if document["deployment_authorized"] is not True:
         raise QualificationError("compose-not-authorized")
@@ -662,7 +758,110 @@ def validate_preflight(
             "provenance_bound": True,
         }:
             raise QualificationError("compose-authorization-binding-mismatch")
-    return generated
+    direct_publication: tuple[str, int] | None = None
+    if proxy_mode == PROXY_MODE_DIRECT_KESTREL:
+        publication = checks.get("hub-only-tls-publication")
+        if not isinstance(publication, dict) or publication.get("passed") is not True:
+            raise QualificationError("direct-kestrel-topology-unverified")
+        detail = exact_object(
+            publication.get("detail"), {"ports", "expected"},
+            "direct-kestrel-topology-unverified",
+        )
+        expected_port = require_int(
+            detail["expected"],
+            "direct-kestrel-topology-unverified",
+            minimum=1,
+            maximum=65_535,
+        )
+        ports = detail["ports"]
+        if not isinstance(ports, list) or len(ports) != 1:
+            raise QualificationError("direct-kestrel-topology-unverified")
+        port = exact_object(
+            ports[0], {"target", "published", "protocol", "host_ip"},
+            "direct-kestrel-topology-unverified",
+        )
+        if (
+            port["target"] != 8443
+            or port["published"] != expected_port
+            or port["protocol"] != "tcp"
+            or not isinstance(port["host_ip"], str)
+            or any(ord(character) < 0x20 or ord(character) == 0x7F for character in port["host_ip"])
+            or services["bolt-hub"]["ports"] != ports
+        ):
+            raise QualificationError("direct-kestrel-topology-unverified")
+        host_inventory = checks.get("direct-publication-host-interface")
+        if not isinstance(host_inventory, dict) or host_inventory.get("passed") is not True:
+            raise QualificationError("direct-kestrel-host-interface-unverified")
+        host_detail = exact_object(
+            host_inventory.get("detail"),
+            {"binding", "resolved_addresses", "host_interface_addresses", "matched_addresses"},
+            "direct-kestrel-host-interface-unverified",
+        )
+        resolved_addresses = require_host_addresses(
+            host_detail["resolved_addresses"], "direct-kestrel-host-interface-unverified"
+        )
+        host_addresses = require_host_addresses(
+            host_detail["host_interface_addresses"], "direct-kestrel-host-interface-unverified"
+        )
+        matched_addresses = require_host_addresses(
+            host_detail["matched_addresses"], "direct-kestrel-host-interface-unverified"
+        )
+        binding = host_detail["binding"]
+        if binding not in ALL_INTERFACE_BINDINGS:
+            try:
+                binding = ipaddress.ip_address(binding).compressed
+            except (TypeError, ValueError) as error:
+                raise QualificationError("direct-kestrel-host-interface-unverified") from error
+        if (
+            host_detail["binding"] != port["host_ip"]
+            or matched_addresses != sorted(set(resolved_addresses) & set(host_addresses))
+            or matched_addresses != resolved_addresses
+            or (binding not in ALL_INTERFACE_BINDINGS and binding not in matched_addresses)
+        ):
+            raise QualificationError("direct-kestrel-host-interface-unverified")
+        topology = checks.get("operator-attested-direct-publication-topology")
+        if not isinstance(topology, dict) or topology.get("passed") is not True:
+            raise QualificationError("direct-kestrel-topology-unattested")
+        topology_detail = exact_object(
+            topology.get("detail"),
+            {
+                "attestation", "attested_by", "attested_by_id", "triggering_actor",
+                "workflow_event", "run_id", "run_attempt",
+                "source_commit", "published_hostname", "published_port", "mode",
+                "intermediaries", "scope", "binding", "resolved_addresses",
+                "host_interface_addresses", "matched_addresses",
+            },
+            "direct-kestrel-topology-unattested",
+        )
+        published_hostname = require_hostname(
+            topology_detail["published_hostname"],
+            "direct-kestrel-topology-unattested",
+        )
+        if (
+            topology_detail["attestation"] != DIRECT_PUBLICATION_ATTESTATION
+            or not isinstance(topology_detail["attested_by"], str)
+            or GITHUB_ACTOR.fullmatch(topology_detail["attested_by"]) is None
+            or not isinstance(topology_detail["attested_by_id"], str)
+            or GITHUB_ACTOR_ID.fullmatch(topology_detail["attested_by_id"]) is None
+            or topology_detail["triggering_actor"] != topology_detail["attested_by"]
+            or topology_detail["workflow_event"] != "workflow_dispatch"
+            or topology_detail["run_id"] != expected_run_id
+            or topology_detail["run_attempt"] != 1
+            or expected_attempt != 1
+            or topology_detail["source_commit"] != expected_commit
+            or topology_detail["published_port"] != expected_port
+            or topology_detail["mode"] != PROXY_MODE_DIRECT_KESTREL
+            or topology_detail["intermediaries"] != []
+            or topology_detail["scope"]
+            != ["host-reverse-proxy", "tailscale-serve", "load-balancer", "ingress"]
+            or topology_detail["binding"] != host_detail["binding"]
+            or topology_detail["resolved_addresses"] != resolved_addresses
+            or topology_detail["host_interface_addresses"] != host_addresses
+            or topology_detail["matched_addresses"] != matched_addresses
+        ):
+            raise QualificationError("direct-kestrel-topology-unattested")
+        direct_publication = (published_hostname, expected_port)
+    return generated, direct_publication
 
 
 def validate_tls(
@@ -671,9 +870,13 @@ def validate_tls(
     generated = require_fresh_root(document, schema, now, maximum_age_seconds, "invalid-tls-evidence")
     if document["internal_hostname"] != hostname:
         raise QualificationError("tls-hostname-mismatch")
-    if not isinstance(document["published_hostname"], str) or not document["published_hostname"]:
-        raise QualificationError("invalid-tls-hostname")
-    require_int(document["published_port"], "invalid-tls-port", minimum=1)
+    require_hostname(document["published_hostname"], "invalid-tls-hostname")
+    require_int(
+        document["published_port"],
+        "invalid-tls-port",
+        minimum=1,
+        maximum=65_535,
+    )
     certificate = exact_object(
         document["certificate"],
         {
@@ -995,6 +1198,28 @@ def validate_probe_receipt(
         raise QualificationError("invalid-probe-receipt")
 
 
+def retained_marker_assertions(marker_count: int) -> dict[str, Any]:
+    return {
+        "retainedStoreQueried": True,
+        "matches": 0,
+        "tokensSearched": marker_count,
+        "markersSearched": marker_count,
+    }
+
+
+def proxy_marker_assertions(proxy_mode: str, marker_count: int) -> dict[str, Any]:
+    proxy_mode = require_synthetic_proxy_mode(proxy_mode)
+    if proxy_mode == PROXY_MODE_LOGS:
+        return retained_marker_assertions(marker_count)
+    return {
+        "retainedStoreQueried": False,
+        "notApplicableReason": "direct-kestrel-publication",
+        "matches": 0,
+        "tokensSearched": marker_count,
+        "markersSearched": marker_count,
+    }
+
+
 def safe_url(value: Any, scheme: str, code: str) -> str:
     if not isinstance(value, str):
         raise QualificationError(code)
@@ -1018,7 +1243,9 @@ def validate_synthetic(
     maximum_age_seconds: int,
     *,
     not_before: dt.datetime | None = None,
+    proxy_mode: str,
 ) -> tuple[str, dt.datetime, dt.datetime]:
+    proxy_mode = require_synthetic_proxy_mode(proxy_mode)
     exact_object(document, SYNTHETIC_KEYS, "invalid-synthetic-evidence")
     if (
         document["schemaVersion"] != SYNTHETIC_SCHEMA
@@ -1044,7 +1271,8 @@ def validate_synthetic(
     )
     if completed < started:
         raise QualificationError("synthetic-time-order-mismatch")
-    safe_url(core["target"], "wss", "invalid-synthetic-target")
+    if safe_url(core["target"], "wss", "invalid-synthetic-target") != DIRECT_KESTREL_TARGET:
+        raise QualificationError("invalid-synthetic-target")
     timings = exact_object(core["timings"], {"totalMs"}, "invalid-synthetic-timings")
     require_int(timings["totalMs"], "invalid-synthetic-timings")
     prefixes = core["tokenSha256Prefixes"]
@@ -1126,7 +1354,15 @@ def validate_synthetic(
         post["markerAbsence"], {"application", "proxy", "seq", "trace", "markerSha256Prefixes"},
         "invalid-marker-absence-evidence",
     )
-    if any(marker[name] != "passed" for name in ("application", "proxy", "seq", "trace")):
+    expected_proxy_marker = (
+        "not_applicable" if proxy_mode == PROXY_MODE_DIRECT_KESTREL else "passed"
+    )
+    if (
+        marker["application"] != "passed"
+        or marker["proxy"] != expected_proxy_marker
+        or marker["seq"] != "passed"
+        or marker["trace"] != "passed"
+    ):
         raise QualificationError("marker-absence-failed")
     if not isinstance(marker["markerSha256Prefixes"], dict) or any(
         not re.fullmatch(r"[0-9a-f]{12}", str(value)) for value in marker["markerSha256Prefixes"].values()
@@ -1144,14 +1380,10 @@ def validate_synthetic(
         raise QualificationError("old-generation-stage-mismatch")
     receipts = post["probeReceipts"]
     marker_count = len(required_prefixes)
-    marker_assertions = {
-        "retainedStoreQueried": True,
-        "matches": 0,
-        "tokensSearched": marker_count,
-        "markersSearched": marker_count,
-    }
+    marker_assertions = retained_marker_assertions(marker_count)
+    proxy_assertions = proxy_marker_assertions(proxy_mode, marker_count)
     expected_receipts: dict[str, tuple[str, dict[str, Any]]] = {
-        "proxyMarkerScan": ("proxy-marker-scan", marker_assertions),
+        "proxyMarkerScan": ("proxy-marker-scan", proxy_assertions),
         "seqMarkerScan": ("seq-marker-scan", marker_assertions),
         "traceMarkerScan": ("trace-marker-scan", marker_assertions),
         "plaintextRejection": (
@@ -1305,7 +1537,14 @@ def validate_run_identity(run_directory: Path, run_id: str, attempt: int, commit
         raise QualificationError("run-directory-identity-mismatch")
 
 
-def qualification_failure(run_id: str, attempt: int, commit: str, now: dt.datetime, code: str) -> dict[str, Any]:
+def qualification_failure(
+    run_id: str,
+    attempt: int,
+    commit: str,
+    proxy_mode: str,
+    now: dt.datetime,
+    code: str,
+) -> dict[str, Any]:
     return {
         "schema": QUALIFICATION_SCHEMA,
         "status": "failed",
@@ -1313,6 +1552,7 @@ def qualification_failure(run_id: str, attempt: int, commit: str, now: dt.dateti
         "run_id": run_id,
         "run_attempt": attempt,
         "source_commit": commit,
+        "proxy_mode": proxy_mode,
         "credential_generation_id": None,
         "artifacts": {},
         "runtime_stages": {},
@@ -1337,9 +1577,11 @@ def verify_qualification(
     project_name: str,
     maximum_age_seconds: int,
     *,
+    proxy_mode: str,
     now: dt.datetime | None = None,
 ) -> dict[str, Any]:
     now = (now or utc_now()).astimezone(dt.timezone.utc)
+    proxy_mode = require_proxy_mode(proxy_mode)
     if not PROJECT_NAME.fullmatch(project_name):
         raise QualificationError("invalid-project-name")
     if not 60 <= maximum_age_seconds <= 7 * 24 * 60 * 60:
@@ -1368,8 +1610,20 @@ def verify_qualification(
 
     pins, _ = validate_image_pins(documents["image-pins.json"], expected_commit, now, maximum_age_seconds)
     validate_override(documents["pinned-compose.override.json"], pins)
-    validate_preflight(documents["pinned-manifest-evidence.json"], pins, now, maximum_age_seconds)
-    validate_tls(documents["bolt-tls-evidence.json"], HUB_TLS_SCHEMA, "bolt-hub", now, maximum_age_seconds)
+    _, direct_publication = validate_preflight(
+        documents["pinned-manifest-evidence.json"], pins, now, maximum_age_seconds, proxy_mode,
+        expected_commit, expected_run_id, expected_attempt,
+    )
+    hub_tls = documents["bolt-tls-evidence.json"]
+    validate_tls(hub_tls, HUB_TLS_SCHEMA, "bolt-hub", now, maximum_age_seconds)
+    if (
+        direct_publication is not None
+        and (
+            hub_tls["published_hostname"] != direct_publication[0]
+            or hub_tls["published_port"] != direct_publication[1]
+        )
+    ):
+        raise QualificationError("direct-kestrel-topology-unverified")
     validate_tls(
         documents["identityserver-tls-evidence.json"], IDENTITY_TLS_SCHEMA, "identityserver", now,
         maximum_age_seconds,
@@ -1440,7 +1694,7 @@ def verify_qualification(
     seen_synthetic_runs: set[str] = set()
     for name, stage in SYNTHETIC_FILES.items():
         run, started, completed = validate_synthetic(
-            documents[name], stage, now, maximum_age_seconds
+            documents[name], stage, now, maximum_age_seconds, proxy_mode=proxy_mode
         )
         if run in seen_synthetic_runs:
             raise QualificationError("duplicate-synthetic-run-id")
@@ -1542,6 +1796,7 @@ def verify_qualification(
         "run_id": expected_run_id,
         "run_attempt": expected_attempt,
         "source_commit": expected_commit,
+        "proxy_mode": proxy_mode,
         "credential_generation_id": common["target_generation_id"],
         "artifacts": artifacts,
         "runtime_stages": runtime_summary,
@@ -1652,7 +1907,8 @@ def qualification_evidence_for_recovery(
     )
     required_keys = {
         "schema", "status", "generated_at_utc", "run_id", "run_attempt", "source_commit",
-        "credential_generation_id", "artifacts", "runtime_stages", "synthetic_stages", "checks", "errors",
+        "proxy_mode", "credential_generation_id", "artifacts", "runtime_stages", "synthetic_stages",
+        "checks", "errors",
     }
     exact_object(evidence, required_keys, "invalid-qualification-evidence")
     if (
@@ -1660,6 +1916,7 @@ def qualification_evidence_for_recovery(
         or evidence["status"] != "passed"
         or evidence["run_id"] != run_id
         or evidence["run_attempt"] != attempt
+        or require_proxy_mode(evidence["proxy_mode"]) != evidence["proxy_mode"]
         or evidence["errors"] != []
         or not isinstance(evidence["checks"], dict)
         or set(evidence["checks"]) != QUALIFICATION_CHECK_KEYS
@@ -1743,6 +2000,10 @@ def recovery_gate(
         raise QualificationError("missing-recovery-synthetic-hook")
     if not Path(hook_value).is_absolute():
         raise QualificationError("invalid-recovery-synthetic-hook")
+    proxy_mode = require_proxy_configuration(env)
+    qualified_proxy_mode = require_proxy_mode(qualification["proxy_mode"])
+    if proxy_mode != qualified_proxy_mode:
+        raise QualificationError("qualified-proxy-mode-changed")
     for name in RECOVERY_EXECUTABLE_FILES:
         validate_private_executable(run_directory / name, sealed=sealed)
     hook = run_directory / "run-bolt-phase0-recovery-synthetic.py"
@@ -1826,7 +2087,8 @@ def recovery_gate(
             raise QualificationError("recovery-synthetic-hook-failed")
         completed = now_provider().astimezone(dt.timezone.utc)
         validate_synthetic(
-            load_json(synthetic_output), "finalized", completed, freshness_seconds, not_before=started
+            load_json(synthetic_output), "finalized", completed, freshness_seconds,
+            not_before=started, proxy_mode=qualified_proxy_mode,
         )
         if any(
             sha256_file(
@@ -1860,6 +2122,7 @@ def add_qualification_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--expected-run-id", required=True)
     parser.add_argument("--expected-run-attempt", required=True, type=int)
     parser.add_argument("--project-name", required=True)
+    parser.add_argument("--proxy-mode", choices=sorted(PROXY_MODES), required=True)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--maximum-evidence-age-seconds", type=int, default=DEFAULT_MAXIMUM_AGE_SECONDS)
 
@@ -1910,7 +2173,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise QualificationError("invalid-qualification-output")
         evidence = verify_qualification(
             run_directory, args.expected_commit, args.expected_run_id, args.expected_run_attempt,
-            args.project_name, args.maximum_evidence_age_seconds, now=now,
+            args.project_name, args.maximum_evidence_age_seconds, proxy_mode=args.proxy_mode, now=now,
         )
         atomic_write_json(output, evidence)
         if args.command == "qualify":
@@ -1918,7 +2181,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (QualificationError, OSError) as error:
         code = error.code if isinstance(error, QualificationError) else "qualification-io-failed"
         evidence = qualification_failure(
-            args.expected_run_id, args.expected_run_attempt, args.expected_commit, now, code
+            args.expected_run_id, args.expected_run_attempt, args.expected_commit,
+            args.proxy_mode, now, code,
         )
         try:
             if output.parent == run_directory and output.name == "qualification-evidence.json":

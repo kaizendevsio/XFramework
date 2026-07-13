@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""First-party retained-store marker absence hook for Bolt Phase 0."""
+"""First-party marker absence hook for Bolt Phase 0."""
 
 from __future__ import annotations
 
@@ -646,19 +646,20 @@ def _prepare_receipt_target(path: str) -> str:
     return canonical
 
 
-def write_receipt(path: str, probe_kind: str, token_count: int, started_at: dt.datetime, completed_at: dt.datetime) -> None:
+def write_receipt(
+    path: str,
+    probe_kind: str,
+    assertions: Mapping[str, Any],
+    started_at: dt.datetime,
+    completed_at: dt.datetime,
+) -> None:
     receipt = {
         "schemaVersion": "bolt-phase0-probe-receipt/v1",
         "probe": probe_kind,
         "status": "passed",
         "startedAtUtc": started_at.isoformat().replace("+00:00", "Z"),
         "completedAtUtc": completed_at.isoformat().replace("+00:00", "Z"),
-        "assertions": {
-            "retainedStoreQueried": True,
-            "matches": 0,
-            "tokensSearched": token_count,
-            "markersSearched": token_count,
-        },
+        "assertions": dict(assertions),
     }
     payload = (json.dumps(receipt, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
     parent = os.path.dirname(path)
@@ -715,9 +716,30 @@ def run_hook(
         values = parse_protected_env(_required(environ, "XFRAMEWORK_ENV_FILE"))
         evidence = load_manifest(_required(environ, "BOLT_SYNTHETIC_TOKEN_MANIFEST"), now=started_at)
         deadline = Deadline()
+        assertions = {
+            "retainedStoreQueried": True,
+            "matches": 0,
+            "tokensSearched": len(evidence.tokens),
+            "markersSearched": len(evidence.markers),
+        }
 
         if probe_kind == "proxy-marker-scan":
-            scan_proxy_logs(_required(values, "BOLT_SYNTHETIC_PROXY_LOG_PATHS"), evidence.needles, deadline)
+            proxy_mode = _required(values, "BOLT_SYNTHETIC_PROXY_MODE")
+            proxy_log_paths = values.get("BOLT_SYNTHETIC_PROXY_LOG_PATHS", "")
+            if proxy_mode == "logs":
+                scan_proxy_logs(_required(values, "BOLT_SYNTHETIC_PROXY_LOG_PATHS"), evidence.needles, deadline)
+            elif proxy_mode == "direct-kestrel":
+                if proxy_log_paths:
+                    _fail("CONFIGURATION")
+                assertions = {
+                    "retainedStoreQueried": False,
+                    "notApplicableReason": "direct-kestrel-publication",
+                    "matches": 0,
+                    "tokensSearched": len(evidence.tokens),
+                    "markersSearched": len(evidence.markers),
+                }
+            else:
+                _fail("CONFIGURATION")
         elif probe_kind == "seq-marker-scan":
             scan_seq(
                 _required(values, "BOLT_SYNTHETIC_SEQ_API_URL"),
@@ -739,7 +761,7 @@ def run_hook(
         completed_at = now_factory()
         if completed_at < started_at:
             _fail("CLOCK")
-        write_receipt(receipt_path, probe_kind, len(evidence.tokens), started_at, completed_at)
+        write_receipt(receipt_path, probe_kind, assertions, started_at, completed_at)
         return 0
     except BaseException:
         if receipt_path and os.path.lexists(receipt_path):

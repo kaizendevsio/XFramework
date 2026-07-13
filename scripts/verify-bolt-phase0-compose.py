@@ -10,6 +10,7 @@ import os
 import re
 import runpy
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -90,6 +91,12 @@ def write_private_json(path: Path, value: Any) -> None:
 INACTIVE_SERVICES = ("bolt-phase0-synthetics",)
 SECURE_URL = "wss://bolt-hub:8443/bolt/ws"
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+WORKFLOW_RUN_ID = re.compile(r"^[1-9][0-9]{0,31}$")
+GITHUB_ACTOR = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
+GITHUB_ACTOR_ID = re.compile(r"^[1-9][0-9]{0,31}$")
+DIRECT_PUBLICATION_ATTESTATION = "ATTEST_DIRECT_KESTREL_NO_INTERMEDIARY"
+ALL_INTERFACE_BINDINGS = frozenset({"", "0.0.0.0", "::"})
 CA_SECRET = "bolt-hub-ca"
 FULLCHAIN_SECRET = "bolt-hub-tls-fullchain"
 PRIVATE_KEY_SECRET = "bolt-hub-tls-private-key"
@@ -170,6 +177,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-fullchain-path")
     parser.add_argument("--expected-private-key-path")
     parser.add_argument("--expected-published-port", type=int)
+    parser.add_argument("--expected-public-hostname")
     parser.add_argument("--expected-identityserver-ca-path")
     parser.add_argument("--expected-identityserver-fullchain-path")
     parser.add_argument("--expected-identityserver-private-key-path")
@@ -180,6 +188,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--provenance-file", help="Passed Phase 0 provenance evidence")
     parser.add_argument("--authorized-service", action="append", default=[])
     parser.add_argument("--authorize-deployment", action="store_true")
+    parser.add_argument("--publication-topology-attestation")
+    parser.add_argument("--publication-topology-attested-by")
+    parser.add_argument("--publication-topology-attested-by-id")
+    parser.add_argument("--publication-topology-triggering-actor")
+    parser.add_argument("--publication-topology-run-id")
+    parser.add_argument("--publication-topology-run-attempt", type=int)
     return parser.parse_args()
 
 
@@ -383,6 +397,58 @@ def canonical_hostname(value: str | None) -> bool:
     except ValueError:
         return True
     return False
+
+
+def canonical_host_address(value: Any) -> str | None:
+    if not isinstance(value, str) or not value or "%" in value:
+        return None
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    if address.is_loopback or address.is_link_local or address.is_unspecified or address.is_multicast:
+        return None
+    return address.compressed
+
+
+def inspect_publication_topology(hostname: str) -> dict[str, list[str]]:
+    resolved = {
+        address
+        for result in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+        if (address := canonical_host_address(result[4][0])) is not None
+    }
+    ip_executable = next(
+        (candidate for candidate in (Path("/usr/sbin/ip"), Path("/usr/bin/ip")) if candidate.is_file()),
+        None,
+    )
+    if ip_executable is None:
+        raise RuntimeError("trusted-ip-command-unavailable")
+    completed = subprocess.run(
+        [str(ip_executable), "-json", "address", "show", "up", "scope", "global"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    interfaces = json.loads(completed.stdout)
+    if not isinstance(interfaces, list):
+        raise ValueError("invalid-host-interface-inventory")
+    host_addresses: set[str] = set()
+    for interface in interfaces:
+        if not isinstance(interface, dict) or not isinstance(interface.get("addr_info"), list):
+            raise ValueError("invalid-host-interface-inventory")
+        for entry in interface["addr_info"]:
+            if not isinstance(entry, dict):
+                raise ValueError("invalid-host-interface-inventory")
+            address = canonical_host_address(entry.get("local"))
+            if address is not None:
+                host_addresses.add(address)
+    matched = resolved & host_addresses
+    return {
+        "resolved_addresses": sorted(resolved),
+        "host_interface_addresses": sorted(host_addresses),
+        "matched_addresses": sorted(matched),
+    }
 
 
 def load_identityserver_environment(args: argparse.Namespace) -> tuple[dict[str, str | int | None], dict[str, Any]]:
@@ -827,6 +893,71 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
     if args.expected_published_port is not None and hub_ports:
         only_tls_port = only_tls_port and hub_ports[0]["published"] == args.expected_published_port
     gate.check("hub-only-tls-publication", only_tls_port, {"ports": hub_ports, "expected": args.expected_published_port})
+
+    if args.authorize_deployment:
+        try:
+            live_topology = inspect_publication_topology(args.expected_public_hostname)
+        except (OSError, RuntimeError, ValueError, socket.gaierror, subprocess.SubprocessError, json.JSONDecodeError):
+            live_topology = {
+                "resolved_addresses": [],
+                "host_interface_addresses": [],
+                "matched_addresses": [],
+            }
+        host_binding = hub_ports[0]["host_ip"] if len(hub_ports) == 1 else None
+        canonical_binding = canonical_host_address(host_binding)
+        binding_is_direct = (
+            host_binding in ALL_INTERFACE_BINDINGS
+            or canonical_binding in live_topology["matched_addresses"]
+        )
+        live_topology_verified = (
+            bool(live_topology["resolved_addresses"])
+            and live_topology["matched_addresses"] == live_topology["resolved_addresses"]
+            and binding_is_direct
+        )
+        gate.check(
+            "direct-publication-host-interface",
+            live_topology_verified,
+            {"binding": host_binding, **live_topology},
+        )
+        topology_detail = {
+            "attestation": args.publication_topology_attestation,
+            "attested_by": args.publication_topology_attested_by,
+            "attested_by_id": args.publication_topology_attested_by_id,
+            "triggering_actor": args.publication_topology_triggering_actor,
+            "workflow_event": "workflow_dispatch",
+            "run_id": args.publication_topology_run_id,
+            "run_attempt": args.publication_topology_run_attempt,
+            "source_commit": args.expected_source_commit,
+            "published_hostname": args.expected_public_hostname,
+            "published_port": args.expected_published_port,
+            "mode": "direct-kestrel",
+            "intermediaries": [],
+            "scope": ["host-reverse-proxy", "tailscale-serve", "load-balancer", "ingress"],
+            "binding": host_binding,
+            **live_topology,
+        }
+        topology_attested = (
+            args.publication_topology_attestation == DIRECT_PUBLICATION_ATTESTATION
+            and isinstance(args.publication_topology_attested_by, str)
+            and GITHUB_ACTOR.fullmatch(args.publication_topology_attested_by) is not None
+            and isinstance(args.publication_topology_attested_by_id, str)
+            and GITHUB_ACTOR_ID.fullmatch(args.publication_topology_attested_by_id) is not None
+            and args.publication_topology_triggering_actor == args.publication_topology_attested_by
+            and isinstance(args.publication_topology_run_id, str)
+            and WORKFLOW_RUN_ID.fullmatch(args.publication_topology_run_id) is not None
+            and args.publication_topology_run_attempt == 1
+            and isinstance(args.expected_source_commit, str)
+            and COMMIT_SHA.fullmatch(args.expected_source_commit) is not None
+            and canonical_hostname(args.expected_public_hostname)
+            and isinstance(args.expected_published_port, int)
+            and 1 <= args.expected_published_port <= 65_535
+            and live_topology_verified
+        )
+        gate.check(
+            "operator-attested-direct-publication-topology",
+            topology_attested,
+            topology_detail,
+        )
 
     identity_ports = ports(identityserver)
     expected_identity_port = identity_inputs.get("IDENTITYSERVER_PUBLIC_HTTPS_PORT")

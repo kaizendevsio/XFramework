@@ -89,6 +89,7 @@ def write_json(path: Path, value: Mapping[str, Any]) -> None:
 class QualificationFacade:
     def __init__(self) -> None:
         self.validated: list[dict[str, Any]] = []
+        self.validated_modes: list[str] = []
 
     @staticmethod
     def qualification_evidence_for_recovery(_: Path, run_id: str, attempt: int) -> dict[str, Any]:
@@ -129,6 +130,7 @@ class QualificationFacade:
         __: int,
         *,
         not_before: dt.datetime,
+        proxy_mode: str,
     ) -> Any:
         result = QUALIFICATION.validate_synthetic(
             document,
@@ -136,8 +138,10 @@ class QualificationFacade:
             CORE_COMPLETED + dt.timedelta(minutes=1),
             3600,
             not_before=not_before,
+            proxy_mode=proxy_mode,
         )
         self.validated.append(document)
+        self.validated_modes.append(proxy_mode)
         return result
 
 
@@ -157,6 +161,7 @@ class MockRunner:
         self.secret_core = False
         self.bad_core_prefix = False
         self.bad_probe_kind: str | None = None
+        self.proxy_receipt_mode: str | None = None
         self.mutate_artifact = False
         self.mutate_token = False
 
@@ -184,7 +189,12 @@ class MockRunner:
             self.manifest_sizes[kind] = len(manifest["tokens"])
             receipt_kind = "plaintext-rejection" if self.bad_probe_kind == kind else kind
             self.fixture.write_probe_receipt(
-                Path(env["BOLT_SYNTHETIC_PROBE_RECEIPT"]), receipt_kind
+                Path(env["BOLT_SYNTHETIC_PROBE_RECEIPT"]),
+                receipt_kind,
+                proxy_mode=(
+                    self.proxy_receipt_mode
+                    or self.fixture.values["BOLT_SYNTHETIC_PROXY_MODE"]
+                ),
             )
             with self.lock:
                 self.probes += 1
@@ -281,6 +291,7 @@ class RecoveryFixture:
 
         values = {
             "BOLT_SYNTHETIC_COMPOSE_PROJECT_NAME": "xframework",
+            "BOLT_SYNTHETIC_PROXY_MODE": MODULE.PROXY_MODE_LOGS,
             "BOLT_SYNTHETIC_MIN_TOKEN_LIFETIME_SECONDS": "60",
             "BOLT_SYNTHETIC_TOKEN_REFRESH_COMMAND_PATH": self.refresh.as_posix(),
             "BOLT_SYNTHETIC_PROXY_MARKER_SCAN_COMMAND_PATH": self.marker.as_posix(),
@@ -335,7 +346,8 @@ class RecoveryFixture:
             },
         )
 
-    def write_probe_receipt(self, path: Path, kind: str) -> None:
+    def write_probe_receipt(self, path: Path, kind: str, *, proxy_mode: str) -> None:
+        assertions = MODULE._probe_assertions(proxy_mode).get(kind, {})
         write_json(
             path,
             {
@@ -344,7 +356,7 @@ class RecoveryFixture:
                 "status": "passed",
                 "startedAtUtc": timestamp(PROBE_STARTED),
                 "completedAtUtc": timestamp(PROBE_COMPLETED),
-                "assertions": MODULE.PROBE_ASSERTIONS.get(kind, {}),
+                "assertions": assertions,
             },
         )
 
@@ -423,6 +435,7 @@ class RecoverySyntheticTests(unittest.TestCase):
         self.assertEqual(MODULE.SYNTHETIC_SCHEMA, evidence["schemaVersion"])
         self.assertEqual("finalized", evidence["stage"])
         self.assertEqual(1, len(self.qualification.validated))
+        self.assertEqual([MODULE.PROXY_MODE_LOGS], self.qualification.validated_modes)
         self.assertEqual(3, self.runner.manifest_sizes["proxy-marker-scan"])
         self.assertEqual(5, self.runner.manifest_sizes["old-generation-rejection"])
         commands = [command for command, _ in self.runner.commands]
@@ -435,6 +448,55 @@ class RecoverySyntheticTests(unittest.TestCase):
         serialized = self.fixture.output.read_bytes()
         for token in (*self.fixture.current_tokens.values(), *self.fixture.retired_tokens.values()):
             self.assertNotIn(token.rstrip(b"\r\n"), serialized)
+
+    def test_direct_kestrel_mode_accepts_only_proxy_not_applicable_receipt(self) -> None:
+        self.fixture.values["BOLT_SYNTHETIC_PROXY_MODE"] = MODULE.PROXY_MODE_DIRECT_KESTREL
+        self.fixture.write_env()
+
+        evidence = self.call()
+
+        receipts = evidence["postRunEvidence"]["probeReceipts"]
+        self.assertEqual(
+            "not_applicable", evidence["postRunEvidence"]["markerAbsence"]["proxy"]
+        )
+        self.assertEqual(
+            {
+                "retainedStoreQueried": False,
+                "notApplicableReason": "direct-kestrel-publication",
+                "matches": 0,
+                "tokensSearched": 3,
+                "markersSearched": 3,
+            },
+            receipts["proxyMarkerScan"]["assertions"],
+        )
+        for name in ("seqMarkerScan", "traceMarkerScan"):
+            self.assertEqual(MODULE._retained_marker_assertions(), receipts[name]["assertions"])
+        self.assertEqual(
+            [MODULE.PROXY_MODE_DIRECT_KESTREL], self.qualification.validated_modes
+        )
+
+    def test_rejects_proxy_mode_receipt_mismatches_in_both_directions(self) -> None:
+        self.runner.proxy_receipt_mode = MODULE.PROXY_MODE_DIRECT_KESTREL
+        self.assert_failure("PROBE_RECEIPT")
+
+        self.runner = MockRunner(self.fixture)
+        self.fixture.values["BOLT_SYNTHETIC_PROXY_MODE"] = MODULE.PROXY_MODE_DIRECT_KESTREL
+        self.fixture.write_env()
+        self.runner.proxy_receipt_mode = MODULE.PROXY_MODE_LOGS
+        self.assert_failure("PROBE_RECEIPT")
+
+    def test_rejects_missing_or_non_exact_proxy_mode_before_children(self) -> None:
+        del self.fixture.values["BOLT_SYNTHETIC_PROXY_MODE"]
+        self.fixture.write_env()
+        self.assert_failure("CONFIG_BOLT_SYNTHETIC_PROXY_MODE")
+        self.assertEqual([], self.runner.commands)
+
+        for value in ("LOGS", "direct_kestrel", "direct-kestrelx"):
+            with self.subTest(value=value):
+                self.fixture.values["BOLT_SYNTHETIC_PROXY_MODE"] = value
+                self.fixture.write_env()
+                self.assert_failure("PROXY_MODE")
+                self.assertEqual([], self.runner.commands)
 
     def test_cli_accepts_only_each_required_option_once(self) -> None:
         args = MODULE.parse_args(

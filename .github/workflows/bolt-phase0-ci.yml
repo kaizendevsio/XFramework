@@ -277,7 +277,7 @@ jobs:
             python3 -m py_compile "$lease_mock"
           sudo --non-interactive install -o root -g root -m 0555 "$lease_mock" "$lease_fixture"
           lease_fixture_installed=true
-          bash "$harness" "$runner" "$env_parser" pass canary
+          bash "$harness" "$runner" "$env_parser" pass canary direct-kestrel
           negative_scenarios=(
             refresh-output
             application-token-leak
@@ -288,7 +288,7 @@ jobs:
             missing-receipt
           )
           for scenario in "${negative_scenarios[@]}"; do
-            bash "$harness" "$runner" "$env_parser" "$scenario" canary
+            bash "$harness" "$runner" "$env_parser" "$scenario" canary direct-kestrel
           done
 
       - name: Check changed lines for whitespace errors

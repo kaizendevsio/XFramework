@@ -85,6 +85,7 @@ QUALIFICATION_KEYS = {
     "run_attempt",
     "source_commit",
     "credential_generation_id",
+    "proxy_mode",
     "artifacts",
     "runtime_stages",
     "synthetic_stages",
@@ -99,6 +100,7 @@ QUALIFICATION_CHECK_KEYS = {
     "canary_observation",
     "rollback_drill",
 }
+QUALIFICATION_PROXY_MODES = ("direct-kestrel",)
 
 RUN_ID = re.compile(r"[1-9][0-9]{0,31}")
 PROJECT_NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,62}")
@@ -106,11 +108,13 @@ PHASE_NAME = re.compile(r"[a-z][a-z0-9-]{0,47}")
 COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
 TIMESTAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
 SAFE_CONTAINER_NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}")
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 MIN_STALE_SECONDS = 60
 MAX_STALE_SECONDS = 86_400
 MAX_JSON_BYTES = 64 * 1024
 MAX_ARTIFACT_BYTES = 4 * 1024 * 1024
+MAX_ENV_BYTES = 1024 * 1024
 MIN_SUPERVISED_TIMEOUT_SECONDS = 10
 MAX_SUPERVISED_TIMEOUT_SECONDS = 3_900
 SUPERVISOR_HEARTBEAT_SECONDS = 30
@@ -271,6 +275,34 @@ def decode_json(raw: bytes) -> Any:
     return document
 
 
+def _validate_qualification(
+    qualification: Any,
+    *,
+    run_id: str,
+    run_attempt: int,
+    source_commit: str,
+) -> None:
+    if (
+        not isinstance(qualification, dict)
+        or set(qualification) != QUALIFICATION_KEYS
+        or qualification.get("schema") != "xframework.bolt.phase0.qualification.v1"
+        or qualification.get("status") != "passed"
+        or qualification.get("run_id") != run_id
+        or qualification.get("run_attempt") != run_attempt
+        or qualification.get("source_commit") != source_commit
+        or qualification.get("proxy_mode") not in QUALIFICATION_PROXY_MODES
+        or qualification.get("errors") != []
+        or not isinstance(qualification.get("artifacts"), dict)
+        or not qualification["artifacts"]
+        or not isinstance(qualification.get("runtime_stages"), dict)
+        or not isinstance(qualification.get("synthetic_stages"), dict)
+        or not isinstance(qualification.get("checks"), dict)
+        or set(qualification["checks"]) != QUALIFICATION_CHECK_KEYS
+        or any(value is not True for value in qualification["checks"].values())
+    ):
+        raise ControllerError("invalid-sealed-run-qualification")
+
+
 def _path_has_controls(path: Path) -> bool:
     return any(ord(character) < 0x20 or ord(character) == 0x7F for character in str(path))
 
@@ -333,6 +365,177 @@ def validate_file(
     if max_bytes is not None and path_stat.st_size > max_bytes:
         raise ControllerError("oversized-file")
     return path_stat
+
+
+def validate_protected_env_file(
+    path: Path,
+    deployment_uid: int,
+    *,
+    deployment_gid: int | None = None,
+    enforce_production_metadata: bool = False,
+) -> os.stat_result:
+    path = _lexical_absolute(path)
+    if enforce_production_metadata:
+        if os.name != "nt" and (deployment_gid is None or deployment_gid < 0):
+            raise ControllerError("invalid-deployment-identity")
+        current = Path(path.anchor)
+        for part in path.parent.parts[1:]:
+            current /= part
+            try:
+                current_stat = current.lstat()
+            except OSError as error:
+                raise ControllerError("missing-directory") from error
+            if stat.S_ISLNK(current_stat.st_mode):
+                raise ControllerError("symlink-rejected")
+        parent = path.parent.lstat()
+        if not stat.S_ISDIR(parent.st_mode) or (
+            os.name != "nt"
+            and (
+                parent.st_uid != 0
+                or parent.st_gid != deployment_gid
+                or stat.S_IMODE(parent.st_mode) != 0o1770
+            )
+        ):
+            raise ControllerError("insecure-deployment-env-directory")
+    else:
+        validate_directory(path.parent, deployment_uid)
+    try:
+        expected = path.lstat()
+    except OSError as error:
+        raise ControllerError("missing-file") from error
+    if (
+        stat.S_ISLNK(expected.st_mode)
+        or not stat.S_ISREG(expected.st_mode)
+        or expected.st_nlink != 1
+        or expected.st_size > MAX_ENV_BYTES
+        or (
+            os.name != "nt"
+            and (
+                expected.st_uid != deployment_uid
+                or stat.S_IMODE(expected.st_mode) != 0o600
+                or (
+                    enforce_production_metadata
+                    and expected.st_gid != deployment_gid
+                )
+            )
+        )
+    ):
+        raise ControllerError("insecure-deployment-env")
+    return expected
+
+
+def validate_deployment_proxy_mode(
+    path: Path,
+    deployment_uid: int,
+    *,
+    deployment_gid: int | None = None,
+    enforce_production_metadata: bool = False,
+) -> str:
+    expected = validate_protected_env_file(
+        path,
+        deployment_uid,
+        deployment_gid=deployment_gid,
+        enforce_production_metadata=enforce_production_metadata,
+    )
+    descriptor = os.open(
+        path,
+        os.O_RDONLY
+        | getattr(os, "O_BINARY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        opened = os.fstat(descriptor)
+        expected_fingerprint = (
+            expected.st_dev,
+            expected.st_ino,
+            expected.st_mode,
+            expected.st_uid,
+            expected.st_gid,
+            expected.st_nlink,
+            expected.st_size,
+            expected.st_mtime_ns,
+        )
+        opened_fingerprint = (
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_mode,
+            opened.st_uid,
+            opened.st_gid,
+            opened.st_nlink,
+            opened.st_size,
+            opened.st_mtime_ns,
+        )
+        if opened_fingerprint != expected_fingerprint:
+            raise ControllerError("deployment-env-replaced")
+        raw = bytearray()
+        while len(raw) <= MAX_ENV_BYTES:
+            try:
+                chunk = os.read(descriptor, min(64 * 1024, MAX_ENV_BYTES + 1 - len(raw)))
+            except InterruptedError:
+                continue
+            if not chunk:
+                break
+            raw.extend(chunk)
+        after = os.fstat(descriptor)
+        try:
+            after_path = path.lstat()
+        except OSError as error:
+            raise ControllerError("deployment-env-replaced") from error
+    finally:
+        os.close(descriptor)
+    if (
+        len(raw) > MAX_ENV_BYTES
+        or len(raw) != opened.st_size
+        or (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_uid,
+            after.st_gid,
+            after.st_nlink,
+            after.st_size,
+            after.st_mtime_ns,
+        )
+        != opened_fingerprint
+        or (
+            after_path.st_dev,
+            after_path.st_ino,
+            after_path.st_mode,
+            after_path.st_uid,
+            after_path.st_gid,
+            after_path.st_nlink,
+            after_path.st_size,
+            after_path.st_mtime_ns,
+        )
+        != opened_fingerprint
+    ):
+        raise ControllerError("deployment-env-changed")
+    if raw.startswith(b"\xef\xbb\xbf") or b"\x00" in raw:
+        raise ControllerError("invalid-deployment-env")
+    try:
+        lines = raw.decode("utf-8", errors="strict").splitlines()
+    except UnicodeDecodeError as error:
+        raise ControllerError("invalid-deployment-env") from error
+    values: dict[str, str] = {}
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        name, separator, value = line.partition("=")
+        if (
+            not separator
+            or ENV_NAME.fullmatch(name) is None
+            or name in values
+            or value != value.strip()
+            or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
+        ):
+            raise ControllerError("invalid-deployment-env")
+        values[name] = value
+    if values.get("BOLT_SYNTHETIC_PROXY_MODE") != "direct-kestrel":
+        raise ControllerError("qualified-proxy-mode-changed")
+    if "BOLT_SYNTHETIC_PROXY_LOG_PATHS" in values:
+        raise ControllerError("invalid-proxy-configuration")
+    return "direct-kestrel"
 
 
 def validate_root_sealed_directory(path: Path, *, expected_mode: int = 0o550) -> os.stat_result:
@@ -1090,24 +1293,12 @@ class DeploymentLeaseController:
                 max_bytes=MAX_JSON_BYTES,
             )
         )
-        if (
-            not isinstance(qualification, dict)
-            or set(qualification) != QUALIFICATION_KEYS
-            or qualification.get("schema") != "xframework.bolt.phase0.qualification.v1"
-            or qualification.get("status") != "passed"
-            or qualification.get("run_id") != run_id
-            or qualification.get("run_attempt") != run_attempt
-            or qualification.get("source_commit") != commit_text
-            or qualification.get("errors") != []
-            or not isinstance(qualification.get("artifacts"), dict)
-            or not qualification["artifacts"]
-            or not isinstance(qualification.get("runtime_stages"), dict)
-            or not isinstance(qualification.get("synthetic_stages"), dict)
-            or not isinstance(qualification.get("checks"), dict)
-            or set(qualification["checks"]) != QUALIFICATION_CHECK_KEYS
-            or any(value is not True for value in qualification["checks"].values())
-        ):
-            raise ControllerError("invalid-sealed-run-qualification")
+        _validate_qualification(
+            qualification,
+            run_id=run_id,
+            run_attempt=run_attempt,
+            source_commit=commit_text,
+        )
 
     def _validate_lease_run_directory(
         self,
@@ -1478,7 +1669,12 @@ class DeploymentLeaseController:
             raise ControllerError("invalid-subprocess-timeout")
         if not 1 <= recovery.stop_timeout_seconds <= 300:
             raise ControllerError("invalid-stop-timeout")
-        validate_file(recovery.env_file, self.config.deployment_uid, require_mode_600=True)
+        validate_deployment_proxy_mode(
+            recovery.env_file,
+            self.config.deployment_uid,
+            deployment_gid=self._deployment_gid(),
+            enforce_production_metadata=self.config.enforce_production_paths,
+        )
         validate_target(recovery.rotation_state_file, self.config.deployment_uid)
         validate_file(recovery.python_executable, self.config.deployment_uid, require_executable=True)
         validate_file(recovery.docker_executable, self.config.deployment_uid, require_executable=True)
@@ -1894,6 +2090,12 @@ class DeploymentLeaseController:
             hub_container_name=hub_container_name,
             subprocess_timeout_seconds=900,
             stop_timeout_seconds=stop_timeout_seconds,
+        )
+        validate_deployment_proxy_mode(
+            recovery.env_file,
+            self.config.deployment_uid,
+            deployment_gid=self._deployment_gid(),
+            enforce_production_metadata=self.config.enforce_production_paths,
         )
         with self._lease_lock():
             now = self._now()

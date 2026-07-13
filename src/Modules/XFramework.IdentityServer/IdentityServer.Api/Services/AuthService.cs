@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text.Json;
@@ -41,6 +42,7 @@ public sealed class AuthService : IAuthService
     private const int PasswordResetTokenExpirationMinutes = 30;
 
     private static readonly ConcurrentDictionary<Guid, LockoutInfo> LockoutCache = new();
+    private static readonly JwtSecurityTokenHandler TokenHandler = new();
 
     private readonly IDataContext _dataContext;
     private readonly ITenantResolver _tenantService;
@@ -532,6 +534,10 @@ public sealed class AuthService : IAuthService
                     tenant.Id);
             }
 
+            var expiresIn = request.GenerateToken
+                ? GetAccessTokenLifetimeSeconds(token)
+                : 0;
+
             // Determine session type based on authorization type
             var sessionTypeId = await GetSessionTypeId(tenant.Id, request.AuthorizationType);
 
@@ -572,8 +578,10 @@ public sealed class AuthService : IAuthService
                 new AuthenticateIdentityResponse
                 {
                     AccessToken = token.AccessToken,
+                    TokenType = request.GenerateToken ? "Bearer" : null,
+                    ExpiresIn = expiresIn,
                     RefreshToken = token.RefreshToken,
-                    SessionId = token.SessionId,
+                    SessionId = request.GenerateToken ? token.SessionId : null,
                     Identity = credential.IdentityInfo,
                     Credential = credential
                 });
@@ -587,6 +595,24 @@ public sealed class AuthService : IAuthService
     }
 
     #endregion
+
+    private static int GetAccessTokenLifetimeSeconds(JwtToken token)
+    {
+        if (string.IsNullOrWhiteSpace(token.AccessToken)
+            || string.IsNullOrWhiteSpace(token.RefreshToken)
+            || token.SessionId == Guid.Empty)
+        {
+            throw new InvalidOperationException("The generated authentication token is incomplete.");
+        }
+
+        var jwt = TokenHandler.ReadJwtToken(token.AccessToken);
+        var lifetimeSeconds = (jwt.ValidTo - jwt.ValidFrom).TotalSeconds;
+
+        if (lifetimeSeconds <= 0 || lifetimeSeconds > int.MaxValue)
+            throw new InvalidOperationException("The generated access token has an invalid lifetime.");
+
+        return checked((int)lifetimeSeconds);
+    }
 
     #region Verification
 

@@ -11,6 +11,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 import unittest
 from pathlib import Path
@@ -49,9 +50,126 @@ SERVICES = (
     "portal",
     "operations-dashboard",
 )
+PROTECTED_DEPLOYMENT_VARS = (
+    "JWT_SECRET",
+    "JWT_ISSUER",
+    "JWT_AUDIENCE",
+    "BOLT_SIGNATURE",
+    "IDENTITYSERVER_SERVICE_IDENTITY_SECRET",
+    "BOLT_HUB_SERVICE_IDENTITY_SECRET",
+    "COMMUNICATIONS_SERVICE_IDENTITY_SECRET",
+    "NOTIFICATIONS_SERVICE_IDENTITY_SECRET",
+    "STORAGE_SERVICE_IDENTITY_SECRET",
+    "ATTENDANCE_SERVICE_IDENTITY_SECRET",
+    "SMSGATEWAY_SERVICE_IDENTITY_SECRET",
+    "WALLETS_SERVICE_IDENTITY_SECRET",
+    "INVENTARIO_SERVICE_IDENTITY_SECRET",
+    "POS_SERVICE_IDENTITY_SECRET",
+    "PORTAL_SERVICE_IDENTITY_SECRET",
+    "OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET",
+    "BOLT_HUB_TLS_FULLCHAIN_PATH",
+    "BOLT_HUB_TLS_PRIVATE_KEY_PATH",
+    "BOLT_HUB_TLS_CA_PATH",
+    "BOLT_HUB_EXPOSE_PORT",
+    "BOLT_HUB_PUBLIC_HOSTNAME",
+    "IDENTITYSERVER_TLS_FULLCHAIN_PATH",
+    "IDENTITYSERVER_TLS_PRIVATE_KEY_PATH",
+    "IDENTITYSERVER_TLS_CA_PATH",
+    "IDENTITYSERVER_PUBLIC_HOSTNAME",
+    "IDENTITYSERVER_PUBLIC_HTTPS_PORT",
+    "IDENTITYSERVER_BOLT_TRANSPORT_TOKEN_PATH",
+    "BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL",
+    "BOLT_SYNTHETIC_IDENTITYSERVER_CA_PATH",
+    "BOLT_SYNTHETIC_TENANT_ID",
+    "BOLT_SYNTHETIC_CREDENTIAL_ID",
+    "BOLT_SYNTHETIC_DEVICE_ID",
+    "BOLT_SYNTHETIC_USER_USERNAME",
+    "BOLT_SYNTHETIC_USER_PASSWORD",
+    "BOLT_SYNTHETIC_USER_ROLE_ID",
+    "BOLT_SYNTHETIC_USER_AUTHORIZATION_TYPE",
+    "BOLT_SYNTHETIC_MIN_TOKEN_LIFETIME_SECONDS",
+    "BOLT_SYNTHETIC_TOKEN_REFRESH_COMMAND_PATH",
+    "BOLT_SYNTHETIC_PROXY_MARKER_SCAN_COMMAND_PATH",
+    "BOLT_SYNTHETIC_SEQ_MARKER_SCAN_COMMAND_PATH",
+    "BOLT_SYNTHETIC_TRACE_MARKER_SCAN_COMMAND_PATH",
+    "BOLT_SYNTHETIC_PLAINTEXT_REJECTION_COMMAND_PATH",
+    "BOLT_SYNTHETIC_REDIS_INTERRUPTION_COMMAND_PATH",
+    "BOLT_SYNTHETIC_OLD_GENERATION_REJECTION_COMMAND_PATH",
+    "BOLT_SYNTHETIC_COMPOSE_PROJECT_NAME",
+    "BOLT_SYNTHETIC_PLAINTEXT_PEER_SERVICE",
+    "BOLT_SYNTHETIC_PROXY_MODE",
+    "BOLT_SYNTHETIC_SEQ_API_URL",
+    "BOLT_SYNTHETIC_SEQ_API_KEY",
+    "BOLT_SYNTHETIC_JAEGER_QUERY_API_URL",
+    "BOLT_SYNTHETIC_REDIS_POST_RECOVERY_COMMAND_PATH",
+    "BOLT_PHASE0_RECOVERY_SYNTHETIC_COMMAND_PATH",
+    "BOLT_SYNTHETIC_REJECTED_CLIENT_SECRET_PATH",
+    "BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_PATH",
+    "BOLT_SYNTHETIC_USER_TOKEN_PATH",
+    "BOLT_SYNTHETIC_EXPIRY_TOKEN_PATH",
+    "BOLT_SYNTHETIC_REJECTED_COMMUNICATIONS_TOKEN_PATH",
+    "BOLT_SYNTHETIC_REJECTED_USER_TOKEN_PATH",
+)
 
 
 class WatchdogContractTests(unittest.TestCase):
+    @staticmethod
+    def _protected_deployment_preflight() -> tuple[tuple[str, ...], str]:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        start = workflow.index("- name: Validate protected deployment inputs without mutation")
+        end = workflow.index("- name: Verify sealed watchdog bootstrap prerequisite", start)
+        block = workflow[start:end]
+        inventory_match = re.search(
+            r"required_vars=\(\n(?P<body>.*?)\n\s+\)",
+            block,
+            re.DOTALL,
+        )
+        if inventory_match is None:
+            raise AssertionError("protected deployment variable inventory was not found")
+        inventory = tuple(
+            line.strip()
+            for line in inventory_match.group("body").splitlines()
+            if line.strip()
+        )
+        script_match = re.search(
+            r"python3 - \"\$XFRAMEWORK_ENV_FILE\" \"\$@\" <<'PY'\n"
+            r"(?P<body>.*?)\n\s+PY\n",
+            block,
+            re.DOTALL,
+        )
+        if script_match is None:
+            raise AssertionError("protected deployment Python preflight was not found")
+        return inventory, textwrap.dedent(script_match.group("body"))
+
+    @staticmethod
+    def _protected_values(proxy_mode: str) -> dict[str, str]:
+        values = {
+            name: f"phase0-value-{index}"
+            for index, name in enumerate(PROTECTED_DEPLOYMENT_VARS, start=1)
+        }
+        values["BOLT_SYNTHETIC_PROXY_MODE"] = proxy_mode
+        if proxy_mode == "logs":
+            values["BOLT_SYNTHETIC_PROXY_LOG_PATHS"] = "/var/log/xframework/proxy.log"
+        return values
+
+    @staticmethod
+    def _write_protected_values(path: Path, values: dict[str, str], *, bom: bool = False) -> None:
+        ordered_names = [
+            *PROTECTED_DEPLOYMENT_VARS,
+            *(
+                ("BOLT_SYNTHETIC_PROXY_LOG_PATHS",)
+                if "BOLT_SYNTHETIC_PROXY_LOG_PATHS" in values
+                else ()
+            ),
+        ]
+        content = "".join(
+            f"{name}={values[name]}\n"
+            for name in ordered_names
+            if name in values
+        ).encode("utf-8")
+        path.write_bytes((b"\xef\xbb\xbf" if bom else b"") + content)
+        path.chmod(0o600)
+
     def test_managers_share_fixed_existing_readonly_lock_contract(self) -> None:
         root_source = ROOT_HELPER.read_text(encoding="utf-8")
         lease_source = LEASE_MANAGER.read_text(encoding="utf-8")
@@ -555,6 +673,241 @@ class WatchdogContractTests(unittest.TestCase):
             "REMOTE_LEASE_MANAGER: /usr/local/libexec/xframework-bolt-phase0/manage-bolt-phase0-deployment-lease.py",
             content,
         )
+
+    def test_proxy_mode_is_preflighted_after_direct_publication_and_root_bound(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        root_helper = ROOT_HELPER.read_text(encoding="utf-8")
+        compose_gate = workflow.index("python3 scripts/verify-bolt-phase0-compose.py")
+        protected_gate = workflow.index("- name: Validate protected deployment inputs without mutation")
+        self.assertLess(compose_gate, protected_gate)
+        inventory, preflight = self._protected_deployment_preflight()
+        self.assertEqual(PROTECTED_DEPLOYMENT_VARS, inventory)
+        self.assertEqual(58, len(inventory))
+        for required in (
+            'flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK',
+            'descriptor = os.open(env_path, flags)',
+            'opened = os.fstat(descriptor)',
+            'before_path = path_metadata()',
+            'after_path = path_metadata()',
+            'first_content = read_opened_file(descriptor)',
+            'second_content = read_opened_file(descriptor)',
+            'first_content != second_content',
+            'first_content.startswith(b"\\xef\\xbb\\xbf")',
+            'maximum_protected_env_bytes = 1024 * 1024',
+            'metadata.st_size > maximum_protected_env_bytes',
+            'total > maximum_protected_env_bytes',
+            'proxy_mode != "direct-kestrel"',
+            '"BOLT_SYNTHETIC_PROXY_LOG_PATHS" in values',
+        ):
+            self.assertIn(required, preflight)
+        self.assertEqual(1, preflight.count("os.open(env_path, flags)"))
+        self.assertNotIn("read_text", preflight)
+        self.assertNotIn('encoding="utf-8-sig"', preflight)
+        self.assertIn('values.get("BOLT_SYNTHETIC_PROXY_MODE")', root_helper)
+        self.assertIn('"--proxy-mode",', root_helper)
+        self.assertIn("self._protected_proxy_mode()", root_helper)
+
+    def test_publication_topology_dispatch_is_bound_to_both_authorized_verifiers(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("publication_topology_confirmation:", workflow)
+        self.assertIn(
+            "PUBLICATION_TOPOLOGY_ATTESTATION: ${{ inputs.publication_topology_confirmation }}",
+            workflow,
+        )
+        self.assertIn("PROMOTION_ACTOR_ID: ${{ github.actor_id }}", workflow)
+        self.assertIn("PROMOTION_TRIGGERING_ACTOR: ${{ github.triggering_actor }}", workflow)
+        self.assertIn('test "$PROMOTION_RUN_ATTEMPT" = 1', workflow)
+        self.assertIn('test "$PROMOTION_TRIGGERING_ACTOR" = "$PROMOTION_ACTOR"', workflow)
+        step_start = workflow.index("- name: Authorize digest-pinned deployment manifest")
+        step_end = workflow.index("- name: Pull candidate images without mutating services", step_start)
+        step = workflow[step_start:step_end]
+        local_start = step.index("python3 scripts/verify-bolt-phase0-compose.py")
+        local_end = step.index('ssh -i "$DEPLOY_SSH_KEY"', local_start)
+        local_invocation = step[local_start:local_end]
+        remote_env_start = step.index('remote_env="')
+        remote_environment = step[remote_env_start:step.index("\n", remote_env_start)]
+        remote_start = step.index('python3 "$COMPOSE_VERIFIER"')
+        remote_invocation = step[remote_start:step.index("REMOTE_SCRIPT", remote_start)]
+
+        local_fields = (
+            '--publication-topology-attestation "$PUBLICATION_TOPOLOGY_ATTESTATION"',
+            '--publication-topology-attested-by "$PUBLICATION_TOPOLOGY_ATTESTED_BY"',
+            '--publication-topology-attested-by-id "$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID"',
+            '--publication-topology-triggering-actor "$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR"',
+            '--publication-topology-run-id "$GITHUB_RUN_ID"',
+            '--publication-topology-run-attempt "$GITHUB_RUN_ATTEMPT"',
+        )
+        for field in local_fields:
+            self.assertIn(field, local_invocation)
+
+        remote_environment_fields = (
+            "PUBLICATION_TOPOLOGY_ATTESTATION='$PUBLICATION_TOPOLOGY_ATTESTATION'",
+            "PUBLICATION_TOPOLOGY_ATTESTED_BY='$PUBLICATION_TOPOLOGY_ATTESTED_BY'",
+            "PUBLICATION_TOPOLOGY_ATTESTED_BY_ID='$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID'",
+            "PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR='$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR'",
+            "PUBLICATION_TOPOLOGY_RUN_ID='$GITHUB_RUN_ID'",
+            "PUBLICATION_TOPOLOGY_RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'",
+        )
+        for field in remote_environment_fields:
+            self.assertIn(field, remote_environment)
+
+        remote_fields = (
+            '--publication-topology-attestation "$PUBLICATION_TOPOLOGY_ATTESTATION"',
+            '--publication-topology-attested-by "$PUBLICATION_TOPOLOGY_ATTESTED_BY"',
+            '--publication-topology-attested-by-id "$PUBLICATION_TOPOLOGY_ATTESTED_BY_ID"',
+            '--publication-topology-triggering-actor "$PUBLICATION_TOPOLOGY_TRIGGERING_ACTOR"',
+            '--publication-topology-run-id "$PUBLICATION_TOPOLOGY_RUN_ID"',
+            '--publication-topology-run-attempt "$PUBLICATION_TOPOLOGY_RUN_ATTEMPT"',
+        )
+        for field in remote_fields:
+            self.assertIn(field, remote_invocation)
+
+        self.assertIn('if [ "$status" -eq 0 ]; then', step)
+        self.assertIn(
+            '"$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json"\n'
+            "          else",
+            step,
+        )
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux")
+        and hasattr(os, "O_NOFOLLOW")
+        and hasattr(os, "O_CLOEXEC")
+        and hasattr(os, "O_NONBLOCK"),
+        "requires Linux descriptor and no-follow semantics",
+    )
+    def test_protected_deployment_preflight_executes_inventory_and_mode_matrix(self) -> None:
+        inventory, preflight = self._protected_deployment_preflight()
+        self.assertEqual(PROTECTED_DEPLOYMENT_VARS, inventory)
+
+        direct_with_paths = self._protected_values("direct-kestrel")
+        direct_with_paths["BOLT_SYNTHETIC_PROXY_LOG_PATHS"] = "/var/log/proxy.log"
+        direct_with_empty_path_key = self._protected_values("direct-kestrel")
+        direct_with_empty_path_key["BOLT_SYNTHETIC_PROXY_LOG_PATHS"] = ""
+        missing_required = self._protected_values("direct-kestrel")
+        missing_required.pop("JWT_SECRET")
+        invalid_mode = self._protected_values("direct-kestrel")
+        invalid_mode["BOLT_SYNTHETIC_PROXY_MODE"] = "auto"
+        placeholder_required = self._protected_values("direct-kestrel")
+        placeholder_required["JWT_SECRET"] = "change-me-in-production"
+
+        cases = (
+            ("direct", self._protected_values("direct-kestrel"), True, None, False, 0o600),
+            (
+                "logs",
+                self._protected_values("logs"),
+                False,
+                "BOLT_SYNTHETIC_PROXY_MODE must be exactly direct-kestrel",
+                False,
+                0o600,
+            ),
+            (
+                "direct-with-paths",
+                direct_with_paths,
+                False,
+                "BOLT_SYNTHETIC_PROXY_LOG_PATHS must be absent",
+                False,
+                0o600,
+            ),
+            (
+                "direct-with-empty-path-key",
+                direct_with_empty_path_key,
+                False,
+                "BOLT_SYNTHETIC_PROXY_LOG_PATHS must be absent",
+                False,
+                0o600,
+            ),
+            (
+                "missing-required",
+                missing_required,
+                False,
+                "missing protected deployment variables: JWT_SECRET",
+                False,
+                0o600,
+            ),
+            (
+                "invalid-mode",
+                invalid_mode,
+                False,
+                "BOLT_SYNTHETIC_PROXY_MODE must be exactly",
+                False,
+                0o600,
+            ),
+            (
+                "placeholder-required",
+                placeholder_required,
+                False,
+                "JWT_SECRET contains a placeholder",
+                False,
+                0o600,
+            ),
+            (
+                "utf8-bom",
+                self._protected_values("direct-kestrel"),
+                False,
+                "must not contain a UTF-8 BOM or NUL",
+                True,
+                0o600,
+            ),
+            (
+                "group-readable",
+                self._protected_values("direct-kestrel"),
+                False,
+                "must not be group/world accessible",
+                False,
+                0o640,
+            ),
+        )
+        for name, values, succeeds, message, bom, mode in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                env_file = Path(temporary) / "xeon-dev.env"
+                self._write_protected_values(env_file, values, bom=bom)
+                env_file.chmod(mode)
+                result = subprocess.run(
+                    [sys.executable, "-c", preflight, str(env_file), *inventory],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(succeeds, result.returncode == 0, result.stdout + result.stderr)
+                if message is not None:
+                    self.assertIn(message, result.stderr)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            env_file = Path(temporary) / "xeon-dev.env"
+            env_file.write_bytes(b"X" * (1024 * 1024 + 1))
+            env_file.chmod(0o600)
+            result = subprocess.run(
+                [sys.executable, "-c", preflight, str(env_file), *inventory],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("exceeds the size limit", result.stderr)
+
+        for attack in ("symlink", "hardlink", "fifo"):
+            with self.subTest(attack=attack), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                target = root / "target.env"
+                self._write_protected_values(target, self._protected_values("direct-kestrel"))
+                candidate = root / "xeon-dev.env"
+                if attack == "symlink":
+                    candidate.symlink_to(target.name)
+                    expected = "must not be a symlink"
+                else:
+                    if attack == "hardlink":
+                        os.link(target, candidate)
+                        expected = "must have exactly one link"
+                    else:
+                        os.mkfifo(candidate, mode=0o600)
+                        expected = "must be a regular file"
+                result = subprocess.run(
+                    [sys.executable, "-c", preflight, str(candidate), *inventory],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+                self.assertIn(expected, result.stderr)
 
     def test_workflows_use_runner_home_ssh_key_and_legacy_path_stays_disabled(self) -> None:
         active = WORKFLOW.read_text(encoding="utf-8")
@@ -1087,8 +1440,47 @@ class WatchdogContractTests(unittest.TestCase):
             'raw_by_name["run-bolt-phase0-watchdog.sh"]',
             'raw_by_name["manage-bolt-phase0-deployment-lease.py"]',
             "metadata.st_uid != 0",
+            'evidence.get("proxy_mode") != "direct-kestrel"',
         ):
             self.assertIn(required, content)
+
+    def test_launcher_requires_exact_qualification_evidence_proxy_mode(self) -> None:
+        bash = self.bash_path()
+        if bash is None:
+            self.skipTest("bash is unavailable")
+        cases = (
+            ("logs", "logs", True, False),
+            ("direct-kestrel", "direct-kestrel", True, True),
+            ("missing", None, False, False),
+            ("empty", "", True, False),
+            ("case-variant", "Logs", True, False),
+            ("wrong-separator", "direct_kestrel", True, False),
+            ("null", None, True, False),
+            ("boolean", True, True, False),
+            ("collection", ["logs"], True, False),
+        )
+        for name, proxy_mode, present, expected_success in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                launcher, run, docker_log = self.make_sandbox(Path(temporary))
+                evidence_path = run / "qualification-evidence.json"
+                evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+                if present:
+                    evidence["proxy_mode"] = proxy_mode
+                else:
+                    evidence.pop("proxy_mode", None)
+                evidence_path.write_text(json.dumps(evidence) + "\n", encoding="utf-8")
+                result = subprocess.run(
+                    [bash, str(launcher)],
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, "DOCKER_LOG": str(docker_log)},
+                )
+                self.assertEqual(expected_success, result.returncode == 0, result.stderr)
+                docker_output = docker_log.read_text(encoding="utf-8")
+                if expected_success:
+                    self.assertEqual("", docker_output)
+                else:
+                    self.assertIn("stop --time 30 xframework-bolt-hub", docker_output)
 
     def test_no_lkg_inspect_failure_requires_exact_absence_and_healthy_daemon(self) -> None:
         bash = self.bash_path()
@@ -1223,6 +1615,7 @@ class WatchdogContractTests(unittest.TestCase):
             "run_id": "123456789",
             "run_attempt": 2,
             "source_commit": "a" * 40,
+            "proxy_mode": "direct-kestrel",
             "artifacts": artifacts,
             "errors": [],
         }

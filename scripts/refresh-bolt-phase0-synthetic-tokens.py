@@ -38,7 +38,6 @@ ALLOWED_AUTHORIZATION_TYPES = {
     "Email": 3,
     "Phone": 4,
 }
-RESULT_KEYS = {"data", "isSuccess", "message", "statusCode", "errors"}
 SERVICE_DATA_KEYS = {"accessToken", "tokenType", "expiresAtUtc"}
 USER_DATA_KEYS = {
     "identity",
@@ -315,19 +314,10 @@ def _parse_json(data: bytes, *, code: str) -> dict[str, Any]:
     return value
 
 
-def _result_data(document: dict[str, Any], expected_data_keys: set[str]) -> dict[str, Any]:
-    if set(document) != RESULT_KEYS:
+def _response_data(document: dict[str, Any], expected_keys: set[str]) -> dict[str, Any]:
+    if set(document) != expected_keys:
         _raise("RESPONSE_SCHEMA")
-    if (
-        document["isSuccess"] is not True
-        or document["statusCode"] != 200
-        or document["errors"] is not None
-        or (document["message"] is not None and not isinstance(document["message"], str))
-        or not isinstance(document["data"], dict)
-        or set(document["data"]) != expected_data_keys
-    ):
-        _raise("RESPONSE_SCHEMA")
-    return document["data"]
+    return document
 
 
 def _build_ssl_context(ca_path: str) -> ssl.SSLContext:
@@ -475,7 +465,7 @@ def _parse_service_token(
     now: int,
     expiry: bool,
 ) -> TokenEvidence:
-    data = _result_data(document, SERVICE_DATA_KEYS)
+    data = _response_data(document, SERVICE_DATA_KEYS)
     if data.get("tokenType") != "Bearer" or not isinstance(data.get("expiresAtUtc"), str):
         _raise("RESPONSE_SCHEMA")
     evidence, claims = _validate_jwt(
@@ -505,7 +495,7 @@ def _parse_service_token(
 
 
 def _parse_user_token(document: dict[str, Any], config: Config, *, now: int) -> TokenEvidence:
-    data = _result_data(document, USER_DATA_KEYS)
+    data = _response_data(document, USER_DATA_KEYS)
     credential = data.get("credential")
     identity = data.get("identity")
     if not isinstance(credential, dict) or not isinstance(identity, dict):
@@ -523,6 +513,28 @@ def _parse_user_token(document: dict[str, Any], config: Config, *, now: int) -> 
         now=now,
         minimum_remaining=config.minimum_lifetime_seconds,
     )
+    expires_in = data.get("expiresIn")
+    refresh_token = data.get("refreshToken")
+    session_id = data.get("sessionId")
+    if (
+        data.get("tokenType") != "Bearer"
+        or isinstance(expires_in, bool)
+        or not isinstance(expires_in, int)
+        or expires_in <= 0
+        or abs((evidence.expiration - now) - expires_in) > 30
+        or not isinstance(refresh_token, str)
+        or not refresh_token
+        or len(refresh_token) > 4096
+        or any(character.isspace() or ord(character) < 0x20 for character in refresh_token)
+        or not isinstance(session_id, str)
+    ):
+        _raise("RESPONSE_SCHEMA")
+    try:
+        parsed_session_id = uuid.UUID(session_id)
+    except (ValueError, AttributeError):
+        _raise("RESPONSE_SCHEMA")
+    if parsed_session_id.int == 0 or str(parsed_session_id) != session_id.lower():
+        _raise("RESPONSE_SCHEMA")
     name_claim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
     role_claim = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
     try:

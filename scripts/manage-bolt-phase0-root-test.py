@@ -162,7 +162,14 @@ class RootBoundaryTests(unittest.TestCase):
         state = directory(deploy / "state", 0o700)
         hooks = directory(deploy / "hooks", 0o700)
         protected = directory(root / "protected", 0o1770)
-        protected_env = file(protected / "xeon-dev.env", 0o600, b"BOLT_TEST=1\n")
+        protected_env = file(
+            protected / "xeon-dev.env",
+            0o600,
+            (
+                b"BOLT_TEST=1\n"
+                b"BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n"
+            ),
+        )
         fixed = directory(root / "fixed", 0o755)
         trust = directory(fixed / "xframework-bolt-phase0", 0o755)
         lease_lock = file(trust / "deployment-lease.lock", 0o440, b"0")
@@ -402,6 +409,13 @@ class RootBoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.RootBoundaryError, "bootstrap-hub-running"):
             self.boundary.verify_bootstrap()
 
+    def test_no_lkg_bootstrap_rejects_unqualified_proxy_mode(self) -> None:
+        self.paths.protected_env.write_bytes(b"BOLT_SYNTHETIC_PROXY_MODE=logs\n")
+        with self.assertRaisesRegex(
+            MODULE.RootBoundaryError, "invalid-proxy-mode"
+        ):
+            self.boundary.verify_bootstrap()
+
     @unittest.skipIf(os.name == "nt", "POSIX mode contract")
     def test_protected_env_parent_and_file_modes_are_exact(self) -> None:
         self.boundary._validate_roots()
@@ -412,6 +426,53 @@ class RootBoundaryTests(unittest.TestCase):
         self.paths.protected_env.chmod(0o0640)
         with self.assertRaisesRegex(MODULE.RootBoundaryError, "insecure-file"):
             self.boundary._validate_roots()
+
+    def test_protected_env_maximum_is_exactly_one_mibibyte(self) -> None:
+        self.assertEqual(1024 * 1024, MODULE.MAX_PROTECTED_ENV_BYTES)
+        self.paths.protected_env.write_bytes(
+            b"A" * (MODULE.MAX_PROTECTED_ENV_BYTES + 1)
+        )
+
+        with self.assertRaisesRegex(MODULE.RootBoundaryError, "insecure-file"):
+            self.boundary._validate_roots()
+
+    def test_protected_proxy_mode_is_exact_and_fail_closed(self) -> None:
+        self.assertEqual("direct-kestrel", self.boundary._protected_proxy_mode())
+
+        invalid = {
+            "direct-with-path": (
+                b"BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n"
+                b"BOLT_SYNTHETIC_PROXY_LOG_PATHS=/var/log/proxy/access.log\n"
+            ),
+            "direct-with-empty-path-key": (
+                b"BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n"
+                b"BOLT_SYNTHETIC_PROXY_LOG_PATHS=\n"
+            ),
+        }
+        for name, payload in invalid.items():
+            with self.subTest(name=name):
+                self.paths.protected_env.write_bytes(payload)
+                with self.assertRaisesRegex(
+                    MODULE.RootBoundaryError, "invalid-proxy-configuration"
+                ):
+                    self.boundary._protected_proxy_mode()
+
+        for value in ("logs", "LOGS", "direct_kestrel", ""):
+            with self.subTest(value=value):
+                self.paths.protected_env.write_bytes(
+                    f"BOLT_SYNTHETIC_PROXY_MODE={value}\n".encode("utf-8")
+                )
+                with self.assertRaisesRegex(MODULE.RootBoundaryError, "invalid-proxy-mode"):
+                    self.boundary._protected_proxy_mode()
+
+        for name, payload in {
+            "bom": b"\xef\xbb\xbfBOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n",
+            "nul": b"BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\x00\n",
+        }.items():
+            with self.subTest(name=name):
+                self.paths.protected_env.write_bytes(payload)
+                with self.assertRaisesRegex(MODULE.RootBoundaryError, "invalid-protected-env"):
+                    self.boundary._protected_proxy_mode()
 
     @unittest.skipUnless(
         os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() == 0,
@@ -492,7 +553,7 @@ class RootBoundaryTests(unittest.TestCase):
             self.boundary.verify_bootstrap()
 
     def test_prepare_run_rejects_invalid_identity_and_existing_path(self) -> None:
-        for run_id, attempt in (("0", "1"), ("123/escape", "1"), ("123", "0")):
+        for run_id, attempt in (("0", "1"), ("123/escape", "1"), ("123", "0"), ("123", "2")):
             with self.subTest(run_id=run_id, attempt=attempt), self.assertRaisesRegex(
                 MODULE.RootBoundaryError, "invalid-run-identity"
             ):

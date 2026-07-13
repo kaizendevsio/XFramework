@@ -32,8 +32,11 @@ ATTEMPT = re.compile(r"[1-9][0-9]{0,5}")
 COMMIT = re.compile(r"[0-9a-f]{40}")
 PROJECT = re.compile(r"[a-z0-9][a-z0-9_-]{0,62}")
 PHASE = re.compile(r"[a-z][a-z0-9-]{0,47}")
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+PROXY_MODES = frozenset({"direct-kestrel"})
 QUALIFICATION_SCHEMA = "xframework.bolt.phase0.qualification.v1"
 MAX_FILE_BYTES = 64 * 1024 * 1024
+MAX_PROTECTED_ENV_BYTES = 1024 * 1024
 MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 MAX_FILES = 256
 WATCHDOG_TIMEOUT_SECONDS = 4_200
@@ -729,10 +732,51 @@ class RootBoundary:
         )
         if os.name == "posix" and protected_parent.st_gid != self.deployment_gid:
             raise RootBoundaryError("insecure-protected-env-directory")
-        _file(self.paths.protected_env, self.deployment_uid, 0o600, MAX_FILE_BYTES)
+        _file(
+            self.paths.protected_env,
+            self.deployment_uid,
+            0o600,
+            MAX_PROTECTED_ENV_BYTES,
+        )
         protected_env = self.paths.protected_env.lstat()
         if os.name == "posix" and protected_env.st_gid != self.deployment_gid:
             raise RootBoundaryError("insecure-protected-env-file")
+
+    def _protected_proxy_mode(self) -> str:
+        raw = _file(
+            self.paths.protected_env,
+            self.deployment_uid,
+            0o600,
+            MAX_PROTECTED_ENV_BYTES,
+        )
+        if raw.startswith(b"\xef\xbb\xbf") or b"\x00" in raw:
+            raise RootBoundaryError("invalid-protected-env")
+        try:
+            text = raw.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as error:
+            raise RootBoundaryError("invalid-protected-env") from error
+
+        values: dict[str, str] = {}
+        for raw in text.splitlines():
+            if not raw.strip() or raw.lstrip().startswith("#"):
+                continue
+            name, separator, value = raw.partition("=")
+            if (
+                not separator
+                or not ENV_NAME.fullmatch(name)
+                or name in values
+                or value != value.strip()
+                or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
+            ):
+                raise RootBoundaryError("invalid-protected-env")
+            values[name] = value
+
+        proxy_mode = values.get("BOLT_SYNTHETIC_PROXY_MODE")
+        if proxy_mode not in PROXY_MODES:
+            raise RootBoundaryError("invalid-proxy-mode")
+        if "BOLT_SYNTHETIC_PROXY_LOG_PATHS" in values:
+            raise RootBoundaryError("invalid-proxy-configuration")
+        return proxy_mode
 
     def _read_pointer(self) -> Path | None:
         if not self.paths.pointer.exists() and not self.paths.pointer.is_symlink():
@@ -759,10 +803,15 @@ class RootBoundary:
     def _validate_sealed_run(self, run: Path) -> None:
         root_uid = 0 if self.enforce_root else self.deployment_uid
         _directory(run, root_uid, 0o550)
+        protected_proxy_mode = self._protected_proxy_mode()
         evidence = json.loads(
             _file(run / "qualification-evidence.json", root_uid, 0o440).decode("utf-8")
         )
-        if evidence.get("schema") != QUALIFICATION_SCHEMA or evidence.get("status") != "passed":
+        if (
+            evidence.get("schema") != QUALIFICATION_SCHEMA
+            or evidence.get("status") != "passed"
+            or evidence.get("proxy_mode") != protected_proxy_mode
+        ):
             raise RootBoundaryError("invalid-qualification")
         artifacts = evidence.get("artifacts")
         if not isinstance(artifacts, dict) or not artifacts:
@@ -789,6 +838,7 @@ class RootBoundary:
         self._validate_systemd()
         pointer = self._read_pointer()
         if pointer is None:
+            self._protected_proxy_mode()
             if not self._hub_stopped():
                 raise RootBoundaryError("bootstrap-hub-running")
             return {"status": "passed", "state": "bootstrap-no-lkg-hub-stopped"}
@@ -812,7 +862,7 @@ class RootBoundary:
 
     @staticmethod
     def _identity(run_id: str, attempt: str) -> str:
-        if not RUN_ID.fullmatch(run_id) or not ATTEMPT.fullmatch(attempt):
+        if not RUN_ID.fullmatch(run_id) or not ATTEMPT.fullmatch(attempt) or attempt != "1":
             raise RootBoundaryError("invalid-run-identity")
         return f"{run_id}-{attempt}"
 
@@ -1012,6 +1062,7 @@ class RootBoundary:
 
     def _qualify(self, run: Path, run_id: str, attempt: str, commit: str, project: str) -> None:
         output = run / "qualification-evidence.json"
+        proxy_mode = self._protected_proxy_mode()
         self._run(
             [
                 str(self.python),
@@ -1027,6 +1078,8 @@ class RootBoundary:
                 attempt,
                 "--project-name",
                 project,
+                "--proxy-mode",
+                proxy_mode,
                 "--output",
                 str(output),
             ],
@@ -1039,6 +1092,7 @@ class RootBoundary:
             or evidence.get("run_id") != run_id
             or evidence.get("run_attempt") != int(attempt)
             or evidence.get("source_commit") != commit
+            or evidence.get("proxy_mode") != proxy_mode
             or evidence.get("errors") != []
         ):
             raise RootBoundaryError("invalid-qualification")
