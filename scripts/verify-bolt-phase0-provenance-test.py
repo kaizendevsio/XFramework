@@ -75,7 +75,14 @@ class Phase0ProvenanceTests(unittest.TestCase):
             "signatures": [{"sig": base64.b64encode(b"test-signature").decode("ascii")}],
         }
 
-    def verify(self, mutate_statement=None, mutate_bundle=None, mutate_build_inputs=None):
+    def verify(
+        self,
+        mutate_statement=None,
+        mutate_bundle=None,
+        mutate_build_inputs=None,
+        trusted_builders=None,
+        trusted_workflows=None,
+    ):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -125,13 +132,14 @@ class Phase0ProvenanceTests(unittest.TestCase):
             dockerfile,
             build_inputs_path,
             BASE_IMAGES,
-            [BUILDER],
-            [WORKFLOW],
+            [BUILDER] if trusted_builders is None else trusted_builders,
+            [WORKFLOW] if trusted_workflows is None else trusted_workflows,
             INVOCATION,
             [("bolt-hub", str(verification_path), str(bundle_path))],
         )
 
     def test_exact_verified_dsse_binding_passes_and_retains_safe_evidence_hashes(self) -> None:
+        self.assertEqual("https://in-toto.io/Statement/v0.1", MODULE.STATEMENT_TYPE)
         bindings, digest = self.verify()
         binding = bindings["bolt-hub"]
         self.assertEqual(PIN, binding["pin"])
@@ -139,6 +147,43 @@ class Phase0ProvenanceTests(unittest.TestCase):
         self.assertEqual(sorted(BASE_IMAGES), binding["base_images"])
         self.assertRegex(binding["cosign_bundle_sha256"], r"^sha256:[0-9a-f]{64}$")
         self.assertEqual(MODULE.DSSE_PAYLOAD_TYPE, binding["verified_dsse_envelope"]["payloadType"])
+
+    def test_same_identity_can_be_trusted_as_builder_and_workflow(self) -> None:
+        bindings, _ = self.verify(
+            mutate_statement=lambda statement: statement["predicate"]["runDetails"]["builder"].update(
+                id=WORKFLOW
+            ),
+            trusted_builders=[WORKFLOW],
+            trusted_workflows=[WORKFLOW],
+        )
+        self.assertEqual(WORKFLOW, bindings["bolt-hub"]["builder_id"])
+        self.assertEqual(WORKFLOW, bindings["bolt-hub"]["workflow_ref"])
+
+    def test_unsupported_statement_version_fails_closed(self) -> None:
+        with self.assertRaisesRegex(ValueError, "pinned Cosign provenance contract"):
+            self.verify(
+                mutate_statement=lambda statement: statement.update(
+                    _type="https://in-toto.io/Statement/v1"
+                )
+            )
+
+    def test_duplicate_values_within_each_trust_namespace_fail_closed(self) -> None:
+        cases = (
+            ("builder", [BUILDER, BUILDER], [WORKFLOW]),
+            ("workflow", [BUILDER], [WORKFLOW, WORKFLOW]),
+        )
+        for description, builders, workflows in cases:
+            with self.subTest(description=description), self.assertRaisesRegex(ValueError, description):
+                self.verify(trusted_builders=builders, trusted_workflows=workflows)
+
+    def test_unsafe_values_within_each_trust_namespace_fail_closed(self) -> None:
+        cases = (
+            ("builder", ["https://github.com/unsafe builder"], [WORKFLOW]),
+            ("workflow", [BUILDER], ["https://github.com/unsafe workflow"]),
+        )
+        for description, builders, workflows in cases:
+            with self.subTest(description=description), self.assertRaisesRegex(ValueError, description):
+                self.verify(trusted_builders=builders, trusted_workflows=workflows)
 
     def test_subject_mismatch_fails_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "subject"):

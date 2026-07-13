@@ -46,7 +46,7 @@ def write_private_json(path: Path, value: Any) -> None:
         if descriptor >= 0:
             os.close(descriptor)
         temporary.unlink(missing_ok=True)
-STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
+STATEMENT_TYPE = "https://in-toto.io/Statement/v0.1"
 DSSE_PAYLOAD_TYPE = "application/vnd.in-toto+json"
 TRUSTED_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
 FROM_INSTRUCTION = re.compile(r"^\s*FROM\s+(?:--platform=\S+\s+)?(\S+)", re.IGNORECASE)
@@ -261,7 +261,9 @@ def verify_statement(
 ) -> tuple[str, str]:
     require_exact_keys(statement, {"_type", "subject", "predicateType", "predicate"}, f"{service}: statement")
     if statement["_type"] != STATEMENT_TYPE or statement["predicateType"] != PREDICATE_TYPE:
-        raise ValueError(f"{service}: statement or predicate type is not the required SLSA v1 type")
+        raise ValueError(
+            f"{service}: statement or predicate type does not match the pinned Cosign provenance contract"
+        )
 
     repository, _, digest = expected_pin.rpartition("@")
     subject = statement["subject"]
@@ -356,9 +358,14 @@ def verify_inputs(
         raise ValueError("workflow invocation ID must be a safe URL for the source repository")
     if not trusted_builders or not trusted_workflows:
         raise ValueError("trusted builder and workflow allowlists must be non-empty")
-    trust_values = [*trusted_builders, *trusted_workflows]
-    if len(trust_values) != len(set(trust_values)) or not all(TRUST_VALUE.fullmatch(item) for item in trust_values):
-        raise ValueError("trusted builder and workflow values must be unique safe identifiers")
+    if len(trusted_builders) != len(set(trusted_builders)) or not all(
+        TRUST_VALUE.fullmatch(item) for item in trusted_builders
+    ):
+        raise ValueError("trusted builder values must be unique safe identifiers")
+    if len(trusted_workflows) != len(set(trusted_workflows)) or not all(
+        TRUST_VALUE.fullmatch(item) for item in trusted_workflows
+    ):
+        raise ValueError("trusted workflow values must be unique safe identifiers")
     if (
         len(expected_base_images) < 2
         or len(expected_base_images) != len(set(expected_base_images))
