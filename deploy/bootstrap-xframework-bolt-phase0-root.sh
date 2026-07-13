@@ -487,7 +487,7 @@ install -d -o "$deployment_user" -g "$deployment_group" -m 0700 "$deploy_root/ph
 sudoers_tmp="$(mktemp /etc/sudoers.d/.xframework-bolt-phase0-root.XXXXXX)"
 trap 'rm -f "$sudoers_tmp"' EXIT
 cat > "$sudoers_tmp" <<'EOF'
-Cmnd_Alias XFRAMEWORK_BOLT_PHASE0_ROOT = /usr/local/sbin/xframework-bolt-phase0-root verify-bootstrap, /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog, /usr/local/sbin/xframework-bolt-phase0-root prepare-run *, /usr/local/sbin/xframework-bolt-phase0-root activate *
+Cmnd_Alias XFRAMEWORK_BOLT_PHASE0_ROOT = /usr/local/sbin/xframework-bolt-phase0-root verify-bootstrap, /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog, /usr/local/sbin/xframework-bolt-phase0-root prepare-run, /usr/local/sbin/xframework-bolt-phase0-root activate
 github-runner ALL=(root) NOPASSWD: XFRAMEWORK_BOLT_PHASE0_ROOT
 EOF
 chmod 0440 "$sudoers_tmp"

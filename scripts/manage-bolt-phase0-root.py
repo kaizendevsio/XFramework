@@ -11,13 +11,15 @@ import json
 import os
 import re
 import secrets
+import select
 import shutil
 import stat
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterator, Sequence
+from typing import Callable, Collection, Iterator, Sequence, cast
 
 try:
     import grp
@@ -31,6 +33,8 @@ RUN_ID = re.compile(r"[1-9][0-9]{0,31}")
 ATTEMPT = re.compile(r"[1-9][0-9]{0,5}")
 COMMIT = re.compile(r"[0-9a-f]{40}")
 PROJECT = re.compile(r"[a-z0-9][a-z0-9_-]{0,62}")
+ROOT_REQUEST_MAX_BYTES = 2048
+ROOT_REQUEST_TIMEOUT_SECONDS = 5.0
 PHASE = re.compile(r"[a-z][a-z0-9-]{0,47}")
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 PROXY_MODES = frozenset({"direct-kestrel"})
@@ -97,6 +101,80 @@ class RootBoundaryError(RuntimeError):
     def __init__(self, code: str):
         super().__init__(code)
         self.code = code
+
+
+def decode_root_request(
+    raw: bytes, required_fields: Collection[str]
+) -> dict[str, str]:
+    if not raw or len(raw) > ROOT_REQUEST_MAX_BYTES:
+        raise RootBoundaryError("invalid-root-request")
+    if raw.count(b"\n") != 1 or not raw.endswith(b"\n") or b"\r" in raw:
+        raise RootBoundaryError("invalid-root-request")
+
+    def exact_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        document: dict[str, object] = {}
+        for key, value in pairs:
+            if key in document:
+                raise ValueError("duplicate-key")
+            document[key] = value
+        return document
+
+    def reject_constant(_: str) -> object:
+        raise ValueError("invalid-constant")
+
+    try:
+        text = raw[:-1].decode("utf-8", errors="strict")
+        document = json.loads(
+            text,
+            object_pairs_hook=exact_object,
+            parse_constant=reject_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise RootBoundaryError("invalid-root-request") from error
+    if (
+        not isinstance(document, dict)
+        or set(document) != set(required_fields)
+        or any(type(value) is not str for value in document.values())
+    ):
+        raise RootBoundaryError("invalid-root-request")
+    canonical = json.dumps(
+        document,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("ascii") + b"\n"
+    if raw != canonical:
+        raise RootBoundaryError("invalid-root-request")
+    return cast(dict[str, str], document)
+
+
+def read_root_request(required_fields: Collection[str]) -> dict[str, str]:
+    descriptor = sys.stdin.buffer.fileno()
+    deadline = time.monotonic() + ROOT_REQUEST_TIMEOUT_SECONDS
+    payload = bytearray()
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RootBoundaryError("root-request-timeout")
+        try:
+            readable, _, _ = select.select([descriptor], [], [], remaining)
+        except (OSError, ValueError) as error:
+            raise RootBoundaryError("invalid-root-request") from error
+        if not readable:
+            raise RootBoundaryError("root-request-timeout")
+        try:
+            chunk = os.read(
+                descriptor,
+                min(4096, ROOT_REQUEST_MAX_BYTES + 1 - len(payload)),
+            )
+        except InterruptedError:
+            continue
+        if not chunk:
+            break
+        payload.extend(chunk)
+        if len(payload) > ROOT_REQUEST_MAX_BYTES:
+            raise RootBoundaryError("root-request-too-large")
+    return decode_root_request(bytes(payload), required_fields)
 
 
 @dataclass(frozen=True)
@@ -1251,14 +1329,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("verify-bootstrap")
     commands.add_parser("ensure-watchdog")
-    prepare = commands.add_parser("prepare-run")
-    prepare.add_argument("run_id")
-    prepare.add_argument("run_attempt")
-    activate = commands.add_parser("activate")
-    activate.add_argument("run_id")
-    activate.add_argument("run_attempt")
-    activate.add_argument("expected_commit")
-    activate.add_argument("project_name")
+    commands.add_parser("prepare-run")
+    commands.add_parser("activate")
     return parser.parse_args(argv)
 
 
@@ -1267,18 +1339,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = parse_args(argv)
         boundary = RootBoundary()
+        request: dict[str, str] = {}
+        if args.command == "prepare-run":
+            request = read_root_request({"run_id", "run_attempt"})
+        elif args.command == "activate":
+            request = read_root_request(
+                {"run_id", "run_attempt", "expected_commit", "project_name"}
+            )
         if args.command == "verify-bootstrap":
             evidence = boundary.verify_bootstrap()
         elif args.command == "ensure-watchdog":
             evidence = boundary.ensure_watchdog()
         elif args.command == "prepare-run":
-            evidence = boundary.prepare_run(args.run_id, args.run_attempt)
+            evidence = boundary.prepare_run(request["run_id"], request["run_attempt"])
         else:
             evidence = boundary.activate(
-                args.run_id,
-                args.run_attempt,
-                args.expected_commit,
-                args.project_name,
+                request["run_id"],
+                request["run_attempt"],
+                request["expected_commit"],
+                request["project_name"],
             )
     except (RootBoundaryError, OSError, ValueError, json.JSONDecodeError) as error:
         if boundary is not None:
