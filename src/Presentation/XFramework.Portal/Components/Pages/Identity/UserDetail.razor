@@ -1045,6 +1045,7 @@ else
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private AttendancePortalReadService AttendanceReadService { get; set; } = default!;
     [Inject] private IIdentityServerServiceWrapper IdentityServer { get; set; } = default!;
+    [Inject] private ILogger<UserDetail> Logger { get; set; } = default!;
 
     // Main data
     private IdentityInformation? _user;
@@ -1114,6 +1115,7 @@ else
     private long _rolePermissionOperationVersion;
     private bool _rolePermissionOverridesLoaded;
     private IdentityRole? _permissionRole;
+    private CancellationTokenSource? _rolePermissionLoadCts;
     private Dictionary<string, string> _rolePermissionValues = new(StringComparer.OrdinalIgnoreCase);
     private string _selectedRolePermissionFeatureKey = TenantModuleFeatureKeys.Identity;
     private HashSet<string> _expandedRolePermissionFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -1121,6 +1123,7 @@ else
     private const string PermissionInherit = "inherit";
     private const string PermissionAllow = "allow";
     private const string PermissionDeny = "deny";
+    private static readonly TimeSpan RolePermissionLoadTimeout = TimeSpan.FromSeconds(35);
     private static readonly IReadOnlyList<string> PermissionCapabilities = IdentityAuthorizationConstants.CapabilityKeys;
 
     private TenantModuleFeatureDefinition? SelectedRolePermissionFeature =>
@@ -1836,6 +1839,11 @@ else
         var operationVersion = ++_rolePermissionOperationVersion;
         var userId = Id;
         var section = CurrentSection;
+        _rolePermissionLoadCts?.Cancel();
+        _rolePermissionLoadCts?.Dispose();
+
+        var loadCts = new CancellationTokenSource(RolePermissionLoadTimeout);
+        _rolePermissionLoadCts = loadCts;
         _loadingRolePermissions = true;
         _loadingRolePermissionsRoleId = role.Id;
         _rolePermissionOverridesLoaded = false;
@@ -1847,7 +1855,12 @@ else
             {
                 IdentityRoleId = role.Id,
                 Metadata = CreateMetadata(role.TenantId)
-            });
+            }, loadCts.Token);
+
+            if (!ReferenceEquals(_rolePermissionLoadCts, loadCts) || loadCts.IsCancellationRequested)
+            {
+                return;
+            }
 
             if (!IsRolePermissionLoadCurrent(operationVersion, userId, section, role))
             {
@@ -1880,20 +1893,40 @@ else
             // Open only after the dialog's content is complete so no loading fragment must be replaced.
             _rolePermissionDialogOpen = true;
         }
-        catch
+        catch (OperationCanceledException) when (loadCts.IsCancellationRequested)
+        {
+            if (ReferenceEquals(_rolePermissionLoadCts, loadCts) &&
+                IsRolePermissionLoadCurrent(operationVersion, userId, section, role))
+            {
+                ToastService.Error("Role permission overrides timed out. Try again shortly.", "Permissions timed out");
+            }
+        }
+        catch (Exception ex)
         {
             if (IsRolePermissionLoadCurrent(operationVersion, userId, section, role))
             {
+                Logger.LogWarning(
+                    ex,
+                    "Role permission overrides failed to load. RoleId={RoleId} OperationVersion={OperationVersion}",
+                    role.Id,
+                    operationVersion);
                 ToastService.Error("Role permission overrides could not be loaded.", "Permissions failed");
             }
         }
         finally
         {
+            if (ReferenceEquals(_rolePermissionLoadCts, loadCts))
+            {
+                _rolePermissionLoadCts = null;
+            }
+
             if (_rolePermissionOperationVersion == operationVersion)
             {
                 _loadingRolePermissions = false;
                 _loadingRolePermissionsRoleId = null;
             }
+
+            loadCts.Dispose();
         }
     }
 
@@ -1919,6 +1952,9 @@ else
         _rolePermissionDialogOpen = false;
         _loadingRolePermissions = false;
         _loadingRolePermissionsRoleId = null;
+        _rolePermissionLoadCts?.Cancel();
+        _rolePermissionLoadCts?.Dispose();
+        _rolePermissionLoadCts = null;
         _permissionRole = null;
         _rolePermissionValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _rolePermissionTreeNodes = [];

@@ -288,6 +288,9 @@ public sealed class IdentityServerPortalContractTests
         loadIndex.Should().BeGreaterThanOrEqualTo(0);
         loadedIndex.Should().BeGreaterThan(loadIndex);
         openMethod.Should().Contain("IsRolePermissionLoadCurrent(operationVersion, userId, section, role)");
+        openMethod.Should().Contain("new CancellationTokenSource(RolePermissionLoadTimeout)");
+        openMethod.Should().Contain("}, loadCts.Token);");
+        openMethod.Should().Contain("catch (OperationCanceledException) when (loadCts.IsCancellationRequested)");
         dialogOpenIndex.Should().BeGreaterThan(
             loadedIndex,
             "portaled dialog content must be complete before the dialog is registered as open");

@@ -536,19 +536,15 @@ public sealed class BoltClient : IAsyncDisposable
         var commandHash = GetCommandHash(commandName);
         var conn = GetConnection();
         var rpcCall = PooledRpcCall.Rent();
+        var responseTask = rpcCall.GetTask().AsTask();
         _pendingCalls[requestId] = rpcCall;
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        ValueTask<BoltRpcResponse> responseTask = default;
-        var responseTaskCreated = false;
 
         try
         {
             using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
             using var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-            rpcCall.RegisterTimeout(timeoutCts.Token);
-            responseTask = rpcCall.GetTask();
-            responseTaskCreated = true;
 
             var writer = RentedBufferWriter.GetThreadLocal();
             BoltCodec.WriteRequest(writer, requestId, recipientHash, _senderHash, commandHash, payload.Span);
@@ -561,8 +557,7 @@ public sealed class BoltClient : IAsyncDisposable
 
             await conn.SendAsync(writer.WrittenMemory, sendCts.Token);
 
-            responseTaskCreated = false;
-            var response = await responseTask;
+            var response = await responseTask.WaitAsync(sendCts.Token);
             sw.Stop();
 
             var level = (int)response.StatusCode >= 400 ? LogLevel.Warning : LogLevel.Debug;
@@ -574,29 +569,29 @@ public sealed class BoltClient : IAsyncDisposable
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             sw.Stop();
-            var timeout = new TimeoutException($"Bolt RPC {commandName} -> {recipientId} timed out before the request was enqueued", ex);
+            var timeout = new TimeoutException($"Bolt RPC {commandName} -> {recipientId} timed out before the request completed", ex);
             _logger.LogError(timeout, "Bolt RPC {Command} -> {Recipient} | FAILED in {Elapsed}ms | RequestSize={RequestSize}B",
                 commandName, recipientId, sw.ElapsedMilliseconds, payload.Length);
-            rpcCall.SetException(timeout);
-            if (responseTaskCreated)
-            {
-                try { await responseTask; } catch { }
-            }
+            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, timeout);
             throw timeout;
+        }
+        catch (OperationCanceledException ex)
+        {
+            sw.Stop();
+            _logger.LogWarning(ex, "Bolt RPC {Command} -> {Recipient} | CANCELED in {Elapsed}ms | RequestSize={RequestSize}B",
+                commandName, recipientId, sw.ElapsedMilliseconds, payload.Length);
+            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
+            throw;
         }
         catch (Exception ex)
         {
             sw.Stop();
             _logger.LogError(ex, "Bolt RPC {Command} -> {Recipient} | FAILED in {Elapsed}ms | RequestSize={RequestSize}B",
                 commandName, recipientId, sw.ElapsedMilliseconds, payload.Length);
-            if (responseTaskCreated)
-            {
-                rpcCall.SetException(ex);
-                try { await responseTask; } catch { }
-            }
+            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
             throw;
         }
-        finally { _pendingCalls.TryRemove(requestId, out _); }
+        finally { _pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)); }
     }
 
     /// <summary>
@@ -613,17 +608,13 @@ public sealed class BoltClient : IAsyncDisposable
 
         // Register pending RPC — response comes back as normal Response frame
         var rpcCall = PooledRpcCall.Rent();
+        var responseTask = rpcCall.GetTask().AsTask();
         _pendingCalls[requestId] = rpcCall;
-        ValueTask<BoltRpcResponse> responseTask = default;
-        var responseTaskCreated = false;
 
         try
         {
             using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
             using var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-            rpcCall.RegisterTimeout(timeoutCts.Token);
-            responseTask = rpcCall.GetTask();
-            responseTaskCreated = true;
 
             // Open stream with special large-RPC command hash
             var stream = await OpenStreamAsync(recipientId, "__bolt_large_rpc__", sendCts.Token);
@@ -649,30 +640,38 @@ public sealed class BoltClient : IAsyncDisposable
 
             // Response arrives as a Request with __bolt_large_rpc_response__ command
             // (handled by RegisterLargeRpcResponseHandler, which resolves our pending call)
-            responseTaskCreated = false;
-            var response = await responseTask;
+            var response = await responseTask.WaitAsync(sendCts.Token);
             return (response.StatusCode, response.Data);
         }
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             var timeout = new TimeoutException($"Large Bolt RPC {commandName} -> {recipientId} timed out before the request completed", ex);
-            rpcCall.SetException(timeout);
-            if (responseTaskCreated)
-            {
-                try { await responseTask; } catch { }
-            }
+            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, timeout);
             throw timeout;
+        }
+        catch (OperationCanceledException ex)
+        {
+            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
+            throw;
         }
         catch (Exception ex)
         {
-            if (responseTaskCreated)
-            {
-                rpcCall.SetException(ex);
-                try { await responseTask; } catch { }
-            }
+            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
             throw;
         }
-        finally { _pendingCalls.TryRemove(requestId, out _); }
+        finally { _pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)); }
+    }
+
+    private async Task CompleteFailedRpcAsync(
+        Guid requestId,
+        PooledRpcCall rpcCall,
+        Task<BoltRpcResponse> responseTask,
+        Exception ex)
+    {
+        if (_pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)))
+            rpcCall.SetException(ex);
+
+        try { await responseTask; } catch { }
     }
 
     public async Task<TResponse?> SendAsync<TRequest, TResponse>(string recipientId, string commandName, TRequest request, CancellationToken ct = default)

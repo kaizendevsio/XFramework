@@ -650,43 +650,43 @@ public sealed class ThreadServiceSecurityTests
         public IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(byte[] queryDescriptorBytes, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage query streams are not used by these tests.");
 
-        public Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(CreateStorageUploadSessionRequest request) =>
+        public Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(CreateStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload sessions are not used by these tests.");
 
-        public Task<QueryResponse<StorageUploadPartResponse>> UploadStorageFilePart(UploadStorageFilePartRequest request) =>
+        public Task<QueryResponse<StorageUploadPartResponse>> UploadStorageFilePart(UploadStorageFilePartRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload parts are not used by these tests.");
 
-        public Task<QueryResponse<StorageUploadPartListResponse>> ListStorageUploadParts(ListStorageUploadPartsRequest request) =>
+        public Task<QueryResponse<StorageUploadPartListResponse>> ListStorageUploadParts(ListStorageUploadPartsRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload parts are not used by these tests.");
 
-        public Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(CompleteStorageUploadSessionRequest request) =>
+        public Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(CompleteStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload completion is not used by these tests.");
 
-        public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request) =>
+        public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload abort is not used by these tests.");
 
-        public Task<QueryResponse<StorageFileResponse>> GetStorageFile(GetStorageFileRequest request) =>
+        public Task<QueryResponse<StorageFileResponse>> GetStorageFile(GetStorageFileRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage file reads are not used by these tests.");
 
-        public Task<QueryResponse<StorageFileListResponse>> GetStorageFiles(GetStorageFilesRequest request) =>
+        public Task<QueryResponse<StorageFileListResponse>> GetStorageFiles(GetStorageFilesRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage file listing is not used by these tests.");
 
-        public Task<QueryResponse<StorageDownloadUrlResponse>> GetStorageDownloadUrl(GetStorageDownloadUrlRequest request) =>
+        public Task<QueryResponse<StorageDownloadUrlResponse>> GetStorageDownloadUrl(GetStorageDownloadUrlRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage download URLs are not used by these tests.");
 
-        public Task<QueryResponse<StoragePublicUrlResponse>> GetStoragePublicUrl(GetStoragePublicUrlRequest request) =>
+        public Task<QueryResponse<StoragePublicUrlResponse>> GetStoragePublicUrl(GetStoragePublicUrlRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage public URLs are not used by these tests.");
 
-        public Task<CmdResponse> DeleteStorageFile(DeleteStorageFileRequest request) =>
+        public Task<CmdResponse> DeleteStorageFile(DeleteStorageFileRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage deletes are not used by these tests.");
 
-        public Task<QueryResponse<StorageFileResponse>> RestoreStorageFile(RestoreStorageFileRequest request) =>
+        public Task<QueryResponse<StorageFileResponse>> RestoreStorageFile(RestoreStorageFileRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage restores are not used by these tests.");
 
-        public Task<QueryResponse<StorageRetentionCleanupResponse>> CleanupStorageRetention(CleanupStorageRetentionRequest request) =>
+        public Task<QueryResponse<StorageRetentionCleanupResponse>> CleanupStorageRetention(CleanupStorageRetentionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage cleanup is not used by these tests.");
 
-        public Task<QueryResponse<StorageFileValidationResponse>> ValidateStorageFileReference(ValidateStorageFileReferenceRequest request) =>
+        public Task<QueryResponse<StorageFileValidationResponse>> ValidateStorageFileReference(ValidateStorageFileReferenceRequest request, CancellationToken ct = default) =>
             Task.FromResult(new QueryResponse<StorageFileValidationResponse>
             {
                 HttpStatusCode = HttpStatusCode.OK,

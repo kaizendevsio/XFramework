@@ -49,7 +49,10 @@ public class IntegrationTestFixture
 
     public static IServiceProvider Services => _identityServerApp.Services;
     private const string TestServiceClientId = "TestClient";
+    private const string TestServiceGenerationId = "test-client-g1";
     private const string TestServiceClientSecret = "IdentityServerIntegrationTestSecret-2026";
+    private const string TestHostServiceGenerationId = "test-host-service-g1";
+    private const string TestHostServiceClientSecret = "IdentityServerHostIntegrationSecret-2026";
 
     /// <summary>
     /// Service wrapper that calls IdentityServer through the actual Bolt transport.
@@ -175,6 +178,7 @@ public class IntegrationTestFixture
         builder.Services.AddCommunicationsWrapperServices();
         builder.Services.AddScoped<IStorageServiceWrapper, TestStorageServiceWrapper>();
         builder.Services.AddScoped<IAuthService, AuthService>();
+        builder.Services.AddScoped<IIdentityAuthorizationService, IdentityAuthorizationService>();
         builder.Services.AddScoped<IServiceIdentityService, ServiceIdentityService>();
         builder.Services.AddSingleton(serviceProvider => ServiceIdentityConfiguration.FromConfiguration(
             serviceProvider.GetRequiredService<IConfiguration>(),
@@ -224,7 +228,7 @@ public class IntegrationTestFixture
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["ServiceIdentity:ClientId"] = TestServiceClientId,
-            ["ServiceIdentity:GenerationId"] = "test-client-g1",
+            ["ServiceIdentity:GenerationId"] = TestServiceGenerationId,
             ["ServiceIdentity:ClientSecret"] = TestServiceClientSecret,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Kestrel:Endpoints:Http:Url"] = TestClientUrl,
@@ -326,9 +330,15 @@ public class IntegrationTestFixture
             ["DefaultDatabaseConnection"] = ConnectionString,
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
+            ["ServiceIdentity:ClientId"] = clientName,
+            ["ServiceIdentity:GenerationId"] = TestHostServiceGenerationId,
+            ["ServiceIdentity:ClientSecret"] = TestHostServiceClientSecret,
             ["ServiceIdentity:Clients:0:ClientId"] = TestServiceClientId,
-            ["ServiceIdentity:Clients:0:GenerationId"] = "test-client-g1",
+            ["ServiceIdentity:Clients:0:GenerationId"] = TestServiceGenerationId,
             ["ServiceIdentity:Clients:0:ClientSecret"] = TestServiceClientSecret,
+            ["ServiceIdentity:Clients:1:ClientId"] = clientName,
+            ["ServiceIdentity:Clients:1:GenerationId"] = TestHostServiceGenerationId,
+            ["ServiceIdentity:Clients:1:ClientSecret"] = TestHostServiceClientSecret,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Kestrel:Endpoints:Http:Url"] = serverUrl,
             ["urls"] = serverUrl,
@@ -422,7 +432,8 @@ internal sealed class TestStorageServiceWrapper(DbContext db) : IStorageServiceW
         throw new NotSupportedException("Storage query streams are not used by these tests.");
 
     public async Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(
-        CreateStorageUploadSessionRequest request)
+        CreateStorageUploadSessionRequest request,
+        CancellationToken ct = default)
     {
         var tenantId = request.Metadata.TenantId ?? IntegrationTestFixture.TestTenantId;
         var storageFileId = Guid.NewGuid();
@@ -457,7 +468,7 @@ internal sealed class TestStorageServiceWrapper(DbContext db) : IStorageServiceW
         };
 
         db.Set<StorageFile>().Add(file);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(ct);
         var fileResponse = ToFileResponse(file);
         db.Entry(file).State = EntityState.Detached;
 
@@ -487,7 +498,8 @@ internal sealed class TestStorageServiceWrapper(DbContext db) : IStorageServiceW
     }
 
     public Task<QueryResponse<StorageUploadPartResponse>> UploadStorageFilePart(
-        UploadStorageFilePartRequest request)
+        UploadStorageFilePartRequest request,
+        CancellationToken ct = default)
     {
         return Task.FromResult(new QueryResponse<StorageUploadPartResponse>
         {
@@ -506,11 +518,14 @@ internal sealed class TestStorageServiceWrapper(DbContext db) : IStorageServiceW
         });
     }
 
-    public Task<QueryResponse<StorageUploadPartListResponse>> ListStorageUploadParts(ListStorageUploadPartsRequest request) =>
+    public Task<QueryResponse<StorageUploadPartListResponse>> ListStorageUploadParts(
+        ListStorageUploadPartsRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage upload part listing is not used by these tests.");
 
     public async Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(
-        CompleteStorageUploadSessionRequest request)
+        CompleteStorageUploadSessionRequest request,
+        CancellationToken ct = default)
     {
         if (!_sessions.TryGetValue(request.UploadSessionId, out var session))
         {
@@ -523,14 +538,14 @@ internal sealed class TestStorageServiceWrapper(DbContext db) : IStorageServiceW
 
         var file = await db.Set<StorageFile>()
             .IgnoreQueryFilters()
-            .FirstAsync(item => item.Id == session.StorageFileId);
+            .FirstAsync(item => item.Id == session.StorageFileId, ct);
         file.Status = StorageFileStatus.Available;
         file.UploadedAt = DateTime.UtcNow;
         file.CompletedAt = file.UploadedAt;
         file.Sha256Hash = request.ExpectedSha256Hash ?? file.Sha256Hash;
         file.Hash = file.Sha256Hash;
         db.Update(file);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(ct);
         var response = ToFileResponse(file);
         db.Entry(file).State = EntityState.Detached;
 
@@ -541,32 +556,49 @@ internal sealed class TestStorageServiceWrapper(DbContext db) : IStorageServiceW
         };
     }
 
-    public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request) =>
+    public Task<CmdResponse> AbortStorageUploadSession(
+        AbortStorageUploadSessionRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage upload abort is not used by these tests.");
 
-    public Task<QueryResponse<StorageFileResponse>> GetStorageFile(GetStorageFileRequest request) =>
+    public Task<QueryResponse<StorageFileResponse>> GetStorageFile(
+        GetStorageFileRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage file reads are not used by these tests.");
 
-    public Task<QueryResponse<StorageFileListResponse>> GetStorageFiles(GetStorageFilesRequest request) =>
+    public Task<QueryResponse<StorageFileListResponse>> GetStorageFiles(
+        GetStorageFilesRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage file listing is not used by these tests.");
 
-    public Task<QueryResponse<StorageDownloadUrlResponse>> GetStorageDownloadUrl(GetStorageDownloadUrlRequest request) =>
+    public Task<QueryResponse<StorageDownloadUrlResponse>> GetStorageDownloadUrl(
+        GetStorageDownloadUrlRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage download URLs are not used by these tests.");
 
-    public Task<QueryResponse<StoragePublicUrlResponse>> GetStoragePublicUrl(GetStoragePublicUrlRequest request) =>
+    public Task<QueryResponse<StoragePublicUrlResponse>> GetStoragePublicUrl(
+        GetStoragePublicUrlRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage public URLs are not used by these tests.");
 
-    public Task<CmdResponse> DeleteStorageFile(DeleteStorageFileRequest request) =>
+    public Task<CmdResponse> DeleteStorageFile(
+        DeleteStorageFileRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage deletes are not used by these tests.");
 
-    public Task<QueryResponse<StorageFileResponse>> RestoreStorageFile(RestoreStorageFileRequest request) =>
+    public Task<QueryResponse<StorageFileResponse>> RestoreStorageFile(
+        RestoreStorageFileRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage restores are not used by these tests.");
 
-    public Task<QueryResponse<StorageRetentionCleanupResponse>> CleanupStorageRetention(CleanupStorageRetentionRequest request) =>
+    public Task<QueryResponse<StorageRetentionCleanupResponse>> CleanupStorageRetention(
+        CleanupStorageRetentionRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage cleanup is not used by these tests.");
 
     public Task<QueryResponse<StorageFileValidationResponse>> ValidateStorageFileReference(
-        ValidateStorageFileReferenceRequest request) =>
+        ValidateStorageFileReferenceRequest request,
+        CancellationToken ct = default) =>
         throw new NotSupportedException("Storage validation is not used by these tests.");
 
     private static StorageFileResponse ToFileResponse(StorageFile file) => new()

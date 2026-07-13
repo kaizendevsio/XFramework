@@ -820,6 +820,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
             CredentialId = credential.Id,
             TypeId = roleTypeId ?? TestData.RoleTypeId,
             RoleExpiration = DateTime.UtcNow.AddYears(1),
+            IsEnabled = true,
             TenantId = IntegrationTestFixture.TestTenantId
         };
         db.Set<IdentityRole>().Add(role);

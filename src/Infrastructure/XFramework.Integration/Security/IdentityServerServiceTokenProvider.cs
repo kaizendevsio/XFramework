@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using Bolt.Client;
 using MemoryPack;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
@@ -13,7 +14,8 @@ public sealed class IdentityServerServiceTokenProvider(
     BoltClient boltClient,
     IOptions<ServiceIdentityOptions> serviceIdentityOptions,
     IOptions<BoltConfiguration> boltConfigurationOptions,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<IdentityServerServiceTokenProvider> logger)
     : IServiceTokenProvider
 {
     private readonly ConcurrentDictionary<string, CachedToken> _cache = new(StringComparer.Ordinal);
@@ -59,7 +61,28 @@ public sealed class IdentityServerServiceTokenProvider(
             {
                 try
                 {
-                    return await AcquireTokenAsync(audience, requestedScopes, cacheKey, CancellationToken.None);
+                    var timeout = ResolveTokenAcquisitionTimeout();
+                    using var timeoutCts = new CancellationTokenSource(timeout);
+                    try
+                    {
+                        return await AcquireTokenAsync(audience, requestedScopes, cacheKey, timeoutCts.Token);
+                    }
+                    catch (OperationCanceledException ex) when (timeoutCts.IsCancellationRequested)
+                    {
+                        throw new TimeoutException(
+                            $"Service token acquisition for audience '{audience}' timed out after {timeout.TotalSeconds:0} seconds.",
+                            ex);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "Service token acquisition failed. ClientId={ClientId} Audience={Audience} Scopes={Scopes}",
+                        ResolveClientIdOrDefault(),
+                        audience,
+                        string.Join(' ', requestedScopes));
+                    throw;
                 }
                 finally
                 {
@@ -177,6 +200,28 @@ public sealed class IdentityServerServiceTokenProvider(
                 RequestId = Guid.NewGuid()
             }
         };
+    }
+
+    private TimeSpan ResolveTokenAcquisitionTimeout()
+    {
+        var options = serviceIdentityOptions.Value;
+        var timeoutSeconds = options.TokenAcquisitionTimeoutSeconds > 0
+            ? options.TokenAcquisitionTimeoutSeconds
+            : Math.Max(1, boltConfigurationOptions.Value.RpcTimeoutSeconds + 5);
+
+        return TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 1, 300));
+    }
+
+    private string ResolveClientIdOrDefault()
+    {
+        try
+        {
+            return ResolveClientId();
+        }
+        catch
+        {
+            return "<unresolved>";
+        }
     }
 
     private sealed record CachedToken(string AccessToken, DateTime ExpiresAtUtc);

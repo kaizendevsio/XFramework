@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+using System.Collections.Concurrent;
 using Bolt.Client;
 using Bolt.Protocol.Transport;
 using Bolt.Server;
@@ -8,7 +9,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using XFramework.Domain.Shared.Configurations;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Bolt.Tests;
 
@@ -16,6 +21,7 @@ namespace Bolt.Tests;
 [CancelAfter(30000)]
 public class BoltRpcReadinessTests
 {
+    private const string ServiceIdentityTestSecret = "bolt-readiness-service-identity-secret-g0";
     private WebApplication _serverApp = null!;
     private ILoggerFactory _loggerFactory = null!;
     private static int _portCounter = 19700;
@@ -27,7 +33,13 @@ public class BoltRpcReadinessTests
         _port = Interlocked.Increment(ref _portCounter);
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls($"http://localhost:{_port}");
-        builder.Services.AddBoltServer();
+        builder.Services.AddBoltServer(options =>
+        {
+            options.InvocationTimeoutMs = 250;
+            options.CleanupIntervalSeconds = 1;
+            options.MaxPendingRpcCalls = 1;
+            options.MaxPendingRpcCallsPerPrincipal = 1;
+        });
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
         _serverApp = builder.Build();
@@ -95,6 +107,77 @@ public class BoltRpcReadinessTests
 
         await caller.DisposeAsync();
         await receiver.DisposeAsync();
+    }
+
+    [Test]
+    public async Task InvokeAsync_WhenResponderNeverReplies_ReturnsHubGatewayTimeout()
+    {
+        var responder = CreateClient("timeout_responder", "TimeoutResponder");
+        var caller = CreateClient("timeout_caller", "TimeoutCaller");
+        var handlerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        responder.RegisterHandler("hang", async (_, _, ct) =>
+        {
+            handlerEntered.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            return (HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty);
+        });
+
+        await responder.ConnectAsync();
+        await caller.ConnectAsync();
+
+        var started = DateTime.UtcNow;
+        var invokeTask = caller.InvokeAsync("timeout_responder", "hang", new byte[] { 1 });
+        await handlerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var (statusCode, responsePayload) = await invokeTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        statusCode.Should().Be(HttpStatusCode.GatewayTimeout);
+        responsePayload.Length.Should().Be(0);
+        (DateTime.UtcNow - started).Should().BeLessThan(TimeSpan.FromSeconds(4));
+        GetServerPendingInvocationCount().Should().Be(0);
+
+        var secondInvoke = caller.InvokeAsync("timeout_responder", "hang", new byte[] { 2 });
+        var (secondStatusCode, secondResponsePayload) = await secondInvoke.WaitAsync(TimeSpan.FromSeconds(5));
+
+        secondStatusCode.Should().Be(HttpStatusCode.GatewayTimeout,
+            "the first timeout must release global and per-principal pending-invocation capacity");
+        secondResponsePayload.Length.Should().Be(0);
+        GetServerPendingInvocationCount().Should().Be(0);
+
+        await caller.DisposeAsync();
+        await responder.DisposeAsync();
+    }
+
+    [Test]
+    public async Task InvokeAsync_WhenResponderDisconnectsDuringPendingInvocation_ReturnsServiceUnavailable()
+    {
+        var responder = CreateClient("disconnect_responder", "DisconnectResponder");
+        var caller = CreateClient("disconnect_caller", "DisconnectCaller");
+        var handlerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        responder.RegisterHandler("hang", async (_, _, ct) =>
+        {
+            handlerEntered.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            return (HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty);
+        });
+
+        await responder.ConnectAsync();
+        await caller.ConnectAsync();
+
+        var invokeTask = caller.InvokeAsync("disconnect_responder", "hang", new byte[] { 1 });
+        await handlerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await responder.DisposeAsync();
+
+        var (statusCode, responsePayload) = await invokeTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        statusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        responsePayload.Length.Should().Be(0);
+        GetServerPendingInvocationCount().Should().Be(0);
+
+        await caller.DisposeAsync();
     }
 
     [Test]
@@ -271,6 +354,187 @@ public class BoltRpcReadinessTests
     }
 
     [Test]
+    public async Task InvokeAsync_WhenResponseNeverArrives_HonorsCallerCancellation()
+    {
+        await using var client = new BoltClient(
+            new Uri($"ws://localhost:{_port}/bolt"),
+            "cancel_wait_caller",
+            "CancelWaitCaller",
+            new BoltClientOptions { RpcTimeoutSeconds = 30, SendQueueCapacity = 4 },
+            _loggerFactory.CreateLogger<BoltClient>());
+        var connection = new BoltConnection(new NoopBoltConnection(), sendQueueCapacity: 4);
+
+        var connections = (List<BoltConnection>)typeof(BoltClient)
+            .GetField("_connections", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(client)!;
+        connections.Add(connection);
+        typeof(BoltClient)
+            .GetField("_isRegistered", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(client, true);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(75));
+        var started = DateTime.UtcNow;
+        Func<Task> invoke = async () => await client.InvokeAsync(
+            "missing_receiver",
+            "noop",
+            new byte[] { 1 },
+            cts.Token);
+
+        await invoke.Should().ThrowAsync<OperationCanceledException>();
+        (DateTime.UtcNow - started).Should().BeLessThan(TimeSpan.FromSeconds(2));
+
+        var pendingCalls = (ConcurrentDictionary<Guid, PooledRpcCall>)typeof(BoltClient)
+            .GetField("_pendingCalls", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(client)!;
+        pendingCalls.Should().BeEmpty();
+
+        connection.CompleteSendChannel();
+    }
+
+    [Test]
+    public async Task InvokeAsync_WhenResponseNeverArrives_UsesContextualRpcTimeoutAndClearsPendingCall()
+    {
+        await using var client = new BoltClient(
+            new Uri($"ws://localhost:{_port}/bolt"),
+            "timeout_wait_caller",
+            "TimeoutWaitCaller",
+            new BoltClientOptions { RpcTimeoutSeconds = 1, SendQueueCapacity = 4 },
+            _loggerFactory.CreateLogger<BoltClient>());
+        var connection = new BoltConnection(new NoopBoltConnection(), sendQueueCapacity: 4);
+
+        var connections = (List<BoltConnection>)typeof(BoltClient)
+            .GetField("_connections", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(client)!;
+        connections.Add(connection);
+        typeof(BoltClient)
+            .GetField("_isRegistered", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(client, true);
+
+        Func<Task> invoke = async () => await client.InvokeAsync(
+            "missing_receiver",
+            "noop",
+            new byte[] { 1 });
+
+        await invoke.Should().ThrowAsync<TimeoutException>()
+            .WithMessage("*timed out before the request completed*");
+
+        var pendingCalls = (ConcurrentDictionary<Guid, PooledRpcCall>)typeof(BoltClient)
+            .GetField("_pendingCalls", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(client)!;
+        pendingCalls.Should().BeEmpty();
+
+        connection.CompleteSendChannel();
+    }
+
+    [Test]
+    public async Task IdentityServerServiceTokenProvider_WhenTokenRpcNeverCompletes_TimesOutAndClearsInflight()
+    {
+        await using var client = new BoltClient(
+            new Uri($"ws://localhost:{_port}/bolt"),
+            "token_timeout_caller",
+            "TokenTimeoutCaller",
+            new BoltClientOptions { RpcTimeoutSeconds = 30, SendQueueCapacity = 4 },
+            _loggerFactory.CreateLogger<BoltClient>());
+        var connection = new BoltConnection(new NoopBoltConnection(), sendQueueCapacity: 4);
+
+        var connections = (List<BoltConnection>)typeof(BoltClient)
+            .GetField("_connections", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(client)!;
+        connections.Add(connection);
+        typeof(BoltClient)
+            .GetField("_isRegistered", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(client, true);
+
+        var provider = new IdentityServerServiceTokenProvider(
+            client,
+            Options.Create(new ServiceIdentityOptions
+            {
+                ClientId = XFrameworkServiceNames.Portal,
+                GenerationId = "test-g0",
+                ClientSecret = ServiceIdentityTestSecret,
+                DefaultScopes = [XFrameworkServiceScopes.IdentityAdmin],
+                TokenAcquisitionTimeoutSeconds = 1
+            }),
+            Options.Create(new BoltConfiguration
+            {
+                ClientName = XFrameworkServiceNames.Portal,
+                RpcTimeoutSeconds = 30
+            }),
+            TimeProvider.System,
+            _loggerFactory.CreateLogger<IdentityServerServiceTokenProvider>());
+
+        var started = DateTime.UtcNow;
+        Func<Task> getToken = async () => await provider.GetTokenAsync(XFrameworkServiceNames.IdentityServer);
+
+        await getToken.Should().ThrowAsync<TimeoutException>();
+        (DateTime.UtcNow - started).Should().BeLessThan(TimeSpan.FromSeconds(5));
+
+        var inflight = (ConcurrentDictionary<string, Lazy<Task<string>>>)typeof(IdentityServerServiceTokenProvider)
+            .GetField("_inflight", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(provider)!;
+        inflight.Should().BeEmpty();
+
+        connection.CompleteSendChannel();
+    }
+
+    [Test]
+    public async Task IdentityServerServiceTokenProvider_WhenCallerCancelsTokenRpc_PreservesSharedAcquisition()
+    {
+        await using var client = new BoltClient(
+            new Uri($"ws://localhost:{_port}/bolt"),
+            "token_cancel_caller",
+            "TokenCancelCaller",
+            new BoltClientOptions { RpcTimeoutSeconds = 30, SendQueueCapacity = 4 },
+            _loggerFactory.CreateLogger<BoltClient>());
+        var connection = new BoltConnection(new NoopBoltConnection(), sendQueueCapacity: 4);
+
+        var connections = (List<BoltConnection>)typeof(BoltClient)
+            .GetField("_connections", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(client)!;
+        connections.Add(connection);
+        typeof(BoltClient)
+            .GetField("_isRegistered", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(client, true);
+
+        var provider = new IdentityServerServiceTokenProvider(
+            client,
+            Options.Create(new ServiceIdentityOptions
+            {
+                ClientId = XFrameworkServiceNames.Portal,
+                GenerationId = "test-g0",
+                ClientSecret = ServiceIdentityTestSecret,
+                DefaultScopes = [XFrameworkServiceScopes.IdentityAdmin],
+                TokenAcquisitionTimeoutSeconds = 1
+            }),
+            Options.Create(new BoltConfiguration
+            {
+                ClientName = XFrameworkServiceNames.Portal,
+                RpcTimeoutSeconds = 30
+            }),
+            TimeProvider.System,
+            _loggerFactory.CreateLogger<IdentityServerServiceTokenProvider>());
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(75));
+        Func<Task> getToken = async () => await provider.GetTokenAsync(
+            XFrameworkServiceNames.IdentityServer,
+            ct: cts.Token);
+
+        await getToken.Should().ThrowAsync<OperationCanceledException>();
+
+        var inflight = (ConcurrentDictionary<string, Lazy<Task<string>>>)typeof(IdentityServerServiceTokenProvider)
+            .GetField("_inflight", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(provider)!;
+        inflight.Should().ContainSingle();
+
+        Func<Task> awaitSharedAcquisition = async () =>
+            await provider.GetTokenAsync(XFrameworkServiceNames.IdentityServer);
+        await awaitSharedAcquisition.Should().ThrowAsync<TimeoutException>();
+        inflight.Should().BeEmpty();
+
+        connection.CompleteSendChannel();
+    }
+
+    [Test]
     public async Task GetHealthSnapshot_WhenPendingSendsExceedThreshold_IsUnhealthy()
     {
         await using var client = new BoltClient(
@@ -348,6 +612,17 @@ public class BoltRpcReadinessTests
         }
 
         throw new TimeoutException("Condition was not met before timeout.");
+    }
+
+    private int GetServerPendingInvocationCount()
+    {
+        var server = _serverApp.Services.GetRequiredService<BoltServer>();
+        var field = typeof(BoltServer).GetField("_pendingInvocations", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("BoltServer pending-invocation field not found.");
+        var pendingInvocations = field.GetValue(server)!;
+        var countProperty = pendingInvocations.GetType().GetProperty("Count")
+            ?? throw new InvalidOperationException("BoltServer pending-invocation collection does not expose Count.");
+        return (int)countProperty.GetValue(pendingInvocations)!;
     }
 
     private class NoopBoltConnection : IBoltConnection

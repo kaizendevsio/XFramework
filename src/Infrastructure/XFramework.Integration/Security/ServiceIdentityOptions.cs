@@ -12,6 +12,7 @@ public sealed class ServiceIdentityOptions
     public ServiceIdentityValidationFallbackOptions? ValidationFallback { get; set; }
     public string Issuer { get; set; } = "XFramework.IdentityServer";
     public int TokenRefreshSkewSeconds { get; set; } = 60;
+    public int TokenAcquisitionTimeoutSeconds { get; set; } = 30;
     public int SigningKeyCacheMinutes { get; set; } = 15;
     public List<string> DefaultScopes { get; set; } = [];
 
