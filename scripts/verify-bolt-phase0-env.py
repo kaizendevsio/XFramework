@@ -9,10 +9,11 @@ import json
 import re
 import sys
 from pathlib import Path, PurePosixPath
+from typing import Collection
 
 
 NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-SAFE_VALUE = re.compile(r"^[A-Za-z0-9_./,:@%+=+-]*$")
+SAFE_TYPED_VALUE = re.compile(r"^[A-Za-z0-9_./,:@%+=+-]*$")
 HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 HTTP_PATH_SEGMENT = re.compile(r"^[A-Za-z0-9._~-]+$")
 FORBIDDEN = frozenset("`'\"#$\\;&|<>(){}[]*?!")
@@ -31,8 +32,12 @@ KEY_TYPES = {
 }
 
 
-def parse_env(path: Path) -> dict[str, str]:
+def parse_env(
+    path: Path, requested_keys: Collection[str] | None = None
+) -> dict[str, str]:
     values: dict[str, str] = {}
+    seen: set[str] = set()
+    requested = set(requested_keys) if requested_keys is not None else None
     with path.open("r", encoding="utf-8-sig", newline="") as stream:
         for line_number, raw in enumerate(stream, start=1):
             if raw.endswith("\r\n"):
@@ -47,16 +52,14 @@ def parse_env(path: Path) -> dict[str, str]:
                 raise ValueError(f"line {line_number}: embedded newline or NUL is not allowed")
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
-            if "#" in line:
-                raise ValueError(f"line {line_number}: inline comments are not allowed")
             name, separator, value = line.partition("=")
             if not separator or not NAME.fullmatch(name):
                 raise ValueError(f"line {line_number}: expected NAME=value")
-            if name in values:
+            if name in seen:
                 raise ValueError(f"line {line_number}: duplicate variable {name}")
-            if any(character in FORBIDDEN for character in value) or not SAFE_VALUE.fullmatch(value):
-                raise ValueError(f"line {line_number}: unsafe shell value for {name}")
-            values[name] = value
+            seen.add(name)
+            if requested is None or name in requested:
+                values[name] = value
     return values
 
 
@@ -118,6 +121,10 @@ def typed_value(key: str, value: str, explicit_type: str | None = None) -> str:
     value_type = explicit_type or KEY_TYPES.get(key)
     if value_type not in VALIDATORS:
         raise ValueError(f"no approved type is defined for {key}; pass --type for a single key")
+    if any(character in FORBIDDEN for character in value) or not SAFE_TYPED_VALUE.fullmatch(
+        value
+    ):
+        raise ValueError(f"{key}: contains characters outside its approved typed syntax")
     try:
         return VALIDATORS[value_type](value)
     except ValueError as error:
@@ -136,7 +143,7 @@ def main() -> int:
             raise ValueError("requested keys must be unique")
         if args.type and len(args.key) != 1:
             raise ValueError("--type can only be used with one --key")
-        values = parse_env(Path(args.file))
+        values = parse_env(Path(args.file), args.key)
         missing = [key for key in args.key if key not in values]
         if missing:
             raise ValueError(f"missing required variables: {', '.join(missing)}")

@@ -120,6 +120,42 @@ class Phase0EnvTests(unittest.TestCase):
                 self.assertNotEqual(0, result.returncode)
                 self.assertEqual("", result.stdout)
 
+    def test_opaque_unrequested_secrets_do_not_block_typed_reads_or_leak(self) -> None:
+        opaque_secret = "opaque-$value!with#shell;characters[]{}"
+        content = (
+            f"DB_PASSWORD={opaque_secret}\n"
+            "JWT_SECRET='quoted-secret-value'\n"
+            "BOLT_HUB_TLS_CA_PATH=/opt/xframework/tls/ca.crt\n"
+        ).encode("utf-8")
+
+        result = self.run_reader(content, "BOLT_HUB_TLS_CA_PATH")
+
+        self.assertEqual((0, "/opt/xframework/tls/ca.crt"), (result.returncode, result.stdout))
+        self.assertNotIn(opaque_secret, result.stdout)
+        self.assertNotIn(opaque_secret, result.stderr)
+
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / "deployment.env"
+            env_file.write_bytes(content)
+            self.assertEqual(
+                {"BOLT_HUB_TLS_CA_PATH": "/opt/xframework/tls/ca.crt"},
+                ENV_PARSER.parse_env(env_file, {"BOLT_HUB_TLS_CA_PATH"}),
+            )
+
+    def test_duplicate_opaque_values_still_fail_without_leaking(self) -> None:
+        content = (
+            b"DB_PASSWORD=first-opaque-secret!\n"
+            b"DB_PASSWORD=second-opaque-secret$\n"
+            b"BOLT_HUB_TLS_CA_PATH=/opt/xframework/tls/ca.crt\n"
+        )
+
+        result = self.run_reader(content, "BOLT_HUB_TLS_CA_PATH")
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertNotIn("first-opaque-secret", result.stderr)
+        self.assertNotIn("second-opaque-secret", result.stderr)
+
     def test_crlf_and_full_line_comments_are_accepted_without_evaluation(self) -> None:
         content = (
             b"# deployment metadata that is never evaluated\r\n"
