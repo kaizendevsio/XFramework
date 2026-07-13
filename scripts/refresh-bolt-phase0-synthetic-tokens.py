@@ -49,7 +49,7 @@ USER_DATA_KEYS = {
     "sessionId",
 }
 JWT_SEGMENT = re.compile(r"[A-Za-z0-9_-]+")
-ENV_KEY = re.compile(r"[A-Z][A-Z0-9_]*")
+ENV_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 GUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 JTI = re.compile(r"(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})")
 ENFORCE_POSIX_PERMISSIONS = os.name == "posix" and hasattr(os, "geteuid")

@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).with_name("verify-bolt-phase0-env.py")
+REFRESH_SCRIPT = Path(__file__).with_name("refresh-bolt-phase0-synthetic-tokens.py")
 WORKFLOW = SCRIPT.parents[1] / ".github" / "workflows" / "deploy-xeon-dev.yml"
 READ_ENV_CALL = re.compile(r"\$\(\s*read_env\b[^)]*\)")
 IMPLICIT_READ_ENV = re.compile(
@@ -22,6 +23,15 @@ if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"unable to load {SCRIPT}")
 ENV_PARSER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ENV_PARSER)
+
+REFRESH_SPEC = importlib.util.spec_from_file_location(
+    "refresh_bolt_phase0_synthetic_tokens", REFRESH_SCRIPT
+)
+if REFRESH_SPEC is None or REFRESH_SPEC.loader is None:
+    raise RuntimeError(f"unable to load {REFRESH_SCRIPT}")
+REFRESH = importlib.util.module_from_spec(REFRESH_SPEC)
+sys.modules[REFRESH_SPEC.name] = REFRESH
+REFRESH_SPEC.loader.exec_module(REFRESH)
 
 
 class Phase0EnvTests(unittest.TestCase):
@@ -49,6 +59,23 @@ class Phase0EnvTests(unittest.TestCase):
         self.assertEqual((0, "/opt/xframework/tls/ca.crt"), (path.returncode, path.stdout))
         self.assertEqual((0, "bolt.example.internal"), (hostname.returncode, hostname.stdout))
         self.assertEqual((0, "7000"), (port.returncode, port.stdout))
+
+    def test_refresh_hook_uses_the_same_compose_key_grammar(self) -> None:
+        valid = (
+            "BOLT_HUB_EXPOSE_PORT",
+            "ControlPanel__BootstrapAdmin__Password",
+            "_COMPOSE_PRIVATE_SETTING",
+        )
+        invalid = ("9INVALID", "WITH-DASH", "WITH.DOT", " WITH_SPACE")
+
+        for name in valid:
+            with self.subTest(name=name):
+                self.assertIsNotNone(ENV_PARSER.NAME.fullmatch(name))
+                self.assertIsNotNone(REFRESH.ENV_KEY.fullmatch(name))
+        for name in invalid:
+            with self.subTest(name=name):
+                self.assertIsNone(ENV_PARSER.NAME.fullmatch(name))
+                self.assertIsNone(REFRESH.ENV_KEY.fullmatch(name))
 
     def test_identityserver_values_use_explicit_safe_types(self) -> None:
         content = (
