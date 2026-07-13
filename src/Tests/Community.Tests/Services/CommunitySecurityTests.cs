@@ -337,43 +337,43 @@ public sealed class CommunitySecurityTests
         public IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(byte[] queryDescriptorBytes, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage query streams should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(CreateStorageUploadSessionRequest request) =>
+        public Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(CreateStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload sessions should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageUploadPartResponse>> UploadStorageFilePart(UploadStorageFilePartRequest request) =>
+        public Task<QueryResponse<StorageUploadPartResponse>> UploadStorageFilePart(UploadStorageFilePartRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload parts should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageUploadPartListResponse>> ListStorageUploadParts(ListStorageUploadPartsRequest request) =>
+        public Task<QueryResponse<StorageUploadPartListResponse>> ListStorageUploadParts(ListStorageUploadPartsRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload part listing should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(CompleteStorageUploadSessionRequest request) =>
+        public Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(CompleteStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload completion should not be called by these security tests.");
 
-        public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request) =>
+        public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload abort should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageFileResponse>> GetStorageFile(GetStorageFileRequest request) =>
+        public Task<QueryResponse<StorageFileResponse>> GetStorageFile(GetStorageFileRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage file reads should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageFileListResponse>> GetStorageFiles(GetStorageFilesRequest request) =>
+        public Task<QueryResponse<StorageFileListResponse>> GetStorageFiles(GetStorageFilesRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage file listing should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageDownloadUrlResponse>> GetStorageDownloadUrl(GetStorageDownloadUrlRequest request) =>
+        public Task<QueryResponse<StorageDownloadUrlResponse>> GetStorageDownloadUrl(GetStorageDownloadUrlRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage download URLs should not be called by these security tests.");
 
-        public Task<QueryResponse<StoragePublicUrlResponse>> GetStoragePublicUrl(GetStoragePublicUrlRequest request) =>
+        public Task<QueryResponse<StoragePublicUrlResponse>> GetStoragePublicUrl(GetStoragePublicUrlRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage public URLs should not be called by these security tests.");
 
-        public Task<CmdResponse> DeleteStorageFile(DeleteStorageFileRequest request) =>
+        public Task<CmdResponse> DeleteStorageFile(DeleteStorageFileRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage deletes should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageFileResponse>> RestoreStorageFile(RestoreStorageFileRequest request) =>
+        public Task<QueryResponse<StorageFileResponse>> RestoreStorageFile(RestoreStorageFileRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage restores should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageRetentionCleanupResponse>> CleanupStorageRetention(CleanupStorageRetentionRequest request) =>
+        public Task<QueryResponse<StorageRetentionCleanupResponse>> CleanupStorageRetention(CleanupStorageRetentionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage cleanup should not be called by these security tests.");
 
-        public Task<QueryResponse<StorageFileValidationResponse>> ValidateStorageFileReference(ValidateStorageFileReferenceRequest request) =>
+        public Task<QueryResponse<StorageFileValidationResponse>> ValidateStorageFileReference(ValidateStorageFileReferenceRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage validation should not be called by these security tests.");
     }
 

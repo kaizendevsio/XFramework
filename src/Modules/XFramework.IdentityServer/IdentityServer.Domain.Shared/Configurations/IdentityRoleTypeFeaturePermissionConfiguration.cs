@@ -39,7 +39,8 @@ public sealed class IdentityRoleTypeFeaturePermissionConfiguration :
 
         entity.Property(e => e.Effect)
             .IsRequired()
-            .HasDefaultValue(RoleCapabilityPermissionEffect.Allow);
+            .HasDefaultValue(RoleCapabilityPermissionEffect.Allow)
+            .HasSentinel(RoleCapabilityPermissionEffect.Allow);
 
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");

@@ -395,6 +395,7 @@ public class AuthenticationTests : IntegrationTestBase
             CredentialId = credential.Id,
             TypeId = TestData.RoleTypeId,
             RoleExpiration = DateTime.UtcNow.AddYears(1),
+            IsEnabled = true,
             TenantId = IntegrationTestFixture.TestTenantId
         };
         db.Set<IdentityRole>().Add(role);

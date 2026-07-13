@@ -58,7 +58,8 @@ public sealed class ServiceWrapperGeneratorTests
         generatedSource.Should().Contain($"TargetClient = \"{"XFramework.JuanBarangay".ToSha256()}\"");
         generatedSource.Should().Contain("IServiceTokenProvider serviceTokenProvider");
         generatedSource.Should().Contain("public IResidentCrudService Resident { get; init; }");
-        generatedSource.Should().Contain("ValidateBarangayId(");
+        generatedSource.Should().Contain("Task<QueryResponse<Juan.Barangay.Domain.Shared.Contracts.Residents.ResidentResponse>> ValidateBarangayId(Juan.Barangay.Domain.Shared.Contracts.Residents.ValidateBarangayIdRequest request, System.Threading.CancellationToken ct = default);");
+        generatedSource.Should().Contain("SendAsync<Juan.Barangay.Domain.Shared.Contracts.Residents.ValidateBarangayIdRequest, Juan.Barangay.Domain.Shared.Contracts.Residents.ResidentResponse>(request, ct);");
         generatedSource.Should().NotContain("namespace Juan.Integration.Drivers");
     }
 
@@ -99,7 +100,8 @@ public sealed class ServiceWrapperGeneratorTests
         generatedSource.Should().Contain($"TargetClient = \"{"XFramework.Inventario".ToSha256()}\"");
         generatedSource.Should().Contain("IServiceTokenProvider serviceTokenProvider");
         generatedSource.Should().Contain("public IProductCrudService Product { get; init; }");
-        generatedSource.Should().Contain("ReserveInventory(");
+        generatedSource.Should().Contain("Task<CmdResponse> ReserveInventory(XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations.ReserveInventoryRequest request, System.Threading.CancellationToken ct = default);");
+        generatedSource.Should().Contain("SendVoidAsync(request, ct);");
     }
 
     [Test]
@@ -132,8 +134,8 @@ public sealed class ServiceWrapperGeneratorTests
             new Dictionary<string, string>());
 
         generatedSource.Should().Contain("public partial interface IPOSServiceWrapper");
-        generatedSource.Should().Contain("Task<CmdResponse<POS.Domain.Shared.Contracts.Responses.PosSaleReceiptResponse>> CheckoutPosSale(POS.Domain.Shared.Contracts.Requests.CheckoutPosSaleRequest request);");
-        generatedSource.Should().Contain("SendVoidAsync<POS.Domain.Shared.Contracts.Requests.CheckoutPosSaleRequest, POS.Domain.Shared.Contracts.Responses.PosSaleReceiptResponse>(request);");
+        generatedSource.Should().Contain("Task<CmdResponse<POS.Domain.Shared.Contracts.Responses.PosSaleReceiptResponse>> CheckoutPosSale(POS.Domain.Shared.Contracts.Requests.CheckoutPosSaleRequest request, System.Threading.CancellationToken ct = default);");
+        generatedSource.Should().Contain("SendVoidAsync<POS.Domain.Shared.Contracts.Requests.CheckoutPosSaleRequest, POS.Domain.Shared.Contracts.Responses.PosSaleReceiptResponse>(request, ct);");
     }
 
     [Test]

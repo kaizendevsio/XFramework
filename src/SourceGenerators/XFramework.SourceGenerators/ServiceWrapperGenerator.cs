@@ -622,19 +622,19 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                 if (isQueryResponse)
                 {
                     var innerType = ((INamedTypeSymbol)tResponse).TypeArguments[0].ToDisplayString();
-                    interfaceSig = $"Task<QueryResponse<{innerType}>> {methodName}({requestFullName} request);";
-                    implMethod = $"public Task<QueryResponse<{innerType}>> {methodName}({requestFullName} request) => SendAsync<{requestFullName}, {innerType}>(request);";
+                    interfaceSig = $"Task<QueryResponse<{innerType}>> {methodName}({requestFullName} request, System.Threading.CancellationToken ct = default);";
+                    implMethod = $"public Task<QueryResponse<{innerType}>> {methodName}({requestFullName} request, System.Threading.CancellationToken ct = default) => SendAsync<{requestFullName}, {innerType}>(request, ct);";
                 }
                 else if (isTypedCommandResponse)
                 {
                     var innerType = ((INamedTypeSymbol)tResponse).TypeArguments[0].ToDisplayString();
-                    interfaceSig = $"Task<CmdResponse<{innerType}>> {methodName}({requestFullName} request);";
-                    implMethod = $"public Task<CmdResponse<{innerType}>> {methodName}({requestFullName} request) => SendVoidAsync<{requestFullName}, {innerType}>(request);";
+                    interfaceSig = $"Task<CmdResponse<{innerType}>> {methodName}({requestFullName} request, System.Threading.CancellationToken ct = default);";
+                    implMethod = $"public Task<CmdResponse<{innerType}>> {methodName}({requestFullName} request, System.Threading.CancellationToken ct = default) => SendVoidAsync<{requestFullName}, {innerType}>(request, ct);";
                 }
                 else
                 {
-                    interfaceSig = $"Task<CmdResponse> {methodName}({requestFullName} request);";
-                    implMethod = $"public Task<CmdResponse> {methodName}({requestFullName} request) => SendVoidAsync(request);";
+                    interfaceSig = $"Task<CmdResponse> {methodName}({requestFullName} request, System.Threading.CancellationToken ct = default);";
+                    implMethod = $"public Task<CmdResponse> {methodName}({requestFullName} request, System.Threading.CancellationToken ct = default) => SendVoidAsync(request, ct);";
                 }
 
                 if (!seen.Add(requestFullName))

@@ -760,10 +760,12 @@ public sealed class BoltServer : IDisposable
             if (pending.ExpectedResponder.StreamId != responder.StreamId)
             {
                 _logger.LogWarning(
-                    "Rejected response from unexpected responder. requestId={RequestId} expected={Expected} actual={Actual}",
+                    "Rejected response from unexpected Bolt responder. requestId={RequestId} expectedClient={ExpectedClient} expectedStream={ExpectedStream} actualClient={ActualClient} actualStream={ActualStream}",
                     requestId,
                     pending.ExpectedResponder.ClientId,
-                    responder.ClientId);
+                    pending.ExpectedResponder.StreamId,
+                    responder.ClientId,
+                    responder.StreamId);
                 return;
             }
 
@@ -3061,6 +3063,52 @@ public sealed class BoltServer : IDisposable
         return firstAlive;
     }
 
+    private async Task SendInvocationTerminalResponseAsync(
+        Guid requestId,
+        BoltHubConnection caller,
+        HttpStatusCode statusCode,
+        string reason,
+        CancellationToken ct)
+    {
+        if (!caller.IsAlive)
+        {
+            _logger.LogDebug(
+                "Skipped terminal Bolt invocation response because caller is disconnected. requestId={RequestId} caller={CallerClientId} callerStream={CallerStreamId} statusCode={StatusCode} reason={Reason}",
+                requestId,
+                caller.ClientId,
+                caller.StreamId,
+                (int)statusCode,
+                reason);
+            return;
+        }
+
+        try
+        {
+            var writer = new ArrayBufferWriter<byte>(BoltCodec.ResponseHeaderSize);
+            BoltCodec.WriteResponse(writer, requestId, statusCode, ReadOnlySpan<byte>.Empty);
+            await caller.SendAsync(writer.WrittenMemory, ct);
+
+            _logger.LogDebug(
+                "Sent terminal Bolt invocation response. requestId={RequestId} caller={CallerClientId} callerStream={CallerStreamId} statusCode={StatusCode} reason={Reason}",
+                requestId,
+                caller.ClientId,
+                caller.StreamId,
+                (int)statusCode,
+                reason);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogDebug(
+                ex,
+                "Failed to send terminal Bolt invocation response. requestId={RequestId} caller={CallerClientId} callerStream={CallerStreamId} statusCode={StatusCode} reason={Reason}",
+                requestId,
+                caller.ClientId,
+                caller.StreamId,
+                (int)statusCode,
+                reason);
+        }
+    }
+
     private async Task RemoveConnectionAsync(BoltHubConnection connection)
     {
         using var notificationCts = new CancellationTokenSource(_transportCloseTimeout);
@@ -3424,8 +3472,26 @@ public sealed class BoltServer : IDisposable
         {
             if (now - pending.Timestamp > _invocationTimeoutMs)
             {
-                if (TryRemovePendingInvocation(requestId, pending, out _))
-                    _logger.LogDebug("Cleaned up stale invocation {RequestId}", requestId);
+                if (TryRemovePendingInvocation(requestId, pending, out var removed))
+                {
+                    var ageMs = now - removed.Timestamp;
+                    _logger.LogWarning(
+                        "Completing stale Bolt invocation at hub timeout. requestId={RequestId} caller={CallerClientId} callerStream={CallerStreamId} responder={ResponderClientId} responderStream={ResponderStreamId} ageMs={AgeMs} timeoutMs={TimeoutMs}",
+                        requestId,
+                        removed.Caller.ClientId,
+                        removed.Caller.StreamId,
+                        removed.ExpectedResponder.ClientId,
+                        removed.ExpectedResponder.StreamId,
+                        ageMs,
+                        _invocationTimeoutMs);
+
+                    _ = SendInvocationTerminalResponseAsync(
+                        requestId,
+                        removed.Caller,
+                        HttpStatusCode.GatewayTimeout,
+                        "hub-invocation-timeout",
+                        CancellationToken.None);
+                }
             }
         }
 
