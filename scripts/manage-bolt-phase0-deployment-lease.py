@@ -1728,7 +1728,6 @@ class DeploymentLeaseController:
         manager_metadata = validate_file(
             manager,
             self.config.deployment_uid,
-            require_executable=True,
             max_bytes=MAX_ARTIFACT_BYTES,
         )
         if (
