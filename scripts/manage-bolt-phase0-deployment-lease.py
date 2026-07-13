@@ -2234,9 +2234,9 @@ class DeploymentLeaseController:
                 evidence = self._evidence(
                     now=now,
                     action="hub-stopped" if gates["hub_stopped"] else "hub-stop-unverified",
-                    status="passed" if gates["hub_stopped"] else "failed",
+                    status="failed",
                     reason_code=(
-                        "no-active-lease-no-lkg-hub-stopped"
+                        "no-active-lease-no-lkg-credential-state-unverified"
                         if gates["hub_stopped"]
                         else "hub-stop-unverified"
                     ),
@@ -2245,7 +2245,7 @@ class DeploymentLeaseController:
                     gates=gates,
                 )
                 self._write_evidence(evidence)
-                return evidence, 0 if gates["hub_stopped"] else 1
+                return evidence, 1
             stale = self._is_stale(lease, now)
             if not force and not stale:
                 evidence = self._evidence(

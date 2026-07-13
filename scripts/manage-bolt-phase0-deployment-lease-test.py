@@ -976,10 +976,43 @@ class RecoveryTests(LeaseFixture):
             stop_timeout_seconds=10,
         )
 
-        self.assertEqual(0, exit_code)
-        self.assertEqual("no-active-lease-no-lkg-hub-stopped", evidence["reason_code"])
+        self.assertEqual(1, exit_code)
+        self.assertEqual(
+            "no-active-lease-no-lkg-credential-state-unverified",
+            evidence["reason_code"],
+        )
+        self.assertEqual("failed", evidence["status"])
         self.assertTrue(evidence["gates"]["hub_stopped"])
         self.assertEqual(1, self.runner.count("stop"))
+
+    def test_no_lkg_without_lease_never_claims_orphaned_credentials_are_clean(self) -> None:
+        self.lkg_pointer.unlink()
+        self.env_file.write_text(
+            "BOLT_SYNTHETIC_PROXY_MODE=direct-kestrel\n"
+            "CREDENTIAL_SECONDARY_GENERATION_ID=orphaned-generation\n",
+            encoding="utf-8",
+        )
+        if os.name != "nt":
+            self.env_file.chmod(0o600)
+        before = self.env_file.read_bytes()
+
+        evidence, exit_code = self.controller.reconcile_no_lkg(
+            force=True,
+            env_file=self.env_file,
+            python_executable=self.python,
+            docker_executable=self.docker,
+            hub_container_name="xframework-bolt-hub",
+            stop_timeout_seconds=10,
+        )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual(
+            "no-active-lease-no-lkg-credential-state-unverified",
+            evidence["reason_code"],
+        )
+        self.assertTrue(evidence["gates"]["hub_stopped"])
+        self.assertEqual(before, self.env_file.read_bytes())
+        self.assertEqual(0, self.runner.count("rotation"))
 
     def test_no_lkg_without_lease_rejects_proxy_mode_drift(self) -> None:
         self.lkg_pointer.unlink()
