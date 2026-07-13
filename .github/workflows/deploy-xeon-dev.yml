@@ -269,6 +269,84 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          local_tls_root="$RUNNER_TEMP/bolt-phase0-local-tls"
+          test -d "$RUNNER_TEMP"
+          test ! -L "$RUNNER_TEMP"
+          test "$(readlink -e -- "$RUNNER_TEMP")" = "$RUNNER_TEMP"
+          test ! -e "$local_tls_root"
+          test ! -L "$local_tls_root"
+          install -d -m 700 "$local_tls_root"
+          python3 - "$local_tls_root" <<'PY'
+          import os
+          import stat
+          import sys
+
+          root = sys.argv[1]
+          names = (
+              "bolt-hub-ca.crt",
+              "bolt-hub-fullchain.pem",
+              "bolt-hub-private-key.pem",
+              "identityserver-ca.crt",
+              "identityserver-fullchain.pem",
+              "identityserver-private-key.pem",
+          )
+          directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+          directory = os.open(root, directory_flags)
+          try:
+              parent = os.fstat(directory)
+              if (
+                  not stat.S_ISDIR(parent.st_mode)
+                  or parent.st_uid != os.geteuid()
+                  or parent.st_gid != os.getegid()
+                  or stat.S_IMODE(parent.st_mode) != 0o700
+              ):
+                  raise SystemExit("local TLS fixture directory metadata is invalid")
+              identities = set()
+              for name in names:
+                  descriptor = os.open(
+                      name,
+                      os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                      0o600,
+                      dir_fd=directory,
+                  )
+                  try:
+                      opened = os.fstat(descriptor)
+                      current = os.stat(name, dir_fd=directory, follow_symlinks=False)
+                      identity = (opened.st_dev, opened.st_ino)
+                      if (
+                          not stat.S_ISREG(opened.st_mode)
+                          or opened.st_nlink != 1
+                          or opened.st_uid != os.geteuid()
+                          or opened.st_gid != os.getegid()
+                          or stat.S_IMODE(opened.st_mode) != 0o600
+                          or opened.st_size != 0
+                          or identity != (current.st_dev, current.st_ino)
+                      ):
+                          raise SystemExit("local TLS fixture metadata is invalid")
+                      identities.add(identity)
+                  finally:
+                      os.close(descriptor)
+              if len(identities) != len(names):
+                  raise SystemExit("local TLS fixtures must have distinct file identities")
+          finally:
+              os.close(directory)
+          PY
+          BOLT_HUB_TLS_CA_PATH="$local_tls_root/bolt-hub-ca.crt"
+          BOLT_HUB_TLS_FULLCHAIN_PATH="$local_tls_root/bolt-hub-fullchain.pem"
+          BOLT_HUB_TLS_PRIVATE_KEY_PATH="$local_tls_root/bolt-hub-private-key.pem"
+          IDENTITYSERVER_TLS_CA_PATH="$local_tls_root/identityserver-ca.crt"
+          IDENTITYSERVER_TLS_FULLCHAIN_PATH="$local_tls_root/identityserver-fullchain.pem"
+          IDENTITYSERVER_TLS_PRIVATE_KEY_PATH="$local_tls_root/identityserver-private-key.pem"
+          export BOLT_HUB_TLS_CA_PATH BOLT_HUB_TLS_FULLCHAIN_PATH BOLT_HUB_TLS_PRIVATE_KEY_PATH
+          export IDENTITYSERVER_TLS_CA_PATH IDENTITYSERVER_TLS_FULLCHAIN_PATH IDENTITYSERVER_TLS_PRIVATE_KEY_PATH
+          {
+            printf 'BOLT_HUB_TLS_CA_PATH=%s\n' "$BOLT_HUB_TLS_CA_PATH"
+            printf 'BOLT_HUB_TLS_FULLCHAIN_PATH=%s\n' "$BOLT_HUB_TLS_FULLCHAIN_PATH"
+            printf 'BOLT_HUB_TLS_PRIVATE_KEY_PATH=%s\n' "$BOLT_HUB_TLS_PRIVATE_KEY_PATH"
+            printf 'IDENTITYSERVER_TLS_CA_PATH=%s\n' "$IDENTITYSERVER_TLS_CA_PATH"
+            printf 'IDENTITYSERVER_TLS_FULLCHAIN_PATH=%s\n' "$IDENTITYSERVER_TLS_FULLCHAIN_PATH"
+            printf 'IDENTITYSERVER_TLS_PRIVATE_KEY_PATH=%s\n' "$IDENTITYSERVER_TLS_PRIVATE_KEY_PATH"
+          } >> "$GITHUB_ENV"
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
           mkdir -p "$evidence_dir"
           rm -f "$evidence_dir"/*.json

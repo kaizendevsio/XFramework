@@ -957,6 +957,37 @@ class WatchdogContractTests(unittest.TestCase):
             self.assertIn(required, setup)
         self.assertNotIn('test -r "$DEPLOY_SSH_KEY"', setup)
 
+    def test_active_workflow_uses_run_scoped_distinct_local_tls_fixtures(self) -> None:
+        content = WORKFLOW.read_text(encoding="utf-8")
+        setup = content[
+            content.index("- name: Validate Phase 0 Compose semantics") :
+            content.index("- name: Validate protected deployment inputs without mutation")
+        ]
+        for required in (
+            'local_tls_root="$RUNNER_TEMP/bolt-phase0-local-tls"',
+            'test ! -e "$local_tls_root"',
+            'test ! -L "$local_tls_root"',
+            'install -d -m 700 "$local_tls_root"',
+            "os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC",
+            'stat.S_IMODE(opened.st_mode) != 0o600',
+            'opened.st_nlink != 1',
+            'opened.st_size != 0',
+            'if len(identities) != len(names):',
+            'export BOLT_HUB_TLS_CA_PATH BOLT_HUB_TLS_FULLCHAIN_PATH BOLT_HUB_TLS_PRIVATE_KEY_PATH',
+            'export IDENTITYSERVER_TLS_CA_PATH IDENTITYSERVER_TLS_FULLCHAIN_PATH IDENTITYSERVER_TLS_PRIVATE_KEY_PATH',
+            '} >> "$GITHUB_ENV"',
+        ):
+            self.assertIn(required, setup)
+        for name in (
+            "bolt-hub-ca.crt",
+            "bolt-hub-fullchain.pem",
+            "bolt-hub-private-key.pem",
+            "identityserver-ca.crt",
+            "identityserver-fullchain.pem",
+            "identityserver-private-key.pem",
+        ):
+            self.assertEqual(2, setup.count(name))
+
     def test_active_workflow_uses_checked_in_pinned_known_hosts_and_exact_ssh_config(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
         pinned_lines = [
