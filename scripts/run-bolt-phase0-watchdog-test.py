@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import ast
 import re
 import hashlib
 import json
@@ -29,6 +30,7 @@ SCRIPT = ROOT / "scripts" / "run-bolt-phase0-watchdog.sh"
 SERVICE = ROOT / "deploy" / "systemd" / "xframework-bolt-phase0-watchdog.service"
 TIMER = ROOT / "deploy" / "systemd" / "xframework-bolt-phase0-watchdog.timer"
 WORKFLOW = ROOT / ".github" / "workflows" / "deploy-xeon-dev.yml"
+PHASE0_CI_WORKFLOW = ROOT / ".github" / "workflows" / "bolt-phase0-ci.yml"
 LEGACY_WORKFLOW = ROOT / ".github" / "workflows" / "deploy-xeon-dev-service.yml"
 PINNED_KNOWN_HOSTS = ROOT / ".github" / "known_hosts" / "xeon-dev"
 ROOT_HELPER = ROOT / "scripts" / "manage-bolt-phase0-root.py"
@@ -256,6 +258,183 @@ class WatchdogContractTests(unittest.TestCase):
         self.assertIn("Persistent=true", content)
         self.assertIn("Unit=xframework-bolt-phase0-watchdog.service", content)
 
+    def test_sudoers_delegates_only_the_fixed_root_helper_boundary(self) -> None:
+        bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+        helper_source = ROOT_HELPER.read_text(encoding="utf-8")
+        expected_alias = (
+            "Cmnd_Alias XFRAMEWORK_BOLT_PHASE0_ROOT = "
+            "/usr/local/sbin/xframework-bolt-phase0-root verify-bootstrap, "
+            "/usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog, "
+            "/usr/local/sbin/xframework-bolt-phase0-root prepare-run, "
+            "/usr/local/sbin/xframework-bolt-phase0-root activate"
+        )
+
+        aliases = [
+            line
+            for line in bootstrap.splitlines()
+            if line.startswith("Cmnd_Alias XFRAMEWORK_BOLT_PHASE0_ROOT = ")
+        ]
+        self.assertEqual([expected_alias], aliases)
+        authorizations = [
+            line
+            for line in bootstrap.splitlines()
+            if line.startswith("github-runner ALL=(root) NOPASSWD:")
+        ]
+        self.assertEqual(
+            ["github-runner ALL=(root) NOPASSWD: XFRAMEWORK_BOLT_PHASE0_ROOT"],
+            authorizations,
+        )
+        self.assertNotIn("prepare-run *", bootstrap)
+        self.assertNotIn("activate *", bootstrap)
+
+        parser_commands = {
+            node.args[0].value
+            for node in ast.walk(ast.parse(helper_source))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "add_parser"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        }
+        self.assertEqual(
+            parser_commands,
+            {"verify-bootstrap", "ensure-watchdog", "prepare-run", "activate"},
+        )
+
+    @unittest.skipUnless(
+        os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() == 0,
+        "requires a disposable Linux root sudo policy",
+    )
+    def test_sudo_policy_preserves_stdin_and_denies_extra_arguments(self) -> None:
+        assert pwd is not None
+        bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+        sudo = Path(os.environ.get("BOLT_PHASE0_SUDO_BINARY", shutil.which("sudo") or ""))
+        visudo = Path(
+            os.environ.get("BOLT_PHASE0_VISUDO_BINARY", shutil.which("visudo") or "")
+        )
+        runuser = Path(shutil.which("runuser") or "")
+        for executable in (sudo, visudo, runuser):
+            self.assertTrue(executable.is_file(), executable)
+
+        test_user = "nobody"
+        pwd.getpwnam(test_user)
+        helper_root = Path(
+            tempfile.mkdtemp(prefix="xframework-bolt-phase0-policy-", dir="/opt")
+        )
+        policy_name = (
+            f"xframework_bolt_phase0_policy_test_{os.getpid()}_"
+            f"{helper_root.name.rsplit('-', 1)[-1]}"
+        )
+        policy_path = Path("/etc/sudoers.d") / policy_name
+        helper = helper_root / "root-helper"
+        policy_created = False
+        try:
+            os.chmod(helper_root, 0o755)
+            helper.write_text(
+                "#!/bin/sh\nset -eu\ntest ! -t 0\ncat\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            os.chown(helper, 0, 0)
+            os.chmod(helper, 0o555)
+
+            alias_line = next(
+                line
+                for line in bootstrap.splitlines()
+                if line.startswith("Cmnd_Alias XFRAMEWORK_BOLT_PHASE0_ROOT = ")
+            )
+            authorization_line = next(
+                line
+                for line in bootstrap.splitlines()
+                if line.startswith("github-runner ALL=(root) NOPASSWD:")
+            )
+            test_alias = f"XFRAMEWORK_BOLT_PHASE0_POLICY_TEST_{os.getpid()}"
+            policy = (
+                alias_line.replace("XFRAMEWORK_BOLT_PHASE0_ROOT", test_alias)
+                .replace("/usr/local/sbin/xframework-bolt-phase0-root", str(helper))
+                + "\n"
+                + authorization_line.replace("github-runner", test_user).replace(
+                    "XFRAMEWORK_BOLT_PHASE0_ROOT", test_alias
+                )
+                + "\n"
+            ).encode("utf-8")
+            descriptor = os.open(
+                policy_path,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                0o440,
+            )
+            policy_created = True
+            try:
+                view = memoryview(policy)
+                while view:
+                    written = os.write(descriptor, view)
+                    self.assertGreater(written, 0)
+                    view = view[written:]
+                os.fchown(descriptor, 0, 0)
+                os.fchmod(descriptor, 0o440)
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+            subprocess.run(
+                [str(visudo), "-cf", str(policy_path)],
+                check=True,
+                capture_output=True,
+                timeout=10,
+            )
+
+            base = [str(runuser), "-u", test_user, "--", str(sudo), "-n", str(helper)]
+            for command, payload in (
+                ("verify-bootstrap", b""),
+                ("ensure-watchdog", b""),
+                ("prepare-run", b'{"run_attempt":"1","run_id":"1"}\n'),
+                ("activate", b'{"expected_commit":"a","project_name":"x"}\n'),
+            ):
+                result = subprocess.run(
+                    [*base, command],
+                    input=payload,
+                    capture_output=True,
+                    timeout=10,
+                )
+                self.assertEqual(0, result.returncode, result.stderr.decode(errors="replace"))
+                self.assertEqual(payload, result.stdout)
+            for arguments in (
+                (),
+                ("prepare-run", "unexpected"),
+                ("activate", "unexpected"),
+                ("future-command",),
+            ):
+                result = subprocess.run(
+                    [*base, *arguments],
+                    input=b"",
+                    capture_output=True,
+                    timeout=10,
+                )
+                self.assertNotEqual(0, result.returncode, arguments)
+                self.assertEqual(b"", result.stdout)
+        finally:
+            if policy_created:
+                policy_path.unlink()
+            shutil.rmtree(helper_root)
+
+    def test_ci_pins_sudo_rs_compatibility_execution(self) -> None:
+        workflow = PHASE0_CI_WORKFLOW.read_text(encoding="utf-8")
+        for required in (
+            "Exercise root-helper policy under pinned sudo-rs 0.2.8",
+            '"Sudo version "*)',
+            "sudo-0.2.8.tar.gz",
+            "71633a32d1b6d12428e95112920570a87bf6bbd2a005d81e9bd87371aa23e2d5",
+            'test "$($sudo_root/bin/sudo --version 2>&1 | sed -n \'1p\')" = "sudo-rs 0.2.8"',
+            'BOLT_PHASE0_SUDO_BINARY="$sudo_root/bin/sudo"',
+            'BOLT_PHASE0_VISUDO_BINARY="$sudo_root/bin/visudo"',
+            "WatchdogContractTests.test_sudo_policy_preserves_stdin_and_denies_extra_arguments",
+        ):
+            self.assertIn(required, workflow)
+
     def test_bootstrap_installs_and_root_helper_checks_effective_systemd_units(self) -> None:
         bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
         content = ROOT_HELPER.read_text(encoding="utf-8")
@@ -295,7 +474,6 @@ class WatchdogContractTests(unittest.TestCase):
             "os.replace(temporary, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)",
             "docker info --format '{{.ServerVersion}}'",
             "docker container ls -a --no-trunc --filter 'name=^/xframework-bolt-hub$' --format '{{.Names}}'",
-            "xframework-bolt-phase0-root ensure-watchdog",
             'install -d -o root -g "$deployment_group" -m 1770 "$protected_root"',
             'parent_fd = os.open(root, directory_flags)',
             'env_fd = os.open("xeon-dev.env", flags, dir_fd=parent_fd)',
@@ -1023,7 +1201,9 @@ class WatchdogContractTests(unittest.TestCase):
 
     def test_rotation_bootstrap_mutation_occurs_only_after_prepare_and_lease_arm(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        prepare_run = workflow.index("prepare-run '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT'")
+        prepare_run = workflow.index(
+            '"$DEPLOY_HOST" "sudo -n \'$REMOTE_ROOT_HELPER\' prepare-run"'
+        )
         validation = workflow.index("- name: Validate credential bootstrap inputs without mutation")
         arm = workflow.index("- name: Arm external deployment watchdog")
         bootstrap = workflow.index("- name: Bootstrap current credential generation under lease")
@@ -1048,6 +1228,43 @@ class WatchdogContractTests(unittest.TestCase):
         ):
             self.assertIn(required, block)
 
+    def test_dynamic_root_requests_use_canonical_stdin_not_sudo_arguments(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        helper = ROOT_HELPER.read_text(encoding="utf-8")
+
+        self.assertNotIn("prepare-run '$GITHUB_RUN_ID'", workflow)
+        self.assertNotIn("activate '$GITHUB_RUN_ID'", workflow)
+        self.assertIn(
+            '"$DEPLOY_HOST" "sudo -n \'$REMOTE_ROOT_HELPER\' prepare-run"',
+            workflow,
+        )
+        self.assertIn(
+            '"$DEPLOY_HOST" "sudo -n \'$REMOTE_ROOT_HELPER\' activate" '
+            '> "$local_temporary"',
+            workflow,
+        )
+        for required in (
+            'local_temporary="$(mktemp "$RUNNER_TEMP/bolt-phase0-root-activation.XXXXXXXX")"',
+            '"$(id -u):600:1:regular file"',
+            'test ! -L "$local_evidence"',
+            'test -s "$local_temporary"',
+            'mv -- "$local_temporary" "$local_evidence"',
+            'case "$local_temporary" in',
+        ):
+            self.assertIn(required, workflow)
+        self.assertNotIn("root-activation-evidence.json.tmp", workflow)
+        self.assertGreaterEqual(workflow.count("printf '%s\\n' \"$request\" | ssh"), 2)
+        for required in (
+            "ROOT_REQUEST_MAX_BYTES = 2048",
+            "ROOT_REQUEST_TIMEOUT_SECONDS = 5.0",
+            "raw.count(b\"\\n\") != 1",
+            "object_pairs_hook=exact_object",
+            'separators=(",", ":")',
+            "sort_keys=True",
+            'request = read_root_request({"run_id", "run_attempt"})',
+        ):
+            self.assertIn(required, helper)
+
     def test_dropins_and_redirecting_exec_hooks_are_explicitly_rejected(self) -> None:
         content = ROOT_HELPER.read_text(encoding="utf-8")
         self.assertIn('(service, "DropInPaths"): ""', content)
@@ -1058,7 +1275,7 @@ class WatchdogContractTests(unittest.TestCase):
     def test_workflow_sudo_is_limited_to_fixed_root_helper_and_failure_ssh_is_pinned(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
         sudo_lines = [line.strip() for line in content.splitlines() if "sudo -n" in line]
-        self.assertEqual(4, len(sudo_lines))
+        self.assertEqual(5, len(sudo_lines))
         self.assertTrue(
             all(
                 "$REMOTE_ROOT_HELPER" in line

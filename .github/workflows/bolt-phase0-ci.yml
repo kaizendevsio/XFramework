@@ -534,3 +534,58 @@ jobs:
             echo "::endgroup::"
           done
           exit "$failed"
+
+      - name: Exercise root-helper policy under pinned sudo-rs 0.2.8
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(sudo --version | sed -n '1p')" in
+            "Sudo version "*) ;;
+            *) echo "ubuntu-latest no longer provides traditional sudo" >&2; exit 1 ;;
+          esac
+          archive="$RUNNER_TEMP/sudo-rs-0.2.8.tar.gz"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$archive" \
+            https://github.com/trifectatechfoundation/sudo-rs/releases/download/v0.2.8/sudo-0.2.8.tar.gz
+          printf '%s  %s\n' \
+            '71633a32d1b6d12428e95112920570a87bf6bbd2a005d81e9bd87371aa23e2d5' \
+            "$archive" | sha256sum --check --strict
+
+          sudo_root=""
+          cleanup_sudo_root() {
+            status=$?
+            trap - EXIT
+            if [ -n "$sudo_root" ]; then
+              case "$sudo_root" in
+                /opt/bolt-phase0-sudo-rs.*)
+                  metadata="$(sudo --non-interactive stat -c '%u:%a:%F' -- "$sudo_root" 2>/dev/null || true)"
+                  if [ "$metadata" = "0:755:directory" ]; then
+                    sudo --non-interactive rm -rf -- "$sudo_root" || status=1
+                  else
+                    echo "refusing to clean an insecure sudo-rs test directory" >&2
+                    status=1
+                  fi
+                  ;;
+                *)
+                  echo "refusing to clean an unexpected sudo-rs test path" >&2
+                  status=1
+                  ;;
+              esac
+            fi
+            exit "$status"
+          }
+          trap cleanup_sudo_root EXIT
+          sudo_root="$(sudo --non-interactive mktemp -d /opt/bolt-phase0-sudo-rs.XXXXXXXX)"
+          sudo --non-interactive chmod 0755 "$sudo_root"
+          sudo --non-interactive tar --extract --gzip --file "$archive" --directory "$sudo_root"
+          test "$(sudo --non-interactive stat -c '%U:%G:%a:%F' -- "$sudo_root/bin/sudo")" = \
+            "root:root:6755:regular file"
+          test "$(sudo --non-interactive stat -c '%U:%G:%a:%F' -- "$sudo_root/bin/visudo")" = \
+            "root:root:755:regular file"
+          test "$($sudo_root/bin/sudo --version 2>&1 | sed -n '1p')" = "sudo-rs 0.2.8"
+          sudo --non-interactive env \
+            BOLT_PHASE0_SUDO_BINARY="$sudo_root/bin/sudo" \
+            BOLT_PHASE0_VISUDO_BINARY="$sudo_root/bin/visudo" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            python3 scripts/run-bolt-phase0-watchdog-test.py \
+              WatchdogContractTests.test_sudo_policy_preserves_stdin_and_denies_extra_arguments

@@ -576,7 +576,24 @@ jobs:
         run: |
           set -euo pipefail
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "sudo -n '$REMOTE_ROOT_HELPER' verify-bootstrap && sudo -n '$REMOTE_ROOT_HELPER' prepare-run '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT'"
+            "sudo -n '$REMOTE_ROOT_HELPER' verify-bootstrap"
+          request="$(
+            python3 - "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
+          import json
+          import sys
+
+          print(
+              json.dumps(
+                  {"run_attempt": sys.argv[2], "run_id": sys.argv[1]},
+                  ensure_ascii=True,
+                  separators=(",", ":"),
+                  sort_keys=True,
+              )
+          )
+          PY
+          )"
+          printf '%s\n' "$request" | ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST" "sudo -n '$REMOTE_ROOT_HELPER' prepare-run"
 
       - name: Install reviewed Phase 0 synthetic hooks
         shell: bash
@@ -2411,11 +2428,63 @@ jobs:
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
-          remote_evidence="$REMOTE_DEPLOY_DIR/phase0-watchdog/root-activation-evidence.json"
-          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
-            "sudo -n '$REMOTE_ROOT_HELPER' activate '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT' '$IMAGE_TAG' '$COMPOSE_PROJECT_NAME' > '$remote_evidence.tmp' && mv '$remote_evidence.tmp' '$remote_evidence'"
-          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
-            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/root-activation-evidence.json"
+          local_evidence="$evidence_dir/root-activation-evidence.json"
+          local_temporary=""
+          cleanup_activation_temporary() {
+            status=$?
+            trap - EXIT
+            if [ -n "$local_temporary" ]; then
+              case "$local_temporary" in
+                "$RUNNER_TEMP"/bolt-phase0-root-activation.*)
+                  metadata="$(stat -c '%u:%a:%h:%F' -- "$local_temporary" 2>/dev/null || true)"
+                  if [ "$metadata" = "$(id -u):600:1:regular file" ]; then
+                    rm -f -- "$local_temporary" || status=1
+                  else
+                    echo "refusing to clean an insecure activation evidence file" >&2
+                    status=1
+                  fi
+                  ;;
+                *)
+                  echo "refusing to clean an unexpected activation evidence path" >&2
+                  status=1
+                  ;;
+              esac
+            fi
+            exit "$status"
+          }
+          trap cleanup_activation_temporary EXIT
+          test ! -e "$local_evidence"
+          test ! -L "$local_evidence"
+          umask 077
+          local_temporary="$(mktemp "$RUNNER_TEMP/bolt-phase0-root-activation.XXXXXXXX")"
+          test "$(stat -c '%u:%a:%h:%F' -- "$local_temporary")" = \
+            "$(id -u):600:1:regular file"
+          request="$(
+            python3 - "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$IMAGE_TAG" "$COMPOSE_PROJECT_NAME" <<'PY'
+          import json
+          import sys
+
+          print(
+              json.dumps(
+                  {
+                      "expected_commit": sys.argv[3],
+                      "project_name": sys.argv[4],
+                      "run_attempt": sys.argv[2],
+                      "run_id": sys.argv[1],
+                  },
+                  ensure_ascii=True,
+                  separators=(",", ":"),
+                  sort_keys=True,
+              )
+          )
+          PY
+          )"
+          printf '%s\n' "$request" | ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST" "sudo -n '$REMOTE_ROOT_HELPER' activate" > "$local_temporary"
+          test -s "$local_temporary"
+          mv -- "$local_temporary" "$local_evidence"
+          local_temporary=""
+          trap - EXIT
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$REMOTE_RUN_DIR/qualification-evidence.json" "$evidence_dir/qualification-evidence.json"
 

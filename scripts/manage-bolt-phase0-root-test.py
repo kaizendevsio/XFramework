@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import select
@@ -868,10 +869,119 @@ class RootBoundaryTests(unittest.TestCase):
             MODULE.resolve_system_python(link, require_root=False)
 
     def test_cli_has_only_fixed_root_boundary_commands(self) -> None:
-        self.assertEqual("verify-bootstrap", MODULE.parse_args(["verify-bootstrap"]).command)
-        self.assertEqual("ensure-watchdog", MODULE.parse_args(["ensure-watchdog"]).command)
+        for command in ("verify-bootstrap", "ensure-watchdog", "prepare-run", "activate"):
+            self.assertEqual(command, MODULE.parse_args([command]).command)
         with self.assertRaises(SystemExit):
-            MODULE.parse_args(["activate", "123", "1", "a" * 40, "xframework", "extra"])
+            MODULE.parse_args(["prepare-run", "123", "1"])
+        with self.assertRaises(SystemExit):
+            MODULE.parse_args(["activate", "123", "1", "a" * 40, "xframework"])
+        with self.assertRaises(SystemExit):
+            MODULE.parse_args(["future-command"])
+
+    def test_root_request_requires_exact_canonical_schema(self) -> None:
+        prepare = {"run_attempt": "1", "run_id": "29244847846"}
+        raw = json.dumps(
+            prepare,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("ascii") + b"\n"
+        self.assertEqual(
+            prepare,
+            MODULE.decode_root_request(raw, {"run_id", "run_attempt"}),
+        )
+
+        invalid = (
+            b"",
+            raw[:-1],
+            raw + b"\n",
+            raw.replace(b"\n", b"\r\n"),
+            b'{"run_attempt":"1","run_id":"1"} \n',
+            b'{"run_attempt":"1","run_id":"1","run_id":"2"}\n',
+            b'{"run_attempt":1,"run_id":"1"}\n',
+            b'{"run_attempt":"1"}\n',
+            b'{"extra":"x","run_attempt":"1","run_id":"1"}\n',
+            b'{"run_attempt":NaN,"run_id":"1"}\n',
+            b"\xff\n",
+            b"x" * (MODULE.ROOT_REQUEST_MAX_BYTES + 1),
+        )
+        for candidate in invalid:
+            with self.subTest(candidate=candidate[:80]):
+                with self.assertRaisesRegex(MODULE.RootBoundaryError, "invalid-root-request"):
+                    MODULE.decode_root_request(candidate, {"run_id", "run_attempt"})
+
+    def test_invalid_privileged_request_stops_hub_fail_closed(self) -> None:
+        boundary = mock.Mock()
+        with (
+            mock.patch.object(MODULE, "RootBoundary", return_value=boundary),
+            mock.patch.object(
+                MODULE,
+                "read_root_request",
+                side_effect=MODULE.RootBoundaryError("invalid-root-request"),
+            ),
+            mock.patch("builtins.print"),
+        ):
+            self.assertEqual(1, MODULE.main(["activate"]))
+        boundary.stop_hub.assert_called_once_with()
+
+    @unittest.skipIf(os.name == "nt", "select does not support Windows pipe descriptors")
+    def test_root_request_reader_accepts_exact_pipe_and_rejects_oversize(self) -> None:
+        fields = {"run_id", "run_attempt"}
+        raw = b'{"run_attempt":"1","run_id":"29244847846"}\n'
+        for payload, expected_error in (
+            (raw, None),
+            (b"x" * (MODULE.ROOT_REQUEST_MAX_BYTES + 1), "root-request-too-large"),
+        ):
+            read_descriptor, write_descriptor = os.pipe()
+            try:
+                os.write(write_descriptor, payload)
+                os.close(write_descriptor)
+                write_descriptor = -1
+                binary = os.fdopen(read_descriptor, "rb", buffering=0)
+                read_descriptor = -1
+                stream = io.TextIOWrapper(binary, encoding="utf-8")
+                try:
+                    with mock.patch.object(MODULE.sys, "stdin", stream):
+                        if expected_error is None:
+                            self.assertEqual(
+                                {"run_attempt": "1", "run_id": "29244847846"},
+                                MODULE.read_root_request(fields),
+                            )
+                        else:
+                            with self.assertRaisesRegex(
+                                MODULE.RootBoundaryError, expected_error
+                            ):
+                                MODULE.read_root_request(fields)
+                finally:
+                    stream.close()
+            finally:
+                if read_descriptor >= 0:
+                    os.close(read_descriptor)
+                if write_descriptor >= 0:
+                    os.close(write_descriptor)
+
+    @unittest.skipIf(os.name == "nt", "select does not support Windows pipe descriptors")
+    def test_root_request_reader_has_a_hard_deadline(self) -> None:
+        read_descriptor, write_descriptor = os.pipe()
+        try:
+            binary = os.fdopen(read_descriptor, "rb", buffering=0)
+            read_descriptor = -1
+            stream = io.TextIOWrapper(binary, encoding="utf-8")
+            try:
+                with (
+                    mock.patch.object(MODULE.sys, "stdin", stream),
+                    mock.patch.object(MODULE, "ROOT_REQUEST_TIMEOUT_SECONDS", 0.01),
+                ):
+                    with self.assertRaisesRegex(
+                        MODULE.RootBoundaryError, "root-request-timeout"
+                    ):
+                        MODULE.read_root_request({"run_id", "run_attempt"})
+            finally:
+                stream.close()
+        finally:
+            if read_descriptor >= 0:
+                os.close(read_descriptor)
+            os.close(write_descriptor)
 
 
 if __name__ == "__main__":
