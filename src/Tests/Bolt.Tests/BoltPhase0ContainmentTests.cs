@@ -719,12 +719,13 @@ public sealed class BoltPhase0ContainmentTests
     public async Task DurableDisconnectCleanup_GateTimeoutDoesNotMutateWithoutOwnership()
     {
         var authorizer = new CountingAllowAuthorizer();
+        var cleanupLogger = new DurableCleanupTimeoutLogger();
         var durableOptions = Options.Create(new DurableQueueOptions());
         var durableStore = new InMemoryDurableQueueStore(
             durableOptions,
             NullLogger<InMemoryDurableQueueStore>.Instance);
         using var server = new BoltServer(
-            NullLogger<BoltServer>.Instance,
+            cleanupLogger,
             new BoltServerOptions
             {
                 MaxSubscriptionsPerPrincipal = 1,
@@ -752,6 +753,7 @@ public sealed class BoltPhase0ContainmentTests
         try
         {
             connection.Complete();
+            await cleanupLogger.WaitForTimeoutAsync(TimeSpan.FromSeconds(10));
             await connectionTask.WaitAsync(TimeSpan.FromSeconds(3));
 
             GetDurableBinding(server, topicHash, subscriberId).ClientId.Should().Be("cleanup-owner");
@@ -1012,6 +1014,35 @@ public sealed class BoltPhase0ContainmentTests
 
             Volatile.Read(ref _callCount).Should().BeGreaterThanOrEqualTo(expected);
         }
+    }
+
+    private sealed class DurableCleanupTimeoutLogger : ILogger<BoltServer>
+    {
+        private const string CleanupTimeoutMessage =
+            "Durable subscription cleanup gate timed out; cleanup will retry.";
+
+        private readonly TaskCompletionSource _timeoutLogged =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning &&
+                formatter(state, exception).StartsWith(CleanupTimeoutMessage, StringComparison.Ordinal))
+            {
+                _timeoutLogged.TrySetResult();
+            }
+        }
+
+        public Task WaitForTimeoutAsync(TimeSpan timeout) => _timeoutLogged.Task.WaitAsync(timeout);
     }
 
     private sealed class ControlledReplayDurableStore(IOptions<DurableQueueOptions> options) : IDurableQueueStore
