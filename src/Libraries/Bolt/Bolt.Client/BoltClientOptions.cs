@@ -9,6 +9,13 @@ namespace Bolt.Client;
 /// </summary>
 public class BoltClientOptions
 {
+    internal BoltClientOptions Clone()
+    {
+        var clone = (BoltClientOptions)MemberwiseClone();
+        clone.PreferredTransports = [.. PreferredTransports];
+        return clone;
+    }
+
     /// <summary>
     /// Preferred transport order. The negotiator tries each in sequence, using the first
     /// that succeeds. Transports unavailable on the current platform are auto-skipped.

@@ -39,14 +39,13 @@ public sealed class BoltAccessTokenRedactionMiddleware(RequestDelegate next)
         }
     }
 
-    internal static string? TakeAccessToken(HttpContext context)
+    public static string? GetAccessToken(HttpContext context)
     {
         if (!context.Items.TryGetValue(AccessTokenItemKey, out var value))
         {
             return null;
         }
 
-        context.Items.Remove(AccessTokenItemKey);
         return value as string;
     }
 

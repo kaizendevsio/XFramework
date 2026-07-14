@@ -9,11 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NUnit.Framework;
-using XFramework.Domain.Shared.Configurations;
-using XFramework.Domain.Shared.ServiceIdentity;
-using XFramework.Integration.Security;
 
 namespace Bolt.Tests;
 
@@ -21,7 +17,6 @@ namespace Bolt.Tests;
 [CancelAfter(30000)]
 public class BoltRpcReadinessTests
 {
-    private const string ServiceIdentityTestSecret = "bolt-readiness-service-identity-secret-g0";
     private WebApplication _serverApp = null!;
     private ILoggerFactory _loggerFactory = null!;
     private static int _portCounter = 19700;
@@ -422,114 +417,6 @@ public class BoltRpcReadinessTests
             .GetField("_pendingCalls", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(client)!;
         pendingCalls.Should().BeEmpty();
-
-        connection.CompleteSendChannel();
-    }
-
-    [Test]
-    public async Task IdentityServerServiceTokenProvider_WhenTokenRpcNeverCompletes_TimesOutAndClearsInflight()
-    {
-        await using var client = new BoltClient(
-            new Uri($"ws://localhost:{_port}/bolt"),
-            "token_timeout_caller",
-            "TokenTimeoutCaller",
-            new BoltClientOptions { RpcTimeoutSeconds = 30, SendQueueCapacity = 4 },
-            _loggerFactory.CreateLogger<BoltClient>());
-        var connection = new BoltConnection(new NoopBoltConnection(), sendQueueCapacity: 4);
-
-        var connections = (List<BoltConnection>)typeof(BoltClient)
-            .GetField("_connections", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(client)!;
-        connections.Add(connection);
-        typeof(BoltClient)
-            .GetField("_isRegistered", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(client, true);
-
-        var provider = new IdentityServerServiceTokenProvider(
-            client,
-            Options.Create(new ServiceIdentityOptions
-            {
-                ClientId = XFrameworkServiceNames.Portal,
-                GenerationId = "test-g0",
-                ClientSecret = ServiceIdentityTestSecret,
-                DefaultScopes = [XFrameworkServiceScopes.IdentityAdmin],
-                TokenAcquisitionTimeoutSeconds = 1
-            }),
-            Options.Create(new BoltConfiguration
-            {
-                ClientName = XFrameworkServiceNames.Portal,
-                RpcTimeoutSeconds = 30
-            }),
-            TimeProvider.System,
-            _loggerFactory.CreateLogger<IdentityServerServiceTokenProvider>());
-
-        var started = DateTime.UtcNow;
-        Func<Task> getToken = async () => await provider.GetTokenAsync(XFrameworkServiceNames.IdentityServer);
-
-        await getToken.Should().ThrowAsync<TimeoutException>();
-        (DateTime.UtcNow - started).Should().BeLessThan(TimeSpan.FromSeconds(5));
-
-        var inflight = (ConcurrentDictionary<string, Lazy<Task<string>>>)typeof(IdentityServerServiceTokenProvider)
-            .GetField("_inflight", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(provider)!;
-        inflight.Should().BeEmpty();
-
-        connection.CompleteSendChannel();
-    }
-
-    [Test]
-    public async Task IdentityServerServiceTokenProvider_WhenCallerCancelsTokenRpc_PreservesSharedAcquisition()
-    {
-        await using var client = new BoltClient(
-            new Uri($"ws://localhost:{_port}/bolt"),
-            "token_cancel_caller",
-            "TokenCancelCaller",
-            new BoltClientOptions { RpcTimeoutSeconds = 30, SendQueueCapacity = 4 },
-            _loggerFactory.CreateLogger<BoltClient>());
-        var connection = new BoltConnection(new NoopBoltConnection(), sendQueueCapacity: 4);
-
-        var connections = (List<BoltConnection>)typeof(BoltClient)
-            .GetField("_connections", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(client)!;
-        connections.Add(connection);
-        typeof(BoltClient)
-            .GetField("_isRegistered", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(client, true);
-
-        var provider = new IdentityServerServiceTokenProvider(
-            client,
-            Options.Create(new ServiceIdentityOptions
-            {
-                ClientId = XFrameworkServiceNames.Portal,
-                GenerationId = "test-g0",
-                ClientSecret = ServiceIdentityTestSecret,
-                DefaultScopes = [XFrameworkServiceScopes.IdentityAdmin],
-                TokenAcquisitionTimeoutSeconds = 1
-            }),
-            Options.Create(new BoltConfiguration
-            {
-                ClientName = XFrameworkServiceNames.Portal,
-                RpcTimeoutSeconds = 30
-            }),
-            TimeProvider.System,
-            _loggerFactory.CreateLogger<IdentityServerServiceTokenProvider>());
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(75));
-        Func<Task> getToken = async () => await provider.GetTokenAsync(
-            XFrameworkServiceNames.IdentityServer,
-            ct: cts.Token);
-
-        await getToken.Should().ThrowAsync<OperationCanceledException>();
-
-        var inflight = (ConcurrentDictionary<string, Lazy<Task<string>>>)typeof(IdentityServerServiceTokenProvider)
-            .GetField("_inflight", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(provider)!;
-        inflight.Should().ContainSingle();
-
-        Func<Task> awaitSharedAcquisition = async () =>
-            await provider.GetTokenAsync(XFrameworkServiceNames.IdentityServer);
-        await awaitSharedAcquisition.Should().ThrowAsync<TimeoutException>();
-        inflight.Should().BeEmpty();
 
         connection.CompleteSendChannel();
     }

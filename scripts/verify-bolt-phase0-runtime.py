@@ -51,6 +51,8 @@ CONTAINER_FORMAT = (
 IMAGE_FORMAT = '{"local_image_id":{{json .Id}},"repo_digests":{{json .RepoDigests}}}'
 SUBPROCESS_TIMEOUT_SECONDS = 30
 DOCKER_EMBEDDED_DNS_ADDRESS = "127.0.0.11"
+IDENTITY_KEYDATA_VOLUME = "identity-keydata"
+IDENTITY_KEYDATA_DIRECTORY = "/var/lib/xframework/identity"
 
 
 def write_private_json(path: Path, value: Any) -> None:
@@ -269,10 +271,10 @@ def verify_tls_service_listeners(service: str, listeners: list[dict[str, Any]]) 
         }
         for item in listeners
     ]
-    expected_health = {
-        "address": "127.0.0.1",
+    expected_http = {
+        "address": "127.0.0.1" if service == "bolt-hub" else "0.0.0.0",
         "family": "ipv4",
-        "scope": "loopback",
+        "scope": "loopback" if service == "bolt-hub" else "wildcard",
         "port": 8080,
     }
     expected_tls = {
@@ -281,14 +283,17 @@ def verify_tls_service_listeners(service: str, listeners: list[dict[str, Any]]) 
         "scope": "wildcard",
         "port": 8443,
     }
-    health = [item for item in normalized if item["port"] == 8080]
+    http = [item for item in normalized if item["port"] == 8080]
     tls = [item for item in normalized if item["port"] == 8443]
-    if health != [expected_health]:
-        errors.append(f"{service}: actual port 8080 listener is not exactly IPv4 127.0.0.1")
+    if http != [expected_http]:
+        expected_address = expected_http["address"]
+        errors.append(
+            f"{service}: actual port 8080 listener is not exactly IPv4 {expected_address}"
+        )
     if tls != [expected_tls]:
         errors.append(f"{service}: actual port 8443 listener is not exactly IPv4 wildcard TLS")
     if len(normalized) != 2 or any(
-        item not in (expected_health, expected_tls) for item in normalized
+        item not in (expected_http, expected_tls) for item in normalized
     ):
         errors.append(f"{service}: unexpected actual TCP listener topology is present")
     return errors
@@ -386,6 +391,41 @@ def private_key_mounts(container: dict[str, Any], private_key: Path) -> tuple[li
     return evidence, errors
 
 
+def identity_signing_key_mounts(
+    container: dict[str, Any], project_name: str
+) -> list[dict[str, Any]]:
+    evidence: list[dict[str, Any]] = []
+    mounts = container.get("mounts")
+    if not isinstance(mounts, list):
+        return evidence
+    expected_name = f"{project_name}_{IDENTITY_KEYDATA_VOLUME}"
+    for mount in mounts:
+        if not isinstance(mount, dict):
+            continue
+        name = str(mount.get("Name", ""))
+        target = str(mount.get("Destination", ""))
+        if name != expected_name and target != IDENTITY_KEYDATA_DIRECTORY:
+            continue
+        exact = (
+            str(mount.get("Type", "")).lower() == "volume"
+            and name == expected_name
+            and target == IDENTITY_KEYDATA_DIRECTORY
+        )
+        evidence.append(
+            {
+                "resolved_source": (
+                    "<identity-signing-key-volume>"
+                    if exact
+                    else "<unexpected-signing-key-mount>"
+                ),
+                "relation": "persistent-volume" if exact else "invalid",
+                "target": target,
+                "read_only": not bool(mount.get("RW", True)),
+            }
+        )
+    return evidence
+
+
 def collect_service(
     service: str,
     container_id: str,
@@ -440,6 +480,7 @@ def collect_service(
     if identity_private_key is not None:
         identity_mounts, identity_mount_errors = private_key_mounts(container, identity_private_key)
         errors.extend(f"{service}: IdentityServer key {error}" for error in identity_mount_errors)
+    signing_key_mounts = identity_signing_key_mounts(container, project_name)
     if service == "bolt-hub":
         key_mount_ok = (
             len(hub_mounts) == 1
@@ -447,6 +488,7 @@ def collect_service(
             and hub_mounts[0]["target"] == "/run/secrets/bolt-hub-tls-private-key.pem"
             and hub_mounts[0]["read_only"] is True
             and not identity_mounts
+            and not signing_key_mounts
         )
         if not key_mount_ok:
             errors.append("bolt-hub: resolved private-key mount is missing, broad, duplicated, writable, or mis-targeted")
@@ -461,8 +503,20 @@ def collect_service(
         )
         if not key_mount_ok:
             errors.append("identityserver: resolved private-key mount is missing, broad, duplicated, writable, cross-mounted, or mis-targeted")
-    elif hub_mounts or identity_mounts:
-        errors.append(f"{service}: resolved runtime mount exposes a TLS private key")
+        signing_key_mount_ok = signing_key_mounts == [
+            {
+                "resolved_source": "<identity-signing-key-volume>",
+                "relation": "persistent-volume",
+                "target": IDENTITY_KEYDATA_DIRECTORY,
+                "read_only": False,
+            }
+        ]
+        if not signing_key_mount_ok:
+            errors.append(
+                "identityserver: persistent writable signing-key volume is missing, duplicated, read-only, or mis-targeted"
+            )
+    elif hub_mounts or identity_mounts or signing_key_mounts:
+        errors.append(f"{service}: resolved runtime mount exposes private signing material")
 
     listener_evidence: list[dict[str, Any]] = []
     publication_evidence: dict[str, Any] | None = None
@@ -501,7 +555,7 @@ def collect_service(
         "health": health,
         "listeners": listener_evidence,
         "published_port": publication_evidence,
-        "private_key_mounts": [*hub_mounts, *identity_mounts],
+        "private_key_mounts": [*hub_mounts, *identity_mounts, *signing_key_mounts],
     }
     return evidence, errors
 

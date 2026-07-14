@@ -222,13 +222,7 @@ public sealed class ServiceIdentityCredentialGenerationTests
             dataContext.Object,
             configuration,
             parsed,
-            new JwtOptions
-            {
-                GenerationId = "jwt-test-generation",
-                Secret = new string('j', JwtCredentialSet.MinimumHmacSha512SecretBytes),
-                ValidIssuer = "https://identity.test",
-                ValidAudience = "https://bolt.test"
-            },
+            Mock.Of<IBoltTransportTokenSigner>(),
             clock,
             logger ?? NullLogger<ServiceIdentityService>.Instance);
     }

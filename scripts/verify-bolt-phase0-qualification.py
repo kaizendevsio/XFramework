@@ -39,7 +39,7 @@ SYNTHETIC_SCHEMA = "bolt-phase0-synthetic-evidence/v1"
 SYNTHETIC_CORE_SCHEMA = "bolt-phase0-synthetic-report/v1"
 POST_RUN_SCHEMA = "bolt-phase0-post-run-evidence/v1"
 PROBE_SCHEMA = "bolt-phase0-probe-receipt/v1"
-ROLLBACK_DRILL_SCHEMA = "xframework.bolt.phase0.rollback-drill.v1"
+CANDIDATE_RESTART_SCHEMA = "xframework.bolt.phase0.candidate-restart.v1"
 PROXY_MODE_LOGS = "logs"
 PROXY_MODE_DIRECT_KESTREL = "direct-kestrel"
 SYNTHETIC_PROXY_MODES = frozenset({PROXY_MODE_LOGS, PROXY_MODE_DIRECT_KESTREL})
@@ -226,18 +226,18 @@ REQUIRED_OPERATIONS = {
     "durable_offline_publish", "durable_ordered_replay", "durable_ack", "durable_no_redelivery",
     "durable_unregister",
 }
-ROLLBACK_KEYS = {
+CANDIDATE_RESTART_KEYS = {
     "schema", "status", "run_id", "run_attempt", "source_commit", "project_name", "started_at_utc",
-    "completed_at_utc", "credential_generation_id", "manifest_sha256", "override_sha256", "pins_sha256",
+    "completed_at_utc", "credential_generation_id", "lkg_compatibility", "manifest_sha256", "override_sha256", "pins_sha256",
     "runtime_evidence_sha256", "synthetic_evidence_sha256", "checks", "errors",
 }
-ROLLBACK_CHECK_KEYS = {
-    "restore_applied", "full_runtime_verified", "authenticated_finalized_synthetic",
+CANDIDATE_RESTART_CHECK_KEYS = {
+    "candidate_digest_recreate_applied", "full_runtime_verified", "authenticated_finalized_synthetic",
     "current_generation_preserved",
 }
 QUALIFICATION_CHECK_KEYS = {
     "artifact_security", "schema_and_status", "identity_and_digest_binding",
-    "rotation_and_convergence", "canary_observation", "rollback_drill",
+    "rotation_and_convergence", "canary_observation", "candidate_restart",
 }
 
 RUN_ID = re.compile(r"[1-9][0-9]{0,31}")
@@ -1014,17 +1014,9 @@ def validate_runtime_service(
             if listener["family"] not in {"ipv4", "ipv6"}:
                 raise QualificationError("invalid-tls-service-listeners")
             normalized_listeners.append((listener["port"], listener["scope"]))
-        ports = set(normalized_listeners)
-        if (
-            (8080, "loopback") not in ports
-            or (8443, "wildcard") not in ports
-            or any(
-                (port == 8080 and scope != "loopback")
-                or (port == 8443 and scope != "wildcard")
-                or port not in {8080, 8443}
-                for port, scope in normalized_listeners
-            )
-        ):
+        expected_http_scope = "loopback" if service == "bolt-hub" else "wildcard"
+        expected_listeners = {(8080, expected_http_scope), (8443, "wildcard")}
+        if len(normalized_listeners) != 2 or set(normalized_listeners) != expected_listeners:
             raise QualificationError("invalid-tls-service-listeners")
         publication = exact_object(
             item["published_port"], {"container_port", "published_port", "protocol"},
@@ -1042,16 +1034,24 @@ def validate_runtime_service(
             if service == "bolt-hub"
             else "/run/secrets/identityserver-tls-private-key.pem"
         )
-        if (
-            not isinstance(mounts, list)
-            or len(mounts) != 1
-            or mounts[0] != {
+        expected_mounts = [
+            {
                 "resolved_source": "<expected-private-key>",
                 "relation": "exact",
                 "target": expected_target,
                 "read_only": True,
             }
-        ):
+        ]
+        if service == "identityserver":
+            expected_mounts.append(
+                {
+                    "resolved_source": "<identity-signing-key-volume>",
+                    "relation": "persistent-volume",
+                    "target": "/var/lib/xframework/identity",
+                    "read_only": False,
+                }
+            )
+        if not isinstance(mounts, list) or mounts != expected_mounts:
             raise QualificationError("invalid-tls-service-private-key-mount")
     elif item["listeners"] != [] or item["published_port"] is not None or item["private_key_mounts"] != []:
         raise QualificationError("unexpected-runtime-boundary-evidence")
@@ -1475,7 +1475,7 @@ def validate_observation(
     return generated
 
 
-def validate_rollback_drill(
+def validate_candidate_restart(
     document: dict[str, Any],
     run_id: str,
     attempt: int,
@@ -1486,9 +1486,9 @@ def validate_rollback_drill(
     now: dt.datetime,
     maximum_age_seconds: int,
 ) -> tuple[dt.datetime, dt.datetime]:
-    exact_object(document, ROLLBACK_KEYS, "invalid-rollback-drill")
+    exact_object(document, CANDIDATE_RESTART_KEYS, "invalid-rollback-drill")
     if (
-        document["schema"] != ROLLBACK_DRILL_SCHEMA
+        document["schema"] != CANDIDATE_RESTART_SCHEMA
         or document["status"] != "passed"
         or document["errors"] != []
         or document["run_id"] != run_id
@@ -1496,6 +1496,7 @@ def validate_rollback_drill(
         or document["source_commit"] != commit
         or document["project_name"] != project_name
         or document["credential_generation_id"] != target_generation
+        or document["lkg_compatibility"] not in {"rendered", "not_applicable_no_prior_lkg"}
     ):
         raise QualificationError("rollback-drill-binding-mismatch")
     started = fresh_timestamp(document["started_at_utc"], "invalid-rollback-time", now, maximum_age_seconds)
@@ -1511,7 +1512,7 @@ def validate_rollback_drill(
     }
     if any(document[field] != value for field, value in expected_digests.items()):
         raise QualificationError("rollback-drill-digest-mismatch")
-    checks = exact_object(document["checks"], ROLLBACK_CHECK_KEYS, "invalid-rollback-checks")
+    checks = exact_object(document["checks"], CANDIDATE_RESTART_CHECK_KEYS, "invalid-rollback-checks")
     if any(value is not True for value in checks.values()):
         raise QualificationError("rollback-drill-check-failed")
     return started, completed
@@ -1573,7 +1574,7 @@ def qualification_failure(
             "identity_and_digest_binding": False,
             "rotation_and_convergence": False,
             "canary_observation": False,
-            "rollback_drill": False,
+            "candidate_restart": False,
         },
         "errors": [code],
     }
@@ -1783,7 +1784,7 @@ def verify_qualification(
         documents["rollback-runtime-evidence.json"], PHASE0_SERVICES, pins, "complete", now,
         maximum_age_seconds, expected_published_ports,
     )
-    rollback_started, rollback_completed = validate_rollback_drill(
+    rollback_started, rollback_completed = validate_candidate_restart(
         documents["rollback-drill-evidence.json"], expected_run_id, expected_attempt, expected_commit,
         common["target_generation_id"], project_name, digests, now, maximum_age_seconds,
     )
@@ -1820,7 +1821,7 @@ def verify_qualification(
             "identity_and_digest_binding": True,
             "rotation_and_convergence": True,
             "canary_observation": True,
-            "rollback_drill": True,
+            "candidate_restart": True,
         },
         "errors": [],
     }

@@ -107,6 +107,10 @@ class BootstrapTests(RotationFixture):
         ) + "\n"
         self.env_path.write_text(content, encoding="utf-8")
 
+    def test_bolt_signatures_remain_rotation_credentials_for_legacy_rollback(self) -> None:
+        self.assertIn("BOLT_SIGNATURE", MODULE.PRIMARY_SECRET_NAMES)
+        self.assertIn("BOLT_SIGNATURE_SECONDARY", MODULE.SECONDARY_SECRET_NAMES)
+
     def test_validate_bootstrap_is_read_only_when_generation_is_missing(self) -> None:
         self.remove_generation()
         before = self.env_path.read_bytes()

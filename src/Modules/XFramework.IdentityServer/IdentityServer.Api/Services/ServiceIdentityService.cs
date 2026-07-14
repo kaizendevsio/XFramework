@@ -16,7 +16,7 @@ public sealed class ServiceIdentityService(
     IDataContext dataContext,
     IConfiguration configuration,
     ServiceIdentityConfiguration serviceIdentityConfiguration,
-    JwtOptions jwtOptions,
+    IBoltTransportTokenSigner boltTransportTokenSigner,
     TimeProvider timeProvider,
     ILogger<ServiceIdentityService> logger,
     IHttpContextAccessor? httpContextAccessor = null,
@@ -133,34 +133,16 @@ public sealed class ServiceIdentityService(
 
         var issuedAt = DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds()).UtcDateTime;
         var expiresAt = issuedAt.AddSeconds(serviceIdentityConfiguration.BoltTransportTokenLifetimeSeconds);
-        List<Claim> claims =
-        [
-            new("client_id", client.ClientId),
-            new("service", client.ClientId),
-            new(JwtRegisteredClaimNames.Sub, client.ClientId),
-            new("scope", XFrameworkServiceScopes.BoltService),
-            new(JwtCredentialSet.GenerationClaim, jwtOptions.GenerationId.Trim()),
-            new("client_credential_generation", clientCredentialGenerationId!),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(issuedAt).ToString(), ClaimValueTypes.Integer64)
-        ];
-
-        var token = new JwtSecurityToken(
-            issuer: jwtOptions.ValidIssuer,
-            audience: jwtOptions.ValidAudience,
-            claims: claims,
-            notBefore: issuedAt,
-            expires: expiresAt,
-            signingCredentials: new SigningCredentials(
-                JwtCredentialSet.CreateCurrentSigningKey(jwtOptions),
-                SecurityAlgorithms.HmacSha512));
-
-        var accessToken = TokenHandler.WriteToken(token);
+        var accessToken = boltTransportTokenSigner.Sign(
+            client.ClientId,
+            clientCredentialGenerationId!,
+            new DateTimeOffset(issuedAt, TimeSpan.Zero),
+            new DateTimeOffset(expiresAt, TimeSpan.Zero));
         logger.LogDebug(
-            "Issued Bolt transport token. ClientId={ClientId} ClientCredentialGenerationId={ClientCredentialGenerationId} SigningGenerationId={SigningGenerationId} LifetimeSeconds={LifetimeSeconds}",
+            "Issued Bolt transport token. ClientId={ClientId} ClientCredentialGenerationId={ClientCredentialGenerationId} KeyId={KeyId} LifetimeSeconds={LifetimeSeconds}",
             client.ClientId,
             clientCredentialGenerationId,
-            jwtOptions.GenerationId.Trim(),
+            boltTransportTokenSigner.KeyId,
             serviceIdentityConfiguration.BoltTransportTokenLifetimeSeconds);
 
         return Task.FromResult(Result<ServiceTokenResponse>.Success(new ServiceTokenResponse

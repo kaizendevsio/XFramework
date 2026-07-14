@@ -89,6 +89,12 @@ def write_private_json(path: Path, value: Any) -> None:
             os.close(descriptor)
         temporary.unlink(missing_ok=True)
 INACTIVE_SERVICES = ("bolt-phase0-synthetics",)
+CENTRAL_IDENTITY_SERVICES = ("bolt-hub", *CLIENT_SERVICES)
+IDENTITY_DEPENDENT_SERVICES = (
+    "bolt-hub",
+    *(service for service in CLIENT_SERVICES if service != "identityserver"),
+    *INACTIVE_SERVICES,
+)
 SECURE_URL = "wss://bolt-hub:8443/bolt/ws"
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -113,6 +119,22 @@ IDENTITY_CA_SECRET = "identityserver-ca"
 IDENTITY_FULLCHAIN_SECRET = "identityserver-tls-fullchain"
 IDENTITY_PRIVATE_KEY_SECRET = "identityserver-tls-private-key"
 IDENTITY_TOKEN_PATH = "/api/service-identity/bolt-transport-token"
+IDENTITY_KEYDATA_VOLUME = "identity-keydata"
+IDENTITY_KEYDATA_DIRECTORY = "/var/lib/xframework/identity"
+IDENTITY_SIGNING_KEY_PATH = f"{IDENTITY_KEYDATA_DIRECTORY}/bolt-transport-signing-key.pem"
+COMMON_CENTRAL_IDENTITY_ENV = {
+    "BoltConfiguration__GenerateServiceAccessToken": "false",
+    "ServiceIdentity__Authority": "http://identityserver:8080",
+    "ServiceIdentity__AllowInsecureHttp": "true",
+}
+HUB_TRANSPORT_AUTHENTICATION_ENV = {
+    "BoltTransportAuthentication__MetadataAddress": (
+        "http://identityserver:8080/.well-known/openid-configuration"
+    ),
+    "BoltTransportAuthentication__Issuer": "XFramework.IdentityServer",
+    "BoltTransportAuthentication__Audience": "XFramework.Bolt.Hub",
+    "BoltTransportAuthentication__RequireHttpsMetadata": "false",
+}
 EXPECTED_ENDPOINT_ENV = {
     "Kestrel__Endpoints__Http__Url": "http://127.0.0.1:8080",
     "Kestrel__Endpoints__Https__Url": "https://0.0.0.0:8443",
@@ -121,15 +143,16 @@ EXPECTED_ENDPOINT_ENV = {
 }
 EXPECTED_ASPNETCORE_URLS = {"http://127.0.0.1:8080", "https://+:8443"}
 IDENTITY_EXPECTED_ENDPOINT_ENV = {
-    "Kestrel__Endpoints__Http__Url": "http://127.0.0.1:8080",
+    "Kestrel__Endpoints__Http__Url": "http://0.0.0.0:8080",
     "Kestrel__Endpoints__Https__Url": "https://0.0.0.0:8443",
     "Kestrel__Endpoints__Https__Certificate__Path": "/run/secrets/identityserver-tls-fullchain.pem",
     "Kestrel__Endpoints__Https__Certificate__KeyPath": "/run/secrets/identityserver-tls-private-key.pem",
 }
-IDENTITY_EXPECTED_ASPNETCORE_URLS = {"http://127.0.0.1:8080", "https://+:8443"}
+IDENTITY_EXPECTED_ASPNETCORE_URLS = {"http://+:8080", "https://+:8443"}
 IDENTITY_ISSUER_ENV = {
     "ServiceIdentity__BoltTransportTokenIssuer__Enabled": "true",
     "ServiceIdentity__BoltTransportTokenIssuer__LifetimeSeconds": "120",
+    "ServiceIdentity__BoltTransportTokenIssuer__SigningKeyPath": IDENTITY_SIGNING_KEY_PATH,
 }
 PHASE0_QUOTAS = {
     "BoltConfiguration__QueueDepth": "256",
@@ -648,6 +671,22 @@ def health_command(service: dict[str, Any]) -> str:
     return " ".join(str(item) for item in test) if isinstance(test, list) else str(test)
 
 
+def dependencies(service: dict[str, Any]) -> dict[str, str]:
+    value = service.get("depends_on") or {}
+    if isinstance(value, list):
+        return {str(name): "service_started" for name in value}
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, str] = {}
+    for name, configuration in value.items():
+        result[str(name)] = (
+            str(configuration.get("condition", "service_started"))
+            if isinstance(configuration, dict)
+            else "service_started"
+        )
+    return result
+
+
 def secrets(service: dict[str, Any]) -> list[dict[str, Any]]:
     result = []
     for item in service.get("secrets") or []:
@@ -689,6 +728,16 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
     hub_env = environment(hub)
     identityserver = services["identityserver"]
     identityserver_env = environment(identityserver)
+    signature_keys = {
+        name: sorted(
+            key
+            for key in environment(service)
+            if configuration_key(key) == "boltconfiguration:signature"
+        )
+        for name, service in services.items()
+    }
+    signature_keys = {name: keys for name, keys in signature_keys.items() if keys}
+    gate.check("bolt-signature-configuration-absent", not signature_keys, signature_keys)
     try:
         identity_inputs, identity_input_detail = load_identityserver_environment(args)
     except (OSError, ValueError) as error:
@@ -708,6 +757,8 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
         "BoltConfiguration__MediaEnabled",
         "BoltConfiguration__RegistrationIdentityBindingMode",
         "ServiceIdentity__DefaultScopes__0",
+        *COMMON_CENTRAL_IDENTITY_ENV,
+        *HUB_TRANSPORT_AUTHENTICATION_ENV,
         *EXPECTED_ENDPOINT_ENV,
         *PHASE0_QUOTAS,
     }
@@ -716,6 +767,7 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
         "ASPNETCORE_HTTP_PORTS",
         "ASPNETCORE_HTTPS_PORTS",
         "DOTNET_URLS",
+        *COMMON_CENTRAL_IDENTITY_ENV,
         *IDENTITY_EXPECTED_ENDPOINT_ENV,
         *IDENTITY_ISSUER_ENV,
         *(
@@ -733,6 +785,7 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
                 {
                     "BoltConfiguration__RequireSecureTransport",
                     "BoltConfiguration__ServerUrls__0",
+                    *COMMON_CENTRAL_IDENTITY_ENV,
                     *(
                         f"ServiceIdentity__DefaultScopes__{index}"
                         for index in range(len(SERVICE_IDENTITY_RUNTIME_DEFAULT_SCOPES[name]))
@@ -766,6 +819,52 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
         "hub-registration-enforcement",
         hub_env.get("BoltConfiguration__RegistrationIdentityBindingMode") == "Enforce",
         {"value": hub_env.get("BoltConfiguration__RegistrationIdentityBindingMode")},
+    )
+
+    central_identity_configuration = {
+        name: {
+            key: environment(services[name]).get(key)
+            for key in COMMON_CENTRAL_IDENTITY_ENV
+        }
+        for name in CENTRAL_IDENTITY_SERVICES
+    }
+    gate.check(
+        "common-central-service-identity-configuration",
+        all(
+            values == COMMON_CENTRAL_IDENTITY_ENV
+            for values in central_identity_configuration.values()
+        ),
+        central_identity_configuration,
+    )
+
+    hub_transport_authentication = {
+        key: hub_env.get(key) for key in HUB_TRANSPORT_AUTHENTICATION_ENV
+    }
+    gate.check(
+        "hub-central-transport-authentication",
+        hub_transport_authentication == HUB_TRANSPORT_AUTHENTICATION_ENV,
+        hub_transport_authentication,
+    )
+
+    identity_dependencies = dependencies(identityserver)
+    identity_bootstrap_ok = (
+        "bolt-hub" not in identity_dependencies
+        and identity_dependencies.get("migrate") == "service_completed_successfully"
+        and identity_dependencies.get("postgres") == "service_healthy"
+    )
+    gate.check(
+        "identityserver-depends-on-database-bootstrap-not-hub",
+        identity_bootstrap_ok,
+        identity_dependencies,
+    )
+    identity_dependents = {
+        name: dependencies(services[name]).get("identityserver")
+        for name in IDENTITY_DEPENDENT_SERVICES
+    }
+    gate.check(
+        "token-consumers-depend-on-healthy-identityserver",
+        all(condition == "service_healthy" for condition in identity_dependents.values()),
+        identity_dependents,
     )
 
     quota_evidence = {
@@ -1022,6 +1121,43 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
         "identityserver-only-tls-publication",
         identity_only_tls_port,
         {"ports": identity_ports, "expected": expected_identity_port},
+    )
+
+    identity_keydata_mounts = [
+        item
+        for item in volumes(identityserver)
+        if item["source"] == IDENTITY_KEYDATA_VOLUME
+        or item["target"] == IDENTITY_KEYDATA_DIRECTORY
+    ]
+    declared_volumes = manifest.get("volumes") or {}
+    identity_keydata_ok = (
+        isinstance(declared_volumes, dict)
+        and IDENTITY_KEYDATA_VOLUME in declared_volumes
+        and identityserver_env.get(
+            "ServiceIdentity__BoltTransportTokenIssuer__SigningKeyPath"
+        ) == IDENTITY_SIGNING_KEY_PATH
+        and identity_keydata_mounts == [
+            {
+                "type": "volume",
+                "source": IDENTITY_KEYDATA_VOLUME,
+                "target": IDENTITY_KEYDATA_DIRECTORY,
+                "read_only": False,
+            }
+        ]
+    )
+    gate.check(
+        "identityserver-persistent-writable-signing-key-volume",
+        identity_keydata_ok,
+        {
+            "volume_declared": (
+                isinstance(declared_volumes, dict)
+                and IDENTITY_KEYDATA_VOLUME in declared_volumes
+            ),
+            "mounts": identity_keydata_mounts,
+            "signing_key_path": identityserver_env.get(
+                "ServiceIdentity__BoltTransportTokenIssuer__SigningKeyPath"
+            ),
+        },
     )
 
     health = health_command(hub)
@@ -1286,7 +1422,7 @@ def verify(manifest: dict[str, Any], args: argparse.Namespace, gate: Gate) -> di
             "security_environment": {
                 key: value
                 for key, value in environment(services[name]).items()
-                if key in {"ASPNETCORE_URLS", "BOLT_SYNTHETIC_TARGET", "BoltConfiguration__MediaEnabled", "BoltConfiguration__RegistrationIdentityBindingMode", "BoltConfiguration__RequireSecureTransport", "BoltConfiguration__ServerUrls__0", *EXPECTED_ENDPOINT_ENV, *IDENTITY_EXPECTED_ENDPOINT_ENV, *IDENTITY_ISSUER_ENV, *PHASE0_QUOTAS}
+                if key in {"ASPNETCORE_URLS", "BOLT_SYNTHETIC_TARGET", "BoltConfiguration__MediaEnabled", "BoltConfiguration__RegistrationIdentityBindingMode", "BoltConfiguration__RequireSecureTransport", "BoltConfiguration__ServerUrls__0", *COMMON_CENTRAL_IDENTITY_ENV, *HUB_TRANSPORT_AUTHENTICATION_ENV, *EXPECTED_ENDPOINT_ENV, *IDENTITY_EXPECTED_ENDPOINT_ENV, *IDENTITY_ISSUER_ENV, *PHASE0_QUOTAS}
             },
             "security_secrets": [
                 {"source": item["source"], "target": item["target"], "mode": item["mode"]}

@@ -13,6 +13,7 @@ public class BoltClientBuilder
     internal BoltClientOptions Options { get; } = new();
     internal readonly List<(string Command, Func<ReadOnlyMemory<byte>, Guid, Task<(System.Net.HttpStatusCode, ReadOnlyMemory<byte>)>> Handler)> Handlers = [];
     internal readonly List<(string Command, Func<BoltStream, Task> Handler)> StreamHandlers = [];
+    internal Func<IServiceProvider, CancellationToken, ValueTask<string?>>? ServiceProviderAccessTokenProvider { get; private set; }
     internal bool AutoConnect { get; private set; } = true;
 
     /// <summary>Set the Bolt server URI. Required.</summary>
@@ -60,14 +61,45 @@ public class BoltClientBuilder
     public BoltClientBuilder WithAccessToken(string? accessToken)
     {
         Options.AccessToken = accessToken;
+        Options.AccessTokenProvider = null;
+        ServiceProviderAccessTokenProvider = null;
         return this;
     }
 
     /// <summary>Use a per-connection bearer token provider for Bolt handshakes.</summary>
     public BoltClientBuilder WithAccessTokenProvider(Func<CancellationToken, ValueTask<string?>> provider)
     {
+        ArgumentNullException.ThrowIfNull(provider);
+        Options.AccessToken = null;
+        ServiceProviderAccessTokenProvider = null;
         Options.AccessTokenProvider = provider;
         return this;
+    }
+
+    /// <summary>
+    /// Use a DI-aware per-connection bearer token provider for Bolt handshakes.
+    /// The callback and its dependencies are resolved only when a connection requests a token.
+    /// </summary>
+    public BoltClientBuilder WithAccessTokenProvider(
+        Func<IServiceProvider, CancellationToken, ValueTask<string?>> provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        Options.AccessToken = null;
+        Options.AccessTokenProvider = null;
+        ServiceProviderAccessTokenProvider = provider;
+        return this;
+    }
+
+    /// <summary>
+    /// Resolve a DI service only when a connection requests a bearer token.
+    /// </summary>
+    public BoltClientBuilder WithAccessTokenProvider<TProvider>(
+        Func<TProvider, CancellationToken, ValueTask<string?>> provider)
+        where TProvider : notnull
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        return WithAccessTokenProvider((serviceProvider, ct) =>
+            provider(serviceProvider.GetRequiredService<TProvider>(), ct));
     }
 
     /// <summary>Send the bearer token as ?access_token= for browser WebSocket clients.</summary>
@@ -126,7 +158,17 @@ public static class BoltClientExtensions
         services.AddSingleton(sp =>
         {
             var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<BoltClient>();
-            var client = new BoltClient(builder.ServerUri, builder.ClientId, builder.ClientName, builder.Options, logger);
+            var options = builder.Options.Clone();
+            if (builder.ServiceProviderAccessTokenProvider is { } accessTokenProvider)
+            {
+                options.AccessTokenProvider = async ct =>
+                {
+                    await using var scope = sp.CreateAsyncScope();
+                    return await accessTokenProvider(scope.ServiceProvider, ct);
+                };
+            }
+
+            var client = new BoltClient(builder.ServerUri, builder.ClientId, builder.ClientName, options, logger);
 
             foreach (var (cmd, handler) in builder.Handlers)
                 client.RegisterHandler(cmd, handler);

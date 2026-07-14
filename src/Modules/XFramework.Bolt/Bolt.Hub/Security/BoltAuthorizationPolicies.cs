@@ -1,16 +1,31 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.Security.Claims;
+using Bolt.Hub.Configurations;
 using XFramework.Domain.Shared.ServiceIdentity;
 
 namespace Bolt.Hub.Security;
 
 public static class BoltAuthorizationPolicies
 {
+    public const string Transport = "BoltTransport";
     public const string ServiceDiscoveryReader = "BoltServiceDiscoveryReader";
+
+    public static void AddTransportPolicy(AuthorizationOptions options) =>
+        options.AddPolicy(Transport, policy =>
+        {
+            policy.AddAuthenticationSchemes(BoltTransportAuthentication.Scheme);
+            policy.RequireAuthenticatedUser();
+            policy.RequireAssertion(context =>
+                HasScope(context.User, XFrameworkServiceScopes.BoltService));
+        });
 
     public static void AddServiceDiscoveryReaderPolicy(AuthorizationOptions options) =>
         options.AddPolicy(ServiceDiscoveryReader, policy =>
         {
+            policy.AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                BoltTransportAuthentication.Scheme);
             policy.RequireAuthenticatedUser();
             policy.RequireAssertion(context => IsServiceDiscoveryReader(context.User));
         });

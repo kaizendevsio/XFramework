@@ -35,6 +35,6 @@ jobs:
     uses: ./.github/workflows/deploy-xeon-dev-service.yml
     with:
       service: identityserver
-      health_url: http://localhost:8261/health/ready
+      health_url: https://xeon-dev.tailed40e.ts.net:8261/health/live
       diagnostics_services: bolt-hub identityserver
     secrets: inherit

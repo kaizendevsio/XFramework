@@ -145,6 +145,17 @@ def inspector(
     return inspect
 
 
+def identity_keydata_mount(**overrides: object) -> dict:
+    return {
+        "Type": "volume",
+        "Name": f"{PROJECT}_{MODULE.IDENTITY_KEYDATA_VOLUME}",
+        "Source": "/var/lib/docker/volumes/xframework_identity-keydata/_data",
+        "Destination": MODULE.IDENTITY_KEYDATA_DIRECTORY,
+        "RW": True,
+        **overrides,
+    }
+
+
 class Phase0RuntimeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -168,6 +179,60 @@ class Phase0RuntimeTests(unittest.TestCase):
             7443,
             inspector(self.private_key, **kwargs),
             listener_runner(tcp, resolv_conf, process_sockets),
+        )
+
+    def collect_identity(
+        self,
+        *,
+        mounts: list[dict] | None = None,
+        tcp: str | None = None,
+        ports: dict | None = None,
+        port_bindings: dict | None = None,
+    ):
+        identity_runtime_ports = ports or {
+            "8080/tcp": None,
+            "8443/tcp": [
+                {"HostIp": "0.0.0.0", "HostPort": "8261"},
+                {"HostIp": "::", "HostPort": "8261"},
+            ],
+        }
+        identity_configured_ports = port_bindings or {
+            "8443/tcp": [{"HostIp": "", "HostPort": "8261"}]
+        }
+        identity_mounts = mounts if mounts is not None else [
+            {
+                "Type": "bind",
+                "Source": str(self.identity_private_key),
+                "Destination": "/run/secrets/identityserver-tls-private-key.pem",
+                "RW": False,
+            },
+            identity_keydata_mount(),
+        ]
+        base = inspector(
+            self.private_key,
+            mounts=identity_mounts,
+            ports=identity_runtime_ports,
+            port_bindings=identity_configured_ports,
+        )
+
+        def identity_inspector(command: list[str]) -> dict:
+            result = base(command)
+            if command[1:2] == ["inspect"]:
+                result["container_name"] = "/xframework-identityserver"
+                result["labels"]["com.docker.compose.service"] = "identityserver"
+            return result
+
+        return MODULE.collect_service(
+            "identityserver",
+            CONTAINER_ID,
+            EXPECTED,
+            PROJECT,
+            self.private_key,
+            7443,
+            identity_inspector,
+            listener_runner(tcp or proc_tcp(health_scope="wildcard")),
+            identity_private_key=self.identity_private_key,
+            identity_expected_published_port=8261,
         )
 
     def test_inspect_template_handles_a_missing_health_object_without_dot_lookup(self) -> None:
@@ -340,85 +405,64 @@ class Phase0RuntimeTests(unittest.TestCase):
         self.assertEqual("exact", evidence["private_key_mounts"][0]["relation"])
 
     def test_identityserver_requires_its_distinct_key_and_tls_only_publication(self) -> None:
-        identity_runtime_ports = {
-            "8080/tcp": None,
-            "8443/tcp": [
-                {"HostIp": "0.0.0.0", "HostPort": "8261"},
-                {"HostIp": "::", "HostPort": "8261"},
-            ],
-        }
-        identity_configured_ports = {
-            "8443/tcp": [{"HostIp": "", "HostPort": "8261"}]
-        }
-        base = inspector(
-            self.private_key,
-            mounts=[
-                {
-                    "Type": "bind",
-                    "Source": str(self.identity_private_key),
-                    "Destination": "/run/secrets/identityserver-tls-private-key.pem",
-                    "RW": False,
-                }
-            ],
-            ports=identity_runtime_ports,
-            port_bindings=identity_configured_ports,
-        )
-
-        def identity_inspector(command: list[str]) -> dict:
-            result = base(command)
-            if command[1:2] == ["inspect"]:
-                result["container_name"] = "/xframework-identityserver"
-                result["labels"]["com.docker.compose.service"] = "identityserver"
-            return result
-
-        evidence, errors = MODULE.collect_service(
-            "identityserver",
-            CONTAINER_ID,
-            EXPECTED,
-            PROJECT,
-            self.private_key,
-            7443,
-            identity_inspector,
-            listener_runner(proc_tcp()),
-            identity_private_key=self.identity_private_key,
-            identity_expected_published_port=8261,
-        )
+        evidence, errors = self.collect_identity()
         self.assertEqual([], errors)
         self.assertEqual(8261, evidence["published_port"]["published_port"])
+        self.assertEqual("wildcard", evidence["listeners"][0]["scope"])
+        self.assertEqual(2, len(evidence["private_key_mounts"]))
+        self.assertEqual(
+            "<identity-signing-key-volume>",
+            evidence["private_key_mounts"][1]["resolved_source"],
+        )
 
-        cross_mounted = inspector(
-            self.private_key,
+        _, cross_errors = self.collect_identity(
             mounts=[
                 {
                     "Type": "bind",
                     "Source": str(self.private_key),
                     "Destination": "/run/secrets/identityserver-tls-private-key.pem",
                     "RW": False,
-                }
-            ],
-            ports=identity_runtime_ports,
-            port_bindings=identity_configured_ports,
-        )
-
-        def cross_inspector(command: list[str]) -> dict:
-            result = cross_mounted(command)
-            if command[1:2] == ["inspect"]:
-                result["labels"]["com.docker.compose.service"] = "identityserver"
-            return result
-
-        _, cross_errors = MODULE.collect_service(
-            "identityserver",
-            CONTAINER_ID,
-            EXPECTED,
-            PROJECT,
-            self.private_key,
-            7443,
-            cross_inspector,
-            listener_runner(proc_tcp()),
-            identity_private_key=self.identity_private_key,
-            identity_expected_published_port=8261,
+                },
+                identity_keydata_mount(),
+            ]
         )
         self.assertTrue(any("private-key mount" in error for error in cross_errors))
+
+    def test_identityserver_loopback_http_or_public_8080_fails_closed(self) -> None:
+        _, listener_errors = self.collect_identity(tcp=proc_tcp(health_scope="loopback"))
+        self.assertTrue(any("0.0.0.0" in error for error in listener_errors))
+
+        public_ports = {
+            "8080/tcp": [
+                {"HostIp": "0.0.0.0", "HostPort": "8080"},
+                {"HostIp": "::", "HostPort": "8080"},
+            ],
+            "8443/tcp": [
+                {"HostIp": "0.0.0.0", "HostPort": "8261"},
+                {"HostIp": "::", "HostPort": "8261"},
+            ],
+        }
+        evidence, publication_errors = self.collect_identity(ports=public_ports)
+        self.assertTrue(any("runtime network publication" in error for error in publication_errors))
+        self.assertIsNone(evidence["published_port"])
+
+    def test_identityserver_signing_key_volume_must_be_persistent_and_writable(self) -> None:
+        tls_mount = {
+            "Type": "bind",
+            "Source": str(self.identity_private_key),
+            "Destination": "/run/secrets/identityserver-tls-private-key.pem",
+            "RW": False,
+        }
+        invalid_mounts = (
+            [tls_mount],
+            [tls_mount, identity_keydata_mount(RW=False)],
+            [tls_mount, identity_keydata_mount(Name="xframework_ephemeral-keydata")],
+            [tls_mount, identity_keydata_mount(Type="bind", Name="")],
+        )
+        for mounts in invalid_mounts:
+            with self.subTest(mounts=mounts):
+                _, errors = self.collect_identity(mounts=mounts)
+                self.assertTrue(any("signing-key volume" in error for error in errors))
 
     def test_mutable_image_and_wrong_repository_digest_fail_closed(self) -> None:
         _, mutable = self.collect(configured_image="registry.example/xframework/bolt-hub:develop")

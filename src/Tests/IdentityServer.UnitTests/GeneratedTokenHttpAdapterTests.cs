@@ -8,6 +8,7 @@ using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using NUnit.Framework;
@@ -85,6 +86,7 @@ public sealed class GeneratedTokenHttpAdapterTests
                 throwOnError: true)!,
             request,
             context.Request,
+            CreateServiceIdentityConfiguration(),
             service.Object,
             CancellationToken.None);
 
@@ -131,5 +133,20 @@ public sealed class GeneratedTokenHttpAdapterTests
 
         var result = generatedUnion!.GetType().GetProperty("Result")!.GetValue(generatedUnion);
         return result.Should().BeAssignableTo<IResult>().Subject;
+    }
+
+    private static ServiceIdentityConfiguration CreateServiceIdentityConfiguration()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ServiceIdentity:Clients:0:ClientId"] = "test-client",
+                ["ServiceIdentity:Clients:0:GenerationId"] = "test-g1",
+                ["ServiceIdentity:Clients:0:ClientSecret"] =
+                    "test-service-credential-material-111111111111111111111111"
+            })
+            .Build();
+
+        return ServiceIdentityConfiguration.FromConfiguration(configuration, DateTimeOffset.UtcNow);
     }
 }

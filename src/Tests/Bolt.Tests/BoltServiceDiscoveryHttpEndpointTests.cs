@@ -1,9 +1,11 @@
 using Bolt.Hub.Extensions;
+using Bolt.Hub.Configurations;
 using Bolt.Hub.Security;
 using Bolt.Hub.Services;
 using Bolt.Server;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +26,6 @@ namespace Bolt.Tests;
 [CancelAfter(30000)]
 public sealed class BoltServiceDiscoveryHttpEndpointTests
 {
-    private const string TestScheme = "BoltDiscoveryTest";
     private static int _portCounter = 20300;
     private WebApplication _app = null!;
     private int _port;
@@ -47,8 +48,13 @@ public sealed class BoltServiceDiscoveryHttpEndpointTests
         builder.Services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         builder.Services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         builder.Services
-            .AddAuthentication(TestScheme)
-            .AddScheme<AuthenticationSchemeOptions, BoltDiscoveryTestAuthHandler>(TestScheme, _ => { });
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddScheme<AuthenticationSchemeOptions, BoltDiscoveryTestAuthHandler>(
+                JwtBearerDefaults.AuthenticationScheme,
+                _ => { })
+            .AddScheme<AuthenticationSchemeOptions, BoltDiscoveryTestAuthHandler>(
+                BoltTransportAuthentication.Scheme,
+                _ => { });
         builder.Services.AddAuthorization(BoltAuthorizationPolicies.AddServiceDiscoveryReaderPolicy);
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
 

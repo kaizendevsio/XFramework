@@ -14,14 +14,20 @@ public sealed class ServiceIdentityConfiguration
     private ServiceIdentityConfiguration(
         string issuer,
         int tokenLifetimeMinutes,
+        bool allowInsecureHttp,
+        Uri? boltTransportDiscoveryAuthority,
         bool boltTransportTokenIssuerEnabled,
         int boltTransportTokenLifetimeSeconds,
+        string? boltTransportSigningKeyPath,
         IReadOnlyDictionary<string, ServiceClientDefinition> clients)
     {
         Issuer = issuer;
         TokenLifetimeMinutes = tokenLifetimeMinutes;
+        AllowInsecureHttp = allowInsecureHttp;
+        BoltTransportDiscoveryAuthority = boltTransportDiscoveryAuthority;
         BoltTransportTokenIssuerEnabled = boltTransportTokenIssuerEnabled;
         BoltTransportTokenLifetimeSeconds = boltTransportTokenLifetimeSeconds;
+        BoltTransportSigningKeyPath = boltTransportSigningKeyPath;
         _clients = clients;
         ValidationGenerationIdsByClient = clients.ToDictionary(
             static pair => pair.Key,
@@ -31,8 +37,11 @@ public sealed class ServiceIdentityConfiguration
 
     public string Issuer { get; }
     public int TokenLifetimeMinutes { get; }
+    public bool AllowInsecureHttp { get; }
+    public Uri? BoltTransportDiscoveryAuthority { get; }
     public bool BoltTransportTokenIssuerEnabled { get; }
     public int BoltTransportTokenLifetimeSeconds { get; }
+    public string? BoltTransportSigningKeyPath { get; }
     public IReadOnlyDictionary<string, IReadOnlyList<string>> ValidationGenerationIdsByClient { get; }
 
     internal ServiceClientDefinition? FindClient(string? clientId) =>
@@ -62,6 +71,38 @@ public sealed class ServiceIdentityConfiguration
         if (string.IsNullOrWhiteSpace(issuer))
             issuer = XFrameworkServiceNames.IdentityServer;
 
+        var allowInsecureHttp = configuration.GetValue<bool>("ServiceIdentity:AllowInsecureHttp");
+        var boltTransportTokenIssuerEnabled = configuration.GetValue<bool>(
+            "ServiceIdentity:BoltTransportTokenIssuer:Enabled");
+        var authorityValue = configuration["ServiceIdentity:Authority"]?.Trim();
+        Uri? boltTransportDiscoveryAuthority = null;
+        if (!string.IsNullOrWhiteSpace(authorityValue))
+        {
+            if (!Uri.TryCreate(authorityValue, UriKind.Absolute, out var authority) ||
+                (authority.Scheme != Uri.UriSchemeHttps && authority.Scheme != Uri.UriSchemeHttp) ||
+                !string.IsNullOrEmpty(authority.UserInfo) ||
+                !string.IsNullOrEmpty(authority.Query) ||
+                !string.IsNullOrEmpty(authority.Fragment) ||
+                authority.AbsolutePath is not ("" or "/"))
+            {
+                throw new InvalidOperationException(
+                    "ServiceIdentity:Authority must be an absolute HTTP or HTTPS origin.");
+            }
+
+            if (authority.Scheme == Uri.UriSchemeHttp && !allowInsecureHttp)
+            {
+                throw new InvalidOperationException(
+                    "ServiceIdentity:Authority must use HTTPS unless ServiceIdentity:AllowInsecureHttp is explicitly true.");
+            }
+
+            boltTransportDiscoveryAuthority = authority;
+        }
+
+        if (boltTransportTokenIssuerEnabled && boltTransportDiscoveryAuthority is null)
+        {
+            throw new InvalidOperationException(
+                "ServiceIdentity:Authority is required when Bolt transport token issuance is enabled.");
+        }
         var boltTransportTokenLifetimeSeconds = configuration.GetValue(
             "ServiceIdentity:BoltTransportTokenIssuer:LifetimeSeconds",
             DefaultBoltTransportTokenLifetimeSeconds);
@@ -73,11 +114,25 @@ public sealed class ServiceIdentityConfiguration
                 $"{MinimumBoltTransportTokenLifetimeSeconds} and {MaximumBoltTransportTokenLifetimeSeconds} seconds.");
         }
 
+        var boltTransportSigningKeyPath = configuration[
+            "ServiceIdentity:BoltTransportTokenIssuer:SigningKeyPath"]?.Trim();
+        if (boltTransportTokenIssuerEnabled && string.IsNullOrWhiteSpace(boltTransportSigningKeyPath))
+        {
+            throw new InvalidOperationException(
+                "ServiceIdentity:BoltTransportTokenIssuer:SigningKeyPath is required when Bolt transport token issuance is enabled.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(boltTransportSigningKeyPath))
+            boltTransportSigningKeyPath = Path.GetFullPath(boltTransportSigningKeyPath);
+
         return new ServiceIdentityConfiguration(
             issuer,
             Math.Clamp(configuration.GetValue("ServiceIdentity:TokenLifetimeMinutes", 10), 1, 60),
-            configuration.GetValue<bool>("ServiceIdentity:BoltTransportTokenIssuer:Enabled"),
+            allowInsecureHttp,
+            boltTransportDiscoveryAuthority,
+            boltTransportTokenIssuerEnabled,
             boltTransportTokenLifetimeSeconds,
+            boltTransportSigningKeyPath,
             clients);
     }
 }

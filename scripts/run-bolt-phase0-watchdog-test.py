@@ -32,6 +32,7 @@ TIMER = ROOT / "deploy" / "systemd" / "xframework-bolt-phase0-watchdog.timer"
 WORKFLOW = ROOT / ".github" / "workflows" / "deploy-xeon-dev.yml"
 PHASE0_CI_WORKFLOW = ROOT / ".github" / "workflows" / "bolt-phase0-ci.yml"
 LEGACY_WORKFLOW = ROOT / ".github" / "workflows" / "deploy-xeon-dev-service.yml"
+IDENTITYSERVER_WORKFLOW = ROOT / ".github" / "workflows" / "deploy-xeon-dev-identityserver.yml"
 PINNED_KNOWN_HOSTS = ROOT / ".github" / "known_hosts" / "xeon-dev"
 ROOT_HELPER = ROOT / "scripts" / "manage-bolt-phase0-root.py"
 BOOTSTRAP = ROOT / "deploy" / "bootstrap-xframework-bolt-phase0-root.sh"
@@ -1231,6 +1232,139 @@ class WatchdogContractTests(unittest.TestCase):
         self.assertNotIn("ssh-keyscan", active)
         self.assertIn("if: ${{ false }}", legacy)
 
+    def test_centralized_identity_activation_precedes_hub_and_clients(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        legacy = LEGACY_WORKFLOW.read_text(encoding="utf-8")
+        identity_workflow = IDENTITYSERVER_WORKFLOW.read_text(encoding="utf-8")
+
+        lkg_compatibility = workflow.index(
+            "- name: Verify current sealed LKG renders with protected credentials"
+        )
+        identity_deploy = workflow.index("- name: Deploy IdentityServer identity plane")
+        identity_ready = workflow.index("- name: Verify IdentityServer live discovery plane")
+        identity_runtime = workflow.index(
+            "- name: Verify staged runtime after IdentityServer deployment"
+        )
+        hub_deploy = workflow.index("- name: Deploy Bolt Hub only")
+        hub_ready = workflow.index("- name: Verify Hub TLS and plaintext boundary")
+        communications_deploy = workflow.index("- name: Deploy Communications canary")
+        remaining_deploy = workflow.index("- name: Promote remaining clients in bounded batches")
+        self.assertLess(lkg_compatibility, identity_deploy)
+        self.assertLess(identity_deploy, identity_ready)
+        self.assertLess(identity_ready, identity_runtime)
+        self.assertLess(identity_runtime, hub_deploy)
+        self.assertLess(hub_deploy, hub_ready)
+        self.assertLess(hub_ready, communications_deploy)
+        self.assertLess(communications_deploy, remaining_deploy)
+
+        lkg_compatibility_block = workflow[
+            lkg_compatibility:workflow.index("- name: Install reviewed Phase 0 synthetic hooks")
+        ]
+        for required in (
+            'pointer="$REMOTE_LKG_DIR/current"',
+            'test ! -L "$pointer"',
+            'test ! -L "$lkg_run"',
+            '"$lkg_run/docker-compose.yml"',
+            '"$lkg_run/pinned-compose.override.json"',
+            'docker compose --env-file "$XFRAMEWORK_ENV_FILE"',
+            "--project-name xframework config --quiet",
+            'pins="$(',
+            'done <<< "$pins"',
+            'docker image inspect "$pin"',
+            'printf \'%s\\n\' rendered > "$status_path"',
+            "not_applicable_no_prior_lkg",
+        ):
+            self.assertIn(required, lkg_compatibility_block)
+        self.assertNotIn('done < <(python3 - "$lkg_run/image-pins.json"', lkg_compatibility_block)
+        self.assertNotIn(" up ", lkg_compatibility_block)
+
+        identity_deploy_block = workflow[identity_deploy:identity_ready]
+        self.assertIn(
+            '"${compose[@]}" up -d --no-build --no-deps identityserver',
+            identity_deploy_block,
+        )
+        identity_ready_block = workflow[identity_ready:identity_runtime]
+        for required in (
+            "docker exec xframework-identityserver",
+            "http://127.0.0.1:8080/health/live",
+            "http://127.0.0.1:8080/.well-known/openid-configuration",
+            "http://127.0.0.1:8080/.well-known/bolt-transport-jwks.json",
+            'metadata.get("issuer") != "XFramework.IdentityServer"',
+            'key.get("alg") == "RS256"',
+        ):
+            self.assertIn(required, identity_ready_block)
+        self.assertNotIn("/health/ready", identity_ready_block)
+        self.assertNotIn("bolt-hub", identity_ready_block.lower())
+
+        identity_runtime_block = workflow[
+            identity_runtime:workflow.index("- name: Deploy Bolt Hub only", identity_runtime)
+        ]
+        self.assertIn("services=(migrate identityserver)", identity_runtime_block)
+        hub_runtime = workflow[
+            workflow.index("- name: Verify staged runtime after Hub deployment"):
+            communications_deploy
+        ]
+        self.assertIn("services=(migrate identityserver bolt-hub)", hub_runtime)
+
+        rotation = workflow[
+            workflow.index("- name: Roll G+1 through identity, Hub, canary, and client batches"):
+            workflow.index("- name: Prove G+1 runtime convergence")
+        ]
+        self.assertRegex(
+            rotation,
+            r'stages=\(\n\s+"identity:identityserver"\n\s+"hub:bolt-hub"\n'
+            r'\s+"canary:communications"',
+        )
+        self.assertIn('if [ "$1" = identityserver ]; then', rotation)
+
+        fallback = workflow[
+            workflow.index("- name: Restart without fallback credentials and rerun synthetics"):
+            workflow.index("- name: Prove finalized credential convergence")
+        ]
+        self.assertIn(
+            "services=(identityserver bolt-hub communications notifications storage attendance "
+            "smsgateway wallets inventario pos portal operations-dashboard)",
+            fallback,
+        )
+        self.assertIn('if [ "$service" = identityserver ]; then', fallback)
+
+        rollback = workflow[
+            workflow.index("- name: Exercise candidate digest-pinned restart under G+1"):
+            workflow.index("- name: Quarantine, root-qualify, seal, and activate recovery bundle")
+        ]
+        self.assertIn(
+            "services=(migrate identityserver bolt-hub communications notifications storage "
+            "attendance smsgateway wallets inventario pos portal operations-dashboard)",
+            rollback,
+        )
+        self.assertIn('for service in "${@:2}"; do', rollback)
+        self.assertIn(
+            '"${compose[@]}" up -d --no-build --no-deps --force-recreate "$service"',
+            rollback,
+        )
+        self.assertNotIn("bolt-hub identityserver communications", rollback)
+        self.assertIn('"schema": "xframework.bolt.phase0.candidate-restart.v1"', rollback)
+        self.assertIn('"candidate_digest_recreate_applied": True', rollback)
+        self.assertNotIn('"restore_applied": True', rollback)
+
+        preflight = legacy[
+            legacy.index("- name: Preflight centralized identity plane for Bolt clients"):
+            legacy.index("- name: Deploy service on xeon-dev")
+        ]
+        self.assertIn("if: inputs.service != 'identityserver'", preflight)
+        self.assertIn("/health/live", preflight)
+        self.assertIn("/.well-known/openid-configuration", preflight)
+        self.assertIn("/.well-known/bolt-transport-jwks.json", preflight)
+
+        self.assertNotIn("http://localhost:8261", identity_workflow)
+        self.assertIn(
+            "health_url: https://xeon-dev.tailed40e.ts.net:8261/health/live",
+            identity_workflow,
+        )
+        for content in (workflow, legacy):
+            self.assertIn("BOLT_SIGNATURE: compose-validation-placeholder", content)
+        self.assertNotIn("BOLT_SIGNATURE", identity_workflow)
+
     def test_active_workflow_fail_closed_ssh_key_metadata_preflight(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
         setup = content[
@@ -1595,6 +1729,7 @@ class WatchdogContractTests(unittest.TestCase):
     def test_every_long_readiness_stage_has_a_fail_closed_heartbeat_supervisor(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         stages = (
+            ("- name: Verify IdentityServer live discovery plane", "- name: Verify staged runtime after IdentityServer deployment"),
             ("- name: Verify Hub TLS and plaintext boundary", "- name: Verify staged runtime after Hub deployment"),
             ("- name: Wait for canary readiness", "- name: Verify staged runtime after canary deployment"),
             ("- name: Wait for readiness", "- name: Capture retiring generation token evidence"),
@@ -1618,7 +1753,7 @@ class WatchdogContractTests(unittest.TestCase):
                     block.index("for attempt"),
                 )
 
-        self.assertEqual(3, workflow.count("trap cleanup_heartbeat EXIT"))
+        self.assertEqual(4, workflow.count("trap cleanup_heartbeat EXIT"))
         batch = workflow[
             workflow.index("- name: Promote remaining clients in bounded batches"):
             workflow.index("- name: Wait for readiness")
@@ -1628,13 +1763,14 @@ class WatchdogContractTests(unittest.TestCase):
     def test_all_long_mutation_paths_use_fixed_supervision_and_bounded_docker(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         stages = (
-            ("- name: Run migration before service mutation", "- name: Deploy Bolt Hub only"),
+            ("- name: Run migration before service mutation", "- name: Deploy IdentityServer identity plane"),
+            ("- name: Deploy IdentityServer identity plane", "- name: Verify IdentityServer live discovery plane"),
             ("- name: Deploy Bolt Hub only", "- name: Verify Hub TLS and plaintext boundary"),
-            ("- name: Deploy IdentityServer and Communications canary", "- name: Wait for canary readiness"),
+            ("- name: Deploy Communications canary", "- name: Wait for canary readiness"),
             ("- name: Promote remaining clients in bounded batches", "- name: Wait for readiness"),
-            ("- name: Roll G+1 through Hub, canary, and client batches", "- name: Prove G+1 runtime convergence"),
+            ("- name: Roll G+1 through identity, Hub, canary, and client batches", "- name: Prove G+1 runtime convergence"),
             ("- name: Restart without fallback credentials and rerun synthetics", "- name: Prove finalized credential convergence"),
-            ("- name: Exercise digest-pinned rollback under G+1", "- name: Quarantine, root-qualify, seal, and activate recovery bundle"),
+            ("- name: Exercise candidate digest-pinned restart under G+1", "- name: Quarantine, root-qualify, seal, and activate recovery bundle"),
         )
         for start, end in stages:
             with self.subTest(stage=start):
