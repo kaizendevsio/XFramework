@@ -68,6 +68,14 @@ class Phase0TlsInputTests(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("absolute", result.stderr.lower())
 
+    def test_chain_and_hostname_verification_require_x509_strict(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+
+        self.assertEqual(
+            2,
+            source.count("openssl verify -x509_strict -purpose sslserver"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
