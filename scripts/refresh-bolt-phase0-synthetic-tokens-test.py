@@ -39,6 +39,8 @@ AUDIENCE = "xframework-phase0"
 USERNAME = "bolt-phase0-user"
 PASSWORD = "synthetic-user-password-that-must-not-leak"
 CLIENT_SECRET = "communications-client-secret-that-must-never-leak-123456789"
+PORTAL_CLIENT_SECRET = "portal-client-secret-that-must-never-leak-123456789012345"
+TRANSPORT_KEY_ID = "bolt-test-signing-key"
 
 
 def private_directory(path: Path) -> Path:
@@ -57,7 +59,7 @@ def b64url(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
 
 
-def jwt(claims: dict[str, Any], *, generation: str = GENERATION) -> str:
+def actor_jwt(claims: dict[str, Any], *, generation: str = GENERATION) -> str:
     header = {"alg": "HS512", "kid": generation, "typ": "JWT"}
     encoded_header = b64url(json.dumps(header, separators=(",", ":"), sort_keys=True).encode())
     encoded_claims = b64url(json.dumps(claims, separators=(",", ":"), sort_keys=True).encode())
@@ -65,18 +67,37 @@ def jwt(claims: dict[str, Any], *, generation: str = GENERATION) -> str:
     return f"{encoded_header}.{encoded_claims}.{signature}"
 
 
-def service_claims(now: int, jti: str, **overrides: Any) -> dict[str, Any]:
+def transport_jwt(
+    claims: dict[str, Any],
+    *,
+    algorithm: str = "RS256",
+    key_id: str = TRANSPORT_KEY_ID,
+    token_type: str = "bolt+jwt",
+) -> str:
+    header = {"alg": algorithm, "kid": key_id, "typ": token_type}
+    encoded_header = b64url(json.dumps(header, separators=(",", ":"), sort_keys=True).encode())
+    encoded_claims = b64url(json.dumps(claims, separators=(",", ":"), sort_keys=True).encode())
+    signature = b64url(("rsa-signature-" + str(claims.get("jti", "missing"))).encode())
+    return f"{encoded_header}.{encoded_claims}.{signature}"
+
+
+def service_claims(
+    now: int,
+    jti: str,
+    client_id: str = "XFramework.Communications",
+    **overrides: Any,
+) -> dict[str, Any]:
     claims = {
-        "iss": ISSUER,
-        "aud": AUDIENCE,
+        "iss": "XFramework.IdentityServer",
+        "aud": "XFramework.Bolt.Hub",
         "exp": now + 120,
         "nbf": now - 1,
+        "iat": now - 1,
         "jti": jti,
-        "credential_generation": GENERATION,
         "client_credential_generation": GENERATION,
-        "client_id": "XFramework.Communications",
-        "service": "XFramework.Communications",
-        "sub": "XFramework.Communications",
+        "client_id": client_id,
+        "service": client_id,
+        "sub": client_id,
         "scope": "bolt.service",
     }
     claims.update(overrides)
@@ -103,14 +124,14 @@ def user_claims(now: int, jti: str, **overrides: Any) -> dict[str, Any]:
 
 def service_response(claims: dict[str, Any]) -> dict[str, Any]:
     expiration = refresh._format_expiration(claims["exp"])
-    return {"accessToken": jwt(claims), "tokenType": "Bearer", "expiresAtUtc": expiration}
+    return {"accessToken": transport_jwt(claims), "tokenType": "Bearer", "expiresAtUtc": expiration}
 
 
 def user_response(claims: dict[str, Any]) -> dict[str, Any]:
     return {
         "identity": {"id": "44444444-4444-4444-8444-444444444444", "tenantId": TENANT_ID},
         "credential": {"id": CREDENTIAL_ID, "tenantId": TENANT_ID, "userName": USERNAME},
-        "accessToken": jwt(claims),
+        "accessToken": actor_jwt(claims),
         "tokenType": "Bearer",
         "expiresIn": 900,
         "refreshToken": "refresh-secret-that-is-never-retained",
@@ -172,22 +193,21 @@ class Workspace:
     def __init__(self, root: Path):
         self.root = root
         self.private = private_directory(root / "private")
-        self.ca = self.private / "identity-ca.crt"
         self.env = self.private / "protected.env"
-        self.communications = self.private / "communications.jwt"
-        self.user = self.private / "user.jwt"
-        self.expiry = self.private / "expiry.jwt"
+        self.communications_transport = self.private / "communications-transport.jwt"
+        self.portal_transport = self.private / "portal-transport.jwt"
+        self.user_actor = self.private / "user-actor.jwt"
+        self.expiry_transport = self.private / "expiry-transport.jwt"
         self.receipt = self.private / "receipt.json"
-        private_write(self.ca, "test-ca-material")
 
     def values(self) -> dict[str, str]:
         return {
             "BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL": BASE_URL,
-            "BOLT_SYNTHETIC_IDENTITYSERVER_CA_PATH": str(self.ca),
             "JWT_ISSUER": ISSUER,
             "JWT_AUDIENCE": AUDIENCE,
             "CREDENTIAL_GENERATION_ID": GENERATION,
             "COMMUNICATIONS_SERVICE_IDENTITY_SECRET": CLIENT_SECRET,
+            "PORTAL_SERVICE_IDENTITY_SECRET": PORTAL_CLIENT_SECRET,
             "BOLT_SYNTHETIC_TENANT_ID": TENANT_ID,
             "BOLT_SYNTHETIC_CREDENTIAL_ID": CREDENTIAL_ID,
             "BOLT_SYNTHETIC_USER_USERNAME": USERNAME,
@@ -195,9 +215,12 @@ class Workspace:
             "BOLT_SYNTHETIC_USER_ROLE_ID": ROLE_ID,
             "BOLT_SYNTHETIC_USER_AUTHORIZATION_TYPE": "Username",
             "BOLT_SYNTHETIC_MIN_TOKEN_LIFETIME_SECONDS": "60",
-            "BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_PATH": str(self.communications),
-            "BOLT_SYNTHETIC_USER_TOKEN_PATH": str(self.user),
-            "BOLT_SYNTHETIC_EXPIRY_TOKEN_PATH": str(self.expiry),
+            "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH": str(
+                self.communications_transport
+            ),
+            "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH": str(self.portal_transport),
+            "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH": str(self.user_actor),
+            "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH": str(self.expiry_transport),
         }
 
     def write_env(self, values: dict[str, str] | None = None, *, crlf: bool = False) -> None:
@@ -272,18 +295,19 @@ class RefreshTokenHookTests(unittest.TestCase):
             config = workspace.config()
 
             self.assertEqual(config.base_url, BASE_URL)
-            self.assertEqual(config.issuer, "xframework")
+            self.assertEqual(config.actor_issuer, "xframework")
 
-    def test_direct_https_uses_explicit_ca_hostname_validation_and_ignores_proxy_environment(self) -> None:
+    def test_direct_https_uses_system_trust_hostname_validation_and_ignores_proxy_environment(self) -> None:
         now = int(time.time())
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Workspace(Path(temporary))
             config = workspace.config()
             factory = ConnectionFactory([FakeResponse(service_response(service_claims(now, uuid.uuid4().hex)))])
-            observed_ca: list[str] = []
+            context_calls = 0
 
-            def context_factory(ca_path: str) -> FakeContext:
-                observed_ca.append(ca_path)
+            def context_factory() -> FakeContext:
+                nonlocal context_calls
+                context_calls += 1
                 return FakeContext()
 
             with mock.patch.dict(os.environ, {"HTTPS_PROXY": "http://attacker.invalid:3128"}):
@@ -295,11 +319,23 @@ class RefreshTokenHookTests(unittest.TestCase):
                     context_factory=context_factory,
                 )
 
-            self.assertEqual(observed_ca, [str(workspace.ca)])
+            self.assertEqual(context_calls, 1)
             self.assertEqual(factory.requests[0][0:2], ("identity.test", 8443))
             self.assertIs(factory.requests[0][2]["context"].check_hostname, True)
             self.assertEqual(factory.requests[0][2]["context"].verify_mode, refresh.ssl.CERT_REQUIRED)
             self.assertNotIn("attacker.invalid", repr(factory.requests))
+
+    def test_ssl_context_uses_system_trust_without_custom_ca(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Workspace(Path(temporary))
+            workspace.write_env()
+
+            with mock.patch.object(refresh.ssl, "create_default_context") as create_context:
+                create_context.return_value = mock.Mock()
+                context = refresh._build_ssl_context()
+
+            create_context.assert_called_once_with(purpose=refresh.ssl.Purpose.SERVER_AUTH)
+            self.assertIs(context, create_context.return_value)
 
     def test_redirect_and_non_json_responses_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -317,7 +353,7 @@ class RefreshTokenHookTests(unittest.TestCase):
                             "/api/auth/authenticate",
                             {},
                             connection_factory=factory,
-                            context_factory=lambda _: FakeContext(),
+                            context_factory=lambda: FakeContext(),
                         )
 
     def test_bare_response_schemas_require_exact_key_sets(self) -> None:
@@ -333,7 +369,13 @@ class RefreshTokenHookTests(unittest.TestCase):
             }.items():
                 with self.subTest(name=name):
                     with self.assertRaises(refresh.RefreshError):
-                        refresh._parse_service_token(document, config, now=now, expiry=False)
+                        refresh._parse_transport_token(
+                            document,
+                            config,
+                            expected_client_id="XFramework.Communications",
+                            now=now,
+                            expiry=False,
+                        )
 
             for name, document in {
                 "user-extra": {**user, "unexpected": True},
@@ -377,7 +419,13 @@ class RefreshTokenHookTests(unittest.TestCase):
             }
 
             with self.assertRaisesRegex(refresh.RefreshError, "RESPONSE_SCHEMA"):
-                refresh._parse_service_token(legacy_envelope, config, now=now, expiry=False)
+                refresh._parse_transport_token(
+                    legacy_envelope,
+                    config,
+                    expected_client_id="XFramework.Communications",
+                    now=now,
+                    expiry=False,
+                )
 
     def test_malformed_and_mismatched_tokens_are_rejected(self) -> None:
         now = int(time.time())
@@ -392,16 +440,70 @@ class RefreshTokenHookTests(unittest.TestCase):
                 "expired": service_response(service_claims(now, uuid.uuid4().hex, exp=now - 1)),
                 "future-nbf": service_response(service_claims(now, uuid.uuid4().hex, nbf=now + 120)),
             }
-            generation_claims = service_claims(now, uuid.uuid4().hex, credential_generation="wrong-generation")
+            generation_claims = service_claims(
+                now,
+                uuid.uuid4().hex,
+                client_credential_generation="wrong-generation",
+            )
             cases["generation"] = {
-                "accessToken": jwt(generation_claims, generation="wrong-generation"),
+                "accessToken": transport_jwt(generation_claims),
                 "tokenType": "Bearer",
                 "expiresAtUtc": refresh._format_expiration(generation_claims["exp"]),
             }
             for name, document in cases.items():
                 with self.subTest(name=name):
                     with self.assertRaises(refresh.RefreshError):
-                        refresh._parse_service_token(document, config, now=now, expiry=False)
+                        refresh._parse_transport_token(
+                            document,
+                            config,
+                            expected_client_id="XFramework.Communications",
+                            now=now,
+                            expiry=False,
+                        )
+
+    def test_transport_token_requires_rs256_bolt_header_scope_and_requested_client(self) -> None:
+        now = int(time.time())
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Workspace(Path(temporary)).config()
+            claims = service_claims(now, uuid.uuid4().hex)
+            cases = {
+                "algorithm": transport_jwt(claims, algorithm="HS512"),
+                "type": transport_jwt(claims, token_type="JWT"),
+                "key": transport_jwt(claims, key_id=""),
+                "scope": transport_jwt({**claims, "scope": "identity.read"}),
+                "client": transport_jwt(
+                    {
+                        **claims,
+                        "client_id": "XFramework.Portal",
+                        "service": "XFramework.Portal",
+                        "sub": "XFramework.Portal",
+                    }
+                ),
+            }
+            for name, token in cases.items():
+                with self.subTest(name=name), self.assertRaises(refresh.RefreshError):
+                    refresh._parse_transport_token(
+                        {
+                            "accessToken": token,
+                            "tokenType": "Bearer",
+                            "expiresAtUtc": refresh._format_expiration(claims["exp"]),
+                        },
+                        config,
+                        expected_client_id="XFramework.Communications",
+                        now=now,
+                        expiry=False,
+                    )
+
+    def test_actor_token_is_validated_as_hs512_application_jwt_only(self) -> None:
+        now = int(time.time())
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Workspace(Path(temporary)).config()
+            claims = user_claims(now, str(uuid.uuid4()))
+            response = user_response(claims)
+            response["accessToken"] = transport_jwt(claims)
+
+            with self.assertRaisesRegex(refresh.RefreshError, "TOKEN_HEADER"):
+                refresh._parse_user_token(response, config, now=now)
 
     def test_user_token_must_bind_expected_tenant_and_credential(self) -> None:
         now = int(time.time())
@@ -467,6 +569,11 @@ class RefreshTokenHookTests(unittest.TestCase):
     def test_success_refreshes_distinct_tokens_and_writes_only_nonsecret_receipt(self) -> None:
         now = int(time.time())
         communications_claims = service_claims(now, uuid.uuid4().hex)
+        portal_claims = service_claims(
+            now,
+            uuid.uuid4().hex,
+            client_id="XFramework.Portal",
+        )
         expiry_claims = service_claims(now, uuid.uuid4().hex, exp=now + 90)
         current_user_claims = user_claims(now, str(uuid.uuid4()))
         with tempfile.TemporaryDirectory() as temporary:
@@ -475,6 +582,7 @@ class RefreshTokenHookTests(unittest.TestCase):
             factory = ConnectionFactory(
                 [
                     FakeResponse(service_response(communications_claims)),
+                    FakeResponse(service_response(portal_claims)),
                     FakeResponse(service_response(expiry_claims)),
                     FakeResponse(user_response(current_user_claims)),
                 ]
@@ -487,33 +595,79 @@ class RefreshTokenHookTests(unittest.TestCase):
                     str(workspace.receipt),
                     True,
                     connection_factory=factory,
-                    context_factory=lambda _: FakeContext(),
+                    context_factory=lambda: FakeContext(),
                     now_provider=lambda: now,
                 )
 
             self.assertEqual(stdout.getvalue(), "")
             self.assertEqual(stderr.getvalue(), "")
-            self.assertEqual(workspace.communications.read_text().strip(), jwt(communications_claims))
-            self.assertEqual(workspace.expiry.read_text().strip(), jwt(expiry_claims))
-            self.assertEqual(workspace.user.read_text().strip(), jwt(current_user_claims))
+            self.assertEqual(
+                workspace.communications_transport.read_text().strip(),
+                transport_jwt(communications_claims),
+            )
+            self.assertEqual(
+                workspace.portal_transport.read_text().strip(),
+                transport_jwt(portal_claims),
+            )
+            self.assertEqual(
+                workspace.expiry_transport.read_text().strip(),
+                transport_jwt(expiry_claims),
+            )
+            self.assertEqual(
+                workspace.user_actor.read_text().strip(),
+                actor_jwt(current_user_claims),
+            )
             receipt = json.loads(workspace.receipt.read_text())
             self.assertEqual(
                 set(receipt),
-                {"schemaVersion", "status", "issuerUri", "principalReference", "refreshedAtUtc", "tokenExpirationsUtc"},
+                {
+                    "schemaVersion",
+                    "status",
+                    "transportIssuer",
+                    "transportAudience",
+                    "actorIssuer",
+                    "principalReference",
+                    "refreshedAtUtc",
+                    "tokenExpirationsUtc",
+                },
             )
+            self.assertEqual(receipt["schemaVersion"], "bolt-phase0-token-refresh/v2")
+            self.assertEqual(receipt["transportIssuer"], "XFramework.IdentityServer")
+            self.assertEqual(receipt["transportAudience"], "XFramework.Bolt.Hub")
+            self.assertEqual(receipt["actorIssuer"], ISSUER)
             receipt_text = workspace.receipt.read_text()
-            for secret in (CLIENT_SECRET, PASSWORD, jwt(communications_claims), jwt(expiry_claims), jwt(current_user_claims)):
+            for secret in (
+                CLIENT_SECRET,
+                PORTAL_CLIENT_SECRET,
+                PASSWORD,
+                transport_jwt(communications_claims),
+                transport_jwt(portal_claims),
+                transport_jwt(expiry_claims),
+                actor_jwt(current_user_claims),
+            ):
                 self.assertNotIn(secret, receipt_text)
-            for path in (workspace.communications, workspace.user, workspace.expiry, workspace.ca, workspace.env):
+            for path in (
+                workspace.communications_transport,
+                workspace.portal_transport,
+                workspace.user_actor,
+                workspace.expiry_transport,
+                workspace.env,
+            ):
                 self.assertNotIn(str(path), receipt_text)
             self.assertEqual([request[4] for request in factory.requests], [
+                "/api/service-identity/bolt-transport-token",
                 "/api/service-identity/bolt-transport-token",
                 "/api/service-identity/bolt-transport-token",
                 "/api/auth/authenticate",
             ])
             first_body = json.loads(factory.requests[0][5])
-            user_body = json.loads(factory.requests[2][5])
+            portal_body = json.loads(factory.requests[1][5])
+            user_body = json.loads(factory.requests[3][5])
             self.assertEqual(first_body, {"clientId": "XFramework.Communications", "clientSecret": CLIENT_SECRET})
+            self.assertEqual(
+                portal_body,
+                {"clientId": "XFramework.Portal", "clientSecret": PORTAL_CLIENT_SECRET},
+            )
             self.assertEqual(user_body["password"], PASSWORD)
             self.assertEqual(user_body["metadata"]["tenantId"], TENANT_ID)
             self.assertEqual(user_body["metadata"]["credentialId"], CREDENTIAL_ID)
@@ -529,6 +683,15 @@ class RefreshTokenHookTests(unittest.TestCase):
             factory = ConnectionFactory(
                 [
                     FakeResponse(service_response(service_claims(now, uuid.uuid4().hex))),
+                    FakeResponse(
+                        service_response(
+                            service_claims(
+                                now,
+                                uuid.uuid4().hex,
+                                client_id="XFramework.Portal",
+                            )
+                        )
+                    ),
                     FakeResponse(service_response(service_claims(now, uuid.uuid4().hex, exp=now + 90))),
                     FakeResponse(user_response(user_claims(now, str(uuid.uuid4())))),
                 ]
@@ -538,13 +701,19 @@ class RefreshTokenHookTests(unittest.TestCase):
                 str(workspace.receipt),
                 False,
                 connection_factory=factory,
-                context_factory=lambda _: FakeContext(),
+                context_factory=lambda: FakeContext(),
                 now_provider=lambda: now,
             )
-            self.assertEqual(workspace.expiry.read_bytes(), b"")
-            self.assertEqual(set(json.loads(workspace.receipt.read_text())["tokenExpirationsUtc"]), {"communications", "user"})
+            self.assertEqual(workspace.expiry_transport.read_bytes(), b"")
+            self.assertEqual(
+                set(json.loads(workspace.receipt.read_text())["tokenExpirationsUtc"]),
+                {"communicationsTransport", "portalTransport", "userActor"},
+            )
             if refresh.ENFORCE_POSIX_PERMISSIONS:
-                self.assertEqual(stat.S_IMODE(workspace.expiry.stat().st_mode) & 0o077, 0)
+                self.assertEqual(
+                    stat.S_IMODE(workspace.expiry_transport.stat().st_mode) & 0o077,
+                    0,
+                )
 
     def test_subprocess_failure_emits_only_fixed_secret_free_code(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

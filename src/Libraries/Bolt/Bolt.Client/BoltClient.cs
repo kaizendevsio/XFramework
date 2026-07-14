@@ -951,14 +951,34 @@ public sealed class BoltClient : IAsyncDisposable
     /// Permanently unregister a durable subscriber from a topic.
     /// Normal durable subscription cancellation only detaches the live connection.
     /// </summary>
-    public async ValueTask UnregisterDurableSubscriptionAsync(string topic, string subscriberId, CancellationToken ct = default)
+    public ValueTask UnregisterDurableSubscriptionAsync(
+        string topic,
+        string subscriberId,
+        CancellationToken ct = default) =>
+        UnregisterDurableSubscriptionCoreAsync(topic, subscriberId, null, ct);
+
+    /// <summary>
+    /// Permanently unregister a durable subscriber using an end-user actor token.
+    /// </summary>
+    public ValueTask UnregisterDurableSubscriptionWithActorAsync(
+        string topic,
+        string subscriberId,
+        string actorAccessToken,
+        CancellationToken ct = default) =>
+        UnregisterDurableSubscriptionCoreAsync(topic, subscriberId, actorAccessToken, ct);
+
+    private async ValueTask UnregisterDurableSubscriptionCoreAsync(
+        string topic,
+        string subscriberId,
+        string? actorAccessToken,
+        CancellationToken ct)
     {
         var topicHash = BoltCodec.Fnv1aHash(topic);
         _durableSubscriptions.TryRemove((topicHash, subscriberId), out _);
 
         var conn = GetPrimaryConnection();
         var w = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteUnsubscribe(w, topic, subscriberId);
+        BoltCodec.WriteUnsubscribe(w, topic, subscriberId, actorAccessToken: actorAccessToken);
         await conn.SendAsync(w.WrittenMemory, ct);
         w.Reset();
     }
@@ -966,14 +986,31 @@ public sealed class BoltClient : IAsyncDisposable
     /// <summary>
     /// Permanently unregister a transient subscriber from a topic.
     /// </summary>
-    public async ValueTask UnsubscribeAsync(string topic, CancellationToken ct = default)
+    public ValueTask UnsubscribeAsync(
+        string topic,
+        CancellationToken ct = default) =>
+        UnsubscribeCoreAsync(topic, null, ct);
+
+    /// <summary>
+    /// Permanently unregister a transient subscriber using an end-user actor token.
+    /// </summary>
+    public ValueTask UnsubscribeWithActorAsync(
+        string topic,
+        string actorAccessToken,
+        CancellationToken ct = default) =>
+        UnsubscribeCoreAsync(topic, actorAccessToken, ct);
+
+    private async ValueTask UnsubscribeCoreAsync(
+        string topic,
+        string? actorAccessToken,
+        CancellationToken ct)
     {
         var topicHash = BoltCodec.Fnv1aHash(topic);
         _transientSubscriptions.TryRemove(topicHash, out _);
 
         var conn = GetPrimaryConnection();
         var w = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteUnsubscribe(w, topic, _clientId);
+        BoltCodec.WriteUnsubscribe(w, topic, _clientId, actorAccessToken: actorAccessToken);
         await conn.SendAsync(w.WrittenMemory, ct);
         w.Reset();
     }

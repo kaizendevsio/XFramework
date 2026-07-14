@@ -28,6 +28,13 @@ apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugi
 # 2. Add user to docker group (rootless access)
 echo "[2/5] Configuring user access..."
 usermod -aG docker xeon
+if id -u github-runner >/dev/null 2>&1; then
+    # The deployment gate reads only the bounded tailscaled journal window used
+    # to prove disposable WebSocket query tokens are not retained by Serve.
+    usermod -aG systemd-journal github-runner
+    # The Docker-capable deployment account owns Tailscale Serve configuration.
+    tailscale set --operator=github-runner
+fi
 
 # 3. Enable Docker service
 echo "[3/5] Enabling Docker service..."
@@ -60,8 +67,9 @@ echo "[5/5] Configuring firewall..."
 if command -v ufw &> /dev/null; then
     ufw allow OpenSSH
     ufw allow 5432/tcp   comment 'Postgres'
-    ufw allow 7000/tcp   comment 'StreamFlow'
-    ufw allow 8261/tcp   comment 'IdentityServer'
+    # Bolt and IdentityServer are loopback backends exposed only by Tailscale Serve.
+    ufw --force delete allow 7000/tcp 2>/dev/null || true
+    ufw --force delete allow 8261/tcp 2>/dev/null || true
     ufw allow 5148/tcp   comment 'Communications'
     ufw allow 5166/tcp   comment 'Notifications'
     ufw allow 5182/tcp   comment 'Attendance'

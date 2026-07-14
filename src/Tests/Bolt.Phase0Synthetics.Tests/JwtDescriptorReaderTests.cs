@@ -13,8 +13,13 @@ public sealed class JwtDescriptorReaderTests
         var token = CreateToken(new Dictionary<string, object>
         {
             ["exp"] = expiration,
-            ["scope"] = "openid bolt.service",
-            ["client_id"] = "XFramework.Communications"
+            ["iss"] = "XFramework.IdentityServer",
+            ["aud"] = "XFramework.Bolt.Hub",
+            ["scope"] = "bolt.service",
+            ["client_credential_generation"] = "generation-2",
+            ["client_id"] = "XFramework.Communications",
+            ["service"] = "XFramework.Communications",
+            ["sub"] = "XFramework.Communications"
         });
 
         var descriptor = JwtDescriptorReader.Read(token);
@@ -24,7 +29,7 @@ public sealed class JwtDescriptorReaderTests
     }
 
     [Test]
-    public void Read_UserTokenClaims_ReturnsNullServiceName()
+    public void Read_UserActorTokenClaims_FailsClosed()
     {
         var expiration = DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeSeconds();
         var token = CreateToken(new Dictionary<string, object>
@@ -34,9 +39,32 @@ public sealed class JwtDescriptorReaderTests
             ["sub"] = Guid.NewGuid().ToString("N")
         });
 
-        var descriptor = JwtDescriptorReader.Read(token);
+        var action = () => JwtDescriptorReader.Read(token);
 
-        descriptor.ServiceName.Should().BeNull();
+        action.Should().Throw<SyntheticConfigurationException>()
+            .Which.Code.Should().Be("invalid_expiry_token_claims");
+    }
+
+    [Test]
+    public void Read_MismatchedTransportIdentityClaims_FailsClosed()
+    {
+        var expiration = DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeSeconds();
+        var token = CreateToken(new Dictionary<string, object>
+        {
+            ["exp"] = expiration,
+            ["iss"] = "XFramework.IdentityServer",
+            ["aud"] = "XFramework.Bolt.Hub",
+            ["scope"] = "bolt.service",
+            ["client_credential_generation"] = "generation-2",
+            ["client_id"] = "XFramework.Communications",
+            ["service"] = "XFramework.Portal",
+            ["sub"] = "XFramework.Communications"
+        });
+
+        var action = () => JwtDescriptorReader.Read(token);
+
+        action.Should().Throw<SyntheticConfigurationException>()
+            .Which.Code.Should().Be("invalid_expiry_token_claims");
     }
 
     [Test]
@@ -52,7 +80,12 @@ public sealed class JwtDescriptorReaderTests
 
     private static SecretToken CreateToken(IReadOnlyDictionary<string, object> claims)
     {
-        var header = Base64Url(JsonSerializer.SerializeToUtf8Bytes(new { alg = "none", typ = "JWT" }));
+        var header = Base64Url(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            alg = "RS256",
+            kid = "bolt-test-key",
+            typ = "bolt+jwt"
+        }));
         var payload = Base64Url(JsonSerializer.SerializeToUtf8Bytes(claims));
         return new SecretToken($"{header}.{payload}.signature");
     }

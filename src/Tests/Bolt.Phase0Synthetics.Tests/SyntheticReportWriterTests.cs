@@ -13,7 +13,7 @@ public sealed class SyntheticReportWriterTests
         var report = new SyntheticReport(
             SyntheticReportValidator.SchemaVersion,
             Guid.NewGuid(),
-            new Dictionary<string, string> { ["user"] = "0123456789ab" },
+            new Dictionary<string, string> { ["user_actor"] = "0123456789ab" },
             now,
             now.AddMilliseconds(12),
             "wss://bolt.example.test/bolt/ws",
@@ -80,7 +80,7 @@ public sealed class SyntheticReportWriterTests
         var report = new SyntheticReport(
             SyntheticReportValidator.SchemaVersion,
             Guid.NewGuid(),
-            new Dictionary<string, string> { ["user"] = "0123456789ab" },
+            new Dictionary<string, string> { ["user_actor"] = "0123456789ab" },
             now,
             now,
             "wss://bolt.example.test/bolt/ws",

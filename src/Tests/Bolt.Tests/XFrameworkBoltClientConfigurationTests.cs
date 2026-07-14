@@ -62,9 +62,11 @@ public class XFrameworkBoltClientConfigurationTests
             .WithMessage("BoltConfiguration:ServerUrls:1 must use wss:// or https://*");
     }
 
+    [TestCase("Development")]
     [TestCase("Staging")]
     [TestCase("Production")]
-    public void AddXFrameworkBoltClient_NonDevelopmentPlaintextUrl_Throws(string environmentName)
+    public void AddXFrameworkBoltClient_SecureTransportExplicitlyDisabled_AllowsPlaintextUrl(
+        string environmentName)
     {
         var configuration = CreateConfiguration("ws://localhost:9999/bolt", requireSecureTransport: false);
         var services = CreateServices();
@@ -73,21 +75,6 @@ public class XFrameworkBoltClientConfigurationTests
             configuration,
             autoConnect: false,
             hostEnvironment: new TestHostEnvironment(environmentName));
-
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*must use wss:// or https://*secure transport is required*");
-    }
-
-    [Test]
-    public void AddXFrameworkBoltClient_DevelopmentPlaintextUrl_Succeeds()
-    {
-        var configuration = CreateConfiguration("ws://localhost:9999/bolt", requireSecureTransport: false);
-        var services = CreateServices();
-
-        var act = () => services.AddXFrameworkBoltClient(
-            configuration,
-            autoConnect: false,
-            hostEnvironment: new TestHostEnvironment(Environments.Development));
 
         act.Should().NotThrow();
     }

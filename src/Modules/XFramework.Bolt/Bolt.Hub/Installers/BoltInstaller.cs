@@ -35,8 +35,7 @@ public sealed class BoltInstaller : IInstaller
                     ? boltConfiguration.QueueDepth
                     : options.SendQueueCapacity;
             options.SendEnqueueTimeoutMs = boltConfiguration.SendEnqueueTimeoutMs;
-            options.RequireSecureTransport = !hostEnvironment.IsDevelopment() ||
-                                             boltConfiguration.RequireSecureTransport;
+            options.RequireSecureTransport = boltConfiguration.RequireSecureTransport;
             options.MediaEnabled = boltConfiguration.MediaEnabled;
             options.MaxPendingRpcCalls = boltConfiguration.MaxPendingRpcCalls;
             options.MaxPendingRpcCallsPerPrincipal = boltConfiguration.MaxPendingRpcCallsPerPrincipal;

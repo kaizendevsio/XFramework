@@ -10,18 +10,26 @@ public sealed class SyntheticOptionsParser(
     public const string TenantEnvironmentVariable = "BOLT_SYNTHETIC_TENANT_ID";
     public const string CredentialEnvironmentVariable = "BOLT_SYNTHETIC_CREDENTIAL_ID";
     public const string DeviceEnvironmentVariable = "BOLT_SYNTHETIC_DEVICE_ID";
-    public const string CommunicationsTokenEnvironmentNameVariable = "BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_ENV";
-    public const string UserTokenEnvironmentNameVariable = "BOLT_SYNTHETIC_USER_TOKEN_ENV";
-    public const string ExpiryTokenEnvironmentNameVariable = "BOLT_SYNTHETIC_EXPIRY_TOKEN_ENV";
-    public const string DefaultCommunicationsTokenEnvironmentVariable = "BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN";
-    public const string DefaultUserTokenEnvironmentVariable = "BOLT_SYNTHETIC_USER_TOKEN";
-    public const string DefaultExpiryTokenEnvironmentVariable = "BOLT_SYNTHETIC_EXPIRY_TOKEN";
-    public const string CommunicationsTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_COMMUNICATIONS_TOKEN_FILE";
-    public const string UserTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_USER_TOKEN_FILE";
-    public const string ExpiryTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_EXPIRY_TOKEN_FILE";
-    public const string RejectedCommunicationsTokenFileEnvironmentVariable =
-        "BOLT_SYNTHETIC_REJECTED_COMMUNICATIONS_TOKEN_FILE";
-    public const string RejectedUserTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_REJECTED_USER_TOKEN_FILE";
+    public const string CommunicationsTransportTokenEnvironmentNameVariable =
+        "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_ENV";
+    public const string PortalTransportTokenEnvironmentNameVariable = "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_ENV";
+    public const string UserActorTokenEnvironmentNameVariable = "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_ENV";
+    public const string ExpiryTransportTokenEnvironmentNameVariable = "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_ENV";
+    public const string DefaultCommunicationsTransportTokenEnvironmentVariable =
+        "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN";
+    public const string DefaultPortalTransportTokenEnvironmentVariable = "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN";
+    public const string DefaultUserActorTokenEnvironmentVariable = "BOLT_SYNTHETIC_USER_ACTOR_TOKEN";
+    public const string DefaultExpiryTransportTokenEnvironmentVariable = "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN";
+    public const string CommunicationsTransportTokenFileEnvironmentVariable =
+        "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_FILE";
+    public const string PortalTransportTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_FILE";
+    public const string UserActorTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_FILE";
+    public const string ExpiryTransportTokenFileEnvironmentVariable =
+        "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_FILE";
+    public const string RejectedCommunicationsTransportTokenFileEnvironmentVariable =
+        "BOLT_SYNTHETIC_REJECTED_COMMUNICATIONS_TRANSPORT_TOKEN_FILE";
+    public const string RejectedPortalTransportTokenFileEnvironmentVariable =
+        "BOLT_SYNTHETIC_REJECTED_PORTAL_TRANSPORT_TOKEN_FILE";
 
     private readonly Func<string, SecretToken> _readTokenFile =
         readTokenFile ?? SecretTokenFileReader.Read;
@@ -32,10 +40,11 @@ public sealed class SyntheticOptionsParser(
         "--tenant-id",
         "--credential-id",
         "--device-id",
-        "--communications-token-env",
-        "--user-token-env",
+        "--communications-transport-token-env",
+        "--portal-transport-token-env",
+        "--user-actor-token-env",
         "--operation-timeout-seconds",
-        "--expiry-token-env",
+        "--expiry-transport-token-env",
         "--expiry-grace-seconds",
         "--expiry-max-wait-seconds"
     ];
@@ -58,16 +67,30 @@ public sealed class SyntheticOptionsParser(
             "invalid_credential_id");
         var deviceId = RequiredValue(cli, "--device-id", DeviceEnvironmentVariable, "missing_device_id");
 
-        var communicationsToken = ReadToken(
-            CommunicationsTokenFileEnvironmentVariable,
-            TokenEnvironmentName(cli, "--communications-token-env", CommunicationsTokenEnvironmentNameVariable,
-                DefaultCommunicationsTokenEnvironmentVariable),
-            "missing_communications_token");
-        var userToken = ReadToken(
-            UserTokenFileEnvironmentVariable,
-            TokenEnvironmentName(cli, "--user-token-env", UserTokenEnvironmentNameVariable,
-                DefaultUserTokenEnvironmentVariable),
-            "missing_user_token");
+        var communicationsTransportToken = ReadToken(
+            CommunicationsTransportTokenFileEnvironmentVariable,
+            TokenEnvironmentName(
+                cli,
+                "--communications-transport-token-env",
+                CommunicationsTransportTokenEnvironmentNameVariable,
+                DefaultCommunicationsTransportTokenEnvironmentVariable),
+            "missing_communications_transport_token");
+        var portalTransportToken = ReadToken(
+            PortalTransportTokenFileEnvironmentVariable,
+            TokenEnvironmentName(
+                cli,
+                "--portal-transport-token-env",
+                PortalTransportTokenEnvironmentNameVariable,
+                DefaultPortalTransportTokenEnvironmentVariable),
+            "missing_portal_transport_token");
+        var userActorToken = ReadToken(
+            UserActorTokenFileEnvironmentVariable,
+            TokenEnvironmentName(
+                cli,
+                "--user-actor-token-env",
+                UserActorTokenEnvironmentNameVariable,
+                DefaultUserActorTokenEnvironmentVariable),
+            "missing_user_actor_token");
 
         var operationTimeout = TimeSpan.FromSeconds(ParseInteger(
             OptionalValue(cli, "--operation-timeout-seconds", "BOLT_SYNTHETIC_OPERATION_TIMEOUT_SECONDS") ?? "30",
@@ -79,23 +102,25 @@ public sealed class SyntheticOptionsParser(
             OptionalValue(cli, "--expiry-max-wait-seconds", "BOLT_SYNTHETIC_EXPIRY_MAX_WAIT_SECONDS") ?? "180",
             "invalid_expiry_max_wait"));
 
-        var expiryToken = ReadOptionalExpiryToken(cli);
-        var rejectedCommunicationsToken = ReadOptionalFileToken(
-            RejectedCommunicationsTokenFileEnvironmentVariable);
-        var rejectedUserToken = ReadOptionalFileToken(RejectedUserTokenFileEnvironmentVariable);
+        var expiryTransportToken = ReadOptionalExpiryTransportToken(cli);
+        var rejectedCommunicationsTransportToken = ReadOptionalFileToken(
+            RejectedCommunicationsTransportTokenFileEnvironmentVariable);
+        var rejectedPortalTransportToken = ReadOptionalFileToken(
+            RejectedPortalTransportTokenFileEnvironmentVariable);
         var options = new SyntheticOptions(
             target,
             tenantId,
             credentialId,
             deviceId,
-            communicationsToken,
-            userToken,
+            communicationsTransportToken,
+            portalTransportToken,
+            userActorToken,
             operationTimeout,
-            expiryToken,
+            expiryTransportToken,
             expiryGrace,
             expiryMaxWait,
-            rejectedCommunicationsToken,
-            rejectedUserToken);
+            rejectedCommunicationsTransportToken,
+            rejectedPortalTransportToken);
         SyntheticOptionsValidator.Validate(options);
         return options;
     }
@@ -106,20 +131,23 @@ public sealed class SyntheticOptionsParser(
         return string.IsNullOrWhiteSpace(tokenFile) ? null : _readTokenFile(tokenFile);
     }
 
-    private SecretToken? ReadOptionalExpiryToken(IReadOnlyDictionary<string, string> cli)
+    private SecretToken? ReadOptionalExpiryTransportToken(IReadOnlyDictionary<string, string> cli)
     {
-        var tokenFile = readEnvironment(ExpiryTokenFileEnvironmentVariable)?.Trim();
+        var tokenFile = readEnvironment(ExpiryTransportTokenFileEnvironmentVariable)?.Trim();
         if (!string.IsNullOrWhiteSpace(tokenFile))
             return _readTokenFile(tokenFile);
 
-        var configuredName = OptionalValue(cli, "--expiry-token-env", ExpiryTokenEnvironmentNameVariable);
+        var configuredName = OptionalValue(
+            cli,
+            "--expiry-transport-token-env",
+            ExpiryTransportTokenEnvironmentNameVariable);
         if (string.IsNullOrWhiteSpace(configuredName))
         {
-            var defaultValue = readEnvironment(DefaultExpiryTokenEnvironmentVariable);
+            var defaultValue = readEnvironment(DefaultExpiryTransportTokenEnvironmentVariable);
             return string.IsNullOrWhiteSpace(defaultValue) ? null : new SecretToken(defaultValue);
         }
 
-        return ReadEnvironmentToken(configuredName, "missing_expiry_token");
+        return ReadEnvironmentToken(configuredName, "missing_expiry_transport_token");
     }
 
     private SecretToken ReadToken(

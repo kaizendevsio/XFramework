@@ -37,9 +37,10 @@ public sealed class SyntheticReportValidatorTests
         {
             TokenSha256Prefixes = new Dictionary<string, string>
             {
-                ["communications"] = "0123456789ab",
-                ["user"] = "123456789abc",
-                ["rejected_user"] = "23456789abcd"
+                ["communications_transport"] = "0123456789ab",
+                ["portal_transport"] = "123456789abc",
+                ["user_actor"] = "23456789abcd",
+                ["rejected_portal_transport"] = "3456789abcde"
             }
         };
 
@@ -91,8 +92,9 @@ public sealed class SyntheticReportValidatorTests
             Guid.NewGuid(),
             new Dictionary<string, string>
             {
-                ["communications"] = "0123456789ab",
-                ["user"] = "123456789abc"
+                ["communications_transport"] = "0123456789ab",
+                ["portal_transport"] = "123456789abc",
+                ["user_actor"] = "23456789abcd"
             },
             started,
             completed,

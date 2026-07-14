@@ -194,6 +194,12 @@ For each core phase:
 
 No phase requires a custom root trust hierarchy, certificate ceremony, or hundreds of lines of deployment evidence to be considered complete.
 
+### First Transition Gate
+
+The one-time move from the retained TLS deployment to the Tailscale boundary is dispatch-only. Before that dispatch, an operator must restore and health-check the exact legacy bundle, apply the tailnet ACL, and run connection probes from distinct allowed and denied tailnet identities. A fresh, private host attestation records those results and the selected legacy release. Automatic `develop` deployments resume after the first Tailscale release becomes the normal rollback baseline.
+
+This gate is transitional deployment evidence only. It does not add certificate, ACL, or trust-management responsibility to Bolt, IdentityServer, or application containers.
+
 ## Immediate Order
 
 1. Finish and merge the current Hub authorization-model loading/tenant-context fix for H19 as its own PR.

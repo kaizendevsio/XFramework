@@ -2,10 +2,14 @@ using System.Text.Json;
 
 namespace XFramework.Bolt.Phase0Synthetics;
 
-public sealed record JwtDescriptor(DateTimeOffset ExpiresAtUtc, string? ServiceName);
+public sealed record JwtDescriptor(DateTimeOffset ExpiresAtUtc, string ServiceName);
 
 public static class JwtDescriptorReader
 {
+    private const string TransportIssuer = "XFramework.IdentityServer";
+    private const string TransportAudience = "XFramework.Bolt.Hub";
+    private const string TransportScope = "bolt.service";
+
     public static JwtDescriptor Read(SecretToken token)
     {
         try
@@ -14,17 +18,29 @@ public static class JwtDescriptorReader
             if (segments.Length != 3)
                 throw new SyntheticConfigurationException("invalid_expiry_token_claims");
 
-            var payload = DecodeBase64Url(segments[1]);
-            using var document = JsonDocument.Parse(payload);
-            var root = document.RootElement;
-            if (!TryReadExpiration(root, out var expiration))
+            using var headerDocument = JsonDocument.Parse(DecodeBase64Url(segments[0]));
+            using var claimsDocument = JsonDocument.Parse(DecodeBase64Url(segments[1]));
+            var header = headerDocument.RootElement;
+            var claims = claimsDocument.RootElement;
+            if (!IsTransportHeader(header) ||
+                !TryReadExpiration(claims, out var expiration) ||
+                !HasExpectedAudience(claims) ||
+                ReadString(claims, "iss") != TransportIssuer ||
+                ReadString(claims, "scope") != TransportScope ||
+                string.IsNullOrWhiteSpace(ReadString(claims, "client_credential_generation")))
+            {
                 throw new SyntheticConfigurationException("invalid_expiry_token_claims");
+            }
 
-            var serviceName = HasServiceScope(root) ? ReadServiceName(root) : null;
-            if (HasServiceScope(root) && string.IsNullOrWhiteSpace(serviceName))
+            var clientId = ReadString(claims, "client_id");
+            if (string.IsNullOrWhiteSpace(clientId) ||
+                ReadString(claims, "service") != clientId ||
+                ReadString(claims, "sub") != clientId)
+            {
                 throw new SyntheticConfigurationException("invalid_expiry_token_claims");
+            }
 
-            return new JwtDescriptor(DateTimeOffset.FromUnixTimeSeconds(expiration), serviceName);
+            return new JwtDescriptor(DateTimeOffset.FromUnixTimeSeconds(expiration), clientId);
         }
         catch (SyntheticConfigurationException)
         {
@@ -59,40 +75,25 @@ public static class JwtDescriptorReader
             : element.ValueKind == JsonValueKind.String && long.TryParse(element.GetString(), out expiration);
     }
 
-    private static bool HasServiceScope(JsonElement root)
+    private static bool IsTransportHeader(JsonElement header) =>
+        ReadString(header, "alg") == "RS256" &&
+        ReadString(header, "typ") == "bolt+jwt" &&
+        !string.IsNullOrWhiteSpace(ReadString(header, "kid"));
+
+    private static bool HasExpectedAudience(JsonElement claims)
     {
-        foreach (var claimName in new[] { "scope", "scp" })
-        {
-            if (!root.TryGetProperty(claimName, out var element))
-                continue;
+        if (!claims.TryGetProperty("aud", out var audience))
+            return false;
 
-            if (element.ValueKind == JsonValueKind.String &&
-                element.GetString()!.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .Contains("bolt.service", StringComparer.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            if (element.ValueKind == JsonValueKind.Array &&
-                element.EnumerateArray().Any(static value =>
-                    value.ValueKind == JsonValueKind.String &&
-                    string.Equals(value.GetString(), "bolt.service", StringComparison.OrdinalIgnoreCase)))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return audience.ValueKind == JsonValueKind.String
+            ? audience.GetString() == TransportAudience
+            : audience.ValueKind == JsonValueKind.Array &&
+              audience.EnumerateArray().Any(static value =>
+                  value.ValueKind == JsonValueKind.String && value.GetString() == TransportAudience);
     }
 
-    private static string? ReadServiceName(JsonElement root)
-    {
-        foreach (var claimName in new[] { "client_id", "service", "azp", "sub" })
-        {
-            if (root.TryGetProperty(claimName, out var element) && element.ValueKind == JsonValueKind.String)
-                return element.GetString();
-        }
-
-        return null;
-    }
+    private static string? ReadString(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var element) && element.ValueKind == JsonValueKind.String
+            ? element.GetString()
+            : null;
 }

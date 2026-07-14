@@ -32,8 +32,8 @@ public static class SyntheticOptionsValidator
             throw new SyntheticConfigurationException("invalid_expiry_max_wait");
         }
 
-        if (options.RejectedCommunicationsToken?.HasSameValue(options.CommunicationsToken) == true ||
-            options.RejectedUserToken?.HasSameValue(options.UserToken) == true)
+        if (options.RejectedCommunicationsTransportToken?.HasSameValue(options.CommunicationsTransportToken) == true ||
+            options.RejectedPortalTransportToken?.HasSameValue(options.PortalTransportToken) == true)
         {
             throw new SyntheticConfigurationException("old_generation_token_matches_current");
         }

@@ -5,11 +5,12 @@ public sealed record SyntheticOptions(
     Guid TenantId,
     Guid CredentialId,
     string DeviceId,
-    SecretToken CommunicationsToken,
-    SecretToken UserToken,
+    SecretToken CommunicationsTransportToken,
+    SecretToken PortalTransportToken,
+    SecretToken UserActorToken,
     TimeSpan OperationTimeout,
-    SecretToken? ExpiryToken,
+    SecretToken? ExpiryTransportToken,
     TimeSpan ExpiryGrace,
     TimeSpan ExpiryMaxWait,
-    SecretToken? RejectedCommunicationsToken,
-    SecretToken? RejectedUserToken);
+    SecretToken? RejectedCommunicationsTransportToken,
+    SecretToken? RejectedPortalTransportToken);
