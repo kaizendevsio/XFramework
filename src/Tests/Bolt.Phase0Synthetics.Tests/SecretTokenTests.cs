@@ -30,7 +30,7 @@ public sealed class SecretTokenTests
         var report = new SyntheticReport(
             SyntheticReportValidator.SchemaVersion,
             Guid.NewGuid(),
-            new Dictionary<string, string> { ["user"] = token.Sha256Prefix },
+            new Dictionary<string, string> { ["user_actor"] = token.Sha256Prefix },
             now,
             now,
             "wss://bolt.example.test/bolt/ws",

@@ -4,7 +4,7 @@ namespace XFramework.Bolt.Phase0Synthetics;
 
 public static partial class SyntheticReportValidator
 {
-    public const string SchemaVersion = "bolt-phase0-synthetic-report/v1";
+    public const string SchemaVersion = "bolt-phase0-synthetic-report/v2";
 
     private static readonly HashSet<string> AllowedStatuses = ["passed", "failed"];
     private static readonly HashSet<string> RequiredPassedOperations =
@@ -50,7 +50,12 @@ public static partial class SyntheticReportValidator
     {
         var allowedNames = new HashSet<string>(StringComparer.Ordinal)
         {
-            "communications", "user", "expiry", "rejected_communications", "rejected_user"
+            "communications_transport",
+            "portal_transport",
+            "user_actor",
+            "expiry_transport",
+            "rejected_communications_transport",
+            "rejected_portal_transport"
         };
         foreach (var (name, value) in evidence)
         {
@@ -86,8 +91,9 @@ public static partial class SyntheticReportValidator
         {
             if (report.Target is null || report.Operations.Any(static operation => operation.Status != "passed") ||
                 !RequiredPassedOperations.IsSubsetOf(names) ||
-                !report.TokenSha256Prefixes.ContainsKey("communications") ||
-                !report.TokenSha256Prefixes.ContainsKey("user"))
+                !report.TokenSha256Prefixes.ContainsKey("communications_transport") ||
+                !report.TokenSha256Prefixes.ContainsKey("portal_transport") ||
+                !report.TokenSha256Prefixes.ContainsKey("user_actor"))
             {
                 throw new InvalidOperationException("A passing synthetic report is incomplete.");
             }
@@ -100,17 +106,21 @@ public static partial class SyntheticReportValidator
                 throw new InvalidOperationException("A passing synthetic report has incomplete acknowledgement evidence.");
             }
 
-            RequireOperationForEvidence(report.TokenSha256Prefixes, names, "expiry", "token_expiry_disconnect");
             RequireOperationForEvidence(
                 report.TokenSha256Prefixes,
                 names,
-                "rejected_communications",
-                "old_generation_communications_token_rejection");
+                "expiry_transport",
+                "token_expiry_disconnect");
             RequireOperationForEvidence(
                 report.TokenSha256Prefixes,
                 names,
-                "rejected_user",
-                "old_generation_user_token_rejection");
+                "rejected_communications_transport",
+                "old_generation_communications_transport_token_rejection");
+            RequireOperationForEvidence(
+                report.TokenSha256Prefixes,
+                names,
+                "rejected_portal_transport",
+                "old_generation_portal_transport_token_rejection");
         }
         else if (report.Operations.Count == 0 || report.Operations.All(static operation => operation.Status == "passed"))
         {

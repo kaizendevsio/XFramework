@@ -112,8 +112,7 @@ The mental model is:
 
 - The xeon-dev service name is `attendance`.
 - The service readiness endpoint is `http://localhost:5182/health/ready` in the dev deployment workflow.
-- Attendance has a service-specific workflow at `.github/workflows/deploy-xeon-dev-attendance.yml`.
-- Shared stack changes may instead flow through `.github/workflows/deploy-xeon-dev.yml`.
+- Attendance changes flow through the single full-stack `.github/workflows/deploy-xeon-dev.yml` deployment.
 - Docker runtime settings live with `Attendance.Api`, including `appsettings.Docker.json`, and the root `docker-compose.yml` service definition.
 - If deployment, Bolt connectivity, health checks, ports, or compose wiring change, update this guide and add or update integration coverage.
 

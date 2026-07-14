@@ -10,6 +10,7 @@ namespace XFramework.Bolt.Phase0Synthetics;
 public sealed class BoltPhase0SyntheticRunner
 {
     private const string CommunicationsServiceName = "XFramework.Communications";
+    private const string PortalServiceName = "XFramework.Portal";
     private const string IdentityServerServiceName = "XFramework.IdentityServer";
     private const int DurableMessageCount = 3;
 
@@ -37,19 +38,17 @@ public sealed class BoltPhase0SyntheticRunner
 
         try
         {
-            var userClientId = $"phase0-synthetic-{runId:N}";
-            userClient = CreateClient(
-                options,
-                userClientId,
-                "Bolt.Phase0Synthetic.User",
-                options.UserToken);
+            userClient = CreatePortalClient(options);
             await recorder.RunAsync(
                 "user_registration",
                 async operationCt =>
                 {
                     await userClient.ConnectAsync(operationCt);
                     EnsureConnected(userClient);
-                    return Results(("authenticated", true), ("registered", true));
+                    return Results(
+                        ("portal_transport_authenticated", true),
+                        ("portal_service_registered", true),
+                        ("actor_token_separate", true));
                 },
                 ct);
 
@@ -66,7 +65,7 @@ public sealed class BoltPhase0SyntheticRunner
                 options,
                 Sha256Hex(CommunicationsServiceName),
                 CommunicationsServiceName,
-                options.CommunicationsToken);
+                options.CommunicationsTransportToken);
             await recorder.RunAsync(
                 "communications_registration",
                 async operationCt =>
@@ -77,34 +76,34 @@ public sealed class BoltPhase0SyntheticRunner
                 },
                 ct);
 
-            if (options.RejectedUserToken is not null)
+            if (options.RejectedPortalTransportToken is not null)
             {
                 await recorder.RunAsync(
-                    "old_generation_user_token_rejection",
+                    "old_generation_portal_transport_token_rejection",
                     async operationCt =>
                     {
                         await ValidateTokenRegistrationRejectedAsync(
                             options,
-                            $"phase0-rejected-user-{runId:N}",
-                            "Bolt.Phase0Synthetic.RejectedUser",
-                            options.RejectedUserToken,
+                            Sha256Hex(PortalServiceName),
+                            PortalServiceName,
+                            options.RejectedPortalTransportToken,
                             operationCt);
-                        return Results(("old_generation_rejected", true), ("user_token_rejected", true));
+                        return Results(("old_generation_rejected", true), ("portal_transport_token_rejected", true));
                     },
                     ct);
             }
 
-            if (options.RejectedCommunicationsToken is not null)
+            if (options.RejectedCommunicationsTransportToken is not null)
             {
                 await recorder.RunAsync(
-                    "old_generation_communications_token_rejection",
+                    "old_generation_communications_transport_token_rejection",
                     async operationCt =>
                     {
                         await ValidateTokenRegistrationRejectedAsync(
                             options,
                             Sha256Hex(CommunicationsServiceName),
                             CommunicationsServiceName,
-                            options.RejectedCommunicationsToken,
+                            options.RejectedCommunicationsTransportToken,
                             operationCt);
                         return Results(("old_generation_rejected", true), ("service_token_rejected", true));
                     },
@@ -122,7 +121,10 @@ public sealed class BoltPhase0SyntheticRunner
             transientCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             transientCts.CancelAfter(options.OperationTimeout);
             transientEnumerator = userClient
-                .SubscribeAsync<CommunicationsPresenceState>(presenceTopic, transientCts.Token)
+                .SubscribeAsync<CommunicationsPresenceState>(
+                    presenceTopic,
+                    transientCts.Token,
+                    options.UserActorToken.Reveal())
                 .GetAsyncEnumerator(transientCts.Token);
             var presenceReceiveTask = ReceiveMatchingAsync(
                 transientEnumerator,
@@ -199,11 +201,7 @@ public sealed class BoltPhase0SyntheticRunner
                 },
                 ct);
 
-            userClient = CreateClient(
-                options,
-                $"phase0-replay-{runId:N}",
-                "Bolt.Phase0Synthetic.Replay",
-                options.UserToken);
+            userClient = CreatePortalClient(options);
             var replayMessages = await recorder.RunAsync(
                 "durable_ordered_replay",
                 async operationCt =>
@@ -215,6 +213,7 @@ public sealed class BoltPhase0SyntheticRunner
                         userTopic,
                         subscriberId,
                         expectedEvents,
+                        options.UserActorToken,
                         operationCt);
                     return (
                         received,
@@ -240,11 +239,7 @@ public sealed class BoltPhase0SyntheticRunner
                 ct);
 
             await DisposeClientQuietlyAsync(userClient, options.OperationTimeout);
-            userClient = CreateClient(
-                options,
-                $"phase0-no-redelivery-{runId:N}",
-                "Bolt.Phase0Synthetic.NoRedelivery",
-                options.UserToken);
+            userClient = CreatePortalClient(options);
             await recorder.RunAsync(
                 "durable_no_redelivery",
                 async operationCt =>
@@ -260,7 +255,11 @@ public sealed class BoltPhase0SyntheticRunner
                 "durable_unregister",
                 async operationCt =>
                 {
-                    await userClient.UnregisterDurableSubscriptionAsync(userTopic, subscriberId, operationCt);
+                    await userClient.UnregisterDurableSubscriptionWithActorAsync(
+                        userTopic,
+                        subscriberId,
+                        options.UserActorToken.Reveal(),
+                        operationCt);
                     await IdentityHealthCheckProbe.InvokeAndValidateAsync(userClient, options, operationCt);
                     await DisposeClientQuietlyAsync(userClient, options.OperationTimeout);
                     userClient = null;
@@ -276,15 +275,15 @@ public sealed class BoltPhase0SyntheticRunner
                         options,
                         operationCt);
 
-                    userClient = CreateClient(
-                        options,
-                        $"phase0-unregister-verify-{runId:N}",
-                        "Bolt.Phase0Synthetic.UnregisterVerify",
-                        options.UserToken);
+                    userClient = CreatePortalClient(options);
                     await userClient.ConnectAsync(operationCt);
                     EnsureConnected(userClient);
                     await VerifyNoReplayAsync(userClient, userTopic, subscriberId, options, operationCt);
-                    await userClient.UnregisterDurableSubscriptionAsync(userTopic, subscriberId, operationCt);
+                    await userClient.UnregisterDurableSubscriptionWithActorAsync(
+                        userTopic,
+                        subscriberId,
+                        options.UserActorToken.Reveal(),
+                        operationCt);
                     await IdentityHealthCheckProbe.InvokeAndValidateAsync(userClient, options, operationCt);
                     durableUnregistered = true;
                     return Results(("permanently_unregistered", true), ("post_unregister_not_queued", true));
@@ -316,16 +315,16 @@ public sealed class BoltPhase0SyntheticRunner
                             if (userClient?.IsConnected != true)
                             {
                                 await DisposeClientQuietlyAsync(userClient, options.OperationTimeout);
-                                userClient = CreateClient(
-                                    options,
-                                    $"phase0-cleanup-{runId:N}",
-                                    "Bolt.Phase0Synthetic.Cleanup",
-                                    options.UserToken);
+                                userClient = CreatePortalClient(options);
                                 await userClient.ConnectAsync(operationCt);
                                 EnsureConnected(userClient);
                             }
 
-                            await userClient.UnregisterDurableSubscriptionAsync(userTopic, subscriberId, operationCt);
+                            await userClient.UnregisterDurableSubscriptionWithActorAsync(
+                                userTopic,
+                                subscriberId,
+                                options.UserActorToken.Reveal(),
+                                operationCt);
                             await IdentityHealthCheckProbe.InvokeAndValidateAsync(userClient, options, operationCt);
                             return Results(("cleanup_permanently_unregistered", true));
                         },
@@ -345,13 +344,13 @@ public sealed class BoltPhase0SyntheticRunner
                 await DisposeClientQuietlyAsync(userClient, options.OperationTimeout);
         }
 
-        if (coreCompleted && options.ExpiryToken is not null)
+        if (coreCompleted && options.ExpiryTransportToken is not null)
         {
             try
             {
                 await recorder.RunAsync(
                     "token_expiry_disconnect",
-                    operationCt => ValidateExpiryDisconnectAsync(options, runId, operationCt),
+                    operationCt => ValidateExpiryDisconnectAsync(options, operationCt),
                     ct,
                     options.ExpiryMaxWait + options.ExpiryGrace);
             }
@@ -376,10 +375,9 @@ public sealed class BoltPhase0SyntheticRunner
 
     private static async Task<IReadOnlyDictionary<string, string>> ValidateExpiryDisconnectAsync(
         SyntheticOptions options,
-        Guid runId,
         CancellationToken ct)
     {
-        var token = options.ExpiryToken!;
+        var token = options.ExpiryTransportToken!;
         var descriptor = JwtDescriptorReader.Read(token);
         var now = DateTimeOffset.UtcNow;
         var untilExpiration = descriptor.ExpiresAtUtc - now;
@@ -389,10 +387,11 @@ public sealed class BoltPhase0SyntheticRunner
             throw new SyntheticCheckException("expiry_outside_bounded_window");
         }
 
-        var clientName = descriptor.ServiceName ?? "Bolt.Phase0Synthetic.Expiry";
-        var clientId = descriptor.ServiceName is null
-            ? $"phase0-expiry-{runId:N}"
-            : Sha256Hex(descriptor.ServiceName);
+        if (!string.Equals(descriptor.ServiceName, CommunicationsServiceName, StringComparison.Ordinal))
+            throw new SyntheticCheckException("expiry_transport_identity_mismatch");
+
+        var clientName = CommunicationsServiceName;
+        var clientId = Sha256Hex(CommunicationsServiceName);
         var client = CreateClient(options, clientId, clientName, token);
         try
         {
@@ -434,17 +433,19 @@ public sealed class BoltPhase0SyntheticRunner
         SyntheticOptions options,
         string clientId,
         string clientName,
-        SecretToken token)
+        SecretToken transportToken)
     {
         var timeoutSeconds = Math.Max(1, (int)Math.Ceiling(options.OperationTimeout.TotalSeconds));
         var clientOptions = new BoltClientOptions
         {
-            AccessToken = token.Reveal(),
+            AccessToken = transportToken.Reveal(),
             RpcTimeoutSeconds = timeoutSeconds,
             TransportAttemptTimeoutMs = Math.Min(timeoutSeconds * 1000, 30_000),
             MinConnections = 1,
             MaxConnections = 1,
-            SendAccessTokenAsQueryString = false
+            // Exercise the browser-compatible Serve ingress so the deployment
+            // gate can prove query tokens are absent from tailscaled journals.
+            SendAccessTokenAsQueryString = true
         };
         return new BoltClient(
             options.Target,
@@ -453,6 +454,13 @@ public sealed class BoltPhase0SyntheticRunner
             clientOptions,
             NullLogger<BoltClient>.Instance);
     }
+
+    private static BoltClient CreatePortalClient(SyntheticOptions options) =>
+        CreateClient(
+            options,
+            Sha256Hex(PortalServiceName),
+            PortalServiceName,
+            options.PortalTransportToken);
 
     private static CommunicationsRealtimeEvent CreateDurableEvent(
         SyntheticOptions options,
@@ -476,7 +484,11 @@ public sealed class BoltPhase0SyntheticRunner
     {
         using var subscriptionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var enumerator = client
-            .SubscribeDurableAsync<CommunicationsRealtimeEvent>(topic, subscriberId, subscriptionCts.Token)
+            .SubscribeDurableAsync<CommunicationsRealtimeEvent>(
+                topic,
+                subscriberId,
+                subscriptionCts.Token,
+                options.UserActorToken.Reveal())
             .GetAsyncEnumerator(subscriptionCts.Token);
         Task<bool>? moveNext = null;
         try
@@ -499,11 +511,16 @@ public sealed class BoltPhase0SyntheticRunner
         string topic,
         string subscriberId,
         IReadOnlyList<CommunicationsRealtimeEvent> expected,
+        SecretToken userActorToken,
         CancellationToken ct)
     {
         using var subscriptionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var enumerator = client
-            .SubscribeDurableAsync<CommunicationsRealtimeEvent>(topic, subscriberId, subscriptionCts.Token)
+            .SubscribeDurableAsync<CommunicationsRealtimeEvent>(
+                topic,
+                subscriberId,
+                subscriptionCts.Token,
+                userActorToken.Reveal())
             .GetAsyncEnumerator(subscriptionCts.Token);
         try
         {
@@ -545,7 +562,11 @@ public sealed class BoltPhase0SyntheticRunner
     {
         using var subscriptionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var enumerator = client
-            .SubscribeDurableAsync<CommunicationsRealtimeEvent>(topic, subscriberId, subscriptionCts.Token)
+            .SubscribeDurableAsync<CommunicationsRealtimeEvent>(
+                topic,
+                subscriberId,
+                subscriptionCts.Token,
+                options.UserActorToken.Reveal())
             .GetAsyncEnumerator(subscriptionCts.Token);
         Task<bool>? moveNext = null;
         try
@@ -580,7 +601,7 @@ public sealed class BoltPhase0SyntheticRunner
             options,
             Sha256Hex(IdentityServerServiceName),
             IdentityServerServiceName,
-            options.UserToken);
+            options.PortalTransportToken);
         try
         {
             try
@@ -685,15 +706,19 @@ public sealed class BoltPhase0SyntheticRunner
     {
         var evidence = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["communications"] = options.CommunicationsToken.Sha256Prefix,
-            ["user"] = options.UserToken.Sha256Prefix
+            ["communications_transport"] = options.CommunicationsTransportToken.Sha256Prefix,
+            ["portal_transport"] = options.PortalTransportToken.Sha256Prefix,
+            ["user_actor"] = options.UserActorToken.Sha256Prefix
         };
-        if (options.ExpiryToken is not null)
-            evidence["expiry"] = options.ExpiryToken.Sha256Prefix;
-        if (options.RejectedCommunicationsToken is not null)
-            evidence["rejected_communications"] = options.RejectedCommunicationsToken.Sha256Prefix;
-        if (options.RejectedUserToken is not null)
-            evidence["rejected_user"] = options.RejectedUserToken.Sha256Prefix;
+        if (options.ExpiryTransportToken is not null)
+            evidence["expiry_transport"] = options.ExpiryTransportToken.Sha256Prefix;
+        if (options.RejectedCommunicationsTransportToken is not null)
+        {
+            evidence["rejected_communications_transport"] =
+                options.RejectedCommunicationsTransportToken.Sha256Prefix;
+        }
+        if (options.RejectedPortalTransportToken is not null)
+            evidence["rejected_portal_transport"] = options.RejectedPortalTransportToken.Sha256Prefix;
 
         return evidence;
     }

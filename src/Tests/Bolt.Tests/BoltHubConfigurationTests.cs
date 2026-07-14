@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Bolt.Hub.Installers;
 using Bolt.Server;
 using FluentAssertions;
@@ -172,13 +173,19 @@ public class BoltHubConfigurationTests
             .Which.ClientId.Should().Be("legacy-id");
     }
 
-    [TestCase("Staging")]
-    [TestCase("Production")]
-    public void InstallServices_NonDevelopment_ForcesSecureTransport(string environmentName)
+    [TestCase("Development", false)]
+    [TestCase("Development", true)]
+    [TestCase("Staging", false)]
+    [TestCase("Staging", true)]
+    [TestCase("Production", false)]
+    [TestCase("Production", true)]
+    public void InstallServices_RequireSecureTransport_UsesExplicitSetting(
+        string environmentName,
+        bool requireSecureTransport)
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["BoltConfiguration:RequireSecureTransport"] = "false",
+            ["BoltConfiguration:RequireSecureTransport"] = requireSecureTransport.ToString(),
             ["BoltConfiguration:Durable:RedisConnectionString"] = "localhost:6379"
         });
         var services = new ServiceCollection();
@@ -190,7 +197,7 @@ public class BoltHubConfigurationTests
 
         using var provider = services.BuildServiceProvider();
         provider.GetRequiredService<BoltServerOptions>()
-            .RequireSecureTransport.Should().BeTrue();
+            .RequireSecureTransport.Should().Be(requireSecureTransport);
     }
 
     [Test]
@@ -293,26 +300,87 @@ public class BoltHubConfigurationTests
     }
 
     [Test]
-    public void NonDevelopmentAppSettings_DoNotContainPlaintextBoltWebSocketUrls()
+    public void ContainerAppSettings_ExplicitlyUseInternalHttpTransport()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var sourceRoots = new[]
-        {
-            Path.Combine(repositoryRoot, "src", "Modules"),
-            Path.Combine(repositoryRoot, "src", "Presentation")
-        };
-        var plaintextFiles = sourceRoots
-            .SelectMany(root => Directory.EnumerateFiles(root, "appsettings*.json", SearchOption.AllDirectories))
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-            .Where(path => !Path.GetFileName(path).Equals("appsettings.Development.json", StringComparison.OrdinalIgnoreCase))
-            .Where(path => File.ReadAllText(path).Contains("ws://", StringComparison.OrdinalIgnoreCase))
-            .Select(path => Path.GetRelativePath(repositoryRoot, path))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
 
-        plaintextFiles.Should().BeEmpty(
-            "non-Development Bolt clients must fail closed on trusted WSS without checked-in plaintext fallbacks");
+        foreach (var environment in new[] { "Docker", "Staging" })
+        {
+            using var identitySettings = ReadAppSettings(
+                repositoryRoot,
+                "XFramework.IdentityServer",
+                "IdentityServer.Api",
+                environment);
+            var identityBolt = identitySettings.RootElement.GetProperty("BoltConfiguration");
+            identityBolt.GetProperty("ServerUrls")[0].GetString()
+                .Should().Be("ws://bolt-hub:8080/bolt/ws");
+            identityBolt.GetProperty("RequireSecureTransport").GetBoolean().Should().BeFalse();
+
+            using var hubSettings = ReadAppSettings(
+                repositoryRoot,
+                "XFramework.Bolt",
+                "Bolt.Hub",
+                environment);
+            var hubAuthentication = hubSettings.RootElement.GetProperty("BoltTransportAuthentication");
+            hubAuthentication.GetProperty("MetadataAddress").GetString()
+                .Should().Be("http://identityserver:8080/.well-known/openid-configuration");
+            hubAuthentication.GetProperty("RequireHttpsMetadata").GetBoolean().Should().BeFalse();
+            hubSettings.RootElement
+                .GetProperty("BoltConfiguration")
+                .GetProperty("RequireSecureTransport")
+                .GetBoolean()
+                .Should()
+                .BeFalse();
+        }
+    }
+
+    [Test]
+    public void DockerBoltClients_UsePrivateServiceNameTransport()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var dockerSettings = Directory
+            .EnumerateFiles(
+                Path.Combine(repositoryRoot, "src"),
+                "appsettings.Docker.json",
+                SearchOption.AllDirectories)
+            .Where(path => !path.Contains(
+                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains(
+                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase));
+
+        var clients = 0;
+        foreach (var path in dockerSettings)
+        {
+            using var settings = JsonDocument.Parse(File.ReadAllText(path));
+            if (!settings.RootElement.TryGetProperty("BoltConfiguration", out var bolt) ||
+                !bolt.TryGetProperty("ServerUrls", out var serverUrls))
+                continue;
+
+            clients++;
+            serverUrls.GetArrayLength().Should().Be(1, because: path);
+            serverUrls[0].GetString().Should().Be("ws://bolt-hub:8080/bolt/ws", because: path);
+            bolt.GetProperty("RequireSecureTransport").GetBoolean().Should().BeFalse(because: path);
+        }
+
+        clients.Should().Be(11, "every deployed Docker Bolt client must be covered");
+    }
+
+    private static JsonDocument ReadAppSettings(
+        string repositoryRoot,
+        string module,
+        string application,
+        string environment)
+    {
+        var path = Path.Combine(
+            repositoryRoot,
+            "src",
+            "Modules",
+            module,
+            application,
+            $"appsettings.{environment}.json");
+        return JsonDocument.Parse(File.ReadAllText(path));
     }
 
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)

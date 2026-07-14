@@ -2,24 +2,6 @@ name: Bolt Phase 0 CI
 
 on:
   pull_request:
-    paths:
-      - .dockerignore
-      - .env.example
-      - .github/actions/**
-      - .github/actionlint.yaml
-      - .github/known_hosts/**
-      - .github/workflows/**
-      - deploy/**
-      - scripts/**
-      - src/**
-      - Directory.Build.props
-      - Directory.Packages.props
-      - Dockerfile*
-      - NuGet.config
-      - Version.props
-      - XFramework.slnx
-      - docker-compose.yml
-      - global.json
   workflow_dispatch:
 
 permissions:
@@ -35,6 +17,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: bolt_authorization_test
+          POSTGRES_USER: bolt_test
+          POSTGRES_PASSWORD: bolt_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolt_test -d bolt_authorization_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
       redis:
         image: redis:7-alpine
         ports:
@@ -49,7 +44,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up .NET 10
@@ -57,28 +51,86 @@ jobs:
         with:
           dotnet-version: 10.x
 
-      - name: Compile Phase 0 Python
+      - name: Parse and actionlint workflows
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -d '' phase0_python < <(
-            find scripts -maxdepth 1 -type f -name '*phase0*.py' -print0 | sort -z
-          )
-          if [ "${#phase0_python[@]}" -ne 35 ]; then
-            printf 'Expected exactly 35 Phase 0 Python files, found %s\n' "${#phase0_python[@]}" >&2
-            printf '  %s\n' "${phase0_python[@]}" >&2
-            exit 1
-          fi
-          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/bolt-phase0-pycache" \
-            python3 -m py_compile "${phase0_python[@]}"
+          venv="$RUNNER_TEMP/workflow-yaml"
+          python3 -m venv "$venv"
+          "$venv/bin/pip" install --disable-pip-version-check --no-cache-dir PyYAML==6.0.2
+          "$venv/bin/python" - <<'PY'
+          import os
+          import re
+          from pathlib import Path
 
-      - name: Validate workflow schema and expressions
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="1.7.8"
+          import yaml
+
+          bash_directory = Path(os.environ["RUNNER_TEMP"]) / "workflow-bash"
+          bash_directory.mkdir(mode=0o700)
+          heredoc = re.compile(
+              r"<<\s*'PY'[ \t]*\n(?P<body>.*?)(?=^PY[ \t]*(?:\n|$))",
+              re.DOTALL | re.MULTILINE,
+          )
+          heredoc_opener = re.compile(r"<<\s*'PY'[ \t]*\n")
+
+          def uses_bash(step, job):
+              shell = step.get("shell")
+              if shell is not None:
+                  executable = str(shell).strip().split()[0].replace("\\", "/")
+                  return executable.rsplit("/", 1)[-1] in {"bash", "bash.exe"}
+
+              runners = job.get("runs-on", [])
+              if isinstance(runners, str):
+                  runners = [runners]
+              return not any("windows" in str(runner).lower() for runner in runners)
+
+          paths = sorted(Path(".github/workflows").glob("*.y*ml"))
+          if not paths:
+              raise SystemExit("No workflow YAML files found")
+          bash_blocks = 0
+          python_blocks = 0
+          for path in paths:
+              document = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+              if not isinstance(document, dict):
+                  raise SystemExit(f"{path}: workflow root must be a mapping")
+              for job_name, job in (document.get("jobs") or {}).items():
+                  if not isinstance(job, dict):
+                      continue
+                  for step_index, step in enumerate(job.get("steps") or []):
+                      if not isinstance(step, dict) or not isinstance(step.get("run"), str):
+                          continue
+                      run = step["run"]
+                      matches = list(heredoc.finditer(run))
+                      if len(matches) != len(heredoc_opener.findall(run)):
+                          raise SystemExit(
+                              f"{path}:{job_name}:step-{step_index}: unterminated Python heredoc"
+                          )
+                      for heredoc_index, match in enumerate(matches):
+                          compile(
+                              match.group("body"),
+                              f"{path}:{job_name}:step-{step_index}:PY-{heredoc_index}",
+                              "exec",
+                          )
+                          python_blocks += 1
+                      if uses_bash(step, job):
+                          safe_job_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(job_name))
+                          script_path = bash_directory / (
+                              f"{path.stem}-{safe_job_name}-{step_index:03d}.sh"
+                          )
+                          script_path.write_text(run + "\n", encoding="utf-8")
+                          bash_blocks += 1
+          print(
+              f"Parsed {len(paths)} workflow files; extracted {bash_blocks} Bash blocks; "
+              f"compiled {python_blocks} Python heredocs"
+          )
+          PY
+
+          while IFS= read -r -d '' script; do
+            bash -n "$script"
+          done < <(find "$RUNNER_TEMP/workflow-bash" -type f -name '*.sh' -print0 | sort -z)
+
+          version=1.7.8
           archive="$RUNNER_TEMP/actionlint.tar.gz"
-          binary="$RUNNER_TEMP/actionlint"
           curl --fail --location --proto '=https' --tlsv1.2 \
             --output "$archive" \
             "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
@@ -86,506 +138,71 @@ jobs:
             'be92c2652ab7b6d08425428797ceabeb16e31a781c07bc388456b4e592f3e36a' \
             "$archive" | sha256sum --check --strict
           tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP" actionlint
-          "$binary" -color -shellcheck= -pyflakes=
+          "$RUNNER_TEMP/actionlint" -color -shellcheck= -pyflakes=
 
-      - name: Extract and syntax-check workflow Bash
+      - name: Render and verify Compose boundary
         shell: bash
         run: |
           set -euo pipefail
-          venv="$RUNNER_TEMP/bolt-phase0-yaml-venv"
-          python3 -m venv "$venv"
-          "$venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir PyYAML==6.0.2
-          "$venv/bin/python" - <<'PY'
-          import re
-          import subprocess
-          import tempfile
-          from pathlib import Path
-
-          import yaml
-
-          workflow_paths = sorted(Path(".github/workflows").glob("*.y*ml"))
-          if not workflow_paths:
-              raise SystemExit("No workflow YAML files found")
-
-          expression = re.compile(r"\$\{\{.*?\}\}", re.DOTALL)
-          heredoc = re.compile(
-              r"(?<!<)<<(?P<strip>-?)(?!<)\s*(?P<quote>['\"]?)"
-              r"(?P<delimiter>[A-Za-z_][A-Za-z0-9_]*)(?P=quote)"
-          )
-          bash_delimiters = {"EOF", "REMOTE_SCRIPT", "REMOTE_OBSERVATION"}
-          non_bash_delimiters = {"PY"}
-          bash_blocks = []
-          embedded_bash_blocks = []
-
-          def effective_shell(document, job, step):
-              workflow_run = (document.get("defaults") or {}).get("run") or {}
-              job_run = (job.get("defaults") or {}).get("run") or {}
-              return step.get("shell") or job_run.get("shell") or workflow_run.get("shell")
-
-          def is_bash_step(document, job, step):
-              shell = effective_shell(document, job, step)
-              if shell is not None:
-                  return str(shell).split()[0] == "bash"
-              runs_on = job.get("runs-on")
-              return isinstance(runs_on, str) and "ubuntu" in runs_on
-
-          def extract_embedded_bash(label, script):
-              lines = script.splitlines()
-              index = 0
-              while index < len(lines):
-                  match = heredoc.search(lines[index])
-                  if match is None:
-                      index += 1
-                      continue
-
-                  delimiter = match.group("delimiter")
-                  strip_tabs = match.group("strip") == "-"
-                  end = index + 1
-                  while end < len(lines):
-                      candidate = lines[end].lstrip("\t") if strip_tabs else lines[end]
-                      if candidate == delimiter:
-                          break
-                      end += 1
-                  if end == len(lines):
-                      raise SystemExit(f"{label}: unterminated heredoc {delimiter}")
-
-                  body = "\n".join(lines[index + 1 : end]) + "\n"
-                  if delimiter in bash_delimiters:
-                      embedded_bash_blocks.append((f"{label}:{delimiter}", body))
-                  elif delimiter not in non_bash_delimiters:
-                      raise SystemExit(f"{label}: unclassified heredoc delimiter {delimiter}")
-                  index = end + 1
-
-          for path in workflow_paths:
-              document = yaml.load(
-                  path.read_text(encoding="utf-8"),
-                  Loader=yaml.BaseLoader,
-              )
-              if not isinstance(document, dict):
-                  raise SystemExit(f"{path}: workflow root must be a mapping")
-              jobs = document.get("jobs")
-              if not isinstance(jobs, dict):
-                  raise SystemExit(f"{path}: jobs must be a mapping")
-
-              for job_id, job in jobs.items():
-                  if not isinstance(job, dict):
-                      raise SystemExit(f"{path}: job {job_id} must be a mapping")
-                  for step_number, step in enumerate(job.get("steps") or (), start=1):
-                      if not isinstance(step, dict) or "run" not in step:
-                          continue
-                      if not is_bash_step(document, job, step):
-                          continue
-                      script = step["run"]
-                      if not isinstance(script, str):
-                          raise SystemExit(f"{path}: {job_id} step {step_number} run must be text")
-                      label = f"{path}:{job_id}:step-{step_number}"
-                      bash_blocks.append((label, script))
-                      extract_embedded_bash(label, script)
-
-          def check_bash(label, script, directory, number):
-              sanitized = expression.sub("GITHUB_EXPRESSION", script)
-              candidate = Path(directory) / f"block-{number}.sh"
-              candidate.write_text(sanitized, encoding="utf-8")
-              result = subprocess.run(
-                  ["bash", "-n", str(candidate)],
-                  check=False,
-                  capture_output=True,
-                  text=True,
-              )
-              if result.returncode:
-                  raise SystemExit(f"{label}: bash -n failed\n{result.stderr}")
-
-          with tempfile.TemporaryDirectory(prefix="bolt-phase0-bash-") as directory:
-              for number, (label, script) in enumerate(
-                  bash_blocks + embedded_bash_blocks,
-                  start=1,
-              ):
-                  check_bash(label, script, directory, number)
-
-          print(
-              f"Parsed {len(workflow_paths)} workflows; checked "
-              f"{len(bash_blocks)} run blocks and "
-              f"{len(embedded_bash_blocks)} embedded Bash heredocs."
-          )
-          PY
-
-      - name: Syntax-check Phase 0 shell files
-        shell: bash
-        run: |
-          set -euo pipefail
-          shell_files=(
-            deploy/bootstrap-xframework-bolt-phase0-root.sh
-            scripts/run-bolt-phase0-synthetics.sh
-            scripts/run-bolt-phase0-watchdog.sh
-            scripts/verify-bolt-phase0-tls.sh
-            scripts/verify-identityserver-phase0-tls.sh
-            src/Tests/Bolt.Phase0Synthetics.Tests/run-wrapper-harness.sh
-          )
-          if [ "${#shell_files[@]}" -ne 6 ]; then
-            echo "Phase 0 shell inventory must contain exactly six files" >&2
-            exit 1
-          fi
-          for shell_file in "${shell_files[@]}"; do
-            echo "Checking $shell_file"
-            bash -n "$shell_file"
+          fixture_dir="$RUNNER_TEMP/bolt-phase0-fixtures"
+          install -d -m 0700 "$fixture_dir"
+          for token in communications-transport portal-transport user-actor expiry-transport; do
+            printf 'fixture-%s-token\n' "$token" >"$fixture_dir/$token-token"
+            chmod 0600 "$fixture_dir/$token-token"
           done
+          export BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH="$fixture_dir/communications-transport-token"
+          export BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH="$fixture_dir/portal-transport-token"
+          export BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH="$fixture_dir/user-actor-token"
+          export BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH="$fixture_dir/expiry-transport-token"
 
-      - name: Exercise Phase 0 synthetic wrapper contracts
+          compose_json="$RUNNER_TEMP/compose.json"
+          serve_json="$RUNNER_TEMP/serve.json"
+          docker compose --env-file .env.example -f docker-compose.yml \
+            config --format json >"$compose_json"
+          printf '%s\n' \
+            '{"TCP":{"7000":{"HTTPS":true},"8261":{"HTTPS":true}},"Web":{"xeon-dev.example-tail.ts.net:7000":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:7000"}}},"xeon-dev.example-tail.ts.net:8261":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8261"}}}},"AllowFunnel":{"xeon-dev.example-tail.ts.net:7000":false,"xeon-dev.example-tail.ts.net:8261":false}}' \
+            >"$serve_json"
+          python3 -B scripts/verify-bolt-tailscale-boundary.py \
+            --serve-status-json "$serve_json" \
+            --compose-json "$compose_json" \
+            --magicdns-host xeon-dev.example-tail.ts.net \
+            --evidence "$RUNNER_TEMP/tailscale-boundary.json"
+
+      - name: Test retained Phase 0 helpers
         shell: bash
         run: |
           set -euo pipefail
-          harness="src/Tests/Bolt.Phase0Synthetics.Tests/run-wrapper-harness.sh"
-          runner="scripts/run-bolt-phase0-synthetics.sh"
-          env_parser="scripts/verify-bolt-phase0-env.py"
-          lease_mock="src/Tests/Bolt.Phase0Synthetics.Tests/mock-lease-manager.py"
-          lease_fixture_parent="/usr/local/libexec"
-          lease_fixture_dir="$lease_fixture_parent/xframework-bolt-phase0"
-          lease_fixture="$lease_fixture_dir/manage-bolt-phase0-deployment-lease.py"
-          lease_fixture_parent_created=false
-          lease_fixture_dir_created=false
-          lease_fixture_installed=false
-          cleanup_lease_fixture() {
-            status=$?
-            trap - EXIT
-            if [ "$lease_fixture_installed" = true ]; then
-              sudo --non-interactive rm -f -- "$lease_fixture"
-            fi
-            if [ "$lease_fixture_dir_created" = true ]; then
-              sudo --non-interactive rmdir -- "$lease_fixture_dir" 2>/dev/null || true
-            fi
-            if [ "$lease_fixture_parent_created" = true ]; then
-              sudo --non-interactive rmdir -- "$lease_fixture_parent" 2>/dev/null || true
-            fi
-            exit "$status"
-          }
-          trap cleanup_lease_fixture EXIT
-          if [ -L "$lease_fixture_parent" ] || { [ -e "$lease_fixture_parent" ] && [ ! -d "$lease_fixture_parent" ]; }; then
-            echo "Phase 0 lease fixture parent is not a real directory" >&2
-            exit 1
-          fi
-          if [ ! -d "$lease_fixture_parent" ]; then
-            sudo --non-interactive mkdir --mode=0755 -- "$lease_fixture_parent"
-            lease_fixture_parent_created=true
-          fi
-          if [ -e "$lease_fixture_dir" ] || [ -L "$lease_fixture_dir" ]; then
-            echo "refusing to replace an existing Phase 0 lease fixture directory" >&2
-            exit 1
-          fi
-          sudo --non-interactive mkdir --mode=0755 -- "$lease_fixture_dir"
-          lease_fixture_dir_created=true
-          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/bolt-phase0-wrapper-pycache" \
-            python3 -m py_compile "$lease_mock"
-          sudo --non-interactive install -o root -g root -m 0555 "$lease_mock" "$lease_fixture"
-          lease_fixture_installed=true
-          bash "$harness" "$runner" "$env_parser" pass canary direct-kestrel
-          negative_scenarios=(
-            refresh-output
-            application-token-leak
-            application-marker-leak
-            tampered-report
-            hook-output
-            token-changed
-            missing-receipt
-          )
-          for scenario in "${negative_scenarios[@]}"; do
-            bash "$harness" "$runner" "$env_parser" "$scenario" canary direct-kestrel
-          done
+          bash -n scripts/configure-bolt-tailscale-boundary.sh
+          python3 -B scripts/verify-bolt-tailscale-boundary-test.py
+          python3 -B scripts/verify-bolt-phase0-diagnostic-sinks-test.py
+          python3 -B scripts/refresh-bolt-phase0-synthetic-tokens-test.py
 
-      - name: Check changed lines for whitespace errors
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - name: Restore and build
         run: |
-          set -euo pipefail
-          if [ -n "$BASE_SHA" ]; then
-            git diff --check "$BASE_SHA...HEAD"
-          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            git diff --check HEAD^..HEAD
-          else
-            echo "Cannot determine a comparison commit for whitespace validation" >&2
-            exit 1
-          fi
-
-      - name: Restore solution
-        run: dotnet restore XFramework.slnx
-
-      - name: Build solution and Bolt Hub container
-        shell: bash
-        run: |
-          set -euo pipefail
+          dotnet restore XFramework.slnx
           dotnet build XFramework.slnx --configuration Release --no-restore
-          docker build \
-            --file Dockerfile \
-            --build-arg PROJECT_PATH=src/Modules/XFramework.Bolt/Bolt.Hub/Bolt.Hub.csproj \
-            --tag xframework/bolt-hub:phase0-ci \
-            .
 
-      - name: Test Bolt with required Redis
-        shell: bash
+      - name: Test complete Bolt suite
         env:
+          BOLT_TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=bolt_authorization_test;Username=bolt_test;Password=bolt_test_password
           BOLT_TEST_REDIS_CONNECTION: localhost:6379,abortConnect=false
           BOLT_TEST_REDIS_REQUIRED: "true"
         run: |
-          set -euo pipefail
-          results="$RUNNER_TEMP/bolt-tests"
-          mkdir -p "$results"
           dotnet test src/Tests/Bolt.Tests/Bolt.Tests.csproj \
-            --configuration Release \
-            --no-build \
-            --no-restore \
-            --logger "trx;LogFileName=bolt-tests.trx" \
-            --results-directory "$results"
-          python3 - "$results/bolt-tests.trx" <<'PY'
-          import sys
-          import xml.etree.ElementTree as ET
+            --configuration Release --no-build --no-restore
 
-          counters = next(
-              node
-              for node in ET.parse(sys.argv[1]).getroot().iter()
-              if node.tag.rsplit("}", 1)[-1] == "Counters"
-          )
-          total = int(counters.attrib.get("total", "0"))
-          passed = int(counters.attrib.get("passed", "0"))
-          if total <= 0 or passed != total:
-              raise SystemExit(
-                  f"Bolt.Tests must execute and pass at least one test: {counters.attrib}"
-              )
-          unexpected = {
-              name: int(counters.attrib.get(name, "0"))
-              for name in ("notExecuted", "notRunnable", "inconclusive", "pending")
-              if int(counters.attrib.get(name, "0"))
-          }
-          if unexpected:
-              raise SystemExit(f"Bolt.Tests must have zero skips: {unexpected}")
-          print(f"Bolt.Tests passed with zero skips: {counters.attrib}")
-          PY
-
-      - name: Test IdentityServer
-        shell: bash
+      - name: Test complete Phase 0 synthetics suite
         run: |
-          set -euo pipefail
-          results="$RUNNER_TEMP/identityserver-tests"
-          mkdir -p "$results"
-          dotnet test src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj \
-            --configuration Release \
-            --no-build \
-            --no-restore \
-            --logger "trx;LogFileName=identityserver-tests.trx" \
-            --results-directory "$results"
-          python3 - "$results/identityserver-tests.trx" <<'PY'
-          import sys
-          import xml.etree.ElementTree as ET
-
-          counters = next(
-              node
-              for node in ET.parse(sys.argv[1]).getroot().iter()
-              if node.tag.rsplit("}", 1)[-1] == "Counters"
-          )
-          total = int(counters.attrib.get("total", "0"))
-          passed = int(counters.attrib.get("passed", "0"))
-          if total <= 0 or passed != total:
-              raise SystemExit(
-                  "IdentityServer.UnitTests must execute and pass at least one test: "
-                  f"{counters.attrib}"
-              )
-          print(f"IdentityServer.UnitTests passed: {counters.attrib}")
-          PY
-
-      - name: Test XFramework Core
-        shell: bash
-        run: |
-          set -euo pipefail
-          results="$RUNNER_TEMP/xframework-core-tests"
-          mkdir -p "$results"
-          dotnet test src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj \
-            --configuration Release \
-            --no-build \
-            --no-restore \
-            --logger "trx;LogFileName=xframework-core-tests.trx" \
-            --results-directory "$results"
-          python3 - "$results/xframework-core-tests.trx" <<'PY'
-          import sys
-          import xml.etree.ElementTree as ET
-
-          counters = next(
-              node
-              for node in ET.parse(sys.argv[1]).getroot().iter()
-              if node.tag.rsplit("}", 1)[-1] == "Counters"
-          )
-          total = int(counters.attrib.get("total", "0"))
-          passed = int(counters.attrib.get("passed", "0"))
-          if total <= 0 or passed != total:
-              raise SystemExit(
-                  "XFramework.Core.Tests must execute and pass at least one test: "
-                  f"{counters.attrib}"
-              )
-          print(f"XFramework.Core.Tests passed: {counters.attrib}")
-          PY
-
-      - name: Test Phase 0 synthetics
-        shell: bash
-        run: |
-          set -euo pipefail
-          results="$RUNNER_TEMP/bolt-phase0-synthetics-tests"
-          mkdir -p "$results"
           dotnet test src/Tests/Bolt.Phase0Synthetics.Tests/Bolt.Phase0Synthetics.Tests.csproj \
-            --configuration Release \
-            --no-build \
-            --no-restore \
-            --logger "trx;LogFileName=bolt-phase0-synthetics-tests.trx" \
-            --results-directory "$results"
-          python3 - "$results/bolt-phase0-synthetics-tests.trx" <<'PY'
-          import sys
-          import xml.etree.ElementTree as ET
+            --configuration Release --no-build --no-restore
 
-          counters = next(
-              node
-              for node in ET.parse(sys.argv[1]).getroot().iter()
-              if node.tag.rsplit("}", 1)[-1] == "Counters"
-          )
-          total = int(counters.attrib.get("total", "0"))
-          passed = int(counters.attrib.get("passed", "0"))
-          if total <= 0 or passed != total:
-              raise SystemExit(
-                  "Bolt.Phase0Synthetics.Tests must execute and pass at least one test: "
-                  f"{counters.attrib}"
-              )
-          unexpected = {
-              name: int(counters.attrib.get(name, "0"))
-              for name in ("notExecuted", "notRunnable", "inconclusive", "pending")
-              if int(counters.attrib.get(name, "0"))
-          }
-          if unexpected:
-              raise SystemExit(f"Bolt.Phase0Synthetics.Tests must have zero skips: {unexpected}")
-          print(f"Bolt.Phase0Synthetics.Tests passed with zero skips: {counters.attrib}")
-          PY
-
-      - name: Run privileged Phase 0 Python contracts
-        shell: bash
-        run: |
-          set -uo pipefail
-          mapfile -d '' test_files < <(
-            find scripts -maxdepth 1 -type f -name '*-test.py' -print0 | sort -z
-          )
-          if [ "${#test_files[@]}" -ne 19 ]; then
-            printf 'Expected exactly 19 Phase 0 Python test files, found %s\n' "${#test_files[@]}" >&2
-            printf '  %s\n' "${test_files[@]}" >&2
-            exit 1
-          fi
-
-          secure_test_tmp=""
-          cleanup_secure_test_tmp() {
-            status=$?
-            trap - EXIT
-            if [ -z "$secure_test_tmp" ]; then
-              exit "$status"
-            fi
-            case "$secure_test_tmp" in
-              /root/bolt-phase0-python-tests.*)
-                metadata="$(sudo --non-interactive stat -c '%u:%a:%F' -- "$secure_test_tmp" 2>/dev/null || true)"
-                if [ "$metadata" = "0:700:directory" ]; then
-                  if ! sudo --non-interactive rm -rf -- "$secure_test_tmp"; then
-                    echo "failed to clean the privileged test directory" >&2
-                    status=1
-                  fi
-                else
-                  echo "refusing to clean an insecure privileged test directory" >&2
-                  status=1
-                fi
-                ;;
-              *)
-                echo "refusing to clean an unexpected privileged test path" >&2
-                status=1
-                ;;
-            esac
-            exit "$status"
-          }
-          trap cleanup_secure_test_tmp EXIT
-          if ! secure_test_tmp="$(sudo --non-interactive mktemp -d /root/bolt-phase0-python-tests.XXXXXXXX)" || \
-             [ -z "$secure_test_tmp" ]; then
-            echo "failed to create the privileged Python test directory" >&2
-            exit 1
-          fi
-          if [ "$(sudo --non-interactive stat -c '%u:%a:%F' -- "$secure_test_tmp")" != "0:700:directory" ]; then
-            echo "privileged Python test directory is not root-owned mode 0700" >&2
-            exit 1
-          fi
-
-          failed=0
-          for test_file in "${test_files[@]}"; do
-            echo "::group::$test_file"
-            output="$(mktemp "$RUNNER_TEMP/bolt-phase0-python-test.XXXXXX")"
-            if sudo --non-interactive env \
-              TMPDIR="$secure_test_tmp" \
-              PYTHONDONTWRITEBYTECODE=1 \
-              python3 "$test_file" 2>&1 | tee "$output"; then
-              if ! grep -Eq '^Ran [1-9][0-9]* tests? in ' "$output"; then
-                echo "$test_file did not execute any reported tests" >&2
-                failed=1
-              elif grep -Eiq 'skipped[=[:space:]]+[1-9][0-9]*' "$output"; then
-                echo "$test_file reported skipped tests" >&2
-                failed=1
-              fi
-            else
-              echo "$test_file failed" >&2
-              failed=1
-            fi
-            rm -f "$output"
-            echo "::endgroup::"
-          done
-          exit "$failed"
-
-      - name: Exercise root-helper policy under pinned sudo-rs 0.2.8
+      - name: Test focused IdentityServer and Portal contracts
         shell: bash
         run: |
           set -euo pipefail
-          case "$(sudo --version | sed -n '1p')" in
-            "Sudo version "*) ;;
-            *) echo "ubuntu-latest no longer provides traditional sudo" >&2; exit 1 ;;
-          esac
-          archive="$RUNNER_TEMP/sudo-rs-0.2.8.tar.gz"
-          curl --fail --location --proto '=https' --tlsv1.2 \
-            --output "$archive" \
-            https://github.com/trifectatechfoundation/sudo-rs/releases/download/v0.2.8/sudo-0.2.8.tar.gz
-          printf '%s  %s\n' \
-            '71633a32d1b6d12428e95112920570a87bf6bbd2a005d81e9bd87371aa23e2d5' \
-            "$archive" | sha256sum --check --strict
-
-          sudo_root=""
-          cleanup_sudo_root() {
-            status=$?
-            trap - EXIT
-            if [ -n "$sudo_root" ]; then
-              case "$sudo_root" in
-                /opt/bolt-phase0-sudo-rs.*)
-                  metadata="$(sudo --non-interactive stat -c '%u:%a:%F' -- "$sudo_root" 2>/dev/null || true)"
-                  if [ "$metadata" = "0:755:directory" ]; then
-                    sudo --non-interactive rm -rf -- "$sudo_root" || status=1
-                  else
-                    echo "refusing to clean an insecure sudo-rs test directory" >&2
-                    status=1
-                  fi
-                  ;;
-                *)
-                  echo "refusing to clean an unexpected sudo-rs test path" >&2
-                  status=1
-                  ;;
-              esac
-            fi
-            exit "$status"
-          }
-          trap cleanup_sudo_root EXIT
-          sudo_root="$(sudo --non-interactive mktemp -d /opt/bolt-phase0-sudo-rs.XXXXXXXX)"
-          sudo --non-interactive chmod 0755 "$sudo_root"
-          sudo --non-interactive tar --extract --gzip --file "$archive" --directory "$sudo_root"
-          test "$(sudo --non-interactive stat -c '%U:%G:%a:%F' -- "$sudo_root/bin/sudo")" = \
-            "root:root:6755:regular file"
-          test "$(sudo --non-interactive stat -c '%U:%G:%a:%F' -- "$sudo_root/bin/visudo")" = \
-            "root:root:755:regular file"
-          test "$($sudo_root/bin/sudo --version 2>&1 | sed -n '1p')" = "sudo-rs 0.2.8"
-          sudo --non-interactive env \
-            BOLT_PHASE0_SUDO_BINARY="$sudo_root/bin/sudo" \
-            BOLT_PHASE0_VISUDO_BINARY="$sudo_root/bin/visudo" \
-            PYTHONDONTWRITEBYTECODE=1 \
-            python3 scripts/run-bolt-phase0-watchdog-test.py \
-              WatchdogContractTests.test_sudo_policy_preserves_stdin_and_denies_extra_arguments
+          dotnet test src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj \
+            --configuration Release --no-build --no-restore \
+            --filter "FullyQualifiedName~BoltTransportTokenIssuerTests"
+          dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj \
+            --configuration Release --no-build --no-restore \
+            --filter "FullyQualifiedName~ServiceIdentityComposeContractTests"

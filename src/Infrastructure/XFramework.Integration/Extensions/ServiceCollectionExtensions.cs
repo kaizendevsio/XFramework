@@ -78,8 +78,7 @@ public static class ServiceCollectionExtensions
         services.Configure<BoltServiceDiscoveryOptions>(
             configuration.GetSection(BoltServiceDiscoveryOptions.SectionName));
 
-        var requireSecureTransport = boltConfig.RequireSecureTransport ||
-                                     hostEnvironment is not null && !hostEnvironment.IsDevelopment();
+        var requireSecureTransport = boltConfig.RequireSecureTransport;
         BoltClientSecureTransportValidator.Validate(boltConfig, requireSecureTransport);
         if (requireSecureTransport)
         {

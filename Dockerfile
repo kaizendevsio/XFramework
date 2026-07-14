@@ -33,6 +33,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8080 8443
+EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "set -eu; if [ -f /usr/local/share/ca-certificates/xframework-bolt-hub-ca.crt ]; then update-ca-certificates >/dev/null; fi; exec dotnet \"$(cat .entrypoint).dll\""]
+ENTRYPOINT ["sh", "-c", "set -eu; exec dotnet \"$(cat .entrypoint).dll\""]
