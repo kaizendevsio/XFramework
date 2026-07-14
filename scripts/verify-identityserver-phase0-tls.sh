@@ -86,9 +86,9 @@ openssl crl2pkcs7 -nocrl -certfile "$ca_file" | openssl pkcs7 -print_certs -noou
 openssl x509 -in "$fullchain_file" -noout -checkend 86400
 openssl x509 -in "$fullchain_file" -noout -checkhost identityserver
 openssl x509 -in "$fullchain_file" -noout -checkhost "$published_hostname"
-openssl verify -purpose sslserver -verify_hostname identityserver \
+openssl verify -x509_strict -purpose sslserver -verify_hostname identityserver \
   -CAfile "$ca_file" -untrusted "$fullchain_file" "$fullchain_file"
-openssl verify -purpose sslserver -verify_hostname "$published_hostname" \
+openssl verify -x509_strict -purpose sslserver -verify_hostname "$published_hostname" \
   -CAfile "$ca_file" -untrusted "$fullchain_file" "$fullchain_file"
 
 tmp_dir="$(mktemp -d)"
