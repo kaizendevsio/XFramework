@@ -19,6 +19,7 @@ status: active
 **Baseline:** `origin/develop` at `18189df6fc486733819c49d8d8095033247d3186`
 **Worktree:** `C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-hub-context`
 **Scope:** `Bolt.Protocol`, `Bolt.Client`, `Bolt.Server`, Bolt Hub, durable pub/sub, XFramework integration/authentication, `Bolt.Media`, `Bolt.Media.Browser`, TypeScript browser client, tests, benchmarks, and deployment configuration.
+**Remediation boundary:** The 2026-07-14 remediation reset assigns encrypted exposure, certificates, and network ACLs to Tailscale/deployment. References below to requiring `wss://` or TLS describe the security outcome, not a requirement for Bolt Hub or application services to manage certificates.
 
 ## Executive Assessment
 
@@ -99,7 +100,7 @@ Compose clients use `ws://`, the Hub exposes HTTP directly, bearer access tokens
 
 Evidence: `src/Modules/XFramework.Bolt/Bolt.Hub/Extensions/ApplicationBuilderExtension.cs:15-21`; `src/Modules/XFramework.Bolt/Bolt.Hub/appsettings.Staging.json:34-41`; `docker-compose.yml:13-25,97-120,458-465`.
 
-Required direction: require `wss://` through a trusted TLS endpoint, preferably mTLS for services, remove direct plaintext exposure, redact query tokens from all access logs, and fail startup outside Development when the transport is plaintext.
+Required direction: require an encrypted deployment path for externally reachable traffic. In XFramework environments, Tailscale owns that path and Tailscale Serve terminates WSS/HTTPS into loopback-only backends; Bolt application containers do not manage certificates. Internal plaintext is permitted only on a private, non-published workload network. Redact query tokens at every layer that can observe the original URL.
 
 ### H5. Custom frame buffers are rented and never returned
 
@@ -433,7 +434,7 @@ Do not publish a universal "faster than gRPC" claim until all of the following a
 1. Equivalent typed and raw unary payloads from 0 B through 100 MB, including serialization/deserialization and status validation.
 2. Equal channel/connection sweeps plus each protocol's documented best configuration.
 3. gRPC channel reuse, multiple HTTP/2 connections where saturated, tuned connection/stream flow-control windows, and bidirectional streaming.
-4. TLS 1.3 and mTLS, same-host, cross-host, 1/10/50/100 ms RTT, bandwidth limits, packet loss, reconnect, and rolling deployment.
+4. Equivalent security topology for both protocols, including the production Tailscale path and TLS termination when used; same-host, cross-host, 1/10/50/100 ms RTT, bandwidth limits, packet loss, reconnect, and rolling deployment.
 5. Closed-loop and open-loop load with request-level HDR p50/p95/p99/p99.9, coordinated-omission correction, errors, queue time, CPU, context switches, copy bytes, working set, pool retention, and GC pause time.
 6. Cold start, connection churn, 1/10/100/1,000/10,000 clients, large fanout, slow consumers, soak, and failure injection.
 7. A CI regression gate based on a stable dedicated runner and statistically meaningful runs, not one ShortRun launch.
@@ -446,7 +447,7 @@ Relevant comparison standards:
 
 ## Remediation Order
 
-1. **Containment:** enforce reserved identity binding, remove shared-key token minting, require WSS/mTLS, lower frame ceilings, and apply byte/rate/concurrency quotas.
+1. **Containment:** enforce reserved identity binding, remove shared-key token minting, require encrypted external exposure through Tailscale/deployment, lower frame ceilings, and apply byte/rate/concurrency quotas.
 2. **Correctness and ownership:** fix pooled RPC generation ownership, custom-frame lifetime, large-response affinity, send completion/error propagation, and connection/stream cleanup.
 3. **Media correctness/security:** bound sequence/NACK behavior, repair FEC, make encryption fail closed and authenticated, fix browser stream wiring, and implement group membership/key epochs.
 4. **Memory/performance architecture:** byte-bounded queues, explicit pooled ownership, fewer full-frame copies, smaller/shorter-lived receive buffers, bounded dispatch, and compact negotiated identifiers.
