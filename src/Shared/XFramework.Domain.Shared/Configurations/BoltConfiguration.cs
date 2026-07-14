@@ -14,7 +14,7 @@ public class BoltConfiguration
     public bool Anonymous { get; set; }
     public string? AccessToken { get; set; }
     public bool SendAccessTokenAsQueryString { get; set; }
-    public bool GenerateServiceAccessToken { get; set; } = true;
+    public bool GenerateServiceAccessToken { get; set; }
     public int RpcTimeoutSeconds { get; set; } = 30;
     public int MaxFrameBytes { get; set; } = 8 * 1024 * 1024;
     public int SendQueueCapacity { get; set; }

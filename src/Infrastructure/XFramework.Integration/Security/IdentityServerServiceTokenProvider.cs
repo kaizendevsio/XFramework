@@ -1,27 +1,30 @@
-using System.Collections.Concurrent;
-using System.Threading;
-using Bolt.Client;
-using MemoryPack;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.ServiceIdentity;
 
 namespace XFramework.Integration.Security;
 
-public sealed class IdentityServerServiceTokenProvider(
-    BoltClient boltClient,
-    IOptions<ServiceIdentityOptions> serviceIdentityOptions,
-    IOptions<BoltConfiguration> boltConfigurationOptions,
-    TimeProvider timeProvider,
-    ILogger<IdentityServerServiceTokenProvider> logger)
-    : IServiceTokenProvider
+public sealed class IdentityServerServiceTokenProvider : IServiceTokenProvider
 {
-    private readonly ConcurrentDictionary<string, CachedToken> _cache = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _inflight = new(StringComparer.Ordinal);
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IOptions<ServiceIdentityOptions> _serviceIdentityOptions;
+    private readonly TimeProvider _timeProvider;
+    private readonly IdentityServerTokenCache _tokenCache;
 
-    public async ValueTask<string> GetTokenAsync(
+    public IdentityServerServiceTokenProvider(
+        IHttpClientFactory httpClientFactory,
+        IOptions<ServiceIdentityOptions> serviceIdentityOptions,
+        TimeProvider timeProvider,
+        ILogger<IdentityServerServiceTokenProvider> logger)
+    {
+        _httpClientFactory = httpClientFactory;
+        _serviceIdentityOptions = serviceIdentityOptions;
+        _timeProvider = timeProvider;
+        _tokenCache = new IdentityServerTokenCache(serviceIdentityOptions, timeProvider, logger);
+    }
+
+    public ValueTask<string> GetTokenAsync(
         string audience,
         IReadOnlyCollection<string>? scopes = null,
         CancellationToken ct = default)
@@ -30,134 +33,49 @@ public sealed class IdentityServerServiceTokenProvider(
             throw new InvalidOperationException("Service token audience is required.");
 
         var requestedScopes = NormalizeScopes(scopes);
-        var cacheKey = $"{audience}|{string.Join(' ', requestedScopes)}";
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var options = serviceIdentityOptions.Value;
-        var refreshSkew = TimeSpan.FromSeconds(Math.Clamp(options.TokenRefreshSkewSeconds, 10, 600));
+        var normalizedAudience = audience.Trim();
+        var cacheKey = $"{normalizedAudience}|{string.Join(' ', requestedScopes)}";
 
-        if (_cache.TryGetValue(cacheKey, out var cached) &&
-            cached.ExpiresAtUtc > now.Add(refreshSkew))
-        {
-            return cached.AccessToken;
-        }
-
-        ct.ThrowIfCancellationRequested();
-
-        var acquisition = _inflight.GetOrAdd(
+        return _tokenCache.GetTokenAsync(
             cacheKey,
-            _ => CreateAcquisition(audience, requestedScopes, cacheKey));
-
-        return await acquisition.Value.WaitAsync(ct);
+            "service",
+            acquisitionCt => AcquireTokenAsync(normalizedAudience, requestedScopes, acquisitionCt),
+            ct);
     }
 
-    private Lazy<Task<string>> CreateAcquisition(
+    private Task<ServiceTokenResponse> AcquireTokenAsync(
         string audience,
         IReadOnlyCollection<string> requestedScopes,
-        string cacheKey)
-    {
-        Lazy<Task<string>>? acquisition = null;
-        acquisition = new Lazy<Task<string>>(
-            async () =>
-            {
-                try
-                {
-                    var timeout = ResolveTokenAcquisitionTimeout();
-                    using var timeoutCts = new CancellationTokenSource(timeout);
-                    try
-                    {
-                        return await AcquireTokenAsync(audience, requestedScopes, cacheKey, timeoutCts.Token);
-                    }
-                    catch (OperationCanceledException ex) when (timeoutCts.IsCancellationRequested)
-                    {
-                        throw new TimeoutException(
-                            $"Service token acquisition for audience '{audience}' timed out after {timeout.TotalSeconds:0} seconds.",
-                            ex);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(
-                        ex,
-                        "Service token acquisition failed. ClientId={ClientId} Audience={Audience} Scopes={Scopes}",
-                        ResolveClientIdOrDefault(),
-                        audience,
-                        string.Join(' ', requestedScopes));
-                    throw;
-                }
-                finally
-                {
-                    if (_inflight.TryGetValue(cacheKey, out var current) && ReferenceEquals(current, acquisition))
-                        _inflight.TryRemove(cacheKey, out _);
-                }
-            },
-            LazyThreadSafetyMode.ExecutionAndPublication);
-
-        return acquisition;
-    }
-
-    private async Task<string> AcquireTokenAsync(
-        string audience,
-        IReadOnlyCollection<string> requestedScopes,
-        string cacheKey,
         CancellationToken ct)
     {
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var options = serviceIdentityOptions.Value;
-        var refreshSkew = TimeSpan.FromSeconds(Math.Clamp(options.TokenRefreshSkewSeconds, 10, 600));
-
-        if (_cache.TryGetValue(cacheKey, out var cached) &&
-            cached.ExpiresAtUtc > now.Add(refreshSkew))
-        {
-            return cached.AccessToken;
-        }
-
-        var clientId = ResolveClientId();
+        var options = _serviceIdentityOptions.Value;
+        var clientId = ResolveClientId(options);
         var request = CreateCurrentCredentialRequest(
             options,
             clientId,
             audience,
             requestedScopes,
-            timeProvider.GetUtcNow());
+            _timeProvider.GetUtcNow());
 
-        var targetClient = XFrameworkServiceNames.IdentityServer.ToSha256();
-        var (status, data) = await boltClient.InvokeAsync(
-            targetClient,
-            nameof(IssueServiceTokenRequest),
-            MemoryPackSerializer.Serialize(request),
+        return ServiceIdentityHttpClient.PostForTokenAsync(
+            _httpClientFactory,
+            options,
+            ServiceIdentityHttpClient.ServiceTokenPath,
+            request,
             ct);
-
-        if ((int)status < 200 || (int)status >= 300)
-            throw new InvalidOperationException($"Service token request failed with status {(int)status} ({status}).");
-
-        var response = MemoryPackSerializer.Deserialize<QueryResponse<ServiceTokenResponse>>(data.Span)
-            ?? throw new InvalidOperationException("Service token response could not be deserialized.");
-
-        if (!response.IsSuccess || response.Response is null || string.IsNullOrWhiteSpace(response.Response.AccessToken))
-        {
-            throw new InvalidOperationException(
-                response.Message ?? "IdentityServer did not issue a service token.");
-        }
-
-        _cache[cacheKey] = new CachedToken(response.Response.AccessToken, response.Response.ExpiresAtUtc);
-        return response.Response.AccessToken;
     }
 
-    private string ResolveClientId()
+    private static string ResolveClientId(ServiceIdentityOptions options)
     {
-        var configured = serviceIdentityOptions.Value.ClientId;
-        if (!string.IsNullOrWhiteSpace(configured))
-            return configured.Trim();
+        if (!string.IsNullOrWhiteSpace(options.ClientId))
+            return options.ClientId.Trim();
 
-        var boltName = boltConfigurationOptions.Value.ClientName;
-        if (!string.IsNullOrWhiteSpace(boltName))
-            return boltName.Trim();
-
-        throw new InvalidOperationException("ServiceIdentity:ClientId or BoltConfiguration:ClientName is required.");
+        throw new InvalidOperationException("ServiceIdentity:ClientId is required.");
     }
 
     private List<string> NormalizeScopes(IReadOnlyCollection<string>? scopes)
     {
-        var defaults = serviceIdentityOptions.Value.DefaultScopes;
+        var defaults = _serviceIdentityOptions.Value.DefaultScopes;
         var source = scopes is { Count: > 0 } ? scopes : defaults;
 
         return source
@@ -182,16 +100,11 @@ public sealed class IdentityServerServiceTokenProvider(
                 options.ClientSecret ?? string.Empty),
             validationFallback: null,
             nowUtc);
-        if (string.IsNullOrWhiteSpace(options.ClientSecret))
-        {
-            throw new InvalidOperationException(
-                $"ServiceIdentity:ClientSecret is required for service client '{clientId}'.");
-        }
 
         return new IssueServiceTokenRequest
         {
             ClientId = clientId,
-            ClientSecret = options.ClientSecret,
+            ClientSecret = options.ClientSecret!,
             Audience = audience,
             Scopes = scopes.ToList(),
             Metadata = new RequestMetadata
@@ -201,28 +114,4 @@ public sealed class IdentityServerServiceTokenProvider(
             }
         };
     }
-
-    private TimeSpan ResolveTokenAcquisitionTimeout()
-    {
-        var options = serviceIdentityOptions.Value;
-        var timeoutSeconds = options.TokenAcquisitionTimeoutSeconds > 0
-            ? options.TokenAcquisitionTimeoutSeconds
-            : Math.Max(1, boltConfigurationOptions.Value.RpcTimeoutSeconds + 5);
-
-        return TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 1, 300));
-    }
-
-    private string ResolveClientIdOrDefault()
-    {
-        try
-        {
-            return ResolveClientId();
-        }
-        catch
-        {
-            return "<unresolved>";
-        }
-    }
-
-    private sealed record CachedToken(string AccessToken, DateTime ExpiresAtUtc);
 }

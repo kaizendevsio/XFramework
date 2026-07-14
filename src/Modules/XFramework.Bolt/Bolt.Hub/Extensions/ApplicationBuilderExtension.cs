@@ -18,7 +18,7 @@ public static class ApplicationBuilderExtension
 
         // Bolt thin-protocol WebSocket endpoint
         app.UseWebSockets();
-        app.MapBolt("/bolt/ws").RequireAuthorization();
+        app.MapBolt("/bolt/ws").RequireAuthorization(BoltAuthorizationPolicies.Transport);
 
         if (app.Configuration.GetValue<bool>("BoltServiceDiscovery:ExposeHttpEndpoints"))
         {

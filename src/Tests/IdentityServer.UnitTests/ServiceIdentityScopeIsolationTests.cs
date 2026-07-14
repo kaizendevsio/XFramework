@@ -8,7 +8,6 @@ using NUnit.Framework;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.ServiceIdentity;
-using XFramework.Integration.Security;
 
 namespace IdentityServer.UnitTests;
 
@@ -106,13 +105,7 @@ public sealed class ServiceIdentityScopeIsolationTests
             new Mock<IDataContext>(MockBehavior.Strict).Object,
             configuration,
             serviceIdentityConfiguration,
-            new JwtOptions
-            {
-                GenerationId = "jwt-g1",
-                Secret = new string('j', JwtCredentialSet.MinimumHmacSha512SecretBytes),
-                ValidIssuer = "https://identity.test",
-                ValidAudience = "https://bolt.test"
-            },
+            Mock.Of<IBoltTransportTokenSigner>(),
             TimeProvider.System,
             NullLogger<ServiceIdentityService>.Instance);
     }

@@ -7,7 +7,10 @@ public class WrapperInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
+        services.AddXFrameworkBoltClient(
+            configuration,
+            connectAfterApplicationStarted: true,
+            hostEnvironment: hostEnvironment);
         services.AddSingleton<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
     }
 }

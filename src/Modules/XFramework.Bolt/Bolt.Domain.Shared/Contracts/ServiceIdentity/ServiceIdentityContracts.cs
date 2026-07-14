@@ -6,8 +6,7 @@ using XFramework.Domain.Shared.Contracts.Requests;
 namespace XFramework.Domain.Shared.ServiceIdentity;
 
 [MemoryPackable]
-public partial record IssueServiceTokenRequest : RequestBase,
-    IBoltRequest<IssueServiceTokenRequest, QueryResponse<ServiceTokenResponse>>
+public partial record IssueServiceTokenRequest : RequestBase
 {
     [MemoryPackOrder(1)] public string ClientId { get; set; } = string.Empty;
     [MemoryPackOrder(2)] public string ClientSecret { get; set; } = string.Empty;

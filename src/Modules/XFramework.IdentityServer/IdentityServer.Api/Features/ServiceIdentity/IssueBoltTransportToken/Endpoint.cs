@@ -13,10 +13,11 @@ public static class IssueBoltTransportTokenEndpoint
     public static async Task<Result<ServiceTokenResponse>> Handle(
         IssueBoltTransportTokenRequest request,
         HttpRequest httpRequest,
+        ServiceIdentityConfiguration configuration,
         IServiceIdentityService serviceIdentityService,
         CancellationToken ct)
     {
-        if (!httpRequest.IsHttps)
+        if (!configuration.AllowInsecureHttp && !httpRequest.IsHttps)
             return Result<ServiceTokenResponse>.Failure("HTTPS is required", 400);
 
         return await serviceIdentityService.IssueBoltTransportTokenAsync(

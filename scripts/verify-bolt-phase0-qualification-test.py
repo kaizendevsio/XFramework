@@ -310,7 +310,7 @@ class EvidenceFactory:
             }]
         elif service == "identityserver":
             item["listeners"] = [
-                {"family": "ipv4", "scope": "loopback", "port": 8080},
+                {"family": "ipv4", "scope": "wildcard", "port": 8080},
                 {"family": "ipv4", "scope": "wildcard", "port": 8443},
             ]
             item["published_port"] = {
@@ -318,12 +318,20 @@ class EvidenceFactory:
                 "published_port": 7443,
                 "protocol": "tcp",
             }
-            item["private_key_mounts"] = [{
-                "resolved_source": "<expected-private-key>",
-                "relation": "exact",
-                "target": "/run/secrets/identityserver-tls-private-key.pem",
-                "read_only": True,
-            }]
+            item["private_key_mounts"] = [
+                {
+                    "resolved_source": "<expected-private-key>",
+                    "relation": "exact",
+                    "target": "/run/secrets/identityserver-tls-private-key.pem",
+                    "read_only": True,
+                },
+                {
+                    "resolved_source": "<identity-signing-key-volume>",
+                    "relation": "persistent-volume",
+                    "target": "/var/lib/xframework/identity",
+                    "read_only": False,
+                },
+            ]
         return item
 
     def runtime(self, services: tuple[str, ...], minute: float, mode: str) -> dict:
@@ -609,7 +617,7 @@ class EvidenceFactory:
         secure_json(
             self.run / "rollback-drill-evidence.json",
             {
-                "schema": MODULE.ROLLBACK_DRILL_SCHEMA,
+                "schema": MODULE.CANDIDATE_RESTART_SCHEMA,
                 "status": "passed",
                 "run_id": self.run_id,
                 "run_attempt": self.attempt,
@@ -618,12 +626,13 @@ class EvidenceFactory:
                 "started_at_utc": self.at(-6),
                 "completed_at_utc": self.at(-4),
                 "credential_generation_id": "generation-g1",
+                "lkg_compatibility": "rendered",
                 "manifest_sha256": digests["docker-compose.yml"],
                 "override_sha256": digests["pinned-compose.override.json"],
                 "pins_sha256": digests["image-pins.json"],
                 "runtime_evidence_sha256": digests["rollback-runtime-evidence.json"],
                 "synthetic_evidence_sha256": digests["rollback-synthetics-finalized.json"],
-                "checks": {name: True for name in MODULE.ROLLBACK_CHECK_KEYS},
+                "checks": {name: True for name in MODULE.CANDIDATE_RESTART_CHECK_KEYS},
                 "errors": [],
             },
         )
@@ -1063,11 +1072,36 @@ class QualificationTests(unittest.TestCase):
         self.factory.create()
         self.factory.mutate(
             "runtime-evidence.json",
+            lambda document: document["services"]["identityserver"]["published_port"].update(
+                container_port=8080
+            ),
+        )
+        self.assert_code("invalid-tls-service-publication")
+        self.factory.create()
+        self.factory.mutate(
+            "runtime-evidence.json",
             lambda document: document["services"]["identityserver"]["private_key_mounts"][0].update(
                 target="/run/secrets/bolt-hub-tls-private-key.pem"
             ),
         )
         self.assert_code("invalid-tls-service-private-key-mount")
+        self.factory.create()
+        self.factory.mutate(
+            "runtime-evidence.json",
+            lambda document: document["services"]["identityserver"]["private_key_mounts"][1].update(
+                read_only=True
+            ),
+        )
+        self.assert_code("invalid-tls-service-private-key-mount")
+
+    def test_rejects_identityserver_loopback_http_listener(self) -> None:
+        self.factory.mutate(
+            "runtime-evidence.json",
+            lambda document: document["services"]["identityserver"]["listeners"][0].update(
+                scope="loopback"
+            ),
+        )
+        self.assert_code("invalid-tls-service-listeners")
 
     def test_rejects_missing_and_unexpected_runtime_inventory(self) -> None:
         (self.factory.run / "runtime-staged-batch-3.json").unlink()
@@ -1183,9 +1217,15 @@ class QualificationTests(unittest.TestCase):
         self.factory.create()
         self.factory.mutate(
             "rollback-drill-evidence.json",
-            lambda document: document["checks"].update(restore_applied=False),
+            lambda document: document["checks"].update(candidate_digest_recreate_applied=False),
         )
         self.assert_code("rollback-drill-check-failed")
+        self.factory.create()
+        self.factory.mutate(
+            "rollback-drill-evidence.json",
+            lambda document: document.update(lkg_compatibility="unverified"),
+        )
+        self.assert_code("rollback-drill-binding-mismatch")
 
     def test_rejects_tampered_recovery_tool(self) -> None:
         secure_executable(

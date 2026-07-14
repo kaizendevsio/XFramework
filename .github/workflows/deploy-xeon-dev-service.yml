@@ -340,6 +340,62 @@ jobs:
             "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/pinned-manifest-remote.json" || true
           exit "$status"
 
+      - name: Preflight centralized identity plane for Bolt clients
+        if: inputs.service != 'identityserver'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          metadata_body="$(mktemp)"
+          jwks_body="$(mktemp)"
+          cleanup() { rm -f "$metadata_body" "$jwks_body"; }
+          trap cleanup EXIT
+
+          identity_ready=0
+          for attempt in $(seq 1 60); do
+            if /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/health/live >/dev/null \
+              && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/openid-configuration > "$metadata_body" \
+              && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/bolt-transport-jwks.json > "$jwks_body" \
+              && python3 - "$metadata_body" "$jwks_body" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.parse
+
+          metadata = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          jwks = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+          jwks_uri = metadata.get("jwks_uri")
+          if metadata.get("issuer") != "XFramework.IdentityServer":
+              raise SystemExit("IdentityServer metadata issuer is invalid")
+          if jwks_uri != "http://identityserver:8080/.well-known/bolt-transport-jwks.json":
+              raise SystemExit("IdentityServer metadata JWKS URI is invalid")
+          if "RS256" not in metadata.get("id_token_signing_alg_values_supported", []):
+              raise SystemExit("IdentityServer metadata does not advertise RS256")
+          keys = jwks.get("keys")
+          if not isinstance(keys, list) or not any(
+              key.get("kty") == "RSA"
+              and key.get("use") == "sig"
+              and key.get("alg") == "RS256"
+              and all(key.get(field) for field in ("kid", "n", "e"))
+              for key in keys
+          ):
+              raise SystemExit("IdentityServer JWKS has no usable RSA signing key")
+          PY
+            then
+              identity_ready=1
+              break
+            fi
+            echo "IdentityServer identity plane not ready; attempt ${attempt}/60"
+            sleep 5
+          done
+          test "$identity_ready" -eq 1
+          REMOTE_SCRIPT
+
       - name: Deploy service on xeon-dev
         shell: bash
         run: |
@@ -360,6 +416,59 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [ "$SERVICE_NAME" = "identityserver" ]; then
+            ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          metadata_body="$(mktemp)"
+          jwks_body="$(mktemp)"
+          cleanup() { rm -f "$metadata_body" "$jwks_body"; }
+          trap cleanup EXIT
+
+          identity_ready=0
+          for attempt in $(seq 1 60); do
+            if /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/health/live >/dev/null \
+              && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/openid-configuration > "$metadata_body" \
+              && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/bolt-transport-jwks.json > "$jwks_body" \
+              && python3 - "$metadata_body" "$jwks_body" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.parse
+
+          metadata = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          jwks = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+          jwks_uri = metadata.get("jwks_uri")
+          if metadata.get("issuer") != "XFramework.IdentityServer":
+              raise SystemExit("IdentityServer metadata issuer is invalid")
+          if jwks_uri != "http://identityserver:8080/.well-known/bolt-transport-jwks.json":
+              raise SystemExit("IdentityServer metadata JWKS URI is invalid")
+          if "RS256" not in metadata.get("id_token_signing_alg_values_supported", []):
+              raise SystemExit("IdentityServer metadata does not advertise RS256")
+          keys = jwks.get("keys")
+          if not isinstance(keys, list) or not any(
+              key.get("kty") == "RSA"
+              and key.get("use") == "sig"
+              and key.get("alg") == "RS256"
+              and all(key.get(field) for field in ("kid", "n", "e"))
+              for key in keys
+          ):
+              raise SystemExit("IdentityServer JWKS has no usable RSA signing key")
+          PY
+            then
+              identity_ready=1
+              break
+            fi
+            echo "IdentityServer identity plane not ready; attempt ${attempt}/60"
+            sleep 5
+          done
+          test "$identity_ready" -eq 1
+          REMOTE_SCRIPT
+            exit 0
+          fi
 
           if [ "$SERVICE_NAME" = "bolt-hub" ]; then
             ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \

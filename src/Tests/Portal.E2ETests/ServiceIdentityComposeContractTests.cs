@@ -39,6 +39,38 @@ public sealed class ServiceIdentityComposeContractTests
         "XFramework.Operations.Dashboard"
     ];
 
+    private static readonly string[] IdentityDependentServices =
+    [
+        "bolt-hub",
+        "communications",
+        "notifications",
+        "storage",
+        "attendance",
+        "smsgateway",
+        "wallets",
+        "inventario",
+        "pos",
+        "portal",
+        "operations-dashboard",
+        "bolt-phase0-synthetics"
+    ];
+
+    private static readonly string[] CentralIdentityServices =
+    [
+        "bolt-hub",
+        "identityserver",
+        "communications",
+        "notifications",
+        "storage",
+        "attendance",
+        "smsgateway",
+        "wallets",
+        "inventario",
+        "pos",
+        "portal",
+        "operations-dashboard"
+    ];
+
     [Test]
     public void DockerCompose_UsesExplicitServiceIdentityClientsInsteadOfDevelopmentFallback()
     {
@@ -90,11 +122,120 @@ public sealed class ServiceIdentityComposeContractTests
         }
 
         compose.Should().Contain("x-service-identity-audiences:");
-        compose.Should().Contain("x-service-identity-scopes:");
         compose.Should().Contain("ServiceIdentity__Clients__");
         compose.Should().Contain("AllowedAudiences: *service-identity-audiences");
-        compose.Should().Contain("AllowedScopes: *service-identity-scopes");
+        compose.Should().Contain("AllowedScopes: bolt.service");
+        compose.Should().Contain("AllowedScopes: bolt.service,datacontext.query,datacontext.mutate,identity.admin");
     }
+
+    [Test]
+    public void DockerCompose_CentralizesBoltTransportIdentityInIdentityServer()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var compose = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "docker-compose.yml"));
+        var envExample = File.ReadAllText(Path.Combine(repositoryRoot.FullName, ".env.example"));
+        var commonEnvironment = ExtractSection(compose, "x-common-env: &common-env", "services:");
+        var hub = ExtractService(compose, "bolt-hub");
+        var identityServer = ExtractService(compose, "identityserver");
+
+        compose.Should().NotContain("BoltConfiguration__Signature");
+        compose.Should().NotContain("BOLT_SIGNATURE");
+        envExample.Should().Contain(
+            "# Rollback-only until the first centralized-identity LKG is sealed. " +
+            "New services do not receive this value.");
+        envExample.Should().Contain("BOLT_SIGNATURE=change-me-legacy-rollback-");
+
+        commonEnvironment.Should().Contain("BoltConfiguration__GenerateServiceAccessToken: false");
+        commonEnvironment.Should().Contain("ServiceIdentity__Authority: http://identityserver:8080");
+        commonEnvironment.Should().Contain("ServiceIdentity__AllowInsecureHttp: true");
+        foreach (var service in CentralIdentityServices)
+        {
+            var serviceBlock = ExtractService(compose, service);
+            var hasEffectiveCentralIdentity = serviceBlock.Contains("      <<: *common-env", StringComparison.Ordinal)
+                || (serviceBlock.Contains(
+                        "BoltConfiguration__GenerateServiceAccessToken: false",
+                        StringComparison.Ordinal)
+                    && serviceBlock.Contains(
+                        "ServiceIdentity__Authority: http://identityserver:8080",
+                        StringComparison.Ordinal)
+                    && serviceBlock.Contains(
+                        "ServiceIdentity__AllowInsecureHttp: true",
+                        StringComparison.Ordinal));
+            hasEffectiveCentralIdentity.Should().BeTrue(
+                "Compose service {0} must receive the common central identity configuration",
+                service);
+        }
+
+        hub.Should().Contain(
+            "BoltTransportAuthentication__MetadataAddress: " +
+            "http://identityserver:8080/.well-known/openid-configuration");
+        hub.Should().Contain("BoltTransportAuthentication__Issuer: XFramework.IdentityServer");
+        hub.Should().Contain("BoltTransportAuthentication__Audience: XFramework.Bolt.Hub");
+        hub.Should().Contain("BoltTransportAuthentication__RequireHttpsMetadata: false");
+
+        identityServer.Should().Contain("Kestrel__Endpoints__Http__Url: http://0.0.0.0:8080");
+        identityServer.Should().Contain(
+            "ServiceIdentity__BoltTransportTokenIssuer__SigningKeyPath: " +
+            "/var/lib/xframework/identity/bolt-transport-signing-key.pem");
+        identityServer.Should().Contain("- identity-keydata:/var/lib/xframework/identity");
+
+        var identityPorts = ExtractSection(identityServer, "    ports:", "    depends_on:");
+        identityPorts.Should().Contain(":8443");
+        identityPorts.Should().NotContain("8080");
+
+        var identityDependencies = ExtractSection(
+            identityServer,
+            "    depends_on:",
+            "    healthcheck:");
+        identityDependencies.Should().Contain(
+            "      migrate:\n        condition: service_completed_successfully");
+        identityDependencies.Should().Contain(
+            "      postgres:\n        condition: service_healthy");
+        identityDependencies.Should().NotContain("      bolt-hub:");
+
+        foreach (var service in IdentityDependentServices)
+        {
+            ExtractService(compose, service).Should().Contain(
+                "      identityserver:\n        condition: service_healthy");
+        }
+    }
+
+    private static string ExtractService(string compose, string service)
+    {
+        var lines = NormalizeLines(compose).Split('\n');
+        var marker = $"  {service}:";
+        var start = Array.FindIndex(lines, line => line == marker);
+        if (start < 0)
+            throw new InvalidOperationException($"Could not locate Compose service '{service}'.");
+
+        var end = Array.FindIndex(
+            lines,
+            start + 1,
+            line => line.StartsWith("  ", StringComparison.Ordinal)
+                && !line.StartsWith("    ", StringComparison.Ordinal)
+                && line.EndsWith(':'));
+        if (end < 0)
+            end = lines.Length;
+
+        return string.Join('\n', lines[start..end]);
+    }
+
+    private static string ExtractSection(string text, string startMarker, string endMarker)
+    {
+        var normalized = NormalizeLines(text);
+        var start = normalized.IndexOf(startMarker, StringComparison.Ordinal);
+        if (start < 0)
+            throw new InvalidOperationException($"Could not locate section '{startMarker}'.");
+
+        var end = normalized.IndexOf($"\n{endMarker}", start, StringComparison.Ordinal);
+        if (end < 0)
+            throw new InvalidOperationException($"Could not locate section terminator '{endMarker}'.");
+
+        return normalized[start..end];
+    }
+
+    private static string NormalizeLines(string value) =>
+        value.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static DirectoryInfo FindRepositoryRoot()
     {

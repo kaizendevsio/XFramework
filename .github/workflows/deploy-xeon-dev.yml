@@ -616,6 +616,90 @@ jobs:
               raise SystemExit("bound Phase 0 run preparation failed")
           PY
 
+      - name: Verify current sealed LKG renders with protected credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_LKG_DIR='$REMOTE_LKG_DIR' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 077
+          status_path="$REMOTE_RUN_DIR/lkg-compatibility-status"
+          test ! -e "$status_path"
+          test ! -L "$status_path"
+          pointer="$REMOTE_LKG_DIR/current"
+          if [ ! -e "$pointer" ]; then
+            test ! -L "$pointer"
+            printf '%s\n' not_applicable_no_prior_lkg > "$status_path"
+            echo "No sealed LKG exists; bootstrap recovery remains fail-closed with Bolt Hub stopped."
+            exit 0
+          fi
+
+          test -f "$pointer"
+          test ! -L "$pointer"
+          test "$(stat -Lc '%a:%h' -- "$pointer")" = "644:1"
+          lkg_run="$(python3 - "$pointer" "$REMOTE_RUN_DIR" <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          pointer = pathlib.Path(sys.argv[1])
+          run_root = pathlib.Path(sys.argv[2]).parent
+          raw = pointer.read_bytes()
+          if raw.count(b"\n") != 1 or not raw.endswith(b"\n"):
+              raise SystemExit("sealed LKG pointer is invalid")
+          try:
+              run = pathlib.Path(raw[:-1].decode("utf-8", errors="strict"))
+          except UnicodeDecodeError:
+              raise SystemExit("sealed LKG pointer is not UTF-8") from None
+          if run.parent != run_root or not re.fullmatch(r"[1-9][0-9]{0,31}-[1-9][0-9]{0,5}", run.name):
+              raise SystemExit("sealed LKG pointer leaves the trusted run root")
+          print(run)
+          PY
+          )"
+          test -d "$lkg_run"
+          test ! -L "$lkg_run"
+          test "$(readlink -e -- "$lkg_run")" = "$lkg_run"
+          test "$(stat -Lc '%a' -- "$lkg_run")" = 550
+          for artifact in docker-compose.yml pinned-compose.override.json image-pins.json security-qualified qualified-commit; do
+            path="$lkg_run/$artifact"
+            test -f "$path"
+            test ! -L "$path"
+            test "$(readlink -e -- "$path")" = "$path"
+            test "$(stat -Lc '%a:%h' -- "$path")" = "440:1"
+          done
+
+          /usr/bin/timeout --foreground --kill-after=10s 120s \
+            docker compose --env-file "$XFRAMEWORK_ENV_FILE" \
+              -f "$lkg_run/docker-compose.yml" \
+              -f "$lkg_run/pinned-compose.override.json" \
+              --project-name xframework config --quiet
+
+          pins="$(
+            python3 - "$lkg_run/image-pins.json" <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+
+          document = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          pins = document.get("pins")
+          pattern = re.compile(r"[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}")
+          if document.get("schema") != "xframework.bolt.phase0.image-pins.v2" or not isinstance(pins, dict) or not pins:
+              raise SystemExit("sealed LKG image pins are invalid")
+          if any(not isinstance(pin, str) or not pattern.fullmatch(pin) for pin in pins.values()):
+              raise SystemExit("sealed LKG contains a non-canonical image pin")
+          print("\n".join(sorted(pins.values())))
+          PY
+          )"
+          test -n "$pins"
+          while IFS= read -r pin; do
+            /usr/bin/timeout --foreground --kill-after=10s 60s \
+              docker image inspect "$pin" >/dev/null
+          done <<< "$pins"
+          printf '%s\n' rendered > "$status_path"
+          REMOTE_SCRIPT
+
       - name: Install reviewed Phase 0 synthetic hooks
         shell: bash
         run: |
@@ -1450,6 +1534,152 @@ jobs:
             "${compose[@]}" up --no-build --no-deps --force-recreate --abort-on-container-exit --exit-code-from migrate migrate
           REMOTE_SCRIPT
 
+      - name: Deploy IdentityServer identity plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "$remote_env bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          test -d "$REMOTE_RUN_DIR"
+          test ! -L "$REMOTE_RUN_DIR"
+          test "$(readlink -e -- "$REMOTE_RUN_DIR")" = "$REMOTE_RUN_DIR"
+          test "$(stat -Lc '%u:%g:%a:%F' -- "$REMOTE_RUN_DIR")" = \
+            "$(id -u):$(id -g):700:directory"
+          deployment_uid="$(id -u)"
+          compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE")
+          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase identity-rollout --mutation-began \
+            --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+            "${compose[@]}" up -d --no-build --no-deps identityserver
+          REMOTE_SCRIPT
+
+      - name: Verify IdentityServer live discovery plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          deployment_uid="$(id -u)"
+          heartbeat_parent_pid=$$
+          heartbeat_failed="$(mktemp)"
+          heartbeat_ready="$(mktemp)"
+          metadata_body="$(mktemp)"
+          jwks_body="$(mktemp)"
+          rm -f "$heartbeat_failed" "$heartbeat_ready"
+          heartbeat_pid=
+          heartbeat() {
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase identity-readiness --mutation-began >/dev/null
+          }
+          heartbeat_loop() {
+            trap 'exit 0' TERM INT HUP
+            while true; do
+              if ! heartbeat; then
+                : > "$heartbeat_failed"
+                kill -TERM "$heartbeat_parent_pid" >/dev/null 2>&1 || true
+                return 1
+              fi
+              : > "$heartbeat_ready"
+              sleep 30 & wait $! || return 0
+            done
+          }
+          cleanup_heartbeat() {
+            status=$?
+            heartbeat_was_alive=false
+            trap - EXIT TERM INT HUP
+            if [ -n "$heartbeat_pid" ]; then
+              if kill -0 "$heartbeat_pid" >/dev/null 2>&1; then
+                heartbeat_was_alive=true
+                kill "$heartbeat_pid" >/dev/null 2>&1 || true
+              fi
+              wait "$heartbeat_pid" 2>/dev/null || true
+              if [ "$status" -eq 0 ] && { [ "$heartbeat_was_alive" != true ] || [ -e "$heartbeat_failed" ]; }; then
+                echo "IdentityServer readiness lease heartbeat stopped unexpectedly" >&2
+                status=1
+              fi
+            fi
+            rm -f "$heartbeat_failed" "$heartbeat_ready" "$metadata_body" "$jwks_body"
+            exit "$status"
+          }
+          trap cleanup_heartbeat EXIT
+          trap 'exit 1' TERM INT HUP
+          heartbeat_loop & heartbeat_pid=$!
+          for _ in $(seq 1 100); do
+            [ -e "$heartbeat_ready" ] && break
+            if [ -e "$heartbeat_failed" ] || ! kill -0 "$heartbeat_pid" >/dev/null 2>&1; then
+              echo "IdentityServer readiness lease heartbeat failed to start" >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
+          test -e "$heartbeat_ready"
+
+          identity_ready=0
+          for attempt in $(seq 1 60); do
+            if /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/health/live >/dev/null \
+              && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/openid-configuration > "$metadata_body" \
+              && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/bolt-transport-jwks.json > "$jwks_body" \
+              && python3 - "$metadata_body" "$jwks_body" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.parse
+
+          metadata = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          jwks = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+          jwks_uri = metadata.get("jwks_uri")
+          if metadata.get("issuer") != "XFramework.IdentityServer":
+              raise SystemExit("IdentityServer metadata issuer is invalid")
+          if jwks_uri != "http://identityserver:8080/.well-known/bolt-transport-jwks.json":
+              raise SystemExit("IdentityServer metadata JWKS URI is invalid")
+          if "RS256" not in metadata.get("id_token_signing_alg_values_supported", []):
+              raise SystemExit("IdentityServer metadata does not advertise RS256")
+          keys = jwks.get("keys")
+          if not isinstance(keys, list) or not any(
+              key.get("kty") == "RSA"
+              and key.get("use") == "sig"
+              and key.get("alg") == "RS256"
+              and all(key.get(field) for field in ("kid", "n", "e"))
+              for key in keys
+          ):
+              raise SystemExit("IdentityServer JWKS has no usable RSA signing key")
+          PY
+            then
+              identity_ready=1
+              break
+            fi
+            echo "IdentityServer identity plane not ready; attempt ${attempt}/60"
+            sleep 5
+          done
+          test "$identity_ready" -eq 1
+          REMOTE_SCRIPT
+
+      - name: Verify staged runtime after IdentityServer deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
+          remote_verifier="$REMOTE_RUNTIME_VERIFIER"
+          remote_evidence="$REMOTE_RUN_DIR/runtime-staged-identityserver.json"
+          services=(migrate identityserver)
+          service_args="$(printf '%q ' "${services[@]}")"
+
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            scripts/verify-bolt-phase0-runtime.py "$DEPLOY_HOST:$remote_verifier"
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "rm -f '$remote_evidence'"
+          status=0
+          ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
+            "python3 '$REMOTE_LEASE_MANAGER' --project-name '$COMPOSE_PROJECT_NAME' --deployment-uid \"\$(id -u)\" supervise --run-id '$GITHUB_RUN_ID' --run-attempt '$GITHUB_RUN_ATTEMPT' --phase runtime-staged-identityserver --mutation-began --timeout-seconds 540 --quiet -- /usr/bin/timeout --foreground --kill-after=30s 510s python3 '$remote_verifier' --compose-file '$REMOTE_COMPOSE_FILE' --compose-file '$REMOTE_PIN_OVERRIDE' --env-file '$XFRAMEWORK_ENV_FILE' --project-name '$COMPOSE_PROJECT_NAME' --output '$remote_evidence' --pins-file '$REMOTE_PINS_FILE' --allow-staged-inventory --services $service_args" || status=$?
+          scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
+            "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/runtime-staged-identityserver.json" || true
+          exit "$status"
+
       - name: Deploy Bolt Hub only
         shell: bash
         run: |
@@ -1573,7 +1803,7 @@ jobs:
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
           remote_verifier="$REMOTE_RUNTIME_VERIFIER"
           remote_evidence="$REMOTE_RUN_DIR/runtime-staged-hub.json"
-          services=(migrate bolt-hub)
+          services=(migrate identityserver bolt-hub)
           service_args="$(printf '%q ' "${services[@]}")"
 
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
@@ -1586,7 +1816,7 @@ jobs:
             "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/runtime-staged-hub.json" || true
           exit "$status"
 
-      - name: Deploy IdentityServer and Communications canary
+      - name: Deploy Communications canary
         shell: bash
         run: |
           set -euo pipefail
@@ -1603,7 +1833,7 @@ jobs:
           python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
             supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase canary-rollout --mutation-began \
             --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
-            "${compose[@]}" up -d --no-build --no-deps identityserver communications
+            "${compose[@]}" up -d --no-build --no-deps communications
           REMOTE_SCRIPT
 
       - name: Wait for canary readiness
@@ -1665,17 +1895,10 @@ jobs:
             sleep 0.1
           done
           test -e "$heartbeat_ready"
-          read_env() { python3 "$ENV_PARSER" --file "$XFRAMEWORK_ENV_FILE" --key "$1"; }
-          identity_host="$(read_env IDENTITYSERVER_PUBLIC_HOSTNAME)"
-          identity_port="$(read_env IDENTITYSERVER_PUBLIC_HTTPS_PORT)"
-          identity_ca="$(read_env IDENTITYSERVER_TLS_CA_PATH)"
           for attempt in $(seq 1 60); do
-            identity_status="$(curl -sS --connect-timeout 5 --max-time 15 --noproxy "$identity_host" \
-              --cacert "$identity_ca" -o /dev/null -w '%{http_code}' \
-              "https://${identity_host}:${identity_port}/health/ready" || true)"
             communications_status="$(curl -sS --connect-timeout 5 --max-time 15 \
               -o /dev/null -w '%{http_code}' http://127.0.0.1:5148/health/ready || true)"
-            if [ "$identity_status" = 200 ] && [ "$communications_status" = 200 ]; then
+            if [ "$communications_status" = 200 ]; then
               exit 0
             fi
             sleep 5
@@ -1690,7 +1913,7 @@ jobs:
           evidence_dir="$RUNNER_TEMP/bolt-phase0-evidence"
           remote_verifier="$REMOTE_RUNTIME_VERIFIER"
           remote_evidence="$REMOTE_RUN_DIR/runtime-staged-canary.json"
-          services=(migrate bolt-hub identityserver communications)
+          services=(migrate identityserver bolt-hub communications)
           service_args="$(printf '%q ' "${services[@]}")"
 
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" "rm -f '$remote_evidence'"
@@ -1750,8 +1973,8 @@ jobs:
             python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
               heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase canary-observation --mutation-began >/dev/null
           }
-          containers=(xframework-bolt-hub xframework-identityserver xframework-communications)
-          services=(bolt-hub identityserver communications)
+          containers=(xframework-identityserver xframework-bolt-hub xframework-communications)
+          services=(identityserver bolt-hub communications)
           for sample_number in $(seq 1 "$MINIMUM_SAMPLES"); do
             heartbeat
             sample_dir="$(mktemp -d /dev/shm/bolt-phase0-observation.XXXXXXXX)"
@@ -1768,7 +1991,7 @@ jobs:
           import datetime, json, pathlib, sys
           root = pathlib.Path(sys.argv[1])
           services = {}
-          for service in ("bolt-hub", "identityserver", "communications"):
+          for service in ("identityserver", "bolt-hub", "communications"):
               health = json.loads((root / f"{service}.json").read_text(encoding="utf-8"))
               services[service] = {"http_status": 200, "health": health}
           sample = {
@@ -1822,7 +2045,7 @@ jobs:
             "wallets inventario pos"
             "portal operations-dashboard"
           )
-          cumulative_services=(migrate bolt-hub identityserver communications)
+          cumulative_services=(migrate identityserver bolt-hub communications)
           remote_verifier="$REMOTE_RUNTIME_VERIFIER"
           batch_number=0
           for batch in "${batches[@]}"; do
@@ -1957,8 +2180,8 @@ jobs:
           done
           identity_status="$(curl -sS --connect-timeout 5 --max-time 15 \
             --noproxy "$IDENTITYSERVER_PUBLIC_HOSTNAME" --cacert "$IDENTITYSERVER_TLS_CA_PATH" \
-            -o /tmp/xframework-identityserver-ready.json -w '%{http_code}' \
-            "https://${IDENTITYSERVER_PUBLIC_HOSTNAME}:${IDENTITYSERVER_PUBLIC_HTTPS_PORT}/health/ready" || true)"
+            -o /tmp/xframework-identityserver-live.json -w '%{http_code}' \
+            "https://${IDENTITYSERVER_PUBLIC_HOSTNAME}:${IDENTITYSERVER_PUBLIC_HTTPS_PORT}/health/live" || true)"
           test "$identity_status" = 200
           checks=(
             "communications=http://localhost:5148/health/ready"
@@ -2101,14 +2324,15 @@ jobs:
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/rotation-activate.json"
 
-      - name: Roll G+1 through Hub, canary, and client batches
+      - name: Roll G+1 through identity, Hub, canary, and client batches
         shell: bash
         run: |
           set -euo pipefail
           remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
           stages=(
+            "identity:identityserver"
             "hub:bolt-hub"
-            "canary:identityserver communications"
+            "canary:communications"
             "batch-1:notifications storage attendance smsgateway"
             "batch-2:wallets inventario pos"
             "batch-3:portal operations-dashboard"
@@ -2141,6 +2365,52 @@ jobs:
             done
             test "$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")" = healthy
           done
+          if [ "$1" = identityserver ]; then
+            metadata_body="$(mktemp)"
+            jwks_body="$(mktemp)"
+            trap 'rm -f "$metadata_body" "$jwks_body"' EXIT
+            identity_ready=0
+            for attempt in $(seq 1 60); do
+              heartbeat
+              if /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                  curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/health/live >/dev/null \
+                && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                  curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/openid-configuration > "$metadata_body" \
+                && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec xframework-identityserver \
+                  curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/bolt-transport-jwks.json > "$jwks_body" \
+                && python3 - "$metadata_body" "$jwks_body" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.parse
+
+          metadata = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          jwks = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+          jwks_uri = metadata.get("jwks_uri")
+          if metadata.get("issuer") != "XFramework.IdentityServer":
+              raise SystemExit("IdentityServer metadata issuer is invalid")
+          if jwks_uri != "http://identityserver:8080/.well-known/bolt-transport-jwks.json":
+              raise SystemExit("IdentityServer metadata JWKS URI is invalid")
+          if "RS256" not in metadata.get("id_token_signing_alg_values_supported", []):
+              raise SystemExit("IdentityServer metadata does not advertise RS256")
+          keys = jwks.get("keys")
+          if not isinstance(keys, list) or not any(
+              key.get("kty") == "RSA"
+              and key.get("use") == "sig"
+              and key.get("alg") == "RS256"
+              and all(key.get(field) for field in ("kid", "n", "e"))
+              for key in keys
+          ):
+              raise SystemExit("IdentityServer JWKS has no usable RSA signing key")
+          PY
+              then
+                identity_ready=1
+                break
+              fi
+              sleep 5
+            done
+            test "$identity_ready" -eq 1
+          fi
           REMOTE_SCRIPT
             read -r -a restarted_services <<< "$services"
             cumulative_services+=("${restarted_services[@]}")
@@ -2153,7 +2423,7 @@ jobs:
             scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
               "$DEPLOY_HOST:$remote_runtime" "$local_runtime" || true
             test "$status" -eq 0
-            if [ "$label" != hub ]; then
+            if [ "$label" != identity ] && [ "$label" != hub ]; then
               bash scripts/run-bolt-phase0-synthetics.sh "rotation-${label}"
             fi
             if [ "$label" = canary ]; then
@@ -2162,8 +2432,10 @@ jobs:
                   "REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_OBSERVATION'
           set -euo pipefail
           for container in xframework-identityserver xframework-communications; do
+            endpoint=ready
+            if [ "$container" = xframework-identityserver ]; then endpoint=live; fi
             status="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container" curl -sS --connect-timeout 3 --max-time 10 \
-              -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health/ready || true)"
+              -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080/health/${endpoint}" || true)"
             test "$status" = 200
           done
           python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$(id -u)" \
@@ -2185,7 +2457,7 @@ jobs:
           remote_inventory="$REMOTE_RUN_DIR/rotation-generation-inventory.json"
           remote_evidence="$REMOTE_RUN_DIR/credential-convergence-dual-validation.json"
           remote_rotation_evidence="$REMOTE_RUN_DIR/rotation-convergence-evidence.json"
-          services=(bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          services=(identityserver bolt-hub communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
           service_args="$(printf '%q ' "${services[@]}")"
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes \
             scripts/verify-bolt-phase0-credential-convergence.py "$DEPLOY_HOST:$remote_verifier"
@@ -2294,8 +2566,10 @@ jobs:
               "REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
           for container in xframework-identityserver xframework-communications; do
+            endpoint=ready
+            if [ "$container" = xframework-identityserver ]; then endpoint=live; fi
             http_status="$(/usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container" curl -sS --connect-timeout 3 --max-time 10 \
-              -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health/ready || true)"
+              -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080/health/${endpoint}" || true)"
             test "$http_status" = 200
           done
           python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$(id -u)" \
@@ -2331,7 +2605,7 @@ jobs:
           DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 3900
         run: |
           set -euo pipefail
-          services=(bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          services=(identityserver bolt-hub communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
           service_args="$(printf '%q ' "${services[@]}")"
           remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT'"
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
@@ -2356,6 +2630,52 @@ jobs:
               sleep 5
             done
             test "$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")" = healthy
+            if [ "$service" = identityserver ]; then
+              metadata_body="$(mktemp)"
+              jwks_body="$(mktemp)"
+              identity_ready=0
+              for attempt in $(seq 1 60); do
+                heartbeat
+                if /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" \
+                    curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/health/live >/dev/null \
+                  && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" \
+                    curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/openid-configuration > "$metadata_body" \
+                  && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" \
+                    curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/bolt-transport-jwks.json > "$jwks_body" \
+                  && python3 - "$metadata_body" "$jwks_body" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.parse
+
+          metadata = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          jwks = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+          jwks_uri = metadata.get("jwks_uri")
+          if metadata.get("issuer") != "XFramework.IdentityServer":
+              raise SystemExit("IdentityServer metadata issuer is invalid")
+          if jwks_uri != "http://identityserver:8080/.well-known/bolt-transport-jwks.json":
+              raise SystemExit("IdentityServer metadata JWKS URI is invalid")
+          if "RS256" not in metadata.get("id_token_signing_alg_values_supported", []):
+              raise SystemExit("IdentityServer metadata does not advertise RS256")
+          keys = jwks.get("keys")
+          if not isinstance(keys, list) or not any(
+              key.get("kty") == "RSA"
+              and key.get("use") == "sig"
+              and key.get("alg") == "RS256"
+              and all(key.get(field) for field in ("kid", "n", "e"))
+              for key in keys
+          ):
+              raise SystemExit("IdentityServer JWKS has no usable RSA signing key")
+          PY
+                then
+                  identity_ready=1
+                  break
+                fi
+                sleep 5
+              done
+              rm -f "$metadata_body" "$jwks_body"
+              test "$identity_ready" -eq 1
+            fi
           done
           REMOTE_SCRIPT
           bash scripts/run-bolt-phase0-synthetics.sh finalized
@@ -2368,7 +2688,7 @@ jobs:
           remote_verifier="$REMOTE_RUN_DIR/verify-bolt-phase0-credential-convergence.py"
           remote_input="$REMOTE_RUN_DIR/credential-convergence-finalized-input.json"
           remote_evidence="$REMOTE_RUN_DIR/credential-convergence-finalized.json"
-          services=(bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          services=(identityserver bolt-hub communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
           service_args="$(printf '%q ' "${services[@]}")"
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' ENV_PARSER='$REMOTE_ENV_PARSER' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_MANAGER='$REMOTE_ROTATION_MANAGER' INPUT='$remote_input' EVIDENCE='$remote_evidence' VERIFIER='$remote_verifier' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' bash -s -- $service_args" <<'REMOTE_SCRIPT'
@@ -2441,8 +2761,8 @@ jobs:
           remote_pins="$REMOTE_PINS_FILE"
           services=(
             migrate
-            bolt-hub
             identityserver
+            bolt-hub
             communications
             notifications
             storage
@@ -2468,7 +2788,7 @@ jobs:
             "$DEPLOY_HOST:$remote_evidence" "$evidence_dir/runtime.json" || true
           exit "$status"
 
-      - name: Exercise digest-pinned rollback under G+1
+      - name: Exercise candidate digest-pinned restart under G+1
         shell: bash
         env:
           DEPLOY_SSH_OPERATION_TIMEOUT_SECONDS: 3900
@@ -2478,7 +2798,7 @@ jobs:
           remote_runtime_verifier="$REMOTE_RUNTIME_VERIFIER"
           remote_runtime="$REMOTE_RUN_DIR/rollback-runtime-evidence.json"
           remote_drill="$REMOTE_RUN_DIR/rollback-drill-evidence.json"
-          services=(migrate bolt-hub identityserver communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          services=(migrate identityserver bolt-hub communications notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
           service_args="$(printf '%q ' "${services[@]}")"
           ssh -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST" \
             "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_PIN_OVERRIDE='$REMOTE_PIN_OVERRIDE' REMOTE_PINS_FILE='$REMOTE_PINS_FILE' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_RUNTIME='$remote_runtime' REMOTE_DRILL='$remote_drill' REMOTE_RUNTIME_VERIFIER='$remote_runtime_verifier' REMOTE_ROTATION_STATE='$REMOTE_ROTATION_STATE' REMOTE_ROTATION_MANAGER='$REMOTE_ROTATION_MANAGER' REMOTE_LEASE_MANAGER='$REMOTE_LEASE_MANAGER' RUN_ID='$GITHUB_RUN_ID' RUN_ATTEMPT='$GITHUB_RUN_ATTEMPT' SOURCE_COMMIT='$GITHUB_SHA' bash -s -- $service_args" <<'REMOTE_SCRIPT'
@@ -2492,13 +2812,11 @@ jobs:
               heartbeat --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase rollback-drill --mutation-began >/dev/null
           }
           compose=(docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_COMPOSE_FILE" -f "$REMOTE_PIN_OVERRIDE" --project-name "$COMPOSE_PROJECT_NAME")
-          python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
-            supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase rollback-drill --mutation-began \
-            --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
-            "${compose[@]}" up -d --no-build --no-deps --force-recreate \
-            bolt-hub identityserver communications notifications storage attendance \
-            smsgateway wallets inventario pos portal operations-dashboard
           for service in "${@:2}"; do
+            python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
+              supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase rollback-drill --mutation-began \
+              --timeout-seconds 540 -- /usr/bin/timeout --foreground --kill-after=30s 510s \
+              "${compose[@]}" up -d --no-build --no-deps --force-recreate "$service"
             container_id="$(/usr/bin/timeout --foreground --kill-after=10s 30s "${compose[@]}" ps --quiet "$service")"
             test -n "$container_id"
             for attempt in $(seq 1 60); do
@@ -2508,6 +2826,52 @@ jobs:
               sleep 5
             done
             test "$(/usr/bin/timeout --foreground --kill-after=10s 30s docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")" = healthy
+            if [ "$service" = identityserver ]; then
+              metadata_body="$(mktemp)"
+              jwks_body="$(mktemp)"
+              identity_ready=0
+              for attempt in $(seq 1 60); do
+                heartbeat
+                if /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" \
+                    curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/health/live >/dev/null \
+                  && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" \
+                    curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/openid-configuration > "$metadata_body" \
+                  && /usr/bin/timeout --foreground --kill-after=10s 30s docker exec "$container_id" \
+                    curl -fsS --connect-timeout 3 --max-time 10 http://127.0.0.1:8080/.well-known/bolt-transport-jwks.json > "$jwks_body" \
+                  && python3 - "$metadata_body" "$jwks_body" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.parse
+
+          metadata = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          jwks = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+          jwks_uri = metadata.get("jwks_uri")
+          if metadata.get("issuer") != "XFramework.IdentityServer":
+              raise SystemExit("IdentityServer metadata issuer is invalid")
+          if jwks_uri != "http://identityserver:8080/.well-known/bolt-transport-jwks.json":
+              raise SystemExit("IdentityServer metadata JWKS URI is invalid")
+          if "RS256" not in metadata.get("id_token_signing_alg_values_supported", []):
+              raise SystemExit("IdentityServer metadata does not advertise RS256")
+          keys = jwks.get("keys")
+          if not isinstance(keys, list) or not any(
+              key.get("kty") == "RSA"
+              and key.get("use") == "sig"
+              and key.get("alg") == "RS256"
+              and all(key.get(field) for field in ("kid", "n", "e"))
+              for key in keys
+          ):
+              raise SystemExit("IdentityServer JWKS has no usable RSA signing key")
+          PY
+                then
+                  identity_ready=1
+                  break
+                fi
+                sleep 5
+              done
+              rm -f "$metadata_body" "$jwks_body"
+              test "$identity_ready" -eq 1
+            fi
           done
           python3 "$REMOTE_LEASE_MANAGER" --project-name "$COMPOSE_PROJECT_NAME" --deployment-uid "$deployment_uid" \
             supervise --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --phase rollback-verification --mutation-began \
@@ -2534,9 +2898,13 @@ jobs:
           root = pathlib.Path(root)
           runtime = pathlib.Path(runtime_text)
           synthetic = root / "rollback-synthetics-finalized.json"
+          lkg_compatibility_path = root / "lkg-compatibility-status"
+          lkg_compatibility = lkg_compatibility_path.read_text(encoding="utf-8").strip()
+          if lkg_compatibility not in {"rendered", "not_applicable_no_prior_lkg"}:
+              raise SystemExit("LKG compatibility status is invalid")
           def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
           document = {
-              "schema": "xframework.bolt.phase0.rollback-drill.v1",
+              "schema": "xframework.bolt.phase0.candidate-restart.v1",
               "status": "passed",
               "run_id": run_id,
               "run_attempt": int(attempt),
@@ -2545,13 +2913,14 @@ jobs:
               "started_at_utc": (root / "rollback-drill-started").read_text(encoding="utf-8").strip(),
               "completed_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
               "credential_generation_id": generation,
+              "lkg_compatibility": lkg_compatibility,
               "manifest_sha256": digest(root / "docker-compose.yml"),
               "override_sha256": digest(root / "pinned-compose.override.json"),
               "pins_sha256": digest(root / "image-pins.json"),
               "runtime_evidence_sha256": digest(runtime),
               "synthetic_evidence_sha256": digest(synthetic),
               "checks": {
-                  "restore_applied": True,
+                  "candidate_digest_recreate_applied": True,
                   "full_runtime_verified": True,
                   "authenticated_finalized_synthetic": True,
                   "current_generation_preserved": True,
@@ -2567,6 +2936,7 @@ jobs:
               stream.flush(); os.fsync(stream.fileno())
           os.replace(temporary_name, output)
           (root / "rollback-drill-started").unlink()
+          lkg_compatibility_path.unlink()
           PY
           REMOTE_SCRIPT
           scp -i "$DEPLOY_SSH_KEY" -o BatchMode=yes "$DEPLOY_HOST:$remote_runtime" "$evidence_dir/rollback-runtime-evidence.json"

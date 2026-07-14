@@ -83,6 +83,7 @@ class Phase0ComposeTests(unittest.TestCase):
         common_environment = {
             "BoltConfiguration__RequireSecureTransport": "true",
             "BoltConfiguration__ServerUrls__0": MODULE.SECURE_URL,
+            **MODULE.COMMON_CENTRAL_IDENTITY_ENV,
         }
         services = {
             name: {
@@ -101,6 +102,9 @@ class Phase0ComposeTests(unittest.TestCase):
                         "mode": "0444",
                     }
                 ],
+                "depends_on": {
+                    "identityserver": {"condition": "service_healthy"},
+                },
             }
             for name in MODULE.CLIENT_SERVICES
         }
@@ -122,6 +126,9 @@ class Phase0ComposeTests(unittest.TestCase):
             "profiles": ["phase0-verification"],
             "restart": "no",
             "environment": {"BOLT_SYNTHETIC_TARGET": MODULE.SECURE_URL},
+            "depends_on": {
+                "identityserver": {"condition": "service_healthy"},
+            },
             "secrets": [
                 {
                     "source": MODULE.CA_SECRET,
@@ -135,12 +142,24 @@ class Phase0ComposeTests(unittest.TestCase):
                 "environment": {
                     **common_environment,
                     "ServiceIdentity__DefaultScopes__0": "bolt.service",
-                    "ASPNETCORE_URLS": "http://127.0.0.1:8080;https://+:8443",
+                    "ASPNETCORE_URLS": "http://+:8080;https://+:8443",
                     **MODULE.IDENTITY_EXPECTED_ENDPOINT_ENV,
                     **MODULE.IDENTITY_ISSUER_ENV,
                     **identity_client_environment,
                 },
                 "ports": [{"target": 8443, "published": "8444", "protocol": "tcp"}],
+                "volumes": [
+                    {
+                        "type": "volume",
+                        "source": MODULE.IDENTITY_KEYDATA_VOLUME,
+                        "target": MODULE.IDENTITY_KEYDATA_DIRECTORY,
+                        "read_only": False,
+                    }
+                ],
+                "depends_on": {
+                    "migrate": {"condition": "service_completed_successfully"},
+                    "postgres": {"condition": "service_healthy"},
+                },
                 "secrets": [
                     {
                         "source": MODULE.CA_SECRET,
@@ -177,6 +196,8 @@ class Phase0ComposeTests(unittest.TestCase):
             "BoltConfiguration__RequireSecureTransport": "true",
             "BoltConfiguration__MediaEnabled": "false",
             "BoltConfiguration__RegistrationIdentityBindingMode": "Enforce",
+            **MODULE.COMMON_CENTRAL_IDENTITY_ENV,
+            **MODULE.HUB_TRANSPORT_AUTHENTICATION_ENV,
             **MODULE.PHASE0_QUOTAS,
         }
         services["bolt-hub"].update({
@@ -187,6 +208,9 @@ class Phase0ComposeTests(unittest.TestCase):
                 "ServiceIdentity__DefaultScopes__0": "bolt.service",
             },
             "ports": [{"target": 8443, "published": "7443", "protocol": "tcp"}],
+            "depends_on": {
+                "identityserver": {"condition": "service_healthy"},
+            },
             "secrets": [
                 {
                     "source": MODULE.CA_SECRET,
@@ -222,6 +246,7 @@ class Phase0ComposeTests(unittest.TestCase):
                 MODULE.IDENTITY_FULLCHAIN_SECRET: {"file": str(self.identity_fullchain)},
                 MODULE.IDENTITY_PRIVATE_KEY_SECRET: {"file": str(self.identity_private_key)},
             },
+            "volumes": {MODULE.IDENTITY_KEYDATA_VOLUME: {}},
         }
 
     def errors(self, manifest: dict, args: SimpleNamespace | None = None) -> list[str]:
@@ -243,6 +268,98 @@ class Phase0ComposeTests(unittest.TestCase):
             },
             gate.checks["identityserver-exact-client-scope-matrix"]["detail"]["observed"],
         )
+
+    def test_central_identity_configuration_and_legacy_signature_fail_closed(self) -> None:
+        for service, key, value, check in (
+            (
+                "portal",
+                "ServiceIdentity__Authority",
+                "https://identity.example.test",
+                "common-central-service-identity-configuration:",
+            ),
+            (
+                "bolt-hub",
+                "BoltTransportAuthentication__Audience",
+                "wrong-audience",
+                "hub-central-transport-authentication:",
+            ),
+            (
+                "communications",
+                "BoltConfiguration__Signature",
+                "legacy-shared-signature",
+                "bolt-signature-configuration-absent:",
+            ),
+            (
+                "notifications",
+                "boltconfiguration:signature",
+                "legacy-shared-signature",
+                "bolt-signature-configuration-absent:",
+            ),
+        ):
+            with self.subTest(service=service, key=key):
+                manifest = self.manifest()
+                manifest["services"][service]["environment"][key] = value
+                self.assertTrue(any(error.startswith(check) for error in self.errors(manifest)))
+
+    def test_identityserver_uses_container_http_and_persistent_signing_key_volume(self) -> None:
+        manifest = self.manifest()
+        identity = manifest["services"]["identityserver"]
+        identity["environment"]["Kestrel__Endpoints__Http__Url"] = "http://127.0.0.1:8080"
+        self.assertTrue(any(
+            error.startswith("identityserver-effective-kestrel-endpoints:")
+            for error in self.errors(manifest)
+        ))
+
+        invalid_mounts = (
+            [],
+            [{
+                "type": "volume",
+                "source": MODULE.IDENTITY_KEYDATA_VOLUME,
+                "target": MODULE.IDENTITY_KEYDATA_DIRECTORY,
+                "read_only": True,
+            }],
+            [{
+                "type": "volume",
+                "source": "ephemeral-keydata",
+                "target": MODULE.IDENTITY_KEYDATA_DIRECTORY,
+                "read_only": False,
+            }],
+        )
+        for mounts in invalid_mounts:
+            with self.subTest(mounts=mounts):
+                manifest = self.manifest()
+                manifest["services"]["identityserver"]["volumes"] = mounts
+                self.assertTrue(any(
+                    error.startswith("identityserver-persistent-writable-signing-key-volume:")
+                    for error in self.errors(manifest)
+                ))
+
+        manifest = self.manifest()
+        del manifest["volumes"][MODULE.IDENTITY_KEYDATA_VOLUME]
+        self.assertTrue(any(
+            error.startswith("identityserver-persistent-writable-signing-key-volume:")
+            for error in self.errors(manifest)
+        ))
+
+    def test_identityserver_dependency_direction_and_health_are_required(self) -> None:
+        manifest = self.manifest()
+        manifest["services"]["identityserver"]["depends_on"]["bolt-hub"] = {
+            "condition": "service_healthy"
+        }
+        del manifest["services"]["identityserver"]["depends_on"]["migrate"]
+        manifest["services"]["portal"]["depends_on"]["identityserver"] = {
+            "condition": "service_started"
+        }
+        errors = self.errors(manifest)
+
+        self.assertTrue(any(
+            error.startswith("identityserver-depends-on-database-bootstrap-not-hub:")
+            for error in errors
+        ))
+        self.assertTrue(any(
+            error.startswith("token-consumers-depend-on-healthy-identityserver:")
+            for error in errors
+        ))
 
     def test_identityserver_client_scope_matrix_rejects_cross_module_privilege(self) -> None:
         cases = (

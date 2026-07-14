@@ -1,6 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
-using System.Security.Claims;
 using Bolt.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.DataContext;
@@ -37,13 +34,23 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration,
         bool autoConnect = true,
-        IHostEnvironment? hostEnvironment = null)
+        IHostEnvironment? hostEnvironment = null,
+        bool connectAfterApplicationStarted = false)
     {
         services.Configure<BoltConfiguration>(configuration.GetSection("BoltConfiguration"));
+        var boltConfig = configuration.GetSection("BoltConfiguration").Get<BoltConfiguration>()
+            ?? throw new InvalidOperationException("BoltConfiguration section is missing or empty in configuration.");
+
+        if (boltConfig.ServerUrls is null || boltConfig.ServerUrls.Count == 0)
+            throw new InvalidOperationException("BoltConfiguration:ServerUrls must contain at least one URL.");
+
+        ValidateTransportIdentityModes(boltConfig, hostEnvironment);
+
         services.TryAddSingleton(TimeProvider.System);
         services.AddCredentialGenerationHealthCheck();
-        services.AddBoltClientTransportHealthCheck();
-        services.AddOptions<ServiceIdentityOptions>()
+        if (!connectAfterApplicationStarted)
+            services.AddBoltClientTransportHealthCheck();
+        var serviceIdentityOptions = services.AddOptions<ServiceIdentityOptions>()
             .Configure(options =>
             {
                 configuration.GetSection(ServiceIdentityOptions.SectionName).Bind(options);
@@ -53,18 +60,23 @@ public static class ServiceCollectionExtensions
 
                 if (options.DefaultScopes.Count == 0)
                     options.DefaultScopes = XFrameworkServiceScopes.AdminDefaults.ToList();
-            })
-            .ValidateOnStart();
+            });
+        if (UsesCentralTransportIdentity(boltConfig))
+            serviceIdentityOptions.ValidateOnStart();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<ServiceIdentityOptions>, ServiceIdentityOptionsValidator>());
+        services.AddHttpClient(ServiceIdentityHttpClient.Name, (serviceProvider, client) =>
+        {
+            client.BaseAddress = serviceProvider
+                .GetRequiredService<IOptions<ServiceIdentityOptions>>()
+                .Value
+                .ResolveAuthority();
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
+        services.TryAddSingleton<IBoltTransportTokenProvider, IdentityServerBoltTransportTokenProvider>();
+        services.TryAddSingleton<IServiceTokenProvider, IdentityServerServiceTokenProvider>();
         services.Configure<BoltServiceDiscoveryOptions>(
             configuration.GetSection(BoltServiceDiscoveryOptions.SectionName));
-
-        var boltConfig = configuration.GetSection("BoltConfiguration").Get<BoltConfiguration>()
-            ?? throw new InvalidOperationException("BoltConfiguration section is missing or empty in configuration.");
-
-        if (boltConfig.ServerUrls is null || boltConfig.ServerUrls.Count == 0)
-            throw new InvalidOperationException("BoltConfiguration:ServerUrls must contain at least one URL.");
 
         var requireSecureTransport = boltConfig.RequireSecureTransport ||
                                      hostEnvironment is not null && !hostEnvironment.IsDevelopment();
@@ -114,25 +126,27 @@ public static class ServiceCollectionExtensions
                     options.ScaleUpThreshold = boltConfig.ScaleUpThreshold > 0
                         ? boltConfig.ScaleUpThreshold
                         : options.ScaleUpThreshold;
-
-                    if (!string.IsNullOrWhiteSpace(boltConfig.AccessToken))
-                    {
-                        options.AccessToken = boltConfig.AccessToken;
-                    }
-                    else if (!boltConfig.Anonymous && boltConfig.GenerateServiceAccessToken)
-                    {
-                        options.AccessTokenProvider = _ =>
-                            new ValueTask<string?>(GenerateBoltServiceAccessToken(configuration, clientName));
-                    }
                 });
 
-            if (!autoConnect)
+            if (!string.IsNullOrWhiteSpace(boltConfig.AccessToken))
+            {
+                builder.WithAccessToken(boltConfig.AccessToken);
+            }
+            else if (!boltConfig.Anonymous)
+            {
+                builder.WithAccessTokenProvider<IBoltTransportTokenProvider>(
+                    async (provider, ct) => await provider.GetTokenAsync(ct));
+            }
+
+            if (!autoConnect || connectAfterApplicationStarted)
                 builder.DisableAutoConnect();
         });
 
+        if (autoConnect && connectAfterApplicationStarted)
+            services.AddHostedService<ApplicationStartedBoltClientHostedService>();
+
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IBoltServiceManifestProvider, ConfigurationBoltServiceManifestProvider>());
         services.AddHostedService<BoltServiceManifestAdvertisementHostedService>();
-        services.TryAddSingleton<IServiceTokenProvider, IdentityServerServiceTokenProvider>();
         services.TryAddSingleton<IIdentitySigningKeyProvider, IdentityServerSigningKeyProvider>();
         services.TryAddSingleton<IServiceTokenValidator, ServiceTokenValidator>();
         services.TryAddSingleton<ITrustedServiceInvocationResolver, TrustedServiceInvocationResolver>();
@@ -141,38 +155,34 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    private static string GenerateBoltServiceAccessToken(IConfiguration configuration, string clientName)
+    private static bool UsesCentralTransportIdentity(BoltConfiguration boltConfig) =>
+        !boltConfig.Anonymous && string.IsNullOrWhiteSpace(boltConfig.AccessToken);
+
+    private static void ValidateTransportIdentityModes(
+        BoltConfiguration boltConfig,
+        IHostEnvironment? hostEnvironment)
     {
-        var jwtOptions = configuration.GetSection(nameof(JwtOptions)).Get<JwtOptions>()
-            ?? throw new InvalidOperationException("JwtOptions is required to generate Bolt service access tokens.");
-        JwtCredentialSet.Validate(jwtOptions, TimeProvider.System.GetUtcNow());
+        var isDevelopment = hostEnvironment?.IsDevelopment() == true;
 
-        var lifetime = TimeSpan.TryParse(jwtOptions.AccessTokenLifespan, out var parsedLifetime)
-            ? parsedLifetime
-            : TimeSpan.FromMinutes(30);
+        if (boltConfig.Anonymous && !isDevelopment)
+        {
+            throw new InvalidOperationException(
+                "BoltConfiguration:Anonymous is permitted only when the host environment is Development.");
+        }
 
-        List<Claim> claims =
-        [
-            new("client_id", clientName),
-            new("service", clientName),
-            new("scope", "bolt.service"),
-            new(JwtCredentialSet.GenerationClaim, jwtOptions.GenerationId.Trim()),
-            new(ClaimTypes.Name, clientName),
-            new(JwtRegisteredClaimNames.Sub, clientName),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-            new(JwtRegisteredClaimNames.AuthTime, DateTime.UtcNow.ToString("O"))
-        ];
+        if (boltConfig.GenerateServiceAccessToken)
+        {
+            throw new InvalidOperationException(
+                "BoltConfiguration:GenerateServiceAccessToken is no longer supported. " +
+                "Use IdentityServer-issued Bolt transport tokens.");
+        }
 
-        var securityKey = JwtCredentialSet.CreateCurrentSigningKey(jwtOptions);
-        var token = new JwtSecurityToken(
-            issuer: jwtOptions.ValidIssuer,
-            audience: jwtOptions.ValidAudience,
-            claims: claims,
-            notBefore: DateTime.UtcNow,
-            expires: DateTime.UtcNow.Add(lifetime),
-            signingCredentials: new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512));
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        if (!string.IsNullOrWhiteSpace(boltConfig.AccessToken) &&
+            boltConfig.Anonymous)
+        {
+            throw new InvalidOperationException(
+                "BoltConfiguration:AccessToken cannot be combined with anonymous transport identity mode.");
+        }
     }
 
     public static IServiceCollection AddBoltServiceManifestProvider<TProvider>(this IServiceCollection services)
@@ -251,4 +261,83 @@ internal sealed class BoltHandlerRegistrationHostedService : IHostedService
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+internal sealed class ApplicationStartedBoltClientHostedService(
+    BoltClient client,
+    IHostApplicationLifetime applicationLifetime,
+    ILogger<ApplicationStartedBoltClientHostedService> logger) : IHostedService
+{
+    private readonly object _gate = new();
+    private CancellationTokenSource? _stoppingCts;
+    private CancellationTokenRegistration _applicationStartedRegistration;
+    private Task _connectTask = Task.CompletedTask;
+
+    public Task StartAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        _stoppingCts = CancellationTokenSource.CreateLinkedTokenSource(applicationLifetime.ApplicationStopping);
+        _applicationStartedRegistration = applicationLifetime.ApplicationStarted.Register(StartConnection);
+        return Task.CompletedTask;
+    }
+
+    public async Task StopAsync(CancellationToken ct)
+    {
+        _applicationStartedRegistration.Dispose();
+        _stoppingCts?.Cancel();
+
+        Task connectTask;
+        lock (_gate)
+            connectTask = _connectTask;
+
+        try
+        {
+            await connectTask.WaitAsync(ct);
+        }
+        catch (OperationCanceledException) when (_stoppingCts?.IsCancellationRequested == true || ct.IsCancellationRequested)
+        {
+        }
+
+        await client.DisposeAsync();
+        _stoppingCts?.Dispose();
+    }
+
+    private void StartConnection()
+    {
+        lock (_gate)
+        {
+            if (!_connectTask.IsCompleted || _stoppingCts is null || _stoppingCts.IsCancellationRequested)
+                return;
+
+            _connectTask = ConnectAsync(_stoppingCts.Token);
+        }
+    }
+
+    private async Task ConnectAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                logger.LogInformation("Bolt client connecting after application startup...");
+                await client.ConnectWithRetryAsync(ct);
+                if (client.IsConnected)
+                {
+                    logger.LogInformation("Bolt client connected after application startup");
+                    return;
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                logger.LogDebug("Bolt client connection canceled during application shutdown");
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Bolt client startup retry cycle failed; retrying until shutdown");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+    }
 }

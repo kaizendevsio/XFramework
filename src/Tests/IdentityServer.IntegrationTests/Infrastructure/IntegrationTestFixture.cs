@@ -9,6 +9,7 @@ using Communications.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Bolt.Hub.Extensions;
 using Storage.Domain.Shared.Contracts.Requests;
@@ -53,6 +54,13 @@ public class IntegrationTestFixture
     private const string TestServiceClientSecret = "IdentityServerIntegrationTestSecret-2026";
     private const string TestHostServiceGenerationId = "test-host-service-g1";
     private const string TestHostServiceClientSecret = "IdentityServerHostIntegrationSecret-2026";
+    private static readonly string TransportSigningKeyDirectory = Path.Combine(
+        Path.GetTempPath(),
+        "XFramework.IdentityServer.IntegrationTests",
+        Guid.NewGuid().ToString("N"));
+    private static readonly string TransportSigningKeyPath = Path.Combine(
+        TransportSigningKeyDirectory,
+        "bolt-transport-signing-key.pem");
 
     /// <summary>
     /// Service wrapper that calls IdentityServer through the actual Bolt transport.
@@ -92,6 +100,7 @@ public class IntegrationTestFixture
         // 4. Start IdentityServer (connects to Bolt as "IdentityServer" client)
         _identityServerApp = StartIdentityServer();
         await WaitForHealth($"{IdentityServerUrl}/health/live", _identityServerTask);
+        await VerifyCentralTransportIdentity();
 
         // 5. Seed the in-memory tenant cache
         var cache = _identityServerApp.Services.GetRequiredService<IMemoryCache>();
@@ -118,6 +127,8 @@ public class IntegrationTestFixture
         try { if (_identityServerApp != null) await _identityServerApp.StopAsync(); } catch { }
         try { if (_streamFlowApp != null) await _streamFlowApp.StopAsync(); } catch { }
         if (_postgres != null) await _postgres.DisposeAsync();
+        if (Directory.Exists(TransportSigningKeyDirectory))
+            Directory.Delete(TransportSigningKeyDirectory, recursive: true);
     }
 
     private static WebApplication StartBolt()
@@ -183,6 +194,7 @@ public class IntegrationTestFixture
         builder.Services.AddSingleton(serviceProvider => ServiceIdentityConfiguration.FromConfiguration(
             serviceProvider.GetRequiredService<IConfiguration>(),
             serviceProvider.GetRequiredService<TimeProvider>().GetUtcNow()));
+        builder.Services.AddSingleton<IBoltTransportTokenSigner, FileBackedBoltTransportTokenSigner>();
         builder.Services.AddSingleton<IIdentitySigningKeyProvider, IdentityServerLocalSigningKeyProvider>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
@@ -227,7 +239,10 @@ public class IntegrationTestFixture
             ["BoltConfiguration:ClientName"] = "TestClient",
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
+            ["BoltConfiguration:GenerateServiceAccessToken"] = "false",
             ["ServiceIdentity:ClientId"] = TestServiceClientId,
+            ["ServiceIdentity:Authority"] = IdentityServerUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
             ["ServiceIdentity:GenerationId"] = TestServiceGenerationId,
             ["ServiceIdentity:ClientSecret"] = TestServiceClientSecret,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
@@ -302,6 +317,23 @@ public class IntegrationTestFixture
         throw new TimeoutException("IdentityServer Bolt clients failed to connect within 15s");
     }
 
+    private static async Task VerifyCentralTransportIdentity()
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(IdentityServerUrl) };
+        using var metadata = await client.GetAsync(BoltTransportTokenConstants.MetadataPath);
+        metadata.EnsureSuccessStatusCode();
+        using var jwks = await client.GetAsync(BoltTransportTokenConstants.JsonWebKeySetPath);
+        jwks.EnsureSuccessStatusCode();
+        using var token = await client.PostAsJsonAsync(
+            BoltTransportTokenConstants.TokenEndpointPath,
+            new
+            {
+                ClientId = XFrameworkServiceNames.IdentityServer,
+                ClientSecret = TestHostServiceClientSecret
+            });
+        token.EnsureSuccessStatusCode();
+    }
+
     private static async Task ConnectBoltClient(BoltClient client, string clientName)
     {
         if (client.IsConnected)
@@ -330,9 +362,14 @@ public class IntegrationTestFixture
             ["DefaultDatabaseConnection"] = ConnectionString,
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
+            ["BoltConfiguration:GenerateServiceAccessToken"] = "false",
             ["ServiceIdentity:ClientId"] = clientName,
+            ["ServiceIdentity:Authority"] = IdentityServerUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
             ["ServiceIdentity:GenerationId"] = TestHostServiceGenerationId,
             ["ServiceIdentity:ClientSecret"] = TestHostServiceClientSecret,
+            ["ServiceIdentity:BoltTransportTokenIssuer:Enabled"] = "true",
+            ["ServiceIdentity:BoltTransportTokenIssuer:SigningKeyPath"] = TransportSigningKeyPath,
             ["ServiceIdentity:Clients:0:ClientId"] = TestServiceClientId,
             ["ServiceIdentity:Clients:0:GenerationId"] = TestServiceGenerationId,
             ["ServiceIdentity:Clients:0:ClientSecret"] = TestServiceClientSecret,
@@ -348,6 +385,11 @@ public class IntegrationTestFixture
             ["JwtOptions:Secret"] = "Mm1VFHaqZ7MoVJyZd1zrAKxTpsXbYG6RqSMKYG2cV7RBBUdmsm97HOfKyA7MZ1LUl77ZklJPJfnegohyHqJIoQ983fTKmJcY",
             ["JwtOptions:AccessTokenLifespan"] = "00:30:00",
             ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",
+            ["BoltTransportAuthentication:MetadataAddress"] =
+                $"{IdentityServerUrl}{BoltTransportTokenConstants.MetadataPath}",
+            ["BoltTransportAuthentication:Issuer"] = XFrameworkServiceNames.IdentityServer,
+            ["BoltTransportAuthentication:Audience"] = XFrameworkServiceNames.BoltHub,
+            ["BoltTransportAuthentication:RequireHttpsMetadata"] = "false",
             ["Logging:LogLevel:Default"] = "Warning"
         });
     }

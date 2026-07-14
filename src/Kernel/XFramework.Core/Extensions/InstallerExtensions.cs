@@ -129,7 +129,7 @@ public static class InstallerExtensions
                 {
                     OnMessageReceived = context =>
                     {
-                        var accessToken = BoltAccessTokenRedactionMiddleware.TakeAccessToken(context.HttpContext)
+                        var accessToken = BoltAccessTokenRedactionMiddleware.GetAccessToken(context.HttpContext)
                             ?? context.Request.Query["access_token"].ToString();
                         var path = context.HttpContext.Request.Path;
                         if (!string.IsNullOrWhiteSpace(accessToken)

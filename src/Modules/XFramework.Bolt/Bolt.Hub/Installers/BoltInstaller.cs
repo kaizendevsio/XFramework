@@ -59,11 +59,19 @@ public sealed class BoltInstaller : IInstaller
         services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         services.AddHostedService<BoltServiceDiscoveryHostedService>();
-        services.AddAuthorization(BoltAuthorizationPolicies.AddServiceDiscoveryReaderPolicy);
+        services.AddAuthorization(options =>
+        {
+            BoltAuthorizationPolicies.AddTransportPolicy(options);
+            BoltAuthorizationPolicies.AddServiceDiscoveryReaderPolicy(options);
+        });
         services.AddHealthChecks().AddCheck<BoltTransportHealthCheck>(
             "Bolt-transport",
             failureStatus: HealthStatus.Unhealthy,
             tags: ["bolt", "transport", "ready"]);
+        services.AddHealthChecks().AddCheck<BoltTransportIdentityHealthCheck>(
+            "Bolt-transport-identity",
+            failureStatus: HealthStatus.Unhealthy,
+            tags: ["bolt", "identity", "ready"]);
 
         // Durable queue store (Redis required outside Development)
         services.Configure<Bolt.Server.Durable.DurableQueueOptions>(configuration.GetSection("BoltConfiguration:Durable"));
