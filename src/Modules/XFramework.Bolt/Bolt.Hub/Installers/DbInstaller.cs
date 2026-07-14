@@ -1,3 +1,6 @@
+using System.Runtime.CompilerServices;
+using Communications.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using XFramework.Core.DataContext;
 using XFramework.Domain.Shared.Interfaces;
@@ -9,6 +12,11 @@ public sealed class DbInstaller : IInstaller
 {
     public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
+        // AppDbContext discovers mappings from loaded Domain.Shared assemblies. Load the
+        // two authorization read-model assemblies before EF builds and caches the Hub model.
+        RuntimeHelpers.RunClassConstructor(typeof(IdentityCredential).TypeHandle);
+        RuntimeHelpers.RunClassConstructor(typeof(MessageThreadMember).TypeHandle);
+
         // Register HttpContextAccessor for audit tracking
         services.AddHttpContextAccessor();
         
