@@ -62,12 +62,16 @@ public sealed class CommunicationsBoltTopicAuthorizer(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<DbContext>();
 
-        var credential = await db.Set<IdentityCredential>()
+        // This system read may run under a tenantless service HttpContext. Replace the
+        // ambient filters with the complete topic-tenant and credential-state boundary.
+        var credentialExists = await db.Set<IdentityCredential>()
+            .IgnoreQueryFilters()
             .Where(c => c.Id == credentialId.Value)
+            .Where(c => c.TenantId == topicTenantId)
             .Where(c => !c.IsDeleted && c.IsEnabled)
-            .FirstOrDefaultAsync(ct);
+            .AnyAsync(ct);
 
-        if (credential is null || credential.TenantId != topicTenantId)
+        if (!credentialExists)
             return false;
 
         var allowed = context.Operation switch
@@ -174,7 +178,9 @@ public sealed class CommunicationsBoltTopicAuthorizer(
             !TryParseCanonicalGuid(segments[4], out var threadId))
             return false;
 
+        // Thread authorization uses the same explicit system-read boundary.
         return await db.Set<MessageThreadMember>()
+            .IgnoreQueryFilters()
             .Where(m => m.TenantId == tenantId)
             .Where(m => m.MessageThreadId == threadId)
             .Where(m => m.CredentialId == credentialId)

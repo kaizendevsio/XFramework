@@ -1,6 +1,7 @@
 using Bolt.Hub.Installers;
 using Bolt.Server;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
@@ -47,6 +48,37 @@ public class BoltHubConfigurationTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*DefaultDatabaseConnection*ConnectionStrings:DatabaseConnection*");
+    }
+
+    [Test]
+    public void InstallServices_RegistersHubAuthorizationEntitiesInTheEfModel()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["DefaultDatabaseConnection"] = "Host=localhost;Database=XFramework;Username=test;Password=test"
+        });
+        var services = new ServiceCollection();
+
+        new DbInstaller().InstallServices<BoltHubConfigurationTests>(
+            services,
+            configuration,
+            new TestHostEnvironment());
+
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var model = scope.ServiceProvider.GetRequiredService<DbContext>().Model;
+
+        var credential = model.FindEntityType("IdentityServer.Domain.Shared.Contracts.IdentityCredential");
+        credential.Should().NotBeNull();
+        var mappedCredential = credential!;
+        mappedCredential.GetSchema().Should().Be("Identity");
+        mappedCredential.GetTableName().Should().Be("IdentityCredential");
+
+        var threadMember = model.FindEntityType("Communications.Domain.Shared.Contracts.MessageThreadMember");
+        threadMember.Should().NotBeNull();
+        var mappedThreadMember = threadMember!;
+        mappedThreadMember.GetSchema().Should().Be("Communications");
+        mappedThreadMember.GetTableName().Should().Be("MessageThreadMember");
     }
 
     [Test]
