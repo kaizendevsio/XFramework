@@ -574,7 +574,7 @@ jobs:
           env_file, compose_file, *service_names = sys.argv[2:]
           rendered = subprocess.run(
               [
-                  "docker", "compose", "--env-file", env_file,
+                  "docker", "compose", "--profile", "phase0-verification", "--env-file", env_file,
                   "-f", compose_file, "-f", str(path), "config", "--format", "json",
               ],
               check=True,
