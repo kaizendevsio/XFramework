@@ -289,6 +289,7 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("postgres redis minio seq jaeger identityserver bolt-hub");
         workflow.Should().Contain("docker inspect --format '{{.Image}}'");
         workflow.Should().Contain("docker image inspect \"$value\"");
+        workflow.Should().Contain("docker pull \"$value\"");
         workflow.Should().Contain("os.replace(temporary, path)");
         workflow.Should().Contain("$REMOTE_RUN_DIR/legacy-previous.env");
         workflow.Should().Contain("sudo -n -l /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog");
@@ -296,9 +297,9 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("systemctl is-active xframework-bolt-phase0-watchdog.service");
         workflow.Should().Contain("flock -n 9");
         workflow.Should().Contain("No complete previous release is available; transition is blocked before mutation.");
-        workflow.Should().Contain("APPROVE_BOLT_TAILSCALE_TRANSITION");
-        workflow.Should().Contain("xframework.bolt.transition-acceptance.v1");
-        workflow.Should().Contain("allowed and denied probes must use different identities");
+        workflow.Should().NotContain("APPROVE_BOLT_TAILSCALE_TRANSITION");
+        workflow.Should().NotContain("xframework.bolt.transition-acceptance.v1");
+        workflow.Should().NotContain("tailscale_acl_applied");
 
         workflow.Should().NotContain("logs --tail=200");
         workflow.Should().NotContain("deploy-xeon-dev-service.yml");
