@@ -207,7 +207,14 @@ public sealed class ServiceTokenValidator(
         {
             rsa.ImportFromPem(key.PublicKeyPem);
             return new ImportedSecurityKey(
-                new RsaSecurityKey(rsa) { KeyId = key.KeyId },
+                new RsaSecurityKey(rsa)
+                {
+                    KeyId = key.KeyId,
+                    CryptoProviderFactory = new CryptoProviderFactory
+                    {
+                        CacheSignatureProviders = false
+                    }
+                },
                 rsa);
         }
         catch
