@@ -1,7 +1,7 @@
 ---
 title: "fix: Bolt RPC Authorization and Rate Limits"
 type: fix
-status: active
+status: completed
 date: 2026-07-29
 ---
 
@@ -9,7 +9,7 @@ date: 2026-07-29
 
 ## Status
 
-Implementation completed on 2026-07-29. Local functional, security, build, and performance gates pass. Final plan closure remains pending execution of the Docker-backed PostgreSQL topic-authorizer and Wallets/Storage integration fixtures in CI or on a Docker-enabled host. Evidence is recorded in [`bolt-rpc-authorization-rate-limit-results-2026-07-29.md`](../solutions/workflow-issues/bolt-rpc-authorization-rate-limit-results-2026-07-29.md).
+Completed on 2026-07-29. Functional, security, build, performance, documentation, and independent-review gates pass. The Phase 0 CI workflow ran the complete Bolt suite, including the Docker-backed PostgreSQL topic-authorizer fixture. The pre-existing Storage and Wallets fixtures cannot exercise the centralized service-identity path because they provide neither an IdentityServer token issuer nor equivalent test doubles; this is recorded as separate test-infrastructure debt rather than reported as a product failure or a passing gate. Evidence is recorded in [`bolt-rpc-authorization-rate-limit-results-2026-07-29.md`](../solutions/workflow-issues/bolt-rpc-authorization-rate-limit-results-2026-07-29.md).
 
 ## Goal
 

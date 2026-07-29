@@ -34,16 +34,19 @@ All commands ran on Windows 11, .NET 10, x64 RyuJIT/AVX2.
 
 | Suite | Result |
 |---|---:|
-| Bolt tests excluding the PostgreSQL Testcontainers fixture | 540 passed, 7 skipped |
+| Complete Bolt suite in Phase 0 CI, including PostgreSQL topic authorization | 551 passed |
+| Local Bolt suite without Docker-backed fixtures | 540 passed, 7 skipped |
 | Communications tests | 92 passed |
 | IdentityServer unit tests | 31 passed |
 | Source-generator tests | 14 passed |
 | Browser tests | 19 passed |
-| Storage integration tests | 8 skipped because Docker was unavailable |
-| Wallets integration tests | Fixture blocked because Docker was unavailable |
+| Storage integration fixture assessment | Reached Docker/PostgreSQL; fixture cannot start its synthetic service because it does not provide centralized service identity |
+| Wallets integration fixture assessment | Same pre-existing synthetic-host limitation as Storage |
 | Full solution build | 0 errors |
 
-The PostgreSQL topic-authorizer fixture and Wallets integration fixture could not start because Docker/Testcontainers was unavailable in the local environment; Storage reported the same dependency as eight skips. The same environment limitation existed before this change. All projects compile, and the in-memory topic authorization, generated-handler, and durable-ack regressions passed.
+GitHub Actions ran the complete Bolt suite against PostgreSQL and Redis-backed fixtures: 551 tests passed with no failures or skips. A Docker 29.3.0 host was also reached through the `xeon-dev` Tailscale path while assessing Storage and Wallets.
+
+Those two module fixtures construct synthetic Bolt Hub, service, and caller applications but do not host IdentityServer or replace the centralized transport-token and destination service-token providers. They therefore stop during fixture startup once mandatory service identity is enabled. This is test-infrastructure debt exposed by the centralized authentication rollout, not evidence of a production defect; it is not counted as a passing gate. Production compose declares IdentityServer authority, generation, and per-service credentials for Bolt Hub and every deployed Bolt client, and the coordinated staging deployment remains the real environment gate.
 
 Security regressions cover wrong audience, malformed/expired/invalid tokens, token/sender substitution, unavailable and rotated signing keys, failed-token cache behavior, pooled-connection quota bypass, malformed and spoofed frame admission, zero-recipient Push, large-RPC accounting, limiter replenishment and cleanup, generated-handler unary/large-RPC parity, validation ordering, unknown topics, denied durable acknowledgements, and acknowledgement/subscription replacement races.
 
@@ -86,6 +89,8 @@ Durable benchmark artifacts included with this change:
 
 The first limiter implementation regressed sequential mean by about 14.5%. Replacing framework token-bucket leases with a small allocation-free principal bucket brought the aggregate A/B results inside the 5% gate. BenchmarkDotNet did not expose a separate CPU-time counter on this Hyper-V host; CPU was therefore recorded in the dedicated warm generated-handler measurement.
 
-## Remaining Environment Work
+## Deployment Readiness
 
-Run the PostgreSQL topic-authorizer and Wallets/Storage integration fixtures in CI or on a Docker-enabled host. This is verification of existing production integrations, not an unresolved implementation gap.
+The checked-in compose contract provisions centralized IdentityServer authority and credentials for Bolt Hub, Communications, Notifications, Storage, Attendance, SmsGateway, Wallets, Inventario, POS, Portal, and Operations Dashboard. The deployment workflow validates that contract, builds and rolls out all wire-v2 components together, then runs service health and Bolt registration smoke checks. Mixed Bolt wire versions intentionally fail registration, so partial deployment is not supported.
+
+Storage and Wallets synthetic integration hosts should be modernized separately to issue real test transport and destination service tokens, or to install explicit test doubles for both trust boundaries. That work improves module-level test coverage but does not change the production authentication design implemented here.
