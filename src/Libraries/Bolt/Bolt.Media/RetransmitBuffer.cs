@@ -14,6 +14,7 @@ public sealed class RetransmitBuffer
 
     public RetransmitBuffer(int capacity = 256)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
         _capacity = capacity;
         _buffer = new BufferedSentFrame[capacity];
     }

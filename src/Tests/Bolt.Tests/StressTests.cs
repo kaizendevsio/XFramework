@@ -48,16 +48,25 @@ public class RpcStressTests
     public async Task TearDown()
     {
         try { await _serverApp.StopAsync(); } catch { }
+        try { await _serverApp.DisposeAsync(); } catch { }
     }
 
-    private BoltClient CreateClient(string id, string name) =>
+    private BoltClient CreateClient(string id, string name, BoltClientOptions? options = null) =>
         new(new Uri($"ws://localhost:{_port}/bolt"), id, name,
-            new BoltClientOptions { RpcTimeoutSeconds = 15 }, _loggerFactory.CreateLogger<BoltClient>());
+            options ?? new BoltClientOptions { RpcTimeoutSeconds = 15 }, _loggerFactory.CreateLogger<BoltClient>());
 
     [Test]
     public async Task HighConcurrency_100ParallelRpcCalls()
     {
-        var clientA = CreateClient("stress_a", "StressA");
+        var clientA = CreateClient(
+            "stress_a",
+            "StressA",
+            new BoltClientOptions
+            {
+                RpcTimeoutSeconds = 15,
+                ScaleUpThreshold = 1,
+                MaxConnections = 2
+            });
         var clientB = CreateClient("stress_b", "StressB");
 
         clientB.RegisterHandler("echo", (payload, _) =>
@@ -105,6 +114,72 @@ public class RpcStressTests
 
         await clientA.DisposeAsync();
         await clientB.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargePayload_20MiB_RpcRoundTrip()
+    {
+        var options = new BoltClientOptions
+        {
+            RpcTimeoutSeconds = 30,
+            LargePayloadThreshold = 1024 * 1024
+        };
+        var clientA = CreateClient("large_20m_a", "Large20MiBA", options);
+        var clientB = CreateClient("large_20m_b", "Large20MiBB", options);
+
+        clientB.RegisterHandler("bigecho20", (payload, _) =>
+            Task.FromResult((HttpStatusCode.OK, payload)));
+
+        await clientA.ConnectAsync();
+        await clientB.ConnectAsync();
+
+        var payload = GC.AllocateUninitializedArray<byte>(20 * 1024 * 1024);
+        Random.Shared.NextBytes(payload);
+
+        var (status, response) = await clientA.InvokeAsync("large_20m_b", "bigecho20", payload);
+
+        status.Should().Be(HttpStatusCode.OK);
+        response.Span.SequenceEqual(payload).Should().BeTrue();
+        GetBufferedLargeRpcBytes(clientA).Should().Be(0);
+        GetBufferedLargeRpcBytes(clientB).Should().Be(0);
+
+        await clientA.DisposeAsync();
+        await clientB.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargePayload_AboveConfiguredLimit_Returns413WithoutInvokingHandler()
+    {
+        var options = new BoltClientOptions
+        {
+            RpcTimeoutSeconds = 5,
+            LargePayloadThreshold = 1024,
+            MaxLargeRpcPayloadBytes = 4096,
+            MaxBufferedLargeRpcBytes = 8192
+        };
+        var caller = CreateClient("large_limit_a", "LargeLimitA", options);
+        var recipient = CreateClient("large_limit_b", "LargeLimitB", options);
+        var invoked = false;
+        recipient.RegisterHandler("should_not_run", (_, _) =>
+        {
+            invoked = true;
+            return Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty));
+        });
+
+        await caller.ConnectAsync();
+        await recipient.ConnectAsync();
+
+        var (status, response) = await caller.InvokeAsync(
+            "large_limit_b",
+            "should_not_run",
+            new byte[4097]);
+
+        status.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+        response.Length.Should().Be(0);
+        invoked.Should().BeFalse();
+
+        await caller.DisposeAsync();
+        await recipient.DisposeAsync();
     }
 
     [Test]
@@ -481,6 +556,76 @@ public class RpcStressTests
     }
 
     [Test]
+    public async Task LargePayload_HubRejectsOversizedDeclarationWith413()
+    {
+        var sender = CreateClient("hub_limit_sender", "HubLimitSender");
+        var receiver = CreateClient("hub_limit_receiver", "HubLimitReceiver");
+        await sender.ConnectAsync();
+        await receiver.ConnectAsync();
+
+        var requestId = Guid.NewGuid();
+        var pendingCall = PooledRpcCall.Rent();
+        var pendingTask = pendingCall.GetTask();
+        AddPendingCall(sender, requestId, pendingCall);
+
+        await using var stream = await sender.OpenStreamAsync("hub_limit_receiver", "__bolt_large_rpc__");
+        var header = new byte[28];
+        requestId.TryWriteBytes(header);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(16), BoltCodec.Fnv1aHash("unused"));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(20), 32 * 1024 * 1024 + 1);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(24), BoltCodec.Fnv1aHash("hub_limit_sender"));
+
+        await stream.SendAsync((ReadOnlyMemory<byte>)header);
+        var response = await pendingTask.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+
+        await sender.DisposeAsync();
+        await receiver.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargePayload_RecipientAggregateBudgetRejectsWith429()
+    {
+        var senderOptions = new BoltClientOptions
+        {
+            RpcTimeoutSeconds = 5,
+            MaxLargeRpcPayloadBytes = 8 * 1024 * 1024
+        };
+        var receiverOptions = new BoltClientOptions
+        {
+            RpcTimeoutSeconds = 5,
+            MaxLargeRpcPayloadBytes = 8 * 1024 * 1024,
+            MaxBufferedLargeRpcBytes = 1024 * 1024
+        };
+        var sender = CreateClient("budget_sender", "BudgetSender", senderOptions);
+        var receiver = CreateClient("budget_receiver", "BudgetReceiver", receiverOptions);
+        await sender.ConnectAsync();
+        await receiver.ConnectAsync();
+
+        var requestId = Guid.NewGuid();
+        var pendingCall = PooledRpcCall.Rent();
+        var pendingTask = pendingCall.GetTask();
+        AddPendingCall(sender, requestId, pendingCall);
+
+        await using var stream = await sender.OpenStreamAsync("budget_receiver", "__bolt_large_rpc__");
+        var header = new byte[28];
+        requestId.TryWriteBytes(header);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(16), BoltCodec.Fnv1aHash("unused"));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(20), 2 * 1024 * 1024);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(24), BoltCodec.Fnv1aHash("budget_sender"));
+
+        await stream.SendAsync((ReadOnlyMemory<byte>)header);
+        var response = await pendingTask.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+
+        response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        GetBufferedLargeRpcBytes(receiver).Should().Be(0);
+
+        await sender.DisposeAsync();
+        await receiver.DisposeAsync();
+    }
+
+    [Test]
     public async Task LargeResponse_TruncatedResponseStream_FaultsPendingCall()
     {
         var opts = new BoltClientOptions { RpcTimeoutSeconds = 5, LargePayloadThreshold = 1024 };
@@ -522,6 +667,45 @@ public class RpcStressTests
             .WithMessage("*ended before declared size*");
 
         try { await requestStream.CloseAsync(); } catch { }
+        await caller.DisposeAsync();
+        await responder.DisposeAsync();
+    }
+
+    [Test]
+    public async Task LargeResponse_ExceedingDeclaredSize_IsRejectedByHub()
+    {
+        var caller = CreateClient("oversized_resp_caller", "OversizedRespCaller");
+        var responder = CreateClient("oversized_resp_responder", "OversizedRespResponder");
+        await caller.ConnectAsync();
+        await responder.ConnectAsync();
+
+        var requestId = Guid.NewGuid();
+        var pendingCall = PooledRpcCall.Rent();
+        var pendingTask = pendingCall.GetTask();
+        AddPendingCall(caller, requestId, pendingCall);
+
+        await using var requestStream = await caller.OpenStreamAsync("oversized_resp_responder", "__bolt_large_rpc__");
+        var requestHeader = new byte[28];
+        requestId.TryWriteBytes(requestHeader);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(16), BoltCodec.Fnv1aHash("blocked-target"));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(20), 4096);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(requestHeader.AsSpan(24), BoltCodec.Fnv1aHash("oversized_resp_caller"));
+        await requestStream.SendAsync((ReadOnlyMemory<byte>)requestHeader);
+        await WaitForServerPendingInvocation(requestId);
+
+        await using var responseStream = await responder.OpenStreamAsync(
+            "oversized_resp_caller",
+            "__bolt_large_rpc_response_stream__");
+        var responseHeader = new byte[22];
+        requestId.TryWriteBytes(responseHeader);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(responseHeader.AsSpan(16), (short)HttpStatusCode.OK);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(responseHeader.AsSpan(18), 64);
+        await responseStream.SendAsync((ReadOnlyMemory<byte>)responseHeader);
+        await responseStream.SendAsync(new byte[128]);
+
+        var response = await pendingTask.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
         await caller.DisposeAsync();
         await responder.DisposeAsync();
     }
@@ -859,6 +1043,11 @@ public class RpcStressTests
         pendingCalls[requestId] = pendingCall;
     }
 
+    private static long GetBufferedLargeRpcBytes(BoltClient client) =>
+        (long)(typeof(BoltClient)
+            .GetField("_bufferedLargeRpcBytes", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.GetValue(client) ?? throw new InvalidOperationException("BoltClient large-RPC buffer counter not found."));
+
     private async Task WaitForServerPendingInvocation(Guid requestId)
     {
         var server = _serverApp.Services.GetRequiredService<BoltServer>();
@@ -921,6 +1110,7 @@ public class LargeRpcPendingInvocationLifecycleTests
     public async Task TearDown()
     {
         try { await _serverApp.StopAsync(); } catch { }
+        try { await _serverApp.DisposeAsync(); } catch { }
     }
 
     [Test]
@@ -1123,7 +1313,9 @@ public class MediaStressTests
         _port = Interlocked.Increment(ref _portCounter);
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls($"http://localhost:{_port}");
-        builder.Services.AddSingleton<BoltServer>();
+        builder.Services.AddSingleton(sp => new BoltServer(
+            sp.GetRequiredService<ILogger<BoltServer>>(),
+            new BoltServerOptions { MediaEnabled = true }));
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         _serverApp = builder.Build();
         _serverApp.UseWebSockets();
@@ -1155,6 +1347,7 @@ public class MediaStressTests
         try { await _clientA.DisposeAsync(); } catch { }
         try { await _clientB.DisposeAsync(); } catch { }
         try { await _serverApp.StopAsync(); } catch { }
+        try { await _serverApp.DisposeAsync(); } catch { }
     }
 
     [Test]

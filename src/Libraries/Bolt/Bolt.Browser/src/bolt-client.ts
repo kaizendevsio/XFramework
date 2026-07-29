@@ -3,17 +3,21 @@ import {
   writeRegister, writeCallSignal, writeMediaConfig, writeMediaFeedback,
   writeMediaKeyRequest, writeNackRequest,
   writeRequest, writeResponse, writePush,
+  writeRequestCancel,
   writeSubscribe, writeUnsubscribe, writePublish, writeAck,
   writeStreamOpen, writeStreamData, writeStreamClose,
   readFrameType, readCallSignal, readMediaFrame, readMediaConfig,
   readMediaFeedback, readMediaKeyRequest, readFecFrame, readNackRequest,
   readEvent,
   readRequest, readResponse, readStreamOpen, readStreamData, readStreamClose,
-  readRegisterAck, guidToBytes, newGuid, fnv1aHash,
-  type QualityHintValue, QualityHint,
-} from './protocol';
-import { BoltBrowserMediaStream } from './media-stream';
-import { MediaCrypto } from './encryption';
+  readRequestCancel,
+  readRegisterAckDetails, readBatch, guidToBytes, newGuid, fnv1aHash,
+  WIRE_VERSION, writeBatch,
+  type QualityHintValue, QualityHint, MAX_FRAME_SIZE, MAX_BATCH_FRAMES, MAX_BATCH_BYTES,
+} from './protocol.js';
+import { BoltBrowserMediaStream } from './media-stream.js';
+
+const NON_CANCELABLE_SIGNAL = new AbortController().signal;
 
 export interface CallInfo {
   callId: string;
@@ -29,6 +33,7 @@ interface PendingRpc {
   resolve: (result: { statusCode: number; payload: Uint8Array }) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
+  cleanup?: () => void;
 }
 
 /** Browser-side byte stream (file transfer, etc.). */
@@ -55,7 +60,7 @@ export interface BoltBrowserEvent {
  * - RPC request/response frames for service calls and delivery confirmation
  * - Push (fire-and-forget for typing indicators, presence)
  * - Bidirectional streaming (file/media sharing)
- * - Voice/video calls with E2E encryption, ABR, FEC, NACK
+ * - Experimental voice/video APIs with ABR, FEC, and NACK support
  * - Auto-reconnection with exponential backoff
  */
 export class BoltBrowserClient {
@@ -66,17 +71,24 @@ export class BoltBrowserClient {
 
   private mediaStreams = new Map<string, BoltBrowserMediaStream>();
   private activeCalls = new Map<string, CallInfo>();
-  private callEncryption = new Map<string, MediaCrypto>();
   private connected = false;
   private disposed = false;
 
   // RPC
   private pendingRpcs = new Map<string, PendingRpc>();
+  private inboundRequestControllers = new Map<string, AbortController>();
   private hashCache = new Map<string, number>();
   private rpcTimeoutMs = 30_000;
+  private registrationTimeoutMs = 10_000;
 
   // Streaming
   private activeStreams = new Map<string, BoltBrowserStream>();
+
+  // Non-media frames are coalesced within one microtask. Media always flushes
+  // this queue first so its wire order stays identical to call order.
+  private outboundFrames: Uint8Array[] = [];
+  private outboundBytes = 0;
+  private outboundFlushScheduled = false;
 
   // Reconnection
   private reconnectAttempt = 0;
@@ -85,7 +97,7 @@ export class BoltBrowserClient {
   private autoReconnect = true;
 
   // Handler registry — maps command hash to handler
-  private handlers = new Map<number, (payload: Uint8Array, requestId: string) => Promise<{ statusCode: number; payload: Uint8Array }>>();
+  private handlers = new Map<number, (payload: Uint8Array, requestId: string, signal: AbortSignal) => Promise<{ statusCode: number; payload: Uint8Array }>>();
   private streamHandlers = new Map<number, (stream: BoltBrowserStream) => void>();
 
   // Events — media
@@ -94,6 +106,7 @@ export class BoltBrowserClient {
   public onCallRejected?: (callId: string) => void;
   public onCallEnded?: (callId: string) => void;
   public onKeyframeRequested?: (streamId: string) => void;
+  public onMediaStreamConfigured?: (stream: BoltBrowserMediaStream) => void;
   public onCallHold?: (callId: string) => void;
   public onCallUnhold?: (callId: string) => void;
   public onParticipantAdded?: (callId: string, payload: Uint8Array) => void;
@@ -125,6 +138,11 @@ export class BoltBrowserClient {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.serverUrl);
       this.ws.binaryType = 'arraybuffer';
+      const registrationTimer = setTimeout(() => {
+        this.ws?.close(1002, 'Bolt registration timeout');
+        reject(new Error(`Bolt registration timed out after ${this.registrationTimeoutMs}ms`));
+      }, this.registrationTimeoutMs);
+      const clearRegistrationTimer = () => clearTimeout(registrationTimer);
 
       this.ws.onopen = () => {
         const registerFrame = writeRegister(this.clientId, this.clientName);
@@ -134,29 +152,60 @@ export class BoltBrowserClient {
       this.ws.onmessage = (event) => {
         const data = new Uint8Array(event.data as ArrayBuffer);
 
-        if (!this.connected) {
-          if (readRegisterAck(data)) {
-            this.connected = true;
-            this.reconnectAttempt = 0;
-            this.onConnected?.();
-            resolve();
-          } else {
-            reject(new Error('Registration failed'));
+        try {
+          if (!this.connected) {
+            const ack = readRegisterAckDetails(data);
+            if (data[0] === FRAME.RegisterAck && !ack) {
+              clearRegistrationTimer();
+              this.ws?.close(1002, 'Invalid Bolt registration response');
+              reject(new Error('Invalid Bolt registration response'));
+            } else if (ack && ack.version !== WIRE_VERSION) {
+              clearRegistrationTimer();
+              this.ws?.close(1002, 'Bolt wire version mismatch');
+              reject(new Error(`Bolt wire version mismatch: expected ${WIRE_VERSION}, received ${ack.version}`));
+            } else if (ack?.success) {
+              clearRegistrationTimer();
+              this.connected = true;
+              this.reconnectAttempt = 0;
+              this.onConnected?.();
+              resolve();
+            } else {
+              clearRegistrationTimer();
+              this.ws?.close(1002, 'Invalid Bolt registration response');
+              reject(new Error('Registration failed'));
+            }
+            return;
           }
-          return;
-        }
 
-        this.handleMessage(data);
+          if (!this.handleMessage(data)) {
+            const error = new Error('Malformed Bolt frame');
+            this.failActiveWork(error);
+            this.disposeMediaState();
+            this.ws?.close(1002, 'Malformed Bolt frame');
+          }
+        } catch (error) {
+          clearRegistrationTimer();
+          this.ws?.close(data.length > MAX_FRAME_SIZE ? 1009 : 1002, 'Invalid Bolt frame');
+          this.failActiveWork(error instanceof Error ? error : new Error('Invalid Bolt frame'));
+          this.disposeMediaState();
+        }
       };
 
       this.ws.onerror = () => {
-        if (!this.connected) reject(new Error('WebSocket error'));
+        if (!this.connected) {
+          clearRegistrationTimer();
+          reject(new Error('WebSocket error'));
+        }
       };
 
       this.ws.onclose = () => {
+        clearRegistrationTimer();
         const wasConnected = this.connected;
         this.connected = false;
+        this.failActiveWork(new Error('Bolt connection closed'));
+        this.disposeMediaState();
         this.onDisconnected?.();
+        if (!wasConnected) reject(new Error('Bolt connection closed before registration'));
 
         // Auto-reconnect if was connected and not intentionally disposed
         if (wasConnected && this.autoReconnect && !this.disposed) {
@@ -205,20 +254,95 @@ export class BoltBrowserClient {
     this.autoReconnect = false;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
 
-    // Reject all pending RPCs
-    for (const [, rpc] of this.pendingRpcs) {
-      clearTimeout(rpc.timer);
-      rpc.reject(new Error('Disconnected'));
-    }
-    this.pendingRpcs.clear();
+    this.failActiveWork(new Error('Disconnected'));
 
     this.ws?.close();
     this.ws = null;
     this.connected = false;
+    this.disposeMediaState();
+  }
+
+  private failActiveWork(error: Error): void {
+    this.clearOutboundFrames();
+    for (const rpc of this.pendingRpcs.values()) {
+      clearTimeout(rpc.timer);
+      rpc.cleanup?.();
+      rpc.reject(error);
+    }
+    this.pendingRpcs.clear();
+    for (const controller of this.inboundRequestControllers.values()) controller.abort();
+    this.inboundRequestControllers.clear();
+    for (const stream of this.activeStreams.values()) stream.onClose?.(503);
+    this.activeStreams.clear();
+  }
+
+  private clearOutboundFrames(): void {
+    this.outboundFrames.length = 0;
+    this.outboundBytes = 0;
+    this.outboundFlushScheduled = false;
+  }
+
+  private sendFrame(frame: Uint8Array, media = false): void {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    if (media) {
+      this.flushOutboundFrames();
+      ws.send(frame);
+      return;
+    }
+
+    this.outboundFrames.push(frame);
+    this.outboundBytes += frame.length + 4;
+    if (!this.outboundFlushScheduled) {
+      this.outboundFlushScheduled = true;
+      queueMicrotask(() => {
+        this.outboundFlushScheduled = false;
+        this.flushOutboundFrames();
+      });
+    }
+  }
+
+  private flushOutboundFrames(): void {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      this.clearOutboundFrames();
+      return;
+    }
+
+    while (this.outboundFrames.length > 0) {
+      if (this.outboundFrames.length === 1) {
+        const frame = this.outboundFrames.shift()!;
+        ws.send(frame);
+        this.outboundBytes -= frame.length + 4;
+        continue;
+      }
+
+      let count = 0;
+      let batchBytes = 1 + 4;
+      while (count < this.outboundFrames.length && count < MAX_BATCH_FRAMES) {
+        const nextBytes = batchBytes + 4 + this.outboundFrames[count].length;
+        if (nextBytes > MAX_BATCH_BYTES) break;
+        batchBytes = nextBytes;
+        count++;
+      }
+
+      if (count >= 2) {
+        ws.send(writeBatch(this.outboundFrames.splice(0, count)));
+        this.outboundBytes -= batchBytes - 5;
+      } else {
+        const frame = this.outboundFrames.shift()!;
+        ws.send(frame);
+        this.outboundBytes -= frame.length + 4;
+      }
+    }
+    this.outboundBytes = 0;
+  }
+
+  private disposeMediaState(): void {
+    for (const stream of this.mediaStreams.values()) stream.dispose();
     this.mediaStreams.clear();
     this.activeCalls.clear();
-    this.callEncryption.clear();
-    this.activeStreams.clear();
   }
 
   // ── RPC request/response ───────────────────────────────────
@@ -229,8 +353,14 @@ export class BoltBrowserClient {
    *
    * Usage: const result = await client.invoke('IdentityServer', 'AuthenticateIdentity', payload);
    */
-  async invoke(recipientId: string, commandName: string, payload: Uint8Array): Promise<{ statusCode: number; payload: Uint8Array }> {
+  async invoke(
+    recipientId: string,
+    commandName: string,
+    payload: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<{ statusCode: number; payload: Uint8Array }> {
     if (!this.connected || !this.ws) throw new Error('Not connected');
+    if (signal?.aborted) throw this.createAbortError();
 
     const requestId = newGuid();
     const recipientHash = this.getHash(recipientId);
@@ -240,14 +370,41 @@ export class BoltBrowserClient {
     const frame = writeRequest(requestId, recipientHash, senderHash, commandHash, payload);
 
     return new Promise((resolve, reject) => {
+      const cleanup = () => signal?.removeEventListener('abort', abort);
+      const cancelRemote = () => {
+        if (this.ws?.readyState === WebSocket.OPEN) this.sendFrame(writeRequestCancel(requestId));
+      };
       const timer = setTimeout(() => {
         this.pendingRpcs.delete(requestId);
+        cleanup();
+        cancelRemote();
         reject(new Error(`RPC timeout after ${this.rpcTimeoutMs}ms`));
       }, this.rpcTimeoutMs);
+      const abort = () => {
+        if (!this.pendingRpcs.delete(requestId)) return;
+        clearTimeout(timer);
+        cleanup();
+        cancelRemote();
+        reject(this.createAbortError());
+      };
 
-      this.pendingRpcs.set(requestId, { resolve, reject, timer });
-      this.ws!.send(frame);
+      signal?.addEventListener('abort', abort, { once: true });
+      this.pendingRpcs.set(requestId, { resolve, reject, timer, cleanup });
+      try {
+        this.sendFrame(frame);
+      } catch (error) {
+        this.pendingRpcs.delete(requestId);
+        clearTimeout(timer);
+        cleanup();
+        reject(error instanceof Error ? error : new Error('Bolt send failed'));
+      }
     });
+  }
+
+  private createAbortError(): Error {
+    const error = new Error('Bolt RPC canceled');
+    error.name = 'AbortError';
+    return error;
   }
 
   /**
@@ -258,7 +415,7 @@ export class BoltBrowserClient {
    *   return { statusCode: 200, payload: new Uint8Array(0) };
    * });
    */
-  registerHandler(commandName: string, handler: (payload: Uint8Array, requestId: string) => Promise<{ statusCode: number; payload: Uint8Array }>): void {
+  registerHandler(commandName: string, handler: (payload: Uint8Array, requestId: string, signal: AbortSignal) => Promise<{ statusCode: number; payload: Uint8Array }>): void {
     const hash = this.getHash(commandName);
     this.handlers.set(hash, handler);
   }
@@ -270,35 +427,38 @@ export class BoltBrowserClient {
    * Usage: client.push('user_123', 'TypingIndicator', payload);
    */
   push(recipientId: string, commandName: string, payload: Uint8Array): void {
+    if (!recipientId || recipientId.trim().length === 0) {
+      throw new TypeError('Bolt Push requires a nonblank recipientId.');
+    }
     if (!this.connected || !this.ws) return;
 
     const recipientHash = this.getHash(recipientId);
     const senderHash = this.getHash(this.clientId);
     const commandHash = this.getHash(commandName);
     const frame = writePush(recipientHash, senderHash, commandHash, payload);
-    this.ws.send(frame);
+    this.sendFrame(frame);
   }
 
   // ── Pub/sub ──────────────────────────────────────────────
 
   subscribe(topic: string, subscriberId = '', durable = false, actorAccessToken = ''): void {
     if (!this.connected || !this.ws) return;
-    this.ws.send(writeSubscribe(topic, subscriberId, durable, actorAccessToken));
+    this.sendFrame(writeSubscribe(topic, subscriberId, durable, actorAccessToken));
   }
 
   unsubscribe(topic: string, subscriberId = '', permanent = true, actorAccessToken = ''): void {
     if (!this.connected || !this.ws) return;
-    this.ws.send(writeUnsubscribe(topic, subscriberId, permanent, actorAccessToken));
+    this.sendFrame(writeUnsubscribe(topic, subscriberId, permanent, actorAccessToken));
   }
 
   publish(topic: string, payload: Uint8Array, durableEligible = false): void {
     if (!this.connected || !this.ws) return;
-    this.ws.send(writePublish(topic, durableEligible, payload));
+    this.sendFrame(writePublish(topic, durableEligible, payload));
   }
 
   ack(topic: string, subscriberId: string, upToSequenceNumber: bigint | number, actorAccessToken = ''): void {
     if (!this.connected || !this.ws) return;
-    this.ws.send(writeAck(topic, subscriberId, upToSequenceNumber, actorAccessToken));
+    this.sendFrame(writeAck(topic, subscriberId, upToSequenceNumber, actorAccessToken));
   }
 
   // ── Streaming (file transfer) ──────────────────────────────
@@ -319,21 +479,23 @@ export class BoltBrowserClient {
     const recipientHash = this.getHash(recipientId);
     const commandHash = this.getHash(commandName);
 
-    const ws = this.ws;
+    const activeStreams = this.activeStreams;
+    const sendFrame = (frame: Uint8Array) => this.sendFrame(frame);
     const stream: BoltBrowserStream = {
       streamId,
       send(data: Uint8Array) {
-        ws.send(writeStreamData(streamId, data));
+        sendFrame(writeStreamData(streamId, data));
       },
       close(statusCode = 200) {
-        ws.send(writeStreamClose(streamId, statusCode));
+        sendFrame(writeStreamClose(streamId, statusCode));
+        activeStreams.delete(streamId);
       },
     };
 
     this.activeStreams.set(streamId, stream);
 
     // Send StreamOpen
-    ws.send(writeStreamOpen(streamId, recipientHash, commandHash));
+    this.sendFrame(writeStreamOpen(streamId, recipientHash, commandHash));
 
     return stream;
   }
@@ -353,41 +515,40 @@ export class BoltBrowserClient {
 
   // ── Call API (unchanged) ───────────────────────────────────
 
-  startCall(recipientId: string, video = false, encrypted = true): string {
+  startCall(recipientId: string, video = false, encrypted = false): string {
+    if (encrypted) {
+      throw new Error('Encrypted Bolt Media calls are disabled until key exchange is bound to authenticated peer identities');
+    }
+
     const callId = crypto.randomUUID();
     this.activeCalls.set(callId, { callId, isOutgoing: true, remoteClientId: recipientId });
-
-    if (encrypted) {
-      const enc = new MediaCrypto();
-      enc.init().then(() => this.callEncryption.set(callId, enc));
-    }
 
     const hash = fnv1aHash(recipientId);
     const payload = new Uint8Array(4);
     new DataView(payload.buffer).setInt32(0, hash, true);
-    this.ws?.send(writeCallSignal(callId, SIGNAL.Initiate, payload));
+    this.sendFrame(writeCallSignal(callId, SIGNAL.Initiate, payload), true);
     return callId;
   }
 
-  answerCall(callId: string): void {
+  answerCall(callId: string, encrypted = false): void {
+    if (encrypted) {
+      throw new Error('Encrypted Bolt Media calls are disabled until key exchange is bound to authenticated peer identities');
+    }
     const call = this.activeCalls.get(callId);
     if (call) call.isOutgoing = false;
-    this.ws?.send(writeCallSignal(callId, SIGNAL.Answer, new Uint8Array(0)));
+    this.sendFrame(writeCallSignal(callId, SIGNAL.Answer, new Uint8Array(0)), true);
   }
 
   rejectCall(callId: string): void {
     this.activeCalls.delete(callId);
-    this.callEncryption.delete(callId);
-    this.ws?.send(writeCallSignal(callId, SIGNAL.Reject, new Uint8Array(0)));
+    this.cleanupMediaStreams(callId);
+    this.sendFrame(writeCallSignal(callId, SIGNAL.Reject, new Uint8Array(0)), true);
   }
 
   endCall(callId: string): void {
     this.activeCalls.delete(callId);
-    this.callEncryption.delete(callId);
-    for (const [streamId, stream] of this.mediaStreams) {
-      if (stream.callId === callId) this.mediaStreams.delete(streamId);
-    }
-    this.ws?.send(writeCallSignal(callId, SIGNAL.End, new Uint8Array(0)));
+    this.cleanupMediaStreams(callId);
+    this.sendFrame(writeCallSignal(callId, SIGNAL.End, new Uint8Array(0)), true);
   }
 
   getMediaStream(streamId: string): BoltBrowserMediaStream | undefined {
@@ -395,131 +556,156 @@ export class BoltBrowserClient {
   }
 
   sendMediaConfig(streamId: string, callId: string, isAudio: boolean, bitrateKbps: number): BoltBrowserMediaStream {
-    this.ws?.send(writeMediaConfig(streamId, callId,
+    if (!this.ws || !this.connected) throw new Error('Not connected');
+    this.sendFrame(writeMediaConfig(streamId, callId,
       isAudio ? 0x01 : 0x02, isAudio ? 0x01 : 0x02,
       isAudio ? 48000 : 1280, isAudio ? 1 : 720,
-      bitrateKbps, 0, new Uint8Array(0)));
-    const stream = new BoltBrowserMediaStream(this.ws!, streamId, callId, isAudio);
+      bitrateKbps, 0, new Uint8Array(0)), true);
+    this.mediaStreams.get(streamId)?.dispose();
+    const stream = new BoltBrowserMediaStream(this.ws, streamId, callId, isAudio,
+      frame => this.sendFrame(frame, true));
     this.mediaStreams.set(streamId, stream);
-    const enc = this.callEncryption.get(callId);
-    if (enc?.isReady) stream.setEncryption(enc);
     return stream;
   }
 
   sendScreenShareConfig(streamId: string, callId: string, width = 1920, height = 1080, bitrateKbps = 3000): BoltBrowserMediaStream {
-    this.ws?.send(writeMediaConfig(streamId, callId, 0x03, 0x02, width, height, bitrateKbps, 0, new Uint8Array(0)));
-    const stream = new BoltBrowserMediaStream(this.ws!, streamId, callId, false);
+    if (!this.ws || !this.connected) throw new Error('Not connected');
+    this.sendFrame(writeMediaConfig(streamId, callId, 0x03, 0x02, width, height, bitrateKbps, 0, new Uint8Array(0)), true);
+    this.mediaStreams.get(streamId)?.dispose();
+    const stream = new BoltBrowserMediaStream(this.ws, streamId, callId, false,
+      frame => this.sendFrame(frame, true));
     this.mediaStreams.set(streamId, stream);
-    const enc = this.callEncryption.get(callId);
-    if (enc?.isReady) stream.setEncryption(enc);
     return stream;
   }
 
   // ── Message dispatcher ─────────────────────────────────────
 
-  private handleMessage(data: Uint8Array): void {
+  private handleMessage(data: Uint8Array): boolean {
     const frameType = readFrameType(data);
+
+    if (frameType === FRAME.Batch) {
+      const frames = readBatch(data);
+      if (!frames) return false;
+      for (const frame of frames) {
+        if (!this.handleMessage(frame)) return false;
+      }
+      return true;
+    }
 
     switch (frameType) {
       // RPC
       case FRAME.Response: {
         const resp = readResponse(data);
-        if (resp) {
-          const rpc = this.pendingRpcs.get(resp.requestId);
-          if (rpc) {
-            clearTimeout(rpc.timer);
-            this.pendingRpcs.delete(resp.requestId);
-            rpc.resolve({ statusCode: resp.statusCode, payload: resp.payload });
-          }
+        if (!resp) return false;
+        const rpc = this.pendingRpcs.get(resp.requestId);
+        if (rpc) {
+          clearTimeout(rpc.timer);
+          rpc.cleanup?.();
+          this.pendingRpcs.delete(resp.requestId);
+          rpc.resolve({ statusCode: resp.statusCode, payload: resp.payload });
         }
-        break;
+        return true;
       }
       case FRAME.Request: {
         const req = readRequest(data);
-        if (req) this.handleIncomingRequest(req.commandHash, req.payload, req.requestId);
-        break;
+        if (!req) return false;
+        this.handleIncomingRequest(req.commandHash, req.payload, req.requestId);
+        return true;
+      }
+      case FRAME.RequestCancel: {
+        const requestId = readRequestCancel(data);
+        if (!requestId) return false;
+        this.inboundRequestControllers.get(requestId)?.abort();
+        return true;
       }
       case FRAME.Push: {
         const req = readRequest(data); // Push has same layout as Request
-        if (req) {
-          const handler = this.handlers.get(req.commandHash);
-          if (handler) handler(req.payload, req.requestId);
-          else this.onPush?.(req.commandHash, req.payload);
-        }
-        break;
+        if (!req) return false;
+        const handler = this.handlers.get(req.commandHash);
+        if (handler) handler(req.payload, req.requestId, NON_CANCELABLE_SIGNAL);
+        else this.onPush?.(req.commandHash, req.payload);
+        return true;
       }
       case FRAME.Event: {
         const evt = readEvent(data);
-        if (evt) this.onEvent?.(evt);
-        break;
+        if (!evt) return false;
+        this.onEvent?.(evt);
+        return true;
       }
 
       // Streaming
       case FRAME.StreamOpen: {
         const so = readStreamOpen(data);
-        if (so) this.handleStreamOpen(so.streamId, so.commandHash);
-        break;
+        if (!so) return false;
+        this.handleStreamOpen(so.streamId, so.commandHash);
+        return true;
       }
       case FRAME.StreamData: {
         const sd = readStreamData(data);
-        if (sd) {
-          const stream = this.activeStreams.get(sd.streamId);
-          stream?.onData?.(sd.payload);
-        }
-        break;
+        if (!sd) return false;
+        const stream = this.activeStreams.get(sd.streamId);
+        stream?.onData?.(sd.payload);
+        return true;
       }
       case FRAME.StreamClose: {
         const sc = readStreamClose(data);
-        if (sc) {
-          const stream = this.activeStreams.get(sc.streamId);
-          stream?.onClose?.(sc.statusCode);
-          this.activeStreams.delete(sc.streamId);
-        }
-        break;
+        if (!sc) return false;
+        const stream = this.activeStreams.get(sc.streamId);
+        stream?.onClose?.(sc.statusCode);
+        this.activeStreams.delete(sc.streamId);
+        return true;
       }
 
       // Media
       case FRAME.MediaFrame: {
         const mf = readMediaFrame(data);
-        if (mf) this.mediaStreams.get(mf.streamId)?.enqueueFrame(mf.sequenceNumber, mf.timestamp, mf.payload, mf.flags);
-        break;
+        if (!mf) return false;
+        this.mediaStreams.get(mf.streamId)?.enqueueFrame(mf.sequenceNumber, mf.timestamp, mf.payload, mf.flags);
+        return true;
       }
       case FRAME.MediaConfig: {
         const mc = readMediaConfig(data);
-        if (mc) {
-          const isAudio = mc.mediaType === 0x01;
-          const stream = new BoltBrowserMediaStream(this.ws!, mc.streamId, mc.callId, isAudio);
-          this.mediaStreams.set(mc.streamId, stream);
-          const enc = this.callEncryption.get(mc.callId);
-          if (enc?.isReady) stream.setEncryption(enc);
-        }
-        break;
+        if (!mc) return false;
+        const isAudio = mc.mediaType === 0x01;
+        this.mediaStreams.get(mc.streamId)?.dispose();
+        const stream = new BoltBrowserMediaStream(this.ws!, mc.streamId, mc.callId, isAudio,
+          frame => this.sendFrame(frame, true));
+        this.mediaStreams.set(mc.streamId, stream);
+        this.onMediaStreamConfigured?.(stream);
+        return true;
       }
       case FRAME.MediaFeedback: {
         const fb = readMediaFeedback(data);
-        if (fb) this.mediaStreams.get(fb.streamId)?.handleFeedback(fb.qualityHint);
-        break;
+        if (!fb) return false;
+        this.mediaStreams.get(fb.streamId)?.handleFeedback(fb.qualityHint);
+        return true;
       }
       case FRAME.MediaKeyRequest: {
         const kr = readMediaKeyRequest(data);
-        if (kr) this.onKeyframeRequested?.(kr.streamId);
-        break;
+        if (!kr) return false;
+        this.onKeyframeRequested?.(kr.streamId);
+        return true;
       }
       case FRAME.FecFrame: {
         const fec = readFecFrame(data);
-        if (fec) this.mediaStreams.get(fec.streamId)?.enqueueFecFrame(fec.fecGroupStart, fec.fecGroupSize, fec.payload);
-        break;
+        if (!fec) return false;
+        this.mediaStreams.get(fec.streamId)?.enqueueFecFrame(fec.fecGroupStart, fec.fecGroupSize, fec.payload);
+        return true;
       }
       case FRAME.NackRequest: {
         const nack = readNackRequest(data);
-        if (nack) this.mediaStreams.get(nack.streamId)?.handleNackRequest(nack.missingSequences);
-        break;
+        if (!nack) return false;
+        this.mediaStreams.get(nack.streamId)?.handleNackRequest(nack.missingSequences);
+        return true;
       }
       case FRAME.CallSignal: {
         const cs = readCallSignal(data);
-        if (cs) this.handleCallSignal(cs.callId, cs.signalType, cs.payload);
-        break;
+        if (!cs) return false;
+        this.handleCallSignal(cs.callId, cs.signalType, cs.payload);
+        return true;
       }
+      default:
+        return false;
     }
   }
 
@@ -528,28 +714,38 @@ export class BoltBrowserClient {
   private async handleIncomingRequest(commandHash: number, payload: Uint8Array, requestId: string): Promise<void> {
     const handler = this.handlers.get(commandHash);
     if (handler) {
+      const controller = new AbortController();
+      this.inboundRequestControllers.set(requestId, controller);
       try {
-        const result = await handler(payload, requestId);
+        const result = await handler(payload, requestId, controller.signal);
+        if (controller.signal.aborted) return;
         const frame = writeResponse(requestId, result.statusCode, result.payload);
-        this.ws?.send(frame);
+        this.sendFrame(frame);
       } catch {
+        if (controller.signal.aborted) return;
         const frame = writeResponse(requestId, 500, new Uint8Array(0));
-        this.ws?.send(frame);
+        this.sendFrame(frame);
+      } finally {
+        this.inboundRequestControllers.delete(requestId);
       }
     } else {
       const frame = writeResponse(requestId, 501, new Uint8Array(0));
-      this.ws?.send(frame);
+      this.sendFrame(frame);
     }
   }
 
   // ── Stream handling ────────────────────────────────────────
 
   private handleStreamOpen(streamId: string, commandHash: number): void {
-    const ws = this.ws!;
+    const activeStreams = this.activeStreams;
+    const sendFrame = (frame: Uint8Array) => this.sendFrame(frame);
     const stream: BoltBrowserStream = {
       streamId,
-      send(data: Uint8Array) { ws.send(writeStreamData(streamId, data)); },
-      close(statusCode = 200) { ws.send(writeStreamClose(streamId, statusCode)); },
+      send(data: Uint8Array) { sendFrame(writeStreamData(streamId, data)); },
+      close(statusCode = 200) {
+        sendFrame(writeStreamClose(streamId, statusCode));
+        activeStreams.delete(streamId);
+      },
     };
     this.activeStreams.set(streamId, stream);
 
@@ -568,56 +764,25 @@ export class BoltBrowserClient {
       case SIGNAL.Ring: break;
       case SIGNAL.Answer:
         this.onCallAnswered?.(callId);
-        this.sendKeyExchange(callId);
         break;
       case SIGNAL.Reject:
         this.activeCalls.delete(callId);
-        this.callEncryption.delete(callId);
+        this.cleanupMediaStreams(callId);
         this.onCallRejected?.(callId);
         break;
       case SIGNAL.End:
         this.activeCalls.delete(callId);
-        this.callEncryption.delete(callId);
-        for (const [streamId, stream] of this.mediaStreams) {
-          if (stream.callId === callId) this.mediaStreams.delete(streamId);
-        }
+        this.cleanupMediaStreams(callId);
         this.onCallEnded?.(callId);
         break;
       case SIGNAL.Hold: this.onCallHold?.(callId); break;
       case SIGNAL.Unhold: this.onCallUnhold?.(callId); break;
       case SIGNAL.AddParticipant: this.onParticipantAdded?.(callId, payload); break;
       case SIGNAL.RemoveParticipant: this.onParticipantRemoved?.(callId, payload); break;
-      case SIGNAL.KeyExchange: this.handleKeyExchange(callId, payload); break;
-    }
-  }
-
-  private async sendKeyExchange(callId: string): Promise<void> {
-    let enc = this.callEncryption.get(callId);
-    if (!enc) {
-      enc = new MediaCrypto();
-      await enc.init();
-      this.callEncryption.set(callId, enc);
-    }
-    this.ws?.send(writeCallSignal(callId, SIGNAL.KeyExchange, enc.getPublicKey()));
-  }
-
-  private async handleKeyExchange(callId: string, remotePublicKey: Uint8Array): Promise<void> {
-    let enc = this.callEncryption.get(callId);
-    if (!enc) {
-      enc = new MediaCrypto();
-      await enc.init();
-      this.callEncryption.set(callId, enc);
-    }
-    await enc.deriveKey(remotePublicKey, callId);
-
-    const call = this.activeCalls.get(callId);
-    if (call && !call.isOutgoing && !call.keySent) {
-      call.keySent = true;
-      await this.sendKeyExchange(callId);
-    }
-
-    for (const [, stream] of this.mediaStreams) {
-      if (stream.callId === callId) stream.setEncryption(enc);
+      case SIGNAL.KeyExchange:
+        // The current signal is not bound to an authenticated peer identity.
+        // Ignore it so encrypted media cannot silently trust a substituted key.
+        break;
     }
   }
 
@@ -630,5 +795,13 @@ export class BoltBrowserClient {
       this.hashCache.set(value, hash);
     }
     return hash;
+  }
+
+  private cleanupMediaStreams(callId: string): void {
+    for (const [streamId, stream] of this.mediaStreams) {
+      if (stream.callId !== callId) continue;
+      stream.dispose();
+      this.mediaStreams.delete(streamId);
+    }
   }
 }

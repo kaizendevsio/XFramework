@@ -8,8 +8,12 @@ public sealed record ServiceTokenValidationResult(
     string? Audience,
     IReadOnlySet<string> Scopes,
     ClaimsPrincipal? Principal,
-    string? Error)
+    string? Error,
+    int FailureStatusCode = 401)
 {
     public static ServiceTokenValidationResult Failure(string error) =>
         new(false, null, null, new HashSet<string>(StringComparer.OrdinalIgnoreCase), null, error);
+
+    public static ServiceTokenValidationResult Unavailable(string error) =>
+        new(false, null, null, new HashSet<string>(StringComparer.OrdinalIgnoreCase), null, error, 503);
 }

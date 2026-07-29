@@ -742,7 +742,9 @@ public class CallLifecycleTests
 
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls($"http://localhost:{_port}");
-        builder.Services.AddSingleton<BoltServer>();
+        builder.Services.AddSingleton(sp => new BoltServer(
+            sp.GetRequiredService<ILogger<BoltServer>>(),
+            new BoltServerOptions { MediaEnabled = true }));
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         _serverApp = builder.Build();
         _serverApp.UseWebSockets();
@@ -774,6 +776,7 @@ public class CallLifecycleTests
         try { await _clientA.DisposeAsync(); } catch { }
         try { await _clientB.DisposeAsync(); } catch { }
         try { await _serverApp.StopAsync(); } catch { }
+        try { await _serverApp.DisposeAsync(); } catch { }
     }
 
     [Test]
@@ -999,7 +1002,9 @@ public class MediaFrameExchangeTests
 
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls($"http://localhost:{_port}");
-        builder.Services.AddSingleton<BoltServer>();
+        builder.Services.AddSingleton(sp => new BoltServer(
+            sp.GetRequiredService<ILogger<BoltServer>>(),
+            new BoltServerOptions { MediaEnabled = true }));
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         _serverApp = builder.Build();
         _serverApp.UseWebSockets();
@@ -1031,6 +1036,7 @@ public class MediaFrameExchangeTests
         try { await _clientA.DisposeAsync(); } catch { }
         try { await _clientB.DisposeAsync(); } catch { }
         try { await _serverApp.StopAsync(); } catch { }
+        try { await _serverApp.DisposeAsync(); } catch { }
     }
 
     [Test]

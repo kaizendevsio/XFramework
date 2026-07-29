@@ -1,0 +1,49 @@
+{
+  "Repetition": 2,
+  "Position": 4,
+  "ProcessId": 4816,
+  "Topology": "Routed_gRPC",
+  "ChunkSize": null,
+  "PayloadBytes": 524288,
+  "Concurrency": 1,
+  "Requests": 1200,
+  "WarmupRequests": 200,
+  "ElapsedMilliseconds": 5521.3401,
+  "ThroughputRequestsPerSecond": 217.33854069232214,
+  "Latency": {
+    "MeanMilliseconds": 4.600934416666667,
+    "P50Milliseconds": 2.946,
+    "P95Milliseconds": 18.182000000000002,
+    "P99Milliseconds": 24.328200000000002,
+    "MaxMilliseconds": 37.595400000000005
+  },
+  "CpuMilliseconds": 12406.25,
+  "Gen2Collections": 250,
+  "BaselineWorkingSetBytes": 84119552,
+  "PeakWorkingSetBytes": 113614848,
+  "PeakWorkingSetDeltaBytes": 29495296,
+  "BaselineManagedHeapBytes": 12507096,
+  "PeakManagedHeapBytes": 28700432,
+  "PeakManagedHeapDeltaBytes": 16193336,
+  "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+  "EffectiveSettings": {
+    "topology": "Routed_gRPC",
+    "logicalPath": "caller -\u003E gRPC router -\u003E gRPC backend",
+    "payloadBytes": 524288,
+    "callTimeoutSeconds": 60,
+    "largePayloadThresholdBytes": 0,
+    "streamChunkSizeBytes": null,
+    "pipelineBytes": null,
+    "receiveBufferBytes": null,
+    "hubReceiveBufferBytes": null,
+    "runRpcContinuationsAsynchronously": null,
+    "grpcHttp2MaxStreamsPerConnection": 2048,
+    "grpcCallerChannelCount": 1,
+    "grpcBackendChannelCount": 1,
+    "grpcMultipleHttp2ConnectionsEnabled": false,
+    "serverAddresses": [
+      "http://127.0.0.1:62088/",
+      "http://127.0.0.1:62089/"
+    ]
+  }
+}

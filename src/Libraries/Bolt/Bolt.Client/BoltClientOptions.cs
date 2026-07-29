@@ -32,6 +32,15 @@ public class BoltClientOptions
     /// <summary>Maximum complete Bolt frame size accepted by receive loops.</summary>
     public int MaxFrameBytes { get; set; } = BoltCodec.DefaultMaxFrameBytes;
 
+    /// <summary>Maximum logical request or response body accepted through large-RPC streaming. Default: 32 MiB.</summary>
+    public int MaxLargeRpcPayloadBytes { get; set; } = 32 * 1024 * 1024;
+
+    /// <summary>Maximum aggregate bytes reserved by concurrent large-RPC reassembly. Default: 64 MiB.</summary>
+    public long MaxBufferedLargeRpcBytes { get; set; } = 64L * 1024 * 1024;
+
+    /// <summary>Per-connection receive fragment buffer. Default: 65536 bytes.</summary>
+    public int ReceiveBufferBytes { get; set; } = 64 * 1024;
+
     /// <summary>
     /// Static bearer token sent during the Bolt WebSocket handshake.
     /// Prefer AccessTokenProvider for long-running clients.
@@ -61,6 +70,9 @@ public class BoltClientOptions
     /// <summary>Bounded send queue capacity per connection. Default: 4096.</summary>
     public int SendQueueCapacity { get; set; } = 4096;
 
+    /// <summary>Combines already queued non-media frames into Bolt wire-v2 batches. Default: enabled.</summary>
+    public bool EnableBatching { get; set; } = true;
+
     /// <summary>Maximum time to wait when the send queue is full. Default: RPC timeout.</summary>
     public int SendEnqueueTimeoutMs { get; set; } = 0;
 
@@ -72,16 +84,37 @@ public class BoltClientOptions
     /// </summary>
     public int PubSubChannelCapacity { get; set; } = 4096;
 
+    /// <summary>Maximum unread chunks buffered by each Bolt stream. Default: 1024.</summary>
+    public int StreamInboundCapacity { get; set; } = 1024;
+
+    /// <summary>Maximum concurrently executing inbound request and push handlers. Default: 128.</summary>
+    public int MaxConcurrentInboundHandlers { get; set; } = 128;
+
+    /// <summary>Maximum active inbound and outbound logical streams. Default: 1024.</summary>
+    public int MaxActiveStreams { get; set; } = 1024;
+
     /// <summary>
     /// Payload size threshold (bytes) above which InvokeAsync transparently switches
     /// to BoltStream chunking instead of a single Request/Response frame.
-    /// Default: 10485760 (10MB). Single frames work fine up to several MB via
+    /// Default: 2097152 (2 MiB). Single frames work fine up to several MB via
     /// WebSocket fragmentation. Streaming helps for very large transfers where
     /// holding the entire payload in memory is undesirable.
-    /// Set to int.MaxValue to disable auto-streaming.
+    /// Values above the safe frame payload ceiling are clamped to that ceiling.
     /// </summary>
-    public int LargePayloadThreshold { get; set; } = 1024 * 1024;
+    public int LargePayloadThreshold { get; set; } = 2 * 1024 * 1024;
 
-    /// <summary>Chunk size for large payload streaming. Default: 65536 (64KB).</summary>
-    public int StreamChunkSize { get; set; } = 65536;
+    /// <summary>
+    /// Chunk size for large payload streaming. Default: 131051 bytes, which keeps the
+    /// complete StreamData frame within a 128 KiB buffer. Other values remain configurable.
+    /// </summary>
+    public int StreamChunkSize { get; set; } = (128 * 1024) - BoltCodec.StreamDataHeaderSize;
+
+    /// <summary>
+    /// Runs RPC continuations away from the receive loop so response handling cannot
+    /// stall the physical receive path under concurrent load.
+    /// </summary>
+    public bool RunRpcContinuationsAsynchronously { get; set; } = true;
+
+    /// <summary>Maximum payload bytes awaiting physical-send completion per large-RPC transfer. Default: 2 MiB.</summary>
+    public int MaxLargeRpcPipelineBytes { get; set; } = 2 * 1024 * 1024;
 }

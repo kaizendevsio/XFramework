@@ -1,0 +1,423 @@
+{
+  "generatedAtUtc": "2026-07-24T17:53:02.9545841+00:00",
+  "executionIsolation": "one fresh child process per randomized variant",
+  "memoryAccounting": "peak minus post-warmup baseline in each isolated worker",
+  "options": {
+    "Worker": false,
+    "ClientCounts": [
+      1000
+    ],
+    "HubReceiveBufferBytes": [
+      65536,
+      131072,
+      262144
+    ],
+    "Workloads": [
+      "Active"
+    ],
+    "PayloadBytes": 1024,
+    "ActiveRequests": 10000,
+    "ActiveConcurrency": 1000,
+    "IdleSeconds": 2,
+    "Repetitions": 3,
+    "Seed": 92337,
+    "WorkerClients": 1,
+    "WorkerReceiveBufferBytes": 65536,
+    "WorkerWorkload": "Idle",
+    "WorkerRepetition": 1,
+    "WorkerPosition": 1,
+    "ArtifactDirectory": "C:\\Users\\Xeon\\RiderProjects\\XFramework-worktrees\\bolt-remediation-plan-scope\\docs\\solutions\\workflow-issues\\bolt-performance-results-2026-07-25\\hub-buffer-scale-1000-active-final",
+    "ResultPath": null
+  },
+  "blocks": [
+    {
+      "Repetition": 1,
+      "Position": 1,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 131072,
+      "Workload": "Active"
+    },
+    {
+      "Repetition": 1,
+      "Position": 2,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 65536,
+      "Workload": "Active"
+    },
+    {
+      "Repetition": 1,
+      "Position": 3,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 262144,
+      "Workload": "Active"
+    },
+    {
+      "Repetition": 2,
+      "Position": 1,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 131072,
+      "Workload": "Active"
+    },
+    {
+      "Repetition": 2,
+      "Position": 2,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 262144,
+      "Workload": "Active"
+    },
+    {
+      "Repetition": 2,
+      "Position": 3,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 65536,
+      "Workload": "Active"
+    },
+    {
+      "Repetition": 3,
+      "Position": 1,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 262144,
+      "Workload": "Active"
+    },
+    {
+      "Repetition": 3,
+      "Position": 2,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 131072,
+      "Workload": "Active"
+    },
+    {
+      "Repetition": 3,
+      "Position": 3,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 65536,
+      "Workload": "Active"
+    }
+  ],
+  "results": [
+    {
+      "Repetition": 1,
+      "Position": 1,
+      "ProcessId": 23900,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 131072,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 134.6784,
+      "ThroughputRequestsPerSecond": 74250.95635231782,
+      "Latency": {
+        "MeanMilliseconds": 12.48001485,
+        "P50Milliseconds": 12.1331,
+        "P95Milliseconds": 19.381800000000002,
+        "P99Milliseconds": 20.4515,
+        "MaxMilliseconds": 23.279600000000002
+      },
+      "CpuMilliseconds": 1937.5,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 168083456,
+      "PeakWorkingSetBytes": 217436160,
+      "PeakWorkingSetDeltaBytes": 49352704,
+      "BaselineManagedHeapBytes": 250320144,
+      "PeakManagedHeapBytes": 299450984,
+      "PeakManagedHeapDeltaBytes": 49130840,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 131072,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    },
+    {
+      "Repetition": 1,
+      "Position": 2,
+      "ProcessId": 32780,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 65536,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 126.3245,
+      "ThroughputRequestsPerSecond": 79161.20784170924,
+      "Latency": {
+        "MeanMilliseconds": 11.55527099,
+        "P50Milliseconds": 12.2344,
+        "P95Milliseconds": 13.5066,
+        "P99Milliseconds": 13.953000000000001,
+        "MaxMilliseconds": 18.8457
+      },
+      "CpuMilliseconds": 2000,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 157306880,
+      "PeakWorkingSetBytes": 206974976,
+      "PeakWorkingSetDeltaBytes": 49668096,
+      "BaselineManagedHeapBytes": 185021264,
+      "PeakManagedHeapBytes": 233603176,
+      "PeakManagedHeapDeltaBytes": 48581912,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 65536,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    },
+    {
+      "Repetition": 1,
+      "Position": 3,
+      "ProcessId": 33108,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 262144,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 77.968,
+      "ThroughputRequestsPerSecond": 128257.74676790478,
+      "Latency": {
+        "MeanMilliseconds": 7.11242563,
+        "P50Milliseconds": 7.234,
+        "P95Milliseconds": 10.1477,
+        "P99Milliseconds": 10.9894,
+        "MaxMilliseconds": 15.319600000000001
+      },
+      "CpuMilliseconds": 1140.625,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 244580352,
+      "PeakWorkingSetBytes": 271224832,
+      "PeakWorkingSetDeltaBytes": 26644480,
+      "BaselineManagedHeapBytes": 379147112,
+      "PeakManagedHeapBytes": 432935696,
+      "PeakManagedHeapDeltaBytes": 53788584,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 262144,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    },
+    {
+      "Repetition": 2,
+      "Position": 1,
+      "ProcessId": 37092,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 131072,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 121.3311,
+      "ThroughputRequestsPerSecond": 82419.09947243535,
+      "Latency": {
+        "MeanMilliseconds": 11.248759620000001,
+        "P50Milliseconds": 11.824300000000001,
+        "P95Milliseconds": 12.703800000000001,
+        "P99Milliseconds": 13.0687,
+        "MaxMilliseconds": 19.4362
+      },
+      "CpuMilliseconds": 2062.5,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 251117568,
+      "PeakWorkingSetBytes": 275787776,
+      "PeakWorkingSetDeltaBytes": 24670208,
+      "BaselineManagedHeapBytes": 249871376,
+      "PeakManagedHeapBytes": 299099552,
+      "PeakManagedHeapDeltaBytes": 49228176,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 131072,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    },
+    {
+      "Repetition": 2,
+      "Position": 2,
+      "ProcessId": 32544,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 262144,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 128.1187,
+      "ThroughputRequestsPerSecond": 78052.6183921629,
+      "Latency": {
+        "MeanMilliseconds": 11.53939983,
+        "P50Milliseconds": 12.379800000000001,
+        "P95Milliseconds": 13.4031,
+        "P99Milliseconds": 13.8781,
+        "MaxMilliseconds": 28.2377
+      },
+      "CpuMilliseconds": 2000,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 167620608,
+      "PeakWorkingSetBytes": 218607616,
+      "PeakWorkingSetDeltaBytes": 50987008,
+      "BaselineManagedHeapBytes": 382224712,
+      "PeakManagedHeapBytes": 431624936,
+      "PeakManagedHeapDeltaBytes": 49400224,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 262144,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    },
+    {
+      "Repetition": 2,
+      "Position": 3,
+      "ProcessId": 23464,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 65536,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 123.1852,
+      "ThroughputRequestsPerSecond": 81178.58314148129,
+      "Latency": {
+        "MeanMilliseconds": 10.62101005,
+        "P50Milliseconds": 11.7482,
+        "P95Milliseconds": 13.094800000000001,
+        "P99Milliseconds": 13.6484,
+        "MaxMilliseconds": 16.8088
+      },
+      "CpuMilliseconds": 1968.75,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 159363072,
+      "PeakWorkingSetBytes": 208855040,
+      "PeakWorkingSetDeltaBytes": 49491968,
+      "BaselineManagedHeapBytes": 185319936,
+      "PeakManagedHeapBytes": 233884360,
+      "PeakManagedHeapDeltaBytes": 48564424,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 65536,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    },
+    {
+      "Repetition": 3,
+      "Position": 1,
+      "ProcessId": 31236,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 262144,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 84.5668,
+      "ThroughputRequestsPerSecond": 118249.7150181868,
+      "Latency": {
+        "MeanMilliseconds": 7.90422821,
+        "P50Milliseconds": 7.4371,
+        "P95Milliseconds": 12.625300000000001,
+        "P99Milliseconds": 16.633,
+        "MaxMilliseconds": 18.8293
+      },
+      "CpuMilliseconds": 1062.5,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 235700224,
+      "PeakWorkingSetBytes": 266153984,
+      "PeakWorkingSetDeltaBytes": 30453760,
+      "BaselineManagedHeapBytes": 382569544,
+      "PeakManagedHeapBytes": 432172448,
+      "PeakManagedHeapDeltaBytes": 49602904,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 262144,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    },
+    {
+      "Repetition": 3,
+      "Position": 2,
+      "ProcessId": 36192,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 131072,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 135.387,
+      "ThroughputRequestsPerSecond": 73862.33537932002,
+      "Latency": {
+        "MeanMilliseconds": 12.544993640000001,
+        "P50Milliseconds": 12.869,
+        "P95Milliseconds": 16.0384,
+        "P99Milliseconds": 16.8464,
+        "MaxMilliseconds": 18.6719
+      },
+      "CpuMilliseconds": 1953.125,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 168136704,
+      "PeakWorkingSetBytes": 218447872,
+      "PeakWorkingSetDeltaBytes": 50311168,
+      "BaselineManagedHeapBytes": 250754160,
+      "PeakManagedHeapBytes": 299880968,
+      "PeakManagedHeapDeltaBytes": 49126808,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 131072,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    },
+    {
+      "Repetition": 3,
+      "Position": 3,
+      "ProcessId": 25092,
+      "Clients": 1000,
+      "HubReceiveBufferBytes": 65536,
+      "Workload": "Active",
+      "PayloadBytes": 1024,
+      "Requests": 10000,
+      "Concurrency": 1000,
+      "WarmupRequests": 1000,
+      "ElapsedMilliseconds": 144.1563,
+      "ThroughputRequestsPerSecond": 69369.15001286798,
+      "Latency": {
+        "MeanMilliseconds": 11.47410263,
+        "P50Milliseconds": 13.517900000000001,
+        "P95Milliseconds": 16.694300000000002,
+        "P99Milliseconds": 17.7118,
+        "MaxMilliseconds": 26.563200000000002
+      },
+      "CpuMilliseconds": 1843.75,
+      "Gen2Collections": 0,
+      "BaselineWorkingSetBytes": 158257152,
+      "PeakWorkingSetBytes": 211120128,
+      "PeakWorkingSetDeltaBytes": 52862976,
+      "BaselineManagedHeapBytes": 185175704,
+      "PeakManagedHeapBytes": 236852816,
+      "PeakManagedHeapDeltaBytes": 51677112,
+      "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+      "EffectiveSettings": {
+        "connectedClients": 1000,
+        "hubReceiveBufferBytes": 65536,
+        "callerConnectionsPerClient": 1,
+        "runRpcContinuationsAsynchronously": true
+      }
+    }
+  ]
+}

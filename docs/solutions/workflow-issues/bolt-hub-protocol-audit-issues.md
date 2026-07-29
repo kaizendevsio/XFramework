@@ -17,6 +17,8 @@ tags: [bolt, bolt-hub, protocol, service-discovery, service-token, portal, audit
 **Status:** Implemented through Phase 11
 **Scope:** Bolt.Protocol, Bolt.Client, Bolt.Server, Bolt.Hub, XFramework.Integration, generated Bolt handlers, Portal Bolt health, and service-token RPC infrastructure.
 
+**2026-07-29 RPC authorization and abuse controls implemented:** generated Bolt handlers now validate destination-audience service tokens and bind the token caller to the Hub-verified sender route before validation or service resolution. Optional handler scopes and allowed callers remain destination policies. Bolt Hub now applies per-`QuotaKey` logical request and inbound-byte token buckets across pooled connections, rejects unary and large RPC admission with `429`, drops and measures over-limit Push, and no longer treats recipient hash zero as broadcast. XFramework Hub requires a registered topic authorizer while reusable `MapBolt()` authentication and topic authorization remain opt-in. Focused coverage is in `BoltServiceInvocationAuthorizerTests`, `ServiceTokenValidatorTests`, `BoltInboundRequestContextTests`, `BoltServerRateLimitingTests`, and `BoltHubConfigurationTests`.
+
 This list consolidates the Bolt protocol and Bolt Hub audit findings, plus the Portal/IdentityServer hang investigation around `Role Permission Overrides`. It is an issue inventory, not an implementation plan.
 
 ## Implementation Status

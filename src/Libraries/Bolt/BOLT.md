@@ -29,9 +29,9 @@ Current benchmarks are useful for regression detection within a fixed workload. 
 | SignalR Hub | 159 us | 6,296 | 5.94 KB |
 | gRPC Hub | 279 us | 3,587 | 19.71 KB |
 
-### Concurrent Load (64 parallel requests)
+### Concurrent Batch (64 parallel requests)
 
-| Transport | Latency | Ops/sec | Memory |
+| Transport | Batch duration | Normalized ops/sec | Memory |
 |-----------|---------|---------|--------|
 | **Bolt Hub** | **1,329 us** | **752** | **88 KB** |
 | gRPC Direct | 1,396 us | 716 | 584 KB |
@@ -41,7 +41,7 @@ Current benchmarks are useful for regression detection within a fixed workload. 
 
 ### Peak Throughput (100 concurrent batch)
 
-| Transport | Per-op Latency | Peak Ops/sec | Memory/op |
+| Transport | Normalized batch time/op | Normalized ops/sec | Memory/op |
 |-----------|---------------|-------------|-----------|
 | **Bolt Direct** | **12.7 us** | **78,709** | **978 B** |
 | **Bolt Hub** | **16.7 us** | **60,014** | **1,313 B** |
@@ -68,7 +68,7 @@ This table summarizes the same non-equivalent localhost run and does not identif
 | Metric | Bolt | gRPC | Historical local delta |
 |--------|------|------|--------|
 | Sequential latency (hub) | 121 us | 279 us | Bolt by 57% |
-| Concurrent latency (hub) | 1,329 us | 1,679 us | Bolt by 21% |
+| Concurrent batch duration (hub) | 1,329 us | 1,679 us | Bolt by 21% |
 | Peak throughput (hub) | 60,014 ops/s | 57,515 ops/s | Bolt by 4% |
 | Peak throughput (direct) | 78,709 ops/s | 57,659 ops/s | Bolt by 37% |
 | Memory per request | 1.3 KB | 20 KB | Bolt by 94% |
@@ -105,6 +105,30 @@ Authenticated service connections can bind the Bolt register identity to the ser
 For service clients, the expected Bolt registration is `clientName == authenticated service name` and `clientId == SHA256(clientName)`. Non-service user/browser clients keep the normal registration path unless they attempt to claim a reserved service identity by name, prefix, or reserved deterministic service client ID.
 
 XFramework Hub intentionally fixes the required service scope to `bolt.service` and resolves service identity from `client_id`, `service`, `azp`, then `sub`. Non-Development deployments must not override `BoltConfiguration:RegistrationIdentityBindingMode=Enforce`. An identity mismatch is a deployment or caller defect and must fail closed.
+
+### Transport and Invocation Authorization
+
+Transport authentication and RPC authorization are separate checks. XFramework Bolt Hub authenticates the WebSocket and binds the registration identity. Each source-generated `[BoltHandler]` then validates `RequestMetadata.ServiceAccessToken` for the destination service before validation, dependency resolution, or business-handler execution. The token caller must produce the same deterministic Bolt sender route as the Hub-verified frame sender.
+
+Generated handlers return `401 Unauthorized` for a missing or invalid destination token, `403 Forbidden` for a sender mismatch, missing required scope, or disallowed caller, and `503 Service Unavailable` when IdentityServer signing-key validation infrastructure is unavailable. Successful base JWT validation is cached by token digest and destination audience, with a fixed entry bound and no lifetime beyond the token expiry. Failed validation is not cached. Signing-key refresh is single-flight and keeps one active key set, so attacker-controlled key IDs cannot create unbounded cache entries. An unknown key ID can force one globally throttled refresh, allowing normal key rotation without creating a per-key cache or refresh storm. Manual low-level handlers remain responsible for their own invocation policy; use the context-aware `RegisterHandler` overload when the verified request ID and sender hash are required.
+
+Handler-specific service policy stays at the destination:
+
+```csharp
+[BoltHandler(
+    RequiredServiceScopes = ["wallets.write"],
+    AllowedServiceCallers = [XFrameworkServiceNames.Portal])]
+```
+
+HTTP user authorization metadata is not automatically converted to Bolt service scopes because the two caller models are different.
+
+### Push, Rate Limits, and Topics
+
+`PushAsync` requires an explicit nonblank recipient. Recipient hash zero has no broadcast meaning and is handled as a route miss. Bolt has no generic broadcast API; use authorized pub/sub for fanout workflows.
+
+Reusable `BoltServer` hosts leave RPC limiting disabled unless configured. XFramework Bolt Hub enables token-bucket limits per authenticated `QuotaKey`, shared across pooled connections. Limits cover logical RPC/Push request count and declared inbound logical payload bytes. A rejected unary RPC receives `429`, a rejected large-RPC stream closes with `429`, and an over-limit Push is dropped and counted. Responses, large-RPC response Push, cancellation, acknowledgements, registration, pub/sub, and media are not charged by this limiter.
+
+`MapBolt()` intentionally does not require endpoint authentication by default. Hosts opt in with endpoint authorization. `BoltServerOptions.RequireTopicAuthorization` also defaults to `false` for reusable hosts; XFramework Bolt Hub sets it to `true` and fails startup when no `IBoltTopicAuthorizer` is registered. `CommunicationsBoltTopicAuthorizer` is the current production topic policy and denies malformed or unknown namespaces.
 
 ### WebSocket Query Tokens
 
@@ -143,7 +167,7 @@ For direct mode (no hub), the client connects straight to the service:
 **Bolt uses different framing and routing work:**
 1. Compact binary headers — no HTTP framing
 2. MemoryPack payloads in the current .NET typed API; relative serializer performance is workload-dependent
-3. Hub forwards raw bytes — zero decode at the routing layer
+3. Hub forwards raw frames without payload deserialization
 4. FNV-1a hash routing — 4-byte integer comparison
 
 **Transport design compared with SignalR**
@@ -178,6 +202,8 @@ public static class AuthenticateEndpoint
 ```
 
 Use manual `BoltServer.RegisterHandler` only for low-level protocol tests, direct-mode samples, or infrastructure that is not a VSA feature.
+
+Every generated Bolt request must expose the inherited `RequestMetadata` contract. The caller-side Bolt driver populates its destination service token, and generated destination handlers enforce the baseline token and sender binding automatically. Add `RequiredServiceScopes` or `AllowedServiceCallers` only when the handler requires a narrower service policy.
 
 ### RPC (Request-Response)
 

@@ -16,6 +16,66 @@ namespace Bolt.Tests;
 [CancelAfter(15000)]
 public sealed class BoltServerSendFailureTests
 {
+    [Test]
+    public async Task RouteStreamFrame_RecipientAdmissionFailure_ClosesRecipientAndKeepsSenderConnected()
+    {
+        using var server = new BoltServer(
+            NullLogger<BoltServer>.Instance,
+            new BoltServerOptions
+            {
+                SendEnqueueTimeoutMs = 75,
+                SendQueueByteCapacity = 128,
+                TransportCloseTimeoutMs = 250
+            });
+        await using var caller = new TestBoltConnection();
+        await using var recipient = new TestBoltConnection(
+            SendFailureMode.Blocked,
+            successfulSendsBeforeFailure: 2,
+            failClose: true);
+        var callerTask = server.HandleConnectionAsync(caller, CancellationToken.None);
+        var recipientTask = server.HandleConnectionAsync(recipient, CancellationToken.None);
+
+        try
+        {
+            caller.Enqueue(WriteFrame(writer =>
+                BoltCodec.WriteRegister(writer, "admission-caller", "AdmissionCaller")));
+            recipient.Enqueue(WriteFrame(writer =>
+                BoltCodec.WriteRegister(writer, "admission-recipient", "AdmissionRecipient")));
+            await Task.WhenAll(
+                caller.WaitForSentFramesAsync(1),
+                recipient.WaitForSentFramesAsync(1));
+
+            var streamId = Guid.NewGuid();
+            caller.Enqueue(WriteFrame(writer => BoltCodec.WriteStreamOpen(
+                writer,
+                streamId,
+                BoltCodec.Fnv1aHash("admission-recipient"),
+                BoltCodec.Fnv1aHash("admission-stream"))));
+            await recipient.WaitForSentFramesAsync(2);
+
+            var payload = new byte[100];
+            caller.Enqueue(WriteFrame(writer => BoltCodec.WriteStreamData(writer, streamId, payload)));
+            caller.Enqueue(WriteFrame(writer => BoltCodec.WriteStreamData(writer, streamId, payload)));
+
+            await caller.WaitForLogicalFramesAsync(2);
+            await WaitForConditionAsync(() => recipientTask.IsCompleted && server.ConnectedClients == 1);
+
+            caller.GetLogicalFrames().Any(frame =>
+                BoltCodec.TryReadStreamClose(frame, out var closedStreamId, out var statusCode) &&
+                closedStreamId == streamId &&
+                statusCode == HttpStatusCode.ServiceUnavailable).Should().BeTrue();
+            callerTask.IsCompleted.Should().BeFalse();
+            caller.IsConnected.Should().BeTrue();
+            server.GetHealthSnapshot().ActiveLogicalStreams.Should().Be(0);
+        }
+        finally
+        {
+            caller.Complete();
+            recipient.Complete();
+            await Task.WhenAll(callerTask, recipientTask).WaitAsync(TimeSpan.FromSeconds(3));
+        }
+    }
+
     [TestCase(SendFailureMode.Blocked)]
     [TestCase(SendFailureMode.Faulted)]
     public async Task HandleConnectionAsync_TransportSendFailure_RetiresOnlyFailedConnectionAndCompletesPendingWork(
@@ -65,10 +125,10 @@ public sealed class BoltServerSendFailureTests
                 BoltCodec.Fnv1aHash("fail"),
                 ReadOnlySpan<byte>.Empty)));
 
-            await caller.WaitForSentFramesAsync(3);
+            await caller.WaitForLogicalFramesAsync(3);
             await WaitForConditionAsync(() => server.ConnectedClients == 2 && failedRecipientTask.IsCompleted);
 
-            var cleanupFrames = caller.SentFrames.ToArray().Skip(1).ToArray();
+            var cleanupFrames = caller.GetLogicalFrames().Skip(1).ToArray();
             cleanupFrames.Any(frame =>
                 BoltCodec.TryReadResponse(frame, out var response, out _) &&
                 response.RequestId == failedRequestId &&
@@ -115,9 +175,9 @@ public sealed class BoltServerSendFailureTests
                 healthyRequestId,
                 HttpStatusCode.OK,
                 ReadOnlySpan<byte>.Empty)));
-            await caller.WaitForSentFramesAsync(4);
+            await caller.WaitForLogicalFramesAsync(4);
 
-            caller.SentFrames.Any(frame =>
+            caller.GetLogicalFrames().Any(frame =>
                 BoltCodec.TryReadResponse(frame, out var response, out _) &&
                 response.RequestId == healthyRequestId &&
                 response.StatusCode == HttpStatusCode.OK).Should().BeTrue();
@@ -166,7 +226,8 @@ public sealed class BoltServerSendFailureTests
 
     private sealed class TestBoltConnection(
         SendFailureMode? failureMode = null,
-        int successfulSendsBeforeFailure = int.MaxValue) : IBoltConnection
+        int successfulSendsBeforeFailure = int.MaxValue,
+        bool failClose = false) : IBoltConnection
     {
         private readonly Channel<byte[]> _incoming = Channel.CreateUnbounded<byte[]>();
         private int _sendCount;
@@ -185,6 +246,29 @@ public sealed class BoltServerSendFailureTests
         public async Task WaitForSentFramesAsync(int expected)
         {
             await WaitForConditionAsync(() => SentFrames.Count >= expected);
+        }
+
+        public async Task WaitForLogicalFramesAsync(int expected)
+        {
+            await WaitForConditionAsync(() => GetLogicalFrames().Count >= expected);
+        }
+
+        public List<byte[]> GetLogicalFrames()
+        {
+            var frames = new List<byte[]>();
+            foreach (var message in SentFrames)
+            {
+                if (BoltCodec.TryReadBatch(message, out var batch))
+                {
+                    foreach (var frame in batch)
+                        frames.Add(frame.ToArray());
+                }
+                else
+                {
+                    frames.Add(message);
+                }
+            }
+            return frames;
         }
 
         public async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
@@ -222,6 +306,8 @@ public sealed class BoltServerSendFailureTests
         {
             Interlocked.Exchange(ref _isConnected, 0);
             Complete();
+            if (failClose)
+                throw new ObjectDisposedException(nameof(TestBoltConnection));
             return ValueTask.CompletedTask;
         }
 

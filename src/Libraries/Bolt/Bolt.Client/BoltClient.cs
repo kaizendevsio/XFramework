@@ -1,6 +1,9 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
+using System.Numerics;
 using System.Threading.Channels;
 using Bolt.Client.Transport;
 using Bolt.Protocol;
@@ -28,6 +31,12 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly ILogger _logger;
     private readonly BoltTransportNegotiator _negotiator;
     private readonly int _maxFrameBytes;
+    private readonly int _maxLargeRpcPayloadBytes;
+    private readonly long _maxBufferedLargeRpcBytes;
+    private readonly int _largePayloadThreshold;
+    private readonly int _streamChunkSize;
+    private readonly int _maxLargeRpcChunksInFlight;
+    private long _bufferedLargeRpcBytes;
 
     private readonly List<BoltConnection> _connections = [];
     private readonly object _connectionsLock = new();
@@ -38,14 +47,44 @@ public sealed class BoltClient : IAsyncDisposable
     private long _totalReceiveLoopFaults;
     private long _totalUnexpectedDisconnects;
     private long _totalSuccessfulReconnects;
+    private int _scaleUpInProgress;
 
     private readonly ConcurrentDictionary<Guid, PooledRpcCall> _pendingCalls = new();
-    private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _handlers = new();
+    private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, BoltInboundRequestContext, CancellationToken, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _handlers = new();
     private readonly ConcurrentDictionary<string, int> _hashCache = new();
     private readonly ConcurrentDictionary<int, string> _commandNamesByHash = new();
     private readonly ConcurrentDictionary<Guid, BoltStream> _activeStreams = new();
+    private readonly ConcurrentDictionary<Guid, LargeRpcInboundCollector> _largeRpcCollectors = new();
+    private int _activeStreamCount;
     private readonly ConcurrentDictionary<int, Func<BoltStream, Task>> _streamHandlers = new();
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _inboundRequestCancellations = new();
+    private readonly ConcurrentDictionary<Guid, long> _earlyInboundCancellations = new();
+    private readonly SemaphoreSlim _inboundDispatchSlots;
     private TimeSpan _rpcTimeout;
+
+    private static readonly Action<ILogger, string, string, int, long, int, int, Exception?> LogRpcCompletedDebug =
+        LoggerMessage.Define<string, string, int, long, int, int>(
+            LogLevel.Debug,
+            new EventId(1001, nameof(InvokeAsync)),
+            "Bolt RPC {Command} -> {Recipient} | {StatusCode} in {Elapsed}ms | RequestSize={RequestSize}B ResponseSize={ResponseSize}B");
+
+    private static readonly Action<ILogger, string, string, int, long, int, int, Exception?> LogRpcCompletedWarning =
+        LoggerMessage.Define<string, string, int, long, int, int>(
+            LogLevel.Warning,
+            new EventId(1002, nameof(InvokeAsync)),
+            "Bolt RPC {Command} -> {Recipient} | {StatusCode} in {Elapsed}ms | RequestSize={RequestSize}B ResponseSize={ResponseSize}B");
+
+    private static readonly Action<ILogger, string, string, long, int, Exception?> LogRpcFailed =
+        LoggerMessage.Define<string, string, long, int>(
+            LogLevel.Error,
+            new EventId(1003, nameof(InvokeAsync)),
+            "Bolt RPC {Command} -> {Recipient} | FAILED in {Elapsed}ms | RequestSize={RequestSize}B");
+
+    private static readonly Action<ILogger, string, string, long, int, Exception?> LogRpcCanceled =
+        LoggerMessage.Define<string, string, long, int>(
+            LogLevel.Warning,
+            new EventId(1004, nameof(InvokeAsync)),
+            "Bolt RPC {Command} -> {Recipient} | CANCELED in {Elapsed}ms | RequestSize={RequestSize}B");
 
     public event Action? Reconnecting;
     public event Action? Reconnected;
@@ -62,10 +101,16 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), DurableSubscription> _durableSubscriptions = new();
 
     /// <summary>
-    /// Register a handler for a specific frame type. Used by Bolt.Media to handle media frames (0x20-0x26).
+    /// Register a handler for a specific frame type. The buffer is valid only for the
+    /// duration of the synchronous callback. Handlers must copy data they retain.
     /// </summary>
     public void RegisterFrameHandler(FrameType frameType, Action<BoltConnection, byte[], int> handler)
         => _frameHandlers[(byte)frameType] = handler;
+
+    /// <summary>Remove a custom frame handler only when it is still the registered handler.</summary>
+    public bool UnregisterFrameHandler(FrameType frameType, Action<BoltConnection, byte[], int> handler) =>
+        _frameHandlers.TryRemove(
+            new KeyValuePair<byte, Action<BoltConnection, byte[], int>>((byte)frameType, handler));
 
     /// <summary>Get the current primary connection for sending frames.</summary>
     public BoltConnection GetPrimaryConnection() => GetConnection();
@@ -75,7 +120,7 @@ public sealed class BoltClient : IAsyncDisposable
         get
         {
             lock (_connectionsLock)
-                return _connections.Count > 0 && _isRegistered;
+                return _isRegistered && _connections.Exists(static connection => connection.IsAvailable);
         }
     }
 
@@ -148,6 +193,23 @@ public sealed class BoltClient : IAsyncDisposable
         _logger = logger;
         _rpcTimeout = TimeSpan.FromSeconds(config.RpcTimeoutSeconds > 0 ? config.RpcTimeoutSeconds : 30);
         _maxFrameBytes = Math.Max(1024, config.MaxFrameBytes);
+        _maxLargeRpcPayloadBytes = Math.Max(1024, config.MaxLargeRpcPayloadBytes);
+        _maxBufferedLargeRpcBytes = Math.Max(1, config.MaxBufferedLargeRpcBytes);
+        var maxUnaryPayloadBytes = Math.Max(
+            0,
+            Math.Min(_maxFrameBytes, BoltCodec.DefaultMaxFrameBytes) - BoltCodec.RequestHeaderSize - 18);
+        _largePayloadThreshold = Math.Clamp(config.LargePayloadThreshold, 0, maxUnaryPayloadBytes);
+        var maxStreamChunkBytes = Math.Max(
+            1,
+            Math.Min(_maxFrameBytes, BoltCodec.DefaultMaxFrameBytes) - BoltCodec.StreamDataHeaderSize);
+        _streamChunkSize = Math.Clamp(config.StreamChunkSize, 1, maxStreamChunkBytes);
+        _maxLargeRpcChunksInFlight = Math.Clamp(
+            Math.Max(_streamChunkSize, config.MaxLargeRpcPipelineBytes) / _streamChunkSize,
+            1,
+            128);
+        _inboundDispatchSlots = new SemaphoreSlim(
+            Math.Max(1, config.MaxConcurrentInboundHandlers),
+            Math.Max(1, config.MaxConcurrentInboundHandlers));
         _negotiator = new BoltTransportNegotiator(logger);
 
         // Wire pub/sub Event frame dispatch
@@ -184,11 +246,32 @@ public sealed class BoltClient : IAsyncDisposable
         // Receiver side: reassemble large RPC payload from stream chunks
         RegisterStreamHandler("__bolt_large_rpc__", async (stream) =>
         {
-            // Read metadata header: [16:requestId][4:commandHash][4:totalSize][4:senderHash]
-            var (hasHeader, headerData) = await stream.ReadAsync();
-            if (!hasHeader || headerData.Length < 28) return;
+            if (!_largeRpcCollectors.TryRemove(stream.StreamId, out var collector))
+            {
+                collector = new LargeRpcInboundCollector(
+                    this,
+                    headerSize: 28,
+                    totalSizeOffset: 20,
+                    usePooledBuffer: true);
+                while (true)
+                {
+                    var (hasData, data) = await stream.ReadAsync();
+                    if (!hasData)
+                        break;
+                    collector.Accept(data.Span);
+                }
+            }
 
-            var headerSpan = headerData.Span;
+            using var collectorOwner = collector;
+            var closeTask = stream.IsClosed
+                ? Task.CompletedTask
+                : stream.WaitForCloseAsync(CancellationToken.None);
+            if (!collector.HeaderProcessed)
+                await Task.WhenAny(collector.HeaderReceived, closeTask);
+            if (!collector.HasHeader)
+                return;
+
+            var headerSpan = collector.HeaderSpan;
             var requestId = new Guid(headerSpan[..16]);
             var commandHash = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(headerSpan[16..]);
             var totalSize = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(headerSpan[20..]);
@@ -202,10 +285,10 @@ public sealed class BoltClient : IAsyncDisposable
                     requestId.TryWriteBytes(respBuf);
                     System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(respBuf.AsSpan(16), (short)statusCode);
 
-                    var conn = GetConnection();
+                    var conn = stream.Connection;
                     var writer = RentedBufferWriter.GetThreadLocal();
                     BoltCodec.WritePush(writer, Guid.NewGuid(), senderHash, _senderHash, LargeRpcResponseHash, respBuf.AsSpan(0, 18));
-                    await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
+                    await conn.SendReliableAsync(writer, CancellationToken.None);
                 }
                 finally
                 {
@@ -213,45 +296,48 @@ public sealed class BoltClient : IAsyncDisposable
                 }
             }
 
-            if (totalSize < 0 || totalSize > _maxFrameBytes)
+            if (collector.RejectionStatus is { } rejectionStatus)
             {
-                await SendLargeRpcErrorAsync(HttpStatusCode.RequestEntityTooLarge);
+                await SendLargeRpcErrorAsync(rejectionStatus);
                 return;
             }
 
-            // Reassemble payload chunks into pooled buffer
-            var buffer = ArrayPool<byte>.Shared.Rent(totalSize);
-            try
-            {
-            var bytesRead = 0;
-            await foreach (var chunk in stream.ReadAllAsync())
-            {
-                if (chunk.Length > totalSize - bytesRead)
-                {
-                    await SendLargeRpcErrorAsync(HttpStatusCode.BadRequest);
-                    return;
-                }
+            if (!stream.IsClosed)
+                await closeTask;
 
-                chunk.CopyTo(buffer.AsMemory(bytesRead));
-                bytesRead += chunk.Length;
-                if (bytesRead >= totalSize) break;
-            }
-
-            if (bytesRead != totalSize)
+            if (collector.IsMalformed || collector.BytesRead != totalSize)
             {
                 await SendLargeRpcErrorAsync(HttpStatusCode.BadRequest);
                 return;
             }
 
+            var bufferReservationSize = collector.ReservationSize;
+            byte[]? buffer = collector.DetachBuffer(transferReservation: true);
+            CancellationTokenSource? requestCts = null;
+            try
+            {
             // Build response
             HttpStatusCode statusCode;
             ReadOnlyMemory<byte> responsePayload;
+
+            requestCts = new CancellationTokenSource(_rpcTimeout);
+            if (!_inboundRequestCancellations.TryAdd(requestId, requestCts))
+                return;
+            if (_earlyInboundCancellations.TryRemove(requestId, out _))
+                requestCts.Cancel();
 
             if (_handlers.TryGetValue(commandHash, out var handler))
             {
                 try
                 {
-                    (statusCode, responsePayload) = await handler(buffer.AsMemory(0, totalSize), requestId);
+                    (statusCode, responsePayload) = await handler(
+                        buffer.AsMemory(0, totalSize),
+                        new BoltInboundRequestContext(requestId, senderHash),
+                        requestCts.Token);
+                }
+                catch (OperationCanceledException) when (requestCts.IsCancellationRequested)
+                {
+                    return;
                 }
                 catch (Exception ex)
                 {
@@ -266,8 +352,14 @@ public sealed class BoltClient : IAsyncDisposable
                 responsePayload = ReadOnlyMemory<byte>.Empty;
             }
 
+            if (responsePayload.Length > _maxLargeRpcPayloadBytes)
+            {
+                await SendLargeRpcErrorAsync(HttpStatusCode.RequestEntityTooLarge);
+                return;
+            }
+
             // Response: small → single Push, large → stream back
-            if (responsePayload.Length <= _config.LargePayloadThreshold)
+            if (responsePayload.Length <= _largePayloadThreshold)
             {
                 // Small response: single Push frame — pool the response data buffer
                 var respLen = 18 + responsePayload.Length;
@@ -278,10 +370,10 @@ public sealed class BoltClient : IAsyncDisposable
                     System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(respBuf.AsSpan(16), (short)statusCode);
                     responsePayload.CopyTo(respBuf.AsMemory(18));
 
-                    var conn = GetConnection();
+                    var conn = stream.Connection;
                     var writer = RentedBufferWriter.GetThreadLocal();
                     BoltCodec.WritePush(writer, Guid.NewGuid(), senderHash, _senderHash, LargeRpcResponseHash, respBuf.AsSpan(0, respLen));
-                    await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
+                    await conn.SendReliableAsync(writer, requestCts.Token);
                 }
                 finally { ArrayPool<byte>.Shared.Return(respBuf); }
             }
@@ -289,32 +381,60 @@ public sealed class BoltClient : IAsyncDisposable
             {
                 // Large response: stream it back via __bolt_large_rpc_response_stream__
                 // Sender hash is used as recipientId for the reverse stream
-                var respStream = new BoltStream(Guid.NewGuid(), GetConnection(), RemoveActiveStream);
-                _activeStreams[respStream.StreamId] = respStream;
+                var responseConnection = stream.Connection;
+                var respStream = new BoltStream(
+                    Guid.NewGuid(),
+                    responseConnection,
+                    RemoveActiveStream,
+                    _config.StreamInboundCapacity);
+                if (!TryTrackStream(respStream))
+                {
+                    var rejected = new byte[18];
+                    requestId.TryWriteBytes(rejected);
+                    System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(
+                        rejected.AsSpan(16),
+                        (short)HttpStatusCode.TooManyRequests);
+                    var rejectedWriter = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WritePush(
+                        rejectedWriter,
+                        Guid.NewGuid(),
+                        senderHash,
+                        _senderHash,
+                        LargeRpcResponseHash,
+                        rejected);
+                    await responseConnection.SendReliableAsync(rejectedWriter, requestCts.Token);
+                    return;
+                }
 
                 // StreamOpen to sender
                 var openWriter = RentedBufferWriter.GetThreadLocal();
                 BoltCodec.WriteStreamOpen(openWriter, respStream.StreamId, senderHash, LargeRpcResponseStreamHash);
-                await GetConnection().SendAsync(openWriter.WrittenMemory, CancellationToken.None);
+                await responseConnection.SendReliableAsync(openWriter, requestCts.Token);
 
                 // Header: [16:requestId][2:statusCode][4:totalSize]
                 var respHeader = new byte[22];
                 requestId.TryWriteBytes(respHeader);
                 System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(respHeader.AsSpan(16), (short)statusCode);
                 System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(respHeader.AsSpan(18), responsePayload.Length);
-                await respStream.SendAsync((ReadOnlyMemory<byte>)respHeader);
+                await respStream.SendAsync((ReadOnlyMemory<byte>)respHeader, requestCts.Token);
 
-                // Chunked payload
-                var chunkSize = _config.StreamChunkSize;
-                for (int offset = 0; offset < responsePayload.Length; offset += chunkSize)
+                await SendLargePayloadPipelinedAsync(respStream, responsePayload, requestCts.Token);
+                await respStream.CloseAsync(ct: requestCts.Token);
+            }
+            }
+            finally
+            {
+                _earlyInboundCancellations.TryRemove(requestId, out _);
+                if (requestCts is not null)
                 {
-                    var len = Math.Min(chunkSize, responsePayload.Length - offset);
-                    await respStream.SendAsync(responsePayload.Slice(offset, len));
+                    _inboundRequestCancellations.TryRemove(
+                        new KeyValuePair<Guid, CancellationTokenSource>(requestId, requestCts));
+                    requestCts.Dispose();
                 }
-                await respStream.CloseAsync();
+                if (buffer is not null && bufferReservationSize > 0)
+                    ArrayPool<byte>.Shared.Return(buffer);
+                ReleaseLargeRpcBuffer(bufferReservationSize);
             }
-            }
-            finally { ArrayPool<byte>.Shared.Return(buffer); }
         });
 
         // Sender side: resolve pending large RPC calls when SMALL response arrives via Push
@@ -328,9 +448,9 @@ public sealed class BoltClient : IAsyncDisposable
             ReadOnlyMemory<byte> respPayload;
             if (payload.Length > 18)
             {
-                var owner = new PooledMemoryOwner(payload.Length - 18);
-                payload.Span[18..].CopyTo(owner.WritableSpan);
-                respPayload = owner.Memory;
+                var response = GC.AllocateUninitializedArray<byte>(payload.Length - 18);
+                payload.Span[18..].CopyTo(response);
+                respPayload = response;
             }
             else
             {
@@ -346,50 +466,177 @@ public sealed class BoltClient : IAsyncDisposable
         // Sender side: resolve pending large RPC calls when LARGE response arrives via stream
         RegisterStreamHandler("__bolt_large_rpc_response_stream__", async (respStream) =>
         {
-            var (hasHeader, headerData) = await respStream.ReadAsync();
-            if (!hasHeader || headerData.Length < 22) return;
+            if (!_largeRpcCollectors.TryRemove(respStream.StreamId, out var collector))
+            {
+                collector = new LargeRpcInboundCollector(
+                    this,
+                    headerSize: 22,
+                    totalSizeOffset: 18,
+                    usePooledBuffer: false);
+                while (true)
+                {
+                    var (hasData, data) = await respStream.ReadAsync();
+                    if (!hasData)
+                        break;
+                    collector.Accept(data.Span);
+                }
+            }
 
-            var hdr = headerData.Span;
+            using var collectorOwner = collector;
+            var closeTask = respStream.IsClosed
+                ? Task.CompletedTask
+                : respStream.WaitForCloseAsync(CancellationToken.None);
+            if (!collector.HeaderProcessed)
+                await Task.WhenAny(collector.HeaderReceived, closeTask);
+            if (!collector.HasHeader)
+                return;
+
+            var hdr = collector.HeaderSpan;
             var requestId = new Guid(hdr[..16]);
             var statusCode = (HttpStatusCode)System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(hdr[16..]);
             var totalSize = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(hdr[18..]);
 
-            if (totalSize < 0 || totalSize > _maxFrameBytes) return;
-
-            var owner = new PooledMemoryOwner(totalSize);
-            var bytesRead = 0;
-            await foreach (var chunk in respStream.ReadAllAsync())
+            if (collector.RejectionStatus is { } rejectionStatus)
             {
-                if (chunk.Length > totalSize - bytesRead)
+                if (_pendingCalls.TryRemove(requestId, out var rejectedCall))
                 {
-                    ((IDisposable)owner).Dispose();
+                    rejectedCall.SetResult(new BoltRpcResponse
+                    {
+                        StatusCode = rejectionStatus,
+                        Data = ReadOnlyMemory<byte>.Empty
+                    });
+                }
+                return;
+            }
+
+            if (!respStream.IsClosed)
+                await closeTask;
+
+            if (!_pendingCalls.TryGetValue(requestId, out var pendingCall))
+                return;
+
+                if (collector.IsMalformed)
+                {
                     if (_pendingCalls.TryRemove(requestId, out var rpcCall))
                         rpcCall.SetException(new InvalidOperationException("Large RPC response exceeded declared size"));
                     return;
                 }
 
-                chunk.Span.CopyTo(owner.WritableSpan.Slice(bytesRead));
-                bytesRead += chunk.Length;
-                if (bytesRead >= totalSize) break;
-            }
+                if (collector.BytesRead != totalSize)
+                {
+                    if (_pendingCalls.TryRemove(requestId, out var rpcCall))
+                    {
+                        if (respStream.CloseStatus is { } closeStatus && closeStatus != HttpStatusCode.OK)
+                        {
+                            rpcCall.SetResult(new BoltRpcResponse
+                            {
+                                StatusCode = closeStatus,
+                                Data = ReadOnlyMemory<byte>.Empty
+                            });
+                        }
+                        else
+                        {
+                            rpcCall.SetException(new InvalidOperationException("Large RPC response ended before declared size"));
+                        }
+                    }
+                    return;
+                }
 
-            if (bytesRead != totalSize)
-            {
-                ((IDisposable)owner).Dispose();
-                if (_pendingCalls.TryRemove(requestId, out var rpcCall))
-                    rpcCall.SetException(new InvalidOperationException("Large RPC response ended before declared size"));
-                return;
-            }
-
-            if (_pendingCalls.TryRemove(requestId, out var completedCall))
-                completedCall.SetResult(new BoltRpcResponse { StatusCode = statusCode, Data = owner.Memory });
-            else
-                ((IDisposable)owner).Dispose();
+                var response = collector.DetachBuffer();
+                if (_pendingCalls.TryRemove(
+                        new KeyValuePair<Guid, PooledRpcCall>(requestId, pendingCall)))
+                {
+                    pendingCall.SetResult(new BoltRpcResponse { StatusCode = statusCode, Data = response });
+                }
         });
     }
 
     private static readonly int LargeRpcResponseHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response__");
     private static readonly int LargeRpcResponseStreamHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response_stream__");
+    private async Task SendLargePayloadPipelinedAsync(
+        BoltStream stream,
+        ReadOnlyMemory<byte> payload,
+        CancellationToken ct)
+    {
+        PooledSendCompletion?[]? pending =
+            ArrayPool<PooledSendCompletion?>.Shared.Rent(_maxLargeRpcChunksInFlight);
+        var head = 0;
+        var count = 0;
+        var chunkSize = _streamChunkSize;
+
+        try
+        {
+            for (var offset = 0; offset < payload.Length; offset += chunkSize)
+            {
+                var length = Math.Min(chunkSize, payload.Length - offset);
+                var completion = await stream.EnqueueAsync(payload.Slice(offset, length), ct);
+                pending[(head + count) % _maxLargeRpcChunksInFlight] = completion;
+                count++;
+
+                if (count == _maxLargeRpcChunksInFlight)
+                {
+                    var oldest = pending[head]!;
+                    pending[head] = null;
+                    head = (head + 1) % _maxLargeRpcChunksInFlight;
+                    count--;
+                    await oldest.WaitAsync(ct);
+                }
+            }
+
+            while (count > 0)
+            {
+                var completion = pending[head]!;
+                pending[head] = null;
+                head = (head + 1) % _maxLargeRpcChunksInFlight;
+                count--;
+                await completion.WaitAsync(ct);
+            }
+        }
+        catch
+        {
+            var pendingCleanup = pending;
+            pending = null;
+            _ = DrainLargeRpcSendCompletionsAsync(
+                pendingCleanup,
+                head,
+                count,
+                _maxLargeRpcChunksInFlight);
+            throw;
+        }
+        finally
+        {
+            if (pending is not null)
+            {
+                Array.Clear(pending, 0, pending.Length);
+                ArrayPool<PooledSendCompletion?>.Shared.Return(pending);
+            }
+        }
+    }
+
+    private static async Task DrainLargeRpcSendCompletionsAsync(
+        PooledSendCompletion?[] pending,
+        int head,
+        int count,
+        int capacity)
+    {
+        try
+        {
+            while (count > 0)
+            {
+                var completion = pending[head]!;
+                pending[head] = null;
+                head = (head + 1) % capacity;
+                count--;
+                try { await completion.WaitAsync(CancellationToken.None); }
+                catch { }
+            }
+        }
+        finally
+        {
+            Array.Clear(pending, 0, pending.Length);
+            ArrayPool<PooledSendCompletion?>.Shared.Return(pending);
+        }
+    }
 
     private async Task<BoltConnection> CreateConnectionAsync(CancellationToken ct)
     {
@@ -402,22 +649,35 @@ public sealed class BoltClient : IAsyncDisposable
             var sendEnqueueTimeoutMs = _config.SendEnqueueTimeoutMs > 0
                 ? _config.SendEnqueueTimeoutMs
                 : (int)Math.Min(int.MaxValue, _rpcTimeout.TotalMilliseconds);
-            var conn = new BoltConnection(transport, _config.SendQueueCapacity, sendEnqueueTimeoutMs);
+            var conn = new BoltConnection(
+                transport,
+                _config.SendQueueCapacity,
+                sendEnqueueTimeoutMs,
+                _config.EnableBatching);
             ObserveConnection(conn);
 
             // Registration send and ACK share one transport-attempt deadline.
-            var regWriter = RentedBufferWriter.GetThreadLocal();
+            using var regWriter = new RentedBufferWriter(256);
             BoltCodec.WriteRegister(regWriter, _clientId, _clientName);
             await transport.SendAsync(regWriter.WrittenMemory, registrationCts.Token);
 
-            var ackBuffer = ArrayPool<byte>.Shared.Rent(2);
+            var ackBuffer = ArrayPool<byte>.Shared.Rent(BoltCodec.RegisterAckSize);
             try
             {
                 var (ackBytes, _) = await transport.ReceiveAsync(ackBuffer, registrationCts.Token);
-                var ackValid = ackBytes >= 2 &&
-                               (FrameType)ackBuffer[0] == FrameType.RegisterAck &&
-                               ackBuffer[1] == 1;
-                if (!ackValid)
+                if (!BoltCodec.TryReadRegisterAck(
+                        ackBuffer.AsSpan(0, ackBytes),
+                        out var registrationAccepted,
+                        out var serverWireVersion))
+                {
+                    throw new InvalidOperationException("Server returned an invalid Bolt registration acknowledgement.");
+                }
+                if (serverWireVersion != BoltCodec.WireVersion)
+                {
+                    throw new InvalidOperationException(
+                        $"Bolt wire version mismatch. Client requires {BoltCodec.WireVersion}, server reported {serverWireVersion}.");
+                }
+                if (!registrationAccepted)
                     throw new InvalidOperationException("Server rejected registration");
             }
             finally
@@ -466,34 +726,44 @@ public sealed class BoltClient : IAsyncDisposable
 
     private async Task ScaleUpAsync()
     {
-        lock (_connectionsLock)
-        {
-            if (_connections.Count >= _config.MaxConnections)
-                return;
-        }
+        if (Interlocked.CompareExchange(ref _scaleUpInProgress, 1, 0) != 0)
+            return;
 
         try
         {
-            var conn = await CreateConnectionAsync(CancellationToken.None);
-            var added = false;
             lock (_connectionsLock)
             {
-                if (!_disposed && _connections.Count < _config.MaxConnections)
-                {
-                    _connections.Add(conn);
-                    added = true;
-                }
+                if (_connections.Count >= _config.MaxConnections)
+                    return;
             }
 
-            if (!added)
+            try
             {
-                conn.CompleteSendChannel();
-                conn.ReceiveCts?.Cancel();
-                try { await conn.Transport.DisposeAsync(); } catch { }
-                conn.ReceiveCts?.Dispose();
+                var conn = await CreateConnectionAsync(CancellationToken.None);
+                var added = false;
+                lock (_connectionsLock)
+                {
+                    if (!_disposed && _connections.Count < _config.MaxConnections)
+                    {
+                        _connections.Add(conn);
+                        added = true;
+                    }
+                }
+
+                if (!added)
+                {
+                    conn.CompleteSendChannel();
+                    conn.ReceiveCts?.Cancel();
+                    try { await conn.Transport.DisposeAsync(); } catch { }
+                    conn.ReceiveCts?.Dispose();
+                }
             }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to scale up connection pool"); }
         }
-        catch (Exception ex) { _logger.LogWarning(ex, "Failed to scale up connection pool"); }
+        finally
+        {
+            Volatile.Write(ref _scaleUpInProgress, 0);
+        }
     }
 
     public async Task ConnectWithRetryAsync(CancellationToken ct = default)
@@ -524,27 +794,33 @@ public sealed class BoltClient : IAsyncDisposable
     public async Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Data)> InvokeAsync(
         string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
-        if (!IsConnected)
-            throw new InvalidOperationException("Not connected");
+        if (payload.Length > _maxLargeRpcPayloadBytes)
+            return (HttpStatusCode.RequestEntityTooLarge, ReadOnlyMemory<byte>.Empty);
+
+        var conn = GetConnection();
 
         // Auto-stream large payloads transparently
-        if (payload.Length > _config.LargePayloadThreshold)
-            return await InvokeLargeAsync(recipientId, commandName, payload, ct);
+        if (payload.Length > _largePayloadThreshold)
+            return await InvokeLargeAsync(conn, recipientId, commandName, payload, ct);
 
         var requestId = Guid.NewGuid();
         var recipientHash = _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
         var commandHash = GetCommandHash(commandName);
-        var conn = GetConnection();
-        var rpcCall = PooledRpcCall.Rent();
-        var responseTask = rpcCall.GetTask().AsTask();
+        var rpcCall = PooledRpcCall.Rent(_config.RunRpcContinuationsAsynchronously);
+        var responseTask = rpcCall.GetTask();
         _pendingCalls[requestId] = rpcCall;
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var requestSent = false;
+        var responseConsumed = false;
+        var measureElapsed = _logger.IsEnabled(LogLevel.Debug) ||
+                             _logger.IsEnabled(LogLevel.Warning) ||
+                             _logger.IsEnabled(LogLevel.Error);
+        var startedAt = measureElapsed ? Stopwatch.GetTimestamp() : 0;
 
         try
         {
-            using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
-            using var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+            using var deadlineCts = CreateDeadlineSource(ct, _rpcTimeout);
+            var deadlineToken = deadlineCts.Token;
+            rpcCall.RegisterCancellation(deadlineToken, this, requestId);
 
             var writer = RentedBufferWriter.GetThreadLocal();
             BoltCodec.WriteRequest(writer, requestId, recipientHash, _senderHash, commandHash, payload.Span);
@@ -555,40 +831,52 @@ public sealed class BoltClient : IAsyncDisposable
                 _ = ScaleUpAsync(); // Start opening new connection in background
             }
 
-            await conn.SendAsync(writer.WrittenMemory, sendCts.Token);
+            var sendCompletion = await conn.EnqueueReliableAsync(writer, deadlineToken);
+            requestSent = true;
+            await sendCompletion.WaitAsync(deadlineToken);
 
-            var response = await responseTask.WaitAsync(sendCts.Token);
-            sw.Stop();
+            BoltRpcResponse response;
+            try { response = await responseTask; }
+            finally { responseConsumed = true; }
 
-            var level = (int)response.StatusCode >= 400 ? LogLevel.Warning : LogLevel.Debug;
-            _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | {StatusCode} in {Elapsed}ms | RequestSize={RequestSize}B ResponseSize={ResponseSize}B",
-                commandName, recipientId, (int)response.StatusCode, sw.ElapsedMilliseconds, payload.Length, response.Data.Length);
+            var elapsed = GetElapsedMilliseconds(startedAt);
+            if ((int)response.StatusCode >= 400)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    LogRpcCompletedWarning(_logger, commandName, recipientId, (int)response.StatusCode, elapsed, payload.Length, response.Data.Length, null);
+            }
+            else if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                LogRpcCompletedDebug(_logger, commandName, recipientId, (int)response.StatusCode, elapsed, payload.Length, response.Data.Length, null);
+            }
 
             return (response.StatusCode, response.Data);
         }
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            sw.Stop();
+            if (requestSent) await TrySendRequestCancelAsync(conn, requestId);
             var timeout = new TimeoutException($"Bolt RPC {commandName} -> {recipientId} timed out before the request completed", ex);
-            _logger.LogError(timeout, "Bolt RPC {Command} -> {Recipient} | FAILED in {Elapsed}ms | RequestSize={RequestSize}B",
-                commandName, recipientId, sw.ElapsedMilliseconds, payload.Length);
-            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, timeout);
+            if (_logger.IsEnabled(LogLevel.Error))
+                LogRpcFailed(_logger, commandName, recipientId, GetElapsedMilliseconds(startedAt), payload.Length, timeout);
+            if (!responseConsumed)
+                await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, timeout);
             throw timeout;
         }
         catch (OperationCanceledException ex)
         {
-            sw.Stop();
-            _logger.LogWarning(ex, "Bolt RPC {Command} -> {Recipient} | CANCELED in {Elapsed}ms | RequestSize={RequestSize}B",
-                commandName, recipientId, sw.ElapsedMilliseconds, payload.Length);
-            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
+            if (requestSent) await TrySendRequestCancelAsync(conn, requestId);
+            if (_logger.IsEnabled(LogLevel.Warning))
+                LogRpcCanceled(_logger, commandName, recipientId, GetElapsedMilliseconds(startedAt), payload.Length, ex);
+            if (!responseConsumed)
+                await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
             throw;
         }
         catch (Exception ex)
         {
-            sw.Stop();
-            _logger.LogError(ex, "Bolt RPC {Command} -> {Recipient} | FAILED in {Elapsed}ms | RequestSize={RequestSize}B",
-                commandName, recipientId, sw.ElapsedMilliseconds, payload.Length);
-            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
+            if (_logger.IsEnabled(LogLevel.Error))
+                LogRpcFailed(_logger, commandName, recipientId, GetElapsedMilliseconds(startedAt), payload.Length, ex);
+            if (!responseConsumed)
+                await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
             throw;
         }
         finally { _pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)); }
@@ -599,25 +887,34 @@ public sealed class BoltClient : IAsyncDisposable
     /// The recipient reassembles the stream and processes it as a normal RPC call.
     /// </summary>
     private async Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Data)> InvokeLargeAsync(
-        string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct)
+        BoltConnection conn,
+        string recipientId,
+        string commandName,
+        ReadOnlyMemory<byte> payload,
+        CancellationToken ct)
     {
-        if (!IsConnected) throw new InvalidOperationException("Not connected");
 
         var requestId = Guid.NewGuid();
         var commandHash = GetCommandHash(commandName);
 
         // Register pending RPC — response comes back as normal Response frame
-        var rpcCall = PooledRpcCall.Rent();
-        var responseTask = rpcCall.GetTask().AsTask();
+        var rpcCall = PooledRpcCall.Rent(_config.RunRpcContinuationsAsynchronously);
+        var responseTask = rpcCall.GetTask();
         _pendingCalls[requestId] = rpcCall;
+        var responseConsumed = false;
+        BoltConnection? requestConnection = null;
+        BoltStream? requestStream = null;
 
         try
         {
-            using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
-            using var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+            using var deadlineCts = CreateDeadlineSource(ct, _rpcTimeout);
+            var deadlineToken = deadlineCts.Token;
+            rpcCall.RegisterCancellation(deadlineToken, this, requestId);
 
             // Open stream with special large-RPC command hash
-            var stream = await OpenStreamAsync(recipientId, "__bolt_large_rpc__", sendCts.Token);
+            var stream = await OpenStreamAsync(conn, recipientId, "__bolt_large_rpc__", deadlineToken);
+            requestStream = stream;
+            requestConnection = stream.Connection;
 
             // First chunk: metadata header [16:requestId][4:commandHash][4:totalSize][4:senderHash]
             var header = new byte[28];
@@ -625,38 +922,49 @@ public sealed class BoltClient : IAsyncDisposable
             System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(16), commandHash);
             System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(20), payload.Length);
             System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(24), _hashCache.GetOrAdd(_clientId, BoltCodec.Fnv1aHash));
-            await stream.SendAsync((ReadOnlyMemory<byte>)header, sendCts.Token);
+            await stream.SendAsync((ReadOnlyMemory<byte>)header, deadlineToken);
 
-            // Send payload in chunks
-            var chunkSize = _config.StreamChunkSize;
-            for (int offset = 0; offset < payload.Length; offset += chunkSize)
-            {
-                var len = Math.Min(chunkSize, payload.Length - offset);
-                await stream.SendAsync(payload.Slice(offset, len), sendCts.Token);
-            }
+            await SendLargePayloadPipelinedAsync(stream, payload, deadlineToken);
 
             // Close stream — signals "all data sent"
-            await stream.CloseAsync(ct: sendCts.Token);
+            await stream.CloseAsync(ct: deadlineToken);
 
             // Response arrives as a Request with __bolt_large_rpc_response__ command
             // (handled by RegisterLargeRpcResponseHandler, which resolves our pending call)
-            var response = await responseTask.WaitAsync(sendCts.Token);
+            BoltRpcResponse response;
+            try { response = await responseTask; }
+            finally { responseConsumed = true; }
             return (response.StatusCode, response.Data);
         }
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
+            if (requestConnection is not null) await TrySendRequestCancelAsync(requestConnection, requestId);
+            if (requestStream is { IsClosed: false })
+            {
+                try { await requestStream.CloseAsync(HttpStatusCode.RequestTimeout, CancellationToken.None); }
+                catch { RemoveActiveStream(requestStream.StreamId); }
+            }
             var timeout = new TimeoutException($"Large Bolt RPC {commandName} -> {recipientId} timed out before the request completed", ex);
-            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, timeout);
+            if (!responseConsumed)
+                await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, timeout);
             throw timeout;
         }
         catch (OperationCanceledException ex)
         {
-            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
+            if (requestConnection is not null) await TrySendRequestCancelAsync(requestConnection, requestId);
+            if (requestStream is { IsClosed: false })
+            {
+                try { await requestStream.CloseAsync(HttpStatusCode.RequestTimeout, CancellationToken.None); }
+                catch { RemoveActiveStream(requestStream.StreamId); }
+            }
+            if (!responseConsumed)
+                await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
             throw;
         }
         catch (Exception ex)
         {
-            await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
+            if (!responseConsumed)
+                await CompleteFailedRpcAsync(requestId, rpcCall, responseTask, ex);
             throw;
         }
         finally { _pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)); }
@@ -665,13 +973,77 @@ public sealed class BoltClient : IAsyncDisposable
     private async Task CompleteFailedRpcAsync(
         Guid requestId,
         PooledRpcCall rpcCall,
-        Task<BoltRpcResponse> responseTask,
+        ValueTask<BoltRpcResponse> responseTask,
         Exception ex)
     {
         if (_pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)))
             rpcCall.SetException(ex);
 
         try { await responseTask; } catch { }
+    }
+
+    internal void CancelPendingCall(
+        Guid requestId,
+        PooledRpcCall rpcCall,
+        CancellationToken cancellationToken)
+    {
+        if (_pendingCalls.TryRemove(new KeyValuePair<Guid, PooledRpcCall>(requestId, rpcCall)))
+            rpcCall.SetException(new OperationCanceledException(cancellationToken));
+    }
+
+    private static CancellationTokenSource CreateDeadlineSource(
+        CancellationToken callerToken,
+        TimeSpan timeout)
+    {
+        var source = callerToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(callerToken)
+            : new CancellationTokenSource();
+        source.CancelAfter(timeout);
+        return source;
+    }
+
+    private static long GetElapsedMilliseconds(long startedAt) =>
+        startedAt == 0 ? 0 : (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+
+    private bool TryReserveLargeRpcBuffer(int length)
+    {
+        while (true)
+        {
+            var current = Interlocked.Read(ref _bufferedLargeRpcBytes);
+            if (length > _maxBufferedLargeRpcBytes - current)
+                return false;
+            if (Interlocked.CompareExchange(ref _bufferedLargeRpcBytes, current + length, current) == current)
+                return true;
+        }
+    }
+
+    private void ReleaseLargeRpcBuffer(int length) =>
+        Interlocked.Add(ref _bufferedLargeRpcBytes, -length);
+
+    private static int GetPooledBufferReservationSize(int length)
+    {
+        if (length <= 0)
+            return 0;
+        if (length <= 16)
+            return 16;
+        return checked((int)BitOperations.RoundUpToPowerOf2((uint)length));
+    }
+
+    private async ValueTask TrySendRequestCancelAsync(BoltConnection connection, Guid requestId)
+    {
+        if (!connection.IsAvailable)
+            return;
+        try
+        {
+            using var cancelCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            var writer = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteRequestCancel(writer, requestId);
+            await connection.SendReliableAsync(writer, cancelCts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to propagate Bolt request cancellation for {RequestId}", requestId);
+        }
     }
 
     public async Task<TResponse?> SendAsync<TRequest, TResponse>(string recipientId, string commandName, TRequest request, CancellationToken ct = default)
@@ -701,7 +1073,7 @@ public sealed class BoltClient : IAsyncDisposable
     public void RegisterHandler(string commandName, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
     {
         var hash = GetCommandHash(commandName);
-        _handlers[hash] = handler;
+        _handlers[hash] = (payload, context, _) => handler(payload, context.RequestId);
     }
 
     /// <summary>
@@ -710,34 +1082,41 @@ public sealed class BoltClient : IAsyncDisposable
     public void RegisterHandler(string commandName, Func<ReadOnlyMemory<byte>, Guid, CancellationToken, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
     {
         var hash = GetCommandHash(commandName);
-        _handlers[hash] = (payload, requestId) =>
-        {
-            // Use a token linked to the client's connection state
-            var cts = new CancellationTokenSource(_rpcTimeout);
-            return handler(payload, requestId, cts.Token);
-        };
+        _handlers[hash] = (payload, context, ct) => handler(payload, context.RequestId, ct);
+    }
+
+    /// <summary>
+    /// Register a handler that receives the Hub-verified sender route hash.
+    /// </summary>
+    public void RegisterHandler(
+        string commandName,
+        Func<ReadOnlyMemory<byte>, BoltInboundRequestContext, CancellationToken, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
+    {
+        var hash = GetCommandHash(commandName);
+        _handlers[hash] = handler;
     }
 
     /// <summary>
     /// Send a fire-and-forget push message (no response expected).
     /// Use for typing indicators, presence updates, read receipts.
-    /// recipientId of "" with hash 0 broadcasts to all connected clients.
     /// </summary>
     public async ValueTask PushAsync(string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipientId);
         if (!IsConnected) return;
 
-        var recipientHash = string.IsNullOrEmpty(recipientId) ? 0 : _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
+        var recipientHash = _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
         var commandHash = GetCommandHash(commandName);
 
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WritePush(writer, Guid.NewGuid(), recipientHash, _senderHash, commandHash, payload.Span);
-        await GetConnection().SendAsync(writer.WrittenMemory, ct);
+        await GetConnection().SendReliableAsync(writer, ct);
     }
 
     /// <summary>Typed push with MemoryPack serialization.</summary>
     public async ValueTask PushAsync<T>(string recipientId, string commandName, T data, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipientId);
         var serWriter = new RentedBufferWriter(256);
         try
         {
@@ -832,11 +1211,10 @@ public sealed class BoltClient : IAsyncDisposable
 
         // Send Subscribe frame
         var conn = GetPrimaryConnection();
-        var writer = RentedBufferWriter.GetThreadLocal();
         var actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, ct);
+        var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteSubscribe(writer, topic, _clientId, durable: false, actorAccessToken);
-        await conn.SendAsync(writer.WrittenMemory, ct);
-        writer.Reset();
+        await conn.SendReliableAsync(writer, ct);
 
         try
         {
@@ -854,11 +1232,10 @@ public sealed class BoltClient : IAsyncDisposable
             _transientSubscriptions.TryRemove(topicHash, out _);
             try
             {
-                var w = RentedBufferWriter.GetThreadLocal();
                 actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, CancellationToken.None);
+                var w = RentedBufferWriter.GetThreadLocal();
                 BoltCodec.WriteUnsubscribe(w, topic, _clientId, actorAccessToken: actorAccessToken);
-                await conn.SendAsync(w.WrittenMemory, CancellationToken.None);
-                w.Reset();
+                await conn.SendReliableAsync(w, CancellationToken.None);
             }
             catch { /* best-effort */ }
         }
@@ -905,11 +1282,10 @@ public sealed class BoltClient : IAsyncDisposable
             throw new InvalidOperationException($"Already subscribed to topic '{topic}' with subscriberId '{subscriberId}'");
 
         var conn = GetPrimaryConnection();
-        var writer = RentedBufferWriter.GetThreadLocal();
         var actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, ct);
+        var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteSubscribe(writer, topic, subscriberId, durable: true, actorAccessToken);
-        await conn.SendAsync(writer.WrittenMemory, ct);
-        writer.Reset();
+        await conn.SendReliableAsync(writer, ct);
 
         try
         {
@@ -937,11 +1313,10 @@ public sealed class BoltClient : IAsyncDisposable
             // queue and replay when the same subscriber id reconnects.
             try
             {
-                var w = RentedBufferWriter.GetThreadLocal();
                 actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, CancellationToken.None);
+                var w = RentedBufferWriter.GetThreadLocal();
                 BoltCodec.WriteUnsubscribe(w, topic, subscriberId, permanent: false, actorAccessToken);
-                await conn.SendAsync(w.WrittenMemory, CancellationToken.None);
-                w.Reset();
+                await conn.SendReliableAsync(w, CancellationToken.None);
             }
             catch { /* best-effort */ }
         }
@@ -979,8 +1354,7 @@ public sealed class BoltClient : IAsyncDisposable
         var conn = GetPrimaryConnection();
         var w = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteUnsubscribe(w, topic, subscriberId, actorAccessToken: actorAccessToken);
-        await conn.SendAsync(w.WrittenMemory, ct);
-        w.Reset();
+        await conn.SendReliableAsync(w, ct);
     }
 
     /// <summary>
@@ -1011,8 +1385,7 @@ public sealed class BoltClient : IAsyncDisposable
         var conn = GetPrimaryConnection();
         var w = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteUnsubscribe(w, topic, _clientId, actorAccessToken: actorAccessToken);
-        await conn.SendAsync(w.WrittenMemory, ct);
-        w.Reset();
+        await conn.SendReliableAsync(w, ct);
     }
 
     /// <summary>
@@ -1026,8 +1399,7 @@ public sealed class BoltClient : IAsyncDisposable
         var conn = GetPrimaryConnection();
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WritePublish(writer, topic, durable, bytes);
-        await conn.SendAsync(writer.WrittenMemory, ct);
-        writer.Reset();
+        await conn.SendReliableAsync(writer, ct);
     }
 
     /// <summary>
@@ -1043,8 +1415,7 @@ public sealed class BoltClient : IAsyncDisposable
         var conn = GetPrimaryConnection();
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteAck(writer, topic, subscriberId, upToSequence, actorAccessToken);
-        await conn.SendAsync(writer.WrittenMemory, ct);
-        writer.Reset();
+        await conn.SendReliableAsync(writer, ct);
     }
 
     // ── Streaming ────────────────────────────────────────────
@@ -1057,17 +1428,36 @@ public sealed class BoltClient : IAsyncDisposable
 
     public async Task<BoltStream> OpenStreamAsync(string recipientId, string commandName, CancellationToken ct = default)
     {
-        if (!IsConnected) throw new InvalidOperationException("Not connected");
+        var conn = GetConnection();
+        return await OpenStreamAsync(conn, recipientId, commandName, ct);
+    }
+
+    private async Task<BoltStream> OpenStreamAsync(
+        BoltConnection conn,
+        string recipientId,
+        string commandName,
+        CancellationToken ct)
+    {
+        if (_activeStreams.Count >= Math.Max(1, _config.MaxActiveStreams))
+            throw new InvalidOperationException("Bolt client active stream limit reached.");
         var streamId = Guid.NewGuid();
         var recipientHash = _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
         var commandHash = GetCommandHash(commandName);
-        var conn = GetConnection();
-        var stream = new BoltStream(streamId, conn, RemoveActiveStream);
-        _activeStreams[streamId] = stream;
+        var stream = new BoltStream(streamId, conn, RemoveActiveStream, _config.StreamInboundCapacity);
+        if (!TryTrackStream(stream))
+            throw new InvalidOperationException("Bolt client active stream limit reached.");
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteStreamOpen(writer, streamId, recipientHash, commandHash);
-        await conn.SendAsync(writer.WrittenMemory, ct);
-        return stream;
+        try
+        {
+            await conn.SendReliableAsync(writer, ct);
+            return stream;
+        }
+        catch
+        {
+            stream.MarkClosed(HttpStatusCode.ServiceUnavailable);
+            throw;
+        }
     }
 
     private int GetCommandHash(string commandName)
@@ -1106,29 +1496,29 @@ public sealed class BoltClient : IAsyncDisposable
     {
         lock (_connectionsLock)
         {
-            var count = _connections.Count;
-            if (count == 0) throw new InvalidOperationException("Not connected");
-            if (count == 1) return _connections[0];
-
-            // Pick the connection with the fewest pending sends
-            var best = _connections[0];
-            var bestPending = best.PendingSends;
-            for (int i = 1; i < count; i++)
+            BoltConnection? best = null;
+            var bestPending = int.MaxValue;
+            foreach (var connection in _connections)
             {
-                var pending = _connections[i].PendingSends;
+                if (!connection.IsAvailable)
+                    continue;
+
+                var pending = connection.PendingSends;
                 if (pending < bestPending)
                 {
-                    best = _connections[i];
+                    best = connection;
                     bestPending = pending;
                 }
             }
-            return best;
+
+            return best ?? throw new InvalidOperationException("Not connected");
         }
     }
 
     private async Task ReceiveLoopAsync(BoltConnection conn, CancellationToken ct)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
+        var receiveBufferBytes = Math.Min(_maxFrameBytes, Math.Max(1024, _config.ReceiveBufferBytes));
+        var buffer = ArrayPool<byte>.Shared.Rent(receiveBufferBytes);
         byte[]? largeBuffer = null; // Rented from pool for multi-frame messages
         try
         {
@@ -1202,48 +1592,14 @@ public sealed class BoltClient : IAsyncDisposable
                     break;
                 }
 
-                var data = frameBytes.AsSpan(0, totalLength);
-                var frameType = BoltCodec.PeekFrameType(data);
+                await DispatchReceivedFrameAsync(conn, frameBytes, totalLength, ct);
 
-                switch (frameType)
+                if (ReferenceEquals(frameBytes, largeBuffer))
                 {
-                    case FrameType.Response:
-                        HandleIncomingResponse(data);
-                        break;
-                    case FrameType.Request:
-                    {
-                        var reqBuf = ArrayPool<byte>.Shared.Rent(totalLength);
-                        data.CopyTo(reqBuf);
-                        _ = DispatchRequestPooledAsync(conn, reqBuf, totalLength, ct);
-                        break;
-                    }
-                    case FrameType.Push:
-                    {
-                        var pushBuf = ArrayPool<byte>.Shared.Rent(totalLength);
-                        data.CopyTo(pushBuf);
-                        _ = DispatchPushPooledAsync(pushBuf, totalLength);
-                        break;
-                    }
-                    case FrameType.StreamOpen:
-                        HandleStreamOpen(conn, data, ct);
-                        break;
-                    case FrameType.StreamData:
-                        await HandleStreamDataAsync(frameBytes.AsMemory(0, totalLength), ct);
-                        break;
-                    case FrameType.StreamClose:
-                        HandleStreamClose(data);
-                        break;
-                    default:
-                        // Extensible dispatch: Bolt.Media registers handlers for 0x20-0x26
-                        if (_frameHandlers.TryGetValue((byte)frameType, out var handler))
-                        {
-                            var handlerBuf = ArrayPool<byte>.Shared.Rent(totalLength);
-                            data.CopyTo(handlerBuf);
-                            handler(conn, handlerBuf, totalLength);
-                            // Note: frame handlers own the buffer lifetime (Bolt.Media returns it)
-                        }
-                        break;
+                    ArrayPool<byte>.Shared.Return(largeBuffer!);
+                    largeBuffer = null;
                 }
+
             }
         }
         catch (OperationCanceledException) { }
@@ -1256,8 +1612,10 @@ public sealed class BoltClient : IAsyncDisposable
         {
             ArrayPool<byte>.Shared.Return(buffer);
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
+            RetireStreamsForConnection(conn, HttpStatusCode.ServiceUnavailable);
             if (!_disposed)
             {
+                conn.Retire(new IOException("Bolt receive loop ended before the connection was disposed."));
                 var noConnections = RemoveConnection(conn, out var removed);
                 if (removed && _isRegistered)
                 {
@@ -1279,13 +1637,98 @@ public sealed class BoltClient : IAsyncDisposable
     private async Task DispatchRequestPooledAsync(BoltConnection conn, byte[] pooledBuf, int length, CancellationToken ct)
     {
         try { await HandleIncomingRequestAsync(conn, pooledBuf, length, ct); }
-        finally { ArrayPool<byte>.Shared.Return(pooledBuf); }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(pooledBuf);
+            _inboundDispatchSlots.Release();
+        }
     }
 
-    private async Task DispatchPushPooledAsync(byte[] pooledBuf, int length)
+    private async ValueTask DispatchReceivedFrameAsync(
+        BoltConnection conn,
+        byte[] frameBytes,
+        int totalLength,
+        CancellationToken ct)
     {
-        try { await HandleIncomingPushAsync(pooledBuf, length); }
-        finally { ArrayPool<byte>.Shared.Return(pooledBuf); }
+        var data = frameBytes.AsSpan(0, totalLength);
+        var frameType = BoltCodec.PeekFrameType(data);
+        switch (frameType)
+        {
+            case FrameType.Batch:
+            {
+                if (!BoltCodec.TryReadBatch(data, out var batch))
+                    throw new InvalidDataException("Received a malformed Bolt batch frame.");
+
+                var count = batch.Count;
+                var offset = BoltCodec.BatchHeaderSize;
+                for (var i = 0; i < count; i++)
+                {
+                    var frameLength = BinaryPrimitives.ReadInt32LittleEndian(frameBytes.AsSpan(offset));
+                    offset += 4;
+                    frameBytes.AsSpan(offset, frameLength).CopyTo(frameBytes);
+                    offset += frameLength;
+                    await DispatchReceivedFrameAsync(conn, frameBytes, frameLength, ct);
+                }
+                break;
+            }
+            case FrameType.Response:
+                HandleIncomingResponse(data);
+                break;
+            case FrameType.Request:
+            {
+                if (!_inboundDispatchSlots.Wait(0))
+                {
+                    if (BoltCodec.TryReadRequest(data, out var rejected, out _))
+                        await SendResponseAsync(conn, rejected.RequestId, rejected.SenderHash, HttpStatusCode.TooManyRequests, ReadOnlyMemory<byte>.Empty, ct);
+                    break;
+                }
+                var reqBuf = ArrayPool<byte>.Shared.Rent(totalLength);
+                data.CopyTo(reqBuf);
+                _ = DispatchRequestPooledAsync(conn, reqBuf, totalLength, ct);
+                break;
+            }
+            case FrameType.Push:
+            {
+                if (!_inboundDispatchSlots.Wait(0))
+                    break;
+                var pushBuf = ArrayPool<byte>.Shared.Rent(totalLength);
+                data.CopyTo(pushBuf);
+                _ = DispatchPushPooledAsync(pushBuf, totalLength, ct);
+                break;
+            }
+            case FrameType.StreamOpen:
+                HandleStreamOpen(conn, data);
+                break;
+            case FrameType.StreamData:
+                HandleStreamData(data);
+                break;
+            case FrameType.StreamClose:
+                HandleStreamClose(data);
+                break;
+            case FrameType.RequestCancel:
+                HandleRequestCancel(data);
+                break;
+            default:
+                if (_frameHandlers.TryGetValue((byte)frameType, out var handler))
+                {
+                    try { handler(conn, frameBytes, totalLength); }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Bolt custom frame handler failed for frame type {FrameType}", frameType);
+                    }
+                }
+                break;
+        }
+    }
+
+    private async Task DispatchPushPooledAsync(byte[] pooledBuf, int length, CancellationToken ct)
+    {
+        try { await HandleIncomingPushAsync(pooledBuf, length, ct); }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(pooledBuf);
+            _inboundDispatchSlots.Release();
+        }
     }
 
     private void HandleIncomingResponse(ReadOnlySpan<byte> data)
@@ -1293,14 +1736,12 @@ public sealed class BoltClient : IAsyncDisposable
         if (!BoltCodec.TryReadResponse(data, out var frame, out _)) return;
         if (_pendingCalls.TryRemove(frame.RequestId, out var rpcCall))
         {
-            // Copy payload into a PooledMemoryOwner — backed by ArrayPool, auto-returned via GC.
-            // Cost: ~32B object header (vs 512KB+ LOH alloc before).
             ReadOnlyMemory<byte> payload;
             if (frame.PayloadLength > 0)
             {
-                var owner = new PooledMemoryOwner(frame.PayloadLength);
-                frame.GetPayload(data).CopyTo(owner.WritableSpan);
-                payload = owner.Memory;
+                var response = GC.AllocateUninitializedArray<byte>(frame.PayloadLength);
+                frame.GetPayload(data).CopyTo(response);
+                payload = response;
             }
             else
             {
@@ -1310,31 +1751,86 @@ public sealed class BoltClient : IAsyncDisposable
         }
     }
 
-    private void HandleStreamOpen(BoltConnection conn, ReadOnlySpan<byte> data, CancellationToken ct)
+    private void HandleStreamOpen(BoltConnection conn, ReadOnlySpan<byte> data)
     {
         if (!BoltCodec.TryReadStreamOpen(data, out var streamId, out _, out var commandHash)) return;
-        var stream = new BoltStream(streamId, conn, RemoveActiveStream);
-        _activeStreams[streamId] = stream;
-        if (_streamHandlers.TryGetValue(commandHash, out var handler))
+        if (!_streamHandlers.TryGetValue(commandHash, out var handler))
+        {
+            _ = SendStreamCloseBestEffortAsync(conn, streamId, HttpStatusCode.NotImplemented);
+            return;
+        }
+
+        LargeRpcInboundCollector? collector = commandHash switch
+        {
+            var hash when hash == LargeRpcCommandHash =>
+                new LargeRpcInboundCollector(this, headerSize: 28, totalSizeOffset: 20, usePooledBuffer: true),
+            var hash when hash == LargeRpcResponseStreamHash =>
+                new LargeRpcInboundCollector(this, headerSize: 22, totalSizeOffset: 18, usePooledBuffer: false),
+            _ => null
+        };
+        var stream = new BoltStream(streamId, conn, RemoveActiveStream, _config.StreamInboundCapacity);
+        if (collector is not null &&
+            (!_largeRpcCollectors.TryAdd(streamId, collector) || !stream.TrySetInboundSink(collector.Accept)))
+        {
+            _largeRpcCollectors.TryRemove(streamId, out _);
+            collector.Dispose();
+            _ = SendStreamCloseBestEffortAsync(conn, streamId, HttpStatusCode.ServiceUnavailable);
+            return;
+        }
+
+        if (TryTrackStream(stream))
         {
             _ = Task.Run(async () =>
             {
-                try { await handler(stream); }
-                catch (Exception ex) { _logger.LogError(ex, "Stream handler error"); }
-                finally { RemoveActiveStream(streamId); }
-            }, ct);
+                var statusCode = HttpStatusCode.OK;
+                try
+                {
+                    await handler(stream);
+                }
+                catch (Exception ex)
+                {
+                    statusCode = HttpStatusCode.InternalServerError;
+                    _logger.LogError(ex, "Stream handler error");
+                }
+                finally
+                {
+                    if (!stream.IsClosed)
+                    {
+                        try { await stream.CloseAsync(statusCode); }
+                        catch { RemoveActiveStream(streamId); }
+                    }
+                    else
+                    {
+                        RemoveActiveStream(streamId);
+                    }
+                }
+            });
+        }
+        else
+        {
+            if (_largeRpcCollectors.TryRemove(streamId, out var rejectedCollector))
+                rejectedCollector.Dispose();
+            _ = SendStreamCloseBestEffortAsync(conn, streamId, HttpStatusCode.TooManyRequests);
         }
     }
 
-    private async ValueTask HandleStreamDataAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    private void HandleRequestCancel(ReadOnlySpan<byte> data)
     {
-        var span = data.Span;
-        if (!BoltCodec.TryReadStreamData(span, out var streamId, out var payloadOffset, out var payloadLength, out _)) return;
+        if (!BoltCodec.TryReadRequestCancel(data, out var requestId))
+            return;
+        if (_inboundRequestCancellations.TryGetValue(requestId, out var cts))
+            cts.Cancel();
+        else
+            TrackEarlyInboundCancellation(requestId);
+    }
+
+    private void HandleStreamData(ReadOnlySpan<byte> data)
+    {
+        if (!BoltCodec.TryReadStreamData(data, out var streamId, out var payloadOffset, out var payloadLength, out _)) return;
         if (_activeStreams.TryGetValue(streamId, out var stream))
         {
-            var owner = new PooledMemoryOwner(payloadLength);
-            span.Slice(payloadOffset, payloadLength).CopyTo(owner.WritableSpan);
-            await stream.EnqueueInboundAsync(owner.Memory, ct);
+            if (!stream.TryAcceptInbound(data.Slice(payloadOffset, payloadLength)))
+                _ = SendStreamCloseBestEffortAsync(stream.Connection, streamId, HttpStatusCode.TooManyRequests);
         }
     }
 
@@ -1342,13 +1838,86 @@ public sealed class BoltClient : IAsyncDisposable
     {
         if (!BoltCodec.TryReadStreamClose(data, out var streamId, out var statusCode)) return;
         if (_activeStreams.TryRemove(streamId, out var stream))
+        {
+            Interlocked.Decrement(ref _activeStreamCount);
             stream.MarkClosed(statusCode);
+        }
+    }
+
+    private bool TryTrackStream(BoltStream stream)
+    {
+        if (Interlocked.Increment(ref _activeStreamCount) > Math.Max(1, _config.MaxActiveStreams))
+        {
+            Interlocked.Decrement(ref _activeStreamCount);
+            return false;
+        }
+
+        if (_activeStreams.TryAdd(stream.StreamId, stream))
+            return true;
+
+        Interlocked.Decrement(ref _activeStreamCount);
+        return false;
     }
 
     private void RemoveActiveStream(Guid streamId)
-        => _activeStreams.TryRemove(streamId, out _);
+    {
+        if (_activeStreams.TryRemove(streamId, out _))
+            Interlocked.Decrement(ref _activeStreamCount);
+    }
 
-    private async Task HandleIncomingPushAsync(byte[] data, int length)
+    private async Task SendStreamCloseBestEffortAsync(
+        BoltConnection connection,
+        Guid streamId,
+        HttpStatusCode statusCode)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(_rpcTimeout);
+            var writer = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteStreamClose(writer, streamId, statusCode);
+            await connection.SendReliableAsync(writer, cts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to close rejected Bolt stream {StreamId}", streamId);
+        }
+    }
+
+    private void RetireStreamsForConnection(BoltConnection connection, HttpStatusCode statusCode)
+    {
+        foreach (var (streamId, stream) in _activeStreams)
+        {
+            if (!ReferenceEquals(stream.Connection, connection) ||
+                !_activeStreams.TryRemove(
+                    new KeyValuePair<Guid, BoltStream>(streamId, stream)))
+            {
+                continue;
+            }
+
+            Interlocked.Decrement(ref _activeStreamCount);
+            stream.MarkClosed(statusCode);
+        }
+    }
+
+    private void TrackEarlyInboundCancellation(Guid requestId)
+    {
+        var now = Environment.TickCount64;
+        var expiresBefore = now - Math.Max(1L, (long)_rpcTimeout.TotalMilliseconds);
+        foreach (var entry in _earlyInboundCancellations)
+        {
+            if (entry.Value <= expiresBefore)
+                _earlyInboundCancellations.TryRemove(entry);
+        }
+
+        var capacity = Math.Max(
+            1,
+            Math.Max(1, _config.MaxConcurrentInboundHandlers) +
+            Math.Max(1, _config.MaxActiveStreams));
+        if (_earlyInboundCancellations.Count < capacity)
+            _earlyInboundCancellations.TryAdd(requestId, now);
+    }
+
+    private async Task HandleIncomingPushAsync(byte[] data, int length, CancellationToken ct)
     {
         // Push uses same frame layout as Request — parse with TryReadRequest
         var span = data.AsSpan(0, length);
@@ -1359,7 +1928,10 @@ public sealed class BoltClient : IAsyncDisposable
             try
             {
                 var payload = frame.GetPayload(data.AsMemory(0, length));
-                await handler(payload, frame.RequestId);
+                await handler(
+                    payload,
+                    new BoltInboundRequestContext(frame.RequestId, frame.SenderHash),
+                    ct);
                 // No response sent for Push (fire-and-forget)
             }
             catch (Exception ex)
@@ -1374,23 +1946,43 @@ public sealed class BoltClient : IAsyncDisposable
         var span = data.AsSpan(0, length);
         if (!BoltCodec.TryReadRequest(span, out var frame, out _)) return;
 
-        if (_handlers.TryGetValue(frame.CommandHash, out var handler))
+        using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        requestCts.CancelAfter(_rpcTimeout);
+        if (!_inboundRequestCancellations.TryAdd(frame.RequestId, requestCts))
+            return;
+        if (_earlyInboundCancellations.TryRemove(frame.RequestId, out _))
+            requestCts.Cancel();
+
+        try
         {
-            try
+            if (_handlers.TryGetValue(frame.CommandHash, out var handler))
             {
                 var payload = frame.GetPayload(data.AsMemory(0, length));
-                var (statusCode, responsePayload) = await handler(payload, frame.RequestId);
-                await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, statusCode, responsePayload, ct);
+                var (statusCode, responsePayload) = await handler(
+                    payload,
+                    new BoltInboundRequestContext(frame.RequestId, frame.SenderHash),
+                    requestCts.Token);
+                await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, statusCode, responsePayload, requestCts.Token);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "Handler error for command hash {CommandHash}", frame.CommandHash);
-                await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, HttpStatusCode.InternalServerError, ReadOnlyMemory<byte>.Empty, ct);
+                await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, HttpStatusCode.NotImplemented, ReadOnlyMemory<byte>.Empty, requestCts.Token);
             }
         }
-        else
+        catch (OperationCanceledException) when (requestCts.IsCancellationRequested)
         {
-            await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, HttpStatusCode.NotImplemented, ReadOnlyMemory<byte>.Empty, ct);
+            // The caller no longer needs a response.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Handler error for command hash {CommandHash}", frame.CommandHash);
+            await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, HttpStatusCode.InternalServerError, ReadOnlyMemory<byte>.Empty, ct);
+        }
+        finally
+        {
+            _inboundRequestCancellations.TryRemove(
+                new KeyValuePair<Guid, CancellationTokenSource>(frame.RequestId, requestCts));
+            _earlyInboundCancellations.TryRemove(frame.RequestId, out _);
         }
     }
 
@@ -1402,21 +1994,35 @@ public sealed class BoltClient : IAsyncDisposable
     private async Task SendResponseAsync(BoltConnection conn, Guid requestId, int callerSenderHash,
         HttpStatusCode statusCode, ReadOnlyMemory<byte> responsePayload, CancellationToken ct)
     {
-        if (responsePayload.Length <= _config.LargePayloadThreshold)
+        if (responsePayload.Length <= _largePayloadThreshold)
         {
             var writer = RentedBufferWriter.GetThreadLocal();
             BoltCodec.WriteResponse(writer, requestId, statusCode, responsePayload.Span);
-            await conn.SendAsync(writer.WrittenMemory, ct);
+            await conn.SendReliableAsync(writer, ct);
         }
         else
         {
             // Large response: BoltStream back to caller — same mechanism as request path
-            var respStream = new BoltStream(Guid.NewGuid(), conn, RemoveActiveStream);
-            _activeStreams[respStream.StreamId] = respStream;
+            var respStream = new BoltStream(
+                Guid.NewGuid(),
+                conn,
+                RemoveActiveStream,
+                _config.StreamInboundCapacity);
+            if (!TryTrackStream(respStream))
+            {
+                var rejectedWriter = RentedBufferWriter.GetThreadLocal();
+                BoltCodec.WriteResponse(
+                    rejectedWriter,
+                    requestId,
+                    HttpStatusCode.TooManyRequests,
+                    ReadOnlySpan<byte>.Empty);
+                await conn.SendReliableAsync(rejectedWriter, ct);
+                return;
+            }
 
             var openWriter = RentedBufferWriter.GetThreadLocal();
             BoltCodec.WriteStreamOpen(openWriter, respStream.StreamId, callerSenderHash, LargeRpcResponseStreamHash);
-            await conn.SendAsync(openWriter.WrittenMemory, ct);
+            await conn.SendReliableAsync(openWriter, ct);
 
             // Header: [16:requestId][2:statusCode][4:totalSize]
             var header = new byte[22];
@@ -1425,12 +2031,7 @@ public sealed class BoltClient : IAsyncDisposable
             System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(18), responsePayload.Length);
             await respStream.SendAsync((ReadOnlyMemory<byte>)header, ct);
 
-            var chunkSize = _config.StreamChunkSize;
-            for (int offset = 0; offset < responsePayload.Length; offset += chunkSize)
-            {
-                var len = Math.Min(chunkSize, responsePayload.Length - offset);
-                await respStream.SendAsync(responsePayload.Slice(offset, len), ct);
-            }
+            await SendLargePayloadPipelinedAsync(respStream, responsePayload, ct);
             await respStream.CloseAsync(ct: ct);
         }
     }
@@ -1450,11 +2051,10 @@ public sealed class BoltClient : IAsyncDisposable
             {
                 try
                 {
-                    var w = RentedBufferWriter.GetThreadLocal();
                     var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, CancellationToken.None);
+                    var w = RentedBufferWriter.GetThreadLocal();
                     BoltCodec.WriteSubscribe(w, sub.Topic, _clientId, durable: false, actorAccessToken);
-                    await GetPrimaryConnection().SendAsync(w.WrittenMemory, CancellationToken.None);
-                    w.Reset();
+                    await GetPrimaryConnection().SendReliableAsync(w, CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -1466,11 +2066,10 @@ public sealed class BoltClient : IAsyncDisposable
             {
                 try
                 {
-                    var w = RentedBufferWriter.GetThreadLocal();
                     var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, CancellationToken.None);
+                    var w = RentedBufferWriter.GetThreadLocal();
                     BoltCodec.WriteSubscribe(w, sub.Topic, sub.SubscriberId, durable: true, actorAccessToken);
-                    await GetPrimaryConnection().SendAsync(w.WrittenMemory, CancellationToken.None);
-                    w.Reset();
+                    await GetPrimaryConnection().SendReliableAsync(w, CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -1496,7 +2095,17 @@ public sealed class BoltClient : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        foreach (var (requestId, _) in _pendingCalls)
+        {
+            if (_pendingCalls.TryRemove(requestId, out var call))
+                call.SetException(new ObjectDisposedException(nameof(BoltClient)));
+        }
+        foreach (var cts in _inboundRequestCancellations.Values)
+            cts.Cancel();
         var connections = ClearConnections();
+        foreach (var connection in connections)
+            RetireStreamsForConnection(connection, HttpStatusCode.ServiceUnavailable);
+        _earlyInboundCancellations.Clear();
         foreach (var conn in connections)
         {
             conn.CompleteSendChannel();
@@ -1541,7 +2150,38 @@ public sealed class BoltClient : IAsyncDisposable
     }
 
     private void ObserveConnection(BoltConnection connection) =>
-        connection.FailureObserver = RecordConnectionFailure;
+        connection.FailureObserver = failure => HandleConnectionFailure(connection, failure);
+
+    private void HandleConnectionFailure(BoltConnection connection, BoltConnectionFailureKind failure)
+    {
+        RecordConnectionFailure(failure);
+        if (failure is not (BoltConnectionFailureKind.SendFailure or BoltConnectionFailureKind.SendTimeout))
+            return;
+
+        var noConnections = RemoveConnection(connection, out var removed);
+        if (!removed)
+            return;
+
+        RetireStreamsForConnection(connection, HttpStatusCode.ServiceUnavailable);
+        connection.CompleteSendChannel();
+        connection.ReceiveCts?.Cancel();
+        _ = Task.Run(async () =>
+        {
+            try { await connection.Transport.CloseAsync(); } catch { }
+        });
+
+        if (!_disposed && _isRegistered && noConnections)
+        {
+            _isRegistered = false;
+            RaiseLifecycleEvent(Disconnected);
+            foreach (var (id, _) in _pendingCalls)
+            {
+                if (_pendingCalls.TryRemove(id, out var call))
+                    call.SetException(new IOException("All Bolt connections failed while sending."));
+            }
+            _ = Task.Run(() => ReconnectAsync());
+        }
+    }
 
     private void RecordConnectionFailure(BoltConnectionFailureKind failure)
     {
@@ -1615,6 +2255,128 @@ public sealed class BoltClient : IAsyncDisposable
                 $"Durable Bolt subscription buffer is full. topic={removed.Topic} subscriber={removed.SubscriberId}"));
         }
     }
+
+    private sealed class LargeRpcInboundCollector : IDisposable
+    {
+        private readonly BoltClient _owner;
+        private readonly int _totalSizeOffset;
+        private readonly bool _usePooledBuffer;
+        private readonly byte[] _header;
+        private readonly TaskCompletionSource _headerReceived =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private byte[]? _buffer;
+        private int _reservationSize;
+        private bool _disposed;
+
+        public bool HasHeader { get; private set; }
+        public bool IsMalformed { get; private set; }
+        public int TotalSize { get; private set; }
+        public int BytesRead { get; private set; }
+        public HttpStatusCode? RejectionStatus { get; private set; }
+        public int ReservationSize => _reservationSize;
+        public ReadOnlySpan<byte> HeaderSpan => _header;
+        public bool HeaderProcessed => _headerReceived.Task.IsCompleted;
+        public Task HeaderReceived => _headerReceived.Task;
+
+        public LargeRpcInboundCollector(
+            BoltClient owner,
+            int headerSize,
+            int totalSizeOffset,
+            bool usePooledBuffer)
+        {
+            _owner = owner;
+            _totalSizeOffset = totalSizeOffset;
+            _usePooledBuffer = usePooledBuffer;
+            _header = GC.AllocateUninitializedArray<byte>(headerSize);
+        }
+
+        public void Accept(ReadOnlySpan<byte> data)
+        {
+            if (_disposed || IsMalformed || RejectionStatus is not null)
+                return;
+
+            if (!HasHeader)
+            {
+                if (data.Length < _header.Length)
+                {
+                    IsMalformed = true;
+                    _headerReceived.TrySetResult();
+                    return;
+                }
+
+                data[.._header.Length].CopyTo(_header);
+                HasHeader = true;
+                TotalSize = BinaryPrimitives.ReadInt32LittleEndian(_header.AsSpan(_totalSizeOffset));
+                if (TotalSize < 0 || TotalSize > _owner._maxLargeRpcPayloadBytes)
+                {
+                    RejectionStatus = HttpStatusCode.RequestEntityTooLarge;
+                    _headerReceived.TrySetResult();
+                    return;
+                }
+
+                var reservationSize = _usePooledBuffer
+                    ? GetPooledBufferReservationSize(TotalSize)
+                    : TotalSize;
+                if (!_owner.TryReserveLargeRpcBuffer(reservationSize))
+                {
+                    RejectionStatus = HttpStatusCode.TooManyRequests;
+                    _headerReceived.TrySetResult();
+                    return;
+                }
+
+                _reservationSize = reservationSize;
+                _buffer = TotalSize == 0
+                    ? Array.Empty<byte>()
+                    : _usePooledBuffer
+                        ? ArrayPool<byte>.Shared.Rent(TotalSize)
+                        : GC.AllocateUninitializedArray<byte>(TotalSize);
+
+                if (_usePooledBuffer && _buffer.Length > reservationSize)
+                {
+                    ArrayPool<byte>.Shared.Return(_buffer);
+                    _buffer = null;
+                    _owner.ReleaseLargeRpcBuffer(_reservationSize);
+                    _reservationSize = 0;
+                    RejectionStatus = HttpStatusCode.InternalServerError;
+                }
+
+                _headerReceived.TrySetResult();
+                return;
+            }
+
+            if (_buffer is null || data.Length > TotalSize - BytesRead)
+            {
+                IsMalformed = true;
+                return;
+            }
+
+            data.CopyTo(_buffer.AsSpan(BytesRead));
+            BytesRead += data.Length;
+        }
+
+        public byte[] DetachBuffer(bool transferReservation = false)
+        {
+            var buffer = _buffer ?? throw new InvalidOperationException("Large RPC collector has no completed buffer.");
+            _buffer = null;
+            if (transferReservation)
+                _reservationSize = 0;
+            return buffer;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            if (_usePooledBuffer && _buffer is { Length: > 0 } buffer)
+                ArrayPool<byte>.Shared.Return(buffer);
+            _buffer = null;
+            if (_reservationSize > 0)
+                _owner.ReleaseLargeRpcBuffer(_reservationSize);
+            _reservationSize = 0;
+        }
+    }
 }
 
 internal enum BoltConnectionFailureKind
@@ -1636,13 +2398,23 @@ internal enum BoltConnectionFailureKind
 /// </summary>
 public sealed class BoltConnection
 {
+    private const int BatchHeaderSize = BoltCodec.BatchHeaderSize;
+
+    private readonly record struct PendingSend(
+        byte[] Buffer,
+        int Length,
+        PooledSendCompletion? TransportCompletion);
+
     public IBoltConnection Transport { get; }
     public BoltTransport TransportType { get; }
-    private readonly Channel<(byte[] Buffer, int Length, CancellationToken Ct)> _sendChannel;
+    private readonly Channel<PendingSend> _sendChannel;
     private readonly TimeSpan _sendEnqueueTimeout;
+    private readonly bool _enableBatching;
     private int _pendingSends;
     private int _activeSends;
     private long _activeSendStartedAt;
+    private int _isClosing;
+    private Exception? _sendFailure;
 
     /// <summary>
     /// Backward-compatible WebSocket accessor for Bolt.Media P2P code.
@@ -1670,6 +2442,8 @@ public sealed class BoltConnection
     public Task? ReceiveLoop { get; set; }
     public Task? SendLoop { get; set; }
     internal Action<BoltConnectionFailureKind>? FailureObserver { get; set; }
+    internal bool IsAvailable => Volatile.Read(ref _isClosing) == 0 && Transport.IsConnected;
+    internal Exception? SendFailure => Volatile.Read(ref _sendFailure);
     public int PendingSends => _pendingSends;
     public int ActiveSends => _activeSends;
     public long ActiveSendElapsedMs
@@ -1681,14 +2455,19 @@ public sealed class BoltConnection
         }
     }
 
-    public BoltConnection(IBoltConnection transport, int sendQueueCapacity = 4096, int sendEnqueueTimeoutMs = 0)
+    public BoltConnection(
+        IBoltConnection transport,
+        int sendQueueCapacity = 4096,
+        int sendEnqueueTimeoutMs = 0,
+        bool enableBatching = true)
     {
         Transport = transport;
         TransportType = transport.TransportType;
+        _enableBatching = enableBatching;
         _sendEnqueueTimeout = sendEnqueueTimeoutMs > 0
             ? TimeSpan.FromMilliseconds(sendEnqueueTimeoutMs)
             : TimeSpan.Zero;
-        _sendChannel = Channel.CreateBounded<(byte[], int, CancellationToken)>(
+        _sendChannel = Channel.CreateBounded<PendingSend>(
             new BoundedChannelOptions(Math.Max(1, sendQueueCapacity))
             {
                 FullMode = BoundedChannelFullMode.Wait,
@@ -1711,75 +2490,334 @@ public sealed class BoltConnection
     /// <summary>Start the background send loop. Call once after construction.</summary>
     public void StartSendLoop(CancellationToken ct)
     {
+        if (SendLoop is not null)
+            throw new InvalidOperationException("The Bolt client send loop has already been started.");
+
         SendLoop = Task.Run(async () =>
         {
+            Exception? terminalFailure = null;
+            var staged = ArrayPool<PendingSend>.Shared.Rent(BoltCodec.MaxBatchFrames);
+            using var sendDeadlineCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             try
             {
-                await foreach (var (buf, len, sendCt) in _sendChannel.Reader.ReadAllAsync(ct))
+                await foreach (var first in _sendChannel.Reader.ReadAllAsync(ct))
                 {
+                    var stagedCount = 1;
+                    staged[0] = first;
+                    var batchSize = BatchHeaderSize + 4 + first.Length;
+                    byte[]? physicalBuffer = null;
+                    var physicalLength = first.Length;
+                    Task? transportSend = null;
+                    var sendStarted = false;
+                    var sendSucceeded = false;
                     try
                     {
+                        if (!Transport.IsConnected)
+                            throw new IOException("Bolt transport disconnected before a queued send completed.");
+
+                        if (_enableBatching && IsBatchable(first) && batchSize <= BoltCodec.MaxBatchBytes)
+                        {
+                            while (stagedCount < BoltCodec.MaxBatchFrames &&
+                                   _sendChannel.Reader.TryPeek(out var next))
+                            {
+                                if (!IsBatchable(next))
+                                    break;
+
+                                var nextSize = 4L + next.Length;
+                                if (batchSize + nextSize > BoltCodec.MaxBatchBytes)
+                                    break;
+
+                                if (!_sendChannel.Reader.TryRead(out next))
+                                    continue;
+
+                                staged[stagedCount++] = next;
+                                batchSize += (int)nextSize;
+                            }
+                        }
+
+                        if (stagedCount > 1)
+                        {
+                            (physicalBuffer, physicalLength) = EncodeBatch(staged, stagedCount, batchSize);
+                        }
+                        else
+                        {
+                            physicalBuffer = first.Buffer;
+                        }
+
                         Interlocked.Exchange(ref _activeSendStartedAt, Environment.TickCount64);
                         Interlocked.Increment(ref _activeSends);
-                        if (Transport.IsConnected)
+                        sendStarted = true;
+                        if (_sendEnqueueTimeout > TimeSpan.Zero)
+                            sendDeadlineCts.CancelAfter(_sendEnqueueTimeout);
+
+                        var sendValue = Transport.SendAsync(
+                            physicalBuffer.AsMemory(0, physicalLength),
+                            sendDeadlineCts.Token);
+                        if (sendValue.IsCompletedSuccessfully)
                         {
-                            using var sendTimeoutCts = _sendEnqueueTimeout > TimeSpan.Zero
-                                ? new CancellationTokenSource(_sendEnqueueTimeout)
-                                : null;
-                            using var linkedSendCts = sendTimeoutCts is null
-                                ? CancellationTokenSource.CreateLinkedTokenSource(ct, sendCt)
-                                : CancellationTokenSource.CreateLinkedTokenSource(ct, sendCt, sendTimeoutCts.Token);
-                            await Transport.SendAsync(buf.AsMemory(0, len), linkedSendCts.Token);
+                            sendValue.GetAwaiter().GetResult();
                         }
+                        else
+                        {
+                            transportSend = sendValue.AsTask();
+                            await transportSend.WaitAsync(sendDeadlineCts.Token);
+                        }
+
+                        if (_sendEnqueueTimeout > TimeSpan.Zero && !sendDeadlineCts.TryReset())
+                            throw new OperationCanceledException(sendDeadlineCts.Token);
+
+                        sendSucceeded = true;
                     }
-                    catch (OperationCanceledException) when (
-                        !ct.IsCancellationRequested &&
-                        !sendCt.IsCancellationRequested)
+                    catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
                     {
+                        var timeout = new TimeoutException(
+                            $"Bolt transport send timed out after {_sendEnqueueTimeout.TotalMilliseconds:0} ms.",
+                            ex);
+                        CompleteStaged(staged, stagedCount, completion => completion.SetException(timeout));
+                        terminalFailure = timeout;
+                        BeginClose(timeout);
                         FailureObserver?.Invoke(BoltConnectionFailureKind.SendTimeout);
+                        break;
                     }
-                    catch (OperationCanceledException) { }
-                    catch
+                    catch (OperationCanceledException)
                     {
+                        CompleteStaged(staged, stagedCount, completion => completion.SetCanceled(ct));
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        CompleteStaged(staged, stagedCount, completion => completion.SetException(ex));
+                        terminalFailure = ex;
+                        BeginClose(ex);
                         FailureObserver?.Invoke(BoltConnectionFailureKind.SendFailure);
+                        break;
                     }
                     finally
                     {
-                        if (Interlocked.Decrement(ref _activeSends) <= 0)
+                        if (sendStarted && Interlocked.Decrement(ref _activeSends) <= 0)
                             Interlocked.Exchange(ref _activeSendStartedAt, 0);
-                        ArrayPool<byte>.Shared.Return(buf);
-                        Interlocked.Decrement(ref _pendingSends);
+
+                        ReleaseStagedBuffers(
+                            staged,
+                            stagedCount,
+                            physicalBuffer,
+                            transportSend);
+
+                        if (sendSucceeded)
+                            CompleteStaged(staged, stagedCount, static completion => completion.SetResult());
+
+                        Array.Clear(staged, 0, stagedCount);
                     }
                 }
             }
             catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                terminalFailure ??= ex;
+                BeginClose(ex);
+            }
             finally
             {
                 while (_sendChannel.Reader.TryRead(out var pending))
                 {
-                    ArrayPool<byte>.Shared.Return(pending.Buffer);
-                    Interlocked.Decrement(ref _pendingSends);
+                    if (terminalFailure is not null)
+                        pending.TransportCompletion?.SetException(terminalFailure);
+                    else
+                        pending.TransportCompletion?.SetCanceled(ct);
+                    ReleasePendingSend(pending);
                 }
+
+                ArrayPool<PendingSend>.Shared.Return(staged, clearArray: true);
             }
-        }, ct);
+        });
+    }
+
+    private static bool IsBatchable(PendingSend pending)
+    {
+        if (pending.Length <= 0)
+            return false;
+
+        return BoltCodec.IsValidBatchInnerFrame(pending.Buffer.AsSpan(0, pending.Length));
+    }
+
+    private static (byte[] Buffer, int Length) EncodeBatch(
+        PendingSend[] staged,
+        int count,
+        int totalSize)
+    {
+        using var writer = new RentedBufferWriter(totalSize);
+        var span = writer.GetSpan(totalSize);
+        span[0] = (byte)FrameType.Batch;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(1), count);
+
+        var offset = BatchHeaderSize;
+        for (var index = 0; index < count; index++)
+        {
+            var pending = staged[index];
+            BinaryPrimitives.WriteInt32LittleEndian(span.Slice(offset), pending.Length);
+            offset += 4;
+            pending.Buffer.AsSpan(0, pending.Length).CopyTo(span[offset..]);
+            offset += pending.Length;
+        }
+
+        writer.Advance(totalSize);
+        return writer.Detach();
+    }
+
+    private static void CompleteStaged(
+        PendingSend[] staged,
+        int count,
+        Action<PooledSendCompletion> complete)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            if (staged[index].TransportCompletion is { } completion)
+                complete(completion);
+        }
+    }
+
+    private void ReleaseStagedBuffers(
+        PendingSend[] staged,
+        int count,
+        byte[]? physicalBuffer,
+        Task? transportSend)
+    {
+        var deferredBuffer = count == 1 && ReferenceEquals(physicalBuffer, staged[0].Buffer)
+            ? staged[0].Buffer
+            : null;
+
+        for (var index = 0; index < count; index++)
+        {
+            var pending = staged[index];
+            if (!ReferenceEquals(pending.Buffer, deferredBuffer))
+                ReleasePendingSend(pending);
+        }
+
+        if (physicalBuffer is null || !ReferenceEquals(physicalBuffer, deferredBuffer))
+        {
+            if (physicalBuffer is not null)
+            {
+                if (transportSend is { IsCompleted: false })
+                    _ = ReleaseWhenTransportCompletesAsync(transportSend, physicalBuffer);
+                else
+                    ArrayPool<byte>.Shared.Return(physicalBuffer);
+            }
+
+            return;
+        }
+
+        if (transportSend is { IsCompleted: false })
+            _ = ReleaseWhenTransportCompletesAsync(transportSend, staged[0]);
+        else
+            ReleasePendingSend(staged[0]);
     }
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        ThrowIfUnavailable();
+        return EnqueueAsync(data, transportCompletion: null, ct);
+    }
+
+    internal ValueTask SendAsync(RentedBufferWriter writer, CancellationToken ct)
+    {
+        ThrowIfUnavailable();
+        ct.ThrowIfCancellationRequested();
+        var (buffer, length) = writer.Detach();
+        return EnqueueOwnedAsync(buffer, length, transportCompletion: null, ct);
+    }
+
+    internal async ValueTask SendReliableAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        ThrowIfUnavailable();
+        var completion = PooledSendCompletion.Rent();
+        try
+        {
+            await EnqueueAsync(data, completion, ct);
+        }
+        catch
+        {
+            completion.ReturnUnused();
+            throw;
+        }
+
+        await completion.WaitAsync(ct);
+    }
+
+    internal async ValueTask SendReliableAsync(RentedBufferWriter writer, CancellationToken ct)
+    {
+        var completion = await EnqueueReliableAsync(writer, ct);
+        await completion.WaitAsync(ct);
+    }
+
+    internal async ValueTask<PooledSendCompletion> EnqueueReliableAsync(
+        RentedBufferWriter writer,
+        CancellationToken ct)
+    {
+        ThrowIfUnavailable();
+        ct.ThrowIfCancellationRequested();
+        var (buffer, length) = writer.Detach();
+        var completion = PooledSendCompletion.Rent();
+        try
+        {
+            await EnqueueOwnedAsync(buffer, length, completion, ct);
+        }
+        catch
+        {
+            completion.ReturnUnused();
+            throw;
+        }
+
+        return completion;
+    }
+
+    private ValueTask EnqueueAsync(
+        ReadOnlyMemory<byte> data,
+        PooledSendCompletion? transportCompletion,
+        CancellationToken ct)
     {
         // Snapshot into a pooled buffer — the caller's buffer (thread-local RentedBufferWriter)
         // may be reused before the async transport write completes.
         var len = data.Length;
         var buf = ArrayPool<byte>.Shared.Rent(len);
-        data.Span.CopyTo(buf);
-        Interlocked.Increment(ref _pendingSends);
+        try
+        {
+            data.Span.CopyTo(buf);
+        }
+        catch
+        {
+            ArrayPool<byte>.Shared.Return(buf);
+            throw;
+        }
 
-        // All sends go through Channel (serialized single-writer)
-        if (_sendChannel.Writer.TryWrite((buf, len, ct)))
-            return ValueTask.CompletedTask;
-        return SendSlowAsync(buf, len, ct);
+        return EnqueueOwnedAsync(buf, len, transportCompletion, ct);
     }
 
-    private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)
+    private ValueTask EnqueueOwnedAsync(
+        byte[] buf,
+        int len,
+        PooledSendCompletion? transportCompletion,
+        CancellationToken ct)
+    {
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+        }
+        catch
+        {
+            ArrayPool<byte>.Shared.Return(buf);
+            throw;
+        }
+
+        Interlocked.Increment(ref _pendingSends);
+        var pending = new PendingSend(buf, len, transportCompletion);
+
+        // All sends go through Channel (serialized single-writer)
+        if (_sendChannel.Writer.TryWrite(pending))
+            return ValueTask.CompletedTask;
+        return SendSlowAsync(pending, ct);
+    }
+
+    private async ValueTask SendSlowAsync(PendingSend pending, CancellationToken ct)
     {
         CancellationTokenSource? timeoutCts = null;
         CancellationTokenSource? linkedCts = null;
@@ -1793,28 +2831,25 @@ public sealed class BoltConnection
                 enqueueToken = linkedCts.Token;
             }
 
-            await _sendChannel.Writer.WriteAsync((buf, len, ct), enqueueToken);
+            await _sendChannel.Writer.WriteAsync(pending, enqueueToken);
         }
         catch (OperationCanceledException) when (
             !ct.IsCancellationRequested &&
             timeoutCts is { IsCancellationRequested: true })
         {
             FailureObserver?.Invoke(BoltConnectionFailureKind.EnqueueTimeout);
-            ArrayPool<byte>.Shared.Return(buf);
-            Interlocked.Decrement(ref _pendingSends);
+            ReleasePendingSend(pending);
             throw;
         }
         catch (OperationCanceledException)
         {
-            ArrayPool<byte>.Shared.Return(buf);
-            Interlocked.Decrement(ref _pendingSends);
+            ReleasePendingSend(pending);
             throw;
         }
         catch
         {
             FailureObserver?.Invoke(BoltConnectionFailureKind.EnqueueFailure);
-            ArrayPool<byte>.Shared.Return(buf);
-            Interlocked.Decrement(ref _pendingSends);
+            ReleasePendingSend(pending);
             throw;
         }
         finally
@@ -1825,7 +2860,48 @@ public sealed class BoltConnection
     }
 
     /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>
-    public void CompleteSendChannel() => _sendChannel.Writer.TryComplete();
+    public void CompleteSendChannel()
+    {
+        Interlocked.Exchange(ref _isClosing, 1);
+        _sendChannel.Writer.TryComplete(_sendFailure);
+    }
+
+    private void BeginClose(Exception failure)
+    {
+        if (Interlocked.Exchange(ref _isClosing, 1) == 0)
+            Volatile.Write(ref _sendFailure, failure);
+        _sendChannel.Writer.TryComplete(SendFailure ?? failure);
+    }
+
+    internal void Retire(Exception failure) => BeginClose(failure);
+
+    private void ThrowIfUnavailable()
+    {
+        if (IsAvailable)
+            return;
+
+        throw new InvalidOperationException("Bolt connection is not available for sending.", SendFailure);
+    }
+
+    private void ReleasePendingSend(PendingSend pending)
+    {
+        ArrayPool<byte>.Shared.Return(pending.Buffer);
+        Interlocked.Decrement(ref _pendingSends);
+    }
+
+    private async Task ReleaseWhenTransportCompletesAsync(Task transportSend, PendingSend pending)
+    {
+        try { await transportSend; }
+        catch { }
+        finally { ReleasePendingSend(pending); }
+    }
+
+    private static async Task ReleaseWhenTransportCompletesAsync(Task transportSend, byte[] buffer)
+    {
+        try { await transportSend; }
+        catch { }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+    }
 
     internal void RecordReceiveLoopFault() =>
         FailureObserver?.Invoke(BoltConnectionFailureKind.ReceiveLoopFault);

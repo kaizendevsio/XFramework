@@ -29,11 +29,18 @@ public sealed class BoltInstaller : IInstaller
             options.MaxFrameBytes = boltConfiguration.MaxFrameBytes > 0
                 ? boltConfiguration.MaxFrameBytes
                 : options.MaxFrameBytes;
+            options.MaxLargeRpcPayloadBytes = boltConfiguration.MaxLargeRpcPayloadBytes > 0
+                ? boltConfiguration.MaxLargeRpcPayloadBytes
+                : options.MaxLargeRpcPayloadBytes;
             options.SendQueueCapacity = boltConfiguration.SendQueueCapacity > 0
                 ? boltConfiguration.SendQueueCapacity
                 : boltConfiguration.QueueDepth > 0
                     ? boltConfiguration.QueueDepth
                     : options.SendQueueCapacity;
+            options.SendQueueByteCapacity = configuration.GetValue<long?>(
+                "BoltConfiguration:SendQueueByteCapacity") is > 0 and var sendQueueByteCapacity
+                    ? sendQueueByteCapacity
+                    : options.SendQueueByteCapacity;
             options.SendEnqueueTimeoutMs = boltConfiguration.SendEnqueueTimeoutMs;
             options.RequireSecureTransport = boltConfiguration.RequireSecureTransport;
             options.MediaEnabled = boltConfiguration.MediaEnabled;
@@ -44,6 +51,11 @@ public sealed class BoltInstaller : IInstaller
             options.MaxMediaStreamsPerPrincipal = boltConfiguration.MaxMediaStreamsPerPrincipal;
             options.MaxSubscriptionsPerPrincipal = boltConfiguration.MaxSubscriptionsPerPrincipal;
             options.MaxDurableSubscribersPerTopic = boltConfiguration.MaxDurableSubscribersPerTopic;
+            options.RpcRequestsPerSecond = boltConfiguration.RpcRequestsPerSecond;
+            options.RpcRequestBurst = boltConfiguration.RpcRequestBurst;
+            options.RpcInboundBytesPerSecond = boltConfiguration.RpcInboundBytesPerSecond;
+            options.RpcInboundByteBurst = boltConfiguration.RpcInboundByteBurst;
+            options.RequireTopicAuthorization = boltConfiguration.RequireTopicAuthorization;
             options.MaxConnectionLifetimeSeconds = boltConfiguration.MaxConnectionLifetimeSeconds;
             options.RegistrationIdentityBindingMode = ResolveRegistrationIdentityBindingMode(
                 boltConfiguration.RegistrationIdentityBindingMode,
@@ -56,6 +68,7 @@ public sealed class BoltInstaller : IInstaller
         });
         services.AddSingleton<IBoltTopicAuthorizer, CommunicationsBoltTopicAuthorizer>();
         services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
+        services.AddMemoryCache();
         services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         services.AddHostedService<BoltServiceDiscoveryHostedService>();
         services.AddAuthorization(options =>

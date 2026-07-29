@@ -1,0 +1,37 @@
+{
+  "source": "PayloadLatencyWorker.Routed_Bolt.R2",
+  "timestampUtc": "2026-07-24T17:54:06.8032686+00:00",
+  "processId": 36252,
+  "runtime": ".NET 10.0.0",
+  "runtimeVersion": "10.0.0",
+  "operatingSystem": "Microsoft Windows 10.0.26200",
+  "processArchitecture": "X64",
+  "osArchitecture": "X64",
+  "processorCount": 18,
+  "serverGc": true,
+  "latencyMode": "Interactive",
+  "processPriority": "Normal",
+  "effectiveSettings": {
+    "topology": "Routed_Bolt",
+    "logicalPath": "caller -\u003E Bolt Hub -\u003E Bolt service",
+    "payloadBytes": 20971520,
+    "callTimeoutSeconds": 60,
+    "largePayloadThresholdBytes": 2097152,
+    "streamChunkSizeBytes": 262123,
+    "pipelineBytes": 2097152,
+    "receiveBufferBytes": 65536,
+    "hubReceiveBufferBytes": 262144,
+    "runRpcContinuationsAsynchronously": true,
+    "grpcHttp2MaxStreamsPerConnection": null,
+    "grpcCallerChannelCount": null,
+    "grpcBackendChannelCount": 0,
+    "grpcMultipleHttp2ConnectionsEnabled": null,
+    "serverAddresses": [
+      "http://127.0.0.1:50766/"
+    ]
+  },
+  "environment": {
+    "BOLT_BENCH_STREAM_CHUNK_SIZE_BYTES": "262123",
+    "BOLT_BENCH_ARTIFACTS": "C:\\Users\\Xeon\\RiderProjects\\XFramework-worktrees\\bolt-remediation-plan-scope\\docs\\solutions\\workflow-issues\\bolt-performance-results-2026-07-25\\chunk-sweep-20m-final\\r2-p3-Routed_Bolt_Chunk_262123"
+  }
+}

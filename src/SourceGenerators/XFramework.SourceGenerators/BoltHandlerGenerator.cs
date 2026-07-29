@@ -136,6 +136,24 @@ public class BoltHandlerGenerator : ISourceGenerator
         bool requireAuthorization = false;
         string? authorizationPolicy = null;
         string[]? roles = null;
+        string[]? requiredServiceScopes = null;
+        string[]? allowedServiceCallers = null;
+
+        if (hasBolt)
+        {
+            var boltAttributeData = methodSymbol.GetAttributes()
+                .FirstOrDefault(static attribute =>
+                    attribute.AttributeClass?.Name == "BoltHandlerAttribute");
+            if (boltAttributeData != null)
+            {
+                requiredServiceScopes = GetStringArrayNamedArgument(
+                    boltAttributeData,
+                    "RequiredServiceScopes");
+                allowedServiceCallers = GetStringArrayNamedArgument(
+                    boltAttributeData,
+                    "AllowedServiceCallers");
+            }
+        }
 
         if (httpAttr != null)
         {
@@ -273,6 +291,8 @@ public class BoltHandlerGenerator : ISourceGenerator
             RequireAuthorization = requireAuthorization,
             AuthorizationPolicy = authorizationPolicy,
             Roles = roles,
+            RequiredServiceScopes = requiredServiceScopes,
+            AllowedServiceCallers = allowedServiceCallers,
             ValidatorTypeFullName = hasValidator ? validatorInterface : null
         };
     }
@@ -555,6 +575,9 @@ public class BoltHandlerGenerator : ISourceGenerator
         if (h.HasCancellationToken)
             callArgs.Append(", ct");
 
+        var requiredServiceScopes = ToStringArrayExpression(h.RequiredServiceScopes);
+        var allowedServiceCallers = ToStringArrayExpression(h.AllowedServiceCallers);
+
         var validationBlock = "";
         if (h.ValidatorTypeFullName != null)
         {
@@ -607,6 +630,7 @@ using MemoryPack;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Security;
 
 namespace {h.Namespace}.Generated;
 
@@ -618,7 +642,7 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
             ""{h.RequestTypeName}"", ""{h.ClassFullName}.{h.MethodName}"");
 
         client.RegisterHandler(""{h.RequestTypeName}"",
-            async (ReadOnlyMemory<byte> payload, Guid requestId, CancellationToken ct) =>
+            async (ReadOnlyMemory<byte> payload, BoltInboundRequestContext context, CancellationToken ct) =>
             {{
                 try
                 {{
@@ -626,6 +650,17 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
                     var request = MemoryPackSerializer.Deserialize<{h.RequestTypeFullName}>(payload.Span);
                     if (request is null)
                         return ((System.Net.HttpStatusCode)400, ReadOnlyMemory<byte>.Empty);
+
+                    var authorization = await scope.ServiceProvider
+                        .GetRequiredService<IBoltServiceInvocationAuthorizer>()
+                        .AuthorizeAsync(
+                            request.Metadata,
+                            context,
+                            requiredScopes: {requiredServiceScopes},
+                            allowedCallers: {allowedServiceCallers},
+                            ct: ct);
+                    if (!authorization.IsSuccess)
+                        return ((System.Net.HttpStatusCode)authorization.StatusCode, ReadOnlyMemory<byte>.Empty);
 
 {validationBlock}
 {diResolves}
@@ -635,6 +670,10 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
 
                     var responseBytes = MemoryPackSerializer.Serialize(sfResponse);
                     return ((System.Net.HttpStatusCode)result.StatusCode, (ReadOnlyMemory<byte>)responseBytes);
+                }}
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {{
+                    throw;
                 }}
                 catch (Exception ex)
                 {{
@@ -1039,6 +1078,11 @@ public static class GeneratedEndpointRoutes
         return builder.ToString();
     }
 
+    private static string ToStringArrayExpression(IReadOnlyCollection<string>? values) =>
+        values is not { Count: > 0 }
+            ? "null"
+            : $"new string[] {{ {string.Join(", ", values.Select(ToCSharpStringLiteral))} }}";
+
     #region Types
 
     private class HandlerInfo
@@ -1071,6 +1115,10 @@ public static class GeneratedEndpointRoutes
         public bool RequireAuthorization { get; set; }
         public string? AuthorizationPolicy { get; set; }
         public string[]? Roles { get; set; }
+
+        // Bolt service authorization
+        public string[]? RequiredServiceScopes { get; set; }
+        public string[]? AllowedServiceCallers { get; set; }
 
         // Validation
         public string? ValidatorTypeFullName { get; set; }

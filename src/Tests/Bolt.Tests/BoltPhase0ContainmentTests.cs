@@ -46,7 +46,7 @@ public sealed class BoltPhase0ContainmentTests
         authorizer.CallCount.Should().Be(2);
         transport.SentFrames.Should().ContainSingle();
         transport.SentFrames.TryPeek(out var registerAck).Should().BeTrue();
-        registerAck.Should().Equal((byte)FrameType.RegisterAck, 1);
+        AssertRegisterAck(registerAck, expectedSuccess: true);
     }
 
     [Test]
@@ -58,19 +58,22 @@ public sealed class BoltPhase0ContainmentTests
         var initiatePayload = new byte[4];
         BinaryPrimitives.WriteInt32LittleEndian(initiatePayload, 12345);
 
-        await using var transport = new ScriptedBoltConnection(
-            WriteFrame(writer => BoltCodec.WriteRegister(writer, "ordinary-client", "OrdinaryClient")),
-            WriteFrame(writer => BoltCodec.WriteCallSignal(
-                writer,
-                Guid.NewGuid(),
-                SignalType.Initiate,
-                initiatePayload)));
-
-        await server.HandleConnectionAsync(transport, CancellationToken.None);
+        await using var transport = new ChannelBoltConnection();
+        var serverTask = server.HandleConnectionAsync(transport, CancellationToken.None);
+        transport.Enqueue(WriteFrame(writer =>
+            BoltCodec.WriteRegister(writer, "ordinary-client", "OrdinaryClient")));
+        await transport.WaitForSentFramesAsync(1);
+        transport.Enqueue(WriteFrame(writer => BoltCodec.WriteCallSignal(
+            writer,
+            Guid.NewGuid(),
+            SignalType.Initiate,
+            initiatePayload)));
+        transport.Complete();
+        await serverTask.WaitAsync(TimeSpan.FromSeconds(3));
 
         transport.SentFrames.Should().ContainSingle();
         transport.SentFrames.TryPeek(out var registerAck).Should().BeTrue();
-        registerAck.Should().Equal((byte)FrameType.RegisterAck, 1);
+        AssertRegisterAck(registerAck, expectedSuccess: true);
     }
 
     [Test]
@@ -179,7 +182,7 @@ public sealed class BoltPhase0ContainmentTests
         second.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "limited-client", "LimitedClient")));
         await second.WaitForSentFramesAsync(1);
 
-        second.SentFrames.Single().Should().Equal((byte)FrameType.RegisterAck, 0);
+        AssertRegisterAck(second.SentFrames.Single(), expectedSuccess: false);
         first.Complete();
         second.Complete();
         await Task.WhenAll(firstTask, secondTask).WaitAsync(TimeSpan.FromSeconds(3));
@@ -202,13 +205,18 @@ public sealed class BoltPhase0ContainmentTests
         second.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "rotating-b", "BrowserB")));
         await second.WaitForSentFramesAsync(1);
 
-        second.SentFrames.Single().Should().Equal((byte)FrameType.RegisterAck, 0);
-        var serviceHashField = typeof(BoltServer).GetField(
-            "_clientIdsByServiceHash",
+        AssertRegisterAck(second.SentFrames.Single(), expectedSuccess: false);
+        var serviceRouteField = typeof(BoltServer).GetField(
+            "_connectionsByServiceHash",
             BindingFlags.Instance | BindingFlags.NonPublic);
-        serviceHashField.Should().NotBeNull();
-        var registeredHashes = (ConcurrentDictionary<int, string>)serviceHashField!.GetValue(server)!;
-        registeredHashes.Values.Should().Equal("rotating-a");
+        serviceRouteField.Should().NotBeNull();
+        var registeredRoutes = serviceRouteField!.GetValue(server)!;
+        var values = (System.Collections.IEnumerable)registeredRoutes
+            .GetType()
+            .GetProperty("Values")!
+            .GetValue(registeredRoutes)!;
+        var route = values.Cast<object>().Should().ContainSingle().Subject;
+        route.GetType().GetProperty("ClientId")!.GetValue(route).Should().Be("rotating-a");
 
         first.Complete();
         second.Complete();
@@ -240,7 +248,7 @@ public sealed class BoltPhase0ContainmentTests
             BoltCodec.WriteRegister(writer, "legacy-id", "XFramework.Legacy")));
         await transport.WaitForSentFramesAsync(1);
 
-        transport.SentFrames.Single().Should().Equal((byte)FrameType.RegisterAck, 1);
+        AssertRegisterAck(transport.SentFrames.Single(), expectedSuccess: true);
         transport.Complete();
         await serverTask.WaitAsync(TimeSpan.FromSeconds(3));
     }
@@ -268,7 +276,7 @@ public sealed class BoltPhase0ContainmentTests
                 CreateUserPrincipal("ordinary-user"),
                 CancellationToken.None);
 
-            transport.SentFrames.Single().Should().Equal((byte)FrameType.RegisterAck, 0);
+            AssertRegisterAck(transport.SentFrames.Single(), expectedSuccess: false);
         }
     }
 
@@ -603,6 +611,96 @@ public sealed class BoltPhase0ContainmentTests
     }
 
     [Test]
+    public async Task DurableAck_DeniedByAuthorizer_DoesNotAdvanceQueue()
+    {
+        var authorizer = new DenyAckAuthorizer();
+        var durableOptions = Options.Create(new DurableQueueOptions());
+        var durableStore = new InMemoryDurableQueueStore(
+            durableOptions,
+            NullLogger<InMemoryDurableQueueStore>.Instance);
+        using var server = new BoltServer(
+            NullLogger<BoltServer>.Instance,
+            new BoltServerOptions(),
+            durableStore,
+            durableOptions,
+            [authorizer]);
+        await using var subscriber = new ChannelBoltConnection();
+        var connectionTask = server.HandleConnectionAsync(subscriber, CancellationToken.None);
+
+        subscriber.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "ack-subscriber", "AckSubscriber")));
+        await subscriber.WaitForSentFramesAsync(1);
+
+        const string topic = "durable.ack.authorization";
+        const string subscriberId = "ack-subscriber-id";
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        subscriber.Enqueue(WriteFrame(writer => BoltCodec.WriteSubscribe(
+            writer,
+            topic,
+            subscriberId,
+            durable: true)));
+        await WaitForDurableBindingAsync(server, topic, subscriberId, "ack-subscriber");
+        var sequence = await durableStore.AppendAsync(topicHash, subscriberId, new byte[] { 1 });
+
+        subscriber.Enqueue(WriteFrame(writer => BoltCodec.WriteAck(
+            writer,
+            topic,
+            subscriberId,
+            sequence,
+            actorAccessToken: "revoked-token")));
+        await authorizer.AckObserved.WaitAsync(TimeSpan.FromSeconds(3));
+        await Task.Delay(20);
+
+        (await durableStore.GetLastAckedSequenceAsync(topicHash, subscriberId)).Should().Be(0);
+
+        subscriber.Complete();
+        await connectionTask.WaitAsync(TimeSpan.FromSeconds(3));
+    }
+
+    [Test]
+    public async Task DurableAck_OldOwnerReplacedDuringAuthorization_DoesNotAdvanceQueue()
+    {
+        var authorizer = new DelayedAckAuthorizer();
+        var durableOptions = Options.Create(new DurableQueueOptions());
+        var durableStore = new InMemoryDurableQueueStore(
+            durableOptions,
+            NullLogger<InMemoryDurableQueueStore>.Instance);
+        using var server = new BoltServer(
+            NullLogger<BoltServer>.Instance,
+            new BoltServerOptions(),
+            durableStore,
+            durableOptions,
+            [authorizer]);
+        await using var first = new ChannelBoltConnection();
+        await using var second = new ChannelBoltConnection();
+        var firstTask = server.HandleConnectionAsync(first, CancellationToken.None);
+        var secondTask = server.HandleConnectionAsync(second, CancellationToken.None);
+
+        first.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "ack-first", "AckFirst")));
+        second.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "ack-second", "AckSecond")));
+        await Task.WhenAll(first.WaitForSentFramesAsync(1), second.WaitForSentFramesAsync(1));
+
+        const string topic = "durable.ack.replacement";
+        const string subscriberId = "ack-replacement-id";
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        first.Enqueue(WriteFrame(writer => BoltCodec.WriteSubscribe(writer, topic, subscriberId, durable: true)));
+        await WaitForDurableBindingAsync(server, topic, subscriberId, "ack-first");
+        var sequence = await durableStore.AppendAsync(topicHash, subscriberId, new byte[] { 1 });
+
+        first.Enqueue(WriteFrame(writer => BoltCodec.WriteAck(writer, topic, subscriberId, sequence, "token")));
+        await authorizer.AckStarted.WaitAsync(TimeSpan.FromSeconds(3));
+        second.Enqueue(WriteFrame(writer => BoltCodec.WriteSubscribe(writer, topic, subscriberId, durable: true)));
+        await WaitForDurableBindingAsync(server, topic, subscriberId, "ack-second");
+        authorizer.ReleaseAck();
+        await Task.Delay(50);
+
+        (await durableStore.GetLastAckedSequenceAsync(topicHash, subscriberId)).Should().Be(0);
+
+        first.Complete();
+        second.Complete();
+        await Task.WhenAll(firstTask, secondTask).WaitAsync(TimeSpan.FromSeconds(3));
+    }
+
+    [Test]
     public async Task DurableSubscriptionReplacement_KeepsExactlyOnePrincipalReservation()
     {
         var authorizer = new CountingAllowAuthorizer();
@@ -823,6 +921,13 @@ public sealed class BoltPhase0ContainmentTests
         return writer.WrittenSpan.ToArray();
     }
 
+    private static void AssertRegisterAck(byte[] frame, bool expectedSuccess)
+    {
+        BoltCodec.TryReadRegisterAck(frame, out var success, out var version).Should().BeTrue();
+        success.Should().Be(expectedSuccess);
+        version.Should().Be(BoltCodec.WireVersion);
+    }
+
     private static byte[] WriteMediaConfig(Guid callId, Guid streamId) =>
         WriteFrame(writer => BoltCodec.WriteMediaConfig(
             writer,
@@ -1013,6 +1118,49 @@ public sealed class BoltPhase0ContainmentTests
             }
 
             Volatile.Read(ref _callCount).Should().BeGreaterThanOrEqualTo(expected);
+        }
+    }
+
+    private sealed class DenyAckAuthorizer : IBoltTopicAuthorizer
+    {
+        private readonly TaskCompletionSource _ackObserved =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task AckObserved => _ackObserved.Task;
+
+        public ValueTask<bool> AuthorizeAsync(
+            BoltTopicAuthorizationContext context,
+            CancellationToken ct = default)
+        {
+            if (context.Operation != BoltTopicOperation.Ack)
+                return ValueTask.FromResult(true);
+
+            _ackObserved.TrySetResult();
+            return ValueTask.FromResult(false);
+        }
+    }
+
+    private sealed class DelayedAckAuthorizer : IBoltTopicAuthorizer
+    {
+        private readonly TaskCompletionSource _ackStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _releaseAck =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task AckStarted => _ackStarted.Task;
+
+        public void ReleaseAck() => _releaseAck.TrySetResult();
+
+        public async ValueTask<bool> AuthorizeAsync(
+            BoltTopicAuthorizationContext context,
+            CancellationToken ct = default)
+        {
+            if (context.Operation != BoltTopicOperation.Ack)
+                return true;
+
+            _ackStarted.TrySetResult();
+            await _releaseAck.Task.WaitAsync(ct);
+            return true;
         }
     }
 

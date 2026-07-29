@@ -148,10 +148,9 @@ public sealed class DirectConnectionManager : IAsyncDisposable
             OnConnectionModeChanged?.Invoke(true);
 
             // Send DirectAnswer confirmation via hub so both sides know
-            var writer = RentedBufferWriter.GetThreadLocal();
+            using var writer = new RentedBufferWriter(64);
             BoltCodec.WriteCallSignal(writer, _callId, SignalType.DirectAnswer, ReadOnlySpan<byte>.Empty);
             await _hubConnection.SendAsync(writer.WrittenMemory, ct);
-            writer.Reset();
 
             // Start receive loop on direct connection
             _receiveTask = Task.Run(() => DirectReceiveLoopAsync(directConn, ct), ct);

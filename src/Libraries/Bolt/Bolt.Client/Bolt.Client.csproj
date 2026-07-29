@@ -9,7 +9,7 @@
         <PackageId>Bolt.Net.Client</PackageId>
         <Version>$(BoltVersion)</Version>
         <Authors>KaizenDevs</Authors>
-        <Description>Bolt — high-performance binary RPC + streaming client for .NET. Connection pooling, typed SendAsync, bidirectional IAsyncEnumerable streaming, DI support for Blazor/ASP.NET. 47% faster than gRPC with 94% less memory.</Description>
+        <Description>Bolt — binary RPC and streaming client for .NET with connection pooling, typed SendAsync, bidirectional IAsyncEnumerable streaming, and DI support.</Description>
         <PackageTags>rpc;binary;client;streaming;websocket;bolt;blazor;high-performance</PackageTags>
         <RepositoryUrl>https://github.com/kaizendevsio/XFramework</RepositoryUrl>
         <PackageProjectUrl>https://github.com/kaizendevsio/XFramework</PackageProjectUrl>

@@ -11,6 +11,9 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
 {
     private ManualResetValueTaskSourceCore<BoltRpcResponse> _core;
     private CancellationTokenRegistration _ctr;
+    private BoltClient? _cancellationOwner;
+    private Guid _requestId;
+    private CancellationToken _cancellationToken;
     private int _completed;
 
     private static readonly ObjectPool<PooledRpcCall> Pool =
@@ -18,10 +21,10 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
 
     public short Version => _core.Version;
 
-    public static PooledRpcCall Rent()
+    public static PooledRpcCall Rent(bool runContinuationsAsynchronously = false)
     {
         var call = Pool.Get();
-        call.ResetForRent();
+        call.ResetForRent(runContinuationsAsynchronously);
         return call;
     }
 
@@ -38,6 +41,27 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
                 self.SetException(new TimeoutException("RPC call timed out"));
             }, this);
         }
+    }
+
+    internal void RegisterCancellation(
+        CancellationToken ct,
+        BoltClient owner,
+        Guid requestId)
+    {
+        if (!ct.CanBeCanceled)
+            return;
+
+        _cancellationOwner = owner;
+        _requestId = requestId;
+        _cancellationToken = ct;
+        _ctr = ct.UnsafeRegister(static state =>
+        {
+            var self = (PooledRpcCall)state!;
+            self._cancellationOwner?.CancelPendingCall(
+                self._requestId,
+                self,
+                self._cancellationToken);
+        }, this);
     }
 
     public void SetResult(BoltRpcResponse result)
@@ -66,6 +90,9 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
         {
             _ctr.Dispose();
             _ctr = default;
+            _cancellationOwner = null;
+            _requestId = default;
+            _cancellationToken = default;
             Pool.Return(this);
         }
     }
@@ -84,9 +111,14 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
         public bool Return(PooledRpcCall obj) => true;
     }
 
-    private void ResetForRent()
+    private void ResetForRent(bool runContinuationsAsynchronously)
     {
+        _core.RunContinuationsAsynchronously = runContinuationsAsynchronously;
         _core.Reset();
+        _ctr = default;
+        _cancellationOwner = null;
+        _requestId = default;
+        _cancellationToken = default;
         _completed = 0;
     }
 }

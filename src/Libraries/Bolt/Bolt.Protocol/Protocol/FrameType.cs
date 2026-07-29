@@ -9,9 +9,9 @@ public enum FrameType : byte
     Request = 0x01,
     /// <summary>RPC response: [1:type] [16:requestId] [2:statusCode] [4:payloadLen] [payload]</summary>
     Response = 0x02,
-    /// <summary>Client registration: [1:type] [4:clientIdLen] [clientId] [4:clientNameLen] [clientName]</summary>
+    /// <summary>Client registration: [1:type] [2:wireVersion] [4:clientIdLen] [clientId] [4:clientNameLen] [clientName]</summary>
     Register = 0x03,
-    /// <summary>Registration ack: [1:type] [1:success]</summary>
+    /// <summary>Registration ack: [1:type] [1:success] [2:wireVersion]</summary>
     RegisterAck = 0x04,
     /// <summary>Fire-and-forget push: same header as Request, including senderHash</summary>
     Push = 0x05,
@@ -25,6 +25,10 @@ public enum FrameType : byte
     Event = 0x09,
     /// <summary>Acknowledge durable messages: [1:type] [4:topicHash] [4:topicLen] [topic] [4:subscriberIdLen] [subscriberId] [8:upToSequenceNumber] [4:actorTokenLen] [actorToken]</summary>
     Ack = 0x0A,
+    /// <summary>Cancel an in-flight RPC request: [1:type] [16:requestId]</summary>
+    RequestCancel = 0x0B,
+    /// <summary>Validated collection of length-prefixed non-media frames.</summary>
+    Batch = 0x0C,
     /// <summary>Open bidirectional stream: [1:type] [16:streamId] [4:recipientHash] [4:commandHash]</summary>
     StreamOpen = 0x10,
     /// <summary>Stream data chunk: [1:type] [16:streamId] [4:payloadLen] [payload]</summary>

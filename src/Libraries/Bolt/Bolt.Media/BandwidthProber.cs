@@ -112,7 +112,6 @@ public sealed class BandwidthProber : IAsyncDisposable
                 var writer = RentedBufferWriter.GetThreadLocal();
                 BoltCodec.WriteMediaFrame(writer, _streamId, (uint)(0xFFFF0000 | i), timestamp, ProbeFlags, probePayload);
                 await _connection.SendAsync(writer.WrittenMemory, ct);
-                writer.Reset();
 
                 if (BurstInterFrameDelayMs > 0)
                     await Task.Delay(BurstInterFrameDelayMs, ct);

@@ -1,0 +1,48 @@
+{
+  "Repetition": 1,
+  "Position": 4,
+  "ProcessId": 35932,
+  "Topology": "Direct_Bolt",
+  "ChunkSize": null,
+  "PayloadBytes": 1024,
+  "Concurrency": 1024,
+  "Requests": 6144,
+  "WarmupRequests": 1024,
+  "ElapsedMilliseconds": 21.9633,
+  "ThroughputRequestsPerSecond": 279739.38342598785,
+  "Latency": {
+    "MeanMilliseconds": 2.903469596354167,
+    "P50Milliseconds": 2.202,
+    "P95Milliseconds": 10.2066,
+    "P99Milliseconds": 10.257800000000001,
+    "MaxMilliseconds": 10.2936
+  },
+  "CpuMilliseconds": 140.625,
+  "Gen2Collections": 0,
+  "BaselineWorkingSetBytes": 80171008,
+  "PeakWorkingSetBytes": 97603584,
+  "PeakWorkingSetDeltaBytes": 17432576,
+  "BaselineManagedHeapBytes": 5912864,
+  "PeakManagedHeapBytes": 28905944,
+  "PeakManagedHeapDeltaBytes": 22993080,
+  "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+  "EffectiveSettings": {
+    "topology": "Direct_Bolt",
+    "logicalPath": "caller -\u003E Bolt server",
+    "payloadBytes": 1024,
+    "callTimeoutSeconds": 60,
+    "largePayloadThresholdBytes": 2097152,
+    "streamChunkSizeBytes": 131051,
+    "pipelineBytes": 2097152,
+    "receiveBufferBytes": 65536,
+    "hubReceiveBufferBytes": 262144,
+    "runRpcContinuationsAsynchronously": true,
+    "grpcHttp2MaxStreamsPerConnection": null,
+    "grpcCallerChannelCount": null,
+    "grpcBackendChannelCount": 0,
+    "grpcMultipleHttp2ConnectionsEnabled": null,
+    "serverAddresses": [
+      "http://127.0.0.1:56172/"
+    ]
+  }
+}

@@ -51,6 +51,7 @@ public class BoltDriverIntegrationTests
     public async Task TearDown()
     {
         try { await _serverApp.StopAsync(); } catch { }
+        try { await _serverApp.DisposeAsync(); } catch { }
     }
 
     [Test]
@@ -126,16 +127,31 @@ public class BoltDriverIntegrationTests
     {
         await using var sender = CreateClient("stream-cleanup-a", "StreamCleanupA");
         await using var receiver = CreateClient("stream-cleanup-b", "StreamCleanupB");
+        var streamAccepted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        receiver.RegisterStreamHandler("unused-stream", async _ =>
+        {
+            streamAccepted.TrySetResult();
+            await releaseHandler.Task;
+        });
 
         await receiver.ConnectAsync();
         await sender.ConnectAsync();
 
-        var stream = await sender.OpenStreamAsync("stream-cleanup-b", "unused-stream");
-        GetActiveStreamCount(sender).Should().Be(1);
+        try
+        {
+            var stream = await sender.OpenStreamAsync("stream-cleanup-b", "unused-stream");
+            await streamAccepted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            GetActiveStreamCount(sender).Should().Be(1);
 
-        await stream.CloseAsync();
+            await stream.CloseAsync();
 
-        GetActiveStreamCount(sender).Should().Be(0);
+            GetActiveStreamCount(sender).Should().Be(0);
+        }
+        finally
+        {
+            releaseHandler.TrySetResult();
+        }
     }
 
     [Test]

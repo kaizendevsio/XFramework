@@ -4,11 +4,9 @@ namespace Bolt.Protocol.Buffers;
 
 /// <summary>
 /// A MemoryManager that wraps an ArrayPool-rented buffer.
-/// When this object is collected by the GC, the buffer is automatically returned to the pool.
-///
 /// Use this instead of GC.AllocateUninitializedArray / new byte[] when you need a
-/// ReadOnlyMemory&lt;byte&gt; whose lifetime is tied to a consumer (e.g. pending RPC response,
-/// channel item) and explicit Dispose isn't practical.
+/// ReadOnlyMemory&lt;byte&gt; whose lifetime is scoped to a consumer. The owner must be
+/// disposed deterministically after the consumer finishes with the memory.
 ///
 /// Allocation cost: ~32 bytes (object header) vs 512KB+ for the payload byte[].
 /// The payload byte[] comes from ArrayPool and is recycled, not GC-tracked.
@@ -54,8 +52,4 @@ public sealed class PooledMemoryOwner : MemoryManager<byte>
         if (arr is not null)
             ArrayPool<byte>.Shared.Return(arr);
     }
-
-#pragma warning disable CA2015 // Intentional: finalizer ensures ArrayPool buffer is returned even if consumer forgets to dispose
-    ~PooledMemoryOwner() => Dispose(false);
-#pragma warning restore CA2015
 }

@@ -151,7 +151,6 @@ public sealed class AdaptiveBitrateController : IAsyncDisposable
                 var writer = RentedBufferWriter.GetThreadLocal();
                 BoltCodec.WriteMediaFeedback(writer, _streamId, _highestSeqReceived, _cumulativeLost, jitterX100, 0, hint);
                 await _connection.SendAsync(writer.WrittenMemory, ct);
-                writer.Reset();
             }
             catch (OperationCanceledException)
             {

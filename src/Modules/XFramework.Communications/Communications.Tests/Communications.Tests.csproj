@@ -21,9 +21,14 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\..\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
       <ProjectReference Include="..\Communications.Api\Communications.Api.csproj" />
       <ProjectReference Include="..\Communications.Integration\Communications.Integration.csproj" />
       <ProjectReference Include="..\..\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
 </Project>

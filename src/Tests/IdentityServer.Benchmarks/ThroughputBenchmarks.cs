@@ -25,11 +25,9 @@ using Contracts = IdentityServer.Domain.Shared.Contracts;
 namespace IdentityServer.Benchmarks;
 
 /// <summary>
-/// Maximum throughput benchmark — fires as many RPCs as possible using
-/// Parallel.ForEachAsync to saturate the machine. Each iteration processes
-/// a batch of 1000 requests at max parallelism.
-///
-/// Reports: total batch time and derived ops/sec.
+/// Concurrent path-throughput benchmark for validated 100-request batches.
+/// Paths execute different application stacks and must only be compared with their own
+/// prior runs. OperationsPerInvoke normalizes throughput, not request-level latency.
 /// </summary>
 [Config(typeof(ThroughputConfig))]
 [MemoryDiagnoser]
@@ -135,7 +133,7 @@ public class ThroughputBenchmarks
     private async Task SetupBolt()
     {
         var thinServerUri = new Uri($"ws://localhost:19400/bolt/ws");
-        var config = new BoltClientOptions { RpcTimeoutSeconds = 60 };
+        var config = new BoltClientOptions { RpcTimeoutSeconds = 60, MinConnections = 1, MaxConnections = 1 };
         var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
         var serviceId = "3902761a822d4c6b8e2d323fd501bcd6";
 
@@ -222,19 +220,15 @@ public class ThroughputBenchmarks
     };
 
     /// <summary>
-    /// Max throughput: fire 1000 requests at max parallelism.
-    /// BenchmarkDotNet measures total batch time. Derived ops/sec = 1000 / mean_seconds.
-    /// </summary>
-    /// <summary>
     /// Fire BatchSize requests concurrently via Task.WhenAll (same pattern as concurrent benchmark).
-    /// OperationsPerInvoke tells BenchmarkDotNet to divide time by BatchSize for per-op metrics.
+    /// OperationsPerInvoke normalizes throughput; batch time is not request latency.
     /// </summary>
     [Benchmark(Baseline = true, OperationsPerInvoke = BatchSize)]
     public async Task Http_MaxThroughput()
     {
         var tasks = new Task[BatchSize];
         for (int i = 0; i < BatchSize; i++)
-            tasks[i] = _httpClient.PostAsJsonAsync("/api/health/check", MakeRequest());
+            tasks[i] = ValidateHttp(_httpClient.PostAsJsonAsync("/api/health/check", MakeRequest()));
         await Task.WhenAll(tasks);
     }
 
@@ -243,11 +237,11 @@ public class ThroughputBenchmarks
     {
         var tasks = new Task[BatchSize];
         for (int i = 0; i < BatchSize; i++)
-            tasks[i] = _grpcClient.CheckAsync(new HealthCheckReq
+            tasks[i] = ValidateGrpc(_grpcClient.CheckAsync(new HealthCheckReq
             {
                 TenantId = TestTenantId.ToString(),
                 RequestId = Guid.NewGuid().ToString()
-            }).ResponseAsync;
+            }).ResponseAsync);
         await Task.WhenAll(tasks);
     }
 
@@ -258,11 +252,32 @@ public class ThroughputBenchmarks
         for (int i = 0; i < BatchSize; i++)
         {
             var payload = MemoryPackSerializer.Serialize(MakeRequest());
-            tasks[i] = _thinCallerClient.InvokeAsync(
+            tasks[i] = ValidateBolt(_thinCallerClient.InvokeAsync(
                 "3902761a822d4c6b8e2d323fd501bcd6",
-                typeof(HealthCheckRequest).GetTypeFullName(), payload);
+                typeof(HealthCheckRequest).GetTypeFullName(), payload));
         }
         await Task.WhenAll(tasks);
+    }
+
+    private static async Task ValidateHttp(Task<HttpResponseMessage> pending)
+    {
+        using var response = await pending;
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task ValidateGrpc(Task<HealthCheckResp> pending)
+    {
+        if (!string.Equals((await pending).Status, "Healthy", StringComparison.Ordinal))
+            throw new InvalidOperationException("gRPC returned an invalid health response.");
+    }
+
+    private static async Task ValidateBolt(
+        Task<(System.Net.HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload)> pending)
+    {
+        var response = await pending;
+        var body = MemoryPackSerializer.Deserialize<QueryResponse<HealthCheckResponse>>(response.Payload.Span);
+        if (response.StatusCode != System.Net.HttpStatusCode.OK || body?.Response is null)
+            throw new InvalidOperationException("Bolt returned an invalid health response.");
     }
 
     [GlobalCleanup]

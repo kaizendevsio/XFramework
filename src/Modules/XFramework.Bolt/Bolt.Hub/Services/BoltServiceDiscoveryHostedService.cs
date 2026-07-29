@@ -9,9 +9,9 @@ namespace Bolt.Hub.Services;
 public sealed class BoltServiceDiscoveryHostedService(
     BoltServer server,
     IServiceScopeFactory scopeFactory,
-    ILogger<BoltServiceDiscoveryHostedService> logger) : IHostedService
+    ILogger<BoltServiceDiscoveryHostedService> logger) : BackgroundService
 {
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public override async Task StartAsync(CancellationToken cancellationToken)
     {
         logger.LogWarning(
             "Bolt service discovery presence is single-instance only. Do not horizontally scale Bolt Hub service discovery until instance-scoped leases are implemented.");
@@ -36,19 +36,38 @@ public sealed class BoltServiceDiscoveryHostedService(
         server.ClientDisconnected += HandleClientDisconnectedAsync;
 
         logger.LogInformation("Bolt service discovery registry handlers registered");
+        await base.StartAsync(cancellationToken);
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromHours(6));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                using var scope = scopeFactory.CreateScope();
+                var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
+                await registry.RetireStaleAsync(stoppingToken);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
     {
         server.ClientRegistered -= HandleClientRegisteredAsync;
         server.ClientDisconnected -= HandleClientDisconnectedAsync;
-        return Task.CompletedTask;
+        await base.StopAsync(cancellationToken);
     }
 
     private async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> HandleAdvertiseServiceManifestAsync(
         BoltRequestContext context,
         ReadOnlyMemory<byte> payload,
-        Guid requestId)
+        Guid requestId,
+        CancellationToken ct)
     {
         var manifest = MemoryPackSerializer.Deserialize<BoltServiceManifest>(payload.Span);
         if (manifest is null)
@@ -62,7 +81,7 @@ public sealed class BoltServiceDiscoveryHostedService(
 
         using var scope = scopeFactory.CreateScope();
         var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
-        var response = await registry.AdvertiseAsync(context, manifest, CancellationToken.None);
+        var response = await registry.AdvertiseAsync(context, manifest, ct);
 
         return Serialize(response.Accepted ? HttpStatusCode.OK : HttpStatusCode.BadRequest, response);
     }
@@ -70,7 +89,8 @@ public sealed class BoltServiceDiscoveryHostedService(
     private async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> HandleGetServiceRegistryAsync(
         BoltRequestContext context,
         ReadOnlyMemory<byte> payload,
-        Guid requestId)
+        Guid requestId,
+        CancellationToken ct)
     {
         if (!BoltAuthorizationPolicies.IsServiceDiscoveryReader(context.User))
         {
@@ -87,7 +107,7 @@ public sealed class BoltServiceDiscoveryHostedService(
 
         using var scope = scopeFactory.CreateScope();
         var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
-        var response = await registry.GetServicesAsync(request, CancellationToken.None);
+        var response = await registry.GetServicesAsync(request, ct);
 
         return Serialize(HttpStatusCode.OK, response);
     }
@@ -95,7 +115,8 @@ public sealed class BoltServiceDiscoveryHostedService(
     private async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> HandleGetModuleRegistryAsync(
         BoltRequestContext context,
         ReadOnlyMemory<byte> payload,
-        Guid requestId)
+        Guid requestId,
+        CancellationToken ct)
     {
         if (!BoltAuthorizationPolicies.IsServiceDiscoveryReader(context.User))
         {
@@ -112,7 +133,7 @@ public sealed class BoltServiceDiscoveryHostedService(
 
         using var scope = scopeFactory.CreateScope();
         var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
-        var response = await registry.GetModulesAsync(request, CancellationToken.None);
+        var response = await registry.GetModulesAsync(request, ct);
 
         return Serialize(HttpStatusCode.OK, response);
     }

@@ -35,6 +35,11 @@ public sealed class BoltServerTransportHealthTests
             MaxMediaStreamsPerPrincipal = 7,
             MaxSubscriptionsPerPrincipal = 11,
             MaxDurableSubscribersPerTopic = 13,
+            RpcRequestsPerSecond = 17,
+            RpcRequestBurst = 19,
+            RpcInboundBytesPerSecond = 23,
+            RpcInboundByteBurst = 29,
+            RequireTopicAuthorization = false,
             MediaEnabled = false
         };
         using var server = new BoltServer(NullLogger<BoltServer>.Instance, options);
@@ -49,6 +54,7 @@ public sealed class BoltServerTransportHealthTests
         snapshot.ActiveLogicalStreams.Should().Be(0);
         snapshot.ActiveCalls.Should().Be(0);
         snapshot.ActiveSubscriptionReservations.Should().Be(0);
+        snapshot.ActiveRateLimitPrincipals.Should().Be(0);
         snapshot.AggregateQueuedSendBytes.Should().Be(0);
         snapshot.RunningSendLoops.Should().Be(0);
         snapshot.FaultedSendLoops.Should().Be(0);
@@ -66,6 +72,11 @@ public sealed class BoltServerTransportHealthTests
             MaximumMediaStreamsPerPrincipal: 7,
             MaximumSubscriptionsPerPrincipal: 11,
             MaximumDurableSubscribersPerTopic: 13,
+            RpcRequestsPerSecond: 17,
+            RpcRequestBurst: 19,
+            RpcInboundBytesPerSecond: 23,
+            RpcInboundByteBurst: 29,
+            RequireTopicAuthorization: false,
             MediaEnabled: false));
     }
 

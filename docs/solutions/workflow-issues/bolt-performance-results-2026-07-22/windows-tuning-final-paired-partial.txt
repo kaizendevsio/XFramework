@@ -1,0 +1,2101 @@
+// Validating benchmarks:
+// ***** BenchmarkRunner: Start   *****
+// ***** Found 10 benchmark(s) in total *****
+// ***** Building 1 exe(s) in Parallel: Start   *****
+// start dotnet  restore /p:UseSharedCompilation=false /p:BuildInParallel=false /m:1 /p:Deterministic=true /p:Optimize=true /p:IntermediateOutputPath="C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\obj\Release\net10.0/" /p:OutDir="C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0/" /p:OutputPath="C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0/" in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea
+// command took 2.53 sec and exited with 0
+// start dotnet  build -c Release --no-restore /p:UseSharedCompilation=false /p:BuildInParallel=false /m:1 /p:Deterministic=true /p:Optimize=true /p:IntermediateOutputPath="C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\obj\Release\net10.0/" /p:OutDir="C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0/" /p:OutputPath="C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0/" --output "C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0/" in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea
+// command took 55.4 sec and exited with 0
+// ***** Done, took 00:00:58 (58.09 sec)   *****
+// Found 10 benchmarks:
+//   PayloadBenchmarks.Bolt_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=524288]
+//   PayloadBenchmarks.GRPC_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=524288]
+//   PayloadBenchmarks.Bolt_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=1048576]
+//   PayloadBenchmarks.GRPC_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=1048576]
+//   PayloadBenchmarks.Bolt_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=2097152]
+//   PayloadBenchmarks.GRPC_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=2097152]
+//   PayloadBenchmarks.Bolt_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=5242880]
+//   PayloadBenchmarks.GRPC_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=5242880]
+//   PayloadBenchmarks.Bolt_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=20971520]
+//   PayloadBenchmarks.GRPC_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=20971520]
+
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: PayloadBenchmarks.Bolt_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=524288]
+// *** Execute ***
+// Launch: 1 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2592 1948 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 524288)" --job PayloadCredible --benchmarkId 0 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 189100.00 ns, 189.1000 us/op
+WorkloadJitting  1: 1 op, 6241100.00 ns, 6.2411 ms/op
+
+OverheadJitting  2: 16 op, 434900.00 ns, 27.1813 us/op
+WorkloadJitting  2: 16 op, 68951100.00 ns, 4.3094 ms/op
+
+WorkloadPilot    1: 16 op, 70794800.00 ns, 4.4247 ms/op
+WorkloadPilot    2: 32 op, 178071700.00 ns, 5.5647 ms/op
+WorkloadPilot    3: 64 op, 220596500.00 ns, 3.4468 ms/op
+WorkloadPilot    4: 128 op, 494251400.00 ns, 3.8613 ms/op
+
+OverheadWarmup   1: 128 op, 4900.00 ns, 38.2813 ns/op
+OverheadWarmup   2: 128 op, 2200.00 ns, 17.1875 ns/op
+OverheadWarmup   3: 128 op, 1600.00 ns, 12.5000 ns/op
+OverheadWarmup   4: 128 op, 1600.00 ns, 12.5000 ns/op
+OverheadWarmup   5: 128 op, 1300.00 ns, 10.1563 ns/op
+OverheadWarmup   6: 128 op, 1500.00 ns, 11.7188 ns/op
+OverheadWarmup   7: 128 op, 1800.00 ns, 14.0625 ns/op
+OverheadWarmup   8: 128 op, 1400.00 ns, 10.9375 ns/op
+
+OverheadActual   1: 128 op, 2200.00 ns, 17.1875 ns/op
+OverheadActual   2: 128 op, 1700.00 ns, 13.2813 ns/op
+OverheadActual   3: 128 op, 2100.00 ns, 16.4063 ns/op
+OverheadActual   4: 128 op, 2100.00 ns, 16.4063 ns/op
+OverheadActual   5: 128 op, 1200.00 ns, 9.3750 ns/op
+OverheadActual   6: 128 op, 2000.00 ns, 15.6250 ns/op
+OverheadActual   7: 128 op, 1900.00 ns, 14.8438 ns/op
+OverheadActual   8: 128 op, 1500.00 ns, 11.7188 ns/op
+OverheadActual   9: 128 op, 2100.00 ns, 16.4063 ns/op
+OverheadActual  10: 128 op, 2900.00 ns, 22.6563 ns/op
+OverheadActual  11: 128 op, 1400.00 ns, 10.9375 ns/op
+OverheadActual  12: 128 op, 2100.00 ns, 16.4063 ns/op
+OverheadActual  13: 128 op, 1800.00 ns, 14.0625 ns/op
+OverheadActual  14: 128 op, 1500.00 ns, 11.7188 ns/op
+OverheadActual  15: 128 op, 1500.00 ns, 11.7188 ns/op
+OverheadActual  16: 128 op, 1400.00 ns, 10.9375 ns/op
+OverheadActual  17: 128 op, 5100.00 ns, 39.8438 ns/op
+OverheadActual  18: 128 op, 2100.00 ns, 16.4063 ns/op
+OverheadActual  19: 128 op, 1800.00 ns, 14.0625 ns/op
+OverheadActual  20: 128 op, 1600.00 ns, 12.5000 ns/op
+
+WorkloadWarmup   1: 128 op, 515688700.00 ns, 4.0288 ms/op
+WorkloadWarmup   2: 128 op, 569764900.00 ns, 4.4513 ms/op
+WorkloadWarmup   3: 128 op, 560358300.00 ns, 4.3778 ms/op
+WorkloadWarmup   4: 128 op, 563211900.00 ns, 4.4001 ms/op
+WorkloadWarmup   5: 128 op, 444517100.00 ns, 3.4728 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 128 op, 403360100.00 ns, 3.1513 ms/op
+WorkloadActual   2: 128 op, 417687600.00 ns, 3.2632 ms/op
+WorkloadActual   3: 128 op, 474918600.00 ns, 3.7103 ms/op
+WorkloadActual   4: 128 op, 549674600.00 ns, 4.2943 ms/op
+WorkloadActual   5: 128 op, 444391400.00 ns, 3.4718 ms/op
+WorkloadActual   6: 128 op, 464566100.00 ns, 3.6294 ms/op
+WorkloadActual   7: 128 op, 435754300.00 ns, 3.4043 ms/op
+WorkloadActual   8: 128 op, 384483200.00 ns, 3.0038 ms/op
+WorkloadActual   9: 128 op, 498200000.00 ns, 3.8922 ms/op
+WorkloadActual  10: 128 op, 399358100.00 ns, 3.1200 ms/op
+WorkloadActual  11: 128 op, 505667300.00 ns, 3.9505 ms/op
+WorkloadActual  12: 128 op, 602125000.00 ns, 4.7041 ms/op
+WorkloadActual  13: 128 op, 433167300.00 ns, 3.3841 ms/op
+WorkloadActual  14: 128 op, 498693800.00 ns, 3.8960 ms/op
+WorkloadActual  15: 128 op, 512962500.00 ns, 4.0075 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 128 op, 403358250.00 ns, 3.1512 ms/op
+WorkloadResult   2: 128 op, 417685750.00 ns, 3.2632 ms/op
+WorkloadResult   3: 128 op, 474916750.00 ns, 3.7103 ms/op
+WorkloadResult   4: 128 op, 549672750.00 ns, 4.2943 ms/op
+WorkloadResult   5: 128 op, 444389550.00 ns, 3.4718 ms/op
+WorkloadResult   6: 128 op, 464564250.00 ns, 3.6294 ms/op
+WorkloadResult   7: 128 op, 435752450.00 ns, 3.4043 ms/op
+WorkloadResult   8: 128 op, 384481350.00 ns, 3.0038 ms/op
+WorkloadResult   9: 128 op, 498198150.00 ns, 3.8922 ms/op
+WorkloadResult  10: 128 op, 399356250.00 ns, 3.1200 ms/op
+WorkloadResult  11: 128 op, 505665450.00 ns, 3.9505 ms/op
+WorkloadResult  12: 128 op, 602123150.00 ns, 4.7041 ms/op
+WorkloadResult  13: 128 op, 433165450.00 ns, 3.3841 ms/op
+WorkloadResult  14: 128 op, 498691950.00 ns, 3.8960 ms/op
+WorkloadResult  15: 128 op, 512960650.00 ns, 4.0075 ms/op
+// GC:  1 1 1 68164176 128
+// Threading:  13256 12 128
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_svc
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+// AfterAll
+// Benchmark Process 39524 has exited with code 0.
+// Launch: 2 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2736 2000 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 524288)" --job PayloadCredible --benchmarkId 0 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 221100.00 ns, 221.1000 us/op
+WorkloadJitting  1: 1 op, 5294000.00 ns, 5.2940 ms/op
+
+OverheadJitting  2: 16 op, 269800.00 ns, 16.8625 us/op
+WorkloadJitting  2: 16 op, 43719200.00 ns, 2.7325 ms/op
+
+WorkloadPilot    1: 16 op, 106800200.00 ns, 6.6750 ms/op
+WorkloadPilot    2: 32 op, 167224700.00 ns, 5.2258 ms/op
+WorkloadPilot    3: 64 op, 332668300.00 ns, 5.1979 ms/op
+
+OverheadWarmup   1: 64 op, 4000.00 ns, 62.5000 ns/op
+OverheadWarmup   2: 64 op, 2500.00 ns, 39.0625 ns/op
+OverheadWarmup   3: 64 op, 3100.00 ns, 48.4375 ns/op
+OverheadWarmup   4: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadWarmup   5: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadWarmup   6: 64 op, 1600.00 ns, 25.0000 ns/op
+
+OverheadActual   1: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual   2: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual   3: 64 op, 2300.00 ns, 35.9375 ns/op
+OverheadActual   4: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   5: 64 op, 2400.00 ns, 37.5000 ns/op
+OverheadActual   6: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual   7: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   8: 64 op, 5000.00 ns, 78.1250 ns/op
+OverheadActual   9: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  10: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual  11: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  12: 64 op, 1100.00 ns, 17.1875 ns/op
+OverheadActual  13: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual  14: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual  15: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual  16: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadActual  17: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual  18: 64 op, 1000.00 ns, 15.6250 ns/op
+OverheadActual  19: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  20: 64 op, 1200.00 ns, 18.7500 ns/op
+
+WorkloadWarmup   1: 64 op, 343524500.00 ns, 5.3676 ms/op
+WorkloadWarmup   2: 64 op, 305036400.00 ns, 4.7662 ms/op
+WorkloadWarmup   3: 64 op, 343171100.00 ns, 5.3620 ms/op
+WorkloadWarmup   4: 64 op, 239061800.00 ns, 3.7353 ms/op
+WorkloadWarmup   5: 64 op, 187328500.00 ns, 2.9270 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 157805600.00 ns, 2.4657 ms/op
+WorkloadActual   2: 64 op, 279552200.00 ns, 4.3680 ms/op
+WorkloadActual   3: 64 op, 279945800.00 ns, 4.3742 ms/op
+WorkloadActual   4: 64 op, 253701000.00 ns, 3.9641 ms/op
+WorkloadActual   5: 64 op, 275211200.00 ns, 4.3002 ms/op
+WorkloadActual   6: 64 op, 173230900.00 ns, 2.7067 ms/op
+WorkloadActual   7: 64 op, 200058900.00 ns, 3.1259 ms/op
+WorkloadActual   8: 64 op, 291951600.00 ns, 4.5617 ms/op
+WorkloadActual   9: 64 op, 230355300.00 ns, 3.5993 ms/op
+WorkloadActual  10: 64 op, 238652100.00 ns, 3.7289 ms/op
+WorkloadActual  11: 64 op, 305932400.00 ns, 4.7802 ms/op
+WorkloadActual  12: 64 op, 188660400.00 ns, 2.9478 ms/op
+WorkloadActual  13: 64 op, 242656100.00 ns, 3.7915 ms/op
+WorkloadActual  14: 64 op, 298911600.00 ns, 4.6705 ms/op
+WorkloadActual  15: 64 op, 281769500.00 ns, 4.4026 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 157803800.00 ns, 2.4657 ms/op
+WorkloadResult   2: 64 op, 279550400.00 ns, 4.3680 ms/op
+WorkloadResult   3: 64 op, 279944000.00 ns, 4.3741 ms/op
+WorkloadResult   4: 64 op, 253699200.00 ns, 3.9641 ms/op
+WorkloadResult   5: 64 op, 275209400.00 ns, 4.3001 ms/op
+WorkloadResult   6: 64 op, 173229100.00 ns, 2.7067 ms/op
+WorkloadResult   7: 64 op, 200057100.00 ns, 3.1259 ms/op
+WorkloadResult   8: 64 op, 291949800.00 ns, 4.5617 ms/op
+WorkloadResult   9: 64 op, 230353500.00 ns, 3.5993 ms/op
+WorkloadResult  10: 64 op, 238650300.00 ns, 3.7289 ms/op
+WorkloadResult  11: 64 op, 305930600.00 ns, 4.7802 ms/op
+WorkloadResult  12: 64 op, 188658600.00 ns, 2.9478 ms/op
+WorkloadResult  13: 64 op, 242654300.00 ns, 3.7915 ms/op
+WorkloadResult  14: 64 op, 298909800.00 ns, 4.6705 ms/op
+WorkloadResult  15: 64 op, 281767700.00 ns, 4.4026 ms/op
+// GC:  0 0 0 34070344 64
+// Threading:  5355 3 64
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_svc
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+// AfterAll
+// Benchmark Process 44184 has exited with code 0.
+// Launch: 3 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2564 2156 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 524288)" --job PayloadCredible --benchmarkId 0 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 282400.00 ns, 282.4000 us/op
+WorkloadJitting  1: 1 op, 4276600.00 ns, 4.2766 ms/op
+
+OverheadJitting  2: 16 op, 316800.00 ns, 19.8000 us/op
+WorkloadJitting  2: 16 op, 67891900.00 ns, 4.2432 ms/op
+
+WorkloadPilot    1: 16 op, 54808300.00 ns, 3.4255 ms/op
+WorkloadPilot    2: 32 op, 152220000.00 ns, 4.7569 ms/op
+WorkloadPilot    3: 64 op, 282894700.00 ns, 4.4202 ms/op
+
+OverheadWarmup   1: 64 op, 7100.00 ns, 110.9375 ns/op
+OverheadWarmup   2: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadWarmup   3: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadWarmup   4: 64 op, 3000.00 ns, 46.8750 ns/op
+OverheadWarmup   5: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadWarmup   6: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadWarmup   7: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadWarmup   8: 64 op, 1600.00 ns, 25.0000 ns/op
+
+OverheadActual   1: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual   2: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual   3: 64 op, 2400.00 ns, 37.5000 ns/op
+OverheadActual   4: 64 op, 2500.00 ns, 39.0625 ns/op
+OverheadActual   5: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual   6: 64 op, 3500.00 ns, 54.6875 ns/op
+OverheadActual   7: 64 op, 2700.00 ns, 42.1875 ns/op
+OverheadActual   8: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual   9: 64 op, 1100.00 ns, 17.1875 ns/op
+OverheadActual  10: 64 op, 2500.00 ns, 39.0625 ns/op
+OverheadActual  11: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual  12: 64 op, 3100.00 ns, 48.4375 ns/op
+OverheadActual  13: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual  14: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual  15: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual  16: 64 op, 1200.00 ns, 18.7500 ns/op
+OverheadActual  17: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual  18: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual  19: 64 op, 1200.00 ns, 18.7500 ns/op
+OverheadActual  20: 64 op, 3100.00 ns, 48.4375 ns/op
+
+WorkloadWarmup   1: 64 op, 207241100.00 ns, 3.2381 ms/op
+WorkloadWarmup   2: 64 op, 176602800.00 ns, 2.7594 ms/op
+WorkloadWarmup   3: 64 op, 244478200.00 ns, 3.8200 ms/op
+WorkloadWarmup   4: 64 op, 222211500.00 ns, 3.4721 ms/op
+WorkloadWarmup   5: 64 op, 248689100.00 ns, 3.8858 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 289327300.00 ns, 4.5207 ms/op
+WorkloadActual   2: 64 op, 274091000.00 ns, 4.2827 ms/op
+WorkloadActual   3: 64 op, 216273800.00 ns, 3.3793 ms/op
+WorkloadActual   4: 64 op, 206942700.00 ns, 3.2335 ms/op
+WorkloadActual   5: 64 op, 199420800.00 ns, 3.1160 ms/op
+WorkloadActual   6: 64 op, 203857400.00 ns, 3.1853 ms/op
+WorkloadActual   7: 64 op, 217139500.00 ns, 3.3928 ms/op
+WorkloadActual   8: 64 op, 226138400.00 ns, 3.5334 ms/op
+WorkloadActual   9: 64 op, 232368400.00 ns, 3.6308 ms/op
+WorkloadActual  10: 64 op, 202293400.00 ns, 3.1608 ms/op
+WorkloadActual  11: 64 op, 186178800.00 ns, 2.9090 ms/op
+WorkloadActual  12: 64 op, 200215500.00 ns, 3.1284 ms/op
+WorkloadActual  13: 64 op, 253981400.00 ns, 3.9685 ms/op
+WorkloadActual  14: 64 op, 277009400.00 ns, 4.3283 ms/op
+WorkloadActual  15: 64 op, 275952800.00 ns, 4.3118 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 289325600.00 ns, 4.5207 ms/op
+WorkloadResult   2: 64 op, 274089300.00 ns, 4.2826 ms/op
+WorkloadResult   3: 64 op, 216272100.00 ns, 3.3793 ms/op
+WorkloadResult   4: 64 op, 206941000.00 ns, 3.2335 ms/op
+WorkloadResult   5: 64 op, 199419100.00 ns, 3.1159 ms/op
+WorkloadResult   6: 64 op, 203855700.00 ns, 3.1852 ms/op
+WorkloadResult   7: 64 op, 217137800.00 ns, 3.3928 ms/op
+WorkloadResult   8: 64 op, 226136700.00 ns, 3.5334 ms/op
+WorkloadResult   9: 64 op, 232366700.00 ns, 3.6307 ms/op
+WorkloadResult  10: 64 op, 202291700.00 ns, 3.1608 ms/op
+WorkloadResult  11: 64 op, 186177100.00 ns, 2.9090 ms/op
+WorkloadResult  12: 64 op, 200213800.00 ns, 3.1283 ms/op
+WorkloadResult  13: 64 op, 253979700.00 ns, 3.9684 ms/op
+WorkloadResult  14: 64 op, 277007700.00 ns, 4.3282 ms/op
+WorkloadResult  15: 64 op, 275951100.00 ns, 4.3117 ms/op
+// GC:  0 0 0 41935064 64
+// Threading:  5724 5 64
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+// AfterAll
+// Benchmark Process 13092 has exited with code 0.
+
+Mean = 3.706 ms, StdErr = 0.088 ms (2.38%), N = 45, StdDev = 0.592 ms
+Min = 2.466 ms, Q1 = 3.185 ms, Median = 3.631 ms, Q3 = 4.294 ms, Max = 4.780 ms
+IQR = 1.109 ms, LowerFence = 1.522 ms, UpperFence = 5.958 ms
+ConfidenceInterval = [3.395 ms; 4.017 ms] (CI 99.9%), Margin = 0.311 ms (8.39% of Mean)
+Skewness = 0.06, Kurtosis = 1.93, MValue = 3.6
+
+// ** Remained 9 (90.0%) benchmark(s) to run. Estimated finish 2026-07-23 14:03 (0h 5m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: PayloadBenchmarks.GRPC_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=524288]
+// *** Execute ***
+// Launch: 1 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2484 2468 --benchmarkName "Bolt.Tests.PayloadBenchmarks.GRPC_Echo(PayloadBytes: 524288)" --job PayloadCredible --benchmarkId 1 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18601
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18602
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+OverheadJitting  1: 1 op, 290500.00 ns, 290.5000 us/op
+WorkloadJitting  1: 1 op, 5350200.00 ns, 5.3502 ms/op
+
+OverheadJitting  2: 16 op, 480300.00 ns, 30.0188 us/op
+WorkloadJitting  2: 16 op, 73380800.00 ns, 4.5863 ms/op
+
+WorkloadPilot    1: 16 op, 65706900.00 ns, 4.1067 ms/op
+WorkloadPilot    2: 32 op, 133443300.00 ns, 4.1701 ms/op
+WorkloadPilot    3: 64 op, 265091000.00 ns, 4.1420 ms/op
+
+OverheadWarmup   1: 64 op, 1100.00 ns, 17.1875 ns/op
+OverheadWarmup   2: 64 op, 1200.00 ns, 18.7500 ns/op
+OverheadWarmup   3: 64 op, 1200.00 ns, 18.7500 ns/op
+OverheadWarmup   4: 64 op, 4000.00 ns, 62.5000 ns/op
+OverheadWarmup   5: 64 op, 1800.00 ns, 28.1250 ns/op
+
+OverheadActual   1: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual   2: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual   3: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   4: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual   5: 64 op, 3100.00 ns, 48.4375 ns/op
+OverheadActual   6: 64 op, 2800.00 ns, 43.7500 ns/op
+OverheadActual   7: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual   8: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual   9: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual  10: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual  11: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual  12: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual  13: 64 op, 3800.00 ns, 59.3750 ns/op
+OverheadActual  14: 64 op, 4800.00 ns, 75.0000 ns/op
+OverheadActual  15: 64 op, 1000.00 ns, 15.6250 ns/op
+OverheadActual  16: 64 op, 2300.00 ns, 35.9375 ns/op
+OverheadActual  17: 64 op, 3900.00 ns, 60.9375 ns/op
+OverheadActual  18: 64 op, 11200.00 ns, 175.0000 ns/op
+OverheadActual  19: 64 op, 2500.00 ns, 39.0625 ns/op
+OverheadActual  20: 64 op, 3000.00 ns, 46.8750 ns/op
+
+WorkloadWarmup   1: 64 op, 235151300.00 ns, 3.6742 ms/op
+WorkloadWarmup   2: 64 op, 237029900.00 ns, 3.7036 ms/op
+WorkloadWarmup   3: 64 op, 200271000.00 ns, 3.1292 ms/op
+WorkloadWarmup   4: 64 op, 292722500.00 ns, 4.5738 ms/op
+WorkloadWarmup   5: 64 op, 304851600.00 ns, 4.7633 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 242831300.00 ns, 3.7942 ms/op
+WorkloadActual   2: 64 op, 289400100.00 ns, 4.5219 ms/op
+WorkloadActual   3: 64 op, 273184800.00 ns, 4.2685 ms/op
+WorkloadActual   4: 64 op, 234832500.00 ns, 3.6693 ms/op
+WorkloadActual   5: 64 op, 252505300.00 ns, 3.9454 ms/op
+WorkloadActual   6: 64 op, 232477700.00 ns, 3.6325 ms/op
+WorkloadActual   7: 64 op, 248042400.00 ns, 3.8757 ms/op
+WorkloadActual   8: 64 op, 220675200.00 ns, 3.4481 ms/op
+WorkloadActual   9: 64 op, 206052800.00 ns, 3.2196 ms/op
+WorkloadActual  10: 64 op, 188762000.00 ns, 2.9494 ms/op
+WorkloadActual  11: 64 op, 241670600.00 ns, 3.7761 ms/op
+WorkloadActual  12: 64 op, 192027700.00 ns, 3.0004 ms/op
+WorkloadActual  13: 64 op, 211329800.00 ns, 3.3020 ms/op
+WorkloadActual  14: 64 op, 269869600.00 ns, 4.2167 ms/op
+WorkloadActual  15: 64 op, 167321900.00 ns, 2.6144 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 242829400.00 ns, 3.7942 ms/op
+WorkloadResult   2: 64 op, 289398200.00 ns, 4.5218 ms/op
+WorkloadResult   3: 64 op, 273182900.00 ns, 4.2685 ms/op
+WorkloadResult   4: 64 op, 234830600.00 ns, 3.6692 ms/op
+WorkloadResult   5: 64 op, 252503400.00 ns, 3.9454 ms/op
+WorkloadResult   6: 64 op, 232475800.00 ns, 3.6324 ms/op
+WorkloadResult   7: 64 op, 248040500.00 ns, 3.8756 ms/op
+WorkloadResult   8: 64 op, 220673300.00 ns, 3.4480 ms/op
+WorkloadResult   9: 64 op, 206050900.00 ns, 3.2195 ms/op
+WorkloadResult  10: 64 op, 188760100.00 ns, 2.9494 ms/op
+WorkloadResult  11: 64 op, 241668700.00 ns, 3.7761 ms/op
+WorkloadResult  12: 64 op, 192025800.00 ns, 3.0004 ms/op
+WorkloadResult  13: 64 op, 211327900.00 ns, 3.3020 ms/op
+WorkloadResult  14: 64 op, 269867700.00 ns, 4.2167 ms/op
+WorkloadResult  15: 64 op, 167320000.00 ns, 2.6144 ms/op
+// GC:  1 1 1 80593120 64
+// Threading:  13719 58 64
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+// AfterAll
+// Benchmark Process 12580 has exited with code 0.
+// Launch: 2 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2680 3312 --benchmarkName "Bolt.Tests.PayloadBenchmarks.GRPC_Echo(PayloadBytes: 524288)" --job PayloadCredible --benchmarkId 1 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18601
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18602
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+OverheadJitting  1: 1 op, 314400.00 ns, 314.4000 us/op
+WorkloadJitting  1: 1 op, 5689000.00 ns, 5.6890 ms/op
+
+OverheadJitting  2: 16 op, 449100.00 ns, 28.0688 us/op
+WorkloadJitting  2: 16 op, 82058100.00 ns, 5.1286 ms/op
+
+WorkloadPilot    1: 16 op, 81938900.00 ns, 5.1212 ms/op
+WorkloadPilot    2: 32 op, 209870500.00 ns, 6.5585 ms/op
+WorkloadPilot    3: 64 op, 259640600.00 ns, 4.0569 ms/op
+
+OverheadWarmup   1: 64 op, 4500.00 ns, 70.3125 ns/op
+OverheadWarmup   2: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadWarmup   3: 64 op, 2500.00 ns, 39.0625 ns/op
+OverheadWarmup   4: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadWarmup   5: 64 op, 3100.00 ns, 48.4375 ns/op
+OverheadWarmup   6: 64 op, 1600.00 ns, 25.0000 ns/op
+
+OverheadActual   1: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   2: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual   3: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual   4: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual   5: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual   6: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual   7: 64 op, 2600.00 ns, 40.6250 ns/op
+OverheadActual   8: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadActual   9: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual  10: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual  11: 64 op, 2700.00 ns, 42.1875 ns/op
+OverheadActual  12: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual  13: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual  14: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual  15: 64 op, 2400.00 ns, 37.5000 ns/op
+OverheadActual  16: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual  17: 64 op, 2300.00 ns, 35.9375 ns/op
+OverheadActual  18: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual  19: 64 op, 1200.00 ns, 18.7500 ns/op
+OverheadActual  20: 64 op, 1500.00 ns, 23.4375 ns/op
+
+WorkloadWarmup   1: 64 op, 262125000.00 ns, 4.0957 ms/op
+WorkloadWarmup   2: 64 op, 229952800.00 ns, 3.5930 ms/op
+WorkloadWarmup   3: 64 op, 254847800.00 ns, 3.9820 ms/op
+WorkloadWarmup   4: 64 op, 311869600.00 ns, 4.8730 ms/op
+WorkloadWarmup   5: 64 op, 275782700.00 ns, 4.3091 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 287650400.00 ns, 4.4945 ms/op
+WorkloadActual   2: 64 op, 288774300.00 ns, 4.5121 ms/op
+WorkloadActual   3: 64 op, 275055000.00 ns, 4.2977 ms/op
+WorkloadActual   4: 64 op, 231348400.00 ns, 3.6148 ms/op
+WorkloadActual   5: 64 op, 300952200.00 ns, 4.7024 ms/op
+WorkloadActual   6: 64 op, 192186100.00 ns, 3.0029 ms/op
+WorkloadActual   7: 64 op, 211070200.00 ns, 3.2980 ms/op
+WorkloadActual   8: 64 op, 234295600.00 ns, 3.6609 ms/op
+WorkloadActual   9: 64 op, 189795300.00 ns, 2.9656 ms/op
+WorkloadActual  10: 64 op, 243081900.00 ns, 3.7982 ms/op
+WorkloadActual  11: 64 op, 179128900.00 ns, 2.7989 ms/op
+WorkloadActual  12: 64 op, 215853600.00 ns, 3.3727 ms/op
+WorkloadActual  13: 64 op, 214650100.00 ns, 3.3539 ms/op
+WorkloadActual  14: 64 op, 225090200.00 ns, 3.5170 ms/op
+WorkloadActual  15: 64 op, 301705700.00 ns, 4.7142 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 287648700.00 ns, 4.4945 ms/op
+WorkloadResult   2: 64 op, 288772600.00 ns, 4.5121 ms/op
+WorkloadResult   3: 64 op, 275053300.00 ns, 4.2977 ms/op
+WorkloadResult   4: 64 op, 231346700.00 ns, 3.6148 ms/op
+WorkloadResult   5: 64 op, 300950500.00 ns, 4.7024 ms/op
+WorkloadResult   6: 64 op, 192184400.00 ns, 3.0029 ms/op
+WorkloadResult   7: 64 op, 211068500.00 ns, 3.2979 ms/op
+WorkloadResult   8: 64 op, 234293900.00 ns, 3.6608 ms/op
+WorkloadResult   9: 64 op, 189793600.00 ns, 2.9655 ms/op
+WorkloadResult  10: 64 op, 243080200.00 ns, 3.7981 ms/op
+WorkloadResult  11: 64 op, 179127200.00 ns, 2.7989 ms/op
+WorkloadResult  12: 64 op, 215851900.00 ns, 3.3727 ms/op
+WorkloadResult  13: 64 op, 214648400.00 ns, 3.3539 ms/op
+WorkloadResult  14: 64 op, 225088500.00 ns, 3.5170 ms/op
+WorkloadResult  15: 64 op, 301704000.00 ns, 4.7141 ms/op
+// GC:  1 1 1 68523472 64
+// Threading:  14018 24 64
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+// AfterAll
+// Benchmark Process 19108 has exited with code 0.
+// Launch: 3 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2552 2696 --benchmarkName "Bolt.Tests.PayloadBenchmarks.GRPC_Echo(PayloadBytes: 524288)" --job PayloadCredible --benchmarkId 1 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18601
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18602
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+OverheadJitting  1: 1 op, 341000.00 ns, 341.0000 us/op
+WorkloadJitting  1: 1 op, 11211500.00 ns, 11.2115 ms/op
+
+OverheadJitting  2: 16 op, 425800.00 ns, 26.6125 us/op
+WorkloadJitting  2: 16 op, 55583700.00 ns, 3.4740 ms/op
+
+WorkloadPilot    1: 16 op, 53130200.00 ns, 3.3206 ms/op
+WorkloadPilot    2: 32 op, 135383500.00 ns, 4.2307 ms/op
+WorkloadPilot    3: 64 op, 403840400.00 ns, 6.3100 ms/op
+
+OverheadWarmup   1: 64 op, 32800.00 ns, 512.5000 ns/op
+OverheadWarmup   2: 64 op, 7300.00 ns, 114.0625 ns/op
+OverheadWarmup   3: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadWarmup   4: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadWarmup   5: 64 op, 3400.00 ns, 53.1250 ns/op
+OverheadWarmup   6: 64 op, 2200.00 ns, 34.3750 ns/op
+OverheadWarmup   7: 64 op, 2200.00 ns, 34.3750 ns/op
+OverheadWarmup   8: 64 op, 1900.00 ns, 29.6875 ns/op
+
+OverheadActual   1: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   2: 64 op, 3900.00 ns, 60.9375 ns/op
+OverheadActual   3: 64 op, 2200.00 ns, 34.3750 ns/op
+OverheadActual   4: 64 op, 2200.00 ns, 34.3750 ns/op
+OverheadActual   5: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual   6: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual   7: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual   8: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual   9: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  10: 64 op, 2300.00 ns, 35.9375 ns/op
+OverheadActual  11: 64 op, 2200.00 ns, 34.3750 ns/op
+OverheadActual  12: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  13: 64 op, 3300.00 ns, 51.5625 ns/op
+OverheadActual  14: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  15: 64 op, 2500.00 ns, 39.0625 ns/op
+OverheadActual  16: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual  17: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  18: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadActual  19: 64 op, 2200.00 ns, 34.3750 ns/op
+OverheadActual  20: 64 op, 2300.00 ns, 35.9375 ns/op
+
+WorkloadWarmup   1: 64 op, 304918500.00 ns, 4.7644 ms/op
+WorkloadWarmup   2: 64 op, 268253400.00 ns, 4.1915 ms/op
+WorkloadWarmup   3: 64 op, 295795900.00 ns, 4.6218 ms/op
+WorkloadWarmup   4: 64 op, 324169800.00 ns, 5.0652 ms/op
+WorkloadWarmup   5: 64 op, 281172000.00 ns, 4.3933 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 294706900.00 ns, 4.6048 ms/op
+WorkloadActual   2: 64 op, 303552700.00 ns, 4.7430 ms/op
+WorkloadActual   3: 64 op, 286331800.00 ns, 4.4739 ms/op
+WorkloadActual   4: 64 op, 339887000.00 ns, 5.3107 ms/op
+WorkloadActual   5: 64 op, 295515200.00 ns, 4.6174 ms/op
+WorkloadActual   6: 64 op, 264645000.00 ns, 4.1351 ms/op
+WorkloadActual   7: 64 op, 263717600.00 ns, 4.1206 ms/op
+WorkloadActual   8: 64 op, 248907800.00 ns, 3.8892 ms/op
+WorkloadActual   9: 64 op, 298605900.00 ns, 4.6657 ms/op
+WorkloadActual  10: 64 op, 254893000.00 ns, 3.9827 ms/op
+WorkloadActual  11: 64 op, 263388200.00 ns, 4.1154 ms/op
+WorkloadActual  12: 64 op, 331014100.00 ns, 5.1721 ms/op
+WorkloadActual  13: 64 op, 224719000.00 ns, 3.5112 ms/op
+WorkloadActual  14: 64 op, 314498200.00 ns, 4.9140 ms/op
+WorkloadActual  15: 64 op, 254865700.00 ns, 3.9823 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 294704900.00 ns, 4.6048 ms/op
+WorkloadResult   2: 64 op, 303550700.00 ns, 4.7430 ms/op
+WorkloadResult   3: 64 op, 286329800.00 ns, 4.4739 ms/op
+WorkloadResult   4: 64 op, 339885000.00 ns, 5.3107 ms/op
+WorkloadResult   5: 64 op, 295513200.00 ns, 4.6174 ms/op
+WorkloadResult   6: 64 op, 264643000.00 ns, 4.1350 ms/op
+WorkloadResult   7: 64 op, 263715600.00 ns, 4.1206 ms/op
+WorkloadResult   8: 64 op, 248905800.00 ns, 3.8892 ms/op
+WorkloadResult   9: 64 op, 298603900.00 ns, 4.6657 ms/op
+WorkloadResult  10: 64 op, 254891000.00 ns, 3.9827 ms/op
+WorkloadResult  11: 64 op, 263386200.00 ns, 4.1154 ms/op
+WorkloadResult  12: 64 op, 331012100.00 ns, 5.1721 ms/op
+WorkloadResult  13: 64 op, 224717000.00 ns, 3.5112 ms/op
+WorkloadResult  14: 64 op, 314496200.00 ns, 4.9140 ms/op
+WorkloadResult  15: 64 op, 254863700.00 ns, 3.9822 ms/op
+// GC:  1 1 1 75296008 64
+// Threading:  14203 17 64
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+// AfterAll
+// Benchmark Process 35936 has exited with code 0.
+
+Mean = 3.924 ms, StdErr = 0.098 ms (2.50%), N = 45, StdDev = 0.658 ms
+Min = 2.614 ms, Q1 = 3.448 ms, Median = 3.889 ms, Q3 = 4.495 ms, Max = 5.311 ms
+IQR = 1.046 ms, LowerFence = 1.878 ms, UpperFence = 6.064 ms
+ConfidenceInterval = [3.578 ms; 4.270 ms] (CI 99.9%), Margin = 0.346 ms (8.81% of Mean)
+Skewness = 0.04, Kurtosis = 2.15, MValue = 3.07
+
+// ** Remained 8 (80.0%) benchmark(s) to run. Estimated finish 2026-07-23 14:03 (0h 4m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: PayloadBenchmarks.Bolt_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=1048576]
+// *** Execute ***
+// Launch: 1 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2432 2440 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 1048576)" --job PayloadCredible --benchmarkId 2 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 177100.00 ns, 177.1000 us/op
+WorkloadJitting  1: 1 op, 24539700.00 ns, 24.5397 ms/op
+
+OverheadJitting  2: 16 op, 342200.00 ns, 21.3875 us/op
+WorkloadJitting  2: 16 op, 107921900.00 ns, 6.7451 ms/op
+
+WorkloadPilot    1: 16 op, 86210300.00 ns, 5.3881 ms/op
+WorkloadPilot    2: 32 op, 240696800.00 ns, 7.5218 ms/op
+WorkloadPilot    3: 64 op, 525853700.00 ns, 8.2165 ms/op
+
+OverheadWarmup   1: 64 op, 4700.00 ns, 73.4375 ns/op
+OverheadWarmup   2: 64 op, 2800.00 ns, 43.7500 ns/op
+OverheadWarmup   3: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadWarmup   4: 64 op, 2400.00 ns, 37.5000 ns/op
+OverheadWarmup   5: 64 op, 2300.00 ns, 35.9375 ns/op
+OverheadWarmup   6: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadWarmup   7: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadWarmup   8: 64 op, 2400.00 ns, 37.5000 ns/op
+OverheadWarmup   9: 64 op, 1700.00 ns, 26.5625 ns/op
+
+OverheadActual   1: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadActual   2: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   3: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual   4: 64 op, 2700.00 ns, 42.1875 ns/op
+OverheadActual   5: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   6: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual   7: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual   8: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual   9: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual  10: 64 op, 2700.00 ns, 42.1875 ns/op
+OverheadActual  11: 64 op, 2400.00 ns, 37.5000 ns/op
+OverheadActual  12: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual  13: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual  14: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual  15: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual  16: 64 op, 1100.00 ns, 17.1875 ns/op
+OverheadActual  17: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadActual  18: 64 op, 2700.00 ns, 42.1875 ns/op
+OverheadActual  19: 64 op, 6700.00 ns, 104.6875 ns/op
+OverheadActual  20: 64 op, 2200.00 ns, 34.3750 ns/op
+
+WorkloadWarmup   1: 64 op, 677801500.00 ns, 10.5906 ms/op
+WorkloadWarmup   2: 64 op, 580617900.00 ns, 9.0722 ms/op
+WorkloadWarmup   3: 64 op, 576114400.00 ns, 9.0018 ms/op
+WorkloadWarmup   4: 64 op, 622216900.00 ns, 9.7221 ms/op
+WorkloadWarmup   5: 64 op, 375024200.00 ns, 5.8598 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 513665400.00 ns, 8.0260 ms/op
+WorkloadActual   2: 64 op, 582619400.00 ns, 9.1034 ms/op
+WorkloadActual   3: 64 op, 653944600.00 ns, 10.2179 ms/op
+WorkloadActual   4: 64 op, 538815400.00 ns, 8.4190 ms/op
+WorkloadActual   5: 64 op, 596036900.00 ns, 9.3131 ms/op
+WorkloadActual   6: 64 op, 595454700.00 ns, 9.3040 ms/op
+WorkloadActual   7: 64 op, 498155600.00 ns, 7.7837 ms/op
+WorkloadActual   8: 64 op, 500722800.00 ns, 7.8238 ms/op
+WorkloadActual   9: 64 op, 432934300.00 ns, 6.7646 ms/op
+WorkloadActual  10: 64 op, 508826900.00 ns, 7.9504 ms/op
+WorkloadActual  11: 64 op, 526935200.00 ns, 8.2334 ms/op
+WorkloadActual  12: 64 op, 490571800.00 ns, 7.6652 ms/op
+WorkloadActual  13: 64 op, 570801900.00 ns, 8.9188 ms/op
+WorkloadActual  14: 64 op, 497278800.00 ns, 7.7700 ms/op
+WorkloadActual  15: 64 op, 462869200.00 ns, 7.2323 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 513663450.00 ns, 8.0260 ms/op
+WorkloadResult   2: 64 op, 582617450.00 ns, 9.1034 ms/op
+WorkloadResult   3: 64 op, 653942650.00 ns, 10.2179 ms/op
+WorkloadResult   4: 64 op, 538813450.00 ns, 8.4190 ms/op
+WorkloadResult   5: 64 op, 596034950.00 ns, 9.3130 ms/op
+WorkloadResult   6: 64 op, 595452750.00 ns, 9.3039 ms/op
+WorkloadResult   7: 64 op, 498153650.00 ns, 7.7837 ms/op
+WorkloadResult   8: 64 op, 500720850.00 ns, 7.8238 ms/op
+WorkloadResult   9: 64 op, 432932350.00 ns, 6.7646 ms/op
+WorkloadResult  10: 64 op, 508824950.00 ns, 7.9504 ms/op
+WorkloadResult  11: 64 op, 526933250.00 ns, 8.2333 ms/op
+WorkloadResult  12: 64 op, 490569850.00 ns, 7.6652 ms/op
+WorkloadResult  13: 64 op, 570799950.00 ns, 8.9187 ms/op
+WorkloadResult  14: 64 op, 497276850.00 ns, 7.7700 ms/op
+WorkloadResult  15: 64 op, 462867250.00 ns, 7.2323 ms/op
+// GC:  1 1 1 67709912 64
+// Threading:  11996 16 64
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_svc
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+// AfterAll
+// Benchmark Process 29360 has exited with code 0.
+// Launch: 2 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 884 2620 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 1048576)" --job PayloadCredible --benchmarkId 2 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 214100.00 ns, 214.1000 us/op
+WorkloadJitting  1: 1 op, 10464900.00 ns, 10.4649 ms/op
+
+OverheadJitting  2: 16 op, 377800.00 ns, 23.6125 us/op
+WorkloadJitting  2: 16 op, 104007800.00 ns, 6.5005 ms/op
+
+WorkloadPilot    1: 16 op, 109015200.00 ns, 6.8135 ms/op
+WorkloadPilot    2: 32 op, 279304500.00 ns, 8.7283 ms/op
+
+OverheadWarmup   1: 32 op, 4900.00 ns, 153.1250 ns/op
+OverheadWarmup   2: 32 op, 1500.00 ns, 46.8750 ns/op
+OverheadWarmup   3: 32 op, 1400.00 ns, 43.7500 ns/op
+OverheadWarmup   4: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadWarmup   5: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadWarmup   6: 32 op, 2400.00 ns, 75.0000 ns/op
+OverheadWarmup   7: 32 op, 1100.00 ns, 34.3750 ns/op
+
+OverheadActual   1: 32 op, 2600.00 ns, 81.2500 ns/op
+OverheadActual   2: 32 op, 2900.00 ns, 90.6250 ns/op
+OverheadActual   3: 32 op, 2600.00 ns, 81.2500 ns/op
+OverheadActual   4: 32 op, 1600.00 ns, 50.0000 ns/op
+OverheadActual   5: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadActual   6: 32 op, 1400.00 ns, 43.7500 ns/op
+OverheadActual   7: 32 op, 1700.00 ns, 53.1250 ns/op
+OverheadActual   8: 32 op, 1400.00 ns, 43.7500 ns/op
+OverheadActual   9: 32 op, 1500.00 ns, 46.8750 ns/op
+OverheadActual  10: 32 op, 2700.00 ns, 84.3750 ns/op
+OverheadActual  11: 32 op, 1600.00 ns, 50.0000 ns/op
+OverheadActual  12: 32 op, 1500.00 ns, 46.8750 ns/op
+OverheadActual  13: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadActual  14: 32 op, 2300.00 ns, 71.8750 ns/op
+OverheadActual  15: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual  16: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadActual  17: 32 op, 1100.00 ns, 34.3750 ns/op
+OverheadActual  18: 32 op, 1200.00 ns, 37.5000 ns/op
+OverheadActual  19: 32 op, 1600.00 ns, 50.0000 ns/op
+OverheadActual  20: 32 op, 1800.00 ns, 56.2500 ns/op
+
+WorkloadWarmup   1: 32 op, 256622200.00 ns, 8.0194 ms/op
+WorkloadWarmup   2: 32 op, 264814300.00 ns, 8.2754 ms/op
+WorkloadWarmup   3: 32 op, 216420700.00 ns, 6.7631 ms/op
+WorkloadWarmup   4: 32 op, 222830800.00 ns, 6.9635 ms/op
+WorkloadWarmup   5: 32 op, 238589300.00 ns, 7.4559 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 32 op, 223188500.00 ns, 6.9746 ms/op
+WorkloadActual   2: 32 op, 241790900.00 ns, 7.5560 ms/op
+WorkloadActual   3: 32 op, 240102200.00 ns, 7.5032 ms/op
+WorkloadActual   4: 32 op, 225649100.00 ns, 7.0515 ms/op
+WorkloadActual   5: 32 op, 196999400.00 ns, 6.1562 ms/op
+WorkloadActual   6: 32 op, 244533300.00 ns, 7.6417 ms/op
+WorkloadActual   7: 32 op, 204983000.00 ns, 6.4057 ms/op
+WorkloadActual   8: 32 op, 198643700.00 ns, 6.2076 ms/op
+WorkloadActual   9: 32 op, 181071500.00 ns, 5.6585 ms/op
+WorkloadActual  10: 32 op, 237331400.00 ns, 7.4166 ms/op
+WorkloadActual  11: 32 op, 234469300.00 ns, 7.3272 ms/op
+WorkloadActual  12: 32 op, 164778400.00 ns, 5.1493 ms/op
+WorkloadActual  13: 32 op, 159629000.00 ns, 4.9884 ms/op
+WorkloadActual  14: 32 op, 173649000.00 ns, 5.4265 ms/op
+WorkloadActual  15: 32 op, 185111400.00 ns, 5.7847 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 32 op, 223186850.00 ns, 6.9746 ms/op
+WorkloadResult   2: 32 op, 241789250.00 ns, 7.5559 ms/op
+WorkloadResult   3: 32 op, 240100550.00 ns, 7.5031 ms/op
+WorkloadResult   4: 32 op, 225647450.00 ns, 7.0515 ms/op
+WorkloadResult   5: 32 op, 196997750.00 ns, 6.1562 ms/op
+WorkloadResult   6: 32 op, 244531650.00 ns, 7.6416 ms/op
+WorkloadResult   7: 32 op, 204981350.00 ns, 6.4057 ms/op
+WorkloadResult   8: 32 op, 198642050.00 ns, 6.2076 ms/op
+WorkloadResult   9: 32 op, 181069850.00 ns, 5.6584 ms/op
+WorkloadResult  10: 32 op, 237329750.00 ns, 7.4166 ms/op
+WorkloadResult  11: 32 op, 234467650.00 ns, 7.3271 ms/op
+WorkloadResult  12: 32 op, 164776750.00 ns, 5.1493 ms/op
+WorkloadResult  13: 32 op, 159627350.00 ns, 4.9884 ms/op
+WorkloadResult  14: 32 op, 173647350.00 ns, 5.4265 ms/op
+WorkloadResult  15: 32 op, 185109750.00 ns, 5.7847 ms/op
+// GC:  0 0 0 33838000 32
+// Threading:  5561 5 32
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_svc
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+// AfterAll
+// Benchmark Process 29640 has exited with code 0.
+// Launch: 3 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 1908 3452 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 1048576)" --job PayloadCredible --benchmarkId 2 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 405400.00 ns, 405.4000 us/op
+WorkloadJitting  1: 1 op, 7515400.00 ns, 7.5154 ms/op
+
+OverheadJitting  2: 16 op, 278500.00 ns, 17.4063 us/op
+WorkloadJitting  2: 16 op, 113118200.00 ns, 7.0699 ms/op
+
+WorkloadPilot    1: 16 op, 101881600.00 ns, 6.3676 ms/op
+WorkloadPilot    2: 32 op, 222246900.00 ns, 6.9452 ms/op
+WorkloadPilot    3: 64 op, 576423000.00 ns, 9.0066 ms/op
+
+OverheadWarmup   1: 64 op, 4600.00 ns, 71.8750 ns/op
+OverheadWarmup   2: 64 op, 2900.00 ns, 45.3125 ns/op
+OverheadWarmup   3: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadWarmup   4: 64 op, 3000.00 ns, 46.8750 ns/op
+OverheadWarmup   5: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadWarmup   6: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadWarmup   7: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadWarmup   8: 64 op, 1700.00 ns, 26.5625 ns/op
+
+OverheadActual   1: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadActual   2: 64 op, 2300.00 ns, 35.9375 ns/op
+OverheadActual   3: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   4: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual   5: 64 op, 1100.00 ns, 17.1875 ns/op
+OverheadActual   6: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadActual   7: 64 op, 1100.00 ns, 17.1875 ns/op
+OverheadActual   8: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual   9: 64 op, 2600.00 ns, 40.6250 ns/op
+OverheadActual  10: 64 op, 6700.00 ns, 104.6875 ns/op
+OverheadActual  11: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  12: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual  13: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual  14: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  15: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual  16: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual  17: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  18: 64 op, 2000.00 ns, 31.2500 ns/op
+OverheadActual  19: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  20: 64 op, 1200.00 ns, 18.7500 ns/op
+
+WorkloadWarmup   1: 64 op, 522059300.00 ns, 8.1572 ms/op
+WorkloadWarmup   2: 64 op, 496578200.00 ns, 7.7590 ms/op
+WorkloadWarmup   3: 64 op, 529396400.00 ns, 8.2718 ms/op
+WorkloadWarmup   4: 64 op, 451746000.00 ns, 7.0585 ms/op
+WorkloadWarmup   5: 64 op, 477490000.00 ns, 7.4608 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 442639200.00 ns, 6.9162 ms/op
+WorkloadActual   2: 64 op, 510403300.00 ns, 7.9751 ms/op
+WorkloadActual   3: 64 op, 549402200.00 ns, 8.5844 ms/op
+WorkloadActual   4: 64 op, 604912400.00 ns, 9.4518 ms/op
+WorkloadActual   5: 64 op, 569112500.00 ns, 8.8924 ms/op
+WorkloadActual   6: 64 op, 634732900.00 ns, 9.9177 ms/op
+WorkloadActual   7: 64 op, 444375900.00 ns, 6.9434 ms/op
+WorkloadActual   8: 64 op, 545693700.00 ns, 8.5265 ms/op
+WorkloadActual   9: 64 op, 477428300.00 ns, 7.4598 ms/op
+WorkloadActual  10: 64 op, 437572300.00 ns, 6.8371 ms/op
+WorkloadActual  11: 64 op, 534040800.00 ns, 8.3444 ms/op
+WorkloadActual  12: 64 op, 722092800.00 ns, 11.2827 ms/op
+WorkloadActual  13: 64 op, 568758900.00 ns, 8.8869 ms/op
+WorkloadActual  14: 64 op, 547853300.00 ns, 8.5602 ms/op
+WorkloadActual  15: 64 op, 361211300.00 ns, 5.6439 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 442637350.00 ns, 6.9162 ms/op
+WorkloadResult   2: 64 op, 510401450.00 ns, 7.9750 ms/op
+WorkloadResult   3: 64 op, 549400350.00 ns, 8.5844 ms/op
+WorkloadResult   4: 64 op, 604910550.00 ns, 9.4517 ms/op
+WorkloadResult   5: 64 op, 569110650.00 ns, 8.8924 ms/op
+WorkloadResult   6: 64 op, 634731050.00 ns, 9.9177 ms/op
+WorkloadResult   7: 64 op, 444374050.00 ns, 6.9433 ms/op
+WorkloadResult   8: 64 op, 545691850.00 ns, 8.5264 ms/op
+WorkloadResult   9: 64 op, 477426450.00 ns, 7.4598 ms/op
+WorkloadResult  10: 64 op, 437570450.00 ns, 6.8370 ms/op
+WorkloadResult  11: 64 op, 534038950.00 ns, 8.3444 ms/op
+WorkloadResult  12: 64 op, 722090950.00 ns, 11.2827 ms/op
+WorkloadResult  13: 64 op, 568757050.00 ns, 8.8868 ms/op
+WorkloadResult  14: 64 op, 547851450.00 ns, 8.5602 ms/op
+WorkloadResult  15: 64 op, 361209450.00 ns, 5.6439 ms/op
+// GC:  1 1 1 103871304 64
+// Threading:  10131 16 64
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_svc
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+// AfterAll
+// Benchmark Process 22148 has exited with code 0.
+
+Mean = 7.689 ms, StdErr = 0.206 ms (2.68%), N = 45, StdDev = 1.382 ms
+Min = 4.988 ms, Q1 = 6.916 ms, Median = 7.665 ms, Q3 = 8.560 ms, Max = 11.283 ms
+IQR = 1.644 ms, LowerFence = 4.450 ms, UpperFence = 11.026 ms
+ConfidenceInterval = [6.963 ms; 8.415 ms] (CI 99.9%), Margin = 0.726 ms (9.45% of Mean)
+Skewness = 0.13, Kurtosis = 2.76, MValue = 2.53
+
+// ** Remained 7 (70.0%) benchmark(s) to run. Estimated finish 2026-07-23 14:04 (0h 4m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: PayloadBenchmarks.GRPC_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=1048576]
+// *** Execute ***
+// Launch: 1 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 3212 3268 --benchmarkName "Bolt.Tests.PayloadBenchmarks.GRPC_Echo(PayloadBytes: 1048576)" --job PayloadCredible --benchmarkId 3 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18601
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18602
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+OverheadJitting  1: 1 op, 280000.00 ns, 280.0000 us/op
+WorkloadJitting  1: 1 op, 24263500.00 ns, 24.2635 ms/op
+
+OverheadJitting  2: 16 op, 486600.00 ns, 30.4125 us/op
+WorkloadJitting  2: 16 op, 166377800.00 ns, 10.3986 ms/op
+
+WorkloadPilot    1: 16 op, 123339000.00 ns, 7.7087 ms/op
+WorkloadPilot    2: 32 op, 286175400.00 ns, 8.9430 ms/op
+
+OverheadWarmup   1: 32 op, 1400.00 ns, 43.7500 ns/op
+OverheadWarmup   2: 32 op, 2600.00 ns, 81.2500 ns/op
+OverheadWarmup   3: 32 op, 6400.00 ns, 200.0000 ns/op
+OverheadWarmup   4: 32 op, 6500.00 ns, 203.1250 ns/op
+OverheadWarmup   5: 32 op, 3700.00 ns, 115.6250 ns/op
+OverheadWarmup   6: 32 op, 1600.00 ns, 50.0000 ns/op
+OverheadWarmup   7: 32 op, 1500.00 ns, 46.8750 ns/op
+OverheadWarmup   8: 32 op, 1800.00 ns, 56.2500 ns/op
+OverheadWarmup   9: 32 op, 4000.00 ns, 125.0000 ns/op
+OverheadWarmup  10: 32 op, 1500.00 ns, 46.8750 ns/op
+
+OverheadActual   1: 32 op, 3200.00 ns, 100.0000 ns/op
+OverheadActual   2: 32 op, 2300.00 ns, 71.8750 ns/op
+OverheadActual   3: 32 op, 1900.00 ns, 59.3750 ns/op
+OverheadActual   4: 32 op, 1800.00 ns, 56.2500 ns/op
+OverheadActual   5: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadActual   6: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadActual   7: 32 op, 3100.00 ns, 96.8750 ns/op
+OverheadActual   8: 32 op, 1600.00 ns, 50.0000 ns/op
+OverheadActual   9: 32 op, 1800.00 ns, 56.2500 ns/op
+OverheadActual  10: 32 op, 2100.00 ns, 65.6250 ns/op
+OverheadActual  11: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadActual  12: 32 op, 1700.00 ns, 53.1250 ns/op
+OverheadActual  13: 32 op, 4100.00 ns, 128.1250 ns/op
+OverheadActual  14: 32 op, 1700.00 ns, 53.1250 ns/op
+OverheadActual  15: 32 op, 2200.00 ns, 68.7500 ns/op
+OverheadActual  16: 32 op, 1600.00 ns, 50.0000 ns/op
+OverheadActual  17: 32 op, 1700.00 ns, 53.1250 ns/op
+OverheadActual  18: 32 op, 2800.00 ns, 87.5000 ns/op
+OverheadActual  19: 32 op, 3100.00 ns, 96.8750 ns/op
+OverheadActual  20: 32 op, 3400.00 ns, 106.2500 ns/op
+
+WorkloadWarmup   1: 32 op, 300973600.00 ns, 9.4054 ms/op
+WorkloadWarmup   2: 32 op, 314736900.00 ns, 9.8355 ms/op
+WorkloadWarmup   3: 32 op, 262451000.00 ns, 8.2016 ms/op
+WorkloadWarmup   4: 32 op, 230972300.00 ns, 7.2179 ms/op
+WorkloadWarmup   5: 32 op, 236975400.00 ns, 7.4055 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 32 op, 276837900.00 ns, 8.6512 ms/op
+WorkloadActual   2: 32 op, 266782100.00 ns, 8.3369 ms/op
+WorkloadActual   3: 32 op, 220241900.00 ns, 6.8826 ms/op
+WorkloadActual   4: 32 op, 231173300.00 ns, 7.2242 ms/op
+WorkloadActual   5: 32 op, 186845000.00 ns, 5.8389 ms/op
+WorkloadActual   6: 32 op, 252380700.00 ns, 7.8869 ms/op
+WorkloadActual   7: 32 op, 305078400.00 ns, 9.5337 ms/op
+WorkloadActual   8: 32 op, 298541300.00 ns, 9.3294 ms/op
+WorkloadActual   9: 32 op, 233400900.00 ns, 7.2938 ms/op
+WorkloadActual  10: 32 op, 187902400.00 ns, 5.8720 ms/op
+WorkloadActual  11: 32 op, 181636700.00 ns, 5.6761 ms/op
+WorkloadActual  12: 32 op, 267122100.00 ns, 8.3476 ms/op
+WorkloadActual  13: 32 op, 332887600.00 ns, 10.4027 ms/op
+WorkloadActual  14: 32 op, 247969400.00 ns, 7.7490 ms/op
+WorkloadActual  15: 32 op, 210945500.00 ns, 6.5920 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 32 op, 276835900.00 ns, 8.6511 ms/op
+WorkloadResult   2: 32 op, 266780100.00 ns, 8.3369 ms/op
+WorkloadResult   3: 32 op, 220239900.00 ns, 6.8825 ms/op
+WorkloadResult   4: 32 op, 231171300.00 ns, 7.2241 ms/op
+WorkloadResult   5: 32 op, 186843000.00 ns, 5.8388 ms/op
+WorkloadResult   6: 32 op, 252378700.00 ns, 7.8868 ms/op
+WorkloadResult   7: 32 op, 305076400.00 ns, 9.5336 ms/op
+WorkloadResult   8: 32 op, 298539300.00 ns, 9.3294 ms/op
+WorkloadResult   9: 32 op, 233398900.00 ns, 7.2937 ms/op
+WorkloadResult  10: 32 op, 187900400.00 ns, 5.8719 ms/op
+WorkloadResult  11: 32 op, 181634700.00 ns, 5.6761 ms/op
+WorkloadResult  12: 32 op, 267120100.00 ns, 8.3475 ms/op
+WorkloadResult  13: 32 op, 332885600.00 ns, 10.4027 ms/op
+WorkloadResult  14: 32 op, 247967400.00 ns, 7.7490 ms/op
+WorkloadResult  15: 32 op, 210943500.00 ns, 6.5920 ms/op
+// GC:  1 1 1 68155744 32
+// Threading:  13734 9 32
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+// AfterAll
+// Benchmark Process 33388 has exited with code 0.
+// Launch: 2 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2364 2340 --benchmarkName "Bolt.Tests.PayloadBenchmarks.GRPC_Echo(PayloadBytes: 1048576)" --job PayloadCredible --benchmarkId 3 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18601
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18602
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+OverheadJitting  1: 1 op, 263000.00 ns, 263.0000 us/op
+WorkloadJitting  1: 1 op, 10195300.00 ns, 10.1953 ms/op
+
+OverheadJitting  2: 16 op, 492600.00 ns, 30.7875 us/op
+WorkloadJitting  2: 16 op, 187252200.00 ns, 11.7033 ms/op
+
+WorkloadPilot    1: 16 op, 125079000.00 ns, 7.8174 ms/op
+WorkloadPilot    2: 32 op, 181037800.00 ns, 5.6574 ms/op
+WorkloadPilot    3: 64 op, 432122600.00 ns, 6.7519 ms/op
+
+OverheadWarmup   1: 64 op, 5500.00 ns, 85.9375 ns/op
+OverheadWarmup   2: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadWarmup   3: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadWarmup   4: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadWarmup   5: 64 op, 3600.00 ns, 56.2500 ns/op
+OverheadWarmup   6: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadWarmup   7: 64 op, 1600.00 ns, 25.0000 ns/op
+OverheadWarmup   8: 64 op, 1400.00 ns, 21.8750 ns/op
+
+OverheadActual   1: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   2: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual   3: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadActual   4: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual   5: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual   6: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual   7: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual   8: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual   9: 64 op, 1900.00 ns, 29.6875 ns/op
+OverheadActual  10: 64 op, 2100.00 ns, 32.8125 ns/op
+OverheadActual  11: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  12: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  13: 64 op, 2200.00 ns, 34.3750 ns/op
+OverheadActual  14: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  15: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual  16: 64 op, 1100.00 ns, 17.1875 ns/op
+OverheadActual  17: 64 op, 1500.00 ns, 23.4375 ns/op
+OverheadActual  18: 64 op, 1800.00 ns, 28.1250 ns/op
+OverheadActual  19: 64 op, 2800.00 ns, 43.7500 ns/op
+OverheadActual  20: 64 op, 1700.00 ns, 26.5625 ns/op
+
+WorkloadWarmup   1: 64 op, 433642000.00 ns, 6.7757 ms/op
+WorkloadWarmup   2: 64 op, 542311800.00 ns, 8.4736 ms/op
+WorkloadWarmup   3: 64 op, 459277700.00 ns, 7.1762 ms/op
+WorkloadWarmup   4: 64 op, 415235700.00 ns, 6.4881 ms/op
+WorkloadWarmup   5: 64 op, 493704600.00 ns, 7.7141 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 548082200.00 ns, 8.5638 ms/op
+WorkloadActual   2: 64 op, 632610800.00 ns, 9.8845 ms/op
+WorkloadActual   3: 64 op, 547735300.00 ns, 8.5584 ms/op
+WorkloadActual   4: 64 op, 533521500.00 ns, 8.3363 ms/op
+WorkloadActual   5: 64 op, 402668600.00 ns, 6.2917 ms/op
+WorkloadActual   6: 64 op, 448896900.00 ns, 7.0140 ms/op
+WorkloadActual   7: 64 op, 504957400.00 ns, 7.8900 ms/op
+WorkloadActual   8: 64 op, 519022500.00 ns, 8.1097 ms/op
+WorkloadActual   9: 64 op, 595310900.00 ns, 9.3017 ms/op
+WorkloadActual  10: 64 op, 625788200.00 ns, 9.7779 ms/op
+WorkloadActual  11: 64 op, 571861400.00 ns, 8.9353 ms/op
+WorkloadActual  12: 64 op, 766658500.00 ns, 11.9790 ms/op
+WorkloadActual  13: 64 op, 697033500.00 ns, 10.8911 ms/op
+WorkloadActual  14: 64 op, 624075400.00 ns, 9.7512 ms/op
+WorkloadActual  15: 64 op, 531870000.00 ns, 8.3105 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 548080400.00 ns, 8.5638 ms/op
+WorkloadResult   2: 64 op, 632609000.00 ns, 9.8845 ms/op
+WorkloadResult   3: 64 op, 547733500.00 ns, 8.5583 ms/op
+WorkloadResult   4: 64 op, 533519700.00 ns, 8.3362 ms/op
+WorkloadResult   5: 64 op, 402666800.00 ns, 6.2917 ms/op
+WorkloadResult   6: 64 op, 448895100.00 ns, 7.0140 ms/op
+WorkloadResult   7: 64 op, 504955600.00 ns, 7.8899 ms/op
+WorkloadResult   8: 64 op, 519020700.00 ns, 8.1097 ms/op
+WorkloadResult   9: 64 op, 595309100.00 ns, 9.3017 ms/op
+WorkloadResult  10: 64 op, 625786400.00 ns, 9.7779 ms/op
+WorkloadResult  11: 64 op, 571859600.00 ns, 8.9353 ms/op
+WorkloadResult  12: 64 op, 766656700.00 ns, 11.9790 ms/op
+WorkloadResult  13: 64 op, 697031700.00 ns, 10.8911 ms/op
+WorkloadResult  14: 64 op, 624073600.00 ns, 9.7512 ms/op
+WorkloadResult  15: 64 op, 531868200.00 ns, 8.3104 ms/op
+// GC:  3 3 3 164861264 64
+// Threading:  26351 48 64
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+// AfterAll
+// Benchmark Process 35640 has exited with code 0.
+// Launch: 3 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 888 2552 --benchmarkName "Bolt.Tests.PayloadBenchmarks.GRPC_Echo(PayloadBytes: 1048576)" --job PayloadCredible --benchmarkId 3 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18601
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18602
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+OverheadJitting  1: 1 op, 286800.00 ns, 286.8000 us/op
+WorkloadJitting  1: 1 op, 8672400.00 ns, 8.6724 ms/op
+
+OverheadJitting  2: 16 op, 769200.00 ns, 48.0750 us/op
+WorkloadJitting  2: 16 op, 206056200.00 ns, 12.8785 ms/op
+
+WorkloadPilot    1: 16 op, 134885100.00 ns, 8.4303 ms/op
+WorkloadPilot    2: 32 op, 265691300.00 ns, 8.3029 ms/op
+
+OverheadWarmup   1: 32 op, 4000.00 ns, 125.0000 ns/op
+OverheadWarmup   2: 32 op, 2400.00 ns, 75.0000 ns/op
+OverheadWarmup   3: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadWarmup   4: 32 op, 1900.00 ns, 59.3750 ns/op
+OverheadWarmup   5: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadWarmup   6: 32 op, 1900.00 ns, 59.3750 ns/op
+OverheadWarmup   7: 32 op, 2100.00 ns, 65.6250 ns/op
+OverheadWarmup   8: 32 op, 2000.00 ns, 62.5000 ns/op
+
+OverheadActual   1: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual   2: 32 op, 2900.00 ns, 90.6250 ns/op
+OverheadActual   3: 32 op, 29000.00 ns, 906.2500 ns/op
+OverheadActual   4: 32 op, 1600.00 ns, 50.0000 ns/op
+OverheadActual   5: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual   6: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual   7: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual   8: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual   9: 32 op, 2400.00 ns, 75.0000 ns/op
+OverheadActual  10: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadActual  11: 32 op, 2400.00 ns, 75.0000 ns/op
+OverheadActual  12: 32 op, 1200.00 ns, 37.5000 ns/op
+OverheadActual  13: 32 op, 1400.00 ns, 43.7500 ns/op
+OverheadActual  14: 32 op, 2300.00 ns, 71.8750 ns/op
+OverheadActual  15: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual  16: 32 op, 1800.00 ns, 56.2500 ns/op
+OverheadActual  17: 32 op, 1400.00 ns, 43.7500 ns/op
+OverheadActual  18: 32 op, 2100.00 ns, 65.6250 ns/op
+OverheadActual  19: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual  20: 32 op, 1500.00 ns, 46.8750 ns/op
+
+WorkloadWarmup   1: 32 op, 248624800.00 ns, 7.7695 ms/op
+WorkloadWarmup   2: 32 op, 274541900.00 ns, 8.5794 ms/op
+WorkloadWarmup   3: 32 op, 294480800.00 ns, 9.2025 ms/op
+WorkloadWarmup   4: 32 op, 277498000.00 ns, 8.6718 ms/op
+WorkloadWarmup   5: 32 op, 252575100.00 ns, 7.8930 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 32 op, 287068400.00 ns, 8.9709 ms/op
+WorkloadActual   2: 32 op, 263674700.00 ns, 8.2398 ms/op
+WorkloadActual   3: 32 op, 247988600.00 ns, 7.7496 ms/op
+WorkloadActual   4: 32 op, 297383300.00 ns, 9.2932 ms/op
+WorkloadActual   5: 32 op, 258255700.00 ns, 8.0705 ms/op
+WorkloadActual   6: 32 op, 266796800.00 ns, 8.3374 ms/op
+WorkloadActual   7: 32 op, 260860600.00 ns, 8.1519 ms/op
+WorkloadActual   8: 32 op, 254694700.00 ns, 7.9592 ms/op
+WorkloadActual   9: 32 op, 288088000.00 ns, 9.0028 ms/op
+WorkloadActual  10: 32 op, 313806000.00 ns, 9.8064 ms/op
+WorkloadActual  11: 32 op, 279105400.00 ns, 8.7220 ms/op
+WorkloadActual  12: 32 op, 292753700.00 ns, 9.1486 ms/op
+WorkloadActual  13: 32 op, 234932800.00 ns, 7.3417 ms/op
+WorkloadActual  14: 32 op, 230085100.00 ns, 7.1902 ms/op
+WorkloadActual  15: 32 op, 255562600.00 ns, 7.9863 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 32 op, 287066950.00 ns, 8.9708 ms/op
+WorkloadResult   2: 32 op, 263673250.00 ns, 8.2398 ms/op
+WorkloadResult   3: 32 op, 247987150.00 ns, 7.7496 ms/op
+WorkloadResult   4: 32 op, 297381850.00 ns, 9.2932 ms/op
+WorkloadResult   5: 32 op, 258254250.00 ns, 8.0704 ms/op
+WorkloadResult   6: 32 op, 266795350.00 ns, 8.3374 ms/op
+WorkloadResult   7: 32 op, 260859150.00 ns, 8.1518 ms/op
+WorkloadResult   8: 32 op, 254693250.00 ns, 7.9592 ms/op
+WorkloadResult   9: 32 op, 288086550.00 ns, 9.0027 ms/op
+WorkloadResult  10: 32 op, 313804550.00 ns, 9.8064 ms/op
+WorkloadResult  11: 32 op, 279103950.00 ns, 8.7220 ms/op
+WorkloadResult  12: 32 op, 292752250.00 ns, 9.1485 ms/op
+WorkloadResult  13: 32 op, 234931350.00 ns, 7.3416 ms/op
+WorkloadResult  14: 32 op, 230083650.00 ns, 7.1901 ms/op
+WorkloadResult  15: 32 op, 255561150.00 ns, 7.9863 ms/op
+// GC:  1 1 1 74927552 32
+// Threading:  13458 17 32
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+// AfterAll
+// Benchmark Process 42660 has exited with code 0.
+
+Mean = 8.337 ms, StdErr = 0.196 ms (2.35%), N = 45, StdDev = 1.313 ms
+Min = 5.676 ms, Q1 = 7.749 ms, Median = 8.336 ms, Q3 = 9.149 ms, Max = 11.979 ms
+IQR = 1.400 ms, LowerFence = 5.650 ms, UpperFence = 11.248 ms
+ConfidenceInterval = [7.647 ms; 9.027 ms] (CI 99.9%), Margin = 0.690 ms (8.27% of Mean)
+Skewness = 0.18, Kurtosis = 3.2, MValue = 3.18
+
+// ** Remained 6 (60.0%) benchmark(s) to run. Estimated finish 2026-07-23 14:04 (0h 3m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: PayloadBenchmarks.Bolt_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=2097152]
+// *** Execute ***
+// Launch: 1 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 3228 3296 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 2097152)" --job PayloadCredible --benchmarkId 4 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 981900.00 ns, 981.9000 us/op
+WorkloadJitting  1: 1 op, 29819000.00 ns, 29.8190 ms/op
+
+OverheadJitting  2: 16 op, 268400.00 ns, 16.7750 us/op
+WorkloadJitting  2: 16 op, 207639300.00 ns, 12.9775 ms/op
+
+WorkloadPilot    1: 16 op, 283303200.00 ns, 17.7065 ms/op
+
+OverheadWarmup   1: 16 op, 2200.00 ns, 137.5000 ns/op
+OverheadWarmup   2: 16 op, 5600.00 ns, 350.0000 ns/op
+OverheadWarmup   3: 16 op, 1400.00 ns, 87.5000 ns/op
+OverheadWarmup   4: 16 op, 1900.00 ns, 118.7500 ns/op
+OverheadWarmup   5: 16 op, 2800.00 ns, 175.0000 ns/op
+OverheadWarmup   6: 16 op, 1600.00 ns, 100.0000 ns/op
+
+OverheadActual   1: 16 op, 2000.00 ns, 125.0000 ns/op
+OverheadActual   2: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadActual   3: 16 op, 1400.00 ns, 87.5000 ns/op
+OverheadActual   4: 16 op, 2100.00 ns, 131.2500 ns/op
+OverheadActual   5: 16 op, 1800.00 ns, 112.5000 ns/op
+OverheadActual   6: 16 op, 2500.00 ns, 156.2500 ns/op
+OverheadActual   7: 16 op, 1800.00 ns, 112.5000 ns/op
+OverheadActual   8: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadActual   9: 16 op, 1800.00 ns, 112.5000 ns/op
+OverheadActual  10: 16 op, 1300.00 ns, 81.2500 ns/op
+OverheadActual  11: 16 op, 1900.00 ns, 118.7500 ns/op
+OverheadActual  12: 16 op, 2100.00 ns, 131.2500 ns/op
+OverheadActual  13: 16 op, 1800.00 ns, 112.5000 ns/op
+OverheadActual  14: 16 op, 1900.00 ns, 118.7500 ns/op
+OverheadActual  15: 16 op, 1600.00 ns, 100.0000 ns/op
+OverheadActual  16: 16 op, 1800.00 ns, 112.5000 ns/op
+OverheadActual  17: 16 op, 1800.00 ns, 112.5000 ns/op
+OverheadActual  18: 16 op, 1200.00 ns, 75.0000 ns/op
+OverheadActual  19: 16 op, 1700.00 ns, 106.2500 ns/op
+OverheadActual  20: 16 op, 1100.00 ns, 68.7500 ns/op
+
+WorkloadWarmup   1: 16 op, 273955100.00 ns, 17.1222 ms/op
+WorkloadWarmup   2: 16 op, 266624000.00 ns, 16.6640 ms/op
+WorkloadWarmup   3: 16 op, 257922400.00 ns, 16.1202 ms/op
+WorkloadWarmup   4: 16 op, 224985900.00 ns, 14.0616 ms/op
+WorkloadWarmup   5: 16 op, 211280900.00 ns, 13.2051 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 16 op, 235644700.00 ns, 14.7278 ms/op
+WorkloadActual   2: 16 op, 222364300.00 ns, 13.8978 ms/op
+WorkloadActual   3: 16 op, 199485000.00 ns, 12.4678 ms/op
+WorkloadActual   4: 16 op, 204166100.00 ns, 12.7604 ms/op
+WorkloadActual   5: 16 op, 146028900.00 ns, 9.1268 ms/op
+WorkloadActual   6: 16 op, 228444100.00 ns, 14.2778 ms/op
+WorkloadActual   7: 16 op, 255265300.00 ns, 15.9541 ms/op
+WorkloadActual   8: 16 op, 330909600.00 ns, 20.6819 ms/op
+WorkloadActual   9: 16 op, 184140400.00 ns, 11.5088 ms/op
+WorkloadActual  10: 16 op, 240612000.00 ns, 15.0383 ms/op
+WorkloadActual  11: 16 op, 277680800.00 ns, 17.3551 ms/op
+WorkloadActual  12: 16 op, 218921500.00 ns, 13.6826 ms/op
+WorkloadActual  13: 16 op, 246970300.00 ns, 15.4356 ms/op
+WorkloadActual  14: 16 op, 286735300.00 ns, 17.9210 ms/op
+WorkloadActual  15: 16 op, 348952700.00 ns, 21.8095 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 16 op, 235642900.00 ns, 14.7277 ms/op
+WorkloadResult   2: 16 op, 222362500.00 ns, 13.8977 ms/op
+WorkloadResult   3: 16 op, 199483200.00 ns, 12.4677 ms/op
+WorkloadResult   4: 16 op, 204164300.00 ns, 12.7603 ms/op
+WorkloadResult   5: 16 op, 146027100.00 ns, 9.1267 ms/op
+WorkloadResult   6: 16 op, 228442300.00 ns, 14.2776 ms/op
+WorkloadResult   7: 16 op, 255263500.00 ns, 15.9540 ms/op
+WorkloadResult   8: 16 op, 330907800.00 ns, 20.6817 ms/op
+WorkloadResult   9: 16 op, 184138600.00 ns, 11.5087 ms/op
+WorkloadResult  10: 16 op, 240610200.00 ns, 15.0381 ms/op
+WorkloadResult  11: 16 op, 277679000.00 ns, 17.3549 ms/op
+WorkloadResult  12: 16 op, 218919700.00 ns, 13.6825 ms/op
+WorkloadResult  13: 16 op, 246968500.00 ns, 15.4355 ms/op
+WorkloadResult  14: 16 op, 286733500.00 ns, 17.9208 ms/op
+// GC:  0 0 0 34794280 16
+// Threading:  6354 11 16
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_svc
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+// AfterAll
+// Benchmark Process 29552 has exited with code 0.
+// Launch: 2 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 3232 2404 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 2097152)" --job PayloadCredible --benchmarkId 4 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 197500.00 ns, 197.5000 us/op
+WorkloadJitting  1: 1 op, 38271600.00 ns, 38.2716 ms/op
+
+WorkloadPilot    1: 2 op, 34909200.00 ns, 17.4546 ms/op
+WorkloadPilot    2: 3 op, 38909900.00 ns, 12.9700 ms/op
+WorkloadPilot    3: 4 op, 42714200.00 ns, 10.6786 ms/op
+WorkloadPilot    4: 5 op, 56686100.00 ns, 11.3372 ms/op
+WorkloadPilot    5: 6 op, 115135100.00 ns, 19.1892 ms/op
+WorkloadPilot    6: 7 op, 167761400.00 ns, 23.9659 ms/op
+WorkloadPilot    7: 8 op, 166997500.00 ns, 20.8747 ms/op
+WorkloadPilot    8: 9 op, 146725900.00 ns, 16.3029 ms/op
+WorkloadPilot    9: 10 op, 162801600.00 ns, 16.2802 ms/op
+WorkloadPilot   10: 11 op, 161045500.00 ns, 14.6405 ms/op
+WorkloadPilot   11: 12 op, 125315900.00 ns, 10.4430 ms/op
+WorkloadPilot   12: 13 op, 210500200.00 ns, 16.1923 ms/op
+WorkloadPilot   13: 14 op, 212269100.00 ns, 15.1621 ms/op
+WorkloadPilot   14: 15 op, 255063400.00 ns, 17.0042 ms/op
+
+WorkloadWarmup   1: 15 op, 249736100.00 ns, 16.6491 ms/op
+WorkloadWarmup   2: 15 op, 202907000.00 ns, 13.5271 ms/op
+WorkloadWarmup   3: 15 op, 217739100.00 ns, 14.5159 ms/op
+WorkloadWarmup   4: 15 op, 231844400.00 ns, 15.4563 ms/op
+WorkloadWarmup   5: 15 op, 235570800.00 ns, 15.7047 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 15 op, 135642400.00 ns, 9.0428 ms/op
+WorkloadActual   2: 15 op, 218326100.00 ns, 14.5551 ms/op
+WorkloadActual   3: 15 op, 207414200.00 ns, 13.8276 ms/op
+WorkloadActual   4: 15 op, 212448600.00 ns, 14.1632 ms/op
+WorkloadActual   5: 15 op, 157437500.00 ns, 10.4958 ms/op
+WorkloadActual   6: 15 op, 209477500.00 ns, 13.9652 ms/op
+WorkloadActual   7: 15 op, 187434700.00 ns, 12.4956 ms/op
+WorkloadActual   8: 15 op, 251105600.00 ns, 16.7404 ms/op
+WorkloadActual   9: 15 op, 168808500.00 ns, 11.2539 ms/op
+WorkloadActual  10: 15 op, 248730200.00 ns, 16.5820 ms/op
+WorkloadActual  11: 15 op, 197404100.00 ns, 13.1603 ms/op
+WorkloadActual  12: 15 op, 209345100.00 ns, 13.9563 ms/op
+WorkloadActual  13: 15 op, 234048400.00 ns, 15.6032 ms/op
+WorkloadActual  14: 15 op, 258973300.00 ns, 17.2649 ms/op
+WorkloadActual  15: 15 op, 223732700.00 ns, 14.9155 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 15 op, 135642400.00 ns, 9.0428 ms/op
+WorkloadResult   2: 15 op, 218326100.00 ns, 14.5551 ms/op
+WorkloadResult   3: 15 op, 207414200.00 ns, 13.8276 ms/op
+WorkloadResult   4: 15 op, 212448600.00 ns, 14.1632 ms/op
+WorkloadResult   5: 15 op, 157437500.00 ns, 10.4958 ms/op
+WorkloadResult   6: 15 op, 209477500.00 ns, 13.9652 ms/op
+WorkloadResult   7: 15 op, 187434700.00 ns, 12.4956 ms/op
+WorkloadResult   8: 15 op, 251105600.00 ns, 16.7404 ms/op
+WorkloadResult   9: 15 op, 168808500.00 ns, 11.2539 ms/op
+WorkloadResult  10: 15 op, 248730200.00 ns, 16.5820 ms/op
+WorkloadResult  11: 15 op, 197404100.00 ns, 13.1603 ms/op
+WorkloadResult  12: 15 op, 209345100.00 ns, 13.9563 ms/op
+WorkloadResult  13: 15 op, 234048400.00 ns, 15.6032 ms/op
+WorkloadResult  14: 15 op, 258973300.00 ns, 17.2649 ms/op
+WorkloadResult  15: 15 op, 223732700.00 ns, 14.9155 ms/op
+// GC:  0 0 0 50718280 15
+// Threading:  5214 3 15
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_svc
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+// AfterAll
+// Benchmark Process 42460 has exited with code 0.
+// Launch: 3 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 1920 3764 --benchmarkName "Bolt.Tests.PayloadBenchmarks.Bolt_Echo(PayloadBytes: 2097152)" --job PayloadCredible --benchmarkId 4 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18600
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_svc (PayloadSvc) [hash=274129856]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_svc (PayloadSvc), 1 connection(s)
+info: Bolt.Client.BoltClient[0]
+      Bolt connected via WebSocket to ws://localhost:18600/bolt
+info: Bolt.Server.BoltServer[0]
+      Client registered: payload_caller (PayloadCaller) [hash=-758070459]
+info: Bolt.Client.BoltClient[0]
+      Bolt client connected: payload_caller (PayloadCaller), 1 connection(s)
+OverheadJitting  1: 1 op, 253100.00 ns, 253.1000 us/op
+WorkloadJitting  1: 1 op, 19855500.00 ns, 19.8555 ms/op
+
+OverheadJitting  2: 16 op, 265100.00 ns, 16.5688 us/op
+WorkloadJitting  2: 16 op, 181910900.00 ns, 11.3694 ms/op
+
+WorkloadPilot    1: 16 op, 310641900.00 ns, 19.4151 ms/op
+
+OverheadWarmup   1: 16 op, 1600.00 ns, 100.0000 ns/op
+OverheadWarmup   2: 16 op, 6700.00 ns, 418.7500 ns/op
+OverheadWarmup   3: 16 op, 1600.00 ns, 100.0000 ns/op
+OverheadWarmup   4: 16 op, 1300.00 ns, 81.2500 ns/op
+OverheadWarmup   5: 16 op, 1300.00 ns, 81.2500 ns/op
+OverheadWarmup   6: 16 op, 1400.00 ns, 87.5000 ns/op
+
+OverheadActual   1: 16 op, 1200.00 ns, 75.0000 ns/op
+OverheadActual   2: 16 op, 1200.00 ns, 75.0000 ns/op
+OverheadActual   3: 16 op, 3100.00 ns, 193.7500 ns/op
+OverheadActual   4: 16 op, 1300.00 ns, 81.2500 ns/op
+OverheadActual   5: 16 op, 1600.00 ns, 100.0000 ns/op
+OverheadActual   6: 16 op, 1300.00 ns, 81.2500 ns/op
+OverheadActual   7: 16 op, 1100.00 ns, 68.7500 ns/op
+OverheadActual   8: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadActual   9: 16 op, 1400.00 ns, 87.5000 ns/op
+OverheadActual  10: 16 op, 1400.00 ns, 87.5000 ns/op
+OverheadActual  11: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadActual  12: 16 op, 1000.00 ns, 62.5000 ns/op
+OverheadActual  13: 16 op, 1800.00 ns, 112.5000 ns/op
+OverheadActual  14: 16 op, 1200.00 ns, 75.0000 ns/op
+OverheadActual  15: 16 op, 3200.00 ns, 200.0000 ns/op
+OverheadActual  16: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadActual  17: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadActual  18: 16 op, 1600.00 ns, 100.0000 ns/op
+OverheadActual  19: 16 op, 1400.00 ns, 87.5000 ns/op
+OverheadActual  20: 16 op, 1000.00 ns, 62.5000 ns/op
+
+WorkloadWarmup   1: 16 op, 243447200.00 ns, 15.2155 ms/op
+WorkloadWarmup   2: 16 op, 242931200.00 ns, 15.1832 ms/op
+WorkloadWarmup   3: 16 op, 252781300.00 ns, 15.7988 ms/op
+WorkloadWarmup   4: 16 op, 247132700.00 ns, 15.4458 ms/op
+WorkloadWarmup   5: 16 op, 160972500.00 ns, 10.0608 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 16 op, 254284600.00 ns, 15.8928 ms/op
+WorkloadActual   2: 16 op, 303262100.00 ns, 18.9539 ms/op
+WorkloadActual   3: 16 op, 218021500.00 ns, 13.6263 ms/op
+WorkloadActual   4: 16 op, 215112600.00 ns, 13.4445 ms/op
+WorkloadActual   5: 16 op, 273354000.00 ns, 17.0846 ms/op
+WorkloadActual   6: 16 op, 190235800.00 ns, 11.8897 ms/op
+WorkloadActual   7: 16 op, 225791200.00 ns, 14.1120 ms/op
+WorkloadActual   8: 16 op, 218523800.00 ns, 13.6577 ms/op
+WorkloadActual   9: 16 op, 178069300.00 ns, 11.1293 ms/op
+WorkloadActual  10: 16 op, 228692500.00 ns, 14.2933 ms/op
+WorkloadActual  11: 16 op, 199631700.00 ns, 12.4770 ms/op
+WorkloadActual  12: 16 op, 217594500.00 ns, 13.5997 ms/op
+WorkloadActual  13: 16 op, 222528300.00 ns, 13.9080 ms/op
+WorkloadActual  14: 16 op, 287975600.00 ns, 17.9985 ms/op
+WorkloadActual  15: 16 op, 223704900.00 ns, 13.9816 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 16 op, 254283200.00 ns, 15.8927 ms/op
+WorkloadResult   2: 16 op, 218020100.00 ns, 13.6263 ms/op
+WorkloadResult   3: 16 op, 215111200.00 ns, 13.4445 ms/op
+WorkloadResult   4: 16 op, 273352600.00 ns, 17.0845 ms/op
+WorkloadResult   5: 16 op, 190234400.00 ns, 11.8897 ms/op
+WorkloadResult   6: 16 op, 225789800.00 ns, 14.1119 ms/op
+WorkloadResult   7: 16 op, 218522400.00 ns, 13.6577 ms/op
+WorkloadResult   8: 16 op, 178067900.00 ns, 11.1292 ms/op
+WorkloadResult   9: 16 op, 228691100.00 ns, 14.2932 ms/op
+WorkloadResult  10: 16 op, 199630300.00 ns, 12.4769 ms/op
+WorkloadResult  11: 16 op, 217593100.00 ns, 13.5996 ms/op
+WorkloadResult  12: 16 op, 222526900.00 ns, 13.9079 ms/op
+WorkloadResult  13: 16 op, 223703500.00 ns, 13.9815 ms/op
+// GC:  0 0 0 57078888 16
+// Threading:  6309 5 16
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_svc
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+fail: Bolt.Server.BoltServer[0]
+      Error handling connection for client payload_caller
+      System.Net.WebSockets.WebSocketException (0x80004005): The remote party closed the WebSocket connection without completing the close handshake.
+         at System.Net.WebSockets.ManagedWebSocket.ThrowEOFUnexpected()
+         at System.Net.WebSockets.ManagedWebSocket.EnsureBufferContainsAsync(Int32 minimumRequiredBytes, CancellationToken cancellationToken)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.WebSockets.ManagedWebSocket.ReceiveAsyncPrivate[TResult](Memory`1 payloadBuffer, CancellationToken cancellationToken)
+         at Bolt.Protocol.Transport.WebSocketBoltConnection.ReceiveAsync(Memory`1 buffer, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Protocol\Transport\WebSocketBoltConnection.cs:line 32
+         at Bolt.Server.BoltServer.HandleConnectionAsync(IBoltConnection transport, ClaimsPrincipal user, CancellationToken ct) in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Libraries\Bolt\Bolt.Server\BoltServer.cs:line 344
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_caller (PayloadCaller)
+info: Bolt.Server.BoltServer[0]
+      Client disconnected: payload_svc (PayloadSvc)
+// AfterAll
+// Benchmark Process 8860 has exited with code 0.
+
+Mean = 14.094 ms, StdErr = 0.355 ms (2.52%), N = 42, StdDev = 2.302 ms
+Min = 9.043 ms, Q1 = 12.860 ms, Median = 13.961 ms, Q3 = 15.336 ms, Max = 20.682 ms
+IQR = 2.476 ms, LowerFence = 9.146 ms, UpperFence = 19.050 ms
+ConfidenceInterval = [12.835 ms; 15.353 ms] (CI 99.9%), Margin = 1.259 ms (8.93% of Mean)
+Skewness = 0.19, Kurtosis = 3.54, MValue = 2.59
+
+// ** Remained 5 (50.0%) benchmark(s) to run. Estimated finish 2026-07-23 14:03 (0h 2m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: PayloadBenchmarks.GRPC_Echo: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5) [PayloadBytes=2097152]
+// *** Execute ***
+// Launch: 1 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2544 2456 --benchmarkName "Bolt.Tests.PayloadBenchmarks.GRPC_Echo(PayloadBytes: 2097152)" --job PayloadCredible --benchmarkId 5 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18601
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18602
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+OverheadJitting  1: 1 op, 261000.00 ns, 261.0000 us/op
+WorkloadJitting  1: 1 op, 16783500.00 ns, 16.7835 ms/op
+
+OverheadJitting  2: 16 op, 583500.00 ns, 36.4688 us/op
+WorkloadJitting  2: 16 op, 222006000.00 ns, 13.8754 ms/op
+
+WorkloadPilot    1: 16 op, 232629500.00 ns, 14.5393 ms/op
+WorkloadPilot    2: 32 op, 517960800.00 ns, 16.1863 ms/op
+
+OverheadWarmup   1: 32 op, 4200.00 ns, 131.2500 ns/op
+OverheadWarmup   2: 32 op, 2500.00 ns, 78.1250 ns/op
+OverheadWarmup   3: 32 op, 1400.00 ns, 43.7500 ns/op
+OverheadWarmup   4: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadWarmup   5: 32 op, 1700.00 ns, 53.1250 ns/op
+OverheadWarmup   6: 32 op, 2300.00 ns, 71.8750 ns/op
+OverheadWarmup   7: 32 op, 1200.00 ns, 37.5000 ns/op
+OverheadWarmup   8: 32 op, 1400.00 ns, 43.7500 ns/op
+OverheadWarmup   9: 32 op, 1200.00 ns, 37.5000 ns/op
+
+OverheadActual   1: 32 op, 1800.00 ns, 56.2500 ns/op
+OverheadActual   2: 32 op, 2400.00 ns, 75.0000 ns/op
+OverheadActual   3: 32 op, 2400.00 ns, 75.0000 ns/op
+OverheadActual   4: 32 op, 2200.00 ns, 68.7500 ns/op
+OverheadActual   5: 32 op, 1500.00 ns, 46.8750 ns/op
+OverheadActual   6: 32 op, 1900.00 ns, 59.3750 ns/op
+OverheadActual   7: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual   8: 32 op, 1600.00 ns, 50.0000 ns/op
+OverheadActual   9: 32 op, 2000.00 ns, 62.5000 ns/op
+OverheadActual  10: 32 op, 1300.00 ns, 40.6250 ns/op
+OverheadActual  11: 32 op, 1100.00 ns, 34.3750 ns/op
+OverheadActual  12: 32 op, 1500.00 ns, 46.8750 ns/op
+OverheadActual  13: 32 op, 2700.00 ns, 84.3750 ns/op
+OverheadActual  14: 32 op, 2300.00 ns, 71.8750 ns/op
+OverheadActual  15: 32 op, 1200.00 ns, 37.5000 ns/op
+OverheadActual  16: 32 op, 1200.00 ns, 37.5000 ns/op
+OverheadActual  17: 32 op, 2600.00 ns, 81.2500 ns/op
+OverheadActual  18: 32 op, 1900.00 ns, 59.3750 ns/op
+OverheadActual  19: 32 op, 1200.00 ns, 37.5000 ns/op
+OverheadActual  20: 32 op, 2700.00 ns, 84.3750 ns/op
+
+WorkloadWarmup   1: 32 op, 536498500.00 ns, 16.7656 ms/op
+WorkloadWarmup   2: 32 op, 488436500.00 ns, 15.2636 ms/op
+WorkloadWarmup   3: 32 op, 484968400.00 ns, 15.1553 ms/op
+WorkloadWarmup   4: 32 op, 551585200.00 ns, 17.2370 ms/op
+WorkloadWarmup   5: 32 op, 494691700.00 ns, 15.4591 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 32 op, 574291400.00 ns, 17.9466 ms/op
+WorkloadActual   2: 32 op, 524119500.00 ns, 16.3787 ms/op
+WorkloadActual   3: 32 op, 560370200.00 ns, 17.5116 ms/op
+WorkloadActual   4: 32 op, 600065600.00 ns, 18.7521 ms/op
+WorkloadActual   5: 32 op, 486294300.00 ns, 15.1967 ms/op
+WorkloadActual   6: 32 op, 553484300.00 ns, 17.2964 ms/op
+WorkloadActual   7: 32 op, 564926200.00 ns, 17.6539 ms/op
+WorkloadActual   8: 32 op, 434536600.00 ns, 13.5793 ms/op
+WorkloadActual   9: 32 op, 456073900.00 ns, 14.2523 ms/op
+WorkloadActual  10: 32 op, 487348300.00 ns, 15.2296 ms/op
+WorkloadActual  11: 32 op, 626742200.00 ns, 19.5857 ms/op
+WorkloadActual  12: 32 op, 572221100.00 ns, 17.8819 ms/op
+WorkloadActual  13: 32 op, 442204100.00 ns, 13.8189 ms/op
+WorkloadActual  14: 32 op, 536784800.00 ns, 16.7745 ms/op
+WorkloadActual  15: 32 op, 632579300.00 ns, 19.7681 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 32 op, 574289550.00 ns, 17.9465 ms/op
+WorkloadResult   2: 32 op, 524117650.00 ns, 16.3787 ms/op
+WorkloadResult   3: 32 op, 560368350.00 ns, 17.5115 ms/op
+WorkloadResult   4: 32 op, 600063750.00 ns, 18.7520 ms/op
+WorkloadResult   5: 32 op, 486292450.00 ns, 15.1966 ms/op
+WorkloadResult   6: 32 op, 553482450.00 ns, 17.2963 ms/op
+WorkloadResult   7: 32 op, 564924350.00 ns, 17.6539 ms/op
+WorkloadResult   8: 32 op, 434534750.00 ns, 13.5792 ms/op
+WorkloadResult   9: 32 op, 456072050.00 ns, 14.2523 ms/op
+WorkloadResult  10: 32 op, 487346450.00 ns, 15.2296 ms/op
+WorkloadResult  11: 32 op, 626740350.00 ns, 19.5856 ms/op
+WorkloadResult  12: 32 op, 572219250.00 ns, 17.8819 ms/op
+WorkloadResult  13: 32 op, 442202250.00 ns, 13.8188 ms/op
+WorkloadResult  14: 32 op, 536782950.00 ns, 16.7745 ms/op
+WorkloadResult  15: 32 op, 632577450.00 ns, 19.7680 ms/op
+// GC:  1 1 1 137507504 32
+// Threading:  26404 38 32
+
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+// AfterAll
+// Benchmark Process 13940 has exited with code 0.
+// Launch: 2 / 3
+// Execute: dotnet c5d340c6-236d-48ad-aa48-57667fa89fea.dll --anonymousPipes 2552 3228 --benchmarkName "Bolt.Tests.PayloadBenchmarks.GRPC_Echo(PayloadBytes: 2097152)" --job PayloadCredible --benchmarkId 5 in C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.14.0
+// Runtime=.NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+// GC=Concurrent Server
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT,AvxVnni,SERIALIZE VectorSize=256
+// Job: PayloadCredible(MinIterationTime=250ms, IterationCount=15, LaunchCount=3, WarmupCount=5)
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18601
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:18602
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Xeon\RiderProjects\XFramework-worktrees\bolt-remediation-plan-scope\src\Tests\Bolt.Tests\bin\Release\net10.0\c5d340c6-236d-48ad-aa48-57667fa89fea\bin\Release\net10.0
+OverheadJitting  1: 1 op, 1880300.00 ns, 1.8803 ms/op
+WorkloadJitting  1: 1 op, 22062300.00 ns, 22.0623 ms/op
+
+OverheadJitting  2: 16 op, 382400.00 ns, 23.9000 us/op
+WorkloadJitting  2: 16 op, 307865800.00 ns, 19.2416 ms/op
+
+WorkloadPilot    1: 16 op, 280245400.00 ns, 17.5153 ms/op
+
+OverheadWarmup   1: 16 op, 1900.00 ns, 118.7500 ns/op
+OverheadWarmup   2: 16 op, 3500.00 ns, 218.7500 ns/op
+OverheadWarmup   3: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadWarmup   4: 16 op, 2300.00 ns, 143.7500 ns/op
+OverheadWarmup   5: 16 op, 1400.00 ns, 87.5000 ns/op
+
+OverheadActual   1: 16 op, 3100.00 ns, 193.7500 ns/op
+OverheadActual   2: 16 op, 2200.00 ns, 137.5000 ns/op
+OverheadActual   3: 16 op, 1700.00 ns, 106.2500 ns/op
+OverheadActual   4: 16 op, 1600.00 ns, 100.0000 ns/op
+OverheadActual   5: 16 op, 1700.00 ns, 106.2500 ns/op
+OverheadActual   6: 16 op, 2000.00 ns, 125.0000 ns/op
+OverheadActual   7: 16 op, 1400.00 ns, 87.5000 ns/op
+OverheadActual   8: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadActual   9: 16 op, 1600.00 ns, 100.0000 ns/op
+OverheadActual  10: 16 op, 1600.00 ns, 100.0000 ns/op
+OverheadActual  11: 16 op, 3400.00 ns, 212.5000 ns/op
+OverheadActual  12: 16 op, 2000.00 ns, 125.0000 ns/op
+OverheadActual  13: 16 op, 1100.00 ns, 68.7500 ns/op
+OverheadActual  14: 16 op, 2800.00 ns, 175.0000 ns/op
+OverheadActual  15: 16 op, 2000.00 ns, 125.0000 ns/op
+OverheadActual  16: 16 op, 1800.00 ns, 112.5000 ns/op
+OverheadActual  17: 16 op, 1500.00 ns, 93.7500 ns/op
+OverheadActual  18: 16 op, 3000.00 ns, 187.5000 ns/op
+OverheadActual  19: 16 op, 2700.00 ns, 168.7500 ns/op
+OverheadActual  20: 16 op, 1400.00 ns, 87.5000 ns/op
+
+WorkloadWarmup   1: 16 op, 333442000.00 ns, 20.8401 ms/op
+WorkloadWarmup   2: 16 op, 237581000.00 ns, 14.8488 ms/op
+WorkloadWarmup   3: 16 op, 261390700.00 ns, 16.3369 ms/op
+WorkloadWarmup   4: 16 op, 171392300.00 ns, 10.7120 ms/op
+WorkloadWarmup   5: 16 op, 372734900.00 ns, 23.2959 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 16 op, 234645800.00 ns, 14.6654 ms/op
+WorkloadActual   2: 16 op, 26909020

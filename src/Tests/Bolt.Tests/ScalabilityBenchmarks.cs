@@ -8,15 +8,15 @@ using Bolt.Server;
 using Bolt.Tests.Grpc;
 using Grpc.Net.Client;
 using MemoryPack;
+using Perfolizer.Horology;
 
 namespace Bolt.Tests;
 
 /// <summary>
-/// Scalability benchmark — measures how each transport handles many concurrent clients.
-/// Each client has multiple connections (Bolt) or a single multiplexed connection (gRPC).
+/// In-process scalability benchmark with one connection/channel per caller.
 ///
 /// Tests: 10, 50, 100 clients. Each fires 1 request simultaneously.
-/// Measures: latency, memory, and connection overhead at scale.
+/// Measures batch completion and whole-process allocation regressions at scale.
 /// </summary>
 [Config(typeof(ScalabilityConfig))]
 [MemoryDiagnoser]
@@ -30,6 +30,7 @@ public class ScalabilityBenchmarks
     // gRPC
     private WebApplication _grpcBackendApp = null!;
     private WebApplication _grpcHubApp = null!;
+    private GrpcChannel _grpcBackendChannel = null!;
     private List<HelloService.HelloServiceClient> _grpcClients = [];
     private List<GrpcChannel> _grpcChannels = [];
 
@@ -46,13 +47,13 @@ public class ScalabilityBenchmarks
         for (int i = 0; i < 5; i++)
         {
             var p = MemoryPackSerializer.Serialize(new HelloMsg { Text = "W" });
-            await _boltClients[0].InvokeAsync("bolt_svc", "hello", p);
-            await _grpcClients[0].SayHelloAsync(new HelloRequest { Name = "W" });
+            await ValidateBoltHello(_boltClients[0].InvokeAsync("bolt_svc", "hello", p), "Hello W");
+            await ValidateGrpcHello(_grpcClients[0].SayHelloAsync(new HelloRequest { Name = "W" }).ResponseAsync, "Hello W");
         }
 
         // Report connection counts
         var boltServer = _boltApp.Services.GetRequiredService<BoltServer>();
-        Console.WriteLine($"[Setup] Bolt: {ClientCount} clients × 2 connections = {boltServer.ConnectedClients} hub connections (+ 2 service connections)");
+        Console.WriteLine($"[Setup] Bolt: {ClientCount} clients × 1 connection = {boltServer.ConnectedClients} hub connections (+ 1 service connection)");
         Console.WriteLine($"[Setup] gRPC: {ClientCount} clients × 1 channel each");
     }
 
@@ -71,15 +72,15 @@ public class ScalabilityBenchmarks
 
         var lf = _boltApp.Services.GetRequiredService<ILoggerFactory>();
 
-        // Service — handles requests (2 connections)
-        var svcOpts = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 2 };
+        // Service uses one connection, matching the single gRPC backend channel.
+        var svcOpts = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 1, MaxConnections = 1 };
         _boltService = new BoltClient(new Uri("ws://localhost:18900/bolt"),
             "bolt_svc", "BoltSvc", svcOpts, lf.CreateLogger<BoltClient>());
         _boltService.RegisterHandler("hello", HelloHandler);
         await _boltService.ConnectAsync();
 
-        // Create N clients, each with 2 connections
-        var clientOpts = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 2, MaxConnections = 4 };
+        // Create N clients, each with one connection/channel.
+        var clientOpts = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 1, MaxConnections = 1 };
         _boltClients = [];
         for (int i = 0; i < ClientCount; i++)
         {
@@ -108,8 +109,8 @@ public class ScalabilityBenchmarks
         await WaitForHealth("http://localhost:18902/health");
 
         // Hub
-        var backendCh = GrpcChannel.ForAddress("http://localhost:18901");
-        var backendCl = new HelloService.HelloServiceClient(backendCh);
+        _grpcBackendChannel = GrpcChannel.ForAddress("http://localhost:18901");
+        var backendCl = new HelloService.HelloServiceClient(_grpcBackendChannel);
         var hb = WebApplication.CreateBuilder();
         hb.WebHost.ConfigureKestrel(o =>
         {
@@ -155,7 +156,7 @@ public class ScalabilityBenchmarks
         {
             var client = _boltClients[i];
             var p = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
-            tasks[i] = client.InvokeAsync("bolt_svc", "hello", p);
+            tasks[i] = ValidateBoltHello(client.InvokeAsync("bolt_svc", "hello", p), "Hello World");
         }
         await Task.WhenAll(tasks);
     }
@@ -166,9 +167,27 @@ public class ScalabilityBenchmarks
         var tasks = new Task[ClientCount];
         for (int i = 0; i < ClientCount; i++)
         {
-            tasks[i] = _grpcClients[i].SayHelloAsync(new HelloRequest { Name = "World" }).ResponseAsync;
+            tasks[i] = ValidateGrpcHello(
+                _grpcClients[i].SayHelloAsync(new HelloRequest { Name = "World" }).ResponseAsync,
+                "Hello World");
         }
         await Task.WhenAll(tasks);
+    }
+
+    private static async Task ValidateBoltHello(
+        Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload)> pending,
+        string expected)
+    {
+        var response = await pending;
+        if (response.StatusCode != HttpStatusCode.OK ||
+            MemoryPackSerializer.Deserialize<HelloMsg>(response.Payload.Span)?.Text != expected)
+            throw new InvalidOperationException("Bolt returned an invalid benchmark response.");
+    }
+
+    private static async Task ValidateGrpcHello(Task<HelloReply> pending, string expected)
+    {
+        if ((await pending).Message != expected)
+            throw new InvalidOperationException("gRPC returned an invalid benchmark response.");
     }
 
     [GlobalCleanup]
@@ -179,6 +198,7 @@ public class ScalabilityBenchmarks
         try { await _boltService.DisposeAsync(); } catch { }
         foreach (var ch in _grpcChannels)
             ch.Dispose();
+        _grpcBackendChannel?.Dispose();
         try { await _grpcHubApp.StopAsync(); } catch { }
         try { await _grpcBackendApp.StopAsync(); } catch { }
         try { await _boltApp.StopAsync(); } catch { }
@@ -197,11 +217,15 @@ public class ScalabilityBenchmarks
     }
 }
 
-file class ScalabilityConfig : ManualConfig
+public class ScalabilityConfig : ManualConfig
 {
     public ScalabilityConfig()
     {
-        AddJob(Job.ShortRun.WithWarmupCount(2).WithIterationCount(5));
+        AddJob(Job.Default
+            .WithLaunchCount(3)
+            .WithWarmupCount(5)
+            .WithIterationCount(15)
+            .WithMinIterationTime(TimeInterval.FromMilliseconds(250)));
         AddColumn(StatisticColumn.P95);
     }
 }

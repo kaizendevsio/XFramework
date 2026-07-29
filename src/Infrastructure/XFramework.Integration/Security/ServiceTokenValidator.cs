@@ -1,4 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
@@ -11,7 +13,11 @@ public sealed class ServiceTokenValidator(
     IOptions<ServiceIdentityOptions> options)
     : IServiceTokenValidator
 {
+    private const int MaxSuccessfulValidationCacheEntries = 1024;
     private static readonly JwtSecurityTokenHandler Handler = new();
+    private readonly object _cacheLock = new();
+    private readonly Dictionary<ValidationCacheKey, LinkedListNode<CachedValidation>> _successfulValidations = [];
+    private readonly LinkedList<CachedValidation> _validationLru = [];
 
     public async Task<ServiceTokenValidationResult> ValidateAsync(
         string? token,
@@ -25,6 +31,10 @@ public sealed class ServiceTokenValidator(
         if (string.IsNullOrWhiteSpace(expectedAudience))
             return ServiceTokenValidationResult.Failure("Expected service token audience is required.");
 
+        var cacheKey = CreateCacheKey(token, expectedAudience);
+        if (TryGetCachedValidation(cacheKey, out var cachedValidation))
+            return ApplyRequiredScopes(cachedValidation, requiredScopes);
+
         JwtSecurityToken unvalidated;
         try
         {
@@ -36,21 +46,25 @@ public sealed class ServiceTokenValidator(
         }
 
         var keyId = unvalidated.Header.Kid;
-        IReadOnlyList<SecurityKey> validationKeys;
+        List<ImportedSecurityKey> importedKeys = [];
         try
         {
             var keys = await signingKeyProvider.GetSigningKeysAsync(keyId, ct);
-            validationKeys = keys
-                .Where(static key => !string.IsNullOrWhiteSpace(key.PublicKeyPem))
-                .Select(ToSecurityKey)
-                .ToList();
+            foreach (var key in keys.Where(static key => !string.IsNullOrWhiteSpace(key.PublicKeyPem)))
+                importedKeys.Add(ImportSecurityKey(key));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            DisposeImportedKeys(importedKeys);
+            throw;
         }
         catch (Exception ex)
         {
-            return ServiceTokenValidationResult.Failure($"Service signing keys are unavailable: {ex.Message}");
+            DisposeImportedKeys(importedKeys);
+            return ServiceTokenValidationResult.Unavailable($"Service signing keys are unavailable: {ex.Message}");
         }
 
-        if (validationKeys.Count == 0)
+        if (importedKeys.Count == 0)
             return ServiceTokenValidationResult.Failure("No service signing key matched the token.");
 
         try
@@ -60,7 +74,7 @@ public sealed class ServiceTokenValidator(
                 new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKeys = validationKeys,
+                    IssuerSigningKeys = importedKeys.Select(static key => key.SecurityKey),
                     ValidateIssuer = true,
                     ValidIssuer = options.Value.Issuer,
                     ValidateAudience = true,
@@ -77,41 +91,136 @@ public sealed class ServiceTokenValidator(
             if (string.IsNullOrWhiteSpace(caller))
                 return ServiceTokenValidationResult.Failure("Service token caller is missing.");
 
-            var scopes = ExtractScopes(principal);
-            if (requiredScopes is { Count: > 0 })
-            {
-                var missing = requiredScopes
-                    .Where(scope => !scopes.Contains(scope))
-                    .ToList();
-                if (missing.Count > 0)
-                {
-                    return ServiceTokenValidationResult.Failure(
-                        $"Service token is missing required scope(s): {string.Join(", ", missing)}.");
-                }
-            }
-
-            return new ServiceTokenValidationResult(
+            var validation = new ServiceTokenValidationResult(
                 true,
                 caller,
                 expectedAudience,
-                scopes,
+                ExtractScopes(principal),
                 principal,
                 null);
+            CacheSuccessfulValidation(cacheKey, validation, unvalidated.ValidTo);
+            return ApplyRequiredScopes(validation, requiredScopes);
         }
         catch (Exception ex)
         {
             return ServiceTokenValidationResult.Failure($"Service token validation failed: {ex.Message}");
         }
+        finally
+        {
+            DisposeImportedKeys(importedKeys);
+        }
     }
 
-    private static SecurityKey ToSecurityKey(XFramework.Domain.Shared.ServiceIdentity.ServiceSigningKeyResponse key)
+    private static ServiceTokenValidationResult ApplyRequiredScopes(
+        ServiceTokenValidationResult validation,
+        IReadOnlyCollection<string>? requiredScopes)
+    {
+        if (requiredScopes is not { Count: > 0 })
+            return validation;
+
+        var missing = requiredScopes
+            .Where(scope => !validation.Scopes.Contains(scope))
+            .ToList();
+        return missing.Count == 0
+            ? validation
+            : ServiceTokenValidationResult.Failure(
+                $"Service token is missing required scope(s): {string.Join(", ", missing)}.");
+    }
+
+    private bool TryGetCachedValidation(
+        ValidationCacheKey key,
+        out ServiceTokenValidationResult validation)
+    {
+        lock (_cacheLock)
+        {
+            if (!_successfulValidations.TryGetValue(key, out var node))
+            {
+                validation = default!;
+                return false;
+            }
+
+            if (node.Value.ExpiresAtUtc <= DateTimeOffset.UtcNow)
+            {
+                _successfulValidations.Remove(key);
+                _validationLru.Remove(node);
+                validation = default!;
+                return false;
+            }
+
+            _validationLru.Remove(node);
+            _validationLru.AddFirst(node);
+            validation = node.Value.Validation;
+            return true;
+        }
+    }
+
+    private void CacheSuccessfulValidation(
+        ValidationCacheKey key,
+        ServiceTokenValidationResult validation,
+        DateTime validToUtc)
+    {
+        var expiresAtUtc = new DateTimeOffset(
+            DateTime.SpecifyKind(validToUtc, DateTimeKind.Utc));
+        if (expiresAtUtc <= DateTimeOffset.UtcNow)
+            return;
+
+        lock (_cacheLock)
+        {
+            if (_successfulValidations.TryGetValue(key, out var existing))
+            {
+                _validationLru.Remove(existing);
+                _successfulValidations.Remove(key);
+            }
+
+            while (_successfulValidations.Count >= MaxSuccessfulValidationCacheEntries)
+            {
+                var oldest = _validationLru.Last;
+                if (oldest is null)
+                    break;
+                _validationLru.RemoveLast();
+                _successfulValidations.Remove(oldest.Value.Key);
+            }
+
+            var cached = new CachedValidation(key, validation, expiresAtUtc);
+            var node = _validationLru.AddFirst(cached);
+            _successfulValidations[key] = node;
+        }
+    }
+
+    private static ValidationCacheKey CreateCacheKey(string token, string expectedAudience)
+    {
+        Span<byte> digest = stackalloc byte[32];
+        SHA256.HashData(MemoryMarshal.AsBytes(token.AsSpan()), digest);
+        return new ValidationCacheKey(
+            BinaryPrimitives.ReadUInt64LittleEndian(digest),
+            BinaryPrimitives.ReadUInt64LittleEndian(digest[8..]),
+            BinaryPrimitives.ReadUInt64LittleEndian(digest[16..]),
+            BinaryPrimitives.ReadUInt64LittleEndian(digest[24..]),
+            expectedAudience);
+    }
+
+    private static ImportedSecurityKey ImportSecurityKey(
+        XFramework.Domain.Shared.ServiceIdentity.ServiceSigningKeyResponse key)
     {
         var rsa = RSA.Create();
-        rsa.ImportFromPem(key.PublicKeyPem);
-        return new RsaSecurityKey(rsa)
+        try
         {
-            KeyId = key.KeyId
-        };
+            rsa.ImportFromPem(key.PublicKeyPem);
+            return new ImportedSecurityKey(
+                new RsaSecurityKey(rsa) { KeyId = key.KeyId },
+                rsa);
+        }
+        catch
+        {
+            rsa.Dispose();
+            throw;
+        }
+    }
+
+    private static void DisposeImportedKeys(IEnumerable<ImportedSecurityKey> keys)
+    {
+        foreach (var key in keys)
+            key.Owner.Dispose();
     }
 
     private static IReadOnlySet<string> ExtractScopes(ClaimsPrincipal principal)
@@ -123,4 +232,18 @@ public sealed class ServiceTokenValidator(
 
         return scopes;
     }
+
+    private readonly record struct ValidationCacheKey(
+        ulong Part0,
+        ulong Part1,
+        ulong Part2,
+        ulong Part3,
+        string Audience);
+
+    private sealed record CachedValidation(
+        ValidationCacheKey Key,
+        ServiceTokenValidationResult Validation,
+        DateTimeOffset ExpiresAtUtc);
+
+    private sealed record ImportedSecurityKey(SecurityKey SecurityKey, RSA Owner);
 }

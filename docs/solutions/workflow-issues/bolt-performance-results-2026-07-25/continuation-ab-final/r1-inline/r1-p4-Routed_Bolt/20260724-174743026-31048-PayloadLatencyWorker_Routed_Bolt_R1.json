@@ -1,0 +1,37 @@
+{
+  "source": "PayloadLatencyWorker.Routed_Bolt.R1",
+  "timestampUtc": "2026-07-24T17:47:43.0252285+00:00",
+  "processId": 31048,
+  "runtime": ".NET 10.0.0",
+  "runtimeVersion": "10.0.0",
+  "operatingSystem": "Microsoft Windows 10.0.26200",
+  "processArchitecture": "X64",
+  "osArchitecture": "X64",
+  "processorCount": 18,
+  "serverGc": true,
+  "latencyMode": "Interactive",
+  "processPriority": "Normal",
+  "effectiveSettings": {
+    "topology": "Routed_Bolt",
+    "logicalPath": "caller -\u003E Bolt Hub -\u003E Bolt service",
+    "payloadBytes": 1024,
+    "callTimeoutSeconds": 60,
+    "largePayloadThresholdBytes": 2097152,
+    "streamChunkSizeBytes": 131051,
+    "pipelineBytes": 2097152,
+    "receiveBufferBytes": 65536,
+    "hubReceiveBufferBytes": 262144,
+    "runRpcContinuationsAsynchronously": false,
+    "grpcHttp2MaxStreamsPerConnection": null,
+    "grpcCallerChannelCount": null,
+    "grpcBackendChannelCount": 0,
+    "grpcMultipleHttp2ConnectionsEnabled": null,
+    "serverAddresses": [
+      "http://127.0.0.1:50427/"
+    ]
+  },
+  "environment": {
+    "BOLT_BENCH_RUN_RPC_CONTINUATIONS_ASYNCHRONOUSLY": "false",
+    "BOLT_BENCH_ARTIFACTS": "C:\\Users\\Xeon\\RiderProjects\\XFramework-worktrees\\bolt-remediation-plan-scope\\docs\\solutions\\workflow-issues\\bolt-performance-results-2026-07-25\\continuation-ab-final\\r1-inline\\r1-p4-Routed_Bolt"
+  }
+}

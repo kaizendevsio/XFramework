@@ -28,15 +28,29 @@ public sealed class InMemoryDurableQueueStore : IDurableQueueStore
 
     public Task<long> AppendAsync(int topicHash, string subscriberId, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+        var maxQueueBytes = Math.Max(1, _options.MaxQueueBytesPerSubscriber);
+        if (payload.Length > maxQueueBytes)
+        {
+            throw new BoltDurableQueueByteCapacityExceededException(
+                $"Durable payload size {payload.Length} exceeds the per-subscriber byte capacity {maxQueueBytes}.");
+        }
+
         var state = _queues.GetOrAdd((topicHash, subscriberId), _ => new QueueState());
+        var maxQueueSize = Math.Max(1, _options.MaxQueueSize);
         long seq;
         lock (state.Lock)
         {
+            while (state.Messages.Count > 0 && state.RetainedBytes > maxQueueBytes - payload.Length)
+                RemoveOldest(state);
+
             seq = ++state.NextSequence;
-            state.Messages.Add((seq, payload.ToArray()));
-            // Trim to MaxQueueSize
-            while (state.Messages.Count > _options.MaxQueueSize)
-                state.Messages.RemoveAt(0);
+            var copy = payload.ToArray();
+            state.Messages.Add((seq, copy));
+            state.RetainedBytes += copy.Length;
+
+            while (state.Messages.Count > maxQueueSize)
+                RemoveOldest(state);
         }
         return Task.FromResult(seq);
     }
@@ -72,7 +86,11 @@ public sealed class InMemoryDurableQueueStore : IDurableQueueStore
                 if (upToSequence <= state.LastAckedSequence || upToSequence > state.NextSequence)
                     return Task.CompletedTask;
 
+                var removedBytes = state.Messages
+                    .Where(m => m.Sequence <= upToSequence)
+                    .Sum(static m => (long)m.Payload.Length);
                 state.Messages.RemoveAll(m => m.Sequence <= upToSequence);
+                state.RetainedBytes -= removedBytes;
                 state.LastAckedSequence = upToSequence;
             }
         }
@@ -148,6 +166,17 @@ public sealed class InMemoryDurableQueueStore : IDurableQueueStore
         public readonly object Lock = new();
         public long NextSequence;
         public long LastAckedSequence;
+        public long RetainedBytes;
         public readonly List<(long Sequence, byte[] Payload)> Messages = new();
     }
+
+    private static void RemoveOldest(QueueState state)
+    {
+        var oldest = state.Messages[0];
+        state.Messages.RemoveAt(0);
+        state.RetainedBytes -= oldest.Payload.Length;
+    }
 }
+
+public sealed class BoltDurableQueueByteCapacityExceededException(string message)
+    : InvalidOperationException(message);

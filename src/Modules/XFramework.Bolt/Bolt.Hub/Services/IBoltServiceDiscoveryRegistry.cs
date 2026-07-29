@@ -7,6 +7,8 @@ public interface IBoltServiceDiscoveryRegistry
 {
     Task ResetPresenceAsync(CancellationToken ct);
 
+    Task RetireStaleAsync(CancellationToken ct);
+
     Task<BoltServiceManifestAdvertisementResponse> AdvertiseAsync(
         BoltRequestContext context,
         BoltServiceManifest manifest,

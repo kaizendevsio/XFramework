@@ -29,9 +29,6 @@ public sealed class BoltMediaClient : IAsyncDisposable
     private readonly ConcurrentDictionary<Guid, ClientCallInfo> _activeCalls = new();
     private readonly ConcurrentDictionary<Guid, BoltMediaStream> _mediaStreams = new();
     private readonly ConcurrentDictionary<Guid, AdaptiveBitrateController> _bitrateControllers = new();
-    private readonly ConcurrentDictionary<Guid, IMediaEncryption> _callEncryption = new();
-
-    private Func<IMediaEncryption>? _encryptionFactory;
 
     // Call events
     public event Func<IncomingCallInfo, Task>? OnIncomingCall;
@@ -39,6 +36,13 @@ public sealed class BoltMediaClient : IAsyncDisposable
     public event Func<Guid, string?, Task>? OnCallRejected;
     public event Func<Guid, Task>? OnCallEnded;
     public event Action<Guid>? OnKeyframeRequested;
+    public event Action<BoltMediaStream>? OnMediaStreamConfigured;
+
+    /// <summary>
+    /// The current call-signaling contract does not bind ECDH keys to an authenticated
+    /// transport identity, so built-in encrypted calls remain unavailable.
+    /// </summary>
+    public static bool BuiltInAuthenticatedEncryptionAvailable => false;
 
     public BoltMediaClient(BoltClient client, ILogger logger)
     {
@@ -46,29 +50,38 @@ public sealed class BoltMediaClient : IAsyncDisposable
         _logger = logger;
 
         // Register frame handlers for all media frame types
-        client.RegisterFrameHandler(FrameType.MediaFrame, HandleMediaFrame);
-        client.RegisterFrameHandler(FrameType.MediaConfig, HandleMediaConfig);
-        client.RegisterFrameHandler(FrameType.MediaFeedback, HandleMediaFeedback);
-        client.RegisterFrameHandler(FrameType.MediaKeyRequest, HandleMediaKeyRequest);
-        client.RegisterFrameHandler(FrameType.FecFrame, HandleFecFrame);
-        client.RegisterFrameHandler(FrameType.NackRequest, HandleNackRequest);
-        client.RegisterFrameHandler(FrameType.CallSignal, HandleCallSignal);
+        RegisterBorrowedFrameHandler(FrameType.MediaFrame, HandleMediaFrame);
+        RegisterBorrowedFrameHandler(FrameType.MediaConfig, HandleMediaConfig);
+        RegisterBorrowedFrameHandler(FrameType.MediaFeedback, HandleMediaFeedback);
+        RegisterBorrowedFrameHandler(FrameType.MediaKeyRequest, HandleMediaKeyRequest);
+        RegisterBorrowedFrameHandler(FrameType.FecFrame, HandleFecFrame);
+        RegisterBorrowedFrameHandler(FrameType.NackRequest, HandleNackRequest);
+        RegisterBorrowedFrameHandler(FrameType.CallSignal, HandleCallSignal);
     }
 
-    /// <summary>Set a custom encryption factory for Blazor WASM (ExternalMediaEncryption).</summary>
-    public void SetEncryptionFactory(Func<IMediaEncryption> factory) => _encryptionFactory = factory;
+    private void RegisterBorrowedFrameHandler(
+        FrameType frameType,
+        Action<BoltConnection, byte[], int> handler) =>
+        _client.RegisterFrameHandler(frameType, handler);
 
-    private IMediaEncryption CreateEncryption() => _encryptionFactory?.Invoke() ?? new MediaEncryption();
+    /// <summary>Built-in signaling cannot safely exchange media keys yet.</summary>
+    public void SetEncryptionFactory(Func<IMediaEncryption> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        throw new NotSupportedException(
+            "Encrypted Bolt Media calls require an identity-bound key exchange, which the current signaling contract does not provide.");
+    }
 
     // ── Call API ─────────────────────────────────────────────
 
-    public async Task<Guid> StartCallAsync(string recipientId, bool video = false, bool encrypted = true)
+    public async Task<Guid> StartCallAsync(string recipientId, bool video = false, bool encrypted = false)
     {
+        if (encrypted)
+            throw new NotSupportedException(
+                "Encrypted Bolt Media calls are disabled until key exchange is bound to authenticated peer identities.");
+
         var callId = Guid.NewGuid();
         _activeCalls[callId] = new ClientCallInfo { CallId = callId, IsOutgoing = true, RemoteClientId = recipientId };
-
-        if (encrypted)
-            _callEncryption[callId] = CreateEncryption();
 
         var recipientHash = BoltCodec.Fnv1aHash(recipientId);
         var payload = new byte[4];
@@ -76,21 +89,42 @@ public sealed class BoltMediaClient : IAsyncDisposable
 
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteCallSignal(writer, callId, SignalType.Initiate, payload);
-        await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
-        writer.Reset();
+        try
+        {
+            await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+        }
+        catch
+        {
+            _activeCalls.TryRemove(callId, out _);
+            throw;
+        }
 
         return callId;
     }
 
-    public async Task AnswerCallAsync(Guid callId)
+    public async Task AnswerCallAsync(Guid callId, bool encrypted = false)
     {
-        if (_activeCalls.TryGetValue(callId, out var call))
+        if (encrypted)
+            throw new NotSupportedException(
+                "Encrypted Bolt Media calls are disabled until key exchange is bound to authenticated peer identities.");
+
+        _activeCalls.TryGetValue(callId, out var call);
+        var previousStatus = call?.Status;
+        if (call is not null)
             call.Status = ClientCallStatus.Active;
 
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteCallSignal(writer, callId, SignalType.Answer, ReadOnlySpan<byte>.Empty);
-        await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
-        writer.Reset();
+        try
+        {
+            await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+        }
+        catch
+        {
+            if (call is not null && previousStatus is { } status)
+                call.Status = status;
+            throw;
+        }
     }
 
     public async Task RejectCallAsync(Guid callId)
@@ -98,9 +132,14 @@ public sealed class BoltMediaClient : IAsyncDisposable
         _activeCalls.TryRemove(callId, out _);
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteCallSignal(writer, callId, SignalType.Reject, ReadOnlySpan<byte>.Empty);
-        await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
-        writer.Reset();
-        await CleanupCallStreamsAsync(callId);
+        try
+        {
+            await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+        }
+        finally
+        {
+            await CleanupCallStreamsAsync(callId);
+        }
     }
 
     public async Task EndCallAsync(Guid callId)
@@ -108,13 +147,24 @@ public sealed class BoltMediaClient : IAsyncDisposable
         _activeCalls.TryRemove(callId, out _);
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteCallSignal(writer, callId, SignalType.End, ReadOnlySpan<byte>.Empty);
-        await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
-        writer.Reset();
-        await CleanupCallStreamsAsync(callId);
+        try
+        {
+            await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+        }
+        finally
+        {
+            await CleanupCallStreamsAsync(callId);
+        }
     }
 
     public BoltMediaStream? GetMediaStream(Guid streamId)
         => _mediaStreams.TryGetValue(streamId, out var stream) ? stream : null;
+
+    public bool RegisterMediaStream(BoltMediaStream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        return _activeCalls.ContainsKey(stream.CallId) && _mediaStreams.TryAdd(stream.StreamId, stream);
+    }
 
     public async Task<BoltMediaStream> SendScreenShareConfigAsync(Guid callId, int width = 1920, int height = 1080, int bitrateKbps = 3000, CancellationToken ct = default)
     {
@@ -125,13 +175,14 @@ public sealed class BoltMediaClient : IAsyncDisposable
         BoltCodec.WriteMediaConfig(writer, streamId, callId, MediaType.ScreenShare, CodecId.H264,
             width, height, bitrateKbps, 0, ReadOnlySpan<byte>.Empty);
         await conn.SendAsync(writer.WrittenMemory, ct);
-        writer.Reset();
 
         var stream = new BoltMediaStream(conn, streamId, callId, false);
         stream.EnableNack(256);
-        if (_callEncryption.TryGetValue(callId, out var enc) && enc.IsReady)
-            stream.SetEncryption(enc);
-        _mediaStreams[streamId] = stream;
+        if (!RegisterMediaStream(stream))
+        {
+            await stream.DisposeAsync();
+            throw new InvalidOperationException("Cannot register a media stream for an inactive call.");
+        }
 
         return stream;
     }
@@ -144,7 +195,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         if (_mediaStreams.TryGetValue(header.StreamId, out var stream))
         {
             var payload = header.GetPayload(buffer.AsSpan(0, length)).ToArray();
-            stream.EnqueueFrame(header.SequenceNumber, header.Timestamp, payload, header.Flags);
+            _ = stream.EnqueueFrameAsync(header.SequenceNumber, header.Timestamp, payload, header.Flags);
 
             if (_bitrateControllers.TryGetValue(header.StreamId, out var controller))
                 controller.RecordFrameReceived(header.SequenceNumber);
@@ -154,18 +205,17 @@ public sealed class BoltMediaClient : IAsyncDisposable
     private void HandleMediaConfig(BoltConnection conn, byte[] buffer, int length)
     {
         if (!BoltCodec.TryReadMediaConfig(buffer.AsSpan(0, length), out var config)) return;
+        if (!_activeCalls.ContainsKey(config.CallId) || _mediaStreams.ContainsKey(config.StreamId)) return;
 
         var isAudio = config.MediaType == MediaType.Audio;
         var stream = new BoltMediaStream(conn, config.StreamId, config.CallId, isAudio);
-        _mediaStreams[config.StreamId] = stream;
+        if (!_mediaStreams.TryAdd(config.StreamId, stream)) return;
 
+        stream.EnableFec(isAudio ? 4 : 8);
         stream.EnableNack(isAudio ? 128 : 256);
         stream.EnableDelayBasedControl(config.BitrateKbps);
 
         if (isAudio) { stream.EnableVad(); stream.EnablePlc(); }
-
-        if (_callEncryption.TryGetValue(config.CallId, out var enc) && enc.IsReady)
-            stream.SetEncryption(enc);
 
         var controller = new AdaptiveBitrateController(conn, config.StreamId, config.BitrateKbps, isAudio);
         _bitrateControllers[config.StreamId] = controller;
@@ -180,6 +230,8 @@ public sealed class BoltMediaClient : IAsyncDisposable
             if (isAudio) call.AudioStreamId = config.StreamId;
             else call.VideoStreamId = config.StreamId;
         }
+
+        OnMediaStreamConfigured?.Invoke(stream);
     }
 
     private void HandleMediaFeedback(BoltConnection conn, byte[] buffer, int length)
@@ -201,7 +253,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
         if (_mediaStreams.TryGetValue(header.StreamId, out var stream))
         {
             var payload = header.GetPayload(buffer.AsSpan(0, length)).ToArray();
-            stream.EnqueueFecFrame(header.FecGroupStart, header.FecGroupSize, payload);
+            _ = stream.EnqueueFecFrameAsync(header.FecGroupStart, header.FecGroupSize, payload);
         }
     }
 
@@ -210,7 +262,10 @@ public sealed class BoltMediaClient : IAsyncDisposable
         if (!BoltCodec.TryReadNackRequest(buffer.AsSpan(0, length), out var header)) return;
         if (_mediaStreams.TryGetValue(header.StreamId, out var stream))
         {
-            var missingSeqs = header.GetMissingSequences(buffer.AsSpan(0, length));
+            var missingSeqs = header.GetMissingSequences(buffer.AsSpan(0, length))
+                .Distinct()
+                .Take(64)
+                .ToArray();
             _ = stream.HandleNackAsync(missingSeqs);
         }
     }
@@ -218,10 +273,10 @@ public sealed class BoltMediaClient : IAsyncDisposable
     private void HandleCallSignal(BoltConnection conn, byte[] buffer, int length)
     {
         if (!BoltCodec.TryReadCallSignal(buffer.AsSpan(0, length), out var header)) return;
-        _ = HandleCallSignalAsync(header, buffer, length);
+        _ = HandleCallSignalAsync(header);
     }
 
-    private async Task HandleCallSignalAsync(CallSignalHeader header, byte[] data, int length)
+    private async Task HandleCallSignalAsync(CallSignalHeader header)
     {
         switch (header.SignalType)
         {
@@ -234,87 +289,68 @@ public sealed class BoltMediaClient : IAsyncDisposable
                 break;
             case SignalType.Answer:
                 if (_activeCalls.TryGetValue(header.CallId, out var answered)) answered.Status = ClientCallStatus.Active;
-                await SendKeyExchangeAsync(header.CallId);
                 if (OnCallAnswered != null) await OnCallAnswered(header.CallId);
                 break;
             case SignalType.Reject:
                 _activeCalls.TryRemove(header.CallId, out _);
-                CleanupCallEncryption(header.CallId);
+                await CleanupCallStreamsAsync(header.CallId);
                 if (OnCallRejected != null) await OnCallRejected(header.CallId, null);
                 break;
             case SignalType.End:
                 _activeCalls.TryRemove(header.CallId, out _);
-                CleanupCallEncryption(header.CallId);
                 await CleanupCallStreamsAsync(header.CallId);
                 if (OnCallEnded != null) await OnCallEnded(header.CallId);
                 break;
             case SignalType.KeyExchange:
-                await HandleKeyExchangeAsync(header.CallId, data, length, header);
+                _logger.LogWarning(
+                    "Ignoring unauthenticated Bolt Media key exchange for call {CallId}; encrypted media remains disabled",
+                    header.CallId);
                 break;
         }
-    }
-
-    private async Task SendKeyExchangeAsync(Guid callId)
-    {
-        if (!_callEncryption.TryGetValue(callId, out var enc))
-        {
-            enc = CreateEncryption();
-            _callEncryption[callId] = enc;
-        }
-        var writer = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteCallSignal(writer, callId, SignalType.KeyExchange, enc.PublicKey);
-        await _client.GetPrimaryConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
-        writer.Reset();
-    }
-
-    private async Task HandleKeyExchangeAsync(Guid callId, byte[] data, int length, CallSignalHeader header)
-    {
-        var remotePublicKey = header.GetPayload(data.AsSpan(0, length)).ToArray();
-        if (!_callEncryption.TryGetValue(callId, out var enc))
-        {
-            enc = CreateEncryption();
-            _callEncryption[callId] = enc;
-        }
-        await enc.DeriveKeyAsync(remotePublicKey, callId);
-
-        if (_activeCalls.TryGetValue(callId, out var call) && !call.IsOutgoing && !call.KeySent)
-        {
-            call.KeySent = true;
-            await SendKeyExchangeAsync(callId);
-        }
-
-        foreach (var (_, stream) in _mediaStreams)
-        {
-            if (stream.CallId == callId)
-                stream.SetEncryption(enc);
-        }
-    }
-
-    private void CleanupCallEncryption(Guid callId)
-    {
-        if (_callEncryption.TryRemove(callId, out var enc)) enc.Dispose();
     }
 
     private async Task CleanupCallStreamsAsync(Guid callId)
     {
         foreach (var (streamId, stream) in _mediaStreams)
         {
-            if (stream.CallId == callId)
+            if (stream.CallId != callId)
+                continue;
+
+            _mediaStreams.TryRemove(streamId, out _);
+            _bitrateControllers.TryRemove(streamId, out var controller);
+            try { await stream.DisposeAsync(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to dispose media stream {StreamId}", streamId); }
+            if (controller is not null)
             {
-                _mediaStreams.TryRemove(streamId, out _);
-                await stream.DisposeAsync();
+                try { await controller.DisposeAsync(); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to dispose bitrate controller {StreamId}", streamId); }
             }
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var (_, stream) in _mediaStreams) await stream.DisposeAsync();
+        _client.UnregisterFrameHandler(FrameType.MediaFrame, HandleMediaFrame);
+        _client.UnregisterFrameHandler(FrameType.MediaConfig, HandleMediaConfig);
+        _client.UnregisterFrameHandler(FrameType.MediaFeedback, HandleMediaFeedback);
+        _client.UnregisterFrameHandler(FrameType.MediaKeyRequest, HandleMediaKeyRequest);
+        _client.UnregisterFrameHandler(FrameType.FecFrame, HandleFecFrame);
+        _client.UnregisterFrameHandler(FrameType.NackRequest, HandleNackRequest);
+        _client.UnregisterFrameHandler(FrameType.CallSignal, HandleCallSignal);
+
+        foreach (var (streamId, stream) in _mediaStreams)
+        {
+            try { await stream.DisposeAsync(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to dispose media stream {StreamId}", streamId); }
+        }
         _mediaStreams.Clear();
-        foreach (var (_, controller) in _bitrateControllers) await controller.DisposeAsync();
+        foreach (var (streamId, controller) in _bitrateControllers)
+        {
+            try { await controller.DisposeAsync(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to dispose bitrate controller {StreamId}", streamId); }
+        }
         _bitrateControllers.Clear();
-        foreach (var (_, enc) in _callEncryption) enc.Dispose();
-        _callEncryption.Clear();
+        _activeCalls.Clear();
     }
 }
 
@@ -331,5 +367,4 @@ internal sealed class ClientCallInfo
     public ClientCallStatus Status { get; set; } = ClientCallStatus.Initiating;
     public Guid? AudioStreamId { get; set; }
     public Guid? VideoStreamId { get; set; }
-    public bool KeySent { get; set; }
 }

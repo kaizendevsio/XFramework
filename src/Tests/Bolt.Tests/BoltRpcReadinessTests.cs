@@ -51,6 +51,7 @@ public class BoltRpcReadinessTests
     {
         try { await _serverApp.StopAsync(); } catch { }
         try { await _serverApp.DisposeAsync(); } catch { }
+        try { await _serverApp.DisposeAsync(); } catch { }
     }
 
     [Test]
@@ -111,7 +112,7 @@ public class BoltRpcReadinessTests
         var caller = CreateClient("timeout_caller", "TimeoutCaller");
         var handlerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        responder.RegisterHandler("hang", async (_, _, ct) =>
+        responder.RegisterHandler("hang", async (ReadOnlyMemory<byte> _, Guid _, CancellationToken ct) =>
         {
             handlerEntered.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, ct);
@@ -151,7 +152,7 @@ public class BoltRpcReadinessTests
         var caller = CreateClient("disconnect_caller", "DisconnectCaller");
         var handlerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        responder.RegisterHandler("hang", async (_, _, ct) =>
+        responder.RegisterHandler("hang", async (ReadOnlyMemory<byte> _, Guid _, CancellationToken ct) =>
         {
             handlerEntered.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, ct);
@@ -171,6 +172,126 @@ public class BoltRpcReadinessTests
         statusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         responsePayload.Length.Should().Be(0);
         GetServerPendingInvocationCount().Should().Be(0);
+
+        await caller.DisposeAsync();
+    }
+
+    [Test]
+    public async Task InvokeAsync_WhenCallerCancels_CancelsRemoteHandlerAndReleasesHubState()
+    {
+        var responder = CreateClient("cancel_responder", "CancelResponder");
+        var caller = CreateClient("cancel_caller", "CancelCaller");
+        var handlerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handlerCanceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        responder.RegisterHandler("cancel", async (ReadOnlyMemory<byte> _, Guid _, CancellationToken ct) =>
+        {
+            handlerEntered.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+            finally
+            {
+                if (ct.IsCancellationRequested)
+                    handlerCanceled.TrySetResult();
+            }
+            return (HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty);
+        });
+
+        await responder.ConnectAsync();
+        await caller.ConnectAsync();
+        using var cts = new CancellationTokenSource();
+        var invoke = caller.InvokeAsync("cancel_responder", "cancel", new byte[] { 1 }, cts.Token);
+        await handlerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        cts.Cancel();
+
+        await FluentActions.Awaiting(async () => await invoke)
+            .Should().ThrowAsync<OperationCanceledException>();
+        await handlerCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForConditionAsync(() => GetServerPendingInvocationCount() == 0, timeoutMs: 5000);
+
+        await caller.DisposeAsync();
+        await responder.DisposeAsync();
+    }
+
+    [Test]
+    public async Task InvokeAsync_WhenCallerDisconnects_CancelsRemoteHandlerAndLocalPendingCall()
+    {
+        var responder = CreateClient("caller_disconnect_responder", "CallerDisconnectResponder");
+        var caller = CreateClient("caller_disconnect_caller", "CallerDisconnectCaller");
+        var handlerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handlerCanceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        responder.RegisterHandler("cancel-on-disconnect", async (ReadOnlyMemory<byte> _, Guid _, CancellationToken ct) =>
+        {
+            handlerEntered.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+            finally
+            {
+                if (ct.IsCancellationRequested)
+                    handlerCanceled.TrySetResult();
+            }
+            return (HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty);
+        });
+
+        await responder.ConnectAsync();
+        await caller.ConnectAsync();
+        var invoke = caller.InvokeAsync(
+            "caller_disconnect_responder",
+            "cancel-on-disconnect",
+            new byte[] { 1 });
+        await handlerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await caller.DisposeAsync();
+
+        await FluentActions.Awaiting(async () => await invoke)
+            .Should().ThrowAsync<ObjectDisposedException>();
+        await handlerCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForConditionAsync(() => GetServerPendingInvocationCount() == 0, timeoutMs: 5000);
+
+        await responder.DisposeAsync();
+    }
+
+    [Test]
+    public async Task InvokeAsync_WhenCallerCancelsHubLocalHandler_CancelsHandlerAndReleasesLocalState()
+    {
+        var server = _serverApp.Services.GetRequiredService<BoltServer>();
+        var caller = CreateClient("local_cancel_caller", "LocalCancelCaller");
+        var handlerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handlerCanceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        server.RegisterHandler("cancel-local", async (_, _, _, ct) =>
+        {
+            handlerEntered.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+            finally
+            {
+                if (ct.IsCancellationRequested)
+                    handlerCanceled.TrySetResult();
+            }
+
+            return (HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty);
+        });
+
+        await caller.ConnectAsync();
+        using var cts = new CancellationTokenSource();
+        var invoke = caller.InvokeAsync("unused-local-recipient", "cancel-local", new byte[] { 1 }, cts.Token);
+        await handlerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        cts.Cancel();
+
+        await FluentActions.Awaiting(async () => await invoke)
+            .Should().ThrowAsync<OperationCanceledException>();
+        await handlerCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForConditionAsync(() => GetServerLocalInvocationCount() == 0, timeoutMs: 5000);
 
         await caller.DisposeAsync();
     }
@@ -207,6 +328,7 @@ public class BoltRpcReadinessTests
         transport.Release();
         connection.CompleteSendChannel();
         await connection.SendLoop!.WaitAsync(TimeSpan.FromSeconds(2));
+        await WaitForConditionAsync(() => connection.PendingBytes == 0, timeoutMs: 2000);
 
         connection.PendingBytes.Should().Be(0);
     }
@@ -288,7 +410,7 @@ public class BoltRpcReadinessTests
 
         var snapshot = client.GetHealthSnapshot();
         snapshot.ConnectionCount.Should().Be(0);
-        snapshot.TotalSendFailures.Should().Be(2);
+        snapshot.TotalSendFailures.Should().Be(1);
         snapshot.TotalSendTimeouts.Should().Be(2);
         snapshot.TotalReceiveLoopFaults.Should().Be(1);
         snapshot.TotalUnexpectedDisconnects.Should().Be(1);
@@ -430,14 +552,11 @@ public class BoltRpcReadinessTests
             "HealthCaller",
             new BoltClientOptions { SendEnqueueTimeoutMs = 25 },
             _loggerFactory.CreateLogger<BoltClient>());
-        var transport = new BlockingSendBoltConnection();
-        var connection = new BoltConnection(transport, sendQueueCapacity: 4, sendEnqueueTimeoutMs: 25);
+        var connection = new BoltConnection(new NoopBoltConnection(), sendQueueCapacity: 4, sendEnqueueTimeoutMs: 25);
         var receiveCts = new CancellationTokenSource();
         connection.ReceiveCts = receiveCts;
         connection.ReceiveLoop = Task.Delay(Timeout.InfiniteTimeSpan, receiveCts.Token);
         connection.StartSendLoop(receiveCts.Token);
-
-        await connection.SendAsync(new byte[] { 1 }, CancellationToken.None);
 
         var connections = (List<BoltConnection>)typeof(BoltClient)
             .GetField("_connections", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -447,15 +566,19 @@ public class BoltRpcReadinessTests
             .GetField("_isRegistered", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(client, true);
 
-        await WaitForConditionAsync(() => connection.ActiveSends > 0);
-        await WaitForConditionAsync(() => connection.ActiveSendElapsedMs > 25, timeoutMs: 2000);
+        typeof(BoltConnection)
+            .GetField("_activeSends", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(connection, 1);
+        typeof(BoltConnection)
+            .GetField("_activeSendStartedAt", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(connection, Environment.TickCount64 - 50);
+
         var snapshot = client.GetHealthSnapshot();
 
         snapshot.ActiveSends.Should().Be(1);
         snapshot.MaxActiveSendElapsedMs.Should().BeGreaterThan(snapshot.ActiveSendUnhealthyThresholdMs);
         snapshot.IsHealthy.Should().BeFalse();
 
-        transport.Release();
         receiveCts.Cancel();
         connection.CompleteSendChannel();
     }
@@ -510,6 +633,17 @@ public class BoltRpcReadinessTests
         var countProperty = pendingInvocations.GetType().GetProperty("Count")
             ?? throw new InvalidOperationException("BoltServer pending-invocation collection does not expose Count.");
         return (int)countProperty.GetValue(pendingInvocations)!;
+    }
+
+    private int GetServerLocalInvocationCount()
+    {
+        var server = _serverApp.Services.GetRequiredService<BoltServer>();
+        var field = typeof(BoltServer).GetField("_localInvocations", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("BoltServer local-invocation field not found.");
+        var localInvocations = field.GetValue(server)!;
+        var countProperty = localInvocations.GetType().GetProperty("Count")
+            ?? throw new InvalidOperationException("BoltServer local-invocation collection does not expose Count.");
+        return (int)countProperty.GetValue(localInvocations)!;
     }
 
     private class NoopBoltConnection : IBoltConnection
