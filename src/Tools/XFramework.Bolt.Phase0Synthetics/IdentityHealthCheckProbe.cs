@@ -18,6 +18,7 @@ public static class IdentityHealthCheckProbe
     public static async Task InvokeAndValidateAsync(
         BoltClient client,
         SyntheticOptions options,
+        SecretToken serviceAccessToken,
         CancellationToken ct)
     {
         var request = new HealthCheckRequest
@@ -31,7 +32,7 @@ public static class IdentityHealthCheckProbe
                 DeviceName = options.DeviceId,
                 DeviceAgent = "XFramework.Bolt.Phase0Synthetics",
                 ActorAccessToken = options.UserActorToken.Reveal(),
-                ServiceAccessToken = options.PortalIdentityServiceToken.Reveal()
+                ServiceAccessToken = serviceAccessToken.Reveal()
             }
         };
         var payload = MemoryPackSerializer.Serialize(request);

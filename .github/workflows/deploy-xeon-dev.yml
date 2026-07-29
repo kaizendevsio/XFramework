@@ -91,6 +91,7 @@ jobs:
       BOLT_SYNTHETIC_CREDENTIAL_ID: 00000000-0000-0000-0000-000000000002
       BOLT_SYNTHETIC_TARGET: wss://xeon-dev.tailed40e.ts.net:7000/bolt/ws
       BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-communications-transport-token
+      BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-communications-identity-service-token
       BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-portal-transport-token
       BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-portal-identity-service-token
       BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-user-actor-token
@@ -205,6 +206,7 @@ jobs:
           python3 -B -m py_compile scripts/verify-bolt-phase0-diagnostic-sinks.py
 
           install -m 600 /dev/null "$BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH"
+          install -m 600 /dev/null "$BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_PATH"
           install -m 600 /dev/null "$BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH"
           install -m 600 /dev/null "$BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH"
           install -m 600 /dev/null "$BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH"
@@ -303,6 +305,7 @@ jobs:
           token_dir="$REMOTE_RUN_DIR/synthetic-tokens"
           install -d -m 700 "$token_dir"
           install -m 600 /dev/null "$token_dir/communications-transport-token"
+          install -m 600 /dev/null "$token_dir/communications-identity-service-token"
           install -m 600 /dev/null "$token_dir/portal-transport-token"
           install -m 600 /dev/null "$token_dir/portal-identity-service-token"
           install -m 600 /dev/null "$token_dir/user-actor-token"
@@ -365,6 +368,7 @@ jobs:
               "BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL": identity_url,
               "BOLT_SYNTHETIC_TARGET": hub_websocket_url,
               "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH": f"{token_dir}/communications-transport-token",
+              "BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_PATH": f"{token_dir}/communications-identity-service-token",
               "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH": f"{token_dir}/portal-transport-token",
               "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH": f"{token_dir}/portal-identity-service-token",
               "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH": f"{token_dir}/user-actor-token",
@@ -893,6 +897,7 @@ jobs:
               --evidence "$REMOTE_RUN_DIR/diagnostic-sinks.json"
           rm -f \
             "$REMOTE_RUN_DIR/synthetic-tokens/communications-transport-token" \
+            "$REMOTE_RUN_DIR/synthetic-tokens/communications-identity-service-token" \
             "$REMOTE_RUN_DIR/synthetic-tokens/portal-transport-token" \
             "$REMOTE_RUN_DIR/synthetic-tokens/portal-identity-service-token" \
             "$REMOTE_RUN_DIR/synthetic-tokens/user-actor-token" \
@@ -947,13 +952,16 @@ jobs:
             "REMOTE_RELEASES_DIR='$REMOTE_RELEASES_DIR' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_ACTIVE_ENV='$REMOTE_ACTIVE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_CANDIDATE_ENV='$REMOTE_CANDIDATE_ENV' IMAGE_TAG='$IMAGE_TAG' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
           umask 077
-          install -m 600 "$REMOTE_CANDIDATE_COMPOSE" "$REMOTE_COMPOSE_FILE"
+          compose_tmp="${REMOTE_COMPOSE_FILE}.tmp.$$"
+          install -m 600 "$REMOTE_CANDIDATE_COMPOSE" "$compose_tmp"
+          mv -f "$compose_tmp" "$REMOTE_COMPOSE_FILE"
           active_env_tmp="${REMOTE_ACTIVE_ENV}.tmp.$$"
           install -m 600 "$REMOTE_CANDIDATE_ENV" "$active_env_tmp"
           mv -f "$active_env_tmp" "$REMOTE_ACTIVE_ENV"
           token_dir="$REMOTE_RUN_DIR/synthetic-tokens"
           install -d -m 700 "$token_dir"
           install -m 600 /dev/null "$token_dir/communications-transport-token"
+          install -m 600 /dev/null "$token_dir/communications-identity-service-token"
           install -m 600 /dev/null "$token_dir/portal-transport-token"
           install -m 600 /dev/null "$token_dir/portal-identity-service-token"
           install -m 600 /dev/null "$token_dir/user-actor-token"
@@ -981,6 +989,7 @@ jobs:
           cleanup_synthetic_tokens() {
             rm -f \
               "$REMOTE_RUN_DIR/synthetic-tokens/communications-transport-token" \
+              "$REMOTE_RUN_DIR/synthetic-tokens/communications-identity-service-token" \
               "$REMOTE_RUN_DIR/synthetic-tokens/portal-transport-token" \
               "$REMOTE_RUN_DIR/synthetic-tokens/portal-identity-service-token" \
               "$REMOTE_RUN_DIR/synthetic-tokens/user-actor-token" \
@@ -1003,7 +1012,7 @@ jobs:
             /usr/bin/timeout --foreground --kill-after=10s 60s docker stop xframework-bolt-hub >/dev/null 2>&1 || \
               /usr/bin/timeout --foreground --kill-after=10s 30s docker kill xframework-bolt-hub >/dev/null 2>&1 || true
           }
-          trap 'stop_hub' ERR
+          trap 'stop_hub; exit 1' ERR
 
           test -f "$REMOTE_RUN_DIR/previous-release"
           test -f "$REMOTE_RUN_DIR/previous-release-kind"
@@ -1061,7 +1070,11 @@ jobs:
             done
             test "$ready" -eq 1
           done
-          install -m 600 "$release/docker-compose.yml" "$REMOTE_COMPOSE_FILE"
+          if [ "$kind" = normal ]; then
+            compose_tmp="${REMOTE_COMPOSE_FILE}.tmp.$$"
+            install -m 600 "$release/docker-compose.yml" "$compose_tmp"
+            mv -f "$compose_tmp" "$REMOTE_COMPOSE_FILE"
+          fi
           rm -f "$REMOTE_RUN_DIR/complete"
           if [ "$kind" = normal ]; then
             active_env_tmp="${REMOTE_ACTIVE_ENV}.tmp.$$"
@@ -1103,6 +1116,7 @@ jobs:
         run: |
           rm -f \
             "$BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH" \
+            "$BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_PATH" \
             "$BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH" \
             "$BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH" \
             "$BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH" \

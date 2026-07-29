@@ -36,9 +36,10 @@ SERVICE_AUDIENCE = "XFramework.IdentityServer"
 SERVICE_ALGORITHM = "RS256"
 SERVICE_TOKEN_TYPE = "JWT"
 PORTAL_SERVICE_SCOPES = ("bolt.service",)
+COMMUNICATIONS_SERVICE_SCOPES = ("bolt.service",)
 ACTOR_ALGORITHM = "HS512"
 ACTOR_TOKEN_TYPE = "JWT"
-RECEIPT_SCHEMA = "bolt-phase0-token-refresh/v3"
+RECEIPT_SCHEMA = "bolt-phase0-token-refresh/v4"
 PRINCIPAL_REFERENCE = "bolt-phase0-synthetic"
 GENERATION_CLAIM = "credential_generation"
 MAX_EXPIRY_REMAINING_SECONDS = 570
@@ -90,6 +91,7 @@ class Config:
     authorization_type: int
     minimum_lifetime_seconds: int
     communications_transport_path: str
+    communications_identity_service_path: str
     portal_transport_path: str
     portal_identity_service_path: str
     user_actor_path: str
@@ -297,6 +299,9 @@ def load_config(values: dict[str, str]) -> Config:
         ),
         communications_transport_path=_required(
             values, "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH"
+        ),
+        communications_identity_service_path=_required(
+            values, "BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_PATH"
         ),
         portal_transport_path=_required(values, "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH"),
         portal_identity_service_path=_required(
@@ -532,6 +537,8 @@ def _validate_service_jwt(
     token: Any,
     config: Config,
     *,
+    expected_client_id: str,
+    expected_scopes: tuple[str, ...],
     now: int,
 ) -> TokenEvidence:
     value, header, claims = _read_jwt(token)
@@ -559,11 +566,11 @@ def _validate_service_jwt(
         _raise("TOKEN_IDENTITY")
     normalized_scopes = scopes.split()
     if (
-        claims.get("client_id") != PORTAL_CLIENT_ID
-        or claims.get("sub") != PORTAL_CLIENT_ID
+        claims.get("client_id") != expected_client_id
+        or claims.get("sub") != expected_client_id
         or claims.get("client_credential_generation") != config.credential_generation
-        or len(normalized_scopes) != len(PORTAL_SERVICE_SCOPES)
-        or set(normalized_scopes) != set(PORTAL_SERVICE_SCOPES)
+        or len(normalized_scopes) != len(expected_scopes)
+        or set(normalized_scopes) != set(expected_scopes)
     ):
         _raise("TOKEN_IDENTITY")
     return evidence
@@ -631,12 +638,20 @@ def _parse_service_token(
     document: dict[str, Any],
     config: Config,
     *,
+    expected_client_id: str,
+    expected_scopes: tuple[str, ...],
     now: int,
 ) -> TokenEvidence:
     data = _response_data(document, SERVICE_DATA_KEYS)
     if data.get("tokenType") != "Bearer" or not isinstance(data.get("expiresAtUtc"), str):
         _raise("RESPONSE_SCHEMA")
-    evidence = _validate_service_jwt(data.get("accessToken"), config, now=now)
+    evidence = _validate_service_jwt(
+        data.get("accessToken"),
+        config,
+        expected_client_id=expected_client_id,
+        expected_scopes=expected_scopes,
+        now=now,
+    )
     try:
         response_expiration = dt.datetime.fromisoformat(
             data["expiresAtUtc"].replace("Z", "+00:00")
@@ -818,6 +833,7 @@ def execute(
     validate_destinations(
         [
             config.communications_transport_path,
+            config.communications_identity_service_path,
             config.portal_transport_path,
             config.portal_identity_service_path,
             config.user_actor_path,
@@ -870,6 +886,26 @@ def execute(
             context_factory=context_factory,
         ),
         config,
+        expected_client_id=PORTAL_CLIENT_ID,
+        expected_scopes=PORTAL_SERVICE_SCOPES,
+        now=now,
+    )
+    communications_identity_service = _parse_service_token(
+        _post_json(
+            config,
+            "/api/service-identity/token",
+            {
+                "clientId": COMMUNICATIONS_CLIENT_ID,
+                "clientSecret": config.communications_secret,
+                "audience": SERVICE_AUDIENCE,
+                "scopes": list(COMMUNICATIONS_SERVICE_SCOPES),
+            },
+            connection_factory=connection_factory,
+            context_factory=context_factory,
+        ),
+        config,
+        expected_client_id=COMMUNICATIONS_CLIENT_ID,
+        expected_scopes=COMMUNICATIONS_SERVICE_SCOPES,
         now=now,
     )
     expiry_transport = _parse_transport_token(
@@ -917,6 +953,7 @@ def execute(
         communications_transport,
         portal_transport,
         portal_identity_service,
+        communications_identity_service,
         expiry_transport,
         user_actor,
     ]
@@ -928,6 +965,7 @@ def execute(
         communications_transport.expiration < final_validation_time + config.minimum_lifetime_seconds
         or portal_transport.expiration < final_validation_time + config.minimum_lifetime_seconds
         or portal_identity_service.expiration < final_validation_time + config.minimum_lifetime_seconds
+        or communications_identity_service.expiration < final_validation_time + config.minimum_lifetime_seconds
         or user_actor.expiration < final_validation_time + config.minimum_lifetime_seconds
     ):
         _raise("TOKEN_LIFETIME")
@@ -949,6 +987,10 @@ def execute(
         config.portal_identity_service_path,
         portal_identity_service.value.encode("ascii") + b"\n",
     )
+    atomic_replace(
+        config.communications_identity_service_path,
+        communications_identity_service.value.encode("ascii") + b"\n",
+    )
     atomic_replace(config.user_actor_path, user_actor.value.encode("ascii") + b"\n")
     atomic_replace(
         config.expiry_transport_path,
@@ -959,6 +1001,9 @@ def execute(
         "communicationsTransport": _format_expiration(communications_transport.expiration),
         "portalTransport": _format_expiration(portal_transport.expiration),
         "portalIdentityService": _format_expiration(portal_identity_service.expiration),
+        "communicationsIdentityService": _format_expiration(
+            communications_identity_service.expiration
+        ),
         "userActor": _format_expiration(user_actor.expiration),
     }
     if expiry_enabled:

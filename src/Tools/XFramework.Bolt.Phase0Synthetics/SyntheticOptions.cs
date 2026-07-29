@@ -6,6 +6,7 @@ public sealed record SyntheticOptions(
     Guid CredentialId,
     string DeviceId,
     SecretToken CommunicationsTransportToken,
+    SecretToken CommunicationsIdentityServiceToken,
     SecretToken PortalTransportToken,
     SecretToken PortalIdentityServiceToken,
     SecretToken UserActorToken,

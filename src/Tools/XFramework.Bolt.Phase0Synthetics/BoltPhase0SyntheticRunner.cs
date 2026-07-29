@@ -135,7 +135,11 @@ public sealed class BoltPhase0SyntheticRunner
                 "identity_health_check",
                 async operationCt =>
                 {
-                    await IdentityHealthCheckProbe.InvokeAndValidateAsync(userClient, options, operationCt);
+                    await IdentityHealthCheckProbe.InvokeAndValidateAsync(
+                        userClient,
+                        options,
+                        options.PortalIdentityServiceToken,
+                        operationCt);
                     return Results(("query_response_validated", true));
                 },
                 ct);
@@ -196,6 +200,7 @@ public sealed class BoltPhase0SyntheticRunner
                     await IdentityHealthCheckProbe.InvokeAndValidateAsync(
                         communicationsClient,
                         options,
+                        options.CommunicationsIdentityServiceToken,
                         operationCt);
                     return Results(("published_while_offline", true), ("batch_ordered", true));
                 },
@@ -230,7 +235,11 @@ public sealed class BoltPhase0SyntheticRunner
                     await lastReplayMessage.AckAsync(operationCt);
                     await firstReplayMessage.AckAsync(operationCt);
                     await lastReplayMessage.AckAsync(operationCt);
-                    await IdentityHealthCheckProbe.InvokeAndValidateAsync(userClient, options, operationCt);
+                    await IdentityHealthCheckProbe.InvokeAndValidateAsync(
+                        userClient,
+                        options,
+                        options.PortalIdentityServiceToken,
+                        operationCt);
                     return Results(
                         ("cumulative_acknowledged", true),
                         ("duplicate_ack_idempotent", true),
@@ -260,7 +269,11 @@ public sealed class BoltPhase0SyntheticRunner
                         subscriberId,
                         options.UserActorToken.Reveal(),
                         operationCt);
-                    await IdentityHealthCheckProbe.InvokeAndValidateAsync(userClient, options, operationCt);
+                    await IdentityHealthCheckProbe.InvokeAndValidateAsync(
+                        userClient,
+                        options,
+                        options.PortalIdentityServiceToken,
+                        operationCt);
                     await DisposeClientQuietlyAsync(userClient, options.OperationTimeout);
                     userClient = null;
 
@@ -273,6 +286,7 @@ public sealed class BoltPhase0SyntheticRunner
                     await IdentityHealthCheckProbe.InvokeAndValidateAsync(
                         communicationsClient,
                         options,
+                        options.CommunicationsIdentityServiceToken,
                         operationCt);
 
                     userClient = CreatePortalClient(options);
@@ -284,7 +298,11 @@ public sealed class BoltPhase0SyntheticRunner
                         subscriberId,
                         options.UserActorToken.Reveal(),
                         operationCt);
-                    await IdentityHealthCheckProbe.InvokeAndValidateAsync(userClient, options, operationCt);
+                    await IdentityHealthCheckProbe.InvokeAndValidateAsync(
+                        userClient,
+                        options,
+                        options.PortalIdentityServiceToken,
+                        operationCt);
                     durableUnregistered = true;
                     return Results(("permanently_unregistered", true), ("post_unregister_not_queued", true));
                 },
@@ -325,7 +343,11 @@ public sealed class BoltPhase0SyntheticRunner
                                 subscriberId,
                                 options.UserActorToken.Reveal(),
                                 operationCt);
-                            await IdentityHealthCheckProbe.InvokeAndValidateAsync(userClient, options, operationCt);
+                            await IdentityHealthCheckProbe.InvokeAndValidateAsync(
+                                userClient,
+                                options,
+                                options.PortalIdentityServiceToken,
+                                operationCt);
                             return Results(("cleanup_permanently_unregistered", true));
                         },
                         CancellationToken.None,
@@ -494,7 +516,11 @@ public sealed class BoltPhase0SyntheticRunner
         try
         {
             moveNext = enumerator.MoveNextAsync().AsTask();
-            await IdentityHealthCheckProbe.InvokeAndValidateAsync(client, options, ct);
+            await IdentityHealthCheckProbe.InvokeAndValidateAsync(
+                client,
+                options,
+                options.PortalIdentityServiceToken,
+                ct);
             if (moveNext.IsCompleted && await moveNext)
                 throw new SyntheticCheckException("unexpected_durable_message_before_offline_publish");
         }
@@ -572,7 +598,11 @@ public sealed class BoltPhase0SyntheticRunner
         try
         {
             moveNext = enumerator.MoveNextAsync().AsTask();
-            await IdentityHealthCheckProbe.InvokeAndValidateAsync(client, options, ct);
+            await IdentityHealthCheckProbe.InvokeAndValidateAsync(
+                client,
+                options,
+                options.PortalIdentityServiceToken,
+                ct);
             var observation = Task.Delay(NoRedeliveryObservationWindow(options.OperationTimeout), ct);
             var completed = await Task.WhenAny(moveNext, observation);
             if (completed == moveNext)
@@ -707,6 +737,7 @@ public sealed class BoltPhase0SyntheticRunner
         var evidence = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["communications_transport"] = options.CommunicationsTransportToken.Sha256Prefix,
+            ["communications_identity_service"] = options.CommunicationsIdentityServiceToken.Sha256Prefix,
             ["portal_transport"] = options.PortalTransportToken.Sha256Prefix,
             ["portal_identity_service"] = options.PortalIdentityServiceToken.Sha256Prefix,
             ["user_actor"] = options.UserActorToken.Sha256Prefix

@@ -20,6 +20,7 @@ public sealed class SyntheticOptionsParserTests
         options.CredentialId.Should().Be(CredentialId);
         options.DeviceId.Should().Be("phase0_device");
         options.CommunicationsTransportToken.ToString().Should().Be("[REDACTED]");
+        options.CommunicationsIdentityServiceToken.ToString().Should().Be("[REDACTED]");
         options.PortalTransportToken.ToString().Should().Be("[REDACTED]");
         options.PortalIdentityServiceToken.ToString().Should().Be("[REDACTED]");
         options.UserActorToken.ToString().Should().Be("[REDACTED]");
@@ -102,6 +103,8 @@ public sealed class SyntheticOptionsParserTests
         var environment = CreateValidEnvironment();
         environment[SyntheticOptionsParser.CommunicationsTransportTokenFileEnvironmentVariable] =
             "/run/secrets/communications-transport";
+        environment[SyntheticOptionsParser.CommunicationsIdentityServiceTokenFileEnvironmentVariable] =
+            "/run/secrets/communications-identity-service";
         environment[SyntheticOptionsParser.PortalTransportTokenFileEnvironmentVariable] =
             "/run/secrets/portal-transport";
         environment[SyntheticOptionsParser.PortalIdentityServiceTokenFileEnvironmentVariable] =
@@ -122,6 +125,7 @@ public sealed class SyntheticOptionsParserTests
 
         reads.Should().Equal(
             "/run/secrets/communications-transport",
+            "/run/secrets/communications-identity-service",
             "/run/secrets/portal-transport",
             "/run/secrets/portal-identity-service",
             "/run/secrets/user-actor",
@@ -130,6 +134,8 @@ public sealed class SyntheticOptionsParserTests
         options.UserActorToken.Sha256Prefix.Should().Be(new SecretToken("file-token-user-actor").Sha256Prefix);
         options.CommunicationsTransportToken.Sha256Prefix.Should()
             .Be(new SecretToken("file-token-communications-transport").Sha256Prefix);
+        options.CommunicationsIdentityServiceToken.Sha256Prefix.Should()
+            .Be(new SecretToken("file-token-communications-identity-service").Sha256Prefix);
         options.PortalTransportToken.Sha256Prefix.Should()
             .Be(new SecretToken("file-token-portal-transport").Sha256Prefix);
         options.PortalIdentityServiceToken.Sha256Prefix.Should()
@@ -213,6 +219,8 @@ public sealed class SyntheticOptionsParserTests
             [SyntheticOptionsParser.DeviceEnvironmentVariable] = "phase0_device",
             [SyntheticOptionsParser.DefaultCommunicationsTransportTokenEnvironmentVariable] =
                 "communications-transport-secret-token",
+            [SyntheticOptionsParser.DefaultCommunicationsIdentityServiceTokenEnvironmentVariable] =
+                "communications-identity-service-secret-token",
             [SyntheticOptionsParser.DefaultPortalTransportTokenEnvironmentVariable] =
                 "portal-transport-secret-token",
             [SyntheticOptionsParser.DefaultPortalIdentityServiceTokenEnvironmentVariable] =

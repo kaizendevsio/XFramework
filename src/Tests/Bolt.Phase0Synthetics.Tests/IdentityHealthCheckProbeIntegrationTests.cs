@@ -76,6 +76,7 @@ public sealed class IdentityHealthCheckProbeIntegrationTests
             await IdentityHealthCheckProbe.InvokeAndValidateAsync(
                 caller,
                 options,
+                options.PortalIdentityServiceToken,
                 CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
 
             IdentityHealthCheckProbe.CommandName.Should().Be(nameof(HealthCheckRequest));
@@ -109,6 +110,7 @@ public sealed class IdentityHealthCheckProbeIntegrationTests
             Guid.NewGuid(),
             "integration-test",
             new SecretToken("communications-transport-test-token"),
+            new SecretToken("communications-identity-service-test-token"),
             new SecretToken("portal-transport-test-token"),
             new SecretToken("portal-identity-service-test-token"),
             new SecretToken("user-actor-test-token"),
