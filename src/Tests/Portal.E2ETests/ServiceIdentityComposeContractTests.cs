@@ -259,8 +259,11 @@ public sealed class ServiceIdentityComposeContractTests
             "?Set the external Tailscale Serve WSS endpoint}");
         envExample.Should().Contain(
             "BOLT_SYNTHETIC_TARGET=wss://xeon-dev.tailed40e.ts.net:7000/bolt/ws");
+        workflow.Should().Contain("if not hub_url.startswith(\"https://\"):");
         workflow.Should().Contain(
-            "\"BOLT_SYNTHETIC_TARGET\": f\"{hub_url}/bolt/ws\"");
+            "hub_websocket_url = f\"wss://{hub_url.removeprefix('https://').rstrip('/')}" +
+            "/bolt/ws\"");
+        workflow.Should().Contain("\"BOLT_SYNTHETIC_TARGET\": hub_websocket_url");
         workflow.Should().Contain("Verify diagnostic sink marker absence");
         workflow.Should().Contain("verify-bolt-phase0-diagnostic-sinks.py");
         workflow.Should().Contain("--seq-base-url");
@@ -293,7 +296,7 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("\"--profile\", \"phase0-verification\", \"--env-file\", env_file");
         workflow.Should().Contain("os.replace(temporary, path)");
         workflow.Should().Contain("$REMOTE_RUN_DIR/legacy-previous.env");
-        workflow.Should().Contain("sudo -n -l /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog");
+        workflow.Should().NotContain("xframework-bolt-phase0-root ensure-watchdog");
         workflow.Should().NotContain("xframework-bolt-phase0-root verify-bootstrap");
         workflow.Should().Contain("systemctl is-active xframework-bolt-phase0-watchdog.service");
         workflow.Should().Contain("flock -n 9");

@@ -353,11 +353,14 @@ jobs:
           }
           for name in superseded:
               values.pop(name, None)
+          if not hub_url.startswith("https://"):
+              raise SystemExit("Hub public URL must use HTTPS")
+          hub_websocket_url = f"wss://{hub_url.removeprefix('https://').rstrip('/')}/bolt/ws"
           overrides = {
               "BOLT_HUB_EXPOSE_PORT": "7000",
               "IDENTITYSERVER_EXPOSE_PORT": "8261",
               "BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL": identity_url,
-              "BOLT_SYNTHETIC_TARGET": f"{hub_url}/bolt/ws",
+              "BOLT_SYNTHETIC_TARGET": hub_websocket_url,
               "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH": f"{token_dir}/communications-transport-token",
               "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH": f"{token_dir}/portal-transport-token",
               "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH": f"{token_dir}/user-actor-token",
@@ -493,8 +496,6 @@ jobs:
                 -f "$selected_release/docker-compose.yml"
                 -f "$selected_release/pinned-compose.override.json"
               )
-              test -x /usr/local/sbin/xframework-bolt-phase0-root
-              sudo -n -l /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog >/dev/null
             fi
             /usr/bin/timeout --foreground --kill-after=10s 120s \
               docker compose --project-name "$COMPOSE_PROJECT_NAME" \
@@ -1053,9 +1054,6 @@ jobs:
             done
             test "$ready" -eq 1
           done
-          if [ "$kind" = legacy ]; then
-            sudo -n /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog >/dev/null
-          fi
           install -m 600 "$release/docker-compose.yml" "$REMOTE_COMPOSE_FILE"
           rm -f "$REMOTE_RUN_DIR/complete"
           if [ "$kind" = normal ]; then
