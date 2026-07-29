@@ -290,6 +290,7 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("docker inspect --format '{{.Image}}'");
         workflow.Should().Contain("docker image inspect \"$value\"");
         workflow.Should().Contain("docker pull \"$value\"");
+        workflow.Should().Contain("\"--profile\", \"phase0-verification\", \"--env-file\", env_file");
         workflow.Should().Contain("os.replace(temporary, path)");
         workflow.Should().Contain("$REMOTE_RUN_DIR/legacy-previous.env");
         workflow.Should().Contain("sudo -n -l /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog");
