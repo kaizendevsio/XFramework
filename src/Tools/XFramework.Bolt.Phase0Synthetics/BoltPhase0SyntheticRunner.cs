@@ -26,6 +26,8 @@ public sealed class BoltPhase0SyntheticRunner
         BoltClient? communicationsClient = null;
         IAsyncEnumerator<CommunicationsPresenceState>? transientEnumerator = null;
         CancellationTokenSource? transientCts = null;
+        IAsyncEnumerator<DurableMessage<CommunicationsRealtimeEvent>>? durableReplayEnumerator = null;
+        CancellationTokenSource? durableReplayCts = null;
         var durableAttempted = false;
         var durableUnregistered = false;
         var coreCompleted = false;
@@ -213,12 +215,17 @@ public sealed class BoltPhase0SyntheticRunner
                 {
                     await userClient.ConnectAsync(operationCt);
                     EnsureConnected(userClient);
-                    var received = await ReceiveOrderedReplayAsync(
-                        userClient,
-                        userTopic,
-                        subscriberId,
+                    durableReplayCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    durableReplayEnumerator = userClient
+                        .SubscribeDurableAsync<CommunicationsRealtimeEvent>(
+                            userTopic,
+                            subscriberId,
+                            durableReplayCts.Token,
+                            options.UserActorToken.Reveal())
+                        .GetAsyncEnumerator(durableReplayCts.Token);
+                    var received = await ReadOrderedReplayAsync(
+                        durableReplayEnumerator,
                         expectedEvents,
-                        options.UserActorToken,
                         operationCt);
                     return (
                         received,
@@ -230,6 +237,10 @@ public sealed class BoltPhase0SyntheticRunner
                 "durable_ack",
                 async operationCt =>
                 {
+                    var replayCts = durableReplayCts
+                        ?? throw new SyntheticCheckException("durable_replay_session_missing");
+                    var replayEnumerator = durableReplayEnumerator
+                        ?? throw new SyntheticCheckException("durable_replay_session_missing");
                     var firstReplayMessage = replayMessages[0];
                     var lastReplayMessage = replayMessages[^1];
                     await lastReplayMessage.AckAsync(operationCt);
@@ -240,10 +251,16 @@ public sealed class BoltPhase0SyntheticRunner
                         options,
                         options.PortalIdentityServiceToken,
                         operationCt);
+                    replayCts.Cancel();
+                    await DisposeEnumeratorQuietlyAsync(replayEnumerator);
+                    durableReplayEnumerator = null;
+                    replayCts.Dispose();
+                    durableReplayCts = null;
                     return Results(
-                        ("cumulative_acknowledged", true),
-                        ("duplicate_ack_idempotent", true),
-                        ("out_of_order_ack_monotonic", true));
+                        ("cumulative_ack_sent", true),
+                        ("stale_ack_sent", true),
+                        ("duplicate_ack_sent", true),
+                        ("processing_barrier_passed", true));
                 },
                 ct);
 
@@ -256,7 +273,10 @@ public sealed class BoltPhase0SyntheticRunner
                     await userClient.ConnectAsync(operationCt);
                     EnsureConnected(userClient);
                     await VerifyNoReplayAsync(userClient, userTopic, subscriberId, options, operationCt);
-                    return Results(("reconnected", true), ("no_redelivery", true));
+                    return Results(
+                        ("reconnected", true),
+                        ("acknowledgement_persisted", true),
+                        ("no_redelivery", true));
                 },
                 ct);
 
@@ -321,6 +341,12 @@ public sealed class BoltPhase0SyntheticRunner
                 await DisposeEnumeratorQuietlyAsync(transientEnumerator);
 
             transientCts?.Dispose();
+
+            durableReplayCts?.Cancel();
+            if (durableReplayEnumerator is not null)
+                await DisposeEnumeratorQuietlyAsync(durableReplayEnumerator);
+
+            durableReplayCts?.Dispose();
 
             if (durableAttempted && !durableUnregistered)
             {
@@ -532,51 +558,32 @@ public sealed class BoltPhase0SyntheticRunner
         }
     }
 
-    private static async Task<IReadOnlyList<DurableMessage<CommunicationsRealtimeEvent>>> ReceiveOrderedReplayAsync(
-        BoltClient client,
-        string topic,
-        string subscriberId,
+    private static async Task<IReadOnlyList<DurableMessage<CommunicationsRealtimeEvent>>> ReadOrderedReplayAsync(
+        IAsyncEnumerator<DurableMessage<CommunicationsRealtimeEvent>> enumerator,
         IReadOnlyList<CommunicationsRealtimeEvent> expected,
-        SecretToken userActorToken,
         CancellationToken ct)
     {
-        using var subscriptionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var enumerator = client
-            .SubscribeDurableAsync<CommunicationsRealtimeEvent>(
-                topic,
-                subscriberId,
-                subscriptionCts.Token,
-                userActorToken.Reveal())
-            .GetAsyncEnumerator(subscriptionCts.Token);
-        try
+        var received = new List<DurableMessage<CommunicationsRealtimeEvent>>(expected.Count);
+        for (var index = 0; index < expected.Count; index++)
         {
-            var received = new List<DurableMessage<CommunicationsRealtimeEvent>>(expected.Count);
-            for (var index = 0; index < expected.Count; index++)
+            if (!await enumerator.MoveNextAsync().AsTask().WaitAsync(ct))
+                throw new SyntheticCheckException("durable_replay_ended_early");
+
+            var current = enumerator.Current;
+            if (!current.IsReplay ||
+                current.Sequence <= 0 ||
+                current.Payload.EventId != expected[index].EventId ||
+                current.Payload.TenantId != expected[index].TenantId ||
+                current.Payload.ActorCredentialId != expected[index].ActorCredentialId ||
+                (received.Count > 0 && current.Sequence <= received[^1].Sequence))
             {
-                if (!await enumerator.MoveNextAsync().AsTask().WaitAsync(ct))
-                    throw new SyntheticCheckException("durable_replay_ended_early");
-
-                var current = enumerator.Current;
-                if (!current.IsReplay ||
-                    current.Sequence <= 0 ||
-                    current.Payload.EventId != expected[index].EventId ||
-                    current.Payload.TenantId != expected[index].TenantId ||
-                    current.Payload.ActorCredentialId != expected[index].ActorCredentialId ||
-                    (received.Count > 0 && current.Sequence <= received[^1].Sequence))
-                {
-                    throw new SyntheticCheckException("durable_replay_not_ordered");
-                }
-
-                received.Add(current);
+                throw new SyntheticCheckException("durable_replay_not_ordered");
             }
 
-            return received;
+            received.Add(current);
         }
-        finally
-        {
-            subscriptionCts.Cancel();
-            await DisposeEnumeratorQuietlyAsync(enumerator);
-        }
+
+        return received;
     }
 
     private static async Task VerifyNoReplayAsync(

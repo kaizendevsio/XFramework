@@ -103,9 +103,14 @@ public static partial class SyntheticReportValidator
             }
 
             var durableAck = report.Operations.Single(static operation => operation.Name == "durable_ack");
-            if (!IsTrue(durableAck.Results, "cumulative_acknowledged") ||
-                !IsTrue(durableAck.Results, "duplicate_ack_idempotent") ||
-                !IsTrue(durableAck.Results, "out_of_order_ack_monotonic"))
+            var durableNoRedelivery = report.Operations.Single(
+                static operation => operation.Name == "durable_no_redelivery");
+            if (!IsTrue(durableAck.Results, "cumulative_ack_sent") ||
+                !IsTrue(durableAck.Results, "stale_ack_sent") ||
+                !IsTrue(durableAck.Results, "duplicate_ack_sent") ||
+                !IsTrue(durableAck.Results, "processing_barrier_passed") ||
+                !IsTrue(durableNoRedelivery.Results, "acknowledgement_persisted") ||
+                !IsTrue(durableNoRedelivery.Results, "no_redelivery"))
             {
                 throw new InvalidOperationException("A passing synthetic report has incomplete acknowledgement evidence.");
             }
