@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Bolt.Tests.RoutedPayloadBenchmarks-20260724-182328</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat) (container)
+Intel Core i5-8265U CPU 1.60GHz (Whiskey Lake), 1 CPU, 6 logical and 6 physical cores
+.NET SDK 10.0.302
+  [Host]          : .NET 10.0.10 (10.0.1026.32716), X64 RyuJIT AVX2
+  PayloadCredible : .NET 10.0.10 (10.0.1026.32716), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Job=PayloadCredible  MinIterationTime=250ms  IterationCount=15
+LaunchCount=3  WarmupCount=5
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>PayloadBytes</th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Routed_Bolt</td><td>524288</td><td>3,725.0 &mu;s</td><td>170.8 &mu;s</td><td>320.7 &mu;s</td><td>1.01</td><td>0.12</td><td>15.6250</td><td>15.6250</td><td>15.6250</td><td>524.29 KB</td><td>1.00</td>
+</tr><tr><td>Routed_gRPC</td><td>524288</td><td>7,535.1 &mu;s</td><td>336.2 &mu;s</td><td>639.6 &mu;s</td><td>2.04</td><td>0.24</td><td>93.7500</td><td>93.7500</td><td>93.7500</td><td>2099.97 KB</td><td>4.01</td>
+</tr><tr><td>Routed_Bolt</td><td>1048576</td><td>7,268.2 &mu;s</td><td>311.0 &mu;s</td><td>591.8 &mu;s</td><td>1.01</td><td>0.12</td><td>31.2500</td><td>31.2500</td><td>31.2500</td><td>1043.04 KB</td><td>1.00</td>
+</tr><tr><td>Routed_gRPC</td><td>1048576</td><td>12,928.3 &mu;s</td><td>581.9 &mu;s</td><td>1,093.0 &mu;s</td><td>1.79</td><td>0.21</td><td>156.2500</td><td>156.2500</td><td>156.2500</td><td>4181.4 KB</td><td>4.01</td>
+</tr><tr><td>Routed_Bolt</td><td>2097152</td><td>9,117.3 &mu;s</td><td>522.6 &mu;s</td><td>968.7 &mu;s</td><td>1.01</td><td>0.15</td><td>31.2500</td><td>31.2500</td><td>31.2500</td><td>2124.14 KB</td><td>1.00</td>
+</tr><tr><td>Routed_gRPC</td><td>2097152</td><td>23,310.8 &mu;s</td><td>664.5 &mu;s</td><td>1,248.1 &mu;s</td><td>2.59</td><td>0.30</td><td>187.5000</td><td>187.5000</td><td>187.5000</td><td>8449.43 KB</td><td>3.98</td>
+</tr><tr><td>Routed_Bolt</td><td>5242880</td><td>20,141.5 &mu;s</td><td>800.5 &mu;s</td><td>1,523.1 &mu;s</td><td>1.01</td><td>0.10</td><td>-</td><td>-</td><td>-</td><td>5282.17 KB</td><td>1.00</td>
+</tr><tr><td>Routed_gRPC</td><td>5242880</td><td>58,166.0 &mu;s</td><td>1,956.5 &mu;s</td><td>3,722.4 &mu;s</td><td>2.90</td><td>0.28</td><td>250.0000</td><td>250.0000</td><td>250.0000</td><td>21232.76 KB</td><td>4.02</td>
+</tr><tr><td>Routed_Bolt</td><td>10485760</td><td>40,115.4 &mu;s</td><td>1,313.5 &mu;s</td><td>2,434.7 &mu;s</td><td>1.00</td><td>0.09</td><td>-</td><td>-</td><td>-</td><td>10545.65 KB</td><td>1.00</td>
+</tr><tr><td>Routed_gRPC</td><td>10485760</td><td>110,913.5 &mu;s</td><td>4,357.0 &mu;s</td><td>8,075.9 &mu;s</td><td>2.78</td><td>0.26</td><td>-</td><td>-</td><td>-</td><td>42501.19 KB</td><td>4.03</td>
+</tr><tr><td>Routed_Bolt</td><td>20971520</td><td>78,897.1 &mu;s</td><td>2,893.4 &mu;s</td><td>5,363.2 &mu;s</td><td>1.00</td><td>0.10</td><td>-</td><td>-</td><td>-</td><td>21090.96 KB</td><td>1.00</td>
+</tr><tr><td>Routed_gRPC</td><td>20971520</td><td>209,886.0 &mu;s</td><td>4,581.8 &mu;s</td><td>8,605.8 &mu;s</td><td>2.67</td><td>0.21</td><td>-</td><td>-</td><td>-</td><td>85154.38 KB</td><td>4.04</td>
+</tr></tbody></table>
+</body>
+</html>

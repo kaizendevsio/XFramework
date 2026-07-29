@@ -110,6 +110,12 @@ public static class ServiceCollectionExtensions
                     options.MaxFrameBytes = boltConfig.MaxFrameBytes > 0
                         ? boltConfig.MaxFrameBytes
                         : options.MaxFrameBytes;
+                    options.MaxLargeRpcPayloadBytes = boltConfig.MaxLargeRpcPayloadBytes > 0
+                        ? boltConfig.MaxLargeRpcPayloadBytes
+                        : options.MaxLargeRpcPayloadBytes;
+                    options.MaxBufferedLargeRpcBytes = boltConfig.MaxBufferedLargeRpcBytes > 0
+                        ? boltConfig.MaxBufferedLargeRpcBytes
+                        : options.MaxBufferedLargeRpcBytes;
                     options.SendQueueCapacity = boltConfig.SendQueueCapacity > 0
                         ? boltConfig.SendQueueCapacity
                         : boltConfig.QueueDepth > 0
@@ -149,6 +155,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IIdentitySigningKeyProvider, IdentityServerSigningKeyProvider>();
         services.TryAddSingleton<IServiceTokenValidator, ServiceTokenValidator>();
         services.TryAddSingleton<ITrustedServiceInvocationResolver, TrustedServiceInvocationResolver>();
+        services.TryAddSingleton<IBoltServiceInvocationAuthorizer, BoltServiceInvocationAuthorizer>();
         services.AddSingleton<IMessageBusWrapper, BoltDriver>();
 
         return services;

@@ -65,10 +65,10 @@ public sealed class HealthCheckResponseWriterTests
             true, 1, 1, 0, 0, 0, 1, 1, 0, 0, 48, 30_000, 0, 0, 0, 0, 0);
         var serverSnapshot = new BoltServerHealthSnapshot(
             1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-            1, 0, 0, 0, 0, false,
+            1, 0, 0, 0, 0, 0, 0, 0, 0, false,
             new BoltServerHealthBounds(
                 8 * 1024 * 1024, 4096, 30_000, 4 * 1024 * 1024, 2 * 1024 * 1024,
-                10_000, 1_000, 8, 128, 32, 1_024, 1_024, true));
+                10_000, 1_000, 8, 128, 32, 1_024, 1_024, 0, 0, 0, 0, false, true));
         var report = new HealthReport(
             new Dictionary<string, HealthReportEntry>
             {
@@ -110,7 +110,8 @@ public sealed class HealthCheckResponseWriterTests
                 "liveConnectionsWithInactiveSendLoops", "negativeRuntimeCounters", "maximumConnectionsForOnePrincipal",
                 "maximumPendingRpcCallsForOnePrincipal", "maximumLogicalStreamsForOnePrincipal",
                 "maximumMediaStreamsForOnePrincipal", "maximumSubscriptionsForOnePrincipal", "isDisposed",
-                "configuredBounds"
+                "activeRateLimitPrincipals", "requestRateLimitRejections", "byteRateLimitRejections",
+                "pushRateLimitRejections", "configuredBounds"
             ]);
         PropertyNames(serverTransport.GetProperty("configuredBounds")).Should().BeEquivalentTo(
             [
@@ -118,7 +119,9 @@ public sealed class HealthCheckResponseWriterTests
                 "sendBackpressureDropThresholdBytes", "sendBackpressureFeedbackThresholdBytes", "maximumPendingRpcCalls",
                 "maximumPendingRpcCallsPerPrincipal", "maximumConnectionsPerPrincipal",
                 "maximumLogicalStreamsPerPrincipal", "maximumMediaStreamsPerPrincipal",
-                "maximumSubscriptionsPerPrincipal", "maximumDurableSubscribersPerTopic", "mediaEnabled"
+                "maximumSubscriptionsPerPrincipal", "maximumDurableSubscribersPerTopic", "rpcRequestsPerSecond",
+                "rpcRequestBurst", "rpcInboundBytesPerSecond", "rpcInboundByteBurst",
+                "requireTopicAuthorization", "mediaEnabled"
             ]);
     }
 

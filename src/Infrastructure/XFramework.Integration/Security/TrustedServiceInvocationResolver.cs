@@ -19,11 +19,26 @@ public sealed class TrustedServiceInvocationResolver(IServiceTokenValidator toke
         var validation = await tokenValidator.ValidateAsync(
             metadata.ServiceAccessToken,
             expectedAudience,
-            requiredScopes,
+            requiredScopes: null,
             ct);
 
         if (!validation.IsValid)
-            return TrustedServiceInvocationResult.Failure(validation.Error ?? "Service token is invalid.");
+            return TrustedServiceInvocationResult.Failure(
+                validation.Error ?? "Service token is invalid.",
+                validation.FailureStatusCode);
+
+        if (requiredScopes is { Count: > 0 })
+        {
+            var missingScopes = requiredScopes
+                .Where(scope => !validation.Scopes.Contains(scope))
+                .ToList();
+            if (missingScopes.Count > 0)
+            {
+                return TrustedServiceInvocationResult.Failure(
+                    $"Service token is missing required scope(s): {string.Join(", ", missingScopes)}.",
+                    403);
+            }
+        }
 
         if (allowedCallers is { Count: > 0 } &&
             !allowedCallers.Any(caller =>

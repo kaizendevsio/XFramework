@@ -17,8 +17,8 @@ public readonly record struct MediaFrameData(uint SequenceNumber, uint Timestamp
 /// for real-time media: sequence numbers, timestamps, keyframe flags, and drop-oldest
 /// back-pressure to keep latency bounded.
 ///
-/// Fully integrated features:
-/// - E2E encryption (AES-256-GCM via MediaEncryption)
+/// Experimental media features:
+/// - Optional payload encryption when supplied with authenticated key material
 /// - FEC (XOR parity for frame recovery)
 /// - NACK retransmission (sender-side buffer + receiver-side gap detection)
 /// - Adaptive bitrate (loss-based + delay-based congestion control)
@@ -40,9 +40,13 @@ public sealed class BoltMediaStream : IAsyncDisposable
     private FecEncoder? _fecEncoder;
     private FecDecoder? _fecDecoder;
     private uint _lastReceivedSeq;
+    private uint _lastReceivedTimestamp;
+    private bool _receivedAnyFrame;
 
     // Encryption
     private IMediaEncryption? _encryption;
+    private bool _encryptionRequired;
+    private bool _ownsEncryption;
 
     // NACK retransmission
     private RetransmitBuffer? _retransmitBuffer;
@@ -75,7 +79,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// <summary>True if this is an audio stream; false for video.</summary>
     public bool IsAudio { get; }
 
-    /// <summary>True if E2E encryption is active.</summary>
+    /// <summary>True if payload encryption is active. The caller must authenticate peer key material.</summary>
     public bool IsEncrypted => _encryption?.IsReady == true;
 
     /// <summary>True if QUIC datagram transport is available.</summary>
@@ -118,17 +122,29 @@ public sealed class BoltMediaStream : IAsyncDisposable
         _fecDecoder = new FecDecoder();
     }
 
-    /// <summary>Enable E2E encryption using .NET-native crypto. Returns the instance for key exchange.</summary>
+    /// <summary>Enable payload encryption using .NET-native crypto. The caller must authenticate exchanged peer keys.</summary>
     /// <remarks>Not available in Blazor WASM — use <see cref="SetEncryption(IMediaEncryption)"/> with <see cref="ExternalMediaEncryption"/> instead.</remarks>
     public MediaEncryption EnableEncryption()
     {
         var enc = new MediaEncryption();
+        if (_ownsEncryption)
+            _encryption?.Dispose();
         _encryption = enc;
+        _encryptionRequired = true;
+        _ownsEncryption = true;
         return enc;
     }
 
     /// <summary>Set encryption from external provider (supports Blazor WASM via ExternalMediaEncryption).</summary>
-    public void SetEncryption(IMediaEncryption encryption) => _encryption = encryption;
+    public void SetEncryption(IMediaEncryption encryption)
+    {
+        ArgumentNullException.ThrowIfNull(encryption);
+        if (_ownsEncryption)
+            _encryption?.Dispose();
+        _encryption = encryption;
+        _encryptionRequired = true;
+        _ownsEncryption = false;
+    }
 
     /// <summary>Set QUIC datagram transport for unreliable sends.</summary>
     public void SetDatagramTransport(Func<ReadOnlyMemory<byte>, ValueTask> datagramSend) => _datagramSend = datagramSend;
@@ -136,6 +152,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// <summary>Enable NACK retransmission (sender buffer + receiver gap detection).</summary>
     public void EnableNack(int retransmitBufferSize = 256)
     {
+        if (_nackTracker != null) return;
         _retransmitBuffer = new RetransmitBuffer(retransmitBufferSize);
         _nackTracker = new NackTracker(_connection, StreamId);
         _nackTracker.Start();
@@ -157,6 +174,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// </summary>
     public void EnableBandwidthProbing(int initialBitrateKbps)
     {
+        if (_prober != null) return;
         _prober = new BandwidthProber(_connection, StreamId, initialBitrateKbps);
         _prober.OnBandwidthEstimated += kbps => OnBitrateChanged?.Invoke(kbps);
         _prober.Start();
@@ -186,6 +204,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// </summary>
     public MediaJitterBuffer EnableJitterBuffer()
     {
+        if (_jitterBuffer != null) return _jitterBuffer;
         _jitterBuffer = new MediaJitterBuffer(IsAudio);
         _jitterBuffer.Start();
         return _jitterBuffer;
@@ -211,14 +230,33 @@ public sealed class BoltMediaStream : IAsyncDisposable
     // ── FEC inbound ──────────────────────────────────────────────
 
     public void EnqueueFecFrame(uint groupStart, byte groupSize, ReadOnlyMemory<byte> payload)
+        => EnqueueFecFrameAsync(groupStart, groupSize, payload).AsTask().GetAwaiter().GetResult();
+
+    public async ValueTask EnqueueFecFrameAsync(uint groupStart, byte groupSize, ReadOnlyMemory<byte> payload)
     {
-        if (_fecDecoder == null) return;
+        if (_fecDecoder == null || groupSize is < 2 or > FecEncoder.MaximumGroupSize) return;
         var span = payload.Span;
+        var lengthsSize = groupSize * sizeof(int);
+        if (span.Length < lengthsSize) return;
+
         var lengths = new int[groupSize];
         for (int i = 0; i < groupSize; i++)
+        {
             lengths[i] = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(i * 4));
-        var parityData = payload.Slice(groupSize * 4);
+            if (lengths[i] < 0 || lengths[i] > span.Length - lengthsSize)
+                return;
+        }
+
+        var parityData = payload.Slice(lengthsSize);
         _fecDecoder.AddFecFrame(groupStart, groupSize, parityData, lengths);
+
+        if (_fecDecoder.TryRecoverSingle(groupStart, out var recoveredSequence, out var recoveredPayload))
+        {
+            _nackTracker?.RecordRetransmitReceived(recoveredSequence);
+            var timestamp = InferTimestamp(recoveredSequence);
+            var flags = _encryptionRequired ? (byte)0x10 : (byte)0;
+            await ProcessFrameAsync(recoveredSequence, timestamp, recoveredPayload, flags, registerForFec: false);
+        }
     }
 
     // ── Send path ────────────────────────────────────────────────
@@ -259,10 +297,13 @@ public sealed class BoltMediaStream : IAsyncDisposable
 
         // Encrypt payload if enabled
         ReadOnlyMemory<byte> payload;
-        if (_encryption?.IsReady == true)
+        if (_encryptionRequired)
         {
+            if (_encryption?.IsReady != true)
+                throw new InvalidOperationException("Media encryption is required but no ready authenticated key is configured.");
+
             flags |= 0x10; // encrypted flag
-            payload = _encryption.Encrypt(encodedData.Span, seq, StreamId);
+            payload = await _encryption.EncryptAsync(encodedData.ToArray(), seq, StreamId);
         }
         else
         {
@@ -286,7 +327,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
             useDatagramTransport = true;
         }
 
-        var writer = RentedBufferWriter.GetThreadLocal();
+        using var writer = new RentedBufferWriter(payload.Length + BoltCodec.MediaFrameHeaderSize);
         BoltCodec.WriteMediaFrame(writer, StreamId, seq, ts, flags, payload.Span);
 
         if (useDatagramTransport)
@@ -299,7 +340,6 @@ public sealed class BoltMediaStream : IAsyncDisposable
             var conn = _directManager?.IsDirectActive == true ? _directManager.ActiveConnection : _connection;
             await conn.SendAsync(writer.WrittenMemory, ct);
         }
-        writer.Reset();
 
         // FEC operates on the (potentially encrypted) payload
         if (_fecEncoder != null)
@@ -318,7 +358,6 @@ public sealed class BoltMediaStream : IAsyncDisposable
                 BoltCodec.WriteFecFrame(fecWriter, StreamId, fecResult.GroupStartSequence, fecResult.GroupSize, fecPayload);
                 var conn = _directManager?.IsDirectActive == true ? _directManager.ActiveConnection : _connection;
                 await conn.SendAsync(fecWriter.WrittenMemory, ct);
-                fecWriter.Reset();
             }
         }
     }
@@ -330,14 +369,13 @@ public sealed class BoltMediaStream : IAsyncDisposable
         if (_retransmitBuffer == null) return;
 
         var conn = _directManager?.IsDirectActive == true ? _directManager.ActiveConnection : _connection;
-        foreach (var seq in missingSequences)
+        foreach (var seq in missingSequences.Distinct().Take(64))
         {
             if (_retransmitBuffer.TryGet(seq, out var frame) && frame.Payload != null)
             {
                 var writer = RentedBufferWriter.GetThreadLocal();
                 BoltCodec.WriteMediaFrame(writer, StreamId, frame.SequenceNumber, frame.Timestamp, frame.Flags, frame.Payload);
                 await conn.SendAsync(writer.WrittenMemory, ct);
-                writer.Reset();
             }
         }
     }
@@ -349,17 +387,34 @@ public sealed class BoltMediaStream : IAsyncDisposable
     /// Applies: decrypt → PLC tracking → delay controller → jitter buffer or direct delivery.
     /// </summary>
     public void EnqueueFrame(uint seq, uint timestamp, ReadOnlyMemory<byte> data, byte flags)
+        => EnqueueFrameAsync(seq, timestamp, data, flags).AsTask().GetAwaiter().GetResult();
+
+    public ValueTask EnqueueFrameAsync(uint seq, uint timestamp, ReadOnlyMemory<byte> data, byte flags) =>
+        ProcessFrameAsync(seq, timestamp, data, flags, registerForFec: true);
+
+    private async ValueTask ProcessFrameAsync(
+        uint seq,
+        uint timestamp,
+        ReadOnlyMemory<byte> data,
+        byte flags,
+        bool registerForFec)
     {
+        if (_closed) return;
+
         var isKeyframe = (flags & 0x01) != 0;
         var isEncrypted = (flags & 0x10) != 0;
 
-        // Decrypt if needed
+        if (_encryptionRequired && !isEncrypted)
+            return;
+        if (isEncrypted && _encryption?.IsReady != true)
+            return;
+
         byte[] frameData;
-        if (isEncrypted && _encryption?.IsReady == true)
+        if (isEncrypted)
         {
             try
             {
-                frameData = _encryption.Decrypt(data.Span, seq, StreamId);
+                frameData = await _encryption!.DecryptAsync(data.ToArray(), seq, StreamId);
             }
             catch
             {
@@ -381,44 +436,46 @@ public sealed class BoltMediaStream : IAsyncDisposable
         // Track for NACK
         _nackTracker?.RecordReceived(seq);
 
-        // PLC: fill gaps with concealment frames for audio
-        if (_plc != null && _lastReceivedSeq > 0)
-        {
-            for (uint missing = _lastReceivedSeq + 1; missing < seq; missing++)
-            {
-                // Try FEC first
-                if (_fecDecoder != null && _fecDecoder.TryRecover(missing, missing, out var fecRecovered))
-                {
-                    _nackTracker?.RecordRetransmitReceived(missing);
-                    DeliverFrame(new MediaFrameData(missing, 0, fecRecovered, false));
-                    continue;
-                }
+        var isNewHighest = !_receivedAnyFrame || MediaSequence.IsNewer(seq, _lastReceivedSeq);
+        var gap = _receivedAnyFrame && isNewHighest
+            ? MediaSequence.ForwardDistance(_lastReceivedSeq, seq)
+            : 0;
 
-                // FEC couldn't recover — use PLC concealment
-                var concealed = _plc.GenerateConcealmentFrame();
-                DeliverFrame(new MediaFrameData(missing, 0, concealed, false));
-            }
-        }
-        else if (_fecDecoder != null && _lastReceivedSeq > 0)
+        // PLC: fill gaps with concealment frames for audio
+        if (_plc != null && _fecDecoder == null && gap is > 1 and <= 512)
         {
-            // No PLC but have FEC — try recovery only
-            for (uint missing = _lastReceivedSeq + 1; missing < seq; missing++)
+            for (uint offset = 1; offset < gap; offset++)
             {
-                if (_fecDecoder.TryRecover(missing, missing, out var recovered))
-                {
-                    _nackTracker?.RecordRetransmitReceived(missing);
-                    DeliverFrame(new MediaFrameData(missing, 0, recovered, false));
-                }
+                var missing = unchecked(_lastReceivedSeq + offset);
+                var concealed = _plc.GenerateConcealmentFrame();
+                DeliverFrame(new MediaFrameData(missing, InferTimestamp(missing), concealed, false));
             }
         }
 
         // Register frame with FEC decoder for potential future recovery
-        _fecDecoder?.AddFrame(seq, seq, data);
+        if (registerForFec)
+            _fecDecoder?.AddFrame(seq, data);
 
-        _lastReceivedSeq = seq;
+        if (isNewHighest)
+        {
+            _lastReceivedSeq = seq;
+            _lastReceivedTimestamp = timestamp;
+            _receivedAnyFrame = true;
+        }
 
         // Deliver the actual frame
         DeliverFrame(new MediaFrameData(seq, timestamp, frameData, isKeyframe));
+    }
+
+    private uint InferTimestamp(uint sequenceNumber)
+    {
+        if (!_receivedAnyFrame)
+            return 0;
+
+        var age = MediaSequence.ForwardDistance(sequenceNumber, _lastReceivedSeq);
+        return age < 0x8000_0000
+            ? unchecked(_lastReceivedTimestamp - age * _timestampIncrement)
+            : _lastReceivedTimestamp;
     }
 
     private void DeliverFrame(MediaFrameData frame)
@@ -453,12 +510,14 @@ public sealed class BoltMediaStream : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_closed) return;
         _closed = true;
         _inbound.Writer.TryComplete();
         if (_nackTracker != null) await _nackTracker.DisposeAsync();
         if (_prober != null) await _prober.DisposeAsync();
         if (_jitterBuffer != null) await _jitterBuffer.DisposeAsync();
         if (_directManager != null) await _directManager.DisposeAsync();
-        _encryption?.Dispose();
+        if (_ownsEncryption)
+            _encryption?.Dispose();
     }
 }

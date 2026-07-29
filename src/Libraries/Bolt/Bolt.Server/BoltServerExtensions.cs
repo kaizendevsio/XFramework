@@ -19,8 +19,17 @@ public class BoltServerOptions
     /// <summary>Maximum complete Bolt frame size accepted by receive loops. Default: 8 MiB.</summary>
     public int MaxFrameBytes { get; set; } = 8 * 1024 * 1024;
 
+    /// <summary>Per-connection receive fragment buffer. Default: 256 KiB. Clamped to [1024, MaxFrameBytes].</summary>
+    public int ReceiveBufferBytes { get; set; } = 256 * 1024;
+
+    /// <summary>Maximum declared request or response body routed through large-RPC streaming. Default: 32 MiB.</summary>
+    public int MaxLargeRpcPayloadBytes { get; set; } = 32 * 1024 * 1024;
+
     /// <summary>Bounded send queue capacity per connection. Default: 4096.</summary>
     public int SendQueueCapacity { get; set; } = 4096;
+
+    /// <summary>Maximum retained send queue bytes per connection. Default: 16 MiB.</summary>
+    public long SendQueueByteCapacity { get; set; } = 16L * 1024 * 1024;
 
     /// <summary>Max time to wait for a send queue slot. 0 uses InvocationTimeoutMs.</summary>
     public int SendEnqueueTimeoutMs { get; set; } = 0;
@@ -31,8 +40,8 @@ public class BoltServerOptions
     /// <summary>Require the Bolt endpoint to use a secure transport.</summary>
     public bool RequireSecureTransport { get; set; }
 
-    /// <summary>Enable Bolt media signaling and frame routing. Default: true for library compatibility.</summary>
-    public bool MediaEnabled { get; set; } = true;
+    /// <summary>Enable Bolt media signaling and frame routing. Disabled unless a host explicitly opts in.</summary>
+    public bool MediaEnabled { get; set; }
 
     /// <summary>Maximum pending RPC calls across the server. Default: 1000.</summary>
     public int MaxPendingRpcCalls { get; set; } = 1000;
@@ -54,6 +63,21 @@ public class BoltServerOptions
 
     /// <summary>Maximum durable subscriber registrations retained for one topic. Default: 128.</summary>
     public int MaxDurableSubscribersPerTopic { get; set; } = 128;
+
+    /// <summary>Logical RPC and Push operations allowed per second for one principal. 0 disables request rate limiting.</summary>
+    public int RpcRequestsPerSecond { get; set; }
+
+    /// <summary>Maximum request tokens accumulated for one principal. 0 disables request rate limiting.</summary>
+    public int RpcRequestBurst { get; set; }
+
+    /// <summary>Inbound logical RPC and Push payload bytes allowed per second for one principal. 0 disables byte rate limiting.</summary>
+    public int RpcInboundBytesPerSecond { get; set; }
+
+    /// <summary>Maximum inbound logical payload byte tokens accumulated for one principal. 0 disables byte rate limiting.</summary>
+    public int RpcInboundByteBurst { get; set; }
+
+    /// <summary>Fail server creation when no topic authorizer is registered. Disabled for reusable hosts by default.</summary>
+    public bool RequireTopicAuthorization { get; set; }
 
     /// <summary>Maximum connection lifetime in seconds. 0 leaves the lifetime uncapped.</summary>
     public int MaxConnectionLifetimeSeconds { get; set; }

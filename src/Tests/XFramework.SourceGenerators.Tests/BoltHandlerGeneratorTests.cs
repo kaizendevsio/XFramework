@@ -122,7 +122,7 @@ public static class ArchiveThreadEndpoint
     }
 }
 
-public sealed record ArchiveThreadRequest : IBoltRequest<ArchiveThreadRequest, CmdResponse>;
+public sealed record ArchiveThreadRequest : RequestBase, IBoltRequest<ArchiveThreadRequest, CmdResponse>;
 """;
 
         var generatedSource = RunGenerator(source, "ArchiveThreadEndpoint_Handle_BoltHandler.g.cs");
@@ -156,7 +156,7 @@ public static class CheckoutSaleEndpoint
     }
 }
 
-public sealed record CheckoutSaleRequest : IBoltRequest<CheckoutSaleRequest, CmdResponse<SaleReceipt>>;
+public sealed record CheckoutSaleRequest : RequestBase, IBoltRequest<CheckoutSaleRequest, CmdResponse<SaleReceipt>>;
 
 public sealed record SaleReceipt;
 """;
@@ -195,7 +195,7 @@ public static class CreateUserEndpoint
     }
 }
 
-public sealed record CreateUserRequest(string Name) : IBoltRequest<CreateUserRequest, QueryResponse<UserResponse>>;
+public sealed record CreateUserRequest(string Name) : RequestBase, IBoltRequest<CreateUserRequest, QueryResponse<UserResponse>>;
 
 public sealed class UserResponse;
 
@@ -253,7 +253,7 @@ public static class CreateUserEndpoint
     }
 }
 
-public sealed record CreateUserRequest(string Name) : IBoltRequest<CreateUserRequest, QueryResponse<UserResponse>>;
+public sealed record CreateUserRequest(string Name) : RequestBase, IBoltRequest<CreateUserRequest, QueryResponse<UserResponse>>;
 
 public sealed class UserResponse;
 
@@ -300,7 +300,7 @@ public static class CheckHealthEndpoint
     }
 }
 
-public sealed record CheckHealthRequest : IBoltRequest<CheckHealthRequest, QueryResponse<HealthResponse>>;
+public sealed record CheckHealthRequest : RequestBase, IBoltRequest<CheckHealthRequest, QueryResponse<HealthResponse>>;
 
 public sealed class HealthResponse;
 """;
@@ -310,6 +310,87 @@ public sealed class HealthResponse;
         generatedSource.Should().NotContain("IValidator<");
         generatedSource.Should().NotContain("ValidateAsync(request, ct)");
         generatedSource.Should().NotContain("validationResponse");
+    }
+
+    [Test]
+    public void GenerateBoltHandler_DefaultAuthorization_RunsBeforeValidationAndEndpointServices()
+    {
+        const string source = """
+
+namespace Sample.Features.Users.Create;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using FluentValidation;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+
+public static class CreateUserEndpoint
+{
+    [BoltHandler]
+    public static Task<Result<UserResponse>> Handle(
+        CreateUserRequest request,
+        UserService userService,
+        CancellationToken ct) =>
+        Task.FromResult(Result<UserResponse>.Success(new UserResponse()));
+}
+
+public sealed record CreateUserRequest(string Name) : RequestBase,
+    IBoltRequest<CreateUserRequest, QueryResponse<UserResponse>>;
+public sealed class UserResponse;
+public sealed class UserService;
+public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>;
+""";
+
+        var generatedSource = RunGenerator(source, "CreateUserEndpoint_Handle_BoltHandler.g.cs");
+
+        generatedSource.Should().Contain("BoltInboundRequestContext context");
+        generatedSource.Should().Contain("GetRequiredService<IBoltServiceInvocationAuthorizer>()");
+        generatedSource.Should().Contain("request.Metadata,");
+        generatedSource.Should().Contain("requiredScopes: null,");
+        generatedSource.Should().Contain("allowedCallers: null,");
+        generatedSource.Should().Contain("(System.Net.HttpStatusCode)authorization.StatusCode");
+        generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
+            .Should().BeLessThan(generatedSource.IndexOf("ValidateAsync(request, ct)", StringComparison.Ordinal));
+        generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
+            .Should().BeLessThan(generatedSource.IndexOf("GetRequiredService<global::Sample.Features.Users.Create.UserService>", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public void GenerateBoltHandler_ExplicitServicePolicy_EmitsScopesAndAllowedCallers()
+    {
+        const string source = """
+
+namespace Sample.Features.Security.Restricted;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+
+public static class RestrictedEndpoint
+{
+    [BoltHandler(
+        RequiredServiceScopes = ["wallets.write", "wallets.approve"],
+        AllowedServiceCallers = ["XFramework.Portal"])]
+    public static Task<Result> Handle(RestrictedRequest request, CancellationToken ct) =>
+        Task.FromResult(new Result());
+}
+
+public sealed record RestrictedRequest : RequestBase,
+    IBoltRequest<RestrictedRequest, CmdResponse>;
+""";
+
+        var generatedSource = RunGenerator(source, "RestrictedEndpoint_Handle_BoltHandler.g.cs");
+
+        generatedSource.Should().Contain(
+            "requiredScopes: new string[] { \"wallets.write\", \"wallets.approve\" },");
+        generatedSource.Should().Contain(
+            "allowedCallers: new string[] { \"XFramework.Portal\" },");
     }
 
     private static string RunGenerator(string source, string generatedHintName)
@@ -374,7 +455,11 @@ using System.Collections.Generic;
 namespace XFramework.Integration.Attributes
 {
     [AttributeUsage(AttributeTargets.Method)]
-    public sealed class BoltHandlerAttribute : Attribute;
+    public sealed class BoltHandlerAttribute : Attribute
+    {
+        public string[]? RequiredServiceScopes { get; set; }
+        public string[]? AllowedServiceCallers { get; set; }
+    }
 
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class MapPostAttribute(string route) : Attribute
@@ -420,6 +505,8 @@ namespace XFramework.Integration.Abstractions
 
 namespace Bolt.Client
 {
+    public readonly record struct BoltInboundRequestContext(Guid RequestId, int SenderHash);
+
     public sealed class BoltClient
     {
         public void RegisterHandler(
@@ -427,6 +514,31 @@ namespace Bolt.Client
             Func<ReadOnlyMemory<byte>, Guid, System.Threading.CancellationToken, Task<(System.Net.HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
         {
         }
+
+        public void RegisterHandler(
+            string requestType,
+            Func<ReadOnlyMemory<byte>, BoltInboundRequestContext, System.Threading.CancellationToken, Task<(System.Net.HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
+        {
+        }
+    }
+}
+
+namespace XFramework.Integration.Security
+{
+    public interface IBoltServiceInvocationAuthorizer
+    {
+        Task<TrustedServiceInvocationResult> AuthorizeAsync(
+            XFramework.Domain.Shared.BusinessObjects.RequestMetadata? metadata,
+            Bolt.Client.BoltInboundRequestContext requestContext,
+            IReadOnlyCollection<string>? requiredScopes = null,
+            IReadOnlyCollection<string>? allowedCallers = null,
+            System.Threading.CancellationToken ct = default);
+    }
+
+    public sealed class TrustedServiceInvocationResult
+    {
+        public bool IsSuccess { get; init; }
+        public int StatusCode { get; init; }
     }
 }
 
@@ -504,6 +616,13 @@ namespace XFramework.Core.Patterns
 
 namespace XFramework.Domain.Shared.BusinessObjects
 {
+    public sealed class RequestMetadata;
+
+    public record RequestBase
+    {
+        public RequestMetadata Metadata { get; set; } = new();
+    }
+
     public class CmdResponse
     {
         public System.Net.HttpStatusCode HttpStatusCode { get; set; }

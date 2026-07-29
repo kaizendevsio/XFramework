@@ -4,174 +4,179 @@ using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Reports;
-using Bolt.Client;
-using Bolt.Server;
 using Bolt.Tests.Grpc;
 using Google.Protobuf;
 using Grpc.Core;
-using Grpc.Net.Client;
 using MemoryPack;
 using Perfolizer.Horology;
 
 namespace Bolt.Tests;
 
 /// <summary>
-/// Head-to-head payload size benchmark: Bolt (WebSocket) vs gRPC.
-/// Both transports echo raw bytes of varying sizes.
-///
-/// Tests answer: "How do Bolt WebSocket and gRPC compare as payloads grow?"
-///
-/// Payload sizes:
-/// - 100B:   tiny (metadata, status codes)
-/// - 1KB:    typical chat message
-/// - 32KB:   small file, JSON response
-/// - 128KB:  medium (below Bolt auto-stream threshold)
-/// - 512KB:  large (above 256KB -> Bolt auto-streams via BoltStream)
+/// Existing product comparison: routed Bolt versus direct gRPC.
+/// BenchmarkDotNet reports means, confidence intervals, and allocations. Request-level
+/// percentiles are produced by the dedicated latency harness.
 /// </summary>
 [Config(typeof(PayloadBenchConfig))]
 [MemoryDiagnoser]
 public class PayloadBenchmarks
 {
-    // Bolt (WebSocket)
-    private WebApplication _boltApp = null!;
-    private BoltClient _boltService = null!;
-    private BoltClient _boltCaller = null!;
-    private byte[] _boltPayload = null!;
+    private PayloadBenchmarkEnvironment _environment = null!;
 
-    // gRPC
-    private WebApplication _grpcApp = null!;
-    private GrpcChannel _grpcChannel = null!;
-    private HelloService.HelloServiceClient _grpcClient = null!;
-    private PayloadRequest _grpcRequest = null!;
-
-    [Params(100, 1024, 32_768, 131_072, 524_288, 1_048_576, 2_097_152, 5_242_880, 10_485_760, 20_971_520)]
+    [ParamsSource(nameof(PayloadSizes))]
     public int PayloadBytes { get; set; }
 
-    [GlobalSetup]
-    public async Task Setup()
-    {
-        await SetupBolt();
-        await SetupGrpc();
-        GeneratePayloads();
+    public static IEnumerable<int> PayloadSizes => BenchmarkTuning.GetPositiveValues(
+        "BOLT_BENCH_PAYLOAD_BYTES",
+        [100, 1024, 32_768, 131_072, 524_288, 1_048_576, 2_097_152, 5_242_880,
+            10_485_760, 20_971_520]);
 
-        // Warmup all transports
-        for (int i = 0; i < 10; i++)
+    [GlobalSetup(Target = nameof(Bolt_Echo))]
+    public Task SetupBoltBenchmark() =>
+        SetupAsync(PayloadBenchmarkTopology.RoutedBolt, nameof(Bolt_Echo));
+
+    [GlobalSetup(Target = nameof(GRPC_Echo))]
+    public Task SetupGrpcBenchmark() =>
+        SetupAsync(PayloadBenchmarkTopology.DirectGrpc, nameof(GRPC_Echo));
+
+    private async Task SetupAsync(PayloadBenchmarkTopology topology, string benchmarkName)
+    {
+        try
         {
-            await _boltCaller.InvokeAsync("payload_svc", "echo", _boltPayload);
-            await _grpcClient.EchoPayloadAsync(_grpcRequest);
+            _environment = await PayloadBenchmarkEnvironment.CreateAsync(
+                topology,
+                PayloadBytes,
+                $"PayloadBenchmarks.{benchmarkName}");
+
+            Console.WriteLine(
+                "Payload topology={0} input={1:N0} encoded={2:N0} threshold={3:N0} mode={4}",
+                topology.Label(),
+                PayloadBytes,
+                topology.IsBolt() ? GetEncodedBoltPayloadSize(PayloadBytes) : PayloadBytes,
+                _environment.BoltLargePayloadThreshold,
+                topology.IsBolt() && GetEncodedBoltPayloadSize(PayloadBytes) > _environment.BoltLargePayloadThreshold
+                    ? "stream"
+                    : "unary");
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                $"{topology.Label()} preflight failed for the {PayloadBytes:N0}-byte payload.",
+                exception);
         }
     }
 
-    private async Task SetupBolt()
+    [Benchmark(Baseline = true, Description = "Product_Routed_Bolt")]
+    [BenchmarkCategory("ProductComparison", "Routed")]
+    public Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload)> Bolt_Echo() =>
+        _environment.InvokeBoltAsync();
+
+    [Benchmark(Description = "Product_Direct_gRPC")]
+    [BenchmarkCategory("ProductComparison", "Direct")]
+    public Task<PayloadReply> GRPC_Echo() =>
+        _environment.InvokeGrpcAsync();
+
+    [GlobalCleanup(Targets =
+    [
+        nameof(Bolt_Echo),
+        nameof(GRPC_Echo)
+    ])]
+    public async Task CleanupBenchmark()
     {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls("http://localhost:18600");
-        builder.Services.AddSingleton<BoltServer>();
-        builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _boltApp = builder.Build();
-        _boltApp.UseWebSockets();
-        _boltApp.MapBolt("/bolt");
-        _boltApp.MapGet("/health", () => "ok");
-        _ = Task.Run(() => _boltApp.RunAsync());
-        await WaitForHealth("http://localhost:18600/health");
-
-        var lf = _boltApp.Services.GetRequiredService<ILoggerFactory>();
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60 }; // Uses default 1MB threshold
-
-        _boltService = new BoltClient(new Uri("ws://localhost:18600/bolt"),
-            "payload_svc", "PayloadSvc", opts, lf.CreateLogger<BoltClient>());
-        _boltService.RegisterHandler("echo", (payload, _) =>
-            Task.FromResult((HttpStatusCode.OK, payload)));
-        await _boltService.ConnectAsync();
-
-        _boltCaller = new BoltClient(new Uri("ws://localhost:18600/bolt"),
-            "payload_caller", "PayloadCaller", opts, lf.CreateLogger<BoltClient>());
-        await _boltCaller.ConnectAsync();
+        if (_environment is not null)
+            await _environment.DisposeAsync();
     }
 
-    private async Task SetupGrpc()
+    private static int GetEncodedBoltPayloadSize(int payloadBytes) =>
+        MemoryPackSerializer.Serialize(new BenchPayload { Data = new byte[payloadBytes] }).Length;
+}
+
+/// <summary>Matched direct transport comparison with a direct-Bolt baseline.</summary>
+[Config(typeof(PayloadBenchConfig))]
+[MemoryDiagnoser]
+public class DirectPayloadBenchmarks
+{
+    private PayloadBenchmarkEnvironment _environment = null!;
+
+    [ParamsSource(nameof(PayloadSizes))]
+    public int PayloadBytes { get; set; }
+
+    public static IEnumerable<int> PayloadSizes => PayloadBenchmarks.PayloadSizes;
+
+    [GlobalSetup(Target = nameof(Bolt_Direct_Echo))]
+    public Task SetupBoltBenchmark() => SetupAsync(PayloadBenchmarkTopology.DirectBolt, nameof(Bolt_Direct_Echo));
+
+    [GlobalSetup(Target = nameof(GRPC_Direct_Echo))]
+    public Task SetupGrpcBenchmark() => SetupAsync(PayloadBenchmarkTopology.DirectGrpc, nameof(GRPC_Direct_Echo));
+
+    private async Task SetupAsync(PayloadBenchmarkTopology topology, string benchmarkName) =>
+        _environment = await PayloadBenchmarkEnvironment.CreateAsync(
+            topology,
+            PayloadBytes,
+            $"DirectPayloadBenchmarks.{benchmarkName}");
+
+    [Benchmark(Baseline = true, Description = "Direct_Bolt")]
+    public Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload)> Bolt_Direct_Echo() =>
+        _environment.InvokeBoltAsync();
+
+    [Benchmark(Description = "Direct_gRPC")]
+    public Task<PayloadReply> GRPC_Direct_Echo() => _environment.InvokeGrpcAsync();
+
+    [GlobalCleanup(Targets = [nameof(Bolt_Direct_Echo), nameof(GRPC_Direct_Echo)])]
+    public async Task CleanupBenchmark()
     {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.ConfigureKestrel(o =>
-        {
-            o.ListenLocalhost(18601, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
-            o.ListenLocalhost(18602, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
-        });
-        builder.Services.AddGrpc(o => o.MaxReceiveMessageSize = 64 * 1024 * 1024);
-        builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _grpcApp = builder.Build();
-        _grpcApp.MapGrpcService<GrpcEchoPayloadBackend>();
-        _grpcApp.MapGet("/health", () => "ok");
-        _ = Task.Run(() => _grpcApp.RunAsync());
-        await WaitForHealth("http://localhost:18602/health");
-
-        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18601", new GrpcChannelOptions
-        {
-            MaxReceiveMessageSize = 64 * 1024 * 1024,
-            MaxSendMessageSize = 64 * 1024 * 1024
-        });
-        _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
-    }
-
-    private void GeneratePayloads()
-    {
-        var data = new byte[PayloadBytes];
-        Random.Shared.NextBytes(data);
-
-        _boltPayload = MemoryPackSerializer.Serialize(new BenchPayload { Data = data });
-        _grpcRequest = new PayloadRequest { Data = ByteString.CopyFrom(data) };
-    }
-
-    [IterationSetup]
-    public void IterationSetup() => GeneratePayloads();
-
-    [Benchmark(Baseline = true)]
-    public async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> Bolt_Echo()
-    {
-        return await _boltCaller.InvokeAsync("payload_svc", "echo", _boltPayload);
-    }
-
-    [Benchmark]
-    public async Task<PayloadReply> GRPC_Echo()
-    {
-        return await _grpcClient.EchoPayloadAsync(_grpcRequest);
-    }
-
-    [GlobalCleanup]
-    public async Task Cleanup()
-    {
-        try { await _boltCaller.DisposeAsync(); } catch { }
-        try { await _boltService.DisposeAsync(); } catch { }
-        _grpcChannel?.Dispose();
-        try { await _grpcApp.StopAsync(); } catch { }
-        try { await _boltApp.StopAsync(); } catch { }
-    }
-
-    private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
-    {
-        using var client = new HttpClient();
-        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            try { if ((await client.GetAsync(url)).IsSuccessStatusCode) return; } catch { }
-            await Task.Delay(100);
-        }
-        throw new TimeoutException($"Service at {url} not healthy within {timeoutSeconds}s");
+        if (_environment is not null)
+            await _environment.DisposeAsync();
     }
 }
 
-/// <summary>gRPC echo backend — returns the same byte payload.</summary>
+/// <summary>Matched routed transport comparison with a routed-Bolt baseline.</summary>
+[Config(typeof(PayloadBenchConfig))]
+[MemoryDiagnoser]
+public class RoutedPayloadBenchmarks
+{
+    private PayloadBenchmarkEnvironment _environment = null!;
+
+    [ParamsSource(nameof(PayloadSizes))]
+    public int PayloadBytes { get; set; }
+
+    public static IEnumerable<int> PayloadSizes => PayloadBenchmarks.PayloadSizes;
+
+    [GlobalSetup(Target = nameof(Bolt_Routed_Echo))]
+    public Task SetupBoltBenchmark() => SetupAsync(PayloadBenchmarkTopology.RoutedBolt, nameof(Bolt_Routed_Echo));
+
+    [GlobalSetup(Target = nameof(GRPC_Routed_Echo))]
+    public Task SetupGrpcBenchmark() => SetupAsync(PayloadBenchmarkTopology.RoutedGrpc, nameof(GRPC_Routed_Echo));
+
+    private async Task SetupAsync(PayloadBenchmarkTopology topology, string benchmarkName) =>
+        _environment = await PayloadBenchmarkEnvironment.CreateAsync(
+            topology,
+            PayloadBytes,
+            $"RoutedPayloadBenchmarks.{benchmarkName}");
+
+    [Benchmark(Baseline = true, Description = "Routed_Bolt")]
+    public Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload)> Bolt_Routed_Echo() =>
+        _environment.InvokeBoltAsync();
+
+    [Benchmark(Description = "Routed_gRPC")]
+    public Task<PayloadReply> GRPC_Routed_Echo() => _environment.InvokeGrpcAsync();
+
+    [GlobalCleanup(Targets = [nameof(Bolt_Routed_Echo), nameof(GRPC_Routed_Echo)])]
+    public async Task CleanupBenchmark()
+    {
+        if (_environment is not null)
+            await _environment.DisposeAsync();
+    }
+}
+
+/// <summary>gRPC echo backend returns the same byte payload.</summary>
 public class GrpcEchoPayloadBackend : HelloService.HelloServiceBase
 {
-    public override Task<PayloadReply> EchoPayload(PayloadRequest request, ServerCallContext context)
-    {
-        return Task.FromResult(new PayloadReply { Data = request.Data });
-    }
+    public override Task<PayloadReply> EchoPayload(PayloadRequest request, ServerCallContext context) =>
+        Task.FromResult(new PayloadReply { Data = request.Data });
 
-    public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
-    {
-        return Task.FromResult(new HelloReply { Message = $"Hello {request.Name}" });
-    }
+    public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context) =>
+        Task.FromResult(new HelloReply { Message = $"Hello {request.Name}" });
 }
 
 [MemoryPackable]
@@ -184,40 +189,34 @@ public class PayloadBenchConfig : ManualConfig
 {
     public PayloadBenchConfig()
     {
-        AddJob(Job.ShortRun.WithWarmupCount(3).WithIterationCount(10));
-        AddColumn(StatisticColumn.P95);
+        if (BenchmarkTuning.GetBoolean("BOLT_BENCH_QUICK", false))
+        {
+            AddJob(Job.Dry.WithId("PayloadSmoke"));
+            WithSummaryStyle(SummaryStyle.Default.WithTimeUnit(TimeUnit.Microsecond));
+            return;
+        }
+
+        AddJob(Job.Default
+            .WithId("PayloadCredible")
+            .WithLaunchCount(3)
+            .WithWarmupCount(5)
+            .WithIterationCount(15)
+            .WithMinIterationTime(TimeInterval.FromMilliseconds(250)));
         WithSummaryStyle(SummaryStyle.Default.WithTimeUnit(TimeUnit.Microsecond));
     }
 }
 
 /// <summary>
-/// Sustained throughput benchmark: Bolt (WebSocket) vs gRPC.
-/// Fires tight sequential RPC loops to measure maximum ops/sec for each transport.
-///
-/// Payload sizes:
-/// - 1KB:  typical RPC message (chat, API call)
-/// - 64KB: medium payload (JSON document, small file)
-///
-/// Each benchmark invocation fires 100 sequential RPCs so BenchmarkDotNet can
-/// report per-operation statistics via OperationsPerInvoke.
+/// Sustained product-path throughput comparison: routed Bolt versus direct gRPC.
+/// Matched topology payload costs are measured by <see cref="PayloadBenchmarks"/>.
 /// </summary>
 [Config(typeof(ThroughputBenchConfig))]
 [MemoryDiagnoser]
 public class ThroughputBenchmarks
 {
     private const int OpsPerInvocation = 100;
-
-    // Bolt (WebSocket)
-    private WebApplication _boltApp = null!;
-    private BoltClient _boltService = null!;
-    private BoltClient _boltCaller = null!;
-    private byte[] _boltPayload = null!;
-
-    // gRPC
-    private WebApplication _grpcApp = null!;
-    private GrpcChannel _grpcChannel = null!;
-    private HelloService.HelloServiceClient _grpcClient = null!;
-    private PayloadRequest _grpcRequest = null!;
+    private PayloadBenchmarkEnvironment _boltEnvironment = null!;
+    private PayloadBenchmarkEnvironment _grpcEnvironment = null!;
 
     [Params(1024, 65_536)]
     public int PayloadBytes { get; set; }
@@ -225,115 +224,43 @@ public class ThroughputBenchmarks
     [GlobalSetup]
     public async Task Setup()
     {
-        await SetupBolt();
-        await SetupGrpc();
-        GeneratePayloads();
+        _boltEnvironment = await PayloadBenchmarkEnvironment.CreateAsync(
+            PayloadBenchmarkTopology.RoutedBolt,
+            PayloadBytes,
+            "ThroughputBenchmarks.Product_Routed_Bolt");
+        _grpcEnvironment = await PayloadBenchmarkEnvironment.CreateAsync(
+            PayloadBenchmarkTopology.DirectGrpc,
+            PayloadBytes,
+            "ThroughputBenchmarks.Product_Direct_gRPC");
 
-        // Warmup all transports
-        for (int i = 0; i < 10; i++)
+        for (var index = 0; index < 10; index++)
         {
-            await _boltCaller.InvokeAsync("tp_svc", "echo", _boltPayload);
-            await _grpcClient.EchoPayloadAsync(_grpcRequest);
+            await _boltEnvironment.InvokeBoltAsync();
+            await _grpcEnvironment.InvokeGrpcAsync();
         }
     }
-
-    private async Task SetupBolt()
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls("http://localhost:18610");
-        builder.Services.AddSingleton<BoltServer>();
-        builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _boltApp = builder.Build();
-        _boltApp.UseWebSockets();
-        _boltApp.MapBolt("/bolt");
-        _boltApp.MapGet("/health", () => "ok");
-        _ = Task.Run(() => _boltApp.RunAsync());
-        await WaitForHealth("http://localhost:18610/health");
-
-        var lf = _boltApp.Services.GetRequiredService<ILoggerFactory>();
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60 };
-
-        _boltService = new BoltClient(new Uri("ws://localhost:18610/bolt"),
-            "tp_svc", "ThroughputSvc", opts, lf.CreateLogger<BoltClient>());
-        _boltService.RegisterHandler("echo", (payload, _) =>
-            Task.FromResult((HttpStatusCode.OK, payload)));
-        await _boltService.ConnectAsync();
-
-        _boltCaller = new BoltClient(new Uri("ws://localhost:18610/bolt"),
-            "tp_caller", "ThroughputCaller", opts, lf.CreateLogger<BoltClient>());
-        await _boltCaller.ConnectAsync();
-    }
-
-    private async Task SetupGrpc()
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.ConfigureKestrel(o =>
-        {
-            o.ListenLocalhost(18611, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
-            o.ListenLocalhost(18612, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
-        });
-        builder.Services.AddGrpc(o => o.MaxReceiveMessageSize = 64 * 1024 * 1024);
-        builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _grpcApp = builder.Build();
-        _grpcApp.MapGrpcService<GrpcEchoPayloadBackend>();
-        _grpcApp.MapGet("/health", () => "ok");
-        _ = Task.Run(() => _grpcApp.RunAsync());
-        await WaitForHealth("http://localhost:18612/health");
-
-        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18611", new GrpcChannelOptions
-        {
-            MaxReceiveMessageSize = 64 * 1024 * 1024,
-            MaxSendMessageSize = 64 * 1024 * 1024
-        });
-        _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
-    }
-
-    private void GeneratePayloads()
-    {
-        var data = new byte[PayloadBytes];
-        Random.Shared.NextBytes(data);
-
-        _boltPayload = MemoryPackSerializer.Serialize(new BenchPayload { Data = data });
-        _grpcRequest = new PayloadRequest { Data = ByteString.CopyFrom(data) };
-    }
-
-    [IterationSetup]
-    public void IterationSetup() => GeneratePayloads();
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OpsPerInvocation)]
     public async Task Bolt_WebSocket_Throughput()
     {
-        for (int i = 0; i < OpsPerInvocation; i++)
-            await _boltCaller.InvokeAsync("tp_svc", "echo", _boltPayload);
+        for (var index = 0; index < OpsPerInvocation; index++)
+            await _boltEnvironment.InvokeBoltAsync();
     }
 
     [Benchmark(OperationsPerInvoke = OpsPerInvocation)]
     public async Task GRPC_Throughput()
     {
-        for (int i = 0; i < OpsPerInvocation; i++)
-            await _grpcClient.EchoPayloadAsync(_grpcRequest);
+        for (var index = 0; index < OpsPerInvocation; index++)
+            await _grpcEnvironment.InvokeGrpcAsync();
     }
 
     [GlobalCleanup]
     public async Task Cleanup()
     {
-        try { await _boltCaller.DisposeAsync(); } catch { }
-        try { await _boltService.DisposeAsync(); } catch { }
-        _grpcChannel?.Dispose();
-        try { await _grpcApp.StopAsync(); } catch { }
-        try { await _boltApp.StopAsync(); } catch { }
-    }
-
-    private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
-    {
-        using var client = new HttpClient();
-        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            try { if ((await client.GetAsync(url)).IsSuccessStatusCode) return; } catch { }
-            await Task.Delay(100);
-        }
-        throw new TimeoutException($"Service at {url} not healthy within {timeoutSeconds}s");
+        if (_grpcEnvironment is not null)
+            await _grpcEnvironment.DisposeAsync();
+        if (_boltEnvironment is not null)
+            await _boltEnvironment.DisposeAsync();
     }
 }
 
@@ -341,159 +268,80 @@ public class ThroughputBenchConfig : ManualConfig
 {
     public ThroughputBenchConfig()
     {
-        AddJob(Job.ShortRun.WithWarmupCount(3).WithIterationCount(10));
-        AddColumn(StatisticColumn.P95);
+        AddJob(Job.Default
+            .WithLaunchCount(3)
+            .WithWarmupCount(5)
+            .WithIterationCount(15)
+            .WithMinIterationTime(TimeInterval.FromMilliseconds(250)));
         AddColumn(StatisticColumn.OperationsPerSecond);
         WithSummaryStyle(SummaryStyle.Default.WithTimeUnit(TimeUnit.Microsecond));
     }
 }
 
 /// <summary>
-/// Concurrency benchmark: Bolt (WebSocket) vs gRPC.
-/// Fires N parallel RPCs simultaneously to measure P95 latency and stability
-/// under contention.
-///
-/// Fixed payload: 1KB (typical RPC message).
-/// Concurrency levels: 10, 50, 100, 500 parallel tasks.
-///
-/// Each benchmark invocation fires all RPCs concurrently with Task.WhenAll.
-/// BenchmarkDotNet captures the distribution (mean, P95, stddev) of the
-/// total time to complete all parallel RPCs.
+/// Concurrent product-path batch benchmark. Batch completion is not request-level p95;
+/// use the latency harness for p50, p95, p99, and maximum request latency.
 /// </summary>
 [Config(typeof(ConcurrencyBenchConfig))]
 [MemoryDiagnoser]
 public class ConcurrencyBenchmarks
 {
     private const int PayloadSize = 1024;
+    private PayloadBenchmarkEnvironment _boltEnvironment = null!;
+    private PayloadBenchmarkEnvironment _grpcEnvironment = null!;
 
-    // Bolt (WebSocket)
-    private WebApplication _boltApp = null!;
-    private BoltClient _boltService = null!;
-    private BoltClient _boltCaller = null!;
-    private byte[] _boltPayload = null!;
-
-    // gRPC
-    private WebApplication _grpcApp = null!;
-    private GrpcChannel _grpcChannel = null!;
-    private HelloService.HelloServiceClient _grpcClient = null!;
-    private PayloadRequest _grpcRequest = null!;
-
-    [Params(10, 50, 100, 500)]
+    [ParamsSource(nameof(ConcurrencyLevels))]
     public int Concurrency { get; set; }
+
+    public static IEnumerable<int> ConcurrencyLevels => BenchmarkTuning.GetPositiveValues(
+        "BOLT_BENCH_CONCURRENCY",
+        [10, 50, 100, 500]);
 
     [GlobalSetup]
     public async Task Setup()
     {
-        await SetupBolt();
-        await SetupGrpc();
-        GeneratePayloads();
+        _boltEnvironment = await PayloadBenchmarkEnvironment.CreateAsync(
+            PayloadBenchmarkTopology.RoutedBolt,
+            PayloadSize,
+            "ConcurrencyBenchmarks.Product_Routed_Bolt");
+        _grpcEnvironment = await PayloadBenchmarkEnvironment.CreateAsync(
+            PayloadBenchmarkTopology.DirectGrpc,
+            PayloadSize,
+            "ConcurrencyBenchmarks.Product_Direct_gRPC");
 
-        // Warmup all transports
-        for (int i = 0; i < 10; i++)
-        {
-            await _boltCaller.InvokeAsync("cc_svc", "echo", _boltPayload);
-            await _grpcClient.EchoPayloadAsync(_grpcRequest);
-        }
-    }
-
-    private async Task SetupBolt()
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls("http://localhost:18620");
-        builder.Services.AddSingleton<BoltServer>();
-        builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _boltApp = builder.Build();
-        _boltApp.UseWebSockets();
-        _boltApp.MapBolt("/bolt");
-        _boltApp.MapGet("/health", () => "ok");
-        _ = Task.Run(() => _boltApp.RunAsync());
-        await WaitForHealth("http://localhost:18620/health");
-
-        var lf = _boltApp.Services.GetRequiredService<ILoggerFactory>();
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60 };
-
-        _boltService = new BoltClient(new Uri("ws://localhost:18620/bolt"),
-            "cc_svc", "ConcurrencySvc", opts, lf.CreateLogger<BoltClient>());
-        _boltService.RegisterHandler("echo", (payload, _) =>
-            Task.FromResult((HttpStatusCode.OK, payload)));
-        await _boltService.ConnectAsync();
-
-        _boltCaller = new BoltClient(new Uri("ws://localhost:18620/bolt"),
-            "cc_caller", "ConcurrencyCaller", opts, lf.CreateLogger<BoltClient>());
-        await _boltCaller.ConnectAsync();
-    }
-
-    private async Task SetupGrpc()
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.ConfigureKestrel(o =>
-        {
-            o.ListenLocalhost(18621, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
-            o.ListenLocalhost(18622, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
-        });
-        builder.Services.AddGrpc(o => o.MaxReceiveMessageSize = 64 * 1024 * 1024);
-        builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _grpcApp = builder.Build();
-        _grpcApp.MapGrpcService<GrpcEchoPayloadBackend>();
-        _grpcApp.MapGet("/health", () => "ok");
-        _ = Task.Run(() => _grpcApp.RunAsync());
-        await WaitForHealth("http://localhost:18622/health");
-
-        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18621", new GrpcChannelOptions
-        {
-            MaxReceiveMessageSize = 64 * 1024 * 1024,
-            MaxSendMessageSize = 64 * 1024 * 1024
-        });
-        _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
-    }
-
-    private void GeneratePayloads()
-    {
-        var data = new byte[PayloadSize];
-        Random.Shared.NextBytes(data);
-
-        _boltPayload = MemoryPackSerializer.Serialize(new BenchPayload { Data = data });
-        _grpcRequest = new PayloadRequest { Data = ByteString.CopyFrom(data) };
+        await RunConcurrentBoltAsync();
+        await RunConcurrentGrpcAsync();
     }
 
     [Benchmark(Baseline = true)]
-    public async Task Bolt_WebSocket_Concurrent()
+    public Task Bolt_WebSocket_Concurrent() => RunConcurrentBoltAsync();
+
+    [Benchmark]
+    public Task GRPC_Concurrent() => RunConcurrentGrpcAsync();
+
+    private async Task RunConcurrentBoltAsync()
     {
         var tasks = new Task[Concurrency];
-        for (int i = 0; i < Concurrency; i++)
-            tasks[i] = _boltCaller.InvokeAsync("cc_svc", "echo", _boltPayload);
+        for (var index = 0; index < tasks.Length; index++)
+            tasks[index] = _boltEnvironment.InvokeBoltAsync();
         await Task.WhenAll(tasks);
     }
 
-    [Benchmark]
-    public async Task GRPC_Concurrent()
+    private async Task RunConcurrentGrpcAsync()
     {
         var tasks = new Task[Concurrency];
-        for (int i = 0; i < Concurrency; i++)
-            tasks[i] = _grpcClient.EchoPayloadAsync(_grpcRequest).ResponseAsync;
+        for (var index = 0; index < tasks.Length; index++)
+            tasks[index] = _grpcEnvironment.InvokeGrpcAsync();
         await Task.WhenAll(tasks);
     }
 
     [GlobalCleanup]
     public async Task Cleanup()
     {
-        try { await _boltCaller.DisposeAsync(); } catch { }
-        try { await _boltService.DisposeAsync(); } catch { }
-        _grpcChannel?.Dispose();
-        try { await _grpcApp.StopAsync(); } catch { }
-        try { await _boltApp.StopAsync(); } catch { }
-    }
-
-    private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
-    {
-        using var client = new HttpClient();
-        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            try { if ((await client.GetAsync(url)).IsSuccessStatusCode) return; } catch { }
-            await Task.Delay(100);
-        }
-        throw new TimeoutException($"Service at {url} not healthy within {timeoutSeconds}s");
+        if (_grpcEnvironment is not null)
+            await _grpcEnvironment.DisposeAsync();
+        if (_boltEnvironment is not null)
+            await _boltEnvironment.DisposeAsync();
     }
 }
 
@@ -501,8 +349,28 @@ public class ConcurrencyBenchConfig : ManualConfig
 {
     public ConcurrencyBenchConfig()
     {
-        AddJob(Job.ShortRun.WithWarmupCount(3).WithIterationCount(10));
-        AddColumn(StatisticColumn.P95);
+        AddJob(Job.Default
+            .WithLaunchCount(3)
+            .WithWarmupCount(5)
+            .WithIterationCount(15)
+            .WithMinIterationTime(TimeInterval.FromMilliseconds(250)));
         WithSummaryStyle(SummaryStyle.Default.WithTimeUnit(TimeUnit.Millisecond));
+    }
+}
+
+internal static class BenchmarkResponseValidation
+{
+    public static void ValidateBoltPayload(
+        (HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload) response,
+        ReadOnlySpan<byte> expected)
+    {
+        if (response.StatusCode != HttpStatusCode.OK || !response.Payload.Span.SequenceEqual(expected))
+            throw new InvalidOperationException("Bolt returned an invalid benchmark payload.");
+    }
+
+    public static void ValidateGrpcPayload(PayloadReply response, ByteString expected)
+    {
+        if (!response.Data.Span.SequenceEqual(expected.Span))
+            throw new InvalidOperationException("gRPC returned an invalid benchmark payload.");
     }
 }

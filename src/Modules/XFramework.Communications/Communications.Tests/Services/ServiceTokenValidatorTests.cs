@@ -81,6 +81,128 @@ public sealed class ServiceTokenValidatorTests
         Assert.That(result.IsValid, Is.False);
     }
 
+    [Test]
+    public async Task ValidateAsync_MalformedToken_ReturnsInvalid()
+    {
+        var fixture = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+
+        var result = await Validator(fixture).ValidateAsync(
+            "not-a-jwt",
+            XFrameworkServiceNames.Communications);
+
+        Assert.That(result.IsValid, Is.False);
+    }
+
+    [Test]
+    public async Task ValidateAsync_WrongSignature_ReturnsInvalid()
+    {
+        var trustedKeys = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+        var attackerToken = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+        var validator = new ServiceTokenValidator(
+            new TestSigningKeyProvider(trustedKeys.PublicKeyPem, attackerToken.KeyId),
+            Options.Create(new ServiceIdentityOptions { Issuer = Issuer }));
+
+        var result = await validator.ValidateAsync(
+            attackerToken.Token,
+            XFrameworkServiceNames.Communications);
+
+        Assert.That(result.IsValid, Is.False);
+    }
+
+    [Test]
+    public async Task ValidateAsync_FailedValidation_IsNotCached()
+    {
+        var trustedKeys = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+        var attackerToken = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+        var keyProvider = new TestSigningKeyProvider(trustedKeys.PublicKeyPem, attackerToken.KeyId);
+        var validator = new ServiceTokenValidator(
+            keyProvider,
+            Options.Create(new ServiceIdentityOptions { Issuer = Issuer }));
+
+        var first = await validator.ValidateAsync(attackerToken.Token, XFrameworkServiceNames.Communications);
+        var second = await validator.ValidateAsync(attackerToken.Token, XFrameworkServiceNames.Communications);
+
+        Assert.That(first.IsValid, Is.False);
+        Assert.That(second.IsValid, Is.False);
+        Assert.That(keyProvider.RequestCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task ValidateAsync_ReusesSuccessfulBaseValidation()
+    {
+        var fixture = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+        var keyProvider = new TestSigningKeyProvider(fixture.PublicKeyPem, fixture.KeyId);
+        var validator = new ServiceTokenValidator(
+            keyProvider,
+            Options.Create(new ServiceIdentityOptions { Issuer = Issuer }));
+
+        var first = await validator.ValidateAsync(
+            fixture.Token,
+            XFrameworkServiceNames.Communications);
+        keyProvider.FailRequests = true;
+        var second = await validator.ValidateAsync(
+            fixture.Token,
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+
+        Assert.That(first.IsValid, Is.True, first.Error);
+        Assert.That(second.IsValid, Is.True, second.Error);
+        Assert.That(keyProvider.RequestCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ValidateAsync_SuccessfulCache_DoesNotOutliveJwtExpiry()
+    {
+        var fixture = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin],
+            expiresAtUtc: DateTime.UtcNow.AddSeconds(1));
+        var keyProvider = new TestSigningKeyProvider(fixture.PublicKeyPem, fixture.KeyId);
+        var validator = new ServiceTokenValidator(
+            keyProvider,
+            Options.Create(new ServiceIdentityOptions { Issuer = Issuer }));
+
+        var first = await validator.ValidateAsync(fixture.Token, XFrameworkServiceNames.Communications);
+        await Task.Delay(TimeSpan.FromMilliseconds(1_200));
+        var second = await validator.ValidateAsync(fixture.Token, XFrameworkServiceNames.Communications);
+
+        Assert.That(first.IsValid, Is.True, first.Error);
+        Assert.That(second.IsValid, Is.False, "an expired token must not survive through the success cache");
+        Assert.That(keyProvider.RequestCount, Is.EqualTo(2), "expired cache entries must be revalidated");
+    }
+
+    [Test]
+    public void ValidateAsync_CallerCancellation_IsPropagated()
+    {
+        var fixture = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+        var validator = new ServiceTokenValidator(
+            new CancelingSigningKeyProvider(),
+            Options.Create(new ServiceIdentityOptions { Issuer = Issuer }));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var act = async () => await validator.ValidateAsync(
+            fixture.Token,
+            XFrameworkServiceNames.Communications,
+            ct: cancellation.Token);
+
+        Assert.That(act, Throws.InstanceOf<OperationCanceledException>());
+    }
+
     private static ServiceTokenValidator Validator(TokenFixture fixture) =>
         new(
             new TestSigningKeyProvider(fixture.PublicKeyPem, fixture.KeyId),
@@ -122,10 +244,17 @@ public sealed class ServiceTokenValidatorTests
 
     private sealed class TestSigningKeyProvider(string publicKeyPem, string keyId) : IIdentitySigningKeyProvider
     {
+        public int RequestCount { get; private set; }
+        public bool FailRequests { get; set; }
+
         public Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
             string? kid = null,
             CancellationToken ct = default)
         {
+            RequestCount++;
+            if (FailRequests)
+                throw new InvalidOperationException("Signing key provider should not be called.");
+
             IReadOnlyList<ServiceSigningKeyResponse> keys =
             [
                 new()
@@ -141,5 +270,12 @@ public sealed class ServiceTokenValidatorTests
 
             return Task.FromResult(keys);
         }
+    }
+
+    private sealed class CancelingSigningKeyProvider : IIdentitySigningKeyProvider
+    {
+        public Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
+            string? keyId = null,
+            CancellationToken ct = default) => Task.FromCanceled<IReadOnlyList<ServiceSigningKeyResponse>>(ct);
     }
 }

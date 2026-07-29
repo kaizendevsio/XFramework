@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Bolt.Tests.DirectPayloadBenchmarks-20260725-021202</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875) (Hyper-V)
+Unknown processor
+.NET SDK 10.0.100
+  [Host]          : .NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+  PayloadCredible : .NET 10.0.0 (10.0.25.52411), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Job=PayloadCredible  MinIterationTime=250ms  IterationCount=15
+LaunchCount=3  WarmupCount=5
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>PayloadBytes</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Direct_Bolt</td><td>524288</td><td>1,283.8 &mu;s</td><td>105.8 &mu;s</td><td>198.6 &mu;s</td><td>1.02</td><td>0.22</td><td>7.8125</td><td>7.8125</td><td>7.8125</td><td>528145 B</td><td>1.00</td>
+</tr><tr><td>Direct_gRPC</td><td>524288</td><td>2,508.3 &mu;s</td><td>203.7 &mu;s</td><td>377.5 &mu;s</td><td>2.00</td><td>0.43</td><td>23.4375</td><td>23.4375</td><td>23.4375</td><td>-</td><td>0.00</td>
+</tr><tr><td>Direct_Bolt</td><td>1048576</td><td>2,410.2 &mu;s</td><td>136.1 &mu;s</td><td>259.0 &mu;s</td><td>1.01</td><td>0.15</td><td>15.6250</td><td>15.6250</td><td>15.6250</td><td>1052998 B</td><td>1.00</td>
+</tr><tr><td>Direct_gRPC</td><td>1048576</td><td>5,688.0 &mu;s</td><td>477.9 &mu;s</td><td>897.6 &mu;s</td><td>2.39</td><td>0.45</td><td>46.8750</td><td>46.8750</td><td>46.8750</td><td>-</td><td>0.00</td>
+</tr></tbody></table>
+</body>
+</html>

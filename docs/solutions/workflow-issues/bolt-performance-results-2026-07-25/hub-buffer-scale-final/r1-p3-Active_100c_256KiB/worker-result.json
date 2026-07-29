@@ -1,0 +1,36 @@
+{
+  "Repetition": 1,
+  "Position": 3,
+  "ProcessId": 30392,
+  "Clients": 100,
+  "HubReceiveBufferBytes": 262144,
+  "Workload": "Active",
+  "PayloadBytes": 1024,
+  "Requests": 10000,
+  "Concurrency": 100,
+  "WarmupRequests": 100,
+  "ElapsedMilliseconds": 131.9178,
+  "ThroughputRequestsPerSecond": 75804.78146239552,
+  "Latency": {
+    "MeanMilliseconds": 1.30797519,
+    "P50Milliseconds": 1.2607000000000002,
+    "P95Milliseconds": 1.6705,
+    "P99Milliseconds": 2.3905000000000003,
+    "MaxMilliseconds": 5.8442
+  },
+  "CpuMilliseconds": 1984.375,
+  "Gen2Collections": 0,
+  "BaselineWorkingSetBytes": 75431936,
+  "PeakWorkingSetBytes": 125169664,
+  "PeakWorkingSetDeltaBytes": 49737728,
+  "BaselineManagedHeapBytes": 40138920,
+  "PeakManagedHeapBytes": 88002920,
+  "PeakManagedHeapDeltaBytes": 47864000,
+  "CoordinatedOmissionLimitation": "Closed-loop workers issue a new request only after the previous request completes; the results can understate queueing tails caused by coordinated omission.",
+  "EffectiveSettings": {
+    "connectedClients": 100,
+    "hubReceiveBufferBytes": 262144,
+    "callerConnectionsPerClient": 1,
+    "runRpcContinuationsAsynchronously": false
+  }
+}

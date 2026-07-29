@@ -30,8 +30,9 @@ using Contracts = IdentityServer.Domain.Shared.Contracts;
 namespace IdentityServer.Benchmarks;
 
 /// <summary>
-/// Concurrent load benchmark — measures throughput under parallel RPC calls.
-/// Shows how each transport handles contention, multiplexing, and head-of-line blocking.
+/// Concurrent path benchmark that measures completion time for a validated batch.
+/// Paths execute different application stacks and must only be compared with their own
+/// prior runs; batch percentiles are not individual request latency percentiles.
 /// </summary>
 [Config(typeof(ConcurrentBenchmarkConfig))]
 [MemoryDiagnoser]
@@ -176,7 +177,7 @@ public class ConcurrentBenchmarks
     private async Task SetupThinProtocol()
     {
         var thinServerUri = new Uri($"ws://localhost:19300/bolt/ws");
-        var config = new BoltClientOptions { RpcTimeoutSeconds = 30 };
+        var config = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 1, MaxConnections = 1 };
         var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
         var serviceId = "3902761a822d4c6b8e2d323fd501bcd6";
 
@@ -258,7 +259,7 @@ public class ConcurrentBenchmarks
     {
         var tasks = new Task[Concurrency];
         for (int i = 0; i < Concurrency; i++)
-            tasks[i] = _httpClient.PostAsJsonAsync("/api/health/check", MakeRequest());
+            tasks[i] = ValidateHttp(_httpClient.PostAsJsonAsync("/api/health/check", MakeRequest()));
         await Task.WhenAll(tasks);
     }
 
@@ -267,7 +268,7 @@ public class ConcurrentBenchmarks
     {
         var tasks = new Task[Concurrency];
         for (int i = 0; i < Concurrency; i++)
-            tasks[i] = _serviceWrapper.HealthCheck(MakeRequest());
+            tasks[i] = ValidateBolt(_serviceWrapper.HealthCheck(MakeRequest()));
         await Task.WhenAll(tasks);
     }
 
@@ -276,11 +277,11 @@ public class ConcurrentBenchmarks
     {
         var tasks = new Task[Concurrency];
         for (int i = 0; i < Concurrency; i++)
-            tasks[i] = _grpcClient.CheckAsync(new HealthCheckReq
+            tasks[i] = ValidateGrpc(_grpcClient.CheckAsync(new HealthCheckReq
             {
                 TenantId = TestTenantId.ToString(), RequestId = Guid.NewGuid().ToString(),
                 IpAddress = "127.0.0.1", Name = "Benchmark"
-            }).ResponseAsync;
+            }).ResponseAsync);
         await Task.WhenAll(tasks);
     }
 
@@ -291,11 +292,39 @@ public class ConcurrentBenchmarks
         for (int i = 0; i < Concurrency; i++)
         {
             var payload = MemoryPackSerializer.Serialize(MakeRequest());
-            tasks[i] = _thinCallerClient.InvokeAsync(
+            tasks[i] = ValidateThin(_thinCallerClient.InvokeAsync(
                 "3902761a822d4c6b8e2d323fd501bcd6",
-                typeof(HealthCheckRequest).GetTypeFullName(), payload);
+                typeof(HealthCheckRequest).GetTypeFullName(), payload));
         }
         await Task.WhenAll(tasks);
+    }
+
+    private static async Task ValidateHttp(Task<HttpResponseMessage> pending)
+    {
+        using var response = await pending;
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task ValidateBolt(Task<QueryResponse<HealthCheckResponse>> pending)
+    {
+        var response = await pending;
+        if (response?.Response is null || response.HttpStatusCode != System.Net.HttpStatusCode.OK)
+            throw new InvalidOperationException("Bolt returned an invalid health response.");
+    }
+
+    private static async Task ValidateGrpc(Task<HealthCheckResp> pending)
+    {
+        if (!string.Equals((await pending).Status, "Healthy", StringComparison.Ordinal))
+            throw new InvalidOperationException("gRPC returned an invalid health response.");
+    }
+
+    private static async Task ValidateThin(
+        Task<(System.Net.HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload)> pending)
+    {
+        var response = await pending;
+        var body = MemoryPackSerializer.Deserialize<QueryResponse<HealthCheckResponse>>(response.Payload.Span);
+        if (response.StatusCode != System.Net.HttpStatusCode.OK || body?.Response is null)
+            throw new InvalidOperationException("Thin Bolt returned an invalid health response.");
     }
 
     [GlobalCleanup]

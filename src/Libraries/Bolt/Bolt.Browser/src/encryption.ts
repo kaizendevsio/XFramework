@@ -1,5 +1,6 @@
 /**
- * End-to-end media encryption using ECDH P-256 key exchange + AES-256-GCM.
+ * Media encryption primitive using ECDH P-256 key exchange + AES-256-GCM.
+ * Callers must authenticate peer keys; Bolt's built-in encrypted call flow remains disabled.
  *
  * Uses the Web Crypto API for all cryptographic operations (hardware-accelerated
  * on most platforms). Compatible with the .NET MediaEncryption implementation.
@@ -13,7 +14,7 @@
  * Nonce: 12 bytes = streamId[0..7] + sequenceNumber (4 bytes LE)
  */
 
-import { guidToBytes } from './protocol';
+import { guidToBytes } from './protocol.js';
 
 export class MediaCrypto {
   private keyPair: CryptoKeyPair | null = null;

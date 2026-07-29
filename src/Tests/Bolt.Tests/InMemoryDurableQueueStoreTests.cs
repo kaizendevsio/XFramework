@@ -9,8 +9,16 @@ namespace Bolt.Tests;
 [TestFixture]
 public class InMemoryDurableQueueStoreTests
 {
-    private InMemoryDurableQueueStore CreateStore(int maxQueueSize = 10_000) =>
-        new(Options.Create(new DurableQueueOptions { MaxQueueSize = maxQueueSize }), NullLogger<InMemoryDurableQueueStore>.Instance);
+    private InMemoryDurableQueueStore CreateStore(
+        int maxQueueSize = 10_000,
+        long maxQueueBytes = 32L * 1024 * 1024) =>
+        new(
+            Options.Create(new DurableQueueOptions
+            {
+                MaxQueueSize = maxQueueSize,
+                MaxQueueBytesPerSubscriber = maxQueueBytes
+            }),
+            NullLogger<InMemoryDurableQueueStore>.Instance);
 
     [Test]
     public async Task Append_AssignsMonotonicSequenceNumbers()
@@ -138,6 +146,32 @@ public class InMemoryDurableQueueStoreTests
 
         results.Should().HaveCount(3);
         results.Select(r => r.Item1).Should().BeEquivalentTo(new long[] { 3, 4, 5 });
+    }
+
+    [Test]
+    public async Task Append_ByteCapacityExceededByRetainedMessages_DropsOldestBeforeCopyingNewPayload()
+    {
+        var store = CreateStore(maxQueueBytes: 5);
+        await store.AppendAsync(1, "sub-a", new byte[] { 1, 2, 3 });
+
+        var second = await store.AppendAsync(1, "sub-a", new byte[] { 4, 5, 6, 7 });
+
+        var messages = await ReadAllAsync(store, 1, "sub-a", 0);
+        messages.Should().ContainSingle();
+        messages[0].Sequence.Should().Be(second);
+        messages[0].Payload.Should().Equal(4, 5, 6, 7);
+    }
+
+    [Test]
+    public async Task Append_SinglePayloadExceedsByteCapacity_RejectsWithoutAdvancingSequence()
+    {
+        var store = CreateStore(maxQueueBytes: 4);
+
+        var act = async () => await store.AppendAsync(1, "sub-a", new byte[5]);
+
+        await act.Should().ThrowAsync<BoltDurableQueueByteCapacityExceededException>();
+        var sequence = await store.AppendAsync(1, "sub-a", new byte[] { 1 });
+        sequence.Should().Be(1);
     }
 
     [Test]

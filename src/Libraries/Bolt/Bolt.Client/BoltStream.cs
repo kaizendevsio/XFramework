@@ -25,21 +25,31 @@ namespace Bolt.Client;
 /// </summary>
 public sealed class BoltStream : IAsyncDisposable
 {
+    internal delegate void InboundSink(ReadOnlySpan<byte> data);
+
     private readonly Guid _streamId;
     private readonly BoltConnection _connection;
     private readonly Channel<ReadOnlyMemory<byte>> _inboundChannel;
     private readonly Action<Guid>? _onClosed;
+    private readonly object _inboundGate = new();
+    private InboundSink? _inboundSink;
     private volatile bool _closed;
 
     public Guid StreamId => _streamId;
     public bool IsClosed => _closed;
+    public HttpStatusCode? CloseStatus { get; private set; }
+    internal BoltConnection Connection => _connection;
 
-    internal BoltStream(Guid streamId, BoltConnection connection, Action<Guid>? onClosed = null)
+    internal BoltStream(
+        Guid streamId,
+        BoltConnection connection,
+        Action<Guid>? onClosed = null,
+        int inboundCapacity = 1024)
     {
         _streamId = streamId;
         _connection = connection;
         _onClosed = onClosed;
-        _inboundChannel = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(1024)
+        _inboundChannel = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(Math.Max(1, inboundCapacity))
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = false,
@@ -58,7 +68,18 @@ public sealed class BoltStream : IAsyncDisposable
 
         var writer = RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteStreamData(writer, _streamId, data.Span);
-        await _connection.SendAsync(writer.WrittenMemory, ct);
+        await _connection.SendReliableAsync(writer, ct);
+    }
+
+    internal ValueTask<PooledSendCompletion> EnqueueAsync(
+        ReadOnlyMemory<byte> data,
+        CancellationToken ct)
+    {
+        if (_closed) throw new InvalidOperationException("Stream is closed");
+
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteStreamData(writer, _streamId, data.Span);
+        return _connection.EnqueueReliableAsync(writer, ct);
     }
 
     /// <summary>
@@ -76,10 +97,8 @@ public sealed class BoltStream : IAsyncDisposable
     /// <summary>
     /// Read all incoming raw byte chunks. Completes when remote closes the stream.
     /// </summary>
-    public IAsyncEnumerable<ReadOnlyMemory<byte>> ReadAllAsync(CancellationToken ct = default)
-    {
-        return _inboundChannel.Reader.ReadAllAsync(ct);
-    }
+    public IAsyncEnumerable<ReadOnlyMemory<byte>> ReadAllAsync(CancellationToken ct = default) =>
+        _inboundChannel.Reader.ReadAllAsync(ct);
 
     /// <summary>
     /// Read a single chunk. Returns false when stream is closed.
@@ -152,24 +171,121 @@ public sealed class BoltStream : IAsyncDisposable
     /// </summary>
     public async ValueTask CloseAsync(HttpStatusCode statusCode = HttpStatusCode.OK, CancellationToken ct = default)
     {
-        if (_closed) return;
-        _closed = true;
+        lock (_inboundGate)
+        {
+            if (_closed) return;
+            _closed = true;
+            CloseStatus = statusCode;
+            _inboundSink = null;
+        }
 
-        var writer = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteStreamClose(writer, _streamId, statusCode);
-        await _connection.SendAsync(writer.WrittenMemory, ct);
-
-        _inboundChannel.Writer.TryComplete();
-        _onClosed?.Invoke(_streamId);
+        try
+        {
+            var writer = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteStreamClose(writer, _streamId, statusCode);
+            await _connection.SendReliableAsync(writer, ct);
+        }
+        finally
+        {
+            lock (_inboundGate)
+                _inboundChannel.Writer.TryComplete();
+            _onClosed?.Invoke(_streamId);
+        }
     }
 
-    internal ValueTask EnqueueInboundAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
-        => _inboundChannel.Writer.WriteAsync(data, ct);
+    internal bool TryEnqueueInbound(ReadOnlyMemory<byte> data)
+    {
+        lock (_inboundGate)
+        {
+            if (!_closed && _inboundSink is { } sink)
+            {
+                sink(data.Span);
+                return true;
+            }
+
+            if (!_closed && _inboundChannel.Writer.TryWrite(data))
+                return true;
+        }
+
+        return FailInboundCapacity();
+    }
+
+    internal bool TryAcceptInbound(ReadOnlySpan<byte> data)
+    {
+        lock (_inboundGate)
+        {
+            if (_closed)
+                return false;
+
+            if (_inboundSink is { } sink)
+            {
+                sink(data);
+                return true;
+            }
+
+            var copy = GC.AllocateUninitializedArray<byte>(data.Length);
+            data.CopyTo(copy);
+            if (_inboundChannel.Writer.TryWrite(copy))
+                return true;
+        }
+
+        return FailInboundCapacity();
+    }
+
+    internal bool TrySetInboundSink(InboundSink sink)
+    {
+        lock (_inboundGate)
+        {
+            if (_inboundSink is not null)
+                return false;
+
+            while (_inboundChannel.Reader.TryRead(out var queued))
+                sink(queued.Span);
+
+            if (!_closed)
+                _inboundSink = sink;
+            return true;
+        }
+    }
+
+    internal void ClearInboundSink(InboundSink sink)
+    {
+        lock (_inboundGate)
+        {
+            if (_inboundSink == sink)
+                _inboundSink = null;
+        }
+    }
+
+    internal Task WaitForCloseAsync(CancellationToken ct) =>
+        _inboundChannel.Reader.Completion.WaitAsync(ct);
+
+    private bool FailInboundCapacity()
+    {
+        lock (_inboundGate)
+        {
+            if (_closed)
+                return false;
+
+            _closed = true;
+            CloseStatus = HttpStatusCode.TooManyRequests;
+            _inboundSink = null;
+            _inboundChannel.Writer.TryComplete(new InvalidOperationException(
+                $"Bolt stream {_streamId} exceeded its inbound buffer capacity."));
+        }
+        _onClosed?.Invoke(_streamId);
+        return false;
+    }
 
     internal void MarkClosed(HttpStatusCode statusCode)
     {
-        _closed = true;
-        _inboundChannel.Writer.TryComplete();
+        lock (_inboundGate)
+        {
+            _closed = true;
+            CloseStatus = statusCode;
+            _inboundSink = null;
+            _inboundChannel.Writer.TryComplete();
+        }
         _onClosed?.Invoke(_streamId);
     }
 

@@ -19,4 +19,11 @@ namespace XFramework.Integration.Attributes;
 ///       CancellationToken ct) { ... }
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-public class BoltHandlerAttribute : Attribute;
+public class BoltHandlerAttribute : Attribute
+{
+    /// <summary>Service-token scopes required in addition to baseline token validation.</summary>
+    public string[]? RequiredServiceScopes { get; set; }
+
+    /// <summary>Service client IDs allowed to invoke this handler.</summary>
+    public string[]? AllowedServiceCallers { get; set; }
+}

@@ -1,21 +1,25 @@
-export { BoltBrowserClient } from './bolt-client';
-export type { CallInfo, BoltBrowserStream, BoltBrowserEvent } from './bolt-client';
-export { BoltBrowserMediaStream } from './media-stream';
-export type { MediaFrameEvent } from './media-stream';
-export { AudioCodecHelper, VideoCodecHelper } from './webcodecs-helper';
-export type { VideoCodecType } from './webcodecs-helper';
-export { MediaCrypto } from './encryption';
-export { JitterBuffer } from './jitter-buffer';
-export type { BufferedFrame, JitterBufferOptions } from './jitter-buffer';
+export { BoltBrowserClient } from './bolt-client.js';
+export type { CallInfo, BoltBrowserStream, BoltBrowserEvent } from './bolt-client.js';
+export { BoltBrowserMediaStream } from './media-stream.js';
+export type { MediaFrameEvent } from './media-stream.js';
+export { AudioCodecHelper, VideoCodecHelper } from './webcodecs-helper.js';
+export type { VideoCodecType } from './webcodecs-helper.js';
+export { MediaCrypto } from './encryption.js';
+export { JitterBuffer } from './jitter-buffer.js';
+export type { BufferedFrame, JitterBufferOptions } from './jitter-buffer.js';
 export {
   FRAME, SIGNAL, MediaFrameFlags, QualityHint, MediaType, CodecId,
-  fnv1aHash, newGuid, guidToBytes,
+  WIRE_VERSION, MAX_BATCH_FRAMES, MAX_BATCH_BYTES,
+  fnv1aHash, newGuid, guidToBytes, writeRegister, readRegisterAck, readRegisterAckDetails,
+  writeBatch, readBatch, isMediaFrameType,
   writeRequest, writeResponse, writePush,
   writeSubscribe, writeUnsubscribe, writePublish, writeAck, readPublish, readEvent,
+  writeRequestCancel, readRequestCancel,
   writeStreamOpen, writeStreamData, writeStreamClose,
-} from './protocol';
+} from './protocol.js';
 export type {
   MediaFrameData, MediaConfigData, MediaFeedbackData, CallSignalData,
   FecFrameData, NackRequestData, RequestFrameData, ResponseFrameData,
   PublishFrameData, EventFrameData, StreamOpenData, StreamDataFrame, StreamCloseData,
-} from './protocol';
+  RegisterAckData,
+} from './protocol.js';

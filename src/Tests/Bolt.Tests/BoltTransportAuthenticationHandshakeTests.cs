@@ -53,6 +53,7 @@ public sealed class BoltTransportAuthenticationHandshakeTests
     {
         try { await _app.StopAsync(); } catch { }
         try { await _app.DisposeAsync(); } catch { }
+        try { await _app.DisposeAsync(); } catch { }
         _signingRsa.Dispose();
     }
 

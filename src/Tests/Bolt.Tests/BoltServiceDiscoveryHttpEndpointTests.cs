@@ -45,6 +45,7 @@ public sealed class BoltServiceDiscoveryHttpEndpointTests
         builder.Services.AddDbContext<DbContext, AppDbContext>(options =>
             options.UseInMemoryDatabase($"bolt-discovery-http-{Guid.NewGuid():N}"));
         builder.Services.AddBoltServer();
+        builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         builder.Services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         builder.Services
@@ -70,6 +71,7 @@ public sealed class BoltServiceDiscoveryHttpEndpointTests
     public async Task TearDown()
     {
         try { await _app.StopAsync(); } catch { }
+        try { await _app.DisposeAsync(); } catch { }
         try { await _app.DisposeAsync(); } catch { }
     }
 

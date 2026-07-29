@@ -13,6 +13,7 @@ public static class ServiceIdentityHttpClient
 
     internal const string BoltTransportTokenPath = "/api/service-identity/bolt-transport-token";
     internal const string ServiceTokenPath = "/api/service-identity/token";
+    internal const string SigningKeysPath = "/api/service-identity/signing-keys/query";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -52,6 +53,36 @@ public static class ServiceIdentityHttpClient
             throw new InvalidOperationException("IdentityServer did not issue a token.");
 
         return token;
+    }
+
+    internal static async Task<TResponse> PostForResponseAsync<TRequest, TResponse>(
+        IHttpClientFactory httpClientFactory,
+        ServiceIdentityOptions options,
+        string path,
+        TRequest request,
+        CancellationToken ct)
+    {
+        var authority = options.ResolveAuthority();
+        var endpoint = new Uri(authority, path);
+        var client = httpClientFactory.CreateClient(Name);
+
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        using var response = await client.SendAsync(
+            httpRequest,
+            HttpCompletionOption.ResponseHeadersRead,
+            ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"IdentityServer request failed with HTTP status {(int)response.StatusCode} ({response.StatusCode}).");
+        }
+
+        return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, ct)
+            ?? throw new InvalidOperationException("IdentityServer response was empty.");
     }
 }
 

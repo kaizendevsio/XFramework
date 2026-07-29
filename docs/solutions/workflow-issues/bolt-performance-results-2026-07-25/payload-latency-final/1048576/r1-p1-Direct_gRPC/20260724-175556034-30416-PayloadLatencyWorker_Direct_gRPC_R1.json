@@ -1,0 +1,36 @@
+{
+  "source": "PayloadLatencyWorker.Direct_gRPC.R1",
+  "timestampUtc": "2026-07-24T17:55:56.03388+00:00",
+  "processId": 30416,
+  "runtime": ".NET 10.0.0",
+  "runtimeVersion": "10.0.0",
+  "operatingSystem": "Microsoft Windows 10.0.26200",
+  "processArchitecture": "X64",
+  "osArchitecture": "X64",
+  "processorCount": 18,
+  "serverGc": true,
+  "latencyMode": "Interactive",
+  "processPriority": "Normal",
+  "effectiveSettings": {
+    "topology": "Direct_gRPC",
+    "logicalPath": "caller -\u003E gRPC backend",
+    "payloadBytes": 1048576,
+    "callTimeoutSeconds": 60,
+    "largePayloadThresholdBytes": 0,
+    "streamChunkSizeBytes": null,
+    "pipelineBytes": null,
+    "receiveBufferBytes": null,
+    "hubReceiveBufferBytes": null,
+    "runRpcContinuationsAsynchronously": null,
+    "grpcHttp2MaxStreamsPerConnection": 2048,
+    "grpcCallerChannelCount": 1,
+    "grpcBackendChannelCount": 0,
+    "grpcMultipleHttp2ConnectionsEnabled": false,
+    "serverAddresses": [
+      "http://127.0.0.1:49701/"
+    ]
+  },
+  "environment": {
+    "BOLT_BENCH_ARTIFACTS": "C:\\Users\\Xeon\\RiderProjects\\XFramework-worktrees\\bolt-remediation-plan-scope\\docs\\solutions\\workflow-issues\\bolt-performance-results-2026-07-25\\payload-latency-final\\1048576\\r1-p1-Direct_gRPC"
+  }
+}

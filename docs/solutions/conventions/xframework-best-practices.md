@@ -232,6 +232,10 @@ For method-level `[Map*]` handlers, do not add `IValidator<TRequest>` to the han
 - **Use route constraints** for type safety: `/api/products/{id:guid}`, `/api/orders/{page:int}`.
 - **Pagination defaults:** page=1, pageSize=20, maxPageSize=100. These should be configurable per endpoint.
 - **Use `[BoltHandler]` only when the first parameter implements `IBoltRequest<TRequest, TResponse>`.** Without that contract the Bolt handler is not generated.
+- **Generated Bolt handlers require a destination service token.** Request types must expose `RequestMetadata`; the generated handler validates its `ServiceAccessToken` for the current service and binds the token caller to the verified inbound Bolt sender before validation or service resolution.
+- **Declare narrower service authorization on `[BoltHandler]`.** Use `RequiredServiceScopes = [...]` for service scopes and `AllowedServiceCallers = [...]` for a caller allowlist. These policies are destination-side and independent from REST user authorization metadata.
+- **Preserve status semantics.** Missing, malformed, expired, wrongly signed, or wrong-audience service tokens produce `401`; sender mismatch, missing required scopes, and disallowed callers produce `403`.
+- **Keep manual handlers explicit.** Low-level `RegisterHandler` users do not receive generated authorization. Use the context-aware overload and invoke the trusted service authorization infrastructure when a manual handler exposes privileged service work.
 
 ### 4.3 Registration Pattern
 

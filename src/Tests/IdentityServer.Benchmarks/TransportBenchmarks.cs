@@ -32,6 +32,11 @@ using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.Benchmarks;
 
+/// <summary>
+/// Measures complete XFramework request paths. The paths execute different application
+/// stacks, so results are useful for per-path regression tracking, not protocol ranking.
+/// Every benchmark validates the returned status before completing.
+/// </summary>
 [Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class TransportBenchmarks
@@ -217,7 +222,7 @@ public class TransportBenchmarks
     private async Task SetupThinProtocol()
     {
         var thinServerUri = new Uri($"ws://localhost:19000/bolt/ws");
-        var config = new BoltClientOptions { RpcTimeoutSeconds = 30 };
+        var config = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 1, MaxConnections = 1 };
         var loggerFactory = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
 
         // Compute hashes for routing
@@ -286,7 +291,9 @@ public class TransportBenchmarks
     [Benchmark(Baseline = true)]
     public async Task<HttpResponseMessage> Http_HealthCheck()
     {
-        return await _httpClient.PostAsJsonAsync("/api/health/check", _request);
+        var response = await _httpClient.PostAsJsonAsync("/api/health/check", _request);
+        response.EnsureSuccessStatusCode();
+        return response;
     }
 
     [Benchmark]
@@ -304,19 +311,23 @@ public class TransportBenchmarks
                 DeviceAgent = "BenchAgent"
             }
         };
-        return await _serviceWrapper.HealthCheck(req);
+        var response = await _serviceWrapper.HealthCheck(req);
+        ValidateBoltResponse(response);
+        return response;
     }
 
     [Benchmark]
     public async Task<HealthCheckResp> Grpc_HealthCheck()
     {
-        return await _grpcClient.CheckAsync(new HealthCheckReq
+        var response = await _grpcClient.CheckAsync(new HealthCheckReq
         {
             TenantId = TestTenantId.ToString(),
             RequestId = Guid.NewGuid().ToString(),
             IpAddress = "127.0.0.1",
             Name = "Benchmark"
         });
+        ValidateGrpcResponse(response);
+        return response;
     }
 
     [Benchmark]
@@ -341,7 +352,25 @@ public class TransportBenchmarks
             typeof(HealthCheckRequest).GetTypeFullName(),
             payload);
 
-        return MemoryPackSerializer.Deserialize<QueryResponse<HealthCheckResponse>>(data.Span);
+        if (statusCode != System.Net.HttpStatusCode.OK)
+            throw new InvalidOperationException($"Thin Bolt returned {statusCode}.");
+
+        var response = MemoryPackSerializer.Deserialize<QueryResponse<HealthCheckResponse>>(data.Span);
+        ValidateBoltResponse(response);
+        return response;
+    }
+
+    private static void ValidateBoltResponse(QueryResponse<HealthCheckResponse>? response)
+    {
+        if (response?.Response is null || response.HttpStatusCode != System.Net.HttpStatusCode.OK ||
+            !string.Equals(response.Response.Status, "ok", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Bolt returned an invalid health response.");
+    }
+
+    private static void ValidateGrpcResponse(HealthCheckResp response)
+    {
+        if (!string.Equals(response.Status, "Healthy", StringComparison.Ordinal))
+            throw new InvalidOperationException("gRPC returned an invalid health response.");
     }
 
     #region Infrastructure

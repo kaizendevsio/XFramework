@@ -92,13 +92,27 @@ public class BoltHubConfigurationTests
             .Should().Be(BoltRegistrationIdentityBindingMode.Enforce);
         configuration.RegistrationIdentityBindingMode
             .Should().Be(nameof(BoltRegistrationIdentityBindingMode.Enforce));
-        serverOptions.MediaEnabled.Should().BeTrue();
+        serverOptions.MediaEnabled.Should().BeFalse();
         serverOptions.RequireSecureTransport.Should().BeFalse();
         serverOptions.MaxConnectionLifetimeSeconds.Should().Be(0);
         serverOptions.MaxFrameBytes.Should().Be(8 * 1024 * 1024);
+        serverOptions.MaxLargeRpcPayloadBytes.Should().Be(32 * 1024 * 1024);
+        serverOptions.SendQueueByteCapacity.Should().Be(16 * 1024 * 1024);
+        serverOptions.RpcRequestsPerSecond.Should().Be(0);
+        serverOptions.RpcRequestBurst.Should().Be(0);
+        serverOptions.RpcInboundBytesPerSecond.Should().Be(0);
+        serverOptions.RpcInboundByteBurst.Should().Be(0);
+        serverOptions.RequireTopicAuthorization.Should().BeFalse();
         configuration.MediaEnabled.Should().BeFalse();
         configuration.MaxConnectionLifetimeSeconds.Should().Be(1800);
         configuration.MaxFrameBytes.Should().Be(8 * 1024 * 1024);
+        configuration.MaxLargeRpcPayloadBytes.Should().Be(32 * 1024 * 1024);
+        configuration.MaxBufferedLargeRpcBytes.Should().Be(64L * 1024 * 1024);
+        configuration.RpcRequestsPerSecond.Should().Be(800_000);
+        configuration.RpcRequestBurst.Should().Be(200_000);
+        configuration.RpcInboundBytesPerSecond.Should().Be(1_342_177_280);
+        configuration.RpcInboundByteBurst.Should().Be(256 * 1024 * 1024);
+        configuration.RequireTopicAuthorization.Should().BeTrue();
     }
 
     [Test]
@@ -125,6 +139,12 @@ public class BoltHubConfigurationTests
         options.MaxSubscriptionsPerPrincipal.Should().Be(128);
         options.MaxDurableSubscribersPerTopic.Should().Be(128);
         options.MaxConnectionLifetimeSeconds.Should().Be(1800);
+        options.MaxLargeRpcPayloadBytes.Should().Be(32 * 1024 * 1024);
+        options.RpcRequestsPerSecond.Should().Be(800_000);
+        options.RpcRequestBurst.Should().Be(200_000);
+        options.RpcInboundBytesPerSecond.Should().Be(1_342_177_280);
+        options.RpcInboundByteBurst.Should().Be(256 * 1024 * 1024);
+        options.RequireTopicAuthorization.Should().BeTrue();
         options.ReservedServiceNames.Should().Contain(XFrameworkServiceNames.IdentityServer);
         options.ReservedServiceNamePrefixes.Should().Contain("XFramework.");
     }
@@ -143,7 +163,13 @@ public class BoltHubConfigurationTests
             ["BoltConfiguration:MaxMediaStreamsPerPrincipal"] = "3",
             ["BoltConfiguration:MaxSubscriptionsPerPrincipal"] = "44",
             ["BoltConfiguration:MaxDurableSubscribersPerTopic"] = "55",
+            ["BoltConfiguration:RpcRequestsPerSecond"] = "66",
+            ["BoltConfiguration:RpcRequestBurst"] = "77",
+            ["BoltConfiguration:RpcInboundBytesPerSecond"] = "8888",
+            ["BoltConfiguration:RpcInboundByteBurst"] = "9999",
+            ["BoltConfiguration:RequireTopicAuthorization"] = "false",
             ["BoltConfiguration:MaxConnectionLifetimeSeconds"] = "555",
+            ["BoltConfiguration:SendQueueByteCapacity"] = "123456",
             ["BoltConfiguration:RegistrationMigrationAllowances:0:AuthenticatedServiceName"] = "XFramework.Current",
             ["BoltConfiguration:RegistrationMigrationAllowances:0:ClientId"] = "legacy-id",
             ["BoltConfiguration:RegistrationMigrationAllowances:0:ClientName"] = "XFramework.Legacy",
@@ -168,7 +194,13 @@ public class BoltHubConfigurationTests
         options.MaxMediaStreamsPerPrincipal.Should().Be(3);
         options.MaxSubscriptionsPerPrincipal.Should().Be(44);
         options.MaxDurableSubscribersPerTopic.Should().Be(55);
+        options.RpcRequestsPerSecond.Should().Be(66);
+        options.RpcRequestBurst.Should().Be(77);
+        options.RpcInboundBytesPerSecond.Should().Be(8888);
+        options.RpcInboundByteBurst.Should().Be(9999);
+        options.RequireTopicAuthorization.Should().BeFalse();
         options.MaxConnectionLifetimeSeconds.Should().Be(555);
+        options.SendQueueByteCapacity.Should().Be(123456);
         options.RegistrationMigrationAllowances.Should().ContainSingle()
             .Which.ClientId.Should().Be("legacy-id");
     }

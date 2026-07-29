@@ -53,6 +53,7 @@ public class BoltPubSubIntegrationTests
     {
         await _app.StopAsync();
         await _app.DisposeAsync();
+        await _app.DisposeAsync();
     }
 
     private BoltClient CreateClient(string clientId, string clientName)

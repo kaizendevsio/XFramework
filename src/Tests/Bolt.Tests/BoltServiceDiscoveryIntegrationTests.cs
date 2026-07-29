@@ -42,6 +42,7 @@ public sealed class BoltServiceDiscoveryIntegrationTests
             options.UseInMemoryDatabase(_databaseName));
         builder.Services.AddBoltServer(options =>
             options.RegistrationIdentityBindingMode = BoltRegistrationIdentityBindingMode.Enforce);
+        builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         builder.Services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
         builder.Services.AddHostedService<BoltServiceDiscoveryHostedService>();
@@ -296,6 +297,37 @@ public sealed class BoltServiceDiscoveryIntegrationTests
     }
 
     [Test]
+    public async Task RetireStaleAsync_RemovesOnlyOfflineRecordsOlderThanRetention()
+    {
+        var manifestJson = JsonSerializer.Serialize(
+            CreateJuanBarangayManifest(),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using (var scope = _hubApp.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            db.AddRange(
+                CreateOfflineRecord("expired_offline", DateTime.UtcNow.AddDays(-31), manifestJson),
+                CreateOfflineRecord("retained_offline", DateTime.UtcNow.AddDays(-29), manifestJson));
+            await db.SaveChangesAsync();
+        }
+
+        using (var scope = _hubApp.Services.CreateScope())
+        {
+            var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
+            await registry.RetireStaleAsync(CancellationToken.None);
+        }
+
+        using (var scope = _hubApp.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            (await db.Set<BoltServiceManifestRecord>().AnyAsync(x => x.ClientId == "expired_offline"))
+                .Should().BeFalse();
+            (await db.Set<BoltServiceManifestRecord>().AnyAsync(x => x.ClientId == "retained_offline"))
+                .Should().BeTrue();
+        }
+    }
+
+    [Test]
     public async Task MultipleConnectionsForSameClient_DisconnectingOneKeepsServiceOnlineUntilFinalConnectionCloses()
     {
         var firstClient = CreateClient("pooled_client", "PooledService");
@@ -455,6 +487,27 @@ public sealed class BoltServiceDiscoveryIntegrationTests
 
     private static string Sha256Hex(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
+    private static BoltServiceManifestRecord CreateOfflineRecord(
+        string clientId,
+        DateTime lastSeenAt,
+        string manifestJson) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            ClientId = clientId,
+            ClientName = clientId,
+            ServiceName = clientId,
+            DisplayName = clientId,
+            Version = "1.0.0",
+            IsConnected = false,
+            ConnectionCount = 0,
+            LastSeenAt = lastSeenAt,
+            LastDisconnectedAt = lastSeenAt,
+            ManifestHash = clientId,
+            ManifestJson = manifestJson,
+            CreatedAt = lastSeenAt
+        };
 
     private static BoltServiceManifest CreateJuanBarangayManifest() =>
         new()

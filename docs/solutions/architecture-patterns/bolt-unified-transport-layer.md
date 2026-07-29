@@ -21,6 +21,23 @@ tags: [bolt, transport, quic, webtransport, websocket]
 
 Keep one Bolt wire protocol (`BoltCodec` with `senderHash`) behind `IBoltConnection`, while preserving the current WebSocket RPC path. QUIC and WebTransport can use the same codec and length-prefixed framing when their runtime endpoints are completed, but they are not the default RPC path today.
 
+## Current Trust Boundaries
+
+Bolt Hub owns transport authentication, registration identity binding, sender-hash provenance, routing, admission, and per-principal quotas. It does not decode RPC payloads or maintain a caller-to-command authorization matrix.
+
+Destination services own invocation and business authorization. Source-generated `[BoltHandler]` handlers validate the existing destination-audience service token in `RequestMetadata`, bind the validated caller to the Hub-verified sender hash, then apply optional required scopes and allowed callers. Authorization runs before FluentValidation, dependency resolution, and handler execution. Missing or invalid tokens return `401`; authenticated callers that fail sender, scope, or caller policy return `403`; unavailable signing-key validation infrastructure returns `503`.
+
+The request lifecycle is therefore:
+
+1. Hub authenticates and registers the transport identity.
+2. Hub structurally parses the frame, charges the authenticated principal limiter, verifies sender provenance, and routes without decoding the RPC payload. Admission precedes provenance rejection so spoofed or malformed traffic cannot bypass quotas.
+3. Destination generated handler validates the service token and sender binding.
+4. Destination applies optional service policy, request validation, and business logic.
+
+Manual protocol handlers are intentionally outside the generated-handler policy and must opt into the inbound request context when they need sender binding.
+
+Push is point-to-point only. An empty recipient is rejected by the .NET client and recipient hash zero is a route miss at the Hub. Authorized topic pub/sub is the fanout mechanism.
+
 ## Decision: One Codec Everywhere
 
 Standardize on `BoltCodec` (33-byte request header with `senderHash`) across all transports. The existing `BoltHubCodec` (29-byte header, no `senderHash`) is deleted. The 4-byte overhead per frame is negligible, and having one wire format simplifies hub routing — the hub forwards raw bytes regardless of transport.

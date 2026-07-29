@@ -15,17 +15,23 @@ namespace Bolt.Protocol;
 /// Response frame: [1:type] [16:requestId] [2:statusCode] [4:payloadLen] [payload]
 ///                 = 23 bytes header + N payload
 ///
-/// Register frame: [1:type] [4:clientIdLen] [clientId UTF-8] [4:clientNameLen] [clientName UTF-8]
+/// Register frame: [1:type] [2:wireVersion] [4:clientIdLen] [clientId UTF-8] [4:clientNameLen] [clientName UTF-8]
 ///
 /// All multi-byte values are little-endian.
 /// </summary>
 public static class BoltCodec
 {
+    public const ushort WireVersion = 2;
     public const int DefaultMaxFrameBytes = 8 * 1024 * 1024;
+    public const int MaxBatchFrames = 32;
+    public const int MaxBatchBytes = 256 * 1024;
+    public const int BatchHeaderSize = 1 + 4;
+    public const int RegisterAckSize = 1 + 1 + 2;
     private const int DefaultMaxStringBytes = 64 * 1024;
 
     public const int RequestHeaderSize = 1 + 16 + 4 + 4 + 4 + 4;   // 33 bytes (added senderHash)
     public const int ResponseHeaderSize = 1 + 16 + 2 + 4;       // 23 bytes
+    public const int RequestCancelSize = 1 + 16;
 
     // Media frame header sizes
     public const int MediaFrameHeaderSize = 1 + 16 + 4 + 4 + 1 + 4;     // 30 bytes
@@ -51,7 +57,7 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteRequest(IBufferWriter<byte> writer, Guid requestId, int recipientHash, int senderHash, int commandHash, ReadOnlySpan<byte> payload)
     {
-        var totalSize = RequestHeaderSize + payload.Length;
+        var totalSize = ValidateFrameSize((long)RequestHeaderSize + payload.Length);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Request;
@@ -72,7 +78,7 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteResponse(IBufferWriter<byte> writer, Guid requestId, HttpStatusCode statusCode, ReadOnlySpan<byte> payload)
     {
-        var totalSize = ResponseHeaderSize + payload.Length;
+        var totalSize = ValidateFrameSize((long)ResponseHeaderSize + payload.Length);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Response;
@@ -92,14 +98,17 @@ public static class BoltCodec
     {
         var idBytes = Encoding.UTF8.GetByteCount(clientId);
         var nameBytes = Encoding.UTF8.GetByteCount(clientName);
-        var totalSize = 1 + 4 + idBytes + 4 + nameBytes;
+        ValidateStringLength(idBytes, DefaultMaxStringBytes, nameof(clientId), allowEmpty: false);
+        ValidateStringLength(nameBytes, DefaultMaxStringBytes, nameof(clientName), allowEmpty: false);
+        var totalSize = ValidateFrameSize(11L + idBytes + nameBytes);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Register;
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(1), idBytes);
-        Encoding.UTF8.GetBytes(clientId, span.Slice(5));
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(5 + idBytes), nameBytes);
-        Encoding.UTF8.GetBytes(clientName, span.Slice(9 + idBytes));
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(1), WireVersion);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(3), idBytes);
+        Encoding.UTF8.GetBytes(clientId, span.Slice(7));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(7 + idBytes), nameBytes);
+        Encoding.UTF8.GetBytes(clientName, span.Slice(11 + idBytes));
 
         writer.Advance(totalSize);
         return totalSize;
@@ -110,11 +119,89 @@ public static class BoltCodec
     /// </summary>
     public static int WriteRegisterAck(IBufferWriter<byte> writer, bool success)
     {
-        var span = writer.GetSpan(2);
+        var span = writer.GetSpan(RegisterAckSize);
         span[0] = (byte)FrameType.RegisterAck;
         span[1] = success ? (byte)1 : (byte)0;
-        writer.Advance(2);
-        return 2;
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(2), WireVersion);
+        writer.Advance(RegisterAckSize);
+        return RegisterAckSize;
+    }
+
+    public static int WriteBatch(
+        IBufferWriter<byte> writer,
+        IReadOnlyList<ReadOnlyMemory<byte>> frames)
+    {
+        ArgumentNullException.ThrowIfNull(frames);
+        if (frames.Count is < 2 or > MaxBatchFrames)
+            throw new ArgumentOutOfRangeException(nameof(frames), $"Bolt batches require 2 to {MaxBatchFrames} frames.");
+
+        long totalSize = BatchHeaderSize;
+        for (var i = 0; i < frames.Count; i++)
+        {
+            var frame = frames[i];
+            if (!IsValidBatchInnerFrame(frame.Span))
+                throw new ArgumentException("Bolt batches cannot contain empty, registration, nested batch, or media frames.", nameof(frames));
+            totalSize += 4L + frame.Length;
+        }
+
+        if (totalSize > MaxBatchBytes)
+            throw new ArgumentOutOfRangeException(nameof(frames), $"Bolt batches cannot exceed {MaxBatchBytes} bytes.");
+
+        var size = (int)totalSize;
+        var destination = writer.GetSpan(size);
+        destination[0] = (byte)FrameType.Batch;
+        BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(1), frames.Count);
+        var offset = BatchHeaderSize;
+        for (var i = 0; i < frames.Count; i++)
+        {
+            var frame = frames[i];
+            BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(offset), frame.Length);
+            offset += 4;
+            frame.Span.CopyTo(destination.Slice(offset));
+            offset += frame.Length;
+        }
+
+        writer.Advance(size);
+        return size;
+    }
+
+    public static int WriteBatch<T>(
+        IBufferWriter<byte> writer,
+        ReadOnlySpan<T> frames,
+        Func<T, ReadOnlyMemory<byte>> getFrame)
+    {
+        ArgumentNullException.ThrowIfNull(getFrame);
+        if (frames.Length is < 2 or > MaxBatchFrames)
+            throw new ArgumentOutOfRangeException(nameof(frames), $"Bolt batches require 2 to {MaxBatchFrames} frames.");
+
+        long totalSize = BatchHeaderSize;
+        for (var i = 0; i < frames.Length; i++)
+        {
+            var frame = getFrame(frames[i]);
+            if (!IsValidBatchInnerFrame(frame.Span))
+                throw new ArgumentException("Bolt batches cannot contain empty, registration, nested batch, or media frames.", nameof(frames));
+            totalSize += 4L + frame.Length;
+        }
+
+        if (totalSize > MaxBatchBytes)
+            throw new ArgumentOutOfRangeException(nameof(frames), $"Bolt batches cannot exceed {MaxBatchBytes} bytes.");
+
+        var size = (int)totalSize;
+        var destination = writer.GetSpan(size);
+        destination[0] = (byte)FrameType.Batch;
+        BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(1), frames.Length);
+        var offset = BatchHeaderSize;
+        for (var i = 0; i < frames.Length; i++)
+        {
+            var frame = getFrame(frames[i]);
+            BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(offset), frame.Length);
+            offset += 4;
+            frame.Span.CopyTo(destination.Slice(offset));
+            offset += frame.Length;
+        }
+
+        writer.Advance(size);
+        return size;
     }
 
     /// <summary>
@@ -123,7 +210,7 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WritePush(IBufferWriter<byte> writer, Guid requestId, int recipientHash, int senderHash, int commandHash, ReadOnlySpan<byte> payload)
     {
-        var totalSize = RequestHeaderSize + payload.Length;
+        var totalSize = ValidateFrameSize((long)RequestHeaderSize + payload.Length);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Push;
@@ -154,7 +241,8 @@ public static class BoltCodec
         var topicBytes = Encoding.UTF8.GetByteCount(topic);
         var idBytes = Encoding.UTF8.GetByteCount(subscriberId);
         var tokenBytes = Encoding.UTF8.GetByteCount(actorAccessToken);
-        var totalSize = 1 + 4 + 1 + 4 + idBytes + 4 + topicBytes + 4 + tokenBytes;
+        ValidatePubSubStrings(topicBytes, idBytes, tokenBytes);
+        var totalSize = ValidateFrameSize(18L + idBytes + topicBytes + tokenBytes);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Subscribe;
@@ -187,7 +275,8 @@ public static class BoltCodec
         var topicBytes = Encoding.UTF8.GetByteCount(topic);
         var idBytes = Encoding.UTF8.GetByteCount(subscriberId);
         var tokenBytes = Encoding.UTF8.GetByteCount(actorAccessToken);
-        var totalSize = 1 + 4 + 4 + topicBytes + 4 + idBytes + 1 + 4 + tokenBytes;
+        ValidatePubSubStrings(topicBytes, idBytes, tokenBytes);
+        var totalSize = ValidateFrameSize(18L + topicBytes + idBytes + tokenBytes);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Unsubscribe;
@@ -211,7 +300,8 @@ public static class BoltCodec
     public static int WritePublish(IBufferWriter<byte> writer, string topic, bool durableEligible, ReadOnlySpan<byte> payload)
     {
         var topicBytes = Encoding.UTF8.GetByteCount(topic);
-        var totalSize = PublishHeaderSize + topicBytes + payload.Length;
+        ValidateStringLength(topicBytes, 4096, nameof(topic), allowEmpty: false);
+        var totalSize = ValidateFrameSize((long)PublishHeaderSize + topicBytes + payload.Length);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Publish;
@@ -247,7 +337,8 @@ public static class BoltCodec
     {
         subscriberId ??= string.Empty;
         var idBytes = Encoding.UTF8.GetByteCount(subscriberId);
-        var totalSize = EventHeaderSize + idBytes + payload.Length;
+        ValidateStringLength(idBytes, 4096, nameof(subscriberId), allowEmpty: true);
+        var totalSize = ValidateFrameSize((long)EventHeaderSize + idBytes + payload.Length);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Event;
@@ -279,7 +370,8 @@ public static class BoltCodec
         var topicBytes = Encoding.UTF8.GetByteCount(topic);
         var idBytes = Encoding.UTF8.GetByteCount(subscriberId);
         var tokenBytes = Encoding.UTF8.GetByteCount(actorAccessToken);
-        var totalSize = 1 + 4 + 4 + topicBytes + 4 + idBytes + 8 + 4 + tokenBytes;
+        ValidatePubSubStrings(topicBytes, idBytes, tokenBytes);
+        var totalSize = ValidateFrameSize(25L + topicBytes + idBytes + tokenBytes);
         var span = writer.GetSpan(totalSize);
 
         span[0] = (byte)FrameType.Ack;
@@ -323,7 +415,7 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteStreamData(IBufferWriter<byte> writer, Guid streamId, ReadOnlySpan<byte> payload)
     {
-        var totalSize = StreamDataHeaderSize + payload.Length;
+        var totalSize = ValidateFrameSize((long)StreamDataHeaderSize + payload.Length);
         var span = writer.GetSpan(totalSize);
         span[0] = (byte)FrameType.StreamData;
         WriteGuid(span.Slice(1), streamId);
@@ -352,7 +444,7 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteMediaFrame(IBufferWriter<byte> writer, Guid streamId, uint sequenceNumber, uint timestamp, byte flags, ReadOnlySpan<byte> payload)
     {
-        var totalSize = MediaFrameHeaderSize + payload.Length;
+        var totalSize = ValidateFrameSize((long)MediaFrameHeaderSize + payload.Length);
         var span = writer.GetSpan(totalSize);
         span[0] = (byte)FrameType.MediaFrame;
         WriteGuid(span.Slice(1), streamId);
@@ -368,7 +460,7 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteMediaConfig(IBufferWriter<byte> writer, Guid streamId, Guid callId, MediaType mediaType, CodecId codecId, int param1, int param2, int bitrateKbps, byte flags, ReadOnlySpan<byte> extension)
     {
-        var totalSize = MediaConfigHeaderSize + extension.Length;
+        var totalSize = ValidateFrameSize((long)MediaConfigHeaderSize + extension.Length);
         var span = writer.GetSpan(totalSize);
         span[0] = (byte)FrameType.MediaConfig;
         WriteGuid(span.Slice(1), streamId);
@@ -413,7 +505,7 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteCallSignal(IBufferWriter<byte> writer, Guid callId, SignalType signalType, ReadOnlySpan<byte> payload)
     {
-        var totalSize = CallSignalHeaderSize + payload.Length;
+        var totalSize = ValidateFrameSize((long)CallSignalHeaderSize + payload.Length);
         var span = writer.GetSpan(totalSize);
         span[0] = (byte)FrameType.CallSignal;
         WriteGuid(span.Slice(1), callId);
@@ -427,7 +519,7 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteFecFrame(IBufferWriter<byte> writer, Guid streamId, uint fecGroupStart, byte fecGroupSize, ReadOnlySpan<byte> payload)
     {
-        var totalSize = FecFrameHeaderSize + payload.Length;
+        var totalSize = ValidateFrameSize((long)FecFrameHeaderSize + payload.Length);
         var span = writer.GetSpan(totalSize);
         span[0] = (byte)FrameType.FecFrame;
         WriteGuid(span.Slice(1), streamId);
@@ -442,7 +534,9 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int WriteNackRequest(IBufferWriter<byte> writer, Guid streamId, ReadOnlySpan<uint> missingSequences)
     {
-        var totalSize = NackRequestHeaderSize + missingSequences.Length * 4;
+        if (missingSequences.Length > ushort.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(missingSequences), "A NACK frame cannot contain more than 65535 sequence numbers.");
+        var totalSize = ValidateFrameSize((long)NackRequestHeaderSize + missingSequences.Length * 4L);
         var span = writer.GetSpan(totalSize);
         span[0] = (byte)FrameType.NackRequest;
         WriteGuid(span.Slice(1), streamId);
@@ -451,6 +545,16 @@ public static class BoltCodec
             BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(19 + i * 4), missingSequences[i]);
         writer.Advance(totalSize);
         return totalSize;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteRequestCancel(IBufferWriter<byte> writer, Guid requestId)
+    {
+        var span = writer.GetSpan(RequestCancelSize);
+        span[0] = (byte)FrameType.RequestCancel;
+        WriteGuid(span.Slice(1), requestId);
+        writer.Advance(RequestCancelSize);
+        return RequestCancelSize;
     }
 
     #endregion
@@ -479,6 +583,26 @@ public static class BoltCodec
         }
 
         return totalSize <= DefaultMaxFrameBytes;
+    }
+
+    private static int ValidateFrameSize(long totalSize)
+    {
+        if (totalSize is < 0 or > DefaultMaxFrameBytes)
+            throw new ArgumentOutOfRangeException(nameof(totalSize), $"Bolt frames cannot exceed {DefaultMaxFrameBytes} bytes.");
+        return (int)totalSize;
+    }
+
+    private static void ValidateStringLength(int byteLength, int maximum, string parameterName, bool allowEmpty)
+    {
+        if ((!allowEmpty && byteLength == 0) || byteLength < 0 || byteLength > maximum)
+            throw new ArgumentOutOfRangeException(parameterName, $"UTF-8 length must be between {(allowEmpty ? 0 : 1)} and {maximum} bytes.");
+    }
+
+    private static void ValidatePubSubStrings(int topicBytes, int subscriberIdBytes, int tokenBytes)
+    {
+        ValidateStringLength(topicBytes, 4096, "topic", allowEmpty: false);
+        ValidateStringLength(subscriberIdBytes, 4096, "subscriberId", allowEmpty: true);
+        ValidateStringLength(tokenBytes, 8192, "actorAccessToken", allowEmpty: true);
     }
 
     /// <summary>
@@ -530,6 +654,16 @@ public static class BoltCodec
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadRequestCancel(ReadOnlySpan<byte> buffer, out Guid requestId)
+    {
+        requestId = default;
+        if (buffer.Length != RequestCancelSize || buffer[0] != (byte)FrameType.RequestCancel)
+            return false;
+        requestId = ReadGuid(buffer.Slice(1));
+        return true;
+    }
+
     /// <summary>
     /// Read only the response header to extract RequestId for routing.
     /// </summary>
@@ -577,27 +711,146 @@ public static class BoltCodec
     /// <summary>
     /// Try to read a register frame.
     /// </summary>
-    public static bool TryReadRegister(ReadOnlySpan<byte> buffer, out string clientId, out string clientName, out int bytesConsumed)
+    public static bool TryReadRegister(
+        ReadOnlySpan<byte> buffer,
+        out ushort wireVersion,
+        out string clientId,
+        out string clientName,
+        out int bytesConsumed)
     {
+        wireVersion = 0;
         clientId = "";
         clientName = "";
         bytesConsumed = 0;
 
-        if (buffer.Length < 9) return false; // 1 + 4 + at least 4
+        if (buffer.Length < 11 || buffer[0] != (byte)FrameType.Register) return false;
 
-        var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(1));
+        wireVersion = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(1));
+        var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(3));
         if (idLen < 0 || idLen > DefaultMaxStringBytes) return false;
-        if (!TryAddLength(9, idLen, out var minimumRegisterSize) || buffer.Length < minimumRegisterSize) return false;
+        if (!TryAddLength(11, idLen, out var minimumRegisterSize) || buffer.Length < minimumRegisterSize) return false;
 
-        var nameLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(5 + idLen));
+        var nameLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(7 + idLen));
         if (nameLen < 0 || nameLen > DefaultMaxStringBytes) return false;
-        if (!TryAddLength(9 + idLen, nameLen, out var totalSize)) return false;
+        if (!TryAddLength(11 + idLen, nameLen, out var totalSize)) return false;
         if (buffer.Length < totalSize) return false;
 
-        clientId = Encoding.UTF8.GetString(buffer.Slice(5, idLen));
-        clientName = Encoding.UTF8.GetString(buffer.Slice(9 + idLen, nameLen));
+        clientId = Encoding.UTF8.GetString(buffer.Slice(7, idLen));
+        clientName = Encoding.UTF8.GetString(buffer.Slice(11 + idLen, nameLen));
         bytesConsumed = totalSize;
         return true;
+    }
+
+    public static bool TryReadRegister(
+        ReadOnlySpan<byte> buffer,
+        out string clientId,
+        out string clientName,
+        out int bytesConsumed) =>
+        TryReadRegister(buffer, out _, out clientId, out clientName, out bytesConsumed);
+
+    public static bool TryReadRegisterAck(
+        ReadOnlySpan<byte> buffer,
+        out bool success,
+        out ushort wireVersion)
+    {
+        success = false;
+        wireVersion = 0;
+        if (buffer.Length != RegisterAckSize || buffer[0] != (byte)FrameType.RegisterAck)
+            return false;
+
+        success = buffer[1] == 1;
+        wireVersion = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(2));
+        return buffer[1] is 0 or 1;
+    }
+
+    public static bool TryReadBatch(ReadOnlySpan<byte> buffer, out BoltBatchFrame batch)
+    {
+        batch = default;
+        if (buffer.Length is < BatchHeaderSize or > MaxBatchBytes || buffer[0] != (byte)FrameType.Batch)
+            return false;
+
+        var count = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(1));
+        if (count is < 2 or > MaxBatchFrames)
+            return false;
+
+        var offset = BatchHeaderSize;
+        for (var i = 0; i < count; i++)
+        {
+            if (offset > buffer.Length - 4)
+                return false;
+
+            var length = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset));
+            offset += 4;
+            if (length <= 0 || offset > buffer.Length - length)
+                return false;
+            var innerFrame = buffer.Slice(offset, length);
+            if (!IsValidBatchInnerFrame(innerFrame))
+                return false;
+
+            offset += length;
+        }
+
+        if (offset != buffer.Length)
+            return false;
+
+        batch = new BoltBatchFrame(buffer.Slice(BatchHeaderSize), count);
+        return true;
+    }
+
+    public static bool IsBatchableFrameType(FrameType frameType) => frameType is
+        FrameType.Request or
+        FrameType.Response or
+        FrameType.Push or
+        FrameType.Subscribe or
+        FrameType.Unsubscribe or
+        FrameType.Publish or
+        FrameType.Event or
+        FrameType.Ack or
+        FrameType.RequestCancel or
+        FrameType.StreamOpen or
+        FrameType.StreamData or
+        FrameType.StreamClose;
+
+    public static bool IsValidBatchInnerFrame(ReadOnlySpan<byte> frame) =>
+        !frame.IsEmpty &&
+        IsBatchableFrameType((FrameType)frame[0]) &&
+        IsCompleteBatchInnerFrame(frame);
+
+    private static bool IsCompleteBatchInnerFrame(ReadOnlySpan<byte> frame)
+    {
+        switch ((FrameType)frame[0])
+        {
+            case FrameType.Request:
+            case FrameType.Push:
+                return TryReadRequest(frame, out _, out var requestSize) && requestSize == frame.Length;
+            case FrameType.Response:
+                return TryReadResponse(frame, out _, out var responseSize) && responseSize == frame.Length;
+            case FrameType.Subscribe:
+                return TryReadSubscribe(frame, out _, out _, out _, out _, out _, out var subscribeSize) &&
+                       subscribeSize == frame.Length;
+            case FrameType.Unsubscribe:
+                return TryReadUnsubscribe(frame, out _, out _, out _, out _, out _, out var unsubscribeSize) &&
+                       unsubscribeSize == frame.Length;
+            case FrameType.Publish:
+                return TryReadPublish(frame, out _, out _, out _, out _, out _, out var publishSize) &&
+                       publishSize == frame.Length;
+            case FrameType.Event:
+                return TryReadEvent(frame, out _, out _, out _, out _, out _, out _, out var eventSize) &&
+                       eventSize == frame.Length;
+            case FrameType.Ack:
+                return TryReadAck(frame, out _, out _, out _, out _, out var ackSize) && ackSize == frame.Length;
+            case FrameType.RequestCancel:
+                return TryReadRequestCancel(frame, out _);
+            case FrameType.StreamOpen:
+                return frame.Length == StreamOpenHeaderSize && TryReadStreamOpen(frame, out _, out _, out _);
+            case FrameType.StreamData:
+                return TryReadStreamData(frame, out _, out _, out _, out var streamDataSize) &&
+                       streamDataSize == frame.Length;
+            case FrameType.StreamClose:
+                return frame.Length == StreamCloseSize && TryReadStreamClose(frame, out _, out _);
+            default:
+                return false;
+        }
     }
 
     // ── Stream frame decoding ──

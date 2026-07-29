@@ -13,13 +13,15 @@ using Grpc.Net.Client;
 using MemoryPack;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using Perfolizer.Horology;
 
 namespace Bolt.Tests;
 
 /// <summary>
-/// Standalone transport comparison: Bolt Hub, Bolt Direct, gRPC (with hub), SignalR (with hub).
-/// All transports return a simple "Hello {name}" string.
-/// No XFramework dependencies — pure protocol benchmark.
+/// Standalone in-process transport comparison with direct and Hub paths reported separately.
+/// All paths return and validate a simple "Hello {name}" string. Concurrent cases measure
+/// completion time for the full batch, not request-level latency percentiles.
+/// No XFramework dependencies.
 /// </summary>
 [Config(typeof(BoltBenchConfig))]
 [MemoryDiagnoser]
@@ -79,7 +81,21 @@ public class BoltBenchmarks
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://localhost:18100");
-        builder.Services.AddSingleton<BoltServer>();
+        builder.Services.AddBoltServer(options =>
+        {
+            if (string.Equals(
+                    Environment.GetEnvironmentVariable("BOLT_BENCH_RATE_LIMITS"),
+                    "0",
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            options.RpcRequestsPerSecond = 800_000;
+            options.RpcRequestBurst = 200_000;
+            options.RpcInboundBytesPerSecond = 1_342_177_280;
+            options.RpcInboundByteBurst = 256 * 1024 * 1024;
+        });
         builder.Logging.SetMinimumLevel(LogLevel.Error);
         _boltHubApp = builder.Build();
         _boltHubApp.UseWebSockets();
@@ -89,8 +105,8 @@ public class BoltBenchmarks
         await WaitForHealth("http://localhost:18100/health");
 
         var lf = _boltHubApp.Services.GetRequiredService<ILoggerFactory>();
-        // Multiple connections for both caller and service — hub round-robins across them
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 4, MaxConnections = 8, ScaleUpThreshold = 16 };
+        // Match the single gRPC caller channel used by this benchmark.
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 1, MaxConnections = 1 };
 
         _boltHubService = new BoltClient(new Uri("ws://localhost:18100/bolt"),
             "bolt_service", "BoltService", opts, lf.CreateLogger<BoltClient>());
@@ -118,7 +134,7 @@ public class BoltBenchmarks
 
         var lf = _boltDirectApp.Services.GetRequiredService<ILoggerFactory>();
         _boltDirectClient = new BoltClient(new Uri("ws://localhost:18200/bolt"),
-            "direct_caller", "DirectCaller", new BoltClientOptions { RpcTimeoutSeconds = 30 },
+            "direct_caller", "DirectCaller", new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 1, MaxConnections = 1 },
             lf.CreateLogger<BoltClient>());
         await _boltDirectClient.ConnectAsync();
     }
@@ -241,28 +257,44 @@ public class BoltBenchmarks
     private async Task BoltHubCall()
     {
         var payload = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
-        await _boltHubCaller.InvokeAsync("bolt_service", "hello", payload);
+        ValidateBoltHello(await _boltHubCaller.InvokeAsync("bolt_service", "hello", payload));
     }
 
     private async Task BoltDirectCall()
     {
         var payload = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
-        await _boltDirectClient.InvokeAsync("_", "hello", payload);
+        ValidateBoltHello(await _boltDirectClient.InvokeAsync("_", "hello", payload));
     }
 
     private async Task GrpcCall()
     {
-        await _grpcClient.SayHelloAsync(new HelloRequest { Name = "World" });
+        ValidateGrpcHello(await _grpcClient.SayHelloAsync(new HelloRequest { Name = "World" }));
     }
 
     private async Task GrpcDirectCall()
     {
-        await _grpcDirectClient.SayHelloAsync(new HelloRequest { Name = "World" });
+        ValidateGrpcHello(await _grpcDirectClient.SayHelloAsync(new HelloRequest { Name = "World" }));
     }
 
     private async Task SignalRCall()
     {
-        await _signalRCaller.InvokeAsync<string>("SayHello", "World");
+        ValidateHelloText(await _signalRCaller.InvokeAsync<string>("SayHello", "World"));
+    }
+
+    private static void ValidateBoltHello((HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload) response)
+    {
+        if (response.StatusCode != HttpStatusCode.OK)
+            throw new InvalidOperationException($"Bolt returned {response.StatusCode}.");
+
+        ValidateHelloText(MemoryPackSerializer.Deserialize<HelloMsg>(response.Payload.Span)?.Text);
+    }
+
+    private static void ValidateGrpcHello(HelloReply response) => ValidateHelloText(response.Message);
+
+    private static void ValidateHelloText(string? value)
+    {
+        if (value != "Hello World")
+            throw new InvalidOperationException($"Unexpected benchmark response: '{value}'.");
     }
 
     #endregion
@@ -385,9 +417,8 @@ public class HelloRouterHub : Microsoft.AspNetCore.SignalR.Hub
 // ── Max Throughput Benchmark ──
 
 /// <summary>
-/// Fires a batch of 100 requests at max parallelism via Task.WhenAll.
-/// OperationsPerInvoke=100 gives BenchmarkDotNet the per-op latency.
-/// Tests peak ops/sec each transport can sustain.
+/// Fires a validated batch of 100 requests via Task.WhenAll. OperationsPerInvoke
+/// normalizes throughput; it does not turn batch duration into request-level latency.
 /// </summary>
 [Config(typeof(BoltBenchConfig))]
 [MemoryDiagnoser]
@@ -427,7 +458,7 @@ public class BoltThroughputBenchmarks
         await WaitForHealth("http://localhost:18500/health");
 
         var lf = _boltHubApp.Services.GetRequiredService<ILoggerFactory>();
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60, MinConnections = 4, MaxConnections = 8, ScaleUpThreshold = 16 };
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60, MinConnections = 1, MaxConnections = 1 };
         _boltHubService = new BoltClient(new Uri("ws://localhost:18500/bolt"),
             "tp_service", "TpService", opts, lf.CreateLogger<BoltClient>());
         _boltHubService.RegisterHandler("hello", HelloHandler);
@@ -547,6 +578,26 @@ public class BoltThroughputBenchmarks
         return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(resp)));
     }
 
+    private static async Task ValidateBoltHello(Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Payload)> pending)
+    {
+        var response = await pending;
+        if (response.StatusCode != HttpStatusCode.OK ||
+            MemoryPackSerializer.Deserialize<HelloMsg>(response.Payload.Span)?.Text != "Hello World")
+            throw new InvalidOperationException("Bolt returned an invalid benchmark response.");
+    }
+
+    private static async Task ValidateGrpcHello(Task<HelloReply> pending)
+    {
+        if ((await pending).Message != "Hello World")
+            throw new InvalidOperationException("gRPC returned an invalid benchmark response.");
+    }
+
+    private static async Task ValidateSignalRHello(Task<string> pending)
+    {
+        if (await pending != "Hello World")
+            throw new InvalidOperationException("SignalR returned an invalid benchmark response.");
+    }
+
     [Benchmark(OperationsPerInvoke = Batch)]
     public async Task Bolt_Hub_Throughput()
     {
@@ -554,7 +605,7 @@ public class BoltThroughputBenchmarks
         for (int i = 0; i < Batch; i++)
         {
             var p = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
-            tasks[i] = _boltHubCaller.InvokeAsync("tp_service", "hello", p);
+            tasks[i] = ValidateBoltHello(_boltHubCaller.InvokeAsync("tp_service", "hello", p));
         }
         await Task.WhenAll(tasks);
     }
@@ -566,7 +617,7 @@ public class BoltThroughputBenchmarks
         for (int i = 0; i < Batch; i++)
         {
             var p = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
-            tasks[i] = _boltDirectClient.InvokeAsync("_", "hello", p);
+            tasks[i] = ValidateBoltHello(_boltDirectClient.InvokeAsync("_", "hello", p));
         }
         await Task.WhenAll(tasks);
     }
@@ -576,7 +627,7 @@ public class BoltThroughputBenchmarks
     {
         var tasks = new Task[Batch];
         for (int i = 0; i < Batch; i++)
-            tasks[i] = _grpcClient.SayHelloAsync(new HelloRequest { Name = "World" }).ResponseAsync;
+            tasks[i] = ValidateGrpcHello(_grpcClient.SayHelloAsync(new HelloRequest { Name = "World" }).ResponseAsync);
         await Task.WhenAll(tasks);
     }
 
@@ -585,7 +636,7 @@ public class BoltThroughputBenchmarks
     {
         var tasks = new Task[Batch];
         for (int i = 0; i < Batch; i++)
-            tasks[i] = _grpcDirectClient.SayHelloAsync(new HelloRequest { Name = "World" }).ResponseAsync;
+            tasks[i] = ValidateGrpcHello(_grpcDirectClient.SayHelloAsync(new HelloRequest { Name = "World" }).ResponseAsync);
         await Task.WhenAll(tasks);
     }
 
@@ -594,7 +645,7 @@ public class BoltThroughputBenchmarks
     {
         var tasks = new Task[Batch];
         for (int i = 0; i < Batch; i++)
-            tasks[i] = _signalRCaller.InvokeAsync<string>("SayHello", "World");
+            tasks[i] = ValidateSignalRHello(_signalRCaller.InvokeAsync<string>("SayHello", "World"));
         await Task.WhenAll(tasks);
     }
 
@@ -631,11 +682,15 @@ public class BoltThroughputBenchmarks
 
 // ── Config ──
 
-file class BoltBenchConfig : ManualConfig
+public class BoltBenchConfig : ManualConfig
 {
     public BoltBenchConfig()
     {
-        AddJob(Job.ShortRun.WithWarmupCount(3).WithIterationCount(10));
+        AddJob(Job.Default
+            .WithLaunchCount(3)
+            .WithWarmupCount(5)
+            .WithIterationCount(15)
+            .WithMinIterationTime(TimeInterval.FromMilliseconds(250)));
         AddColumn(StatisticColumn.P95);
         AddColumn(new BoltOpsPerSecColumn());
     }

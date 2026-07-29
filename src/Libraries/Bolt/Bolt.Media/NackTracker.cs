@@ -27,9 +27,6 @@ public sealed class NackTracker : IAsyncDisposable
     /// <summary>Max sequence numbers per single NackRequest frame.</summary>
     private const int MaxNacksPerRequest = 64;
 
-    /// <summary>How long to wait before sending NACK (allow reordering/FEC).</summary>
-    private const int NackDelayMs = 30;
-
     /// <summary>How often to check for gaps and send NACKs.</summary>
     private const int NackIntervalMs = 50;
 
@@ -67,20 +64,20 @@ public sealed class NackTracker : IAsyncDisposable
                 return;
             }
 
-            if (seq > _highestReceived)
+            if (MediaSequence.IsNewer(seq, _highestReceived))
             {
-                // Detect gap: any sequence between _highestReceived+1 and seq-1 is missing
-                for (var missing = _highestReceived + 1; missing < seq && missing > _highestReceived; missing++)
+                var distance = MediaSequence.ForwardDistance(_highestReceived, seq);
+                if (distance <= MaxNackAge + 1)
                 {
-                    _missingSeqs.Add(missing);
+                    for (uint offset = 1; offset < distance; offset++)
+                        _missingSeqs.Add(unchecked(_highestReceived + offset));
                 }
+
                 _highestReceived = seq;
             }
 
-            // Prune old missing entries
-            var cutoff = _highestReceived > MaxNackAge ? _highestReceived - MaxNackAge : 0;
-            _missingSeqs.RemoveWhere(s => s < cutoff);
-            _nackedSeqs.RemoveWhere(s => s < cutoff);
+            _missingSeqs.RemoveWhere(s => MediaSequence.IsOlderThan(s, _highestReceived, MaxNackAge));
+            _nackedSeqs.RemoveWhere(s => MediaSequence.IsOlderThan(s, _highestReceived, MaxNackAge));
         }
     }
 
@@ -121,7 +118,9 @@ public sealed class NackTracker : IAsyncDisposable
 
                 if (pending.Count == 0) continue;
 
-                pending.Sort();
+                pending.Sort((left, right) =>
+                    MediaSequence.ForwardDistance(right, _highestReceived)
+                        .CompareTo(MediaSequence.ForwardDistance(left, _highestReceived)));
                 toNack = pending.Count > MaxNacksPerRequest
                     ? pending.GetRange(0, MaxNacksPerRequest).ToArray()
                     : pending.ToArray();
@@ -135,7 +134,6 @@ public sealed class NackTracker : IAsyncDisposable
                 var writer = RentedBufferWriter.GetThreadLocal();
                 BoltCodec.WriteNackRequest(writer, _streamId, toNack);
                 await _connection.SendAsync(writer.WrittenMemory, ct);
-                writer.Reset();
             }
             catch (OperationCanceledException) { break; }
             catch { /* Connection closing */ }

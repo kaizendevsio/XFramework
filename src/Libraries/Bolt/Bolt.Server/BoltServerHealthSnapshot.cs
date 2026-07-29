@@ -31,6 +31,10 @@ public sealed record BoltServerHealthSnapshot(
     int MaximumLogicalStreamsForOnePrincipal,
     int MaximumMediaStreamsForOnePrincipal,
     int MaximumSubscriptionsForOnePrincipal,
+    int ActiveRateLimitPrincipals,
+    long RequestRateLimitRejections,
+    long ByteRateLimitRejections,
+    long PushRateLimitRejections,
     bool IsDisposed,
     BoltServerHealthBounds ConfiguredBounds);
 
@@ -50,4 +54,9 @@ public sealed record BoltServerHealthBounds(
     int MaximumMediaStreamsPerPrincipal,
     int MaximumSubscriptionsPerPrincipal,
     int MaximumDurableSubscribersPerTopic,
+    int RpcRequestsPerSecond,
+    int RpcRequestBurst,
+    int RpcInboundBytesPerSecond,
+    int RpcInboundByteBurst,
+    bool RequireTopicAuthorization,
     bool MediaEnabled);

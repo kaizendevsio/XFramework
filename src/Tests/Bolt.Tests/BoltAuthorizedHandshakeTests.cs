@@ -36,6 +36,7 @@ public sealed class BoltAuthorizedHandshakeTests
     {
         try { await _app.StopAsync(); } catch { }
         try { await _app.DisposeAsync(); } catch { }
+        try { await _app.DisposeAsync(); } catch { }
     }
 
     [Test]
@@ -269,6 +270,7 @@ public sealed class BoltAuthorizedHandshakeTests
     private async Task RestartServerAsync(BoltRegistrationIdentityBindingMode bindingMode)
     {
         try { await _app.StopAsync(); } catch { }
+        try { await _app.DisposeAsync(); } catch { }
         try { await _app.DisposeAsync(); } catch { }
         await StartServerAsync(bindingMode);
     }

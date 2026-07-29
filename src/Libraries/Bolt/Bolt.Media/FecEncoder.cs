@@ -4,13 +4,23 @@ public record FecResult(uint GroupStartSequence, byte GroupSize, byte[] ParityDa
 
 public sealed class FecEncoder
 {
+    public const int MaximumGroupSize = 32;
+
     private readonly int _groupSize;
     private readonly List<(uint Seq, byte[] Data)> _frames = new();
 
-    public FecEncoder(int groupSize = 4) => _groupSize = groupSize;
+    public FecEncoder(int groupSize = 4)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(groupSize, 2);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(groupSize, MaximumGroupSize);
+        _groupSize = groupSize;
+    }
 
     public FecResult? AddFrame(uint sequenceNumber, ReadOnlyMemory<byte> data)
     {
+        if (_frames.Count > 0 && sequenceNumber != unchecked(_frames[^1].Seq + 1))
+            _frames.Clear();
+
         _frames.Add((sequenceNumber, data.ToArray()));
         if (_frames.Count < _groupSize) return null;
 

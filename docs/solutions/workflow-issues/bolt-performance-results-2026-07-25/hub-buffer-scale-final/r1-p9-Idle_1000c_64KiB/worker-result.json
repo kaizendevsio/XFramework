@@ -1,0 +1,30 @@
+{
+  "Repetition": 1,
+  "Position": 9,
+  "ProcessId": 28400,
+  "Clients": 1000,
+  "HubReceiveBufferBytes": 65536,
+  "Workload": "Idle",
+  "PayloadBytes": 1024,
+  "Requests": 0,
+  "Concurrency": 1000,
+  "WarmupRequests": 1000,
+  "ElapsedMilliseconds": 5006.8914,
+  "ThroughputRequestsPerSecond": 0,
+  "Latency": null,
+  "CpuMilliseconds": 875,
+  "Gen2Collections": 0,
+  "BaselineWorkingSetBytes": 157782016,
+  "PeakWorkingSetBytes": 162193408,
+  "PeakWorkingSetDeltaBytes": 4411392,
+  "BaselineManagedHeapBytes": 186012160,
+  "PeakManagedHeapBytes": 187056896,
+  "PeakManagedHeapDeltaBytes": 1044736,
+  "CoordinatedOmissionLimitation": null,
+  "EffectiveSettings": {
+    "connectedClients": 1000,
+    "hubReceiveBufferBytes": 65536,
+    "callerConnectionsPerClient": 1,
+    "runRpcContinuationsAsynchronously": false
+  }
+}

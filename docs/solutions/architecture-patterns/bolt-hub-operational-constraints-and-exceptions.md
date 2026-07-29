@@ -33,6 +33,12 @@ Required future work before horizontal scaling:
 
 This exception is allowed only for Communications topic authorization and only for read-only checks. The authorizer must not mutate Identity or Communications data, must filter by tenant and enabled/deleted flags, and must keep the topic contract in sync with the Communications module.
 
+## Required Production Wiring
+
+XFramework Bolt Hub sets `BoltConfiguration:RequireTopicAuthorization` to `true`. Resolving `BoltServer` fails at startup when that option is enabled and no `IBoltTopicAuthorizer` is registered. The reusable Bolt server default remains `false` so embedding `MapBolt()` does not silently impose an XFramework domain dependency.
+
+`CommunicationsBoltTopicAuthorizer` is the current `IBoltTopicAuthorizer` implementation. Bolt invokes it for Subscribe, Publish, Unsubscribe, and Ack. Unknown or malformed topic namespaces are denied. Do not register independent boolean authorizers for unrelated namespaces: the current contract combines all registered authorizers as required checks. Introduce a namespace dispatcher only when a second production topic domain exists.
+
 Preferred future direction:
 - Move the checks behind owning-module authorization contracts or dedicated read models.
 - Keep the Hub as a routing surface once those contracts are available.

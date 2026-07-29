@@ -1,0 +1,38 @@
+{
+  "source": "PayloadLatencyWorker.Routed_gRPC.R1",
+  "timestampUtc": "2026-07-24T17:48:26.3138496+00:00",
+  "processId": 35848,
+  "runtime": ".NET 10.0.0",
+  "runtimeVersion": "10.0.0",
+  "operatingSystem": "Microsoft Windows 10.0.26200",
+  "processArchitecture": "X64",
+  "osArchitecture": "X64",
+  "processorCount": 18,
+  "serverGc": true,
+  "latencyMode": "Interactive",
+  "processPriority": "Normal",
+  "effectiveSettings": {
+    "topology": "Routed_gRPC",
+    "logicalPath": "caller -\u003E gRPC router -\u003E gRPC backend",
+    "payloadBytes": 1024,
+    "callTimeoutSeconds": 60,
+    "largePayloadThresholdBytes": 0,
+    "streamChunkSizeBytes": null,
+    "pipelineBytes": null,
+    "receiveBufferBytes": null,
+    "hubReceiveBufferBytes": null,
+    "runRpcContinuationsAsynchronously": null,
+    "grpcHttp2MaxStreamsPerConnection": 2048,
+    "grpcCallerChannelCount": 1,
+    "grpcBackendChannelCount": 1,
+    "grpcMultipleHttp2ConnectionsEnabled": false,
+    "serverAddresses": [
+      "http://127.0.0.1:49511/",
+      "http://127.0.0.1:49512/"
+    ]
+  },
+  "environment": {
+    "BOLT_BENCH_ARTIFACTS": "C:\\Users\\Xeon\\RiderProjects\\XFramework-worktrees\\bolt-remediation-plan-scope\\docs\\solutions\\workflow-issues\\bolt-performance-results-2026-07-25\\continuation-ab-1024-final\\r1-async\\r1-p3-Routed_gRPC",
+    "BOLT_BENCH_RUN_RPC_CONTINUATIONS_ASYNCHRONOUSLY": "true"
+  }
+}

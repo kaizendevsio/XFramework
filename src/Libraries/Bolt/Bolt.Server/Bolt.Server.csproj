@@ -9,7 +9,7 @@
         <PackageId>Bolt.Net.Server</PackageId>
         <Version>$(BoltVersion)</Version>
         <Authors>KaizenDevs</Authors>
-        <Description>Bolt — high-performance binary RPC + streaming hub server for ASP.NET Core. WebSocket middleware with zero-copy routing, connection pooling, and direct handler support. 47% faster than gRPC.</Description>
+        <Description>Bolt — binary RPC and streaming hub server for ASP.NET Core with WebSocket routing, connection pooling, and direct handler support.</Description>
         <PackageTags>rpc;binary;server;hub;websocket;bolt;aspnetcore;high-performance</PackageTags>
         <RepositoryUrl>https://github.com/kaizendevsio/XFramework</RepositoryUrl>
         <PackageProjectUrl>https://github.com/kaizendevsio/XFramework</PackageProjectUrl>

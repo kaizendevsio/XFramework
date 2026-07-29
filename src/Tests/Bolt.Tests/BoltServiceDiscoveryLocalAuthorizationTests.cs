@@ -73,6 +73,7 @@ public sealed class BoltServiceDiscoveryLocalAuthorizationTests
     {
         try { await _app.StopAsync(); } catch { }
         try { await _app.DisposeAsync(); } catch { }
+        try { await _app.DisposeAsync(); } catch { }
     }
 
     [TestCase(BoltServiceDiscoveryCommands.GetServiceRegistry)]

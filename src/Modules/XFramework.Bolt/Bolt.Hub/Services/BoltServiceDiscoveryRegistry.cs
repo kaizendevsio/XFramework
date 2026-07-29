@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
 using Bolt.Server;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Shared.ServiceIdentity;
 
@@ -11,13 +12,21 @@ namespace Bolt.Hub.Services;
 
 public sealed class BoltServiceDiscoveryRegistry(
     DbContext db,
-    IBoltServicePresenceTracker presenceTracker) : IBoltServiceDiscoveryRegistry
+    IBoltServicePresenceTracker presenceTracker,
+    IMemoryCache cache) : IBoltServiceDiscoveryRegistry
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan OfflineRetention = TimeSpan.FromDays(30);
+    private const int MaximumRegistryRecords = 1000;
+    private const string OnlineSnapshotKey = "bolt-discovery:online";
+    private const string CompleteSnapshotKey = "bolt-discovery:complete";
+    private static readonly TimeSpan SnapshotLifetime = TimeSpan.FromSeconds(30);
 
     public async Task ResetPresenceAsync(CancellationToken ct)
     {
         presenceTracker.Clear();
+
+        await RetireStaleAsync(ct);
 
         var now = DateTime.UtcNow;
         var records = await db.Set<BoltServiceManifestRecord>()
@@ -34,6 +43,27 @@ public sealed class BoltServiceDiscoveryRegistry(
         }
 
         await db.SaveChangesAsync(ct);
+        InvalidateSnapshots();
+    }
+
+    public async Task RetireStaleAsync(CancellationToken ct)
+    {
+        var staleCutoff = DateTime.UtcNow - OfflineRetention;
+        var staleRecords = db.Set<BoltServiceManifestRecord>()
+            .Where(record => !record.IsConnected && record.LastSeenAt < staleCutoff);
+        if (db.Database.IsRelational())
+        {
+            if (await staleRecords.ExecuteDeleteAsync(ct) > 0)
+                InvalidateSnapshots();
+            return;
+        }
+
+        var records = await staleRecords.ToListAsync(ct);
+        if (records.Count == 0)
+            return;
+        db.RemoveRange(records);
+        await db.SaveChangesAsync(ct);
+        InvalidateSnapshots();
     }
 
     public async Task<BoltServiceManifestAdvertisementResponse> AdvertiseAsync(
@@ -117,6 +147,7 @@ public sealed class BoltServiceDiscoveryRegistry(
         }
 
         await db.SaveChangesAsync(ct);
+        InvalidateSnapshots();
         return new BoltServiceManifestAdvertisementResponse { Accepted = true, Message = "Accepted" };
     }
 
@@ -201,6 +232,7 @@ public sealed class BoltServiceDiscoveryRegistry(
         record.LastConnectedAt = now;
 
         await db.SaveChangesAsync(ct);
+        InvalidateSnapshots();
     }
 
     private async Task MarkDisconnectedRecordAsync(
@@ -229,18 +261,21 @@ public sealed class BoltServiceDiscoveryRegistry(
         }
 
         await db.SaveChangesAsync(ct);
+        InvalidateSnapshots();
     }
 
     public async Task<BoltServiceRegistryResponse> GetServicesAsync(
         BoltServiceRegistryRequest request,
         CancellationToken ct)
     {
-        var records = await LoadRecordsAsync(request.IncludeOffline, ct);
+        var snapshot = await LoadSnapshotAsync(request.IncludeOffline, ct);
+        var records = snapshot.Records;
+        var index = snapshot.Index;
         var items = records
             .Select(record =>
             {
-                var manifest = DeserializeManifest(record);
-                var dependencyStatuses = EvaluateDependencies(manifest.Dependencies, records);
+                var manifest = index.Manifests[record.ClientId];
+                var dependencyStatuses = EvaluateDependencies(manifest.Dependencies, index);
                 var status = GetStatus(record, dependencyStatuses);
 
                 return new BoltServiceRegistryItem
@@ -270,19 +305,21 @@ public sealed class BoltServiceDiscoveryRegistry(
         BoltModuleRegistryRequest request,
         CancellationToken ct)
     {
-        var records = await LoadRecordsAsync(request.IncludeOffline, ct);
+        var snapshot = await LoadSnapshotAsync(request.IncludeOffline, ct);
+        var records = snapshot.Records;
+        var index = snapshot.Index;
         var modules = new List<BoltModuleRegistryItem>();
 
         foreach (var record in records)
         {
-            var manifest = DeserializeManifest(record);
-            var serviceDependencies = EvaluateDependencies(manifest.Dependencies, records);
+            var manifest = index.Manifests[record.ClientId];
+            var serviceDependencies = EvaluateDependencies(manifest.Dependencies, index);
             var serviceStatus = GetStatus(record, serviceDependencies);
 
             foreach (var module in manifest.Modules)
             {
                 var moduleDependencies = serviceDependencies
-                    .Concat(EvaluateDependencies(module.Dependencies, records))
+                    .Concat(EvaluateDependencies(module.Dependencies, index))
                     .ToList();
                 var moduleStatus = GetStatus(record, moduleDependencies);
 
@@ -299,7 +336,7 @@ public sealed class BoltServiceDiscoveryRegistry(
                     Status = serviceStatus == BoltRegistryStatus.Offline ? serviceStatus : moduleStatus,
                     DependencyStatuses = moduleDependencies,
                     Features = module.Features
-                        .Select(feature => CreateFeatureItem(feature, record, records, moduleDependencies))
+                        .Select(feature => CreateFeatureItem(feature, record, index, moduleDependencies))
                         .ToList()
                 });
             }
@@ -314,21 +351,38 @@ public sealed class BoltServiceDiscoveryRegistry(
         };
     }
 
-    private async Task<List<BoltServiceManifestRecord>> LoadRecordsAsync(bool includeOffline, CancellationToken ct) =>
-        await db.Set<BoltServiceManifestRecord>()
+    private async Task<DiscoverySnapshot> LoadSnapshotAsync(bool includeOffline, CancellationToken ct)
+    {
+        var key = includeOffline ? CompleteSnapshotKey : OnlineSnapshotKey;
+        if (cache.TryGetValue(key, out DiscoverySnapshot? cached) && cached is not null)
+            return cached;
+
+        var records = await db.Set<BoltServiceManifestRecord>()
             .AsNoTracking()
-            .Where(record => includeOffline || record.IsConnected)
+            .Where(record => includeOffline ||
+                (record.IsConnected && record.ConnectionCount > 0))
             .OrderBy(record => record.ServiceName)
+            .Take(MaximumRegistryRecords)
             .ToListAsync(ct);
+        var snapshot = new DiscoverySnapshot(records, CreateDiscoveryIndex(records));
+        cache.Set(key, snapshot, SnapshotLifetime);
+        return snapshot;
+    }
+
+    private void InvalidateSnapshots()
+    {
+        cache.Remove(OnlineSnapshotKey);
+        cache.Remove(CompleteSnapshotKey);
+    }
 
     private static BoltTenantModuleFeatureRegistryItem CreateFeatureItem(
         BoltTenantModuleFeatureManifest feature,
         BoltServiceManifestRecord owner,
-        IReadOnlyList<BoltServiceManifestRecord> allRecords,
+        DiscoveryIndex index,
         IReadOnlyList<BoltDependencyStatus> inheritedDependencies)
     {
         var dependencyStatuses = inheritedDependencies
-            .Concat(EvaluateDependencies(feature.Dependencies, allRecords))
+            .Concat(EvaluateDependencies(feature.Dependencies, index))
             .ToList();
 
         return new BoltTenantModuleFeatureRegistryItem
@@ -350,7 +404,7 @@ public sealed class BoltServiceDiscoveryRegistry(
         BoltServiceManifestRecord record,
         IReadOnlyCollection<BoltDependencyStatus> dependencyStatuses)
     {
-        if (!record.IsConnected || record.ConnectionCount <= 0)
+        if (!IsOnline(record))
         {
             return BoltRegistryStatus.Offline;
         }
@@ -362,33 +416,50 @@ public sealed class BoltServiceDiscoveryRegistry(
 
     private static List<BoltDependencyStatus> EvaluateDependencies(
         IEnumerable<BoltDependencyRequirement> requirements,
-        IReadOnlyList<BoltServiceManifestRecord> records)
-    {
-        var onlineRecords = records
-            .Where(record => record.IsConnected && record.ConnectionCount > 0)
+        DiscoveryIndex index) =>
+        requirements
+            .Select(requirement => EvaluateDependency(
+                requirement,
+                index.ServiceKeys,
+                index.ModuleKeys,
+                index.FeatureKeys))
             .ToList();
 
+    private static DiscoveryIndex CreateDiscoveryIndex(IReadOnlyList<BoltServiceManifestRecord> records)
+    {
+        var manifests = records.ToDictionary(record => record.ClientId, DeserializeManifest, StringComparer.Ordinal);
+        var onlineRecords = records.Where(IsOnline).ToList();
         var serviceKeys = onlineRecords
             .SelectMany(record => new[] { record.ClientId, record.ClientName, record.ServiceName })
-            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Where(static key => !string.IsNullOrWhiteSpace(key))
             .Select(NormalizeLookupKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var moduleKeys = onlineRecords
-            .SelectMany(record => DeserializeManifest(record).Modules)
+        var onlineManifests = onlineRecords.Select(record => manifests[record.ClientId]).ToList();
+        var moduleKeys = onlineManifests
+            .SelectMany(static manifest => manifest.Modules)
             .Select(module => NormalizeLookupKey(module.ModuleKey))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var featureKeys = onlineRecords
-            .SelectMany(record => DeserializeManifest(record).Modules)
-            .SelectMany(module => module.Features)
+        var featureKeys = onlineManifests
+            .SelectMany(static manifest => manifest.Modules)
+            .SelectMany(static module => module.Features)
             .Select(feature => NormalizeLookupKey(feature.Key ?? CombineKey(feature.ModuleKey, feature.SubFeatureKey)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return requirements
-            .Select(requirement => EvaluateDependency(requirement, serviceKeys, moduleKeys, featureKeys))
-            .ToList();
+        return new DiscoveryIndex(manifests, serviceKeys, moduleKeys, featureKeys);
     }
+
+    private static bool IsOnline(BoltServiceManifestRecord record) =>
+        record.IsConnected &&
+        record.ConnectionCount > 0;
+
+    private sealed record DiscoveryIndex(
+        IReadOnlyDictionary<string, BoltServiceManifest> Manifests,
+        IReadOnlySet<string> ServiceKeys,
+        IReadOnlySet<string> ModuleKeys,
+        IReadOnlySet<string> FeatureKeys);
+
+    private sealed record DiscoverySnapshot(
+        IReadOnlyList<BoltServiceManifestRecord> Records,
+        DiscoveryIndex Index);
 
     private static BoltDependencyStatus EvaluateDependency(
         BoltDependencyRequirement requirement,

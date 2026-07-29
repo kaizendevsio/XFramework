@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Bolt.Client;
 using Bolt.Protocol;
 using Microsoft.AspNetCore.Components;
@@ -24,7 +25,7 @@ public sealed class BoltMediaService : IAsyncDisposable
     private readonly ILogger<BoltMediaService> _logger;
 
     private BoltMediaClient? _mediaClient;
-    private readonly Dictionary<Guid, CancellationTokenSource> _streamPlaybackTasks = new();
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _streamPlaybackTasks = new();
 
     private Guid _activeAudioStreamId;
     private Guid _activeVideoStreamId;
@@ -74,18 +75,15 @@ public sealed class BoltMediaService : IAsyncDisposable
     {
         if (_initialized) return;
 
-        // Initialize crypto if encryption enabled
         if (_options.EnableEncryption)
-            await _crypto.InitializeAsync();
+            throw new NotSupportedException(
+                "Encrypted Bolt Media calls are disabled until key exchange is bound to authenticated peer identities.");
 
         // Initialize audio pipeline
         await _audio.InitializeAsync(_options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps);
 
         // Create media client and wire events
         _mediaClient = new BoltMediaClient(client, _logger);
-
-        if (_options.EnableEncryption)
-            _mediaClient.SetEncryptionFactory(() => _crypto.CreateEncryption());
 
         _mediaClient.OnIncomingCall += async info =>
         {
@@ -106,6 +104,7 @@ public sealed class BoltMediaService : IAsyncDisposable
         {
             _ = _video.RequestKeyframeAsync();
         };
+        _mediaClient.OnMediaStreamConfigured += StartPlaybackLoop;
 
         _initialized = true;
         _logger.LogInformation("BoltMediaService initialized");
@@ -150,13 +149,15 @@ public sealed class BoltMediaService : IAsyncDisposable
             _video.OnEncoded += OnVideoEncodedForStream;
         }
 
-        await _mediaClient!.AnswerCallAsync(callId);
+        await _mediaClient!.AnswerCallAsync(callId, _options.EnableEncryption);
+        await HandleCallAnsweredAsync(callId);
     }
 
     /// <summary>Reject an incoming call.</summary>
     public async Task RejectCallAsync(Guid callId)
     {
         EnsureInitialized();
+        await StopPipelinesAsync();
         await _mediaClient!.RejectCallAsync(callId);
     }
 
@@ -203,14 +204,7 @@ public sealed class BoltMediaService : IAsyncDisposable
         var conn = client.GetPrimaryConnection();
         var writer = Bolt.Protocol.Buffers.RentedBufferWriter.GetThreadLocal();
 
-        // Send audio MediaConfig to peer
         _activeAudioStreamId = Guid.NewGuid();
-        BoltCodec.WriteMediaConfig(writer, _activeAudioStreamId, callId, MediaType.Audio, CodecId.Opus,
-            _options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, 0, ReadOnlySpan<byte>.Empty);
-        await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
-        writer.Reset();
-
-        // Create local audio stream with features enabled
         var audioStream = new BoltMediaStream(conn, _activeAudioStreamId, callId, true);
         if (_options.EnableFec) audioStream.EnableFec(_options.FecAudioGroupSize);
         audioStream.EnableNack(128);
@@ -218,27 +212,37 @@ public sealed class BoltMediaService : IAsyncDisposable
         audioStream.EnablePlc();
         audioStream.OnBitrateChanged += kbps =>
             _ = _audio.ReconfigureBitrateAsync(_options.AudioSampleRate, _options.AudioChannels, kbps);
+        if (!_mediaClient.RegisterMediaStream(audioStream))
+        {
+            await audioStream.DisposeAsync();
+            throw new InvalidOperationException("Unable to register the local audio stream.");
+        }
 
-        // Start playback loop for received audio frames
-        StartPlaybackLoop(audioStream);
+        BoltCodec.WriteMediaConfig(writer, _activeAudioStreamId, callId, MediaType.Audio, CodecId.Opus,
+            _options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, 0, ReadOnlySpan<byte>.Empty);
+        await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
+        writer.Reset();
 
         // Send video MediaConfig if video is active for this call
         if (_hasVideo || _video.IsCapturing)
         {
             _activeVideoStreamId = Guid.NewGuid();
-            BoltCodec.WriteMediaConfig(writer, _activeVideoStreamId, callId, MediaType.Video, CodecId.H264,
-                _options.VideoWidth, _options.VideoHeight, _options.VideoBitrateKbps, 0, ReadOnlySpan<byte>.Empty);
-            await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
-            writer.Reset();
-
             var videoStream = new BoltMediaStream(conn, _activeVideoStreamId, callId, false);
             if (_options.EnableFec) videoStream.EnableFec(_options.FecVideoGroupSize);
             videoStream.EnableNack(256);
             videoStream.EnableBandwidthProbing(_options.VideoBitrateKbps);
             videoStream.OnBitrateChanged += kbps => _ = _video.ReconfigureBitrateAsync(kbps);
             videoStream.OnKeyframeNeeded += () => _ = _video.RequestKeyframeAsync();
+            if (!_mediaClient.RegisterMediaStream(videoStream))
+            {
+                await videoStream.DisposeAsync();
+                throw new InvalidOperationException("Unable to register the local video stream.");
+            }
 
-            StartPlaybackLoop(videoStream);
+            BoltCodec.WriteMediaConfig(writer, _activeVideoStreamId, callId, MediaType.Video, CodecId.H264,
+                _options.VideoWidth, _options.VideoHeight, _options.VideoBitrateKbps, 0, ReadOnlySpan<byte>.Empty);
+            await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
+            writer.Reset();
         }
 
         if (OnCallAnswered is not null) await OnCallAnswered(callId);
@@ -261,7 +265,11 @@ public sealed class BoltMediaService : IAsyncDisposable
     private void StartPlaybackLoop(BoltMediaStream stream)
     {
         var cts = new CancellationTokenSource();
-        _streamPlaybackTasks[stream.StreamId] = cts;
+        if (!_streamPlaybackTasks.TryAdd(stream.StreamId, cts))
+        {
+            cts.Dispose();
+            return;
+        }
 
         _ = Task.Run(async () =>
         {
@@ -280,17 +288,26 @@ public sealed class BoltMediaService : IAsyncDisposable
             {
                 _logger.LogError(ex, "Playback loop error for stream {StreamId}", stream.StreamId);
             }
+            finally
+            {
+                if (_streamPlaybackTasks.TryRemove(stream.StreamId, out var removed))
+                    removed.Dispose();
+            }
         });
     }
 
     private async Task StopPipelinesAsync()
     {
-        foreach (var (_, cts) in _streamPlaybackTasks)
+        foreach (var (streamId, _) in _streamPlaybackTasks.ToArray())
         {
+            if (!_streamPlaybackTasks.TryRemove(streamId, out var cts))
+                continue;
             await cts.CancelAsync();
             cts.Dispose();
         }
-        _streamPlaybackTasks.Clear();
+        _activeAudioStreamId = Guid.Empty;
+        _activeVideoStreamId = Guid.Empty;
+        _hasVideo = false;
 
         if (_audio.IsCapturing) await _audio.StopCaptureAsync();
         if (_video.IsCapturing) await _video.StopCaptureAsync();

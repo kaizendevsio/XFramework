@@ -91,6 +91,33 @@ public sealed class RedisDurableQueueStoreTests
     }
 
     [Test]
+    public async Task AppendAsync_WhenByteCapacityWouldBeExceeded_EvictsOldestEntries()
+    {
+        var (store, topicHash, subscriberId) = await CreateRegisteredStoreAsync(maxQueueBytes: 10);
+        var first = await store.AppendAsync(topicHash, subscriberId, new byte[6]);
+        var second = await store.AppendAsync(topicHash, subscriberId, new byte[6]);
+
+        var retained = await ReadAllAsync(store, topicHash, subscriberId);
+
+        retained.Select(message => message.Sequence).Should().Equal(second);
+        retained.Single().Payload.Should().HaveCount(6);
+        ((long)(await _redis.GetDatabase().StringGetAsync(BytesKey(topicHash, subscriberId)))!).Should().Be(6);
+        first.Should().BeLessThan(second);
+    }
+
+    [Test]
+    public async Task AppendAsync_WhenPayloadExceedsByteCapacity_RejectsWithoutAdvancingSequence()
+    {
+        var (store, topicHash, subscriberId) = await CreateRegisteredStoreAsync(maxQueueBytes: 5);
+
+        var act = async () => await store.AppendAsync(topicHash, subscriberId, new byte[6]);
+
+        await act.Should().ThrowAsync<BoltDurableQueueByteCapacityExceededException>();
+        (await _redis.GetDatabase().StringGetAsync(SequenceKey(topicHash, subscriberId))).IsNull.Should().BeTrue();
+        (await StreamLengthAsync(topicHash, subscriberId)).Should().Be(0);
+    }
+
+    [Test]
     public async Task AckAsync_ValidStaleDuplicateAndFutureAcks_AdvanceMonotonicallyAndRejectFutureStateChanges()
     {
         var (store, topicHash, subscriberId) = await CreateRegisteredStoreAsync();
@@ -215,9 +242,10 @@ public sealed class RedisDurableQueueStoreTests
 
     private async Task<(RedisDurableQueueStore Store, int TopicHash, string SubscriberId)> CreateRegisteredStoreAsync(
         int streamScanBatchSize = 2,
-        int maxQueueSize = 100)
+        int maxQueueSize = 100,
+        long maxQueueBytes = 32L * 1024 * 1024)
     {
-        var store = CreateStore(_redis, streamScanBatchSize, maxQueueSize);
+        var store = CreateStore(_redis, streamScanBatchSize, maxQueueSize, maxQueueBytes);
         var topicHash = Random.Shared.Next(1, int.MaxValue);
         var subscriberId = $"phase0-test-{Guid.NewGuid():N}";
         await store.RegisterDurableSubscriberAsync(topicHash, subscriberId);
@@ -228,12 +256,14 @@ public sealed class RedisDurableQueueStoreTests
     private static RedisDurableQueueStore CreateStore(
         IConnectionMultiplexer redis,
         int streamScanBatchSize = 2,
-        int maxQueueSize = 100) =>
+        int maxQueueSize = 100,
+        long maxQueueBytes = 32L * 1024 * 1024) =>
         new(
             redis,
             Options.Create(new DurableQueueOptions
             {
                 MaxQueueSize = maxQueueSize,
+                MaxQueueBytesPerSubscriber = maxQueueBytes,
                 MessageTtlSeconds = 300,
                 RedisStreamScanBatchSize = streamScanBatchSize
             }),
@@ -247,6 +277,9 @@ public sealed class RedisDurableQueueStoreTests
 
     private static string SequenceKey(int topicHash, string subscriberId) =>
         $"bolt:durable:seq:{topicHash}:{subscriberId}";
+
+    private static string BytesKey(int topicHash, string subscriberId) =>
+        $"bolt:durable:bytes:{topicHash}:{subscriberId}";
 
     private static async Task<List<(long Sequence, byte[] Payload)>> ReadAllAsync(
         IDurableQueueStore store,
