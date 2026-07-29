@@ -59,6 +59,8 @@ Imported verification keys now disable signature-provider caching, matching the 
 
 The staging gate also keeps the durable replay subscription active until its cumulative, stale, and duplicate acknowledgement frames pass the IdentityServer RPC processing barrier. Persistence is reported only after the next subscription observes no redelivery. Previously the runner disposed the subscription before sending those acknowledgement frames, so the Hub correctly rejected them as coming from a detached owner and the next connection replayed the unacknowledged message. This was a synthetic lifecycle defect; Hub ownership checks, durable-store behavior, and Bolt's at-least-once delivery contract are unchanged.
 
+Permanent durable unregistration now also removes an authorized offline subscription after its live session has detached, matching the public client API contract. A permanent unregister remains rejected while another live connection owns the same subscriber identity, preventing a stale session from deleting active durable state.
+
 The final ownership review also exposed a scheduling race where a successful reliable-send waiter could resume immediately before its pooled buffer decremented `PendingSends`. Success notification now follows buffer release, while timeout paths continue retaining ownership until a cancellation-ignoring physical write completes. The near-deadline lifecycle test passed 30 consecutive isolated repetitions; the synchronized outbound-stream cleanup test passed 10.
 
 ## Performance Gate
