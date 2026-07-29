@@ -30,7 +30,8 @@ public static class IdentityHealthCheckProbe
                 Name = "Bolt Phase 0 Synthetic",
                 DeviceName = options.DeviceId,
                 DeviceAgent = "XFramework.Bolt.Phase0Synthetics",
-                ActorAccessToken = options.UserActorToken.Reveal()
+                ActorAccessToken = options.UserActorToken.Reveal(),
+                ServiceAccessToken = options.PortalIdentityServiceToken.Reveal()
             }
         };
         var payload = MemoryPackSerializer.Serialize(request);

@@ -52,6 +52,7 @@ public static partial class SyntheticReportValidator
         {
             "communications_transport",
             "portal_transport",
+            "portal_identity_service",
             "user_actor",
             "expiry_transport",
             "rejected_communications_transport",
@@ -93,6 +94,7 @@ public static partial class SyntheticReportValidator
                 !RequiredPassedOperations.IsSubsetOf(names) ||
                 !report.TokenSha256Prefixes.ContainsKey("communications_transport") ||
                 !report.TokenSha256Prefixes.ContainsKey("portal_transport") ||
+                !report.TokenSha256Prefixes.ContainsKey("portal_identity_service") ||
                 !report.TokenSha256Prefixes.ContainsKey("user_actor"))
             {
                 throw new InvalidOperationException("A passing synthetic report is incomplete.");

@@ -18,11 +18,15 @@ public sealed class SyntheticOptionsParser(
     public const string DefaultCommunicationsTransportTokenEnvironmentVariable =
         "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN";
     public const string DefaultPortalTransportTokenEnvironmentVariable = "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN";
+    public const string DefaultPortalIdentityServiceTokenEnvironmentVariable =
+        "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN";
     public const string DefaultUserActorTokenEnvironmentVariable = "BOLT_SYNTHETIC_USER_ACTOR_TOKEN";
     public const string DefaultExpiryTransportTokenEnvironmentVariable = "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN";
     public const string CommunicationsTransportTokenFileEnvironmentVariable =
         "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_FILE";
     public const string PortalTransportTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_FILE";
+    public const string PortalIdentityServiceTokenFileEnvironmentVariable =
+        "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_FILE";
     public const string UserActorTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_FILE";
     public const string ExpiryTransportTokenFileEnvironmentVariable =
         "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_FILE";
@@ -83,6 +87,10 @@ public sealed class SyntheticOptionsParser(
                 PortalTransportTokenEnvironmentNameVariable,
                 DefaultPortalTransportTokenEnvironmentVariable),
             "missing_portal_transport_token");
+        var portalIdentityServiceToken = ReadToken(
+            PortalIdentityServiceTokenFileEnvironmentVariable,
+            DefaultPortalIdentityServiceTokenEnvironmentVariable,
+            "missing_portal_identity_service_token");
         var userActorToken = ReadToken(
             UserActorTokenFileEnvironmentVariable,
             TokenEnvironmentName(
@@ -114,6 +122,7 @@ public sealed class SyntheticOptionsParser(
             deviceId,
             communicationsTransportToken,
             portalTransportToken,
+            portalIdentityServiceToken,
             userActorToken,
             operationTimeout,
             expiryTransportToken,

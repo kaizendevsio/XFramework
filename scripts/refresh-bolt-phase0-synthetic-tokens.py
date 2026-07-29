@@ -32,9 +32,13 @@ TRANSPORT_AUDIENCE = "XFramework.Bolt.Hub"
 TRANSPORT_SCOPE = "bolt.service"
 TRANSPORT_ALGORITHM = "RS256"
 TRANSPORT_TOKEN_TYPE = "bolt+jwt"
+SERVICE_AUDIENCE = "XFramework.IdentityServer"
+SERVICE_ALGORITHM = "RS256"
+SERVICE_TOKEN_TYPE = "JWT"
+PORTAL_SERVICE_SCOPES = ("bolt.service",)
 ACTOR_ALGORITHM = "HS512"
 ACTOR_TOKEN_TYPE = "JWT"
-RECEIPT_SCHEMA = "bolt-phase0-token-refresh/v2"
+RECEIPT_SCHEMA = "bolt-phase0-token-refresh/v3"
 PRINCIPAL_REFERENCE = "bolt-phase0-synthetic"
 GENERATION_CLAIM = "credential_generation"
 MAX_EXPIRY_REMAINING_SECONDS = 570
@@ -87,6 +91,7 @@ class Config:
     minimum_lifetime_seconds: int
     communications_transport_path: str
     portal_transport_path: str
+    portal_identity_service_path: str
     user_actor_path: str
     expiry_transport_path: str
 
@@ -294,6 +299,9 @@ def load_config(values: dict[str, str]) -> Config:
             values, "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH"
         ),
         portal_transport_path=_required(values, "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH"),
+        portal_identity_service_path=_required(
+            values, "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH"
+        ),
         user_actor_path=_required(values, "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH"),
         expiry_transport_path=_required(
             values, "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH"
@@ -520,6 +528,47 @@ def _validate_transport_jwt(
     return evidence, claims
 
 
+def _validate_service_jwt(
+    token: Any,
+    config: Config,
+    *,
+    now: int,
+) -> TokenEvidence:
+    value, header, claims = _read_jwt(token)
+    if set(header) != {"alg", "kid", "typ"}:
+        _raise("TOKEN_HEADER")
+    key_id = header.get("kid")
+    if (
+        header.get("alg") != SERVICE_ALGORITHM
+        or header.get("typ") != SERVICE_TOKEN_TYPE
+        or not isinstance(key_id, str)
+        or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,256}", key_id)
+    ):
+        _raise("TOKEN_HEADER")
+    evidence = _validate_temporal_claims(
+        value,
+        claims,
+        expected_issuer=TRANSPORT_ISSUER,
+        expected_audience=SERVICE_AUDIENCE,
+        now=now,
+        minimum_remaining=config.minimum_lifetime_seconds,
+        require_issued_at=True,
+    )
+    scopes = claims.get("scope")
+    if not isinstance(scopes, str):
+        _raise("TOKEN_IDENTITY")
+    normalized_scopes = scopes.split()
+    if (
+        claims.get("client_id") != PORTAL_CLIENT_ID
+        or claims.get("sub") != PORTAL_CLIENT_ID
+        or claims.get("client_credential_generation") != config.credential_generation
+        or len(normalized_scopes) != len(PORTAL_SERVICE_SCOPES)
+        or set(normalized_scopes) != set(PORTAL_SERVICE_SCOPES)
+    ):
+        _raise("TOKEN_IDENTITY")
+    return evidence
+
+
 def _validate_actor_jwt(
     token: Any,
     config: Config,
@@ -567,6 +616,27 @@ def _parse_transport_token(
         minimum_remaining=2 if expiry else config.minimum_lifetime_seconds,
         maximum_remaining=MAX_EXPIRY_REMAINING_SECONDS if expiry else None,
     )
+    try:
+        response_expiration = dt.datetime.fromisoformat(
+            data["expiresAtUtc"].replace("Z", "+00:00")
+        )
+    except ValueError:
+        _raise("RESPONSE_SCHEMA")
+    if response_expiration.tzinfo is None or int(response_expiration.timestamp()) != evidence.expiration:
+        _raise("RESPONSE_SCHEMA")
+    return evidence
+
+
+def _parse_service_token(
+    document: dict[str, Any],
+    config: Config,
+    *,
+    now: int,
+) -> TokenEvidence:
+    data = _response_data(document, SERVICE_DATA_KEYS)
+    if data.get("tokenType") != "Bearer" or not isinstance(data.get("expiresAtUtc"), str):
+        _raise("RESPONSE_SCHEMA")
+    evidence = _validate_service_jwt(data.get("accessToken"), config, now=now)
     try:
         response_expiration = dt.datetime.fromisoformat(
             data["expiresAtUtc"].replace("Z", "+00:00")
@@ -749,6 +819,7 @@ def execute(
         [
             config.communications_transport_path,
             config.portal_transport_path,
+            config.portal_identity_service_path,
             config.user_actor_path,
             config.expiry_transport_path,
             receipt_path,
@@ -784,6 +855,22 @@ def execute(
         expected_client_id=PORTAL_CLIENT_ID,
         now=now,
         expiry=False,
+    )
+    portal_identity_service = _parse_service_token(
+        _post_json(
+            config,
+            "/api/service-identity/token",
+            {
+                "clientId": PORTAL_CLIENT_ID,
+                "clientSecret": config.portal_secret,
+                "audience": SERVICE_AUDIENCE,
+                "scopes": list(PORTAL_SERVICE_SCOPES),
+            },
+            connection_factory=connection_factory,
+            context_factory=context_factory,
+        ),
+        config,
+        now=now,
     )
     expiry_transport = _parse_transport_token(
         _post_json(
@@ -826,7 +913,13 @@ def execute(
         config,
         now=now,
     )
-    tokens = [communications_transport, portal_transport, expiry_transport, user_actor]
+    tokens = [
+        communications_transport,
+        portal_transport,
+        portal_identity_service,
+        expiry_transport,
+        user_actor,
+    ]
     if len({token.value for token in tokens}) != len(tokens) or len({token.jti for token in tokens}) != len(tokens):
         _raise("TOKEN_DISTINCTNESS")
 
@@ -834,6 +927,7 @@ def execute(
     if (
         communications_transport.expiration < final_validation_time + config.minimum_lifetime_seconds
         or portal_transport.expiration < final_validation_time + config.minimum_lifetime_seconds
+        or portal_identity_service.expiration < final_validation_time + config.minimum_lifetime_seconds
         or user_actor.expiration < final_validation_time + config.minimum_lifetime_seconds
     ):
         _raise("TOKEN_LIFETIME")
@@ -851,6 +945,10 @@ def execute(
         config.portal_transport_path,
         portal_transport.value.encode("ascii") + b"\n",
     )
+    atomic_replace(
+        config.portal_identity_service_path,
+        portal_identity_service.value.encode("ascii") + b"\n",
+    )
     atomic_replace(config.user_actor_path, user_actor.value.encode("ascii") + b"\n")
     atomic_replace(
         config.expiry_transport_path,
@@ -860,6 +958,7 @@ def execute(
     expirations = {
         "communicationsTransport": _format_expiration(communications_transport.expiration),
         "portalTransport": _format_expiration(portal_transport.expiration),
+        "portalIdentityService": _format_expiration(portal_identity_service.expiration),
         "userActor": _format_expiration(user_actor.expiration),
     }
     if expiry_enabled:
@@ -870,6 +969,8 @@ def execute(
         "status": "passed",
         "transportIssuer": TRANSPORT_ISSUER,
         "transportAudience": TRANSPORT_AUDIENCE,
+        "serviceIssuer": TRANSPORT_ISSUER,
+        "serviceAudience": SERVICE_AUDIENCE,
         "actorIssuer": config.actor_issuer,
         "principalReference": PRINCIPAL_REFERENCE,
         "refreshedAtUtc": refreshed_at.isoformat().replace("+00:00", "Z"),

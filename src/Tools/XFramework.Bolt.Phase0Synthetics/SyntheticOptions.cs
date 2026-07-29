@@ -7,6 +7,7 @@ public sealed record SyntheticOptions(
     string DeviceId,
     SecretToken CommunicationsTransportToken,
     SecretToken PortalTransportToken,
+    SecretToken PortalIdentityServiceToken,
     SecretToken UserActorToken,
     TimeSpan OperationTimeout,
     SecretToken? ExpiryTransportToken,

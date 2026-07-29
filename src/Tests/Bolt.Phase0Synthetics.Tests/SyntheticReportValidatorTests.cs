@@ -39,6 +39,7 @@ public sealed class SyntheticReportValidatorTests
             {
                 ["communications_transport"] = "0123456789ab",
                 ["portal_transport"] = "123456789abc",
+                ["portal_identity_service"] = "456789abcdef",
                 ["user_actor"] = "23456789abcd",
                 ["rejected_portal_transport"] = "3456789abcde"
             }
@@ -94,6 +95,7 @@ public sealed class SyntheticReportValidatorTests
             {
                 ["communications_transport"] = "0123456789ab",
                 ["portal_transport"] = "123456789abc",
+                ["portal_identity_service"] = "456789abcdef",
                 ["user_actor"] = "23456789abcd"
             },
             started,
