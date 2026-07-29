@@ -41,8 +41,10 @@ public static class IdentityHealthCheckProbe
             CommandName,
             payload,
             ct);
-        if (!IsSuccess(statusCode) || data.IsEmpty)
-            throw new SyntheticCheckException("health_transport_response_invalid");
+        if (!IsSuccess(statusCode))
+            throw new SyntheticCheckException($"health_transport_status_{(int)statusCode}");
+        if (data.IsEmpty)
+            throw new SyntheticCheckException("health_transport_response_empty");
 
         QueryResponse<HealthCheckResponse>? response;
         try
