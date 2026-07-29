@@ -51,6 +51,7 @@ public static partial class SyntheticReportValidator
         var allowedNames = new HashSet<string>(StringComparer.Ordinal)
         {
             "communications_transport",
+            "communications_identity_service",
             "portal_transport",
             "portal_identity_service",
             "user_actor",
@@ -93,6 +94,7 @@ public static partial class SyntheticReportValidator
             if (report.Target is null || report.Operations.Any(static operation => operation.Status != "passed") ||
                 !RequiredPassedOperations.IsSubsetOf(names) ||
                 !report.TokenSha256Prefixes.ContainsKey("communications_transport") ||
+                !report.TokenSha256Prefixes.ContainsKey("communications_identity_service") ||
                 !report.TokenSha256Prefixes.ContainsKey("portal_transport") ||
                 !report.TokenSha256Prefixes.ContainsKey("portal_identity_service") ||
                 !report.TokenSha256Prefixes.ContainsKey("user_actor"))

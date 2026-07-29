@@ -38,6 +38,7 @@ public sealed class SyntheticReportValidatorTests
             TokenSha256Prefixes = new Dictionary<string, string>
             {
                 ["communications_transport"] = "0123456789ab",
+                ["communications_identity_service"] = "56789abcdef0",
                 ["portal_transport"] = "123456789abc",
                 ["portal_identity_service"] = "456789abcdef",
                 ["user_actor"] = "23456789abcd",
@@ -94,6 +95,7 @@ public sealed class SyntheticReportValidatorTests
             new Dictionary<string, string>
             {
                 ["communications_transport"] = "0123456789ab",
+                ["communications_identity_service"] = "56789abcdef0",
                 ["portal_transport"] = "123456789abc",
                 ["portal_identity_service"] = "456789abcdef",
                 ["user_actor"] = "23456789abcd"

@@ -17,6 +17,8 @@ public sealed class SyntheticOptionsParser(
     public const string ExpiryTransportTokenEnvironmentNameVariable = "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_ENV";
     public const string DefaultCommunicationsTransportTokenEnvironmentVariable =
         "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN";
+    public const string DefaultCommunicationsIdentityServiceTokenEnvironmentVariable =
+        "BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN";
     public const string DefaultPortalTransportTokenEnvironmentVariable = "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN";
     public const string DefaultPortalIdentityServiceTokenEnvironmentVariable =
         "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN";
@@ -24,6 +26,8 @@ public sealed class SyntheticOptionsParser(
     public const string DefaultExpiryTransportTokenEnvironmentVariable = "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN";
     public const string CommunicationsTransportTokenFileEnvironmentVariable =
         "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_FILE";
+    public const string CommunicationsIdentityServiceTokenFileEnvironmentVariable =
+        "BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_FILE";
     public const string PortalTransportTokenFileEnvironmentVariable = "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_FILE";
     public const string PortalIdentityServiceTokenFileEnvironmentVariable =
         "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_FILE";
@@ -79,6 +83,10 @@ public sealed class SyntheticOptionsParser(
                 CommunicationsTransportTokenEnvironmentNameVariable,
                 DefaultCommunicationsTransportTokenEnvironmentVariable),
             "missing_communications_transport_token");
+        var communicationsIdentityServiceToken = ReadToken(
+            CommunicationsIdentityServiceTokenFileEnvironmentVariable,
+            DefaultCommunicationsIdentityServiceTokenEnvironmentVariable,
+            "missing_communications_identity_service_token");
         var portalTransportToken = ReadToken(
             PortalTransportTokenFileEnvironmentVariable,
             TokenEnvironmentName(
@@ -121,6 +129,7 @@ public sealed class SyntheticOptionsParser(
             credentialId,
             deviceId,
             communicationsTransportToken,
+            communicationsIdentityServiceToken,
             portalTransportToken,
             portalIdentityServiceToken,
             userActorToken,

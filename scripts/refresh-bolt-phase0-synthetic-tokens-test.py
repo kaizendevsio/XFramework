@@ -119,7 +119,12 @@ def service_claims(
     return claims
 
 
-def identity_service_claims(now: int, jti: str, **overrides: Any) -> dict[str, Any]:
+def identity_service_claims(
+    now: int,
+    jti: str,
+    client_id: str = "XFramework.Portal",
+    **overrides: Any,
+) -> dict[str, Any]:
     claims = {
         "iss": "XFramework.IdentityServer",
         "aud": "XFramework.IdentityServer",
@@ -128,8 +133,8 @@ def identity_service_claims(now: int, jti: str, **overrides: Any) -> dict[str, A
         "iat": now - 1,
         "jti": jti,
         "client_credential_generation": GENERATION,
-        "client_id": "XFramework.Portal",
-        "sub": "XFramework.Portal",
+        "client_id": client_id,
+        "sub": client_id,
         "scope": "bolt.service",
     }
     claims.update(overrides)
@@ -236,6 +241,7 @@ class Workspace:
         self.private = private_directory(root / "private")
         self.env = self.private / "protected.env"
         self.communications_transport = self.private / "communications-transport.jwt"
+        self.communications_identity_service = self.private / "communications-identity-service.jwt"
         self.portal_transport = self.private / "portal-transport.jwt"
         self.portal_identity_service = self.private / "portal-identity-service.jwt"
         self.user_actor = self.private / "user-actor.jwt"
@@ -259,6 +265,9 @@ class Workspace:
             "BOLT_SYNTHETIC_MIN_TOKEN_LIFETIME_SECONDS": "60",
             "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH": str(
                 self.communications_transport
+            ),
+            "BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_PATH": str(
+                self.communications_identity_service
             ),
             "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH": str(self.portal_transport),
             "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH": str(
@@ -341,6 +350,16 @@ class RefreshTokenHookTests(unittest.TestCase):
 
             self.assertEqual(config.base_url, BASE_URL)
             self.assertEqual(config.actor_issuer, "xframework")
+
+    def test_communications_identity_service_token_path_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Workspace(Path(temporary))
+            values = workspace.values()
+            del values["BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_PATH"]
+            workspace.write_env(values)
+
+            with self.assertRaisesRegex(refresh.RefreshError, "CONFIGURATION"):
+                refresh.load_config(refresh.parse_protected_env(str(workspace.env)))
 
     def test_direct_https_uses_system_trust_hostname_validation_and_ignores_proxy_environment(self) -> None:
         now = int(time.time())
@@ -574,13 +593,66 @@ class RefreshTokenHookTests(unittest.TestCase):
                             "expiresAtUtc": refresh._format_expiration(claims["exp"]),
                         },
                         config,
+                        expected_client_id="XFramework.Portal",
+                        expected_scopes=("bolt.service",),
                         now=now,
                     )
 
             mismatched_expiration = identity_service_response(claims)
             mismatched_expiration["expiresAtUtc"] = refresh._format_expiration(now + 121)
             with self.assertRaisesRegex(refresh.RefreshError, "RESPONSE_SCHEMA"):
-                refresh._parse_service_token(mismatched_expiration, config, now=now)
+                refresh._parse_service_token(
+                    mismatched_expiration,
+                    config,
+                    expected_client_id="XFramework.Portal",
+                    expected_scopes=("bolt.service",),
+                    now=now,
+                )
+
+    def test_communications_identity_service_token_requires_exact_claims_and_lifetime(self) -> None:
+        now = int(time.time())
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Workspace(Path(temporary)).config()
+            claims = identity_service_claims(
+                now,
+                uuid.uuid4().hex,
+                client_id="XFramework.Communications",
+            )
+            cases = {
+                "algorithm": identity_service_jwt(claims, algorithm="HS512"),
+                "type": identity_service_jwt(claims, token_type="bolt+jwt"),
+                "key": identity_service_jwt(claims, key_id=""),
+                "issuer": identity_service_jwt({**claims, "iss": "wrong"}),
+                "audience": identity_service_jwt({**claims, "aud": "XFramework.Bolt.Hub"}),
+                "client": identity_service_jwt({**claims, "client_id": "XFramework.Portal"}),
+                "subject": identity_service_jwt({**claims, "sub": "XFramework.Portal"}),
+                "generation": identity_service_jwt(
+                    {**claims, "client_credential_generation": "wrong-generation"}
+                ),
+                "missing-scope": identity_service_jwt({**claims, "scope": ""}),
+                "extra-scope": identity_service_jwt(
+                    {**claims, "scope": "bolt.service identity.admin"}
+                ),
+                "duplicate-scope": identity_service_jwt(
+                    {**claims, "scope": "bolt.service bolt.service"}
+                ),
+                "expired": identity_service_jwt({**claims, "exp": now - 1}),
+                "short-lifetime": identity_service_jwt({**claims, "exp": now + 59}),
+                "future-nbf": identity_service_jwt({**claims, "nbf": now + 120}),
+            }
+            for name, token in cases.items():
+                with self.subTest(name=name), self.assertRaises(refresh.RefreshError):
+                    refresh._parse_service_token(
+                        {
+                            "accessToken": token,
+                            "tokenType": "Bearer",
+                            "expiresAtUtc": refresh._format_expiration(claims["exp"]),
+                        },
+                        config,
+                        expected_client_id="XFramework.Communications",
+                        expected_scopes=("bolt.service",),
+                        now=now,
+                    )
 
     def test_actor_token_is_validated_as_hs512_application_jwt_only(self) -> None:
         now = int(time.time())
@@ -663,6 +735,11 @@ class RefreshTokenHookTests(unittest.TestCase):
             client_id="XFramework.Portal",
         )
         portal_identity_claims = identity_service_claims(now, uuid.uuid4().hex)
+        communications_identity_claims = identity_service_claims(
+            now,
+            uuid.uuid4().hex,
+            client_id="XFramework.Communications",
+        )
         expiry_claims = service_claims(now, uuid.uuid4().hex, exp=now + 90)
         current_user_claims = user_claims(now, str(uuid.uuid4()))
         with tempfile.TemporaryDirectory() as temporary:
@@ -673,6 +750,7 @@ class RefreshTokenHookTests(unittest.TestCase):
                     FakeResponse(service_response(communications_claims)),
                     FakeResponse(service_response(portal_claims)),
                     FakeResponse(identity_service_response(portal_identity_claims)),
+                    FakeResponse(identity_service_response(communications_identity_claims)),
                     FakeResponse(service_response(expiry_claims)),
                     FakeResponse(user_response(current_user_claims)),
                 ]
@@ -704,6 +782,10 @@ class RefreshTokenHookTests(unittest.TestCase):
                 identity_service_jwt(portal_identity_claims),
             )
             self.assertEqual(
+                workspace.communications_identity_service.read_text().strip(),
+                identity_service_jwt(communications_identity_claims),
+            )
+            self.assertEqual(
                 workspace.expiry_transport.read_text().strip(),
                 transport_jwt(expiry_claims),
             )
@@ -727,7 +809,7 @@ class RefreshTokenHookTests(unittest.TestCase):
                     "tokenExpirationsUtc",
                 },
             )
-            self.assertEqual(receipt["schemaVersion"], "bolt-phase0-token-refresh/v3")
+            self.assertEqual(receipt["schemaVersion"], "bolt-phase0-token-refresh/v4")
             self.assertEqual(receipt["transportIssuer"], "XFramework.IdentityServer")
             self.assertEqual(receipt["transportAudience"], "XFramework.Bolt.Hub")
             self.assertEqual(receipt["serviceIssuer"], "XFramework.IdentityServer")
@@ -737,6 +819,7 @@ class RefreshTokenHookTests(unittest.TestCase):
                 set(receipt["tokenExpirationsUtc"]),
                 {
                     "communicationsTransport",
+                    "communicationsIdentityService",
                     "portalTransport",
                     "portalIdentityService",
                     "expiryTransport",
@@ -749,6 +832,7 @@ class RefreshTokenHookTests(unittest.TestCase):
                 PORTAL_CLIENT_SECRET,
                 PASSWORD,
                 transport_jwt(communications_claims),
+                identity_service_jwt(communications_identity_claims),
                 transport_jwt(portal_claims),
                 identity_service_jwt(portal_identity_claims),
                 transport_jwt(expiry_claims),
@@ -757,6 +841,7 @@ class RefreshTokenHookTests(unittest.TestCase):
                 self.assertNotIn(secret, receipt_text)
             for path in (
                 workspace.communications_transport,
+                workspace.communications_identity_service,
                 workspace.portal_transport,
                 workspace.portal_identity_service,
                 workspace.user_actor,
@@ -768,13 +853,15 @@ class RefreshTokenHookTests(unittest.TestCase):
                 "/api/service-identity/bolt-transport-token",
                 "/api/service-identity/bolt-transport-token",
                 "/api/service-identity/token",
+                "/api/service-identity/token",
                 "/api/service-identity/bolt-transport-token",
                 "/api/auth/authenticate",
             ])
             first_body = json.loads(factory.requests[0][5])
             portal_body = json.loads(factory.requests[1][5])
             portal_identity_body = json.loads(factory.requests[2][5])
-            user_body = json.loads(factory.requests[4][5])
+            communications_identity_body = json.loads(factory.requests[3][5])
+            user_body = json.loads(factory.requests[5][5])
             self.assertEqual(first_body, {"clientId": "XFramework.Communications", "clientSecret": CLIENT_SECRET})
             self.assertEqual(
                 portal_body,
@@ -789,12 +876,73 @@ class RefreshTokenHookTests(unittest.TestCase):
                     "scopes": ["bolt.service"],
                 },
             )
+            self.assertEqual(
+                communications_identity_body,
+                {
+                    "clientId": "XFramework.Communications",
+                    "clientSecret": CLIENT_SECRET,
+                    "audience": "XFramework.IdentityServer",
+                    "scopes": ["bolt.service"],
+                },
+            )
             self.assertEqual(user_body["password"], PASSWORD)
             self.assertEqual(user_body["metadata"]["tenantId"], TENANT_ID)
             self.assertEqual(user_body["metadata"]["credentialId"], CREDENTIAL_ID)
             self.assertEqual(user_body["metadata"]["name"], "bolt-phase0-synthetic")
             self.assertEqual(user_body["metadata"]["deviceName"], "bolt-phase0-synthetic")
             self.assertEqual(user_body["metadata"]["deviceAgent"], "bolt-phase0-synthetic")
+
+    def test_communications_identity_service_token_participates_in_distinctness(self) -> None:
+        now = int(time.time())
+        duplicate_jti = uuid.uuid4().hex
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Workspace(Path(temporary))
+            workspace.write_env()
+            factory = ConnectionFactory(
+                [
+                    FakeResponse(service_response(service_claims(now, uuid.uuid4().hex))),
+                    FakeResponse(
+                        service_response(
+                            service_claims(
+                                now,
+                                uuid.uuid4().hex,
+                                client_id="XFramework.Portal",
+                            )
+                        )
+                    ),
+                    FakeResponse(
+                        identity_service_response(identity_service_claims(now, duplicate_jti))
+                    ),
+                    FakeResponse(
+                        identity_service_response(
+                            identity_service_claims(
+                                now,
+                                duplicate_jti,
+                                client_id="XFramework.Communications",
+                            )
+                        )
+                    ),
+                    FakeResponse(
+                        service_response(
+                            service_claims(now, uuid.uuid4().hex, exp=now + 90)
+                        )
+                    ),
+                    FakeResponse(user_response(user_claims(now, str(uuid.uuid4())))),
+                ]
+            )
+
+            with self.assertRaisesRegex(refresh.RefreshError, "TOKEN_DISTINCTNESS"):
+                refresh.execute(
+                    str(workspace.env),
+                    str(workspace.receipt),
+                    True,
+                    connection_factory=factory,
+                    context_factory=lambda: FakeContext(),
+                    now_provider=lambda: now,
+                )
+
+            self.assertFalse(workspace.communications_identity_service.exists())
+            self.assertFalse(workspace.receipt.exists())
 
     def test_disabled_expiry_writes_private_empty_placeholder_and_omits_receipt_entry(self) -> None:
         now = int(time.time())
@@ -818,6 +966,15 @@ class RefreshTokenHookTests(unittest.TestCase):
                             identity_service_claims(now, uuid.uuid4().hex)
                         )
                     ),
+                    FakeResponse(
+                        identity_service_response(
+                            identity_service_claims(
+                                now,
+                                uuid.uuid4().hex,
+                                client_id="XFramework.Communications",
+                            )
+                        )
+                    ),
                     FakeResponse(service_response(service_claims(now, uuid.uuid4().hex, exp=now + 90))),
                     FakeResponse(user_response(user_claims(now, str(uuid.uuid4())))),
                 ]
@@ -835,6 +992,7 @@ class RefreshTokenHookTests(unittest.TestCase):
                 set(json.loads(workspace.receipt.read_text())["tokenExpirationsUtc"]),
                 {
                     "communicationsTransport",
+                    "communicationsIdentityService",
                     "portalTransport",
                     "portalIdentityService",
                     "userActor",

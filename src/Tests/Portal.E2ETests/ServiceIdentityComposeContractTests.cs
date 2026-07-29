@@ -208,6 +208,9 @@ public sealed class ServiceIdentityComposeContractTests
         envExample.Should().Contain(
             "BOLT_SYNTHETIC_TARGET=wss://xeon-dev.tailed40e.ts.net:7000/bolt/ws");
         envExample.Should().Contain(
+            "BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_PATH=" +
+            "./.secrets/bolt-phase0/communications-identity-service-token");
+        envExample.Should().Contain(
             "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH=" +
             "./.secrets/bolt-phase0/portal-identity-service-token");
         envExample.Should().NotContain("BOLT_SYNTHETIC_PROXY_");
@@ -222,6 +225,9 @@ public sealed class ServiceIdentityComposeContractTests
         synthetics.Should().Contain(
             "BOLT_SYNTHETIC_TARGET: ${BOLT_SYNTHETIC_TARGET:" +
             "?Set the external Tailscale Serve WSS endpoint}");
+        synthetics.Should().Contain(
+            "BOLT_SYNTHETIC_COMMUNICATIONS_IDENTITY_SERVICE_TOKEN_FILE: " +
+            "/run/secrets/bolt-synthetic-communications-identity-service-token");
         synthetics.Should().Contain(
             "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_FILE: " +
             "/run/secrets/bolt-synthetic-portal-identity-service-token");
@@ -303,6 +309,10 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("\"--profile\", \"phase0-verification\", \"--env-file\", env_file");
         workflow.Should().Contain("os.replace(temporary, path)");
         workflow.Should().Contain("$REMOTE_RUN_DIR/legacy-previous.env");
+        workflow.Should().Contain("compose_tmp=\"${REMOTE_COMPOSE_FILE}.tmp.$$\"");
+        workflow.Should().Contain("trap 'stop_hub; exit 1' ERR");
+        workflow.Should().NotContain(
+            "install -m 600 \"$release/docker-compose.yml\" \"$REMOTE_COMPOSE_FILE\"");
         workflow.Should().NotContain("xframework-bolt-phase0-root ensure-watchdog");
         workflow.Should().NotContain("xframework-bolt-phase0-root verify-bootstrap");
         workflow.Should().Contain("systemctl is-active xframework-bolt-phase0-watchdog.service");
