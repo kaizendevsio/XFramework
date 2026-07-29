@@ -184,7 +184,7 @@ The Hub remains payload-agnostic. It performs frame admission, sender provenance
 - Normal and large-RPC paths enforce identical authorization.
 - FluentValidation still runs after authorization and preserves its existing response shape.
 - Manual handlers using legacy overloads preserve current behavior.
-- Successful token validation is reused without accepting a token beyond expiry.
+- Successful token validation is reused without accepting a token beyond expiry plus the configured JWT clock skew.
 - Generated source snapshots cover default authorization and optional policies.
 
 ### Review gate

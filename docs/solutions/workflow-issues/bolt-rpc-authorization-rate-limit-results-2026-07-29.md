@@ -37,6 +37,7 @@ All commands ran on Windows 11, .NET 10, x64 RyuJIT/AVX2.
 | Complete Bolt suite in Phase 0 CI, including PostgreSQL topic authorization | 551 passed |
 | Local Bolt suite without Docker-backed fixtures | 540 passed, 7 skipped |
 | Communications tests | 92 passed |
+| Communications validator follow-up | 93 passed |
 | IdentityServer unit tests | 31 passed |
 | Source-generator tests | 14 passed |
 | Browser tests | 19 passed |
@@ -49,6 +50,12 @@ GitHub Actions ran the complete Bolt suite against PostgreSQL and Redis-backed f
 Those two module fixtures construct synthetic Bolt Hub, service, and caller applications but do not host IdentityServer or replace the centralized transport-token and destination service-token providers. They therefore stop during fixture startup once mandatory service identity is enabled. This is test-infrastructure debt exposed by the centralized authentication rollout, not evidence of a production defect; it is not counted as a passing gate. Production compose declares IdentityServer authority, generation, and per-service credentials for Bolt Hub and every deployed Bolt client, and the coordinated staging deployment remains the real environment gate.
 
 Security regressions cover wrong audience, malformed/expired/invalid tokens, token/sender substitution, unavailable and rotated signing keys, failed-token cache behavior, pooled-connection quota bypass, malformed and spoofed frame admission, zero-recipient Push, large-RPC accounting, limiter replenishment and cleanup, generated-handler unary/large-RPC parity, validation ordering, unknown topics, denied durable acknowledgements, and acknowledgement/subscription replacement races.
+
+### Staging validator follow-up
+
+The coordinated staging synthetic run subsequently exposed a signature-provider lifetime defect that unit tests using only one destination token had not exercised. `ServiceTokenValidator` imported each signing key into an owned RSA instance and disposed it after validation, while IdentityModel's default signature-provider cache could retain a provider backed by that disposed RSA instance. The first destination token validated, but a second distinct token signed by the same IdentityServer key could return `401`.
+
+Imported verification keys now disable signature-provider caching, matching the IdentityServer token-issuance path and keeping provider lifetime within the owned RSA lifetime. A regression validates separate Portal and Communications tokens, with distinct callers and the same signing key, against the IdentityServer audience. The focused validator suite passes 11 tests, the complete Communications suite passes 93 tests, and the Phase 0 synthetic suite passes 41 tests with one platform-specific symbolic-link test skipped.
 
 The final ownership review also exposed a scheduling race where a successful reliable-send waiter could resume immediately before its pooled buffer decremented `PendingSends`. Success notification now follows buffer release, while timeout paths continue retaining ownership until a cancellation-ignoring physical write completes. The near-deadline lifecycle test passed 30 consecutive isolated repetitions; the synchronized outbound-stream cleanup test passed 10.
 

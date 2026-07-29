@@ -163,7 +163,44 @@ public sealed class ServiceTokenValidatorTests
     }
 
     [Test]
-    public async Task ValidateAsync_SuccessfulCache_DoesNotOutliveJwtExpiry()
+    public async Task ValidateAsync_DistinctTokensSignedBySameKey_BothValidate()
+    {
+        using var rsa = RSA.Create(2048);
+        var keyId = Guid.NewGuid().ToString("N");
+        var keyProvider = new TestSigningKeyProvider(rsa.ExportSubjectPublicKeyInfoPem(), keyId);
+        var validator = new ServiceTokenValidator(
+            keyProvider,
+            Options.Create(new ServiceIdentityOptions { Issuer = Issuer }));
+        var portalToken = CreateToken(
+            rsa,
+            keyId,
+            XFrameworkServiceNames.IdentityServer,
+            XFrameworkServiceNames.Portal,
+            [XFrameworkServiceScopes.BoltService]);
+        var communicationsToken = CreateToken(
+            rsa,
+            keyId,
+            XFrameworkServiceNames.IdentityServer,
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.BoltService]);
+
+        var portal = await validator.ValidateAsync(
+            portalToken,
+            XFrameworkServiceNames.IdentityServer,
+            [XFrameworkServiceScopes.BoltService]);
+        var communications = await validator.ValidateAsync(
+            communicationsToken,
+            XFrameworkServiceNames.IdentityServer,
+            [XFrameworkServiceScopes.BoltService]);
+
+        Assert.That(portal.IsValid, Is.True, portal.Error);
+        Assert.That(communications.IsValid, Is.True, communications.Error);
+        Assert.That(communications.CallerClientId, Is.EqualTo(XFrameworkServiceNames.Communications));
+        Assert.That(keyProvider.RequestCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task ValidateAsync_SuccessfulCache_RevalidatesAfterJwtExpiry()
     {
         var fixture = CreateTokenFixture(
             XFrameworkServiceNames.Communications,
@@ -179,7 +216,7 @@ public sealed class ServiceTokenValidatorTests
         var second = await validator.ValidateAsync(fixture.Token, XFrameworkServiceNames.Communications);
 
         Assert.That(first.IsValid, Is.True, first.Error);
-        Assert.That(second.IsValid, Is.False, "an expired token must not survive through the success cache");
+        Assert.That(second.IsValid, Is.True, "JWT clock skew still applies during revalidation");
         Assert.That(keyProvider.RequestCount, Is.EqualTo(2), "expired cache entries must be revalidated");
     }
 
@@ -215,6 +252,24 @@ public sealed class ServiceTokenValidatorTests
     {
         using var rsa = RSA.Create(2048);
         var keyId = Guid.NewGuid().ToString("N");
+        var token = CreateToken(
+            rsa,
+            keyId,
+            audience,
+            XFrameworkServiceNames.Portal,
+            scopes,
+            expiresAtUtc);
+        return new(token, rsa.ExportSubjectPublicKeyInfoPem(), keyId);
+    }
+
+    private static string CreateToken(
+        RSA rsa,
+        string keyId,
+        string audience,
+        string caller,
+        IReadOnlyCollection<string> scopes,
+        DateTime? expiresAtUtc = null)
+    {
         var securityKey = new RsaSecurityKey(rsa) { KeyId = keyId };
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.RsaSha256);
         var now = DateTime.UtcNow;
@@ -227,8 +282,8 @@ public sealed class ServiceTokenValidatorTests
             audience: audience,
             claims:
             [
-                new Claim("client_id", XFrameworkServiceNames.Portal),
-                new Claim(JwtRegisteredClaimNames.Sub, XFrameworkServiceNames.Portal),
+                new Claim("client_id", caller),
+                new Claim(JwtRegisteredClaimNames.Sub, caller),
                 new Claim("scope", string.Join(' ', scopes))
             ],
             notBefore: notBefore,
@@ -236,8 +291,7 @@ public sealed class ServiceTokenValidatorTests
             signingCredentials: credentials);
 
         jwt.Header["kid"] = keyId;
-        var token = new JwtSecurityTokenHandler().WriteToken(jwt);
-        return new(token, rsa.ExportSubjectPublicKeyInfoPem(), keyId);
+        return new JwtSecurityTokenHandler().WriteToken(jwt);
     }
 
     private sealed record TokenFixture(string Token, string PublicKeyPem, string KeyId);
