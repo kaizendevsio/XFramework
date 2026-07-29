@@ -114,10 +114,17 @@ public sealed class SyntheticReportValidatorTests
                 name == "durable_ack"
                     ? new Dictionary<string, string>
                     {
-                        ["cumulative_acknowledged"] = "true",
-                        ["duplicate_ack_idempotent"] = "true",
-                        ["out_of_order_ack_monotonic"] = "true"
+                        ["cumulative_ack_sent"] = "true",
+                        ["stale_ack_sent"] = "true",
+                        ["duplicate_ack_sent"] = "true",
+                        ["processing_barrier_passed"] = "true"
                     }
+                    : name == "durable_no_redelivery"
+                        ? new Dictionary<string, string>
+                        {
+                            ["acknowledgement_persisted"] = "true",
+                            ["no_redelivery"] = "true"
+                        }
                     : new Dictionary<string, string> { ["outcome"] = "passed" })).ToArray());
     }
 }
