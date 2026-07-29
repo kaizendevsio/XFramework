@@ -32,10 +32,6 @@ on:
         description: Type DEPLOY_XEON_DEV to authorize deployment from develop
         required: true
         type: string
-      transition_confirmation:
-        description: Type APPROVE_BOLT_TAILSCALE_TRANSITION for the one-time legacy transition
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -63,7 +59,6 @@ jobs:
       REMOTE_RUN_DIR: /home/github-runner/xframework-deploy/releases/${{ github.run_id }}-${{ github.run_attempt }}
       REMOTE_COMPOSE_FILE: /home/github-runner/xframework-deploy/docker-compose.yml
       REMOTE_ACTIVE_ENV: /home/github-runner/xframework-deploy/active.env
-      REMOTE_TRANSITION_ACCEPTANCE: /home/github-runner/xframework-deploy/bolt-transition-acceptance.json
       REMOTE_CANDIDATE_COMPOSE: /home/github-runner/xframework-deploy/releases/${{ github.run_id }}-${{ github.run_attempt }}/docker-compose.yml
       REMOTE_CANDIDATE_ENV: /home/github-runner/xframework-deploy/releases/${{ github.run_id }}-${{ github.run_attempt }}/candidate.env
       REMOTE_IMAGE_OVERRIDE: /home/github-runner/xframework-deploy/releases/${{ github.run_id }}-${{ github.run_attempt }}/images.override.json
@@ -75,8 +70,6 @@ jobs:
       IDENTITY_PUBLIC_URL: https://xeon-dev.tailed40e.ts.net:8261
       HUB_PUBLIC_URL: https://xeon-dev.tailed40e.ts.net:7000
       OBSERVATION_SECONDS: 120
-      DEPLOY_EVENT_NAME: ${{ github.event_name }}
-      TRANSITION_CONFIRMATION: ${{ inputs.transition_confirmation }}
       DB_PASSWORD: compose-validation-placeholder
       JWT_SECRET: compose-validation-placeholder
       BOLT_SIGNATURE: compose-validation-placeholder
@@ -295,7 +288,7 @@ jobs:
           scp scripts/refresh-bolt-phase0-synthetic-tokens.py "$DEPLOY_HOST:$REMOTE_REFRESH_TOKENS"
 
           ssh "$DEPLOY_HOST" \
-            "REMOTE_DEPLOY_DIR='$REMOTE_DEPLOY_DIR' REMOTE_RELEASES_DIR='$REMOTE_RELEASES_DIR' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_ACTIVE_ENV='$REMOTE_ACTIVE_ENV' REMOTE_TRANSITION_ACCEPTANCE='$REMOTE_TRANSITION_ACCEPTANCE' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_CANDIDATE_ENV='$REMOTE_CANDIDATE_ENV' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' REMOTE_CONFIGURE_BOUNDARY='$REMOTE_CONFIGURE_BOUNDARY' REMOTE_VERIFY_BOUNDARY='$REMOTE_VERIFY_BOUNDARY' REMOTE_VERIFY_DIAGNOSTICS='$REMOTE_VERIFY_DIAGNOSTICS' REMOTE_REFRESH_TOKENS='$REMOTE_REFRESH_TOKENS' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' IDENTITY_PUBLIC_URL='$IDENTITY_PUBLIC_URL' HUB_PUBLIC_URL='$HUB_PUBLIC_URL' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' DEPLOY_EVENT_NAME='$DEPLOY_EVENT_NAME' TRANSITION_CONFIRMATION='$TRANSITION_CONFIRMATION' bash -s" <<'REMOTE_SCRIPT'
+            "REMOTE_DEPLOY_DIR='$REMOTE_DEPLOY_DIR' REMOTE_RELEASES_DIR='$REMOTE_RELEASES_DIR' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_ACTIVE_ENV='$REMOTE_ACTIVE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_CANDIDATE_ENV='$REMOTE_CANDIDATE_ENV' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' REMOTE_CONFIGURE_BOUNDARY='$REMOTE_CONFIGURE_BOUNDARY' REMOTE_VERIFY_BOUNDARY='$REMOTE_VERIFY_BOUNDARY' REMOTE_VERIFY_DIAGNOSTICS='$REMOTE_VERIFY_DIAGNOSTICS' REMOTE_REFRESH_TOKENS='$REMOTE_REFRESH_TOKENS' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' IDENTITY_PUBLIC_URL='$IDENTITY_PUBLIC_URL' HUB_PUBLIC_URL='$HUB_PUBLIC_URL' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
           umask 077
           chmod 600 "$REMOTE_CANDIDATE_COMPOSE"
@@ -531,64 +524,14 @@ jobs:
           PY
             while IFS=$'\t' read -r requirement value; do
               case "$requirement" in
-                image) docker image inspect "$value" >/dev/null ;;
+                image)
+                  docker image inspect "$value" >/dev/null ||
+                    /usr/bin/timeout --foreground --kill-after=10s 10m docker pull "$value"
+                  ;;
                 file) test -f "$value" && test ! -L "$value" ;;
                 *) echo "Unknown rollback requirement." >&2; exit 1 ;;
               esac
             done < "$previous_requirements"
-            if [ "$selected_kind" = legacy ]; then
-              if [ "$DEPLOY_EVENT_NAME" != workflow_dispatch ] || \
-                 [ "$TRANSITION_CONFIRMATION" != APPROVE_BOLT_TAILSCALE_TRANSITION ]; then
-                echo "The first Tailscale boundary transition is dispatch-only and requires explicit transition confirmation." >&2
-                exit 1
-              fi
-              test -f "$REMOTE_TRANSITION_ACCEPTANCE"
-              test ! -L "$REMOTE_TRANSITION_ACCEPTANCE"
-              IFS=: read -r acceptance_owner acceptance_mode acceptance_links acceptance_size \
-                < <(stat -Lc '%u:%a:%h:%s' "$REMOTE_TRANSITION_ACCEPTANCE")
-              test "$acceptance_owner" = "$(id -u)"
-              test "$acceptance_mode" = 600
-              test "$acceptance_links" = 1
-              test "$acceptance_size" -gt 0
-              test "$acceptance_size" -le 16384
-              python3 - "$REMOTE_TRANSITION_ACCEPTANCE" "$selected_release" <<'PY'
-          import datetime as dt
-          import json
-          import pathlib
-          import re
-          import sys
-
-          evidence_path, selected_release = sys.argv[1:]
-          evidence = json.loads(pathlib.Path(evidence_path).read_text(encoding="utf-8"))
-          expected_keys = {
-              "schema", "generated_at_utc", "legacy_release", "legacy_restore_passed",
-              "tailscale_acl_applied", "allowed_probe", "denied_probe",
-          }
-          if set(evidence) != expected_keys:
-              raise SystemExit("transition acceptance fields are invalid")
-          if evidence["schema"] != "xframework.bolt.transition-acceptance.v1":
-              raise SystemExit("transition acceptance schema is invalid")
-          if evidence["legacy_release"] != selected_release:
-              raise SystemExit("transition acceptance names a different legacy release")
-          if evidence["legacy_restore_passed"] is not True or evidence["tailscale_acl_applied"] is not True:
-              raise SystemExit("transition acceptance is incomplete")
-          generated = dt.datetime.fromisoformat(evidence["generated_at_utc"].replace("Z", "+00:00"))
-          now = dt.datetime.now(dt.timezone.utc)
-          if generated.tzinfo is None or generated > now + dt.timedelta(minutes=5) or now - generated > dt.timedelta(hours=24):
-              raise SystemExit("transition acceptance is stale")
-          sources = []
-          for name in ("allowed_probe", "denied_probe"):
-              probe = evidence[name]
-              if set(probe) != {"source", "passed"} or probe["passed"] is not True:
-                  raise SystemExit(f"{name} did not pass")
-              source = probe["source"]
-              if not isinstance(source, str) or not re.fullmatch(r"[A-Za-z0-9.-]+\.ts\.net", source):
-                  raise SystemExit(f"{name} source is invalid")
-              sources.append(source.lower())
-          if sources[0] == sources[1]:
-              raise SystemExit("allowed and denied probes must use different identities")
-          PY
-            fi
             printf '%s\n' "$selected_release" > "$REMOTE_RUN_DIR/previous-release"
             printf '%s\n' "$selected_kind" > "$REMOTE_RUN_DIR/previous-release-kind"
             chmod 600 "$REMOTE_RUN_DIR/previous-release" "$REMOTE_RUN_DIR/previous-release-kind"
