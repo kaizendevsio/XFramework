@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 using Bolt.Client;
 using Bolt.Server;
 using Bolt.Server.Durable;
@@ -14,7 +15,7 @@ namespace Bolt.Phase0Synthetics.Tests;
 [NonParallelizable]
 public sealed class ActorTokenPropagationIntegrationTests
 {
-    private const string ActorToken = "synthetic-user-actor-token";
+    private static readonly string ActorToken = CreateActorToken();
     private static int _portCounter = 23200;
 
     [Test]
@@ -68,14 +69,15 @@ public sealed class ActorTokenPropagationIntegrationTests
                     .GetAsyncEnumerator(durableCts.Token);
                 var pending = durable.MoveNextAsync().AsTask();
                 await authorizer.WaitForAsync(BoltTopicOperation.Subscribe, durable: true);
+
+                await client.AckAsync(durableTopic, subscriberId, 1, actorAccessToken: ActorToken);
+                await authorizer.WaitForAsync(BoltTopicOperation.Ack, durable: true);
+
                 durableCts.Cancel();
                 await IgnoreCancellationAsync(pending);
                 await IgnoreCancellationAsync(durable.DisposeAsync().AsTask());
                 await authorizer.WaitForAsync(BoltTopicOperation.Unsubscribe, durable: true);
             }
-
-            await client.AckAsync(durableTopic, subscriberId, 1, actorAccessToken: ActorToken);
-            await authorizer.WaitForAsync(BoltTopicOperation.Ack, durable: true);
 
             await client.UnregisterDurableSubscriptionWithActorAsync(
                 durableTopic,
@@ -104,6 +106,16 @@ public sealed class ActorTokenPropagationIntegrationTests
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private static string CreateActorToken()
+    {
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds();
+        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{{\"exp\":{expiresAt}}}"))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        return $"e30.{payload}.c2ln";
     }
 
     private static async Task WaitForHealthAsync(int port)
