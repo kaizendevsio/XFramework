@@ -296,7 +296,7 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("\"--profile\", \"phase0-verification\", \"--env-file\", env_file");
         workflow.Should().Contain("os.replace(temporary, path)");
         workflow.Should().Contain("$REMOTE_RUN_DIR/legacy-previous.env");
-        workflow.Should().Contain("sudo -n -l /usr/local/sbin/xframework-bolt-phase0-root ensure-watchdog");
+        workflow.Should().NotContain("xframework-bolt-phase0-root ensure-watchdog");
         workflow.Should().NotContain("xframework-bolt-phase0-root verify-bootstrap");
         workflow.Should().Contain("systemctl is-active xframework-bolt-phase0-watchdog.service");
         workflow.Should().Contain("flock -n 9");
