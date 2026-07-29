@@ -2990,8 +2990,12 @@ public sealed class BoltServer : IDisposable
             await gate.WaitAsync(ct);
             try
             {
-                if (_liveDurableConnections.TryGetValue(durableKey, out var mappedConnection) &&
-                    ReferenceEquals(mappedConnection, conn))
+                if (!_liveDurableConnections.TryGetValue(durableKey, out var mappedConnection))
+                {
+                    if (permanent && _durableStore is not null)
+                        await _durableStore.UnregisterDurableSubscriberAsync(topicHash, subscriberId, ct);
+                }
+                else if (ReferenceEquals(mappedConnection, conn))
                 {
                     if (permanent && _durableStore is not null)
                         await _durableStore.UnregisterDurableSubscriberAsync(topicHash, subscriberId, ct);
@@ -3006,6 +3010,14 @@ public sealed class BoltServer : IDisposable
                     }
 
                     RemoveDurableReplayState(durableKey, conn);
+                }
+                else if (permanent)
+                {
+                    _logger.LogWarning(
+                        "Rejected permanent durable unsubscribe from non-current subscriber session. client={ClientId} topic={Topic} subscriber={Subscriber}",
+                        conn.ClientId,
+                        topic,
+                        subscriberId);
                 }
             }
             finally

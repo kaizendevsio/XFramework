@@ -752,6 +752,114 @@ public sealed class BoltPhase0ContainmentTests
     }
 
     [Test]
+    public async Task DurablePermanentUnsubscribe_WhenDetached_RemovesOfflineSubscription()
+    {
+        var authorizer = new CountingAllowAuthorizer();
+        var durableOptions = Options.Create(new DurableQueueOptions());
+        var durableStore = new InMemoryDurableQueueStore(
+            durableOptions,
+            NullLogger<InMemoryDurableQueueStore>.Instance);
+        using var server = new BoltServer(
+            NullLogger<BoltServer>.Instance,
+            new BoltServerOptions(),
+            durableStore,
+            durableOptions,
+            [authorizer]);
+        await using var connection = new ChannelBoltConnection();
+        var connectionTask = server.HandleConnectionAsync(connection, CancellationToken.None);
+
+        connection.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "offline-owner", "OfflineOwner")));
+        await connection.WaitForSentFramesAsync(1);
+        const string topic = "durable.offline.unregister";
+        const string subscriberId = "offline-subscriber";
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        connection.Enqueue(WriteFrame(writer => BoltCodec.WriteSubscribe(
+            writer,
+            topic,
+            subscriberId,
+            durable: true)));
+        await WaitForDurableBindingAsync(server, topic, subscriberId, "offline-owner");
+        await durableStore.AppendAsync(topicHash, subscriberId, new byte[] { 1 });
+
+        connection.Enqueue(WriteFrame(writer => BoltCodec.WriteUnsubscribe(
+            writer,
+            topic,
+            subscriberId,
+            permanent: false)));
+        await WaitForNoDurableBindingAsync(server, topicHash, subscriberId);
+        (await durableStore.IsDurableSubscriberRegisteredAsync(topicHash, subscriberId)).Should().BeTrue();
+
+        connection.Enqueue(WriteFrame(writer => BoltCodec.WriteUnsubscribe(
+            writer,
+            topic,
+            subscriberId,
+            permanent: true)));
+        connection.Enqueue(WriteFrame(writer => BoltCodec.WritePublish(
+            writer,
+            "durable.unregister.barrier",
+            false,
+            [2])));
+        await authorizer.WaitForCallsAsync(4);
+        (await durableStore.IsDurableSubscriberRegisteredAsync(topicHash, subscriberId)).Should().BeFalse();
+        (await durableStore.GetLastAckedSequenceAsync(topicHash, subscriberId)).Should().Be(0);
+
+        connection.Complete();
+        await connectionTask.WaitAsync(TimeSpan.FromSeconds(3));
+    }
+
+    [Test]
+    public async Task DurablePermanentUnsubscribe_WhenAnotherSessionOwnsSubscription_DoesNotRemoveIt()
+    {
+        var authorizer = new CountingAllowAuthorizer();
+        var durableOptions = Options.Create(new DurableQueueOptions());
+        var durableStore = new InMemoryDurableQueueStore(
+            durableOptions,
+            NullLogger<InMemoryDurableQueueStore>.Instance);
+        using var server = new BoltServer(
+            NullLogger<BoltServer>.Instance,
+            new BoltServerOptions(),
+            durableStore,
+            durableOptions,
+            [authorizer]);
+        await using var owner = new ChannelBoltConnection();
+        await using var other = new ChannelBoltConnection();
+        var ownerTask = server.HandleConnectionAsync(owner, CancellationToken.None);
+        var otherTask = server.HandleConnectionAsync(other, CancellationToken.None);
+
+        owner.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "current-owner", "CurrentOwner")));
+        other.Enqueue(WriteFrame(writer => BoltCodec.WriteRegister(writer, "other-session", "OtherSession")));
+        await Task.WhenAll(owner.WaitForSentFramesAsync(1), other.WaitForSentFramesAsync(1));
+        const string topic = "durable.unregister.ownership";
+        const string subscriberId = "owned-subscriber";
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        owner.Enqueue(WriteFrame(writer => BoltCodec.WriteSubscribe(
+            writer,
+            topic,
+            subscriberId,
+            durable: true)));
+        await WaitForDurableBindingAsync(server, topic, subscriberId, "current-owner");
+
+        other.Enqueue(WriteFrame(writer => BoltCodec.WriteUnsubscribe(
+            writer,
+            topic,
+            subscriberId,
+            permanent: true)));
+        other.Enqueue(WriteFrame(writer => BoltCodec.WritePublish(
+            writer,
+            "durable.unregister.ownership.barrier",
+            false,
+            [2])));
+        await authorizer.WaitForCallsAsync(3);
+
+        GetDurableBinding(server, topicHash, subscriberId).ClientId.Should().Be("current-owner");
+        (await durableStore.IsDurableSubscriberRegisteredAsync(topicHash, subscriberId)).Should().BeTrue();
+
+        owner.Complete();
+        other.Complete();
+        await Task.WhenAll(ownerTask, otherTask).WaitAsync(TimeSpan.FromSeconds(3));
+    }
+
+    [Test]
     public async Task DurableReplayReplacement_ObsoleteReplayCannotDrainNewOwnerDeferredEvents()
     {
         var authorizer = new CountingAllowAuthorizer();
