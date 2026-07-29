@@ -353,11 +353,14 @@ jobs:
           }
           for name in superseded:
               values.pop(name, None)
+          if not hub_url.startswith("https://"):
+              raise SystemExit("Hub public URL must use HTTPS")
+          hub_websocket_url = f"wss://{hub_url.removeprefix('https://').rstrip('/')}/bolt/ws"
           overrides = {
               "BOLT_HUB_EXPOSE_PORT": "7000",
               "IDENTITYSERVER_EXPOSE_PORT": "8261",
               "BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL": identity_url,
-              "BOLT_SYNTHETIC_TARGET": f"{hub_url}/bolt/ws",
+              "BOLT_SYNTHETIC_TARGET": hub_websocket_url,
               "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH": f"{token_dir}/communications-transport-token",
               "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH": f"{token_dir}/portal-transport-token",
               "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH": f"{token_dir}/user-actor-token",
