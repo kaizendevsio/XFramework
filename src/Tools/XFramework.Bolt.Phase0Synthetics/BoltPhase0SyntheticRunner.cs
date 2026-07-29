@@ -708,6 +708,7 @@ public sealed class BoltPhase0SyntheticRunner
         {
             ["communications_transport"] = options.CommunicationsTransportToken.Sha256Prefix,
             ["portal_transport"] = options.PortalTransportToken.Sha256Prefix,
+            ["portal_identity_service"] = options.PortalIdentityServiceToken.Sha256Prefix,
             ["user_actor"] = options.UserActorToken.Sha256Prefix
         };
         if (options.ExpiryTransportToken is not null)

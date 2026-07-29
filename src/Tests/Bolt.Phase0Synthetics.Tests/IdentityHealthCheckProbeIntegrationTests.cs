@@ -46,12 +46,14 @@ public sealed class IdentityHealthCheckProbeIntegrationTests
                 Sha256Hex("XFramework.IdentityServer"),
                 "XFramework.IdentityServer");
             string? actorAccessToken = null;
+            string? serviceAccessToken = null;
             identityService.RegisterHandler(
                 nameof(HealthCheckRequest),
                 (payload, _) =>
                 {
                     var request = MemoryPackSerializer.Deserialize<HealthCheckRequest>(payload.Span);
                     actorAccessToken = request?.Metadata?.ActorAccessToken;
+                    serviceAccessToken = request?.Metadata?.ServiceAccessToken;
                     var response = new QueryResponse<HealthCheckResponse>
                     {
                         HttpStatusCode = HttpStatusCode.OK,
@@ -78,6 +80,7 @@ public sealed class IdentityHealthCheckProbeIntegrationTests
 
             IdentityHealthCheckProbe.CommandName.Should().Be(nameof(HealthCheckRequest));
             actorAccessToken.Should().Be("user-actor-test-token");
+            serviceAccessToken.Should().Be("portal-identity-service-test-token");
         }
         finally
         {
@@ -107,6 +110,7 @@ public sealed class IdentityHealthCheckProbeIntegrationTests
             "integration-test",
             new SecretToken("communications-transport-test-token"),
             new SecretToken("portal-transport-test-token"),
+            new SecretToken("portal-identity-service-test-token"),
             new SecretToken("user-actor-test-token"),
             TimeSpan.FromSeconds(5),
             null,

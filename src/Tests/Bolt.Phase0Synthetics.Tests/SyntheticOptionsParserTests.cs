@@ -21,6 +21,7 @@ public sealed class SyntheticOptionsParserTests
         options.DeviceId.Should().Be("phase0_device");
         options.CommunicationsTransportToken.ToString().Should().Be("[REDACTED]");
         options.PortalTransportToken.ToString().Should().Be("[REDACTED]");
+        options.PortalIdentityServiceToken.ToString().Should().Be("[REDACTED]");
         options.UserActorToken.ToString().Should().Be("[REDACTED]");
     }
 
@@ -103,6 +104,8 @@ public sealed class SyntheticOptionsParserTests
             "/run/secrets/communications-transport";
         environment[SyntheticOptionsParser.PortalTransportTokenFileEnvironmentVariable] =
             "/run/secrets/portal-transport";
+        environment[SyntheticOptionsParser.PortalIdentityServiceTokenFileEnvironmentVariable] =
+            "/run/secrets/portal-identity-service";
         environment[SyntheticOptionsParser.UserActorTokenFileEnvironmentVariable] = "/run/secrets/user-actor";
         environment[SyntheticOptionsParser.ExpiryTransportTokenFileEnvironmentVariable] =
             "/run/secrets/expiry-transport";
@@ -120,6 +123,7 @@ public sealed class SyntheticOptionsParserTests
         reads.Should().Equal(
             "/run/secrets/communications-transport",
             "/run/secrets/portal-transport",
+            "/run/secrets/portal-identity-service",
             "/run/secrets/user-actor",
             "/run/secrets/expiry-transport");
         reads.Should().OnlyHaveUniqueItems();
@@ -128,6 +132,8 @@ public sealed class SyntheticOptionsParserTests
             .Be(new SecretToken("file-token-communications-transport").Sha256Prefix);
         options.PortalTransportToken.Sha256Prefix.Should()
             .Be(new SecretToken("file-token-portal-transport").Sha256Prefix);
+        options.PortalIdentityServiceToken.Sha256Prefix.Should()
+            .Be(new SecretToken("file-token-portal-identity-service").Sha256Prefix);
         options.ExpiryTransportToken!.Sha256Prefix.Should()
             .Be(new SecretToken("file-token-expiry-transport").Sha256Prefix);
     }
@@ -209,6 +215,8 @@ public sealed class SyntheticOptionsParserTests
                 "communications-transport-secret-token",
             [SyntheticOptionsParser.DefaultPortalTransportTokenEnvironmentVariable] =
                 "portal-transport-secret-token",
+            [SyntheticOptionsParser.DefaultPortalIdentityServiceTokenEnvironmentVariable] =
+                "portal-identity-service-secret-token",
             [SyntheticOptionsParser.DefaultUserActorTokenEnvironmentVariable] = "user-actor-secret-token"
         };
 }

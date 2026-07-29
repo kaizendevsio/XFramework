@@ -676,6 +676,7 @@ services:
       BOLT_SYNTHETIC_DEVICE_ID: ${BOLT_SYNTHETIC_DEVICE_ID:-phase0-deployment-gate}
       BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_FILE: /run/secrets/bolt-synthetic-communications-transport-token
       BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_FILE: /run/secrets/bolt-synthetic-portal-transport-token
+      BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_FILE: /run/secrets/bolt-synthetic-portal-identity-service-token
       BOLT_SYNTHETIC_USER_ACTOR_TOKEN_FILE: /run/secrets/bolt-synthetic-user-actor-token
       BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_FILE: /run/secrets/bolt-synthetic-expiry-transport-token
     secrets:
@@ -684,6 +685,9 @@ services:
         mode: 0400
       - source: bolt-synthetic-portal-transport-token
         target: /run/secrets/bolt-synthetic-portal-transport-token
+        mode: 0400
+      - source: bolt-synthetic-portal-identity-service-token
+        target: /run/secrets/bolt-synthetic-portal-identity-service-token
         mode: 0400
       - source: bolt-synthetic-user-actor-token
         target: /run/secrets/bolt-synthetic-user-actor-token
@@ -727,6 +731,8 @@ secrets:
     file: ${BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH:?Set BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH in the protected deployment env}
   bolt-synthetic-portal-transport-token:
     file: ${BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH:?Set BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH in the protected deployment env}
+  bolt-synthetic-portal-identity-service-token:
+    file: ${BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH:?Set BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH in the protected deployment env}
   bolt-synthetic-user-actor-token:
     file: ${BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH:?Set BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH in the protected deployment env}
   bolt-synthetic-expiry-transport-token:

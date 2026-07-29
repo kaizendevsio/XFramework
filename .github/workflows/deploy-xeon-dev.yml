@@ -92,6 +92,7 @@ jobs:
       BOLT_SYNTHETIC_TARGET: wss://xeon-dev.tailed40e.ts.net:7000/bolt/ws
       BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-communications-transport-token
       BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-portal-transport-token
+      BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-portal-identity-service-token
       BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-user-actor-token
       BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-expiry-transport-token
 
@@ -205,6 +206,7 @@ jobs:
 
           install -m 600 /dev/null "$BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH"
           install -m 600 /dev/null "$BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH"
+          install -m 600 /dev/null "$BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH"
           install -m 600 /dev/null "$BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH"
           install -m 600 /dev/null "$BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH"
           timeout --foreground --kill-after=10s 60s docker compose -f "$COMPOSE_FILE_PATH" config --quiet
@@ -302,6 +304,7 @@ jobs:
           install -d -m 700 "$token_dir"
           install -m 600 /dev/null "$token_dir/communications-transport-token"
           install -m 600 /dev/null "$token_dir/portal-transport-token"
+          install -m 600 /dev/null "$token_dir/portal-identity-service-token"
           install -m 600 /dev/null "$token_dir/user-actor-token"
           install -m 600 /dev/null "$token_dir/expiry-transport-token"
           python3 - "$XFRAMEWORK_ENV_FILE" "$REMOTE_CANDIDATE_ENV" "$IDENTITY_PUBLIC_URL" "$HUB_PUBLIC_URL" "$token_dir" <<'PY'
@@ -363,6 +366,7 @@ jobs:
               "BOLT_SYNTHETIC_TARGET": hub_websocket_url,
               "BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH": f"{token_dir}/communications-transport-token",
               "BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH": f"{token_dir}/portal-transport-token",
+              "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH": f"{token_dir}/portal-identity-service-token",
               "BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH": f"{token_dir}/user-actor-token",
               "BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH": f"{token_dir}/expiry-transport-token",
           }
@@ -890,6 +894,7 @@ jobs:
           rm -f \
             "$REMOTE_RUN_DIR/synthetic-tokens/communications-transport-token" \
             "$REMOTE_RUN_DIR/synthetic-tokens/portal-transport-token" \
+            "$REMOTE_RUN_DIR/synthetic-tokens/portal-identity-service-token" \
             "$REMOTE_RUN_DIR/synthetic-tokens/user-actor-token" \
             "$REMOTE_RUN_DIR/synthetic-tokens/expiry-transport-token"
           rmdir "$REMOTE_RUN_DIR/synthetic-tokens"
@@ -950,6 +955,7 @@ jobs:
           install -d -m 700 "$token_dir"
           install -m 600 /dev/null "$token_dir/communications-transport-token"
           install -m 600 /dev/null "$token_dir/portal-transport-token"
+          install -m 600 /dev/null "$token_dir/portal-identity-service-token"
           install -m 600 /dev/null "$token_dir/user-actor-token"
           install -m 600 /dev/null "$token_dir/expiry-transport-token"
           printf '%s\n' "$IMAGE_TAG" > "$REMOTE_RUN_DIR/commit"
@@ -976,6 +982,7 @@ jobs:
             rm -f \
               "$REMOTE_RUN_DIR/synthetic-tokens/communications-transport-token" \
               "$REMOTE_RUN_DIR/synthetic-tokens/portal-transport-token" \
+              "$REMOTE_RUN_DIR/synthetic-tokens/portal-identity-service-token" \
               "$REMOTE_RUN_DIR/synthetic-tokens/user-actor-token" \
               "$REMOTE_RUN_DIR/synthetic-tokens/expiry-transport-token"
             rmdir "$REMOTE_RUN_DIR/synthetic-tokens" 2>/dev/null || true
@@ -1097,5 +1104,6 @@ jobs:
           rm -f \
             "$BOLT_SYNTHETIC_COMMUNICATIONS_TRANSPORT_TOKEN_PATH" \
             "$BOLT_SYNTHETIC_PORTAL_TRANSPORT_TOKEN_PATH" \
+            "$BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH" \
             "$BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH" \
             "$BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH"

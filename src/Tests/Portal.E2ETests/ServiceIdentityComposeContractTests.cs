@@ -207,6 +207,9 @@ public sealed class ServiceIdentityComposeContractTests
             "BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL=https://xeon-dev.tailed40e.ts.net:8261");
         envExample.Should().Contain(
             "BOLT_SYNTHETIC_TARGET=wss://xeon-dev.tailed40e.ts.net:7000/bolt/ws");
+        envExample.Should().Contain(
+            "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH=" +
+            "./.secrets/bolt-phase0/portal-identity-service-token");
         envExample.Should().NotContain("BOLT_SYNTHETIC_PROXY_");
         envExample.Should().NotContain("BOLT_SYNTHETIC_PLAINTEXT_REJECTION_COMMAND_PATH");
         envExample.Should().NotContain("BOLT_SYNTHETIC_REDIS_INTERRUPTION_COMMAND_PATH");
@@ -215,9 +218,13 @@ public sealed class ServiceIdentityComposeContractTests
         operationsDashboard.Should().Contain(
             "BoltConfiguration__ServerUrls__0: ws://bolt-hub:8080/bolt/ws");
         operationsDashboard.Should().Contain("BoltConfiguration__RequireSecureTransport: false");
-        ExtractService(compose, "bolt-phase0-synthetics").Should().Contain(
+        var synthetics = ExtractService(compose, "bolt-phase0-synthetics");
+        synthetics.Should().Contain(
             "BOLT_SYNTHETIC_TARGET: ${BOLT_SYNTHETIC_TARGET:" +
             "?Set the external Tailscale Serve WSS endpoint}");
+        synthetics.Should().Contain(
+            "BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_FILE: " +
+            "/run/secrets/bolt-synthetic-portal-identity-service-token");
 
         var identityDependencies = ExtractSection(
             identityServer,
