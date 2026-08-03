@@ -84,7 +84,7 @@ public sealed class BoltTransportTokenIssuerTests
     }
 
     [Test]
-    public void Configuration_AllowInsecureHttp_IsLimitedToDevelopmentAndTest()
+    public void Configuration_AllowInsecureHttp_IsLimitedToDevelopmentTestAndDocker()
     {
         var now = DateTimeOffset.Parse("2026-07-13T01:00:00Z");
         var secureByDefault = ServiceIdentityConfiguration.FromConfiguration(
@@ -98,6 +98,14 @@ public sealed class BoltTransportTokenIssuerTests
                 includeSigningKeyPath: false),
             now,
             "Development");
+        var explicitlyInsecureDocker = ServiceIdentityConfiguration.FromConfiguration(
+            CreateConfiguration(
+                now,
+                enabled: false,
+                allowInsecureHttp: true,
+                includeSigningKeyPath: false),
+            now,
+            "Docker");
 
         var productionParse = () => ServiceIdentityConfiguration.FromConfiguration(
             CreateConfiguration(
@@ -110,8 +118,9 @@ public sealed class BoltTransportTokenIssuerTests
 
         secureByDefault.AllowInsecureHttp.Should().BeFalse();
         explicitlyInsecure.AllowInsecureHttp.Should().BeTrue();
+        explicitlyInsecureDocker.AllowInsecureHttp.Should().BeTrue();
         productionParse.Should().Throw<InvalidOperationException>()
-            .WithMessage("*only in Development or Test environments*");
+            .WithMessage("*only in Development, Test, or Docker environments*");
     }
 
     [Test]
