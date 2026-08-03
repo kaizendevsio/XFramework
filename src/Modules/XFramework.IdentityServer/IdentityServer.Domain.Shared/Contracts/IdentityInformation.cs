@@ -8,11 +8,9 @@ namespace IdentityServer.Domain.Shared.Contracts;
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Both,
-    Actions = EndpointActions.All,
+    Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-info",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "identity-info"
+    RequireAuthorization = true
 )]
 public partial class IdentityInformation : BaseModel
 {
@@ -61,34 +59,6 @@ public partial class IdentityInformation : BaseModel
 
     [MemoryPackOrder(12)]
     public virtual ICollection<IdentityCredential> IdentityCredentials { get; set; } = new List<IdentityCredential>();
-}
-
-public class CreateIdentityInformationRequest
-{
-    public string? FirstName { get; set; }
-    public string? MiddleName { get; set; }
-    public string? LastName { get; set; }
-    public string? Suffix { get; set; }
-    public string? IdentityName { get; set; }
-    public string? IdentityDescription { get; set; }
-    public DateOnly? BirthDate { get; set; }
-    public Gender? Gender { get; set; }
-    public bool IsVerified { get; set; }
-    public CivilStatus? CivilStatus { get; set; }
-}
-
-public class UpdateIdentityInformationRequest
-{
-    public string? FirstName { get; set; }
-    public string? MiddleName { get; set; }
-    public string? LastName { get; set; }
-    public string? Suffix { get; set; }
-    public string? IdentityName { get; set; }
-    public string? IdentityDescription { get; set; }
-    public DateOnly? BirthDate { get; set; }
-    public Gender? Gender { get; set; }
-    public bool IsVerified { get; set; }
-    public CivilStatus? CivilStatus { get; set; }
 }
 
 public class GetIdentityInformationListRequest

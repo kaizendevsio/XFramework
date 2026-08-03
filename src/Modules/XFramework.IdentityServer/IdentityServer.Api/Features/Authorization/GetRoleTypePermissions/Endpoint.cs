@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.GetRoleTypePermissions;
 
 public static class GetRoleTypePermissionsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<RoleTypePermissionsResponse>> Handle(
         GetRoleTypePermissionsRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class GetRoleTypePermissionsEndpoint
     [MapPost("/api/identity/authorization/role-type-permissions/get", Tags = ["Identity Authorization"],
         Summary = "Get role type permissions",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.View,
+        ExcludeFromOpenApi = false)]
     public static Task<Result<RoleTypePermissionsResponse>> HandleHttp(
         GetRoleTypePermissionsRequest request,
         HttpContext httpContext,

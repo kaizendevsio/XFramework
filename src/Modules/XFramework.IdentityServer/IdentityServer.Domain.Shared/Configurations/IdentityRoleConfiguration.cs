@@ -16,12 +16,18 @@ public class IdentityRoleConfiguration : IEntityTypeConfiguration<IdentityRole>
 
         entity.HasIndex(e => e.CredentialId, "IX_tbl_IdentityRoles_UserCredID");
 
+        entity.HasIndex(e => new { e.TenantId, e.CredentialId, e.TypeId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_IdentityRole_Tenant_Credential_Type");
+
         entity.Property(e => e.Id)
             .HasColumnName("ID")
             .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
 
         entity.Property(e => e.TypeId).HasColumnName("RoleTypeID");
         entity.Property(e => e.CredentialId).HasColumnName("UserCredID");
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
 
         entity.HasOne(d => d.Type).WithMany(p => p.IdentityRoles)
             .HasForeignKey(d => d.TypeId)

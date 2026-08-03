@@ -25,8 +25,7 @@ public partial class IdentityState
             var result = await identityServerServiceWrapper.ChangePassword(new()
             {
                 CreadentialId = CurrentState.Credential.Id,
-                NewPassword = request.Password,
-                RequireVerificationId = false
+                NewPassword = request.Password
             });
                     
             // Handle if the response is invalid or error

@@ -14,10 +14,10 @@ public static class ServiceTokenMetadataExtensions
     {
         descriptor.Metadata ??= new RequestMetadata();
         descriptor.Metadata.RequestId ??= Guid.NewGuid();
-        descriptor.Metadata.ServiceAccessToken = await tokenProvider.GetTokenAsync(
-            audience,
-            [XFrameworkServiceScopes.DataContextQuery],
-            ct);
+        IReadOnlyCollection<string> scopes = descriptor.IgnoreQueryFilters
+            ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
+            : [XFrameworkServiceScopes.DataContextQuery];
+        descriptor.Metadata.ServiceAccessToken = await tokenProvider.GetTokenAsync(audience, scopes, ct);
     }
 
     public static async Task AttachServiceTokenAsync(

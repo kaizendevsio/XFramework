@@ -19,6 +19,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
     </ItemGroup>
 
 </Project>

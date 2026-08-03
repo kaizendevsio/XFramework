@@ -21,6 +21,7 @@ public class PortalE2ETests : PageTest
     private static string _userName = "Jane";
     private static string _userLastName = "Smith";
     private static string _identityName = $"janesmith-{Guid.NewGuid().ToString()[..6]}";
+    private static readonly Guid BootstrapAdminIdentityId = new("e9c13537-9726-4508-94e6-62806cb706f1");
 
     public override BrowserNewContextOptions ContextOptions()
     {
@@ -182,10 +183,46 @@ public class PortalE2ETests : PageTest
         // User name should be visible
         await Expect(Page.GetByText(_identityName)).ToBeVisibleAsync();
 
-        // Tabs should be visible
-        await Expect(Page.GetByRole(AriaRole.Tab, new() { NameRegex = new Regex("Credentials") })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Tab, new() { NameRegex = new Regex("Roles") })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Tab, new() { NameRegex = new Regex("Wallets") })).ToBeVisibleAsync();
+        // Detail sections use the shell sidebar and route-backed navigation.
+        var credentialsLink = Page.GetByRole(AriaRole.Link, new() { Name = "Credentials", Exact = true });
+        var rolesLink = Page.GetByRole(AriaRole.Link, new() { Name = "Roles", Exact = true });
+        var walletsLink = Page.GetByRole(AriaRole.Link, new() { Name = "Wallets", Exact = true });
+        await Expect(credentialsLink).ToBeVisibleAsync();
+        await Expect(rolesLink).ToBeVisibleAsync();
+        await Expect(walletsLink).ToBeVisibleAsync();
+
+        await credentialsLink.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/identity/users/[0-9a-f-]+/credentials$"));
+        await rolesLink.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/identity/users/[0-9a-f-]+/roles$"));
+        await walletsLink.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/identity/users/[0-9a-f-]+/wallets$"));
+    }
+
+    [Test, Order(24)]
+    public async Task Users_RolePermissionDialog_CanBeOpenedRepeatedly()
+    {
+        await Page.GotoAsync($"/identity/users/{BootstrapAdminIdentityId}/roles");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var editPermissions = Page.GetByRole(
+            AriaRole.Button,
+            new() { NameRegex = new Regex("^Edit permission overrides for") }).First;
+        await Expect(editPermissions).ToBeVisibleAsync();
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            await editPermissions.ClickAsync();
+            var dialog = Page.GetByRole(AriaRole.Dialog);
+            await Expect(dialog).ToBeVisibleAsync();
+            await Expect(dialog.GetByRole(AriaRole.Heading, new() { Name = "Role Permission Overrides" }))
+                .ToBeVisibleAsync();
+            await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Save Overrides" }))
+                .ToBeEnabledAsync();
+
+            await dialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+            await Expect(dialog).ToBeHiddenAsync();
+        }
     }
 
     // ==========================================

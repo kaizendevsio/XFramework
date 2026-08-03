@@ -42,6 +42,8 @@ public sealed class IdentityRoleTypeFeaturePermissionConfiguration :
             .HasDefaultValue(RoleCapabilityPermissionEffect.Allow)
             .HasSentinel(RoleCapabilityPermissionEffect.Allow);
 
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
+
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");

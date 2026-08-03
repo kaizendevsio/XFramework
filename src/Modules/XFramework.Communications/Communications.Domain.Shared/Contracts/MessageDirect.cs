@@ -76,4 +76,7 @@ public partial class MessageDirect : BaseModel
 
     [MemoryPackOrder(23)]
     public virtual MessageType Type { get; set; } = null!;
+
+    [MemoryPackOrder(24)]
+    public Guid? IdempotencyRequestId { get; set; }
 }

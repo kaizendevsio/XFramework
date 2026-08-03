@@ -25,7 +25,7 @@ public static class DataContextHandlerExtensions
                 {
                     var mutableEntities = GetMutableEntityNames(registrationType);
                     foreach (var (name, type) in entityTypes)
-                        queryService.RegisterEntity(type, name, mutableEntities?.Contains(name) ?? true);
+                        queryService.RegisterEntity(type, name, mutableEntities?.Contains(name) ?? false);
                 }
             }
 

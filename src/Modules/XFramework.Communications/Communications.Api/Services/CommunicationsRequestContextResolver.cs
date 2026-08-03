@@ -21,12 +21,19 @@ public sealed record CommunicationsTenantContext(
 
 public interface ICommunicationsRequestContextResolver
 {
-    Result<CommunicationsRequestContext> Resolve(RequestMetadata? metadata);
-    Result<CommunicationsTenantContext> ResolveTenant(RequestMetadata? metadata);
-    Result<CommunicationsTenantContext> ResolveAdmin(RequestMetadata? metadata);
-    Result<CommunicationsTenantContext> ResolveTrustedInternal(
+    Task<Result<CommunicationsRequestContext>> ResolveAsync(
         RequestMetadata? metadata,
-        params string[] allowedServiceNames);
+        CancellationToken ct = default);
+    Task<Result<CommunicationsTenantContext>> ResolveTenantAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct = default);
+    Task<Result<CommunicationsTenantContext>> ResolveAdminAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct = default);
+    Task<Result<CommunicationsTenantContext>> ResolveTrustedInternalAsync(
+        RequestMetadata? metadata,
+        IReadOnlyCollection<string>? allowedServiceNames = null,
+        CancellationToken ct = default);
 }
 
 public sealed class CommunicationsRequestContextResolver : ICommunicationsRequestContextResolver
@@ -51,21 +58,25 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         this.serviceInvocationResolver = serviceInvocationResolver;
     }
 
-    public Result<CommunicationsRequestContext> Resolve(RequestMetadata? metadata)
+    public async Task<Result<CommunicationsRequestContext>> ResolveAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct = default)
     {
-        var userContext = ResolveUserContext(metadata, enforceChatFeature: true);
+        var userContext = await ResolveUserContextAsync(metadata, enforceChatFeature: true, ct);
         if (!userContext.IsSuccess)
             return userContext;
 
         return Result<CommunicationsRequestContext>.Success(userContext.Data!);
     }
 
-    public Result<CommunicationsTenantContext> ResolveTenant(RequestMetadata? metadata)
+    public async Task<Result<CommunicationsTenantContext>> ResolveTenantAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct = default)
     {
         var httpContext = httpContextAccessor.HttpContext;
         var user = httpContext?.User;
-        var userContext = ResolveUserContext(metadata, enforceChatFeature: false);
-        var trustedInvocation = ResolveTrustedServerMetadata(metadata);
+        var userContext = await ResolveUserContextAsync(metadata, enforceChatFeature: false, ct);
+        var trustedInvocation = await ResolveTrustedServerMetadataAsync(metadata, ct);
         var isTrustedInternalRequest = trustedInvocation is not null;
         var trustedServiceName = trustedInvocation?.CallerClientId;
         var tenantId = ResolveTenantId(user)
@@ -99,7 +110,10 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         if (tenantId is null || tenantId == Guid.Empty)
             return Result<CommunicationsTenantContext>.Unauthorized("Authenticated tenant could not be resolved");
 
-        var moduleFeature = EnsureFeatureEnabled(tenantId.Value, TenantModuleFeatureKeys.Communications);
+        var moduleFeature = await EnsureFeatureEnabledAsync(
+            tenantId.Value,
+            TenantModuleFeatureKeys.Communications,
+            ct);
         if (!moduleFeature.IsSuccess)
             return Result<CommunicationsTenantContext>.Failure(
                 moduleFeature.Message ?? "Communications module is disabled for this tenant",
@@ -113,9 +127,11 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
             trustedServiceName));
     }
 
-    public Result<CommunicationsTenantContext> ResolveAdmin(RequestMetadata? metadata)
+    public async Task<Result<CommunicationsTenantContext>> ResolveAdminAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct = default)
     {
-        var contextResult = ResolveTenant(metadata);
+        var contextResult = await ResolveTenantAsync(metadata, ct);
         if (!contextResult.IsSuccess)
             return contextResult;
 
@@ -129,11 +145,12 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         return contextResult;
     }
 
-    public Result<CommunicationsTenantContext> ResolveTrustedInternal(
+    public async Task<Result<CommunicationsTenantContext>> ResolveTrustedInternalAsync(
         RequestMetadata? metadata,
-        params string[] allowedServiceNames)
+        IReadOnlyCollection<string>? allowedServiceNames = null,
+        CancellationToken ct = default)
     {
-        var contextResult = ResolveTenant(metadata);
+        var contextResult = await ResolveTenantAsync(metadata, ct);
         if (!contextResult.IsSuccess)
             return contextResult;
 
@@ -141,7 +158,7 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         if (!context.IsTrustedInternal)
             return Result<CommunicationsTenantContext>.Forbidden("Communications operation requires a trusted internal service context");
 
-        if (allowedServiceNames.Length > 0 &&
+        if (allowedServiceNames is { Count: > 0 } &&
             !allowedServiceNames.Any(name =>
                 string.Equals(name, context.TrustedServiceName, StringComparison.OrdinalIgnoreCase)))
         {
@@ -151,18 +168,19 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         return contextResult;
     }
 
-    private TrustedServiceInvocation? ResolveTrustedServerMetadata(RequestMetadata? metadata)
+    private async Task<TrustedServiceInvocation?> ResolveTrustedServerMetadataAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct)
     {
         if (serviceInvocationResolver is null)
             return null;
 
-        var result = serviceInvocationResolver.ResolveAsync(
-                metadata,
-                GetExpectedAudience(),
-                [XFrameworkServiceScopes.BoltService],
-                requireTenant: true)
-            .GetAwaiter()
-            .GetResult();
+        var result = await serviceInvocationResolver.ResolveAsync(
+            metadata,
+            GetExpectedAudience(),
+            [XFrameworkServiceScopes.BoltService],
+            requireTenant: true,
+            ct: ct);
 
         return result.IsSuccess ? result.Invocation : null;
     }
@@ -170,7 +188,10 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
     private string GetExpectedAudience() =>
         configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Communications;
 
-    private Result<CommunicationsRequestContext> ResolveUserContext(RequestMetadata? metadata, bool enforceChatFeature)
+    private async Task<Result<CommunicationsRequestContext>> ResolveUserContextAsync(
+        RequestMetadata? metadata,
+        bool enforceChatFeature,
+        CancellationToken ct)
     {
         var httpContext = httpContextAccessor.HttpContext;
         var user = httpContext?.User;
@@ -180,7 +201,7 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         if ((tenantId is null || credentialId is null) &&
             !string.IsNullOrWhiteSpace(metadata?.ActorAccessToken))
         {
-            var tokenPrincipal = DecodeActorToken(metadata.ActorAccessToken);
+            var tokenPrincipal = await DecodeActorTokenAsync(metadata.ActorAccessToken);
             if (tokenPrincipal is not null)
             {
                 tenantId ??= ResolveTenantId(tokenPrincipal);
@@ -212,7 +233,10 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
 
         if (enforceChatFeature)
         {
-            var chatFeature = EnsureFeatureEnabled(tenantId.Value, TenantModuleFeatureKeys.CommunicationsChat);
+            var chatFeature = await EnsureFeatureEnabledAsync(
+                tenantId.Value,
+                TenantModuleFeatureKeys.CommunicationsChat,
+                ct);
             if (!chatFeature.IsSuccess)
                 return Result<CommunicationsRequestContext>.Failure(
                     chatFeature.Message ?? "Communications chat is disabled for this tenant",
@@ -222,17 +246,21 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         return Result<CommunicationsRequestContext>.Success(new(credentialId.Value, tenantId.Value));
     }
 
-    private Result EnsureFeatureEnabled(Guid tenantId, string featureKey)
+    private async Task<Result> EnsureFeatureEnabledAsync(
+        Guid tenantId,
+        string featureKey,
+        CancellationToken ct)
     {
         if (featureService is null)
             return Result.Success();
 
         try
         {
-            return featureService
-                .EnsureEnabledAsync(tenantId, featureKey)
-                .GetAwaiter()
-                .GetResult();
+            return await featureService.EnsureEnabledAsync(tenantId, featureKey, ct: ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
@@ -240,14 +268,14 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         }
     }
 
-    private ClaimsPrincipal? DecodeActorToken(string token)
+    private async Task<ClaimsPrincipal?> DecodeActorTokenAsync(string token)
     {
         if (jwtService is null)
             return null;
 
         try
         {
-            return jwtService.DecodeJwtToken(token).GetAwaiter().GetResult().Item1;
+            return (await jwtService.DecodeJwtToken(token)).Item1;
         }
         catch
         {

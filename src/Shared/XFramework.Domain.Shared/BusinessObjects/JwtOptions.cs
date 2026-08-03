@@ -3,7 +3,8 @@
 public class JwtOptions
 {
     public string GenerationId { get; set; } = string.Empty;
-    public string Secret { get; set; } = string.Empty;
+    public string SigningPublicKeyPath { get; set; } = string.Empty;
+    public string? SigningPrivateKeyPath { get; set; }
     public JwtValidationFallbackOptions? ValidationFallback { get; set; }
     public string ValidIssuer { get; set; } = string.Empty;
     public string ValidAudience { get; set; } = string.Empty;
@@ -12,7 +13,7 @@ public class JwtOptions
 
     public bool HasValidationFallback => ValidationFallback is { } fallback
         && (!string.IsNullOrWhiteSpace(fallback.GenerationId)
-            || !string.IsNullOrWhiteSpace(fallback.Secret)
+            || !string.IsNullOrWhiteSpace(fallback.SigningPublicKeyPath)
             || fallback.ValidUntilUtc.HasValue);
 
     public IReadOnlyList<string> ValidationGenerationIds => !HasValidationFallback
@@ -23,6 +24,6 @@ public class JwtOptions
 public sealed class JwtValidationFallbackOptions
 {
     public string GenerationId { get; set; } = string.Empty;
-    public string Secret { get; set; } = string.Empty;
+    public string SigningPublicKeyPath { get; set; } = string.Empty;
     public DateTimeOffset? ValidUntilUtc { get; set; }
 }

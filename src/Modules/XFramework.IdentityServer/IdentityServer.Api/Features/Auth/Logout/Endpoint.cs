@@ -1,21 +1,30 @@
 using FluentValidation;
+using IdentityServer.Api.Features.Authorization.Shared;
 using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Api.Features.Auth.Logout;
 
 public static class LogoutEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    public static Task<Result> Handle(
+        LogoutRequest request,
+        IAuthService authService,
+        CancellationToken ct) => authService.LogoutAsync(request, ct);
+
     [MapPost("/api/auth/logout", Tags = ["Auth"],
         Summary = "Logout a user",
         Description = "Marks the user's session as Inactive. Creates an authorization log entry for audit trail.",
-        ExcludeFromOpenApi = true)]
-    public static async Task<Result> Handle(
+        RequireAuthorization = true,
+        ExcludeFromOpenApi = false)]
+    public static Task<Result> HandleHttp(
         LogoutRequest request,
+        HttpContext httpContext,
         IAuthService authService,
         CancellationToken ct)
     {
-        return await authService.LogoutAsync(request, ct);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        return authService.LogoutAsync(request, ct);
     }
 }
 

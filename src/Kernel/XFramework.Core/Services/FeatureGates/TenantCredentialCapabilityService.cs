@@ -93,20 +93,48 @@ public sealed class TenantCredentialCapabilityService(
         if (!IdentityAuthorizationConstants.CapabilityKeys.Contains(normalizedCapabilityKey))
             return Result<CapabilityDecision>.Failure("Capability key is invalid.", 400);
 
-        var credentialExists = await dbContext.Set<IdentityCredential>()
+        var now = DateTime.UtcNow;
+        var tenantExists = await dbContext.Set<Tenant>()
             .IgnoreQueryFilters()
             .AsNoTracking()
             .AnyAsync(x =>
+                x.Id == tenantId &&
+                !x.IsDeleted &&
+                x.IsEnabled &&
+                (x.AvailabilityDate == null || x.AvailabilityDate <= now) &&
+                (x.Expiration == null || x.Expiration > now),
+                ct);
+
+        if (!tenantExists)
+            return Result<CapabilityDecision>.NotFound("Tenant not found");
+
+        var credential = await dbContext.Set<IdentityCredential>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x =>
                 x.Id == credentialId &&
+                x.TenantId == tenantId &&
+                !x.IsDeleted &&
+                x.IsEnabled)
+            .Select(x => new { x.IdentityInfoId })
+            .FirstOrDefaultAsync(ct);
+
+        if (credential is null)
+            return Result<CapabilityDecision>.NotFound("Credential not found");
+
+        var identityExists = await dbContext.Set<IdentityInformation>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.Id == credential.IdentityInfoId &&
                 x.TenantId == tenantId &&
                 !x.IsDeleted &&
                 x.IsEnabled,
                 ct);
 
-        if (!credentialExists)
-            return Result<CapabilityDecision>.NotFound("Credential not found");
+        if (!identityExists)
+            return Result<CapabilityDecision>.NotFound("Identity not found");
 
-        var now = DateTime.UtcNow;
         var roles = await dbContext.Set<IdentityRole>()
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -125,6 +153,25 @@ public sealed class TenantCredentialCapabilityService(
 
         var roleIds = roles.Select(x => x.RoleId).ToList();
         var roleTypeIds = roles.Select(x => x.RoleTypeId).Distinct().ToList();
+        var activeRoleTypeIds = await dbContext.Set<IdentityRoleType>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                roleTypeIds.Contains(x.Id) &&
+                !x.IsDeleted &&
+                x.IsEnabled)
+            .Select(x => x.Id)
+            .ToListAsync(ct);
+
+        roles = roles
+            .Where(role => activeRoleTypeIds.Contains(role.RoleTypeId))
+            .ToList();
+        if (roles.Count == 0)
+            return Result<CapabilityDecision>.Success(new CapabilityDecision(false, "NoActiveRoleType"));
+
+        roleIds = roles.Select(x => x.RoleId).ToList();
+        roleTypeIds = roles.Select(x => x.RoleTypeId).Distinct().ToList();
         var capabilityKeys = BuildCapabilityKeySet(normalizedCapabilityKey);
 
         var overrides = await dbContext.Set<IdentityRoleFeaturePermissionOverride>()

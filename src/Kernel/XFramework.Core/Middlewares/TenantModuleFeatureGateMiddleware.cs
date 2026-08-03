@@ -156,6 +156,11 @@ public sealed class TenantModuleFeatureGateMiddleware(
 
     private static string ResolveCapabilityKey(HttpRequest request)
     {
+        var declaredRequirement = request.HttpContext.GetEndpoint()?
+            .Metadata.GetMetadata<TenantCapabilityRequirement>();
+        if (declaredRequirement is not null)
+            return declaredRequirement.CapabilityKey;
+
         var method = request.Method;
         if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method))
             return IdentityAuthorizationConstants.View;

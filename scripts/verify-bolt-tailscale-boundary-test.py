@@ -225,6 +225,44 @@ class BoundaryVerifierTests(unittest.TestCase):
             "compose.tls_secret.forbidden:bolt-hub", self.verify(compose=compose)
         )
 
+    def test_application_signing_key_secrets_are_not_treated_as_tls(self) -> None:
+        compose = valid_compose()
+        compose["services"]["bolt-hub"]["secrets"] = [
+            {
+                "source": "identity-user-jwt-public-key",
+                "target": "/run/secrets/identity-user-jwt-public-key.pem",
+            }
+        ]
+        compose["services"]["identityserver"]["secrets"] = [
+            {
+                "source": "identity-user-jwt-public-key",
+                "target": "/run/secrets/identity-user-jwt-public-key.pem",
+            },
+            {
+                "source": "identity-user-jwt-private-key",
+                "target": "/run/secrets/identity-user-jwt-private-key.pem",
+            },
+        ]
+        compose["secrets"] = {
+            "identity-user-jwt-public-key": {"file": "/keys/user-jwt-public.pem"},
+            "identity-user-jwt-private-key": {"file": "/keys/user-jwt-private.pem"},
+        }
+
+        self.assertEqual([], self.verify(compose=compose))
+
+    def test_application_signing_secret_with_wrong_target_fails_closed(self) -> None:
+        compose = valid_compose()
+        compose["services"]["identityserver"]["secrets"] = [
+            {
+                "source": "identity-user-jwt-private-key",
+                "target": "/run/secrets/identityserver-tls-private-key.pem",
+            }
+        ]
+
+        self.assertIn(
+            "compose.tls_secret.forbidden:identityserver", self.verify(compose=compose)
+        )
+
     def test_kestrel_https_environment_fails_closed(self) -> None:
         compose = valid_compose()
         compose["services"]["identityserver"]["environment"][

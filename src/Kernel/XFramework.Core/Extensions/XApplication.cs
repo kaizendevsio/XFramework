@@ -24,7 +24,7 @@ public static class XApplication
         services.InstallServicesInAssembly<T>(configuration, builder.Environment);
         services.InstallSwagger(configuration);
         services.InstallOData(configuration);
-        services.InstallJwt(configuration);
+        services.InstallJwt(configuration, builder.Environment);
         services.InstallStandardServices<T>(configuration);
         services.InstallRuntimeServices(configuration);
         

@@ -1,14 +1,18 @@
 using System.Security.Cryptography;
+using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Integration.DataContext.Cache;
 
 internal static class CacheKeyBuilder
 {
-    public static string ForQuery<T>(QueryDescriptor descriptor)
+    public static string ForQuery<T>(QueryDescriptor descriptor, RequestMetadata metadata)
     {
         var hash = ComputeDescriptorHash(descriptor);
-        return $"{typeof(T).Name}:query:{hash}";
+        var tenantId = metadata.TenantId
+            ?? throw new InvalidOperationException("Tenant metadata is required for cached remote queries.");
+        var credentialPartition = metadata.CredentialId?.ToString("N") ?? "none";
+        return $"{typeof(T).Name}:tenant:{tenantId:N}:credential:{credentialPartition}:query:{hash}";
     }
 
     public static string PrefixForEntity<T>()

@@ -8,4 +8,5 @@ public partial record DeleteTenantRequest : RequestBase,
     IBoltRequest<DeleteTenantRequest, TResponse>
 {
     public Guid TenantId { get; set; }
+    public Guid ExpectedConcurrencyStamp { get; set; }
 }

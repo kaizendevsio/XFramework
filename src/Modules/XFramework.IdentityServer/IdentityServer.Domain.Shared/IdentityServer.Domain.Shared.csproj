@@ -19,7 +19,6 @@
     <ItemGroup>
       <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\XFramework.Bolt\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />
-      <ProjectReference Include="..\..\XFramework.Storage\Storage.Domain.Shared\Storage.Domain.Shared.csproj" />
     </ItemGroup>
     
 </Project>

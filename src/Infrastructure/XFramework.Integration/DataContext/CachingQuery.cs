@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext.Cache;
+using Microsoft.Extensions.Logging;
 
 namespace XFramework.Integration.DataContext;
 
@@ -9,13 +10,19 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
     private readonly IRemoteQuery<T> _inner;
     private readonly IClientCacheService _cache;
     private readonly CachePolicy _policy;
+    private readonly ILogger _logger;
     private bool _noCache;
 
-    public CachingQuery(IRemoteQuery<T> inner, IClientCacheService cache, CachePolicy policy)
+    public CachingQuery(
+        IRemoteQuery<T> inner,
+        IClientCacheService cache,
+        CachePolicy policy,
+        ILogger logger)
     {
         _inner = inner;
         _cache = cache;
         _policy = policy;
+        _logger = logger;
     }
 
     // All builder methods delegate to inner and return this wrapper
@@ -37,11 +44,11 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
         if (ShouldUseCache)
         {
             var key = GetCacheKey();
-            var cached = await _cache.GetAsync<List<T>>(key, ct);
+            var cached = await TryGetAsync<List<T>>(key, ct);
             if (cached is not null) return cached;
 
             var result = await _inner.ToListAsync(ct);
-            await _cache.SetAsync(key, result, _policy.AbsoluteExpiration, ct);
+            await TrySetAsync(key, result, ct);
             return result;
         }
 
@@ -53,12 +60,12 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
         if (ShouldUseCache)
         {
             var key = GetCacheKey();
-            var cached = await _cache.GetAsync<T>(key, ct);
+            var cached = await TryGetAsync<T>(key, ct);
             if (cached is not null) return cached;
 
             var result = await _inner.FirstOrDefaultAsync(ct);
             if (result is not null)
-                await _cache.SetAsync(key, result, _policy.AbsoluteExpiration, ct);
+                await TrySetAsync(key, result, ct);
             return result;
         }
 
@@ -70,12 +77,12 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
         if (ShouldUseCache)
         {
             var key = GetCacheKey();
-            var cached = await _cache.GetAsync<T>(key, ct);
+            var cached = await TryGetAsync<T>(key, ct);
             if (cached is not null) return cached;
 
             var result = await _inner.SingleOrDefaultAsync(ct);
             if (result is not null)
-                await _cache.SetAsync(key, result, _policy.AbsoluteExpiration, ct);
+                await TrySetAsync(key, result, ct);
             return result;
         }
 
@@ -91,11 +98,11 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
         if (ShouldUseCache)
         {
             var key = GetCacheKey();
-            var cached = await _cache.GetAsync<int?>(key, ct);
+            var cached = await TryGetAsync<int?>(key, ct);
             if (cached.HasValue) return cached.Value;
 
             var result = await _inner.CountAsync(ct);
-            await _cache.SetAsync<int?>(key, result, _policy.AbsoluteExpiration, ct);
+            await TrySetAsync<int?>(key, result, ct);
             return result;
         }
 
@@ -114,14 +121,51 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
     public Task<double> AverageAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default) => _inner.AverageAsync(selector, ct);
     public Task<List<GroupResult<TKey, T>>> GroupByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default) => _inner.GroupByAsync(keySelector, ct);
 
-    private bool ShouldUseCache => _policy.Enabled && !_noCache;
+    private bool ShouldUseCache =>
+        _policy.Enabled &&
+        !_noCache &&
+        _inner is RemoteQuery<T> { Metadata.TenantId: { } tenantId } &&
+        tenantId != Guid.Empty;
 
     private string GetCacheKey()
     {
         if (_inner is RemoteQuery<T> remoteQuery)
-            return CacheKeyBuilder.ForQuery<T>(remoteQuery.Descriptor);
+            return CacheKeyBuilder.ForQuery<T>(remoteQuery.Descriptor, remoteQuery.Metadata!);
 
         // Fallback for non-remote queries
         return $"{typeof(T).Name}:query:{Guid.NewGuid()}";
+    }
+
+    private async Task<TValue?> TryGetAsync<TValue>(string key, CancellationToken ct)
+    {
+        try
+        {
+            return await _cache.GetAsync<TValue>(key, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Remote data-context cache read failed for {EntityType}.", typeof(T).Name);
+            return default;
+        }
+    }
+
+    private async Task TrySetAsync<TValue>(string key, TValue value, CancellationToken ct)
+    {
+        try
+        {
+            await _cache.SetAsync(key, value, _policy.AbsoluteExpiration, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Remote data-context cache write failed for {EntityType}.", typeof(T).Name);
+        }
     }
 }

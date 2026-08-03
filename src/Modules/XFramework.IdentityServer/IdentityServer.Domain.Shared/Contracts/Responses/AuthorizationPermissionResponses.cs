@@ -5,6 +5,7 @@ public partial record TenantAuthorizationPolicyResponse
 {
     public Guid TenantId { get; set; }
     public MissingPermissionBehavior MissingPermissionBehavior { get; set; }
+    public Guid ConcurrencyStamp { get; set; }
 }
 
 [MemoryPackable]
@@ -23,6 +24,7 @@ public partial record RoleTypePermissionsResponse
 {
     public Guid TenantId { get; set; }
     public Guid RoleTypeId { get; set; }
+    public Guid ConcurrencyStamp { get; set; }
     public List<CapabilityPermissionDto> Permissions { get; set; } = [];
 }
 
@@ -31,6 +33,7 @@ public partial record CredentialRolePermissionOverridesResponse
 {
     public Guid TenantId { get; set; }
     public Guid IdentityRoleId { get; set; }
+    public Guid ConcurrencyStamp { get; set; }
     public List<CapabilityPermissionDto> Overrides { get; set; } = [];
 }
 

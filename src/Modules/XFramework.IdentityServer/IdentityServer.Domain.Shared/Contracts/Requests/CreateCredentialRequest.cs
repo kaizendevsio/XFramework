@@ -1,6 +1,6 @@
 namespace IdentityServer.Domain.Shared.Contracts.Requests;
 
-using TResponse = CmdResponse;
+using TResponse = CmdResponse<CredentialAdministrationResponse>;
 
 [MemoryPackable]
 public partial record CreateCredentialRequest : RequestBase,

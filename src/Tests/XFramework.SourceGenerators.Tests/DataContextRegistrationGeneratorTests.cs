@@ -10,7 +10,7 @@ namespace XFramework.SourceGenerators.Tests;
 public sealed class DataContextRegistrationGeneratorTests
 {
     [Test]
-    public void GenerateRegistration_ActionsNoneWithoutOptIn_IsQueryOnly()
+    public void GenerateRegistration_OnlyExplicitOptInIsMutableRegardlessOfEndpointActions()
     {
         const string source = """
 namespace Sample;
@@ -19,6 +19,9 @@ using XFramework.Domain.Shared.Attributes;
 
 [GenerateEndpoints(Actions = EndpointActions.None)]
 public sealed class QueryOnlyEntity;
+
+[GenerateEndpoints(Actions = EndpointActions.All)]
+public sealed class BroadEndpointEntity;
 
 [AllowRemoteDataContextMutation]
 [GenerateEndpoints(Actions = EndpointActions.None)]
@@ -31,11 +34,13 @@ public sealed class GeneratedCreateEntity;
         var generatedSource = RunGenerator(source);
 
         generatedSource.Should().Contain("[\"QueryOnlyEntity\"] = typeof(global::Sample.QueryOnlyEntity),");
+        generatedSource.Should().Contain("[\"BroadEndpointEntity\"] = typeof(global::Sample.BroadEndpointEntity),");
         generatedSource.Should().Contain("[\"AdminMutableEntity\"] = typeof(global::Sample.AdminMutableEntity),");
         generatedSource.Should().Contain("[\"GeneratedCreateEntity\"] = typeof(global::Sample.GeneratedCreateEntity),");
 
         generatedSource.Should().Contain("\"AdminMutableEntity\",");
-        generatedSource.Should().Contain("\"GeneratedCreateEntity\",");
+        generatedSource.Should().NotContain("\"BroadEndpointEntity\",");
+        generatedSource.Should().NotContain("\"GeneratedCreateEntity\",");
         generatedSource.Should().NotContain("\"QueryOnlyEntity\",");
     }
 

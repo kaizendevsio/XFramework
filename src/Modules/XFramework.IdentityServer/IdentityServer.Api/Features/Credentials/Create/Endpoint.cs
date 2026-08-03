@@ -1,43 +1,31 @@
 using FluentValidation;
+using IdentityServer.Api.Features.Authorization.Shared;
+using IdentityServer.Api.Infrastructure;
 using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Api.Features.Credentials.Create;
 
 public static class CreateCredentialEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    public static Task<Result<CredentialAdministrationResponse>> Handle(
+        CreateCredentialRequest request,
+        IAuthService authService,
+        CancellationToken ct) => authService.CreateCredentialAsync(request, ct);
+
     [MapPost("/api/credentials", Tags = ["Credentials"],
         Summary = "Create a new identity credential",
         Description = "Creates a new identity credential with BCrypt password hashing (workFactor 11).",
-        ExcludeFromOpenApi = true)]
-    public static async Task<Result<IdentityCredential>> Handle(
+        RequireAuthorization = true,
+        Capability = IdentityAuthorizationConstants.Create)]
+    public static Task<Result<CredentialAdministrationResponse>> HandleHttp(
         CreateCredentialRequest request,
+        HttpContext httpContext,
         IAuthService authService,
         CancellationToken ct)
     {
-        if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
-        {
-            return Result<IdentityCredential>.Failure("Tenant context is required.");
-        }
-
-        var credential = new IdentityCredential
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            IdentityInfoId = request.IdentityInfoId,
-            UserName = request.UserName,
-            UserAlias = request.UserAlias,
-            Password = request.Password,
-            IsEnabled = true,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        return await authService.CreateCredentialAsync(
-            new Create<IdentityCredential>(credential)
-            {
-                Metadata = request.Metadata
-            },
-            ct);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        return authService.CreateCredentialAsync(request, ct);
     }
 }
 
@@ -46,11 +34,17 @@ public class CreateCredentialRequestValidator : AbstractValidator<CreateCredenti
     public CreateCredentialRequestValidator()
     {
         RuleFor(x => x.UserName)
-            .NotEmpty().WithMessage("Username is required");
+            .NotEmpty().WithMessage("Username is required")
+            .MaximumLength(256).WithMessage("Username must not exceed 256 characters");
+
+        RuleFor(x => x.UserAlias)
+            .MaximumLength(256).WithMessage("User alias must not exceed 256 characters");
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters");
+            .MinimumLength(8).WithMessage("Password must be at least 8 characters")
+            .Must(IdentityPasswordPolicy.IsWithinBcryptByteLimit)
+            .WithMessage("Password must not exceed 72 UTF-8 bytes");
 
         RuleFor(x => x.IdentityInfoId)
             .NotEmpty().WithMessage("Identity Info ID is required");

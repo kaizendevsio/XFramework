@@ -22,6 +22,7 @@ public sealed class StorageUploadSessionConfiguration : IEntityTypeConfiguration
         entity.Property(e => e.ProviderUploadId).HasColumnType("text");
         entity.Property(e => e.Status).HasConversion<int>();
         entity.Property(e => e.ExpectedSha256Hash).HasMaxLength(128);
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
 
         entity.HasOne(e => e.StorageFile).WithMany(e => e.UploadSessions)
             .HasForeignKey(e => e.StorageFileId)
@@ -33,5 +34,8 @@ public sealed class StorageUploadSessionConfiguration : IEntityTypeConfiguration
             .HasDatabaseName("ix_storageuploadsession_uploadid");
         entity.HasIndex(e => new { e.TenantId, e.Status, e.ExpiresAt })
             .HasDatabaseName("ix_storageuploadsession_tenant_status_expires");
+        entity.HasIndex(e => new { e.ExpiresAt, e.CreatedAt })
+            .HasFilter("\"AbortedAt\" IS NULL AND \"Status\" IN (0, 1, 4, 5)")
+            .HasDatabaseName("ix_storageuploadsession_global_expired_due");
     }
 }

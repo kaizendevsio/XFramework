@@ -348,9 +348,7 @@ else
 
         try
         {
-            _address.IsDeleted = true;
-            _address.IsEnabled = false;
-            DataContext.Update(_address);
+            DataContext.Remove(_address);
             var result = await DataContext.SaveChangesAsync();
             if (result.IsSuccess)
             {

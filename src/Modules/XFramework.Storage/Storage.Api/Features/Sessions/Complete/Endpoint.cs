@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Sessions.Complete;
 
 public static class CompleteStorageUploadSessionEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite])]
     [MapPost("/api/storage/uploads/sessions/{uploadSessionId:guid}/complete", Tags = ["Storage"],
         Summary = "Complete upload session",
         Description = "Completes provider multipart/block upload and marks the file available.")]

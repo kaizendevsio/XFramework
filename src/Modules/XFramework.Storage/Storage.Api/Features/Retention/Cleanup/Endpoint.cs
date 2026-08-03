@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Retention.Cleanup;
 
 public static class CleanupStorageRetentionEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite])]
     [MapPost("/api/storage/retention/cleanup", Tags = ["Storage"],
         Summary = "Run retention cleanup",
         Description = "Physically deletes retained objects whose metadata was already soft-deleted.")]

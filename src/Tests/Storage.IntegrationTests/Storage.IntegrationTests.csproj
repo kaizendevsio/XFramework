@@ -23,6 +23,7 @@
         <ProjectReference Include="..\..\Modules\XFramework.Storage\Storage.Api\Storage.Api.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Bolt\Bolt.Hub\Bolt.Hub.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" />
         <ProjectReference Include="..\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     </ItemGroup>
 

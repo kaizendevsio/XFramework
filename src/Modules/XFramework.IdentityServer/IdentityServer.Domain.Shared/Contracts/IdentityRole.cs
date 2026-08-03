@@ -8,9 +8,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-roles",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "identity-roles"
+    RequireAuthorization = true
 )]
 public partial class IdentityRole : BaseModel
 {

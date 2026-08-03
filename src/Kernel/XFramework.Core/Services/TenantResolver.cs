@@ -1,5 +1,4 @@
 using IdentityServer.Domain.Shared.Contracts;
-using Microsoft.Extensions.Caching.Memory;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Core.Services;
@@ -15,39 +14,41 @@ public interface ITenantResolver
     /// <param name="id">The tenant ID.</param>
     /// <returns>The tenant entity.</returns>
     Task<Tenant> GetTenant(Guid? id);
+
+    Task<Tenant> GetTenant(Guid? id, CancellationToken ct) => GetTenant(id);
+
+    /// <summary>Removes a tenant from the local resolver cache after lifecycle changes.</summary>
+    void Invalidate(Guid id) { }
 }
 
 /// <summary>
 /// Implementation of ITenantResolver with memory caching.
 /// </summary>
-public sealed class TenantResolver(
-    IDataContext dataContext,
-    IMemoryCache cache) : ITenantResolver
+public sealed class TenantResolver(IDataContext dataContext) : ITenantResolver
 {
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(15);
-
     /// <inheritdoc />
-    public async Task<Tenant> GetTenant(Guid? id)
+    public Task<Tenant> GetTenant(Guid? id) => GetTenant(id, CancellationToken.None);
+
+    public async Task<Tenant> GetTenant(Guid? id, CancellationToken ct)
     {
         if (id is null || id == Guid.Empty) throw new ArgumentNullException(nameof(id));
 
-        var cacheKey = $"GetTenant-{id}";
-        if (cache.TryGetValue(cacheKey, out Tenant? entity) && entity is not null)
-        {
-            return entity;
-        }
-
         var tenant = await dataContext.Query<Tenant>()
+            .NoCache()
             .IgnoreQueryFilters()
             .Where(i => i.Id == id)
-            .FirstOrDefaultAsync();
+            .Where(i => !i.IsDeleted && i.IsEnabled)
+            .Where(i => i.AvailabilityDate == null || i.AvailabilityDate <= DateTime.UtcNow)
+            .Where(i => i.Expiration == null || i.Expiration > DateTime.UtcNow)
+            .FirstOrDefaultAsync(ct);
 
         if (tenant is null)
         {
             throw new InvalidOperationException($"Tenant '{id}' could not be found.");
         }
 
-        cache.Set(cacheKey, tenant, CacheDuration);
         return tenant;
     }
+
+    public void Invalidate(Guid id) { }
 }

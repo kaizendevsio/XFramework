@@ -91,6 +91,7 @@ public sealed class ServiceIdentityScopeIsolationTests
             values[$"{prefix}:ClientId"] = clientId;
             values[$"{prefix}:GenerationId"] = "least-privilege-g1";
             values[$"{prefix}:ClientSecret"] = ClientSecret;
+            values[$"{prefix}:AllowedAudiences:0"] = XFrameworkServiceNames.IdentityServer;
             for (var scopeIndex = 0; scopeIndex < scopes.Length; scopeIndex++)
                 values[$"{prefix}:AllowedScopes:{scopeIndex}"] = scopes[scopeIndex];
             index++;

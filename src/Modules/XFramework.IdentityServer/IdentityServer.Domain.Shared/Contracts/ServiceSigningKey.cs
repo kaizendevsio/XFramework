@@ -6,7 +6,9 @@ public partial class ServiceSigningKey
     [MemoryPackOrder(0)] public Guid Id { get; set; }
     [MemoryPackOrder(1)] public string KeyId { get; set; } = string.Empty;
     [MemoryPackOrder(2)] public string Algorithm { get; set; } = "RS256";
-    [MemoryPackOrder(3)] public string PrivateKeyPem { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonIgnore]
+    [MemoryPackIgnore]
+    public string PrivateKeyFileName { get; set; } = string.Empty;
     [MemoryPackOrder(4)] public string PublicKeyPem { get; set; } = string.Empty;
     [MemoryPackOrder(5)] public DateTime CreatedAtUtc { get; set; }
     [MemoryPackOrder(6)] public DateTime? ActivatedAtUtc { get; set; }

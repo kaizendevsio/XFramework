@@ -1,14 +1,14 @@
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Security;
-using System.Security.Claims;
+using XFramework.Core.Services.FeatureGates;
 
 namespace IdentityServer.Api.Services;
 
 public sealed class IdentityAuthorizationService(
     IDataContext dataContext,
     ITrustedServiceInvocationResolver trustedServiceInvocationResolver,
-    IHttpContextAccessor httpContextAccessor,
+    XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService tenantModuleFeatureService,
     ILogger<IdentityAuthorizationService> logger) : IIdentityAuthorizationService
 {
     private const string SourceCredentialOverrideAllow = "CredentialRoleOverrideAllow";
@@ -18,6 +18,139 @@ public sealed class IdentityAuthorizationService(
     private const string SourceTenantDefaultAllow = "TenantDefaultAllow";
     private const string SourceTenantDefaultDeny = "TenantDefaultDeny";
     private const string SourceTenantFeatureDisabled = "TenantFeatureDisabled";
+    private const string SourceAuthorizationStateLimitExceeded = "AuthorizationStateLimitExceeded";
+    internal const int MaximumEffectiveRoleCount = 100;
+    internal const int MaximumEffectivePermissionCount = 1000;
+
+    public async Task<Result> AuthorizeCredentialOperationAsync(
+        RequestMetadata metadata,
+        Guid tenantId,
+        Guid? targetCredentialId,
+        string capabilityKey,
+        bool allowSelf,
+        CancellationToken ct = default)
+    {
+        var tenantCheck = EnsureMetadataTenantMatchesTarget(metadata, tenantId);
+        if (!tenantCheck.IsSuccess)
+            return tenantCheck;
+
+        if (allowSelf &&
+            targetCredentialId is { } credentialId &&
+            TryResolveAuthenticatedCredential(metadata, tenantId, out var actorCredentialId) &&
+            actorCredentialId == credentialId)
+        {
+            return Result.Success();
+        }
+
+        return await EnsureCallerCapabilityAsync(
+            metadata,
+            tenantId,
+            TenantModuleFeatureKeys.Identity,
+            TenantModuleFeatureKeys.CredentialsSubFeature,
+            capabilityKey,
+            ct);
+    }
+
+    public async Task<Result> SetTenantModuleFeaturesAsync(
+        SetTenantModuleFeaturesRequest request,
+        CancellationToken ct = default)
+    {
+        var authorization = await EnsureTenantAdministratorAsync(request.Metadata, ct);
+        if (!authorization.IsSuccess)
+            return authorization;
+
+        var tenant = await dataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(item => item.Id == request.TenantId)
+            .Where(item => !item.IsDeleted)
+            .FirstOrDefaultAsync(ct);
+        if (tenant is null)
+            return Result.NotFound("Tenant not found");
+        if (tenant.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
+            return Result.Failure("Tenant settings were changed by another operation. Reload and try again.", 409);
+
+        var normalized = request.Features
+            .Select(feature =>
+            {
+                var key = TenantModuleFeatureKeys.Normalize(feature.ModuleKey, feature.SubFeatureKey);
+                return (Feature: feature, key.ModuleKey, key.SubFeatureKey);
+            })
+            .ToList();
+        if (normalized.Any(x => string.IsNullOrWhiteSpace(x.ModuleKey)))
+            return Result.Failure("Module key is required", 400);
+        if (normalized.Select(x => TenantModuleFeatureKeys.Combine(x.ModuleKey, x.SubFeatureKey))
+            .Distinct(StringComparer.OrdinalIgnoreCase).Count() != normalized.Count)
+            return Result.Failure("Duplicate module feature keys are not allowed", 400);
+
+        var existing = await dataContext.Query<TenantModuleFeature>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == request.TenantId)
+            .ToListAsync(ct);
+        var existingByKey = existing.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
+        var now = DateTime.UtcNow;
+
+        dataContext.Update(tenant);
+        tenant.ModifiedAt = now;
+        tenant.ConcurrencyStamp = Guid.NewGuid();
+
+        foreach (var item in normalized)
+        {
+            var key = TenantModuleFeatureKeys.Combine(item.ModuleKey, item.SubFeatureKey);
+            if (existingByKey.TryGetValue(key, out var row))
+            {
+                dataContext.Update(row);
+                row.DisplayName = item.Feature.DisplayName?.Trim();
+                row.Description = item.Feature.Description?.Trim();
+                row.IsEnabled = item.Feature.IsEnabled;
+                row.IsDeleted = false;
+                row.DeletedAt = null;
+                row.ModifiedAt = now;
+                row.ConcurrencyStamp = Guid.NewGuid();
+            }
+            else
+            {
+                dataContext.Add(new TenantModuleFeature
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = request.TenantId,
+                    ModuleKey = item.ModuleKey,
+                    SubFeatureKey = item.SubFeatureKey,
+                    DisplayName = item.Feature.DisplayName?.Trim(),
+                    Description = item.Feature.Description?.Trim(),
+                    IsEnabled = item.Feature.IsEnabled,
+                    CreatedAt = now,
+                    ConcurrencyStamp = Guid.NewGuid()
+                });
+            }
+        }
+
+        var saveResult = await dataContext.SaveChangesAsync(ct);
+        if (!saveResult.IsSuccess)
+            return Result.Failure("Tenant module features could not be saved", saveResult.StatusCode);
+
+        foreach (var item in normalized)
+            tenantModuleFeatureService.Invalidate(request.TenantId, item.ModuleKey, item.SubFeatureKey);
+
+        return Result.Success("Tenant module features updated");
+    }
+
+    private async Task<Result> EnsureTenantAdministratorAsync(RequestMetadata metadata, CancellationToken ct)
+    {
+        if (metadata.HasTrustedActorContext && metadata.TrustedActorRoles.Contains("SuperAdmin"))
+            return Result.Success();
+
+        var trusted = await trustedServiceInvocationResolver.ResolveAsync(
+            metadata,
+            XFrameworkServiceNames.IdentityServer,
+            [XFrameworkServiceScopes.IdentityAdmin],
+            requireTenant: false,
+            ct: ct);
+        return trusted.IsSuccess
+            ? Result.Success()
+            : Result.Failure(trusted.Error ?? "Tenant administration is not authorized", trusted.StatusCode);
+    }
 
     public async Task<Result<CredentialCapabilityCheckResponse>> CheckCredentialCapabilityAsync(
         CheckCredentialCapabilityRequest request,
@@ -106,18 +239,93 @@ public sealed class IdentityAuthorizationService(
             CredentialId = credential.Id
         };
 
+        var now = DateTime.UtcNow;
+        var activeRoles = await dataContext.Query<IdentityRole>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Include(x => x.Type)
+            .Where(x => x.TenantId == credential.TenantId)
+            .Where(x => x.CredentialId == credential.Id)
+            .Where(x => !x.IsDeleted && x.IsEnabled)
+            .Where(x => x.TypeId != null && x.RoleExpiration >= now)
+            .Where(x => x.Type != null && !x.Type.IsDeleted && x.Type.IsEnabled)
+            .Take(MaximumEffectiveRoleCount + 1)
+            .ToListAsync(ct);
+        if (activeRoles.Count > MaximumEffectiveRoleCount)
+        {
+            logger.LogWarning(
+                "Effective authorization rejected for credential {CredentialId} because active role count exceeds {MaximumRoleCount}.",
+                credential.Id,
+                MaximumEffectiveRoleCount);
+            return Result<EffectiveCredentialCapabilitiesResponse>.Failure(
+                "Credential authorization state exceeds supported limits.",
+                409);
+        }
+
+        var roleIds = activeRoles.Select(x => x.Id).ToArray();
+        var roleTypeIds = activeRoles.Select(x => x.TypeId!.Value).Distinct().ToArray();
+
+        var enabledFeatureKeys = (await dataContext.Query<TenantModuleFeature>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == credential.TenantId)
+                .Where(x => !x.IsDeleted && x.IsEnabled)
+                .ToListAsync(ct))
+            .Select(x => TenantModuleFeatureKeys.Combine(x.ModuleKey, x.SubFeatureKey))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var overrides = roleIds.Length == 0
+            ? []
+            : await dataContext.Query<IdentityRoleFeaturePermissionOverride>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == credential.TenantId)
+                .Where(x => roleIds.Contains(x.IdentityRoleId))
+                .Where(x => !x.IsDeleted && x.IsEnabled)
+                .Take(MaximumEffectivePermissionCount + 1)
+                .ToListAsync(ct);
+        var roleTypePermissions = roleTypeIds.Length == 0
+            ? []
+            : await dataContext.Query<IdentityRoleTypeFeaturePermission>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == credential.TenantId)
+                .Where(x => roleTypeIds.Contains(x.RoleTypeId))
+                .Where(x => !x.IsDeleted && x.IsEnabled)
+                .Take(MaximumEffectivePermissionCount + 1)
+                .ToListAsync(ct);
+        if (overrides.Count + roleTypePermissions.Count > MaximumEffectivePermissionCount)
+        {
+            logger.LogWarning(
+                "Effective authorization rejected for credential {CredentialId} because permission assignment count exceeds {MaximumPermissionCount}.",
+                credential.Id,
+                MaximumEffectivePermissionCount);
+            return Result<EffectiveCredentialCapabilitiesResponse>.Failure(
+                "Credential authorization state exceeds supported limits.",
+                409);
+        }
+
+        var tenantPolicy = await dataContext.Query<TenantAuthorizationPolicy>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == credential.TenantId)
+            .Where(x => !x.IsDeleted && x.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+        var missingBehavior = tenantPolicy?.MissingPermissionBehavior ?? MissingPermissionBehavior.Deny;
+
         foreach (var feature in TenantModuleFeatureKeys.All.OrderBy(x => x.ModuleKey).ThenBy(x => x.SubFeatureKey))
         {
             foreach (var capability in IdentityAuthorizationConstants.CapabilityKeys)
             {
-                var decision = await ResolveCapabilityAsync(
-                    credential.TenantId,
-                    credential.Id,
+                var decision = ResolveCapabilityFromSnapshot(
                     feature.ModuleKey,
                     feature.SubFeatureKey,
                     capability,
-                    ct,
-                    credentialAlreadyValidated: true);
+                    activeRoles,
+                    enabledFeatureKeys,
+                    overrides,
+                    roleTypePermissions,
+                    missingBehavior);
 
                 response.Capabilities.Add(new CredentialCapabilityCheckResponse
                 {
@@ -133,6 +341,61 @@ public sealed class IdentityAuthorizationService(
         }
 
         return Result<EffectiveCredentialCapabilitiesResponse>.Success(response);
+    }
+
+    private static CapabilityDecision ResolveCapabilityFromSnapshot(
+        string moduleKey,
+        string subFeatureKey,
+        string capabilityKey,
+        IReadOnlyList<IdentityRole> activeRoles,
+        IReadOnlySet<string> enabledFeatureKeys,
+        IReadOnlyList<IdentityRoleFeaturePermissionOverride> overrides,
+        IReadOnlyList<IdentityRoleTypeFeaturePermission> roleTypePermissions,
+        MissingPermissionBehavior missingBehavior)
+    {
+        if (RequiresTenantFeature(moduleKey, subFeatureKey) &&
+            !enabledFeatureKeys.Contains(TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey)))
+        {
+            return new CapabilityDecision(false, SourceTenantFeatureDisabled);
+        }
+
+        if (activeRoles.Count == 0)
+            return new CapabilityDecision(false, "NoActiveRole");
+
+        var capabilityKeys = BuildCapabilityKeySet(capabilityKey);
+        var decisions = new List<CapabilityDecision>();
+        foreach (var role in activeRoles)
+        {
+            var roleOverrides = overrides
+                .Where(x => x.IdentityRoleId == role.Id &&
+                            string.Equals(x.ModuleKey, moduleKey, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(x.SubFeatureKey, subFeatureKey, StringComparison.OrdinalIgnoreCase) &&
+                            capabilityKeys.Contains(x.CapabilityKey))
+                .OrderBy(x => string.Equals(x.CapabilityKey, capabilityKey, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ToList();
+            if (roleOverrides.Count > 0)
+            {
+                decisions.AddRange(roleOverrides.Select(x => ToDecision(x.Effect, isOverride: true)));
+                continue;
+            }
+
+            decisions.AddRange(roleTypePermissions
+                .Where(x => x.RoleTypeId == role.TypeId &&
+                            string.Equals(x.ModuleKey, moduleKey, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(x.SubFeatureKey, subFeatureKey, StringComparison.OrdinalIgnoreCase) &&
+                            capabilityKeys.Contains(x.CapabilityKey))
+                .OrderBy(x => string.Equals(x.CapabilityKey, capabilityKey, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .Select(x => ToDecision(x.Effect, isOverride: false)));
+        }
+
+        if (decisions.FirstOrDefault(x => !x.IsAllowed) is { } denied)
+            return denied;
+        if (decisions.FirstOrDefault(x => x.IsAllowed) is { } allowed)
+            return allowed;
+
+        return missingBehavior == MissingPermissionBehavior.Allow
+            ? new CapabilityDecision(true, SourceTenantDefaultAllow)
+            : new CapabilityDecision(false, SourceTenantDefaultDeny);
     }
 
     public async Task<Result<TenantAuthorizationPolicyResponse>> GetTenantAuthorizationPolicyAsync(
@@ -168,7 +431,8 @@ public sealed class IdentityAuthorizationService(
         return Result<TenantAuthorizationPolicyResponse>.Success(new TenantAuthorizationPolicyResponse
         {
             TenantId = resolvedTenantId,
-            MissingPermissionBehavior = policy?.MissingPermissionBehavior ?? MissingPermissionBehavior.Deny
+            MissingPermissionBehavior = policy?.MissingPermissionBehavior ?? MissingPermissionBehavior.Deny,
+            ConcurrencyStamp = policy?.ConcurrencyStamp ?? Guid.Empty
         });
     }
 
@@ -203,6 +467,11 @@ public sealed class IdentityAuthorizationService(
 
         if (policy is null)
         {
+            if (request.ExpectedConcurrencyStamp != Guid.Empty)
+                return Result<TenantAuthorizationPolicyResponse>.Failure(
+                    "Tenant authorization policy was changed by another operation. Reload and try again.",
+                    409);
+
             policy = new TenantAuthorizationPolicy
             {
                 Id = Guid.NewGuid(),
@@ -216,11 +485,17 @@ public sealed class IdentityAuthorizationService(
         }
         else
         {
+            if (policy.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
+                return Result<TenantAuthorizationPolicyResponse>.Failure(
+                    "Tenant authorization policy was changed by another operation. Reload and try again.",
+                    409);
+
+            dataContext.Update(policy);
             policy.MissingPermissionBehavior = request.MissingPermissionBehavior;
             policy.IsEnabled = true;
             policy.IsDeleted = false;
             policy.ModifiedAt = DateTime.UtcNow;
-            dataContext.Update(policy);
+            policy.ConcurrencyStamp = Guid.NewGuid();
         }
 
         var saveResult = await dataContext.SaveChangesAsync(ct);
@@ -230,7 +505,8 @@ public sealed class IdentityAuthorizationService(
         return Result<TenantAuthorizationPolicyResponse>.Success(new TenantAuthorizationPolicyResponse
         {
             TenantId = resolvedTenantId,
-            MissingPermissionBehavior = policy.MissingPermissionBehavior
+            MissingPermissionBehavior = policy.MissingPermissionBehavior,
+            ConcurrencyStamp = policy.ConcurrencyStamp
         });
     }
 
@@ -267,6 +543,7 @@ public sealed class IdentityAuthorizationService(
         {
             TenantId = roleType.Data.TenantId,
             RoleTypeId = roleType.Data.Id,
+            ConcurrencyStamp = roleType.Data.ConcurrencyStamp,
             Permissions = permissions.Select(ToPermissionDto).ToList()
         });
     }
@@ -289,6 +566,11 @@ public sealed class IdentityAuthorizationService(
         if (!authorization.IsSuccess)
             return Result<RoleTypePermissionsResponse>.Failure(authorization.Message!, authorization.StatusCode);
 
+        if (roleType.Data.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
+            return Result<RoleTypePermissionsResponse>.Failure(
+                "Role permissions were changed by another operation. Reload and try again.",
+                409);
+
         var normalized = NormalizePermissionDtos(request.Permissions);
         if (!normalized.IsSuccess)
             return Result<RoleTypePermissionsResponse>.Failure(normalized.Message!, normalized.StatusCode);
@@ -305,15 +587,20 @@ public sealed class IdentityAuthorizationService(
             .Select(BuildPermissionKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        dataContext.Update(roleType.Data);
+        roleType.Data.ModifiedAt = DateTime.UtcNow;
+        roleType.Data.ConcurrencyStamp = Guid.NewGuid();
+
         foreach (var permission in normalized.Data!)
         {
             if (existingByKey.TryGetValue(BuildPermissionKey(permission), out var row))
             {
+                dataContext.Update(row);
                 row.Effect = permission.Effect;
                 row.IsEnabled = true;
                 row.IsDeleted = false;
                 row.ModifiedAt = DateTime.UtcNow;
-                dataContext.Update(row);
+                row.ConcurrencyStamp = Guid.NewGuid();
                 continue;
             }
 
@@ -335,9 +622,8 @@ public sealed class IdentityAuthorizationService(
         foreach (var row in existing.Where(row => !desiredKeys.Contains(BuildPermissionKey(row))))
         {
             row.IsEnabled = false;
-            row.IsDeleted = true;
-            row.DeletedAt = DateTime.UtcNow;
-            dataContext.Update(row);
+            dataContext.Remove(row);
+            row.ConcurrencyStamp = Guid.NewGuid();
         }
 
         var saveResult = await dataContext.SaveChangesAsync(ct);
@@ -386,6 +672,7 @@ public sealed class IdentityAuthorizationService(
         {
             TenantId = role.Data.TenantId,
             IdentityRoleId = role.Data.Id,
+            ConcurrencyStamp = role.Data.ConcurrencyStamp,
             Overrides = overrides.Select(ToPermissionDto).ToList()
         });
     }
@@ -410,6 +697,11 @@ public sealed class IdentityAuthorizationService(
                 authorization.Message!,
                 authorization.StatusCode);
 
+        if (role.Data.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
+            return Result<CredentialRolePermissionOverridesResponse>.Failure(
+                "Credential role overrides were changed by another operation. Reload and try again.",
+                409);
+
         var normalized = NormalizePermissionDtos(request.Overrides);
         if (!normalized.IsSuccess)
             return Result<CredentialRolePermissionOverridesResponse>.Failure(normalized.Message!, normalized.StatusCode);
@@ -426,15 +718,20 @@ public sealed class IdentityAuthorizationService(
             .Select(BuildPermissionKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        dataContext.Update(role.Data);
+        role.Data.ModifiedAt = DateTime.UtcNow;
+        role.Data.ConcurrencyStamp = Guid.NewGuid();
+
         foreach (var permission in normalized.Data!)
         {
             if (existingByKey.TryGetValue(BuildPermissionKey(permission), out var row))
             {
+                dataContext.Update(row);
                 row.Effect = permission.Effect;
                 row.IsEnabled = true;
                 row.IsDeleted = false;
                 row.ModifiedAt = DateTime.UtcNow;
-                dataContext.Update(row);
+                row.ConcurrencyStamp = Guid.NewGuid();
                 continue;
             }
 
@@ -456,9 +753,8 @@ public sealed class IdentityAuthorizationService(
         foreach (var row in existing.Where(row => !desiredKeys.Contains(BuildPermissionKey(row))))
         {
             row.IsEnabled = false;
-            row.IsDeleted = true;
-            row.DeletedAt = DateTime.UtcNow;
-            dataContext.Update(row);
+            dataContext.Remove(row);
+            row.ConcurrencyStamp = Guid.NewGuid();
         }
 
         var saveResult = await dataContext.SaveChangesAsync(ct);
@@ -472,7 +768,7 @@ public sealed class IdentityAuthorizationService(
         }, ct);
     }
 
-    public async Task<Result<IdentityRole>> AssignCredentialRoleAsync(
+    public async Task<Result<AssignedCredentialRoleResponse>> AssignCredentialRoleAsync(
         AssignCredentialRoleRequest request,
         CancellationToken ct = default)
     {
@@ -484,10 +780,12 @@ public sealed class IdentityAuthorizationService(
             .FirstOrDefaultAsync(ct);
 
         if (credential is null)
-            return Result<IdentityRole>.NotFound("Credential not found");
+            return Result<AssignedCredentialRoleResponse>.NotFound("Credential not found");
 
         if (request.Metadata.TenantId is { } metadataTenantId && metadataTenantId != credential.TenantId)
-            return Result<IdentityRole>.Failure("Credential does not belong to the active tenant", 403);
+            return Result<AssignedCredentialRoleResponse>.Failure(
+                "Credential does not belong to the active tenant",
+                403);
 
         var authorization = await EnsureCallerCapabilityAsync(
             request.Metadata,
@@ -497,11 +795,15 @@ public sealed class IdentityAuthorizationService(
             IdentityAuthorizationConstants.Create,
             ct);
         if (!authorization.IsSuccess)
-            return Result<IdentityRole>.Failure(authorization.Message!, authorization.StatusCode);
+            return Result<AssignedCredentialRoleResponse>.Failure(
+                authorization.Message!,
+                authorization.StatusCode);
 
         var roleType = await GetRoleTypeAsync(request.RoleTypeId, credential.TenantId, ct);
         if (!roleType.IsSuccess)
-            return Result<IdentityRole>.Failure(roleType.Message!, roleType.StatusCode);
+            return Result<AssignedCredentialRoleResponse>.Failure(
+                roleType.Message!,
+                roleType.StatusCode);
         var roleTypeData = roleType.Data!;
 
         var existing = await dataContext.Query<IdentityRole>()
@@ -533,20 +835,32 @@ public sealed class IdentityAuthorizationService(
         }
         else
         {
+            dataContext.Update(existing);
             existing.RoleExpiration = expiration;
             existing.IsEnabled = true;
             existing.IsDeleted = false;
             existing.ModifiedAt = DateTime.UtcNow;
-            dataContext.Update(existing);
+            existing.ConcurrencyStamp = Guid.NewGuid();
         }
 
         var saveResult = await dataContext.SaveChangesAsync(ct);
         if (!saveResult.IsSuccess)
-            return Result<IdentityRole>.Failure("Role could not be assigned", saveResult.StatusCode);
+            return Result<AssignedCredentialRoleResponse>.Failure(
+                "Role could not be assigned",
+                saveResult.StatusCode);
 
-        existing.Type = roleTypeData;
-        existing.Credential = credential;
-        return Result<IdentityRole>.Success(existing);
+        return Result<AssignedCredentialRoleResponse>.Success(new AssignedCredentialRoleResponse
+        {
+            Id = existing.Id,
+            TenantId = existing.TenantId,
+            CredentialId = existing.CredentialId,
+            RoleTypeId = roleTypeData.Id,
+            RoleExpiration = existing.RoleExpiration,
+            IsEnabled = existing.IsEnabled,
+            ConcurrencyStamp = existing.ConcurrencyStamp,
+            CreatedAt = existing.CreatedAt,
+            ModifiedAt = existing.ModifiedAt
+        });
     }
 
     public async Task<Result> RemoveCredentialRoleAsync(
@@ -568,9 +882,8 @@ public sealed class IdentityAuthorizationService(
             return Result.Failure(authorization.Message!, authorization.StatusCode);
 
         role.Data!.IsEnabled = false;
-        role.Data.IsDeleted = true;
-        role.Data.DeletedAt = DateTime.UtcNow;
-        dataContext.Update(role.Data);
+        dataContext.Remove(role.Data);
+        role.Data.ConcurrencyStamp = Guid.NewGuid();
 
         var overrides = await dataContext.Query<IdentityRoleFeaturePermissionOverride>()
             .IgnoreQueryFilters()
@@ -583,9 +896,8 @@ public sealed class IdentityAuthorizationService(
         foreach (var permissionOverride in overrides)
         {
             permissionOverride.IsEnabled = false;
-            permissionOverride.IsDeleted = true;
-            permissionOverride.DeletedAt = DateTime.UtcNow;
-            dataContext.Update(permissionOverride);
+            dataContext.Remove(permissionOverride);
+            permissionOverride.ConcurrencyStamp = Guid.NewGuid();
         }
 
         var saveResult = await dataContext.SaveChangesAsync(ct);
@@ -628,11 +940,12 @@ public sealed class IdentityAuthorizationService(
         {
             if (existingByKey.TryGetValue(BuildPermissionKey(permission), out var row))
             {
+                dataContext.Update(row);
                 row.Effect = RoleCapabilityPermissionEffect.Allow;
                 row.IsEnabled = true;
                 row.IsDeleted = false;
                 row.ModifiedAt = DateTime.UtcNow;
-                dataContext.Update(row);
+                row.ConcurrencyStamp = Guid.NewGuid();
                 continue;
             }
 
@@ -699,15 +1012,26 @@ public sealed class IdentityAuthorizationService(
         var activeRoles = await dataContext.Query<IdentityRole>()
             .IgnoreQueryFilters()
             .NoCache()
+            .Include(x => x.Type)
             .Where(x => x.TenantId == tenantId)
             .Where(x => x.CredentialId == credentialId)
             .Where(x => !x.IsDeleted && x.IsEnabled)
             .Where(x => x.TypeId != null)
             .Where(x => x.RoleExpiration >= now)
+            .Where(x => x.Type != null && !x.Type.IsDeleted && x.Type.IsEnabled)
+            .Take(MaximumEffectiveRoleCount + 1)
             .ToListAsync(ct);
 
         if (activeRoles.Count == 0)
             return new CapabilityDecision(false, "NoActiveRole");
+        if (activeRoles.Count > MaximumEffectiveRoleCount)
+        {
+            logger.LogWarning(
+                "Authorization denied for credential {CredentialId} because active role count exceeds {MaximumRoleCount}.",
+                credentialId,
+                MaximumEffectiveRoleCount);
+            return new CapabilityDecision(false, SourceAuthorizationStateLimitExceeded);
+        }
 
         var roleIds = activeRoles.Select(x => x.Id).ToArray();
         var roleTypeIds = activeRoles
@@ -725,6 +1049,7 @@ public sealed class IdentityAuthorizationService(
             .Where(x => x.SubFeatureKey == subFeatureKey)
             .Where(x => capabilityKeys.Contains(x.CapabilityKey))
             .Where(x => !x.IsDeleted && x.IsEnabled)
+            .Take(MaximumEffectivePermissionCount + 1)
             .ToListAsync(ct);
 
         var roleTypePermissions = await dataContext.Query<IdentityRoleTypeFeaturePermission>()
@@ -736,7 +1061,16 @@ public sealed class IdentityAuthorizationService(
             .Where(x => x.SubFeatureKey == subFeatureKey)
             .Where(x => capabilityKeys.Contains(x.CapabilityKey))
             .Where(x => !x.IsDeleted && x.IsEnabled)
+            .Take(MaximumEffectivePermissionCount + 1)
             .ToListAsync(ct);
+        if (overrides.Count + roleTypePermissions.Count > MaximumEffectivePermissionCount)
+        {
+            logger.LogWarning(
+                "Authorization denied for credential {CredentialId} because permission assignment count exceeds {MaximumPermissionCount}.",
+                credentialId,
+                MaximumEffectivePermissionCount);
+            return new CapabilityDecision(false, SourceAuthorizationStateLimitExceeded);
+        }
 
         var decisions = new List<CapabilityDecision>();
         foreach (var role in activeRoles)
@@ -825,9 +1159,11 @@ public sealed class IdentityAuthorizationService(
         var role = await dataContext.Query<IdentityRole>()
             .IgnoreQueryFilters()
             .NoCache()
+            .Include(x => x.Type)
             .Where(x => x.Id == roleId)
             .Where(x => x.TenantId == tenantId.Value)
             .Where(x => !x.IsDeleted && x.IsEnabled)
+            .Where(x => x.Type != null && !x.Type.IsDeleted && x.Type.IsEnabled)
             .FirstOrDefaultAsync(ct);
 
         if (role is null)
@@ -841,7 +1177,9 @@ public sealed class IdentityAuthorizationService(
             .IgnoreQueryFilters()
             .NoCache()
             .Where(x => x.Id == tenantId)
-            .Where(x => !x.IsDeleted)
+            .Where(x => !x.IsDeleted && x.IsEnabled)
+            .Where(x => x.AvailabilityDate == null || x.AvailabilityDate <= DateTime.UtcNow)
+            .Where(x => x.Expiration == null || x.Expiration > DateTime.UtcNow)
             .AnyAsync(ct);
 
     private static Result<Guid> ResolveRequestedTenantId(Guid requestedTenantId, Guid? metadataTenantId)
@@ -865,7 +1203,7 @@ public sealed class IdentityAuthorizationService(
         if (!tenantCheck.IsSuccess)
             return tenantCheck;
 
-        if (TryResolveAuthenticatedHttpCredential(metadata, targetTenantId, out var credentialId) &&
+        if (TryResolveAuthenticatedCredential(metadata, targetTenantId, out var credentialId) &&
             credentialId == targetCredentialId)
         {
             return Result.Success();
@@ -892,7 +1230,14 @@ public sealed class IdentityAuthorizationService(
         if (!tenantCheck.IsSuccess)
             return tenantCheck;
 
-        if (TryResolveAuthenticatedHttpCredential(metadata, targetTenantId, out var credentialId))
+        if (metadata.HasTrustedActorContext &&
+            metadata.TrustedActorRoles.Contains("SuperAdmin") &&
+            metadata.TenantId == targetTenantId)
+        {
+            return Result.Success();
+        }
+
+        if (TryResolveAuthenticatedCredential(metadata, targetTenantId, out var credentialId))
         {
             var decision = await ResolveCapabilityAsync(
                 targetTenantId,
@@ -941,48 +1286,23 @@ public sealed class IdentityAuthorizationService(
             : Result.Forbidden("Requested tenant does not match the active tenant");
     }
 
-    private bool TryResolveAuthenticatedHttpCredential(
+    private static bool TryResolveAuthenticatedCredential(
         RequestMetadata metadata,
         Guid targetTenantId,
         out Guid credentialId)
     {
         credentialId = default;
 
-        var user = httpContextAccessor.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated != true)
-            return false;
-
-        var claimTenantId = ResolveGuidClaim(user, "tenant_id", "tenantId", "TenantId", "tid", "tenant");
-        var claimCredentialId = ResolveGuidClaim(
-            user,
-            "credentialId",
-            "credential_id",
-            ClaimTypes.NameIdentifier,
-            "sub");
-
-        if (claimTenantId != targetTenantId ||
-            claimCredentialId is null ||
-            claimCredentialId == Guid.Empty ||
-            metadata.TenantId != claimTenantId ||
-            metadata.CredentialId != claimCredentialId)
+        if (!metadata.HasTrustedActorContext ||
+            metadata.TenantId != targetTenantId ||
+            metadata.CredentialId is not { } actorCredentialId ||
+            actorCredentialId == Guid.Empty)
         {
             return false;
         }
 
-        credentialId = claimCredentialId.Value;
+        credentialId = actorCredentialId;
         return true;
-    }
-
-    private static Guid? ResolveGuidClaim(ClaimsPrincipal user, params string[] claimNames)
-    {
-        foreach (var claimName in claimNames)
-        {
-            var claimValue = user.FindFirst(claimName)?.Value;
-            if (Guid.TryParse(claimValue, out var value))
-                return value;
-        }
-
-        return null;
     }
 
     private static Result<PermissionTarget> NormalizePermissionTarget(

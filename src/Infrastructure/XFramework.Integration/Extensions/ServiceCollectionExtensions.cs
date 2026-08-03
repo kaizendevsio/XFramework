@@ -58,8 +58,6 @@ public static class ServiceCollectionExtensions
                     ? configuration["BoltConfiguration:ClientName"]
                     : options.ClientId;
 
-                if (options.DefaultScopes.Count == 0)
-                    options.DefaultScopes = XFrameworkServiceScopes.AdminDefaults.ToList();
             });
         if (UsesCentralTransportIdentity(boltConfig))
             serviceIdentityOptions.ValidateOnStart();
@@ -275,9 +273,11 @@ internal sealed class ApplicationStartedBoltClientHostedService(
     ILogger<ApplicationStartedBoltClientHostedService> logger) : IHostedService
 {
     private readonly object _gate = new();
+    private readonly object _stopGate = new();
     private CancellationTokenSource? _stoppingCts;
     private CancellationTokenRegistration _applicationStartedRegistration;
     private Task _connectTask = Task.CompletedTask;
+    private Task? _stopTask;
 
     public Task StartAsync(CancellationToken ct)
     {
@@ -287,10 +287,20 @@ internal sealed class ApplicationStartedBoltClientHostedService(
         return Task.CompletedTask;
     }
 
-    public async Task StopAsync(CancellationToken ct)
+    public Task StopAsync(CancellationToken ct)
+    {
+        Task stopTask;
+        lock (_stopGate)
+            stopTask = _stopTask ??= StopCoreAsync();
+
+        return stopTask.WaitAsync(ct);
+    }
+
+    private async Task StopCoreAsync()
     {
         _applicationStartedRegistration.Dispose();
-        _stoppingCts?.Cancel();
+        var stoppingCts = _stoppingCts;
+        stoppingCts?.Cancel();
 
         Task connectTask;
         lock (_gate)
@@ -298,14 +308,14 @@ internal sealed class ApplicationStartedBoltClientHostedService(
 
         try
         {
-            await connectTask.WaitAsync(ct);
+            await connectTask;
         }
-        catch (OperationCanceledException) when (_stoppingCts?.IsCancellationRequested == true || ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (stoppingCts?.IsCancellationRequested == true)
         {
         }
 
         await client.DisposeAsync();
-        _stoppingCts?.Dispose();
+        stoppingCts?.Dispose();
     }
 
     private void StartConnection()

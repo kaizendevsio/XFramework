@@ -1,4 +1,5 @@
 using XFramework.Domain.Shared.Interfaces;
+using IdentityServer.Integration.Extensions;
 using XFramework.Integration.Extensions;
 
 namespace Storage.Api.Installers;
@@ -11,5 +12,6 @@ public sealed class WrapperInstaller : IInstaller
         IHostEnvironment hostEnvironment)
     {
         services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
+        services.AddIdentityServerSessionValidation();
     }
 }

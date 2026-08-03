@@ -126,6 +126,49 @@ public sealed class ServiceIdentityCredentialGenerationTests
             .WithMessage("*at least one service client*");
     }
 
+    [TestCase(false, true, "AllowedAudiences")]
+    [TestCase(true, false, "AllowedScopes")]
+    public void Configuration_MissingAllowedAudiencesOrScopes_FailsClosed(
+        bool includeAllowedAudiences,
+        bool includeAllowedScopes,
+        string missingSetting)
+    {
+        var configuration = CreateConfiguration(
+            "g0",
+            G0Secret,
+            "",
+            "",
+            null,
+            includeAllowedAudiences,
+            includeAllowedScopes);
+
+        var parse = () => ServiceIdentityConfiguration.FromConfiguration(
+            configuration,
+            DateTimeOffset.UtcNow);
+
+        parse.Should().Throw<InvalidOperationException>()
+            .WithMessage($"*{missingSetting}*");
+    }
+
+    [Test]
+    public void ClientOptions_MissingDefaultScopes_FailsValidation()
+    {
+        var options = new ServiceIdentityOptions
+        {
+            Authority = "https://identity.example.test",
+            ClientId = "test-client",
+            GenerationId = "g0",
+            ClientSecret = G0Secret,
+            DefaultScopes = []
+        };
+        var validator = new ServiceIdentityOptionsValidator(TimeProvider.System);
+
+        var result = validator.Validate(null, options);
+
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("DefaultScopes");
+    }
+
     [Test]
     public void ProviderRequest_FallbackDeadlineHasPassed_StillSendsCurrentSecret()
     {
@@ -199,12 +242,18 @@ public sealed class ServiceIdentityCredentialGenerationTests
             validUntilUtc);
         var parsed = ServiceIdentityConfiguration.FromConfiguration(configuration, clock.GetUtcNow());
         using var rsa = RSA.Create(2048);
+        var signingKeyDirectory = configuration["ServiceIdentity:ServiceTokenSigningKeyDirectory"]!;
+        Directory.CreateDirectory(signingKeyDirectory);
+        const string signingKeyFileName = "test-signing-key.pem";
+        File.WriteAllText(
+            Path.Combine(signingKeyDirectory, signingKeyFileName),
+            rsa.ExportPkcs8PrivateKeyPem());
         var signingKey = new ServiceSigningKey
         {
             Id = Guid.NewGuid(),
             KeyId = "test-signing-key",
             Algorithm = "RS256",
-            PrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem(),
+            PrivateKeyFileName = signingKeyFileName,
             PublicKeyPem = rsa.ExportSubjectPublicKeyInfoPem(),
             CreatedAtUtc = clock.GetUtcNow().UtcDateTime,
             ActivatedAtUtc = clock.GetUtcNow().UtcDateTime,
@@ -232,7 +281,9 @@ public sealed class ServiceIdentityCredentialGenerationTests
         string currentSecret,
         string fallbackGenerationId,
         string fallbackSecret,
-        DateTimeOffset? validUntilUtc)
+        DateTimeOffset? validUntilUtc,
+        bool includeAllowedAudiences = true,
+        bool includeAllowedScopes = true)
     {
         var values = new Dictionary<string, string?>
         {
@@ -241,8 +292,25 @@ public sealed class ServiceIdentityCredentialGenerationTests
             ["ServiceIdentity:Clients:0:ClientSecret"] = currentSecret,
             ["ServiceIdentity:Clients:0:ValidationFallback:GenerationId"] = fallbackGenerationId,
             ["ServiceIdentity:Clients:0:ValidationFallback:ClientSecret"] = fallbackSecret,
-            ["ServiceIdentity:Clients:0:ValidationFallback:ValidUntilUtc"] = validUntilUtc?.ToString("O")
+            ["ServiceIdentity:Clients:0:ValidationFallback:ValidUntilUtc"] = validUntilUtc?.ToString("O"),
+            ["ServiceIdentity:ServiceTokenSigningKeyDirectory"] = Path.Combine(
+                Path.GetTempPath(),
+                "xframework-identity-unit-keys",
+                Guid.NewGuid().ToString("N"))
         };
+
+        if (includeAllowedAudiences)
+        {
+            values["ServiceIdentity:Clients:0:AllowedAudiences:0"] =
+                XFrameworkServiceNames.Communications;
+        }
+
+        if (includeAllowedScopes)
+        {
+            values["ServiceIdentity:Clients:0:AllowedScopes:0"] =
+                XFrameworkServiceScopes.BoltService;
+        }
+
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
     }
 

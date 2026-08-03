@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using XFramework.Core.Services.FeatureGates;
@@ -22,8 +21,7 @@ public sealed class TenantModuleFeatureServiceTests
         SeedFeature(db, tenantId, TenantModuleFeatureKeys.Wallets, string.Empty, enabled: true);
         await db.SaveChangesAsync();
 
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var service = CreateService(db, cache);
+        var service = CreateService(db);
 
         var result = await service.IsEnabledAsync(tenantId, TenantModuleFeatureKeys.Wallets);
 
@@ -39,8 +37,7 @@ public sealed class TenantModuleFeatureServiceTests
         SeedFeature(db, tenantId, TenantModuleFeatureKeys.Inventario, string.Empty, enabled: false);
         await db.SaveChangesAsync();
 
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var service = CreateService(db, cache);
+        var service = CreateService(db);
 
         var result = await service.EnsureEnabledAsync(tenantId, TenantModuleFeatureKeys.Inventario);
 
@@ -58,8 +55,7 @@ public sealed class TenantModuleFeatureServiceTests
         SeedFeature(db, enabledTenantId, TenantModuleFeatureKeys.Communications, TenantModuleFeatureKeys.ChatSubFeature, enabled: true);
         await db.SaveChangesAsync();
 
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var service = CreateService(db, cache);
+        var service = CreateService(db);
 
         var result = await service.IsEnabledAsync(disabledTenantId, TenantModuleFeatureKeys.CommunicationsChat);
 
@@ -68,27 +64,23 @@ public sealed class TenantModuleFeatureServiceTests
     }
 
     [Test]
-    public async Task Invalidate_FeatureUpdatedAfterCachedRead_RefreshesValue()
+    public async Task IsEnabledAsync_FeatureUpdate_IsVisibleWithoutReplicaLocalInvalidation()
     {
         await using var db = CreateDbContext();
         var tenantId = Guid.NewGuid();
         var feature = SeedFeature(db, tenantId, TenantModuleFeatureKeys.Notifications, string.Empty, enabled: false);
         await db.SaveChangesAsync();
 
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var service = CreateService(db, cache);
+        var service = CreateService(db);
 
         var cachedDisabled = await service.IsEnabledAsync(tenantId, TenantModuleFeatureKeys.Notifications);
         feature.IsEnabled = true;
         db.Update(feature);
         await db.SaveChangesAsync();
 
-        var staleRead = await service.IsEnabledAsync(tenantId, TenantModuleFeatureKeys.Notifications);
-        service.Invalidate(tenantId, TenantModuleFeatureKeys.Notifications);
         var refreshedRead = await service.IsEnabledAsync(tenantId, TenantModuleFeatureKeys.Notifications);
 
         cachedDisabled.Data.Should().BeFalse();
-        staleRead.Data.Should().BeFalse();
         refreshedRead.Data.Should().BeTrue();
     }
 
@@ -103,8 +95,8 @@ public sealed class TenantModuleFeatureServiceTests
         return new AppDbContext(options);
     }
 
-    private static TenantModuleFeatureService CreateService(AppDbContext db, IMemoryCache cache) =>
-        new(db, cache, NullLogger<TenantModuleFeatureService>.Instance);
+    private static TenantModuleFeatureService CreateService(AppDbContext db) =>
+        new(db, NullLogger<TenantModuleFeatureService>.Instance);
 
     private static TenantModuleFeature SeedFeature(
         AppDbContext db,

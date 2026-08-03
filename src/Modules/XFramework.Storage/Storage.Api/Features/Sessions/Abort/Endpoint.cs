@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Sessions.Abort;
 
 public static class AbortStorageUploadSessionEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite])]
     [MapPost("/api/storage/uploads/sessions/{uploadSessionId:guid}/abort", Tags = ["Storage"],
         Summary = "Abort upload session",
         Description = "Aborts a resumable upload session.")]

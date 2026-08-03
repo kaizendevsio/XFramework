@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authentication;
+using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Integration.Drivers;
 using XFramework.Portal.Services;
 using Microsoft.Extensions.Logging;
+using XFramework.Domain.Shared.BusinessObjects;
 
 namespace XFramework.Portal.Extensions;
 
@@ -62,9 +65,67 @@ public static class PortalAuthEndpointExtensions
         return Results.Redirect(GetSafeReturnUrl(returnUrl));
     }
 
-    private static async Task<IResult> Logout(HttpContext context)
+    private static async Task<IResult> Logout(
+        HttpContext context,
+        IIdentityServerServiceWrapper identityServer,
+        ILogger<PortalAuthService> logger)
     {
-        await context.SignOutAsync(PortalAuthDefaults.AuthenticationScheme);
+        try
+        {
+            if (!PortalIdentitySessionValidator.TryReadSessionClaims(
+                    context.User,
+                    out var tenantId,
+                    out var credentialId,
+                    out var sessionId,
+                    out _))
+            {
+                logger.LogWarning("Portal logout could not revoke the IdentityServer session because required claims were missing.");
+            }
+            else
+            {
+                var request = new LogoutRequest
+                {
+                    SessionId = sessionId,
+                    CredentialId = credentialId,
+                    Metadata = new RequestMetadata
+                    {
+                        TenantId = tenantId,
+                        CredentialId = credentialId,
+                        SessionId = sessionId,
+                        RequestId = Guid.NewGuid(),
+                        Name = "Portal logout",
+                        DeviceName = Environment.MachineName,
+                        DeviceAgent = context.Request.Headers.UserAgent.ToString(),
+                        IpAddress = context.Connection.RemoteIpAddress?.ToString()
+                    }
+                };
+
+                try
+                {
+                    var result = await identityServer.Logout(request)
+                        .WaitAsync(PortalIdentitySessionValidator.ValidationTimeout);
+                    if (!result.IsSuccess)
+                    {
+                        logger.LogWarning(
+                            "IdentityServer rejected Portal session revocation. Status={StatusCode}.",
+                            (int)result.HttpStatusCode);
+                    }
+                }
+                catch (TimeoutException ex)
+                {
+                    logger.LogWarning(ex, "IdentityServer session revocation timed out during Portal logout.");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "IdentityServer session revocation failed during Portal logout.");
+                }
+            }
+        }
+        finally
+        {
+            await context.SignOutAsync(PortalAuthDefaults.AuthenticationScheme);
+        }
+
         return Results.Redirect("/login");
     }
 

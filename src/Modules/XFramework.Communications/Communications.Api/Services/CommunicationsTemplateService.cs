@@ -31,7 +31,7 @@ public sealed class CommunicationsTemplateService(
         GetMessageTemplatesRequest request,
         CancellationToken ct = default)
     {
-        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata, ct);
         if (!accessResult.IsSuccess)
             return Result<GetMessageTemplatesResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
@@ -104,7 +104,7 @@ public sealed class CommunicationsTemplateService(
         GetMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata, ct);
         if (!accessResult.IsSuccess)
             return Result<MessageTemplateResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
@@ -127,7 +127,7 @@ public sealed class CommunicationsTemplateService(
         CreateMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata, ct);
         if (!accessResult.IsSuccess)
             return Result<MessageTemplateResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
@@ -185,7 +185,7 @@ public sealed class CommunicationsTemplateService(
         UpdateMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata, ct);
         if (!accessResult.IsSuccess)
             return Result<MessageTemplateResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
@@ -247,7 +247,7 @@ public sealed class CommunicationsTemplateService(
         DeleteMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata, ct);
         if (!accessResult.IsSuccess)
             return Result<CmdResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
@@ -287,7 +287,7 @@ public sealed class CommunicationsTemplateService(
         CloneMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var accessResult = await ResolveTemplateAccessAsync(request.Metadata);
+        var accessResult = await ResolveTemplateAccessAsync(request.Metadata, ct);
         if (!accessResult.IsSuccess)
             return Result<MessageTemplateResponse>.Failure(accessResult.Message ?? "Tenant could not be resolved", accessResult.StatusCode);
 
@@ -332,7 +332,7 @@ public sealed class CommunicationsTemplateService(
         RenderMessageTemplateRequest request,
         CancellationToken ct = default)
     {
-        var tenantContext = requestContextResolver.ResolveTenant(request.Metadata);
+        var tenantContext = await requestContextResolver.ResolveTenantAsync(request.Metadata, ct);
         if (!tenantContext.IsSuccess)
             return Result<RenderMessageTemplateResponse>.Failure(
                 tenantContext.Message ?? "Tenant could not be resolved",
@@ -884,9 +884,11 @@ public sealed class CommunicationsTemplateService(
         }
     }
 
-    private async Task<Result<TemplateAccessContext>> ResolveTemplateAccessAsync(RequestMetadata? metadata)
+    private async Task<Result<TemplateAccessContext>> ResolveTemplateAccessAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct)
     {
-        var adminContext = requestContextResolver.ResolveAdmin(metadata);
+        var adminContext = await requestContextResolver.ResolveAdminAsync(metadata, ct);
         if (adminContext.IsSuccess)
         {
             var tenant = await ResolveTenantIdAsync(adminContext.Data!.TenantId);
@@ -895,7 +897,7 @@ public sealed class CommunicationsTemplateService(
                 : Result<TemplateAccessContext>.Failure(tenant.Message ?? "Tenant could not be resolved", tenant.StatusCode);
         }
 
-        var userContext = requestContextResolver.Resolve(metadata);
+        var userContext = await requestContextResolver.ResolveAsync(metadata, ct);
         if (!userContext.IsSuccess)
         {
             return Result<TemplateAccessContext>.Failure(
@@ -909,9 +911,11 @@ public sealed class CommunicationsTemplateService(
             : Result<TemplateAccessContext>.Failure(userTenant.Message ?? "Tenant could not be resolved", userTenant.StatusCode);
     }
 
-    private async Task<Result<Guid>> ResolveAdminTenantIdAsync(RequestMetadata? metadata)
+    private async Task<Result<Guid>> ResolveAdminTenantIdAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct)
     {
-        var adminContext = requestContextResolver.ResolveAdmin(metadata);
+        var adminContext = await requestContextResolver.ResolveAdminAsync(metadata, ct);
         if (!adminContext.IsSuccess)
             return Result<Guid>.Failure(
                 adminContext.Message ?? "Communications templates require an admin context",

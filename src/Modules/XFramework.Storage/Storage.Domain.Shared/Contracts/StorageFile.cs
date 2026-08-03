@@ -97,6 +97,9 @@ public partial class StorageFile : BaseModel
     [MemoryPackOrder(27)]
     public DateTime? ObjectDeletedAt { get; set; }
 
+    [MemoryPackOrder(28)]
+    public DateTime? UnclaimedUntil { get; set; }
+
     [MemoryPackOrder(40)]
     public virtual StorageFileType Type { get; set; } = null!;
 

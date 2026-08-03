@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.RemoveCredentialRole;
 
 public static class RemoveCredentialRoleEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result> Handle(
         RemoveCredentialRoleRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class RemoveCredentialRoleEndpoint
     [MapPost("/api/identity/authorization/roles/remove", Tags = ["Identity Authorization"],
         Summary = "Remove a credential role",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.Manage,
+        ExcludeFromOpenApi = false)]
     public static Task<Result> HandleHttp(
         RemoveCredentialRoleRequest request,
         HttpContext httpContext,

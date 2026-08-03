@@ -8,4 +8,6 @@ public partial class TrackedEntity
     [MemoryPackOrder(2)] public byte[] SnapshotBytes { get; set; } = [];
 
     [MemoryPackIgnore] public object? Snapshot { get; set; }
+    [MemoryPackIgnore] public bool? OriginalIsEnabled { get; set; }
+    [MemoryPackIgnore] public bool? OriginalIsDeleted { get; set; }
 }

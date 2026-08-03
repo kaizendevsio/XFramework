@@ -185,6 +185,7 @@
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityServer { get; set; } = default!;
 
     private List<IdentityInformation> _users = [];
     private Dictionary<Guid, string?> _credentialUsernames = new();
@@ -310,10 +311,8 @@
                 return;
             }
 
-            var user = new IdentityInformation
+            var result = await IdentityServer.CreateIdentity(new CreateIdentityRequest
             {
-                Id = Guid.NewGuid(),
-                TenantId = tenant.Id,
                 FirstName = _form.FirstName,
                 MiddleName = _form.MiddleName,
                 LastName = _form.LastName,
@@ -322,12 +321,8 @@
                 BirthDate = DateOnly.TryParse(_form.BirthDateString, out var d) ? d : null,
                 Gender = Enum.TryParse<Gender>(_form.GenderString, out var g) ? g : null,
                 CivilStatus = Enum.TryParse<CivilStatus>(_form.CivilStatusString, out var cs) ? cs : null,
-                IsEnabled = true,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            DataContext.Add(user);
-            var result = await DataContext.SaveChangesAsync();
+                Metadata = new RequestMetadata { TenantId = tenant.Id }
+            });
 
             if (result.IsSuccess)
             {
@@ -354,26 +349,17 @@
     {
         try
         {
-            var fresh = await DataContext.Query<IdentityInformation>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == user.Id)
-                .FirstOrDefaultAsync();
-
-            if (fresh is null)
+            var result = await IdentityServer.SetIdentityEnabled(new SetIdentityEnabledRequest
             {
-                ToastService.Warning("User was not found.", "User unavailable");
-                return;
-            }
-
-            fresh.IsEnabled = !fresh.IsEnabled;
-            fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+                IdentityId = user.Id,
+                ExpectedConcurrencyStamp = user.ConcurrencyStamp,
+                IsEnabled = !user.IsEnabled,
+                Metadata = new RequestMetadata { TenantId = user.TenantId }
+            });
 
             if (result.IsSuccess)
             {
-                ToastService.Success(fresh.IsEnabled ? "User enabled." : "User disabled.", "User updated");
+                ToastService.Success(user.IsEnabled ? "User disabled." : "User enabled.", "User updated");
                 await LoadData();
             }
             else
@@ -399,24 +385,12 @@
 
         try
         {
-            var fresh = await DataContext.Query<IdentityInformation>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == _deletingUser.Id)
-                .FirstOrDefaultAsync();
-
-            if (fresh is null)
+            var result = await IdentityServer.SoftDeleteIdentity(new SoftDeleteIdentityRequest
             {
-                ToastService.Warning("User was not found.", "User unavailable");
-                return;
-            }
-
-            fresh.IsDeleted = true;
-            fresh.IsEnabled = false;
-            fresh.DeletedAt = DateTime.UtcNow;
-            fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+                IdentityId = _deletingUser.Id,
+                ExpectedConcurrencyStamp = _deletingUser.ConcurrencyStamp,
+                Metadata = new RequestMetadata { TenantId = _deletingUser.TenantId }
+            });
 
             if (result.IsSuccess)
             {

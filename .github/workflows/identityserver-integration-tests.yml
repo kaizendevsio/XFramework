@@ -1,0 +1,78 @@
+name: IdentityServer Integration Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: NUnit test filter
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: identityserver-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  identityserver-integration-tests:
+    name: IdentityServer PostgreSQL and Bolt integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Restore
+        run: |
+          dotnet restore src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj
+          dotnet restore src/Tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj
+          dotnet restore src/Tests/Portal.E2ETests/Portal.E2ETests.csproj
+
+      - name: Run IdentityServer unit tests
+        run: >-
+          dotnet test
+          src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj
+          --no-restore
+          -m:1
+          /nr:false
+
+      - name: Run IdentityServer Portal contract tests
+        run: >-
+          dotnet test
+          src/Tests/Portal.E2ETests/Portal.E2ETests.csproj
+          --no-restore
+          -m:1
+          /nr:false
+          --filter "TestCategory=Module:IdentityServer&TestCategory=Area:PortalContract"
+
+      - name: Run IdentityServer integration tests
+        shell: bash
+        env:
+          TEST_FILTER: ${{ inputs.test_filter }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          args=(
+            dotnet test
+            src/Tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj
+            --no-restore
+            -m:1
+            /nr:false
+          )
+          if [[ -n "$TEST_FILTER" ]]; then
+            args+=(--filter "$TEST_FILTER")
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            args+=(--filter "TestCategory!=Kind:ExtendedIntegration")
+          fi
+          "${args[@]}"

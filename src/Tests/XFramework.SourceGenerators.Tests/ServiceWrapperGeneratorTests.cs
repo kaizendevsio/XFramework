@@ -172,6 +172,40 @@ public sealed class ServiceWrapperGeneratorTests
         generatedSources.Should().BeEmpty();
     }
 
+    [Test]
+    public void GenerateWrapper_ProjectWithPartialWrapperExtensions_StillGeneratesWrapper()
+    {
+        var domainReference = CreateReference(
+            "IdentityServer.Domain.Shared",
+            """
+            namespace IdentityServer.Domain.Shared.Contracts.Requests
+            {
+                using Bolt.Domain.Shared.Contracts.Requests;
+                using XFramework.Domain.Shared.BusinessObjects;
+                using XFramework.Domain.Shared.Contracts.Requests;
+
+                public partial record AuthenticateRequest : RequestBase,
+                    IQuery<QueryResponse<string>>,
+                    IBoltRequest<AuthenticateRequest, QueryResponse<string>>;
+            }
+            """);
+
+        var generatedSources = RunGeneratorSources(
+            "IdentityServer.Integration",
+            domainReference,
+            new Dictionary<string, string>(),
+            """
+            namespace IdentityServer.Integration.Drivers
+            {
+                public partial interface IIdentityServerServiceWrapper { }
+                public partial record IdentityServerServiceWrapper { }
+            }
+            """);
+
+        generatedSources.Should().ContainSingle();
+        generatedSources.Single().Should().Contain("Authenticate(");
+    }
+
     private static string RunGenerator(
         string assemblyName,
         MetadataReference domainReference,

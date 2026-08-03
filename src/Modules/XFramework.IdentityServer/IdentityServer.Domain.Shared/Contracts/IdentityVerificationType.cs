@@ -8,11 +8,9 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-verification-types",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 3600,
-    CacheKeyPrefix = "identity-verification-types"
+    RequireAuthorization = true
 )]
-public partial class IdentityVerificationType : BaseModel, IHasSystemReferenceId
+public partial class IdentityVerificationType : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows
 {
     
     [MemoryPackOrder(0)]

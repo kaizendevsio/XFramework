@@ -20,5 +20,6 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         entity.Property(e => e.ParentTenantId).HasColumnName("ParentAppID");
         entity.Property(e => e.Version).HasPrecision(6, 3);
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
     }
 }

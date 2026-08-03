@@ -18,7 +18,7 @@ public sealed class CommunicationsAdminReadService(
         QueryCommunicationsAdminUsersRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveAdminTenantId(request.Metadata);
+        var tenantResult = await ResolveAdminTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
         {
             return Failure<CommunicationsAdminUsersResponse>(tenantResult);
@@ -46,7 +46,7 @@ public sealed class CommunicationsAdminReadService(
         GetCommunicationsAdminUserDetailRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveAdminTenantId(request.Metadata);
+        var tenantResult = await ResolveAdminTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
         {
             return Failure<CommunicationsAdminUserDetailResponse>(tenantResult);
@@ -154,7 +154,7 @@ public sealed class CommunicationsAdminReadService(
         QueryCommunicationsAdminThreadsRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveAdminTenantId(request.Metadata);
+        var tenantResult = await ResolveAdminTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
         {
             return Failure<CommunicationsAdminThreadsResponse>(tenantResult);
@@ -187,7 +187,7 @@ public sealed class CommunicationsAdminReadService(
         GetCommunicationsAdminThreadDetailRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveAdminTenantId(request.Metadata);
+        var tenantResult = await ResolveAdminTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
         {
             return Failure<CommunicationsAdminThreadDetailResponse>(tenantResult);
@@ -261,7 +261,7 @@ public sealed class CommunicationsAdminReadService(
         GetCommunicationsAdminOperationsRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveAdminTenantId(request.Metadata);
+        var tenantResult = await ResolveAdminTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
         {
             return Failure<CommunicationsAdminOperationsResponse>(tenantResult);
@@ -318,7 +318,7 @@ public sealed class CommunicationsAdminReadService(
         GetCommunicationsAdminModerationRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveAdminTenantId(request.Metadata);
+        var tenantResult = await ResolveAdminTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
         {
             return Failure<CommunicationsAdminModerationResponse>(tenantResult);
@@ -1048,9 +1048,11 @@ public sealed class CommunicationsAdminReadService(
     private static Result<T> Failure<T>(Result<Guid> result) =>
         Result<T>.Failure(result.Message ?? "Tenant could not be resolved.", result.StatusCode);
 
-    private Result<Guid> ResolveAdminTenantId(RequestMetadata? metadata)
+    private async Task<Result<Guid>> ResolveAdminTenantIdAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct)
     {
-        var adminContext = requestContextResolver.ResolveAdmin(metadata);
+        var adminContext = await requestContextResolver.ResolveAdminAsync(metadata, ct);
         if (!adminContext.IsSuccess)
             return Result<Guid>.Failure(
                 adminContext.Message ?? "Communications administration requires an admin context.",

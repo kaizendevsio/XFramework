@@ -18,7 +18,7 @@ public sealed class CommunicationsSettingsService(
         GetCommunicationsSettingsRequest request,
         CancellationToken ct = default)
     {
-        var adminContext = requestContextResolver.ResolveAdmin(request.Metadata);
+        var adminContext = await requestContextResolver.ResolveAdminAsync(request.Metadata, ct);
         if (!adminContext.IsSuccess)
         {
             return Result<CommunicationsSettingsResponse>.Failure(
@@ -42,7 +42,7 @@ public sealed class CommunicationsSettingsService(
         UpdateCommunicationsSettingsRequest request,
         CancellationToken ct = default)
     {
-        var adminContext = requestContextResolver.ResolveAdmin(request.Metadata);
+        var adminContext = await requestContextResolver.ResolveAdminAsync(request.Metadata, ct);
         if (!adminContext.IsSuccess)
         {
             return Result<CommunicationsSettingsResponse>.Failure(

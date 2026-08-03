@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Files.DownloadUrl;
 
 public static class GetStorageDownloadUrlEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageRead])]
     [MapPost("/api/storage/files/{storageFileId:guid}/download-url", Tags = ["Storage"],
         Summary = "Create download URL",
         Description = "Returns a short-lived signed URL for private files or a public URL for public assets.")]

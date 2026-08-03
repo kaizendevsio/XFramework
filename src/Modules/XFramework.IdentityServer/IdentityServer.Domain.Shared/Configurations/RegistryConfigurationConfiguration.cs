@@ -12,10 +12,15 @@ public class RegistryConfigurationConfiguration : IEntityTypeConfiguration<Regis
 
         entity.ToTable("RegistryConfiguration", "Registry");
 
+        entity.HasIndex(e => new { e.TenantId, e.Key })
+            .HasDatabaseName("UX_RegistryConfiguration_Tenant_Key")
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
 
         entity.Property(e => e.Id)
             .HasColumnName("ID")
             .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
         entity.Property(e => e.TenantId);
 
         entity.Property(e => e.Key).HasColumnType("character varying");

@@ -22,6 +22,16 @@ namespace XFramework.SourceGenerators;
 [Generator]
 public class ChangeTrackerGenerator : IIncrementalGenerator
 {
+    private static readonly HashSet<string> ServerOwnedPropertyNames =
+    [
+        "TenantId",
+        "CreatedAt",
+        "ModifiedAt",
+        "IsDeleted",
+        "DeletedAt",
+        "IsEnabled"
+    ];
+
     // SpecialType values that are known scalar types (covers keyword aliases like string, bool, int, etc.)
     private static readonly HashSet<SpecialType> ScalarSpecialTypes = new()
     {
@@ -180,8 +190,8 @@ public class ChangeTrackerGenerator : IIncrementalGenerator
                 if (prop.SetMethod == null)
                     continue;
 
-                // Skip Id (PK)
-                if (prop.Name == "Id")
+                // Identity, tenant, audit, and lifecycle fields are owned by the server.
+                if (prop.Name == "Id" || ServerOwnedPropertyNames.Contains(prop.Name))
                     continue;
 
                 // Deduplicate (overrides in derived types)
@@ -299,6 +309,9 @@ public class ChangeTrackerGenerator : IIncrementalGenerator
         sb.AppendLine();
         foreach (var prop in entity.ScalarProperties)
         {
+            if (prop.Name == "ConcurrencyStamp")
+                continue;
+
             sb.AppendLine($"        if (!System.Collections.Generic.EqualityComparer<{prop.FullyQualifiedTypeName}>.Default.Equals(current.{prop.Name}, original.{prop.Name}))");
             sb.AppendLine($"            changes[\"{prop.Name}\"] = MemoryPack.MemoryPackSerializer.Serialize(current.{prop.Name});");
         }
@@ -308,6 +321,8 @@ public class ChangeTrackerGenerator : IIncrementalGenerator
         sb.AppendLine("        return new FieldPatch");
         sb.AppendLine("        {");
         sb.AppendLine("            EntityId = MemoryPack.MemoryPackSerializer.Serialize(current.Id),");
+        if (entity.ScalarProperties.Any(static property => property.Name == "ConcurrencyStamp"))
+            sb.AppendLine("            ExpectedConcurrencyStamp = original.ConcurrencyStamp,");
         sb.AppendLine("            Changes = changes");
         sb.AppendLine("        };");
         sb.AppendLine("    }");

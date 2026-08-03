@@ -15,7 +15,13 @@
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Bolt\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />
         <ProjectReference Include="..\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     </ItemGroup>
 
 </Project>

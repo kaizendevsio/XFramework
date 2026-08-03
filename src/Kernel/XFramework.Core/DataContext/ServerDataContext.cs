@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Core.DataContext;
 
-public class ServerDataContext<TDbContext>(TDbContext dbContext) : IDataContext
+public class ServerDataContext<TDbContext>(
+    TDbContext dbContext,
+    ILogger<ServerDataContext<TDbContext>>? logger = null) : IDataContext
     where TDbContext : DbContext
 {
     public IRemoteQuery<T> Query<T>() where T : class
@@ -25,9 +28,15 @@ public class ServerDataContext<TDbContext>(TDbContext dbContext) : IDataContext
             await dbContext.SaveChangesAsync(ct);
             return DataContextResult.Success();
         }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger?.LogWarning(ex, "Concurrent database update rejected for {DbContextType}", typeof(TDbContext).Name);
+            return DataContextResult.Failure("The record was changed by another operation. Reload and try again.", 409);
+        }
         catch (DbUpdateException ex)
         {
-            return DataContextResult.Failure(ex.InnerException?.Message ?? ex.Message);
+            logger?.LogError(ex, "Database update failed for {DbContextType}", typeof(TDbContext).Name);
+            return DataContextResult.Failure("The database update could not be completed.");
         }
     }
 }

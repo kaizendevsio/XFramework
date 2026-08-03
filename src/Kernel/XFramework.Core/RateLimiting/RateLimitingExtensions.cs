@@ -1,6 +1,10 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 
 namespace XFramework.Core.RateLimiting;
 
@@ -42,30 +46,89 @@ public static class RateLimitingExtensions
                     }));
 
             // Strict policy for auth endpoints: 10 requests per minute per IP
-            options.AddFixedWindowLimiter("auth", opt =>
-            {
-                opt.PermitLimit = 10;
-                opt.Window = TimeSpan.FromMinutes(1);
-            });
+            AddIpPolicy(options, "auth", 10, TimeSpan.FromMinutes(1));
 
             // Strict policy for password reset: 3 requests per 15 minutes per IP
-            options.AddFixedWindowLimiter("password-reset", opt =>
-            {
-                opt.PermitLimit = 3;
-                opt.Window = TimeSpan.FromMinutes(15);
-            });
+            AddIpPolicy(options, "password-reset", 3, TimeSpan.FromMinutes(15));
+
+            AddIpPolicy(options, "verification", 5, TimeSpan.FromMinutes(15));
 
             // Standard API policy: 60 requests per minute per IP
-            options.AddFixedWindowLimiter("api", opt =>
-            {
-                opt.PermitLimit = 60;
-                opt.Window = TimeSpan.FromMinutes(1);
-            });
+            AddIpPolicy(options, "api", 60, TimeSpan.FromMinutes(1));
 
             options.RejectionStatusCode = 429;
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Adds Redis-backed enforcement for security-sensitive IdentityServer HTTP routes.
+    /// The existing ASP.NET Core policies remain active as defense in depth.
+    /// </summary>
+    public static IServiceCollection AddDistributedStrictSecurityRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        var section = configuration.GetSection(DistributedSecurityRateLimitOptions.SectionName);
+        var configuredOptions = section.Get<DistributedSecurityRateLimitOptions>()
+            ?? new DistributedSecurityRateLimitOptions();
+
+        services.AddSingleton<IValidateOptions<DistributedSecurityRateLimitOptions>>(
+            new DistributedSecurityRateLimitOptionsValidator(environment));
+        services.AddOptions<DistributedSecurityRateLimitOptions>()
+            .Bind(section)
+            .ValidateOnStart();
+
+        if (configuredOptions.Enabled)
+        {
+            services.TryAddSingleton<IConnectionMultiplexer>(serviceProvider =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<IOptions<DistributedSecurityRateLimitOptions>>()
+                    .Value;
+                var redisConfiguration = ConfigurationOptions.Parse(options.RedisConnectionString!);
+                redisConfiguration.AbortOnConnectFail = true;
+                redisConfiguration.ConnectRetry = 1;
+                redisConfiguration.ConnectTimeout = options.ConnectTimeoutMilliseconds;
+                redisConfiguration.SyncTimeout = options.OperationTimeoutMilliseconds;
+                redisConfiguration.AsyncTimeout = options.OperationTimeoutMilliseconds;
+                try
+                {
+                    return ConnectionMultiplexer.Connect(redisConfiguration);
+                }
+                catch
+                {
+                    throw new InvalidOperationException(
+                        "The distributed security rate-limit store is unavailable.");
+                }
+            });
+            services.AddSingleton<IDistributedSecurityRateLimiter, RedisDistributedSecurityRateLimiter>();
+            services.AddHostedService<DistributedSecurityRateLimitStartupService>();
+        }
+        else
+        {
+            services.AddSingleton<IDistributedSecurityRateLimiter, DisabledDistributedSecurityRateLimiter>();
+        }
+
+        return services;
+    }
+
+    private static void AddIpPolicy(
+        RateLimiterOptions options,
+        string policyName,
+        int permitLimit,
+        TimeSpan window)
+    {
+        options.AddPolicy(policyName, context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = permitLimit,
+                    Window = window
+                }));
     }
 
     /// <summary>
@@ -77,6 +140,15 @@ public static class RateLimitingExtensions
     public static IApplicationBuilder UseXFrameworkRateLimiting(this IApplicationBuilder app)
     {
         app.UseRateLimiter();
+        return app;
+    }
+
+    /// <summary>
+    /// Adds distributed strict security throttling before endpoint execution.
+    /// </summary>
+    public static IApplicationBuilder UseDistributedStrictSecurityRateLimiting(this IApplicationBuilder app)
+    {
+        app.UseMiddleware<DistributedSecurityRateLimitMiddleware>();
         return app;
     }
 }

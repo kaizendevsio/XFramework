@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.SetCredentialRolePermissionO
 
 public static class SetCredentialRolePermissionOverridesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<CredentialRolePermissionOverridesResponse>> Handle(
         SetCredentialRolePermissionOverridesRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class SetCredentialRolePermissionOverridesEndpoint
     [MapPost("/api/identity/authorization/credential-role-overrides/set", Tags = ["Identity Authorization"],
         Summary = "Set credential role permission overrides",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.Manage,
+        ExcludeFromOpenApi = false)]
     public static Task<Result<CredentialRolePermissionOverridesResponse>> HandleHttp(
         SetCredentialRolePermissionOverridesRequest request,
         HttpContext httpContext,
@@ -36,7 +37,18 @@ public sealed class SetCredentialRolePermissionOverridesRequestValidator :
         RuleFor(x => x.IdentityRoleId)
             .NotEmpty().WithMessage("Identity role is required");
 
+        RuleFor(x => x.ExpectedConcurrencyStamp)
+            .NotEmpty().WithMessage("Identity role version is required");
+
+        RuleFor(x => x.Overrides)
+            .Cascade(CascadeMode.Stop)
+            .NotNull()
+            .Must(overrides => overrides.Count <= 500)
+            .WithMessage("At most 500 credential role overrides can be updated at once");
+
         RuleForEach(x => x.Overrides)
-            .SetValidator(new CapabilityPermissionDtoValidator());
+            .NotNull()
+            .SetValidator(new CapabilityPermissionDtoValidator())
+            .When(x => x.Overrides is not null);
     }
 }

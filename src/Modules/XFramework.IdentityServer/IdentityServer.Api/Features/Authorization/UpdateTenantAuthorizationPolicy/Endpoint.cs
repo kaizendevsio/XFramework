@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.UpdateTenantAuthorizationPol
 
 public static class UpdateTenantAuthorizationPolicyEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<TenantAuthorizationPolicyResponse>> Handle(
         UpdateTenantAuthorizationPolicyRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class UpdateTenantAuthorizationPolicyEndpoint
     [MapPost("/api/identity/authorization/tenant-policy/update", Tags = ["Identity Authorization"],
         Summary = "Update tenant authorization policy",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.Manage,
+        ExcludeFromOpenApi = false)]
     public static Task<Result<TenantAuthorizationPolicyResponse>> HandleHttp(
         UpdateTenantAuthorizationPolicyRequest request,
         HttpContext httpContext,
@@ -38,5 +39,6 @@ public sealed class UpdateTenantAuthorizationPolicyRequestValidator :
 
         RuleFor(x => x.MissingPermissionBehavior)
             .IsInEnum().WithMessage("Missing permission behavior is invalid");
+
     }
 }

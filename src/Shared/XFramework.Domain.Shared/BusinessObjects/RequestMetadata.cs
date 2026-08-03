@@ -33,4 +33,16 @@ public partial class RequestMetadata
 
     [MemoryPackOrder(9)]
     public string? ServiceAccessToken { get; set; }
+
+    [MemoryPackOrder(10)]
+    public Guid? ActorTenantId { get; set; }
+
+    [MemoryPackIgnore]
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasTrustedActorContext { get; set; }
+
+    [MemoryPackIgnore]
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlySet<string> TrustedActorRoles { get; set; } = new HashSet<string>(
+        StringComparer.OrdinalIgnoreCase);
 }

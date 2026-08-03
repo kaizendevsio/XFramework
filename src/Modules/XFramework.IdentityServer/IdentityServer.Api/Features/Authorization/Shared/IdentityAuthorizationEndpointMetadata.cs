@@ -2,7 +2,7 @@ using System.Security.Claims;
 
 namespace IdentityServer.Api.Features.Authorization.Shared;
 
-internal static class IdentityAuthorizationEndpointMetadata
+public static class IdentityAuthorizationEndpointMetadata
 {
     public static void ApplyHttpContextActor(RequestMetadata metadata, HttpContext httpContext)
     {
@@ -14,6 +14,11 @@ internal static class IdentityAuthorizationEndpointMetadata
             ClaimTypes.NameIdentifier,
             "sub");
         metadata.ServiceAccessToken = null;
+        metadata.HasTrustedActorContext = httpContext.User.Identity?.IsAuthenticated == true;
+        metadata.TrustedActorRoles = httpContext.User.FindAll(ClaimTypes.Role)
+            .Select(claim => claim.Value)
+            .Where(role => !string.IsNullOrWhiteSpace(role))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static Guid? ResolveGuidClaim(ClaimsPrincipal user, params string[] claimNames)

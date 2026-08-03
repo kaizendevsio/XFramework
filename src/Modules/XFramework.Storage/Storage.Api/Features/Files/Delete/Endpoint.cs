@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Files.Delete;
 
 public static class DeleteStorageFileEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite])]
     [MapDelete("/api/storage/files/{storageFileId:guid}", Tags = ["Storage"],
         Summary = "Delete storage file",
         Description = "Soft-deletes storage metadata and schedules physical deletion by retention cleanup.")]

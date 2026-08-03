@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using Communications.Domain.Shared;
 using Communications.Domain.Shared.Contracts.Requests.Create;
 using Communications.Domain.Shared.Contracts.Requests.Templates;
@@ -31,14 +30,16 @@ public sealed class CommunicationsService(
     ILogger<CommunicationsService> logger
 ) : ICommunicationsService
 {
+    private static readonly TimeSpan DeliveryLeaseDuration = TimeSpan.FromMinutes(2);
+
     public async Task<Result<CmdResponse>> CreateDirectMessageAsync(CreateDirectMessageRequest request, CancellationToken ct = default)
     {
         try
         {
-            var tenantContext = requestContextResolver.ResolveTrustedInternal(
+            var tenantContext = await requestContextResolver.ResolveTrustedInternalAsync(
                 request.Metadata,
-                XFrameworkServiceNames.Portal,
-                XFrameworkServiceNames.IdentityServer);
+                [XFrameworkServiceNames.Portal, XFrameworkServiceNames.IdentityServer],
+                ct);
             if (!tenantContext.IsSuccess)
             {
                 return Result<CmdResponse>.Failure(
@@ -47,6 +48,23 @@ public sealed class CommunicationsService(
             }
 
             var tenant = await tenantService.GetTenant(tenantContext.Data!.TenantId);
+            var requestId = request.Metadata.RequestId;
+            var record = requestId is { } existingRequestId
+                ? await GetDirectMessageAsync(tenant.Id, existingRequestId, ct)
+                : null;
+            if (record?.Status is MessageStatus.Sent or MessageStatus.Delivered)
+            {
+                return AcceptedDirectMessage();
+            }
+
+            var now = DateTime.UtcNow;
+            if (record?.Status == MessageStatus.Processing &&
+                record.ModifiedAt is { } modifiedAt &&
+                modifiedAt > now.Subtract(DeliveryLeaseDuration))
+            {
+                return Result<CmdResponse>.Failure("Direct message delivery is already being processed", 409);
+            }
+
             var policy = await policyService.GetPolicyAsync(tenant.Id, ct);
             var rateLimit = rateLimiter.Check(
                 tenant.Id,
@@ -87,7 +105,7 @@ public sealed class CommunicationsService(
                 if (!renderResult.IsSuccess || renderResult.Data is null)
                 {
                     return Result<CmdResponse>.Failure(
-                        renderResult.Message ?? "Message template could not be rendered",
+                        "Message template could not be rendered",
                         renderResult.StatusCode);
                 }
 
@@ -98,26 +116,44 @@ public sealed class CommunicationsService(
             if (string.IsNullOrWhiteSpace(messageText))
                 return Result<CmdResponse>.Failure("Message text or template is required", 400);
 
-            var record = new MessageDirect()
+            if (record is null)
             {
-                TenantId = tenant.Id,
-                MessageTransportType = request.MessageTransportType,
-                ExternalRecipient = request.Recipient,
-                Subject = renderedTemplate?.Subject ?? request.Subject,
-                Message = messageText,
-                TemplateId = renderedTemplate?.TemplateId,
-                TemplateKey = renderedTemplate?.TemplateKey,
-                TemplateType = renderedTemplate?.TemplateType,
-                TemplateVariablesJson = JsonSerializer.Serialize(
-                    renderedTemplate?.TemplateVariables ?? new Dictionary<string, string>()),
-                AgentClusterId = request.AgentClusterId,
-                Status = MessageStatus.Queued
-            };
+                record = new MessageDirect
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    MessageTransportType = request.MessageTransportType,
+                    ExternalRecipient = null,
+                    Subject = null,
+                    Message = "[redacted]",
+                    Intent = request.Intent,
+                    TemplateId = renderedTemplate?.TemplateId,
+                    TemplateKey = renderedTemplate?.TemplateKey,
+                    TemplateType = renderedTemplate?.TemplateType,
+                    TemplateVariablesJson = "{}",
+                    AgentClusterId = request.AgentClusterId,
+                    IdempotencyRequestId = requestId,
+                    Status = MessageStatus.Processing,
+                    ModifiedAt = now
+                };
 
-            dataContext.Add(record);
+                dataContext.Add(record);
+            }
+            else
+            {
+                record.Status = MessageStatus.Processing;
+                record.ModifiedAt = now;
+                record.ConcurrencyStamp = Guid.NewGuid();
+                dataContext.Update(record);
+            }
+
             var saveResult = await dataContext.SaveChangesAsync(ct);
             if (!saveResult.IsSuccess)
-                return Result<CmdResponse>.Failure(saveResult.Message ?? "Direct message could not be queued", saveResult.StatusCode);
+            {
+                return Result<CmdResponse>.Failure(
+                    "Direct message delivery could not be claimed",
+                    saveResult.StatusCode == 0 ? 409 : saveResult.StatusCode);
+            }
 
             QueryResponse<NotificationInboxItemResponse> result;
             try
@@ -145,9 +181,10 @@ public sealed class CommunicationsService(
             {
                 record.Status = MessageStatus.Failed;
                 record.ModifiedAt = DateTime.UtcNow;
+                record.ConcurrencyStamp = Guid.NewGuid();
                 dataContext.Update(record);
                 await dataContext.SaveChangesAsync(ct);
-                logger.CommunicationsCreateDirectError(request.Recipient, ex);
+                logger.CommunicationsCreateDirectError(ex.GetType().Name);
                 return Result<CmdResponse>.Failure("Direct message could not be queued with the SMS gateway", 502);
             }
 
@@ -155,6 +192,7 @@ public sealed class CommunicationsService(
             {
                 record.Status = MessageStatus.Failed;
                 record.ModifiedAt = DateTime.UtcNow;
+                record.ConcurrencyStamp = Guid.NewGuid();
                 dataContext.Update(record);
                 await dataContext.SaveChangesAsync(ct);
 
@@ -163,20 +201,28 @@ public sealed class CommunicationsService(
                     : (int)result.HttpStatusCode;
 
                 return Result<CmdResponse>.Failure(
-                    result.Message ?? "Direct message could not be queued with the SMS gateway",
+                    "Direct message could not be queued with the delivery provider",
                     statusCode);
             }
 
-            return Result<CmdResponse>.Success(new CmdResponse
+            record.Status = MessageStatus.Sent;
+            record.ModifiedAt = DateTime.UtcNow;
+            record.ConcurrencyStamp = Guid.NewGuid();
+            dataContext.Update(record);
+            var completionSave = await dataContext.SaveChangesAsync(ct);
+            if (!completionSave.IsSuccess)
             {
-                HttpStatusCode = HttpStatusCode.Accepted,
-                Message = "Direct message delivery queued"
-            });
+                return Result<CmdResponse>.Failure(
+                    "Direct message delivery state could not be finalized",
+                    completionSave.StatusCode == 0 ? 503 : completionSave.StatusCode);
+            }
+
+            return AcceptedDirectMessage();
         }
         catch (Exception ex)
         {
-            logger.CommunicationsCreateDirectError(request.Recipient, ex);
-            return Result<CmdResponse>.Failure($"Error creating direct message: {ex.Message}");
+            logger.CommunicationsCreateDirectError(ex.GetType().Name);
+            return Result<CmdResponse>.Failure("Direct message could not be queued", 500);
         }
     }
 
@@ -215,8 +261,8 @@ public sealed class CommunicationsService(
         }
         catch (Exception ex)
         {
-            logger.CommunicationsCreateDirectError(request.Contact ?? string.Empty, ex);
-            return Result<CmdResponse>.Failure($"Error creating verification message: {ex.Message}");
+            logger.CommunicationsCreateDirectError(ex.GetType().Name);
+            return Result<CmdResponse>.Failure("Verification message could not be queued", 500);
         }
     }
 
@@ -224,9 +270,10 @@ public sealed class CommunicationsService(
     {
         try
         {
-            var tenantContext = requestContextResolver.ResolveTrustedInternal(
+            var tenantContext = await requestContextResolver.ResolveTrustedInternalAsync(
                 request.Metadata,
-                XFrameworkServiceNames.SmsGateway);
+                [XFrameworkServiceNames.SmsGateway],
+                ct);
             if (!tenantContext.IsSuccess)
             {
                 return Result<CmdResponse>.Failure(
@@ -274,12 +321,26 @@ public sealed class CommunicationsService(
         catch (Exception ex)
         {
             logger.CommunicationsUpdateError(request.Id ?? Guid.Empty, ex);
-            return Result<CmdResponse>.Failure($"Error updating message: {ex.Message}");
+            return Result<CmdResponse>.Failure("Message could not be updated", 500);
         }
     }
 
     private static bool HasTemplate(Guid? templateId, string? templateKey) =>
         templateId is Guid || !string.IsNullOrWhiteSpace(templateKey);
+
+    private Task<MessageDirect?> GetDirectMessageAsync(Guid tenantId, Guid requestId, CancellationToken ct) =>
+        dataContext.Query<MessageDirect>()
+            .IgnoreQueryFilters()
+            .Where(message => message.TenantId == tenantId)
+            .Where(message => message.IdempotencyRequestId == requestId)
+            .FirstOrDefaultAsync(ct);
+
+    private static Result<CmdResponse> AcceptedDirectMessage() =>
+        Result<CmdResponse>.Success(new CmdResponse
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Direct message delivery queued"
+        });
 
     private static bool TryMapDeliveryChannel(
         MessageTransportType transportType,

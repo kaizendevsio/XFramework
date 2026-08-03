@@ -106,11 +106,17 @@ public static class InstallerExtensions
         });
     }
     
-    public static void InstallJwt(this IServiceCollection services, IConfiguration configuration)
+    public static void InstallJwt(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment? hostEnvironment = null)
     {
         var jwtOptions = new JwtOptions();
         configuration.Bind(nameof(jwtOptions), jwtOptions);
-        JwtCredentialSet.Validate(jwtOptions, TimeProvider.System.GetUtcNow());
+        JwtCredentialSet.Validate(
+            jwtOptions,
+            TimeProvider.System.GetUtcNow(),
+            hostEnvironment?.EnvironmentName ?? Environments.Production);
 
         services.AddSingleton(jwtOptions);
         services.TryAddSingleton(TimeProvider.System);

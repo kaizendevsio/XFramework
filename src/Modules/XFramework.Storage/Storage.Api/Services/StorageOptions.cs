@@ -13,6 +13,9 @@ public sealed class StorageOptions
     public int SessionTtlMinutes { get; set; } = 24 * 60;
     public int SignedUrlExpirationMinutes { get; set; } = 15;
     public int RetentionDays { get; set; } = 30;
+    public int UnclaimedFileTtlMinutes { get; set; } = 24 * 60;
+    public int MaintenancePollSeconds { get; set; } = 30;
+    public int MaintenanceBatchSize { get; set; } = 100;
     public bool AutoCreateBuckets { get; set; } = true;
     public bool EnforceProviderLimits { get; set; } = true;
     public S3StorageOptions S3 { get; set; } = new();

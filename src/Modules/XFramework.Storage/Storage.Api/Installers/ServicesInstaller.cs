@@ -15,6 +15,8 @@ public sealed class ServicesInstaller : IInstaller
         services.AddTenantModuleFeatures();
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddScoped<StorageService>();
+        services.AddScoped<StorageMaintenanceService>();
+        services.AddHostedService<StorageMaintenanceHostedService>();
         services.AddScoped<IStorageProviderFactory, StorageProviderFactory>();
         services.AddScoped<AzureBlobStorageProvider>();
         services.AddScoped<S3CompatibleStorageProvider>();

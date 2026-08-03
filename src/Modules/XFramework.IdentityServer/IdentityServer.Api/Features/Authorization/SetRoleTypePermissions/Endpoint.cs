@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.SetRoleTypePermissions;
 
 public static class SetRoleTypePermissionsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<RoleTypePermissionsResponse>> Handle(
         SetRoleTypePermissionsRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class SetRoleTypePermissionsEndpoint
     [MapPost("/api/identity/authorization/role-type-permissions/set", Tags = ["Identity Authorization"],
         Summary = "Set role type permissions",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.Manage,
+        ExcludeFromOpenApi = false)]
     public static Task<Result<RoleTypePermissionsResponse>> HandleHttp(
         SetRoleTypePermissionsRequest request,
         HttpContext httpContext,
@@ -35,7 +36,18 @@ public sealed class SetRoleTypePermissionsRequestValidator : AbstractValidator<S
         RuleFor(x => x.RoleTypeId)
             .NotEmpty().WithMessage("Role type is required");
 
+        RuleFor(x => x.ExpectedConcurrencyStamp)
+            .NotEmpty().WithMessage("Role type version is required");
+
+        RuleFor(x => x.Permissions)
+            .Cascade(CascadeMode.Stop)
+            .NotNull()
+            .Must(permissions => permissions.Count <= 500)
+            .WithMessage("At most 500 role permissions can be updated at once");
+
         RuleForEach(x => x.Permissions)
-            .SetValidator(new CapabilityPermissionDtoValidator());
+            .NotNull()
+            .SetValidator(new CapabilityPermissionDtoValidator())
+            .When(x => x.Permissions is not null);
     }
 }

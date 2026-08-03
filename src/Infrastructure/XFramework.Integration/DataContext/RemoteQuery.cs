@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using MemoryPack;
 using Microsoft.Extensions.DependencyInjection;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext.ExpressionVisitor;
 
@@ -10,13 +11,10 @@ namespace XFramework.Integration.DataContext;
 
 public class RemoteQuery<T> : IRemoteQuery<T> where T : class
 {
-    private const string IgnoreQueryFiltersMetadataFlag = "xframework.ignoreQueryFilters";
-
     private readonly QueryDescriptor _descriptor;
     private readonly IServiceProvider _serviceProvider;
     private readonly List<TrackedEntity> _trackedEntities;
     private readonly RequestMetadata? _metadata;
-    private bool _ignoreQueryFilters;
 
     public RemoteQuery(
         IServiceProvider serviceProvider,
@@ -30,6 +28,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     }
 
     internal QueryDescriptor Descriptor => _descriptor;
+    internal RequestMetadata? Metadata => _metadata;
 
     public IRemoteQuery<T> Where(Expression<Func<T, bool>> predicate)
     {
@@ -120,8 +119,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
 
     public IRemoteQuery<T> IgnoreQueryFilters()
     {
-        _ignoreQueryFilters = true;
-        _descriptor.Metadata = BuildQueryMetadata();
+        _descriptor.IgnoreQueryFilters = true;
         return this;
     }
 
@@ -291,29 +289,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     }
 
     private RequestMetadata? BuildQueryMetadata()
-    {
-        if (!_ignoreQueryFilters)
-            return _metadata;
-
-        var metadata = _metadata is null
-            ? new RequestMetadata()
-            : new RequestMetadata
-            {
-                SessionId = _metadata.SessionId,
-                TenantId = _metadata.TenantId,
-                Name = _metadata.Name,
-                DeviceName = _metadata.DeviceName,
-                DeviceAgent = _metadata.DeviceAgent,
-                IpAddress = _metadata.IpAddress,
-                RequestId = _metadata.RequestId
-            };
-
-        metadata.DeviceAgent = string.IsNullOrWhiteSpace(metadata.DeviceAgent)
-            ? IgnoreQueryFiltersMetadataFlag
-            : $"{metadata.DeviceAgent};{IgnoreQueryFiltersMetadataFlag}";
-
-        return metadata;
-    }
+        => _metadata;
 
     private static TQueryResult? DeserializeOptionalQueryResult<TQueryResult>(
         byte[] resultBytes,
@@ -389,11 +365,16 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         var tracker = RemoteDataContext.GetTracker<T>();
         var pk = tracker.GetPrimaryKey(entity);
         var snapshot = tracker.Snapshot(entity);
+        _trackedEntities.RemoveAll(tracked =>
+            tracked.EntityTypeName.Equals(typeof(T).Name, StringComparison.OrdinalIgnoreCase) &&
+            tracked.PrimaryKey == pk);
         _trackedEntities.Add(new TrackedEntity
         {
             EntityTypeName = typeof(T).Name,
             PrimaryKey = pk,
-            Snapshot = snapshot
+            Snapshot = snapshot,
+            OriginalIsEnabled = (entity as ISoftDeletable)?.IsEnabled,
+            OriginalIsDeleted = (entity as ISoftDeletable)?.IsDeleted
         });
     }
 }

@@ -1,13 +1,24 @@
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Core.DataContext;
 
 public static class QueryDescriptorExecutor
 {
-    private const string IgnoreQueryFiltersMetadataFlag = "xframework.ignoreQueryFilters";
+    public const int DefaultMaterializationLimit = 500;
+    public const int MaximumMaterializationLimit = 1000;
+    public const int MaximumIncludeCount = 8;
+    public const int MaximumIncludeDepth = 4;
+    public const int MaximumFilterCount = 128;
+    public const int MaximumSortCount = 16;
+    public const int MaximumPredicateFilterCount = 64;
+    public const int MaximumInValueCount = 64;
+    public const int MaximumSkip = 10_000;
+    public const int MaximumQueryDescriptorBytes = 256 * 1024;
 
     public static async Task<object?> ExecuteAsync(
         DbContext dbContext,
@@ -80,10 +91,23 @@ public static class QueryDescriptorExecutor
     {
         IQueryable<T> queryable = dbContext.Set<T>().AsNoTracking();
 
-        if (ShouldIgnoreQueryFilters(descriptor))
+        var isTenantOwned = typeof(IHasTenantId).IsAssignableFrom(typeof(T)) &&
+                            typeof(T) != typeof(Tenant) &&
+                            typeof(T) != typeof(TenantModuleFeature);
+        if (isTenantOwned)
+        {
+            // The service's configured tenant is not the caller's tenant boundary.
+            // Start without the ambient filter, then apply the authenticated request tenant explicitly.
+            queryable = queryable.IgnoreQueryFilters();
+            if (!descriptor.IgnoreQueryFilters && typeof(ISoftDeletable).IsAssignableFrom(typeof(T)))
+                queryable = ApplySoftDeleteBoundary(queryable);
+        }
+        else if (descriptor.IgnoreQueryFilters)
         {
             queryable = queryable.IgnoreQueryFilters();
         }
+
+        queryable = ApplyRequestTenantBoundary(queryable, descriptor);
 
         // Apply filters
         if (descriptor.Filters.Count > 0)
@@ -119,18 +143,107 @@ public static class QueryDescriptorExecutor
             queryable = queryable.Skip(descriptor.Skip.Value);
         }
 
-        if (descriptor.Take.HasValue)
+        var take = descriptor.Take;
+        if (!take.HasValue && descriptor.Mode is
+                QueryExecutionMode.ToList or QueryExecutionMode.Stream or QueryExecutionMode.GroupBy)
+            take = DefaultMaterializationLimit;
+
+        if (take.HasValue)
         {
-            queryable = queryable.Take(descriptor.Take.Value);
+            queryable = queryable.Take(take.Value);
         }
 
         return queryable;
     }
 
-    private static bool ShouldIgnoreQueryFilters(QueryDescriptor descriptor)
-        => descriptor.Metadata?.DeviceAgent?
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Contains(IgnoreQueryFiltersMetadataFlag, StringComparer.Ordinal) == true;
+    public static string? ValidateDescriptor(QueryDescriptor descriptor)
+    {
+        if (descriptor.Filters is null)
+            return "Remote query filters are required.";
+
+        if (descriptor.Sorting is null)
+            return "Remote query sorting is required.";
+
+        if (descriptor.Includes is null)
+            return "Remote query includes are required.";
+
+        if (descriptor.Filters.Count > MaximumFilterCount)
+            return $"Remote query supports at most {MaximumFilterCount} filters.";
+
+        if (descriptor.Sorting.Count > MaximumSortCount)
+            return $"Remote query supports at most {MaximumSortCount} sort fields.";
+
+        if (descriptor.PredicateFilters?.Count > MaximumPredicateFilterCount)
+            return $"Remote query supports at most {MaximumPredicateFilterCount} predicate filters.";
+
+        if (HasOversizedInList(descriptor.Filters) ||
+            descriptor.PredicateFilters is not null && HasOversizedInList(descriptor.PredicateFilters))
+        {
+            return $"Remote query supports at most {MaximumInValueCount} values in an In filter.";
+        }
+
+        if (descriptor.Skip is < 0 or > MaximumSkip)
+            return $"Remote query Skip must be between 0 and {MaximumSkip}.";
+
+        if (descriptor.Take is <= 0 or > MaximumMaterializationLimit)
+            return $"Remote query Take must be between 1 and {MaximumMaterializationLimit}.";
+
+        if (descriptor.Includes.Count > MaximumIncludeCount)
+            return $"Remote query supports at most {MaximumIncludeCount} includes.";
+
+        if (descriptor.Includes.Any(include =>
+                string.IsNullOrWhiteSpace(include) ||
+                include.Split('.', StringSplitOptions.RemoveEmptyEntries).Length > MaximumIncludeDepth))
+            return $"Remote query include paths must contain between 1 and {MaximumIncludeDepth} segments.";
+
+        if (descriptor.Mode == QueryExecutionMode.Stream &&
+            descriptor.ChunkSize is <= 0 or > DefaultMaterializationLimit)
+            return $"Remote query stream chunk size must be between 1 and {DefaultMaterializationLimit}.";
+
+        return null;
+    }
+
+    private static bool HasOversizedInList(IEnumerable<QueryFilter> filters) =>
+        filters
+            .Where(filter => filter.Operation == QueryFilterOperation.In)
+            .GroupBy(filter => filter.PropertyName, StringComparer.Ordinal)
+            .Any(group => group.Count() > MaximumInValueCount);
+
+    private static IQueryable<T> ApplySoftDeleteBoundary<T>(IQueryable<T> queryable) where T : class
+    {
+        var parameter = Expression.Parameter(typeof(T), "entity");
+        var isDeleted = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+        var predicate = Expression.Lambda<Func<T, bool>>(Expression.Not(isDeleted), parameter);
+        return queryable.Where(predicate);
+    }
+
+    private static IQueryable<T> ApplyRequestTenantBoundary<T>(
+        IQueryable<T> queryable,
+        QueryDescriptor descriptor) where T : class
+    {
+        if (!typeof(IHasTenantId).IsAssignableFrom(typeof(T)) ||
+            typeof(T) == typeof(Tenant) ||
+            typeof(T) == typeof(TenantModuleFeature))
+        {
+            return queryable;
+        }
+
+        if (descriptor.Metadata?.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            throw new InvalidOperationException("Tenant metadata is required for tenant-owned remote queries.");
+
+        var parameter = Expression.Parameter(typeof(T), "entity");
+        var tenantProperty = Expression.Property(parameter, nameof(IHasTenantId.TenantId));
+        Expression tenantBoundary = Expression.Equal(tenantProperty, Expression.Constant(tenantId));
+        if (typeof(IAllowsGlobalTenantRows).IsAssignableFrom(typeof(T)))
+        {
+            tenantBoundary = Expression.OrElse(
+                tenantBoundary,
+                Expression.Equal(tenantProperty, Expression.Constant(Guid.Empty)));
+        }
+
+        var predicate = Expression.Lambda<Func<T, bool>>(tenantBoundary, parameter);
+        return queryable.Where(predicate);
+    }
 
     private static IQueryable<T> ApplyFilters<T>(IQueryable<T> queryable, List<QueryFilter> filters) where T : class
     {

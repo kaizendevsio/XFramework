@@ -71,7 +71,7 @@ jobs:
       HUB_PUBLIC_URL: https://xeon-dev.tailed40e.ts.net:7000
       OBSERVATION_SECONDS: 120
       DB_PASSWORD: compose-validation-placeholder
-      JWT_SECRET: compose-validation-placeholder
+      USER_JWT_GENERATION_ID: compose-validation-user-jwt-g1
       BOLT_SIGNATURE: compose-validation-placeholder
       CREDENTIAL_GENERATION_ID: compose-validation-placeholder
       IDENTITYSERVER_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
@@ -87,6 +87,8 @@ jobs:
       PORTAL_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_TRUSTED_METADATA_SECRET: compose-validation-placeholder
+      IDENTITY_USER_JWT_PUBLIC_KEY_PATH: /tmp/xframework-compose-identity-user-jwt-public-key.pem
+      IDENTITY_USER_JWT_PRIVATE_KEY_PATH: /tmp/xframework-compose-identity-user-jwt-private-key.pem
       BOLT_SYNTHETIC_TENANT_ID: 00000000-0000-0000-0000-000000000001
       BOLT_SYNTHETIC_CREDENTIAL_ID: 00000000-0000-0000-0000-000000000002
       BOLT_SYNTHETIC_TARGET: wss://xeon-dev.tailed40e.ts.net:7000/bolt/ws
@@ -211,6 +213,8 @@ jobs:
           install -m 600 /dev/null "$BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH"
           install -m 600 /dev/null "$BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH"
           install -m 600 /dev/null "$BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH"
+          install -m 600 /dev/null "$IDENTITY_USER_JWT_PUBLIC_KEY_PATH"
+          install -m 600 /dev/null "$IDENTITY_USER_JWT_PRIVATE_KEY_PATH"
           timeout --foreground --kill-after=10s 60s docker compose -f "$COMPOSE_FILE_PATH" config --quiet
 
           headers="$(mktemp)"
@@ -314,6 +318,8 @@ jobs:
           import os
           import pathlib
           import re
+          import stat
+          import subprocess
           import sys
 
           source, destination, identity_url, hub_url, token_dir = sys.argv[1:]
@@ -341,6 +347,57 @@ jobs:
                   raise SystemExit(f"protected deployment env entry {number} is invalid")
               values[name] = value
               order.append(name)
+
+          generation_id = values.get("USER_JWT_GENERATION_ID", "")
+          if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", generation_id):
+              raise SystemExit("USER_JWT_GENERATION_ID is missing or invalid")
+
+          key_paths = {
+              "IDENTITY_USER_JWT_PRIVATE_KEY_PATH": 0o600,
+              "IDENTITY_USER_JWT_PUBLIC_KEY_PATH": 0o644,
+          }
+          for name, maximum_mode in key_paths.items():
+              value = values.get(name, "")
+              path = pathlib.Path(value)
+              if not value or not path.is_absolute() or path.is_symlink():
+                  raise SystemExit(f"{name} must be an absolute regular file path")
+              metadata = path.stat()
+              if (
+                  not stat.S_ISREG(metadata.st_mode)
+                  or metadata.st_uid != os.getuid()
+                  or stat.S_IMODE(metadata.st_mode) & ~maximum_mode
+                  or metadata.st_nlink != 1
+                  or metadata.st_size < 256
+                  or metadata.st_size > 65536
+              ):
+                  raise SystemExit(f"{name} has unsafe ownership, permissions, links, or size")
+
+          private_path = values["IDENTITY_USER_JWT_PRIVATE_KEY_PATH"]
+          public_path = values["IDENTITY_USER_JWT_PUBLIC_KEY_PATH"]
+          try:
+              derived_public = subprocess.run(
+                  ["openssl", "pkey", "-in", private_path, "-pubout"],
+                  check=True,
+                  capture_output=True,
+              ).stdout
+              private_description = subprocess.run(
+                  ["openssl", "pkey", "-in", private_path, "-text", "-noout"],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              ).stdout
+              normalized_public = subprocess.run(
+                  ["openssl", "pkey", "-pubin", "-in", public_path, "-pubout"],
+                  check=True,
+                  capture_output=True,
+              ).stdout
+          except (OSError, subprocess.CalledProcessError) as error:
+              raise SystemExit("Identity user JWT key material is not valid PEM") from error
+          if derived_public != normalized_public:
+              raise SystemExit("Identity user JWT public and private keys do not match")
+          key_size = re.search(r"Private-Key:\s*\((\d+) bit", private_description)
+          if key_size is None or int(key_size.group(1)) < 2048:
+              raise SystemExit("Identity user JWT RSA key size must be at least 2048 bits")
 
           superseded = {
               "BOLT_HUB_TLS_CA_PATH",

@@ -4,13 +4,15 @@ using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace XFramework.Integration.Security;
 
 public sealed class ServiceTokenValidator(
     IIdentitySigningKeyProvider signingKeyProvider,
-    IOptions<ServiceIdentityOptions> options)
+    IOptions<ServiceIdentityOptions> options,
+    ILogger<ServiceTokenValidator> logger)
     : IServiceTokenValidator
 {
     private const int MaxSuccessfulValidationCacheEntries = 1024;
@@ -33,7 +35,7 @@ public sealed class ServiceTokenValidator(
 
         var cacheKey = CreateCacheKey(token, expectedAudience);
         if (TryGetCachedValidation(cacheKey, out var cachedValidation))
-            return ApplyRequiredScopes(cachedValidation, requiredScopes);
+            return ApplyCurrentPolicy(cachedValidation, requiredScopes);
 
         JwtSecurityToken unvalidated;
         try
@@ -61,7 +63,8 @@ public sealed class ServiceTokenValidator(
         catch (Exception ex)
         {
             DisposeImportedKeys(importedKeys);
-            return ServiceTokenValidationResult.Unavailable($"Service signing keys are unavailable: {ex.Message}");
+            logger.LogError(ex, "Service signing keys are unavailable.");
+            return ServiceTokenValidationResult.Unavailable("Service signing keys are unavailable.");
         }
 
         if (importedKeys.Count == 0)
@@ -98,17 +101,48 @@ public sealed class ServiceTokenValidator(
                 ExtractScopes(principal),
                 principal,
                 null);
+            var policyResult = ApplyCredentialGenerationPolicy(validation);
+            if (!policyResult.IsValid)
+                return policyResult;
+
             CacheSuccessfulValidation(cacheKey, validation, unvalidated.ValidTo);
             return ApplyRequiredScopes(validation, requiredScopes);
         }
         catch (Exception ex)
         {
-            return ServiceTokenValidationResult.Failure($"Service token validation failed: {ex.Message}");
+            logger.LogDebug(ex, "Service token validation failed.");
+            return ServiceTokenValidationResult.Failure("Service token validation failed.");
         }
         finally
         {
             DisposeImportedKeys(importedKeys);
         }
+    }
+
+    private ServiceTokenValidationResult ApplyCurrentPolicy(
+        ServiceTokenValidationResult validation,
+        IReadOnlyCollection<string>? requiredScopes)
+    {
+        var generationResult = ApplyCredentialGenerationPolicy(validation);
+        return generationResult.IsValid
+            ? ApplyRequiredScopes(validation, requiredScopes)
+            : generationResult;
+    }
+
+    private ServiceTokenValidationResult ApplyCredentialGenerationPolicy(
+        ServiceTokenValidationResult validation)
+    {
+        var generationClaims = validation.Principal?
+            .FindAll("client_credential_generation")
+            .Select(static claim => claim.Value)
+            .ToList() ?? [];
+        if (generationClaims.Count != 1 || string.IsNullOrWhiteSpace(generationClaims[0]))
+        {
+            return ServiceTokenValidationResult.Failure(
+                "Service token credential generation is not accepted.");
+        }
+
+        return validation;
     }
 
     private static ServiceTokenValidationResult ApplyRequiredScopes(
@@ -206,6 +240,12 @@ public sealed class ServiceTokenValidator(
         try
         {
             rsa.ImportFromPem(key.PublicKeyPem);
+            if (rsa.KeySize < JwtCredentialSet.MinimumRsaKeySize)
+            {
+                throw new CryptographicException(
+                    $"Service signing RSA keys must be at least {JwtCredentialSet.MinimumRsaKeySize} bits.");
+            }
+
             return new ImportedSecurityKey(
                 new RsaSecurityKey(rsa)
                 {

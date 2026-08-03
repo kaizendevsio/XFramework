@@ -88,6 +88,7 @@ public sealed class GeneratedTokenHttpAdapterTests
             context.Request,
             CreateServiceIdentityConfiguration(),
             service.Object,
+            new IssueBoltTransportTokenRequestValidator(),
             CancellationToken.None);
 
         response.Should().BeOfType<Ok<ServiceTokenResponse>>()
@@ -143,7 +144,9 @@ public sealed class GeneratedTokenHttpAdapterTests
                 ["ServiceIdentity:Clients:0:ClientId"] = "test-client",
                 ["ServiceIdentity:Clients:0:GenerationId"] = "test-g1",
                 ["ServiceIdentity:Clients:0:ClientSecret"] =
-                    "test-service-credential-material-111111111111111111111111"
+                    "test-service-credential-material-111111111111111111111111",
+                ["ServiceIdentity:Clients:0:AllowedAudiences:0"] = XFrameworkServiceNames.IdentityServer,
+                ["ServiceIdentity:Clients:0:AllowedScopes:0"] = XFrameworkServiceScopes.BoltService
             })
             .Build();
 

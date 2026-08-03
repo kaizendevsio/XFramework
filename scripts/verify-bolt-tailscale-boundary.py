@@ -22,6 +22,10 @@ TLS_MATERIAL = re.compile(
     r"(?:$|[/_.-])|private[-_.]?key|\.(?:cer|crt|key|p12|pfx|pem)(?:$|[/_.-])",
     re.IGNORECASE,
 )
+APPLICATION_SIGNING_SECRET_TARGETS = {
+    "identity-user-jwt-public-key": "/run/secrets/identity-user-jwt-public-key.pem",
+    "identity-user-jwt-private-key": "/run/secrets/identity-user-jwt-private-key.pem",
+}
 OWNED_LISTENERS = {
     "bolt-hub": {
         "serve_port": 7000,
@@ -230,8 +234,14 @@ def _has_tls_secret(
     if not isinstance(references, list):
         return True
     for reference in references:
-        candidates = list(_flatten_strings(reference))
         source = _secret_source(reference)
+        if (
+            isinstance(reference, dict)
+            and source in APPLICATION_SIGNING_SECRET_TARGETS
+            and reference.get("target") == APPLICATION_SIGNING_SECRET_TARGETS[source]
+        ):
+            continue
+        candidates = list(_flatten_strings(reference))
         if source is not None and source in top_level_secrets:
             candidates.extend(_flatten_strings(top_level_secrets[source]))
         if any(TLS_MATERIAL.search(candidate) for candidate in candidates):

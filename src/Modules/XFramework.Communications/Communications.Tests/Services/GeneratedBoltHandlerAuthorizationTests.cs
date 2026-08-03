@@ -181,7 +181,12 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
         var token = CreateServiceToken(rsa, keyId);
         var validator = new ServiceTokenValidator(
             new StaticSigningKeyProvider(rsa.ExportSubjectPublicKeyInfoPem(), keyId),
-            Options.Create(new ServiceIdentityOptions { Issuer = "XFramework.IdentityServer" }));
+            Options.Create(new ServiceIdentityOptions
+            {
+                Issuer = "XFramework.IdentityServer",
+                GenerationId = "generation-1"
+            }),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ServiceTokenValidator>.Instance);
         var authorizer = new BoltServiceInvocationAuthorizer(
             new TrustedServiceInvocationResolver(validator),
             Options.Create(new ServiceIdentityOptions { ClientId = XFrameworkServiceNames.Communications }));
@@ -239,7 +244,8 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
             [
                 new Claim("client_id", XFrameworkServiceNames.Portal),
                 new Claim(JwtRegisteredClaimNames.Sub, XFrameworkServiceNames.Portal),
-                new Claim("scope", XFrameworkServiceScopes.BoltService)
+                new Claim("scope", XFrameworkServiceScopes.BoltService),
+                new Claim("client_credential_generation", "generation-1")
             ],
             notBefore: now.AddMinutes(-1),
             expires: now.AddMinutes(5),

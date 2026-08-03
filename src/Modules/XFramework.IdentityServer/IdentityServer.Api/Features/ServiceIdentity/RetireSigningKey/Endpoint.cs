@@ -1,3 +1,5 @@
+using FluentValidation;
+using IdentityServer.Api.Features.Authorization.Shared;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 
@@ -5,16 +7,31 @@ namespace IdentityServer.Api.Features.ServiceIdentity.RetireSigningKey;
 
 public static class RetireServiceSigningKeyEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    public static Task<Result<ServiceSigningKeyResponse>> Handle(
+        RetireServiceSigningKeyRequest request,
+        IServiceIdentityService serviceIdentityService,
+        CancellationToken ct) => serviceIdentityService.RetireSigningKeyAsync(request, ct);
+
     [MapPost("/api/service-identity/signing-keys/retire", Tags = ["Service Identity"],
         Summary = "Retire service signing key",
         Description = "Retires a non-active service-token signing key.",
-        ExcludeFromOpenApi = true)]
-    public static async Task<Result<ServiceSigningKeyResponse>> Handle(
+        RequireAuthorization = true,
+        Roles = ["SuperAdmin"],
+        ExcludeFromOpenApi = false)]
+    public static Task<Result<ServiceSigningKeyResponse>> HandleHttp(
         RetireServiceSigningKeyRequest request,
+        HttpContext httpContext,
         IServiceIdentityService serviceIdentityService,
         CancellationToken ct)
     {
-        return await serviceIdentityService.RetireSigningKeyAsync(request, ct);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        return serviceIdentityService.RetireSigningKeyAsync(request, ct);
     }
+}
+
+public sealed class RetireServiceSigningKeyRequestValidator : AbstractValidator<RetireServiceSigningKeyRequest>
+{
+    public RetireServiceSigningKeyRequestValidator() =>
+        RuleFor(request => request.KeyId).NotEmpty().MaximumLength(128);
 }

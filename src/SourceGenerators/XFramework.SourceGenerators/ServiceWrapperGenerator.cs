@@ -139,9 +139,13 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             foreach (var declaration in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
             {
                 var identifier = declaration.Identifier.Text;
-                if (identifier.Equals(interfaceName, StringComparison.Ordinal) ||
+                var isWrapperDeclaration =
+                    identifier.Equals(interfaceName, StringComparison.Ordinal) ||
                     identifier.Equals(recordName, StringComparison.Ordinal) ||
-                    identifier.Equals(extensionsName, StringComparison.Ordinal))
+                    identifier.Equals(extensionsName, StringComparison.Ordinal);
+                var isPartialExtension = declaration.Modifiers.Any(static modifier =>
+                    modifier.ValueText.Equals("partial", StringComparison.Ordinal));
+                if (isWrapperDeclaration && !isPartialExtension)
                     return true;
             }
         }

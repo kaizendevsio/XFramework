@@ -22,6 +22,7 @@ public sealed class StorageFileConfiguration : IEntityTypeConfiguration<StorageF
         entity.Property(e => e.IsDeleted).IsRequired().HasDefaultValueSql("false");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.Name).HasColumnType("character varying");
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
 
         entity.Property(e => e.Status).HasConversion<int>().HasDefaultValue(StorageFileStatus.Pending);
         entity.Property(e => e.Visibility).HasConversion<int>().HasDefaultValue(StorageFileVisibility.Private);
@@ -33,6 +34,7 @@ public sealed class StorageFileConfiguration : IEntityTypeConfiguration<StorageF
         entity.Property(e => e.PublicUrl).HasColumnType("text");
         entity.Property(e => e.CdnBaseUrl).HasColumnType("text");
         entity.Property(e => e.ObjectDeletedAt);
+        entity.Property(e => e.UnclaimedUntil);
 
         entity.HasOne(d => d.Type).WithMany(p => p.StorageFiles)
             .HasForeignKey(d => d.TypeId)
@@ -61,5 +63,8 @@ public sealed class StorageFileConfiguration : IEntityTypeConfiguration<StorageF
             .HasDatabaseName("ix_storagefile_tenant_identifier");
         entity.HasIndex(e => new { e.TenantId, e.BucketName, e.ObjectKey })
             .HasDatabaseName("ix_storagefile_tenant_bucket_object");
+        entity.HasIndex(e => new { e.UnclaimedUntil, e.CreatedAt })
+            .HasFilter("\"UnclaimedUntil\" IS NOT NULL AND \"ObjectDeletedAt\" IS NULL")
+            .HasDatabaseName("ix_storagefile_global_unclaimed_due");
     }
 }

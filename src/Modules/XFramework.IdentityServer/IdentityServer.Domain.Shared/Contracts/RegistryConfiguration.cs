@@ -4,13 +4,13 @@ namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.All,
     RoutePrefix = "api/registry-configurations",
     RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "registry-configurations"
+    ResponseProperties = ["Id", "Key", "GroupId", "Unit", "IsEnabled", "CreatedAt", "ModifiedAt", "TenantId", "ConcurrencyStamp"]
 )]
 public partial class RegistryConfiguration : BaseModel
 {

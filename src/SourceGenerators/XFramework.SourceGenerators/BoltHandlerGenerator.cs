@@ -135,6 +135,8 @@ public class BoltHandlerGenerator : ISourceGenerator
         bool excludeFromOpenApi = false;
         bool requireAuthorization = false;
         string? authorizationPolicy = null;
+        string? rateLimitPolicy = null;
+        string? capability = null;
         string[]? roles = null;
         string[]? requiredServiceScopes = null;
         string[]? allowedServiceCallers = null;
@@ -191,6 +193,12 @@ public class BoltHandlerGenerator : ISourceGenerator
                     case "AuthorizationPolicy":
                         authorizationPolicy = value.Trim('"');
                         break;
+                    case "RateLimitPolicy":
+                        rateLimitPolicy = value.Trim('"');
+                        break;
+                    case "Capability":
+                        capability = value.Trim('"');
+                        break;
                     case "Tags":
                         tags = ParseStringArray(value);
                         break;
@@ -214,6 +222,12 @@ public class BoltHandlerGenerator : ISourceGenerator
                 authorizationPolicy = GetStringNamedArgument(
                     httpAttributeData,
                     "AuthorizationPolicy") ?? authorizationPolicy;
+                rateLimitPolicy = GetStringNamedArgument(
+                    httpAttributeData,
+                    "RateLimitPolicy") ?? rateLimitPolicy;
+                capability = GetStringNamedArgument(
+                    httpAttributeData,
+                    "Capability") ?? capability;
                 roles = GetStringArrayNamedArgument(
                     httpAttributeData,
                     "Roles") ?? roles;
@@ -290,6 +304,8 @@ public class BoltHandlerGenerator : ISourceGenerator
             ExcludeFromOpenApi = excludeFromOpenApi,
             RequireAuthorization = requireAuthorization,
             AuthorizationPolicy = authorizationPolicy,
+            RateLimitPolicy = rateLimitPolicy,
+            Capability = capability,
             Roles = roles,
             RequiredServiceScopes = requiredServiceScopes,
             AllowedServiceCallers = allowedServiceCallers,
@@ -804,6 +820,9 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
         if (h.Description != null)
             chain.AppendLine($"            .WithDescription({ToCSharpStringLiteral(h.Description)})");
         chain.Append(GenerateAuthorizationConfiguration(h));
+        chain.Append(GenerateRateLimitConfiguration(h));
+        if (!string.IsNullOrWhiteSpace(h.Capability))
+            chain.AppendLine($"            .WithMetadata(new global::XFramework.Core.Services.FeatureGates.TenantCapabilityRequirement({ToCSharpStringLiteral(h.Capability!)}))");
         if (h.ExcludeFromOpenApi)
             chain.AppendLine("            .ExcludeFromDescription()");
 
@@ -1051,6 +1070,11 @@ public static class GeneratedEndpointRoutes
         return builder.ToString();
     }
 
+    private static string GenerateRateLimitConfiguration(HandlerInfo h) =>
+        string.IsNullOrWhiteSpace(h.RateLimitPolicy)
+            ? string.Empty
+            : $"            .RequireRateLimiting({ToCSharpStringLiteral(h.RateLimitPolicy!)}){Environment.NewLine}";
+
     private static string ToCSharpStringLiteral(string value)
     {
         var builder = new StringBuilder(value.Length + 2);
@@ -1114,6 +1138,8 @@ public static class GeneratedEndpointRoutes
         public bool ExcludeFromOpenApi { get; set; }
         public bool RequireAuthorization { get; set; }
         public string? AuthorizationPolicy { get; set; }
+        public string? RateLimitPolicy { get; set; }
+        public string? Capability { get; set; }
         public string[]? Roles { get; set; }
 
         // Bolt service authorization

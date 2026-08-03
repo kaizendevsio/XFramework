@@ -9,37 +9,17 @@ namespace IdentityServer.Api.Services;
 public interface IAuthService
 {
     /// <summary>
-    /// Creates a tenant through the IdentityServer admin workflow.
-    /// </summary>
-    /// <param name="request">Tenant creation request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Result containing the created tenant</returns>
-    Task<Result<Tenant>> CreateTenantAsync(
-        CreateTenantRequest request,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Soft-deletes a tenant through the IdentityServer admin workflow.
-    /// </summary>
-    /// <param name="request">Tenant deletion request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Result indicating whether the tenant was deleted</returns>
-    Task<Result> DeleteTenantAsync(
-        DeleteTenantRequest request,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// Creates a new identity credential with BCrypt password hashing (workFactor 11).
     /// </summary>
     /// <param name="request">The credential creation request containing username, password, and identity info</param>
     /// <param name="ct">Cancellation token</param>
-    /// <returns>Result containing the created credential or error details</returns>
-    Task<Result<IdentityCredential>> CreateCredentialAsync(
-        Create<IdentityCredential> request,
+    /// <returns>Result containing safe credential administration metadata or error details</returns>
+    Task<Result<CredentialAdministrationResponse>> CreateCredentialAsync(
+        CreateCredentialRequest request,
         CancellationToken ct = default);
 
     /// <summary>
-    /// Authenticates an identity with multi-type support (Username, Email, Phone, Token).
+    /// Authenticates an identity with username, email, or phone lookup.
     /// Generates JWT tokens, creates session, and logs authorization attempts.
     /// </summary>
     /// <param name="request">Authentication request with credentials and authentication type</param>
@@ -50,7 +30,7 @@ public interface IAuthService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Changes a user's password with optional verification requirement.
+    /// Changes a user's password after an approved verification challenge.
     /// Uses BCrypt hashing with workFactor 11.
     /// </summary>
     /// <param name="request">Password change request with credential ID and new password</param>
@@ -63,11 +43,11 @@ public interface IAuthService
     /// <summary>
     /// Updates an identity credential.
     /// </summary>
-    /// <param name="request">Patch request for credential update</param>
+    /// <param name="request">Dedicated credential administration update request</param>
     /// <param name="ct">Cancellation token</param>
-    /// <returns>Result containing the updated credential</returns>
-    Task<Result<IdentityCredential>> UpdateCredentialAsync(
-        Patch<IdentityCredential> request,
+    /// <returns>Result containing safe credential administration metadata</returns>
+    Task<Result<CredentialAdministrationResponse>> UpdateCredentialAsync(
+        UpdateCredentialRequest request,
         CancellationToken ct = default);
 
     /// <summary>
@@ -130,6 +110,10 @@ public interface IAuthService
     /// </summary>
     Task<Result> LogoutAsync(
         LogoutRequest request,
+        CancellationToken ct = default);
+
+    Task<Result<ValidateIdentitySessionResponse>> ValidateIdentitySessionAsync(
+        ValidateIdentitySessionRequest request,
         CancellationToken ct = default);
 
     /// <summary>

@@ -8,9 +8,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/authorization-logs",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 60,
-    CacheKeyPrefix = "authorization-logs"
+    RequireAuthorization = true
 )]
 public partial class AuthorizationLog : BaseModel
 {

@@ -8,11 +8,9 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-contact-groups",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 3600,
-    CacheKeyPrefix = "identity-contact-groups"
+    RequireAuthorization = true
 )]
-public partial class IdentityContactGroup : BaseModel, IHasSystemReferenceId
+public partial class IdentityContactGroup : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows
 {
     
     [MemoryPackOrder(0)]

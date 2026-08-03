@@ -172,7 +172,8 @@ public static class BoltTestHelper
             ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
             ["JwtOptions:ValidAudience"] = "http://localhost",
             ["JwtOptions:ValidIssuer"] = "http://localhost",
-            ["JwtOptions:Secret"] = "Mm1VFHaqZ7MoVJyZd1zrAKxTpsXbYG6RqSMKYG2cV7RBBUdmsm97HOfKyA7MZ1LUl77ZklJPJfnegohyHqJIoQ983fTKmJcY",
+            ["JwtOptions:GenerationId"] = "integration-tests-g1",
+            ["JwtOptions:SigningPublicKeyPath"] = TestJwtKeyMaterial.PublicKeyPath,
             ["JwtOptions:AccessTokenLifespan"] = "00:30:00",
             ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",
             ["Logging:LogLevel:Default"] = "Warning"

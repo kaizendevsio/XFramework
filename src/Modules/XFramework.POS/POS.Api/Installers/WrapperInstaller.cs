@@ -1,5 +1,6 @@
 using Inventario.Integration.Drivers;
 using Wallets.Integration.Drivers;
+using IdentityServer.Integration.Extensions;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Extensions;
 
@@ -13,6 +14,7 @@ public sealed class WrapperInstaller : IInstaller
         IHostEnvironment hostEnvironment)
     {
         services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
+        services.AddIdentityServerSessionValidation();
         services.AddInventarioWrapperServices();
         services.AddWalletsWrapperServices();
     }

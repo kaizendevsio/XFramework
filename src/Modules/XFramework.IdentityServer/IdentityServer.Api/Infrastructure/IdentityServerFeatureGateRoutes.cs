@@ -7,7 +7,8 @@ public static class IdentityServerFeatureGateRoutes
 {
     public static void Configure(TenantModuleFeatureGateOptions options)
     {
-        options.RequireFeature(TenantModuleFeatureKeys.IdentityUsers, "/api/identity-informations");
+        options.RequireFeature(TenantModuleFeatureKeys.IdentityUsers, "/api/identity-info");
+        options.RequireFeature(TenantModuleFeatureKeys.IdentityUsers, "/api/identities");
         options.RequireFeature(TenantModuleFeatureKeys.IdentityCredentials, "/api/identity-credentials");
         options.RequireFeature(TenantModuleFeatureKeys.IdentityCredentials, "/api/credentials");
         options.RequireFeature(TenantModuleFeatureKeys.IdentityRoles, "/api/identity-roles");
@@ -27,9 +28,14 @@ public static class IdentityServerFeatureGateRoutes
         options.RequireFeature(TenantModuleFeatureKeys.IdentityContacts, "/api/identity-contacts");
         options.RequireFeature(TenantModuleFeatureKeys.IdentityContacts, "/api/identity-contact-types");
         options.RequireFeature(TenantModuleFeatureKeys.IdentityContacts, "/api/identity-contact-groups");
+        options.RequireFeature(TenantModuleFeatureKeys.Identity, "/api/identity-favorites");
         options.RequireFeature(TenantModuleFeatureKeys.IdentityAddresses, "/api/identity-addresses");
         options.RequireFeature(TenantModuleFeatureKeys.IdentityAddresses, "/api/identity-address-types");
-        options.RequireFeature(TenantModuleFeatureKeys.IdentityAddresses, "/api/address");
+        options.RequireFeature(TenantModuleFeatureKeys.IdentityAddresses, "/api/address-countries");
+        options.RequireFeature(TenantModuleFeatureKeys.IdentityAddresses, "/api/address-regions");
+        options.RequireFeature(TenantModuleFeatureKeys.IdentityAddresses, "/api/address-provinces");
+        options.RequireFeature(TenantModuleFeatureKeys.IdentityAddresses, "/api/address-cities");
+        options.RequireFeature(TenantModuleFeatureKeys.IdentityAddresses, "/api/address-barangays");
         options.RequireFeature(TenantModuleFeatureKeys.IdentityAuthLogs, "/api/authorization-logs");
         options.RequireFeature(TenantModuleFeatureKeys.Identity, "/api/registry-configurations");
         options.RequireFeature(TenantModuleFeatureKeys.Identity, "/api/registry-configuration-groups");

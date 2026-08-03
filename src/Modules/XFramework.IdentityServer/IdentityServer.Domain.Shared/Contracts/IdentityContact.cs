@@ -4,13 +4,12 @@ namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.All,
     RoutePrefix = "api/identity-contacts",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "identity-contacts"
+    RequireAuthorization = true
 )]
 public partial class IdentityContact : BaseModel
 {

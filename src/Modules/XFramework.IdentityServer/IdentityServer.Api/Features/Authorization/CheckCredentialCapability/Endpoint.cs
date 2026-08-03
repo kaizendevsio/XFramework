@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.CheckCredentialCapability;
 
 public static class CheckCredentialCapabilityEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<CredentialCapabilityCheckResponse>> Handle(
         CheckCredentialCapabilityRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class CheckCredentialCapabilityEndpoint
     [MapPost("/api/identity/authorization/check-capability", Tags = ["Identity Authorization"],
         Summary = "Check a credential capability",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.View,
+        ExcludeFromOpenApi = false)]
     public static Task<Result<CredentialCapabilityCheckResponse>> HandleHttp(
         CheckCredentialCapabilityRequest request,
         HttpContext httpContext,
@@ -36,10 +37,15 @@ public sealed class CheckCredentialCapabilityRequestValidator : AbstractValidato
             .NotEmpty().WithMessage("Credential is required");
 
         RuleFor(x => x.ModuleKey)
-            .NotEmpty().WithMessage("Module key is required");
+            .NotEmpty().WithMessage("Module key is required")
+            .MaximumLength(100);
+
+        RuleFor(x => x.SubFeatureKey)
+            .MaximumLength(100);
 
         RuleFor(x => x.CapabilityKey)
             .NotEmpty().WithMessage("Capability key is required")
+            .MaximumLength(100)
             .Must(BeKnownCapability).WithMessage("Capability key is invalid");
     }
 
