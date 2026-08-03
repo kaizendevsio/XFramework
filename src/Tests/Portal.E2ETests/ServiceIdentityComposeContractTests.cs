@@ -365,6 +365,10 @@ public sealed class ServiceIdentityComposeContractTests
             "docker compose -f \"$COMPOSE_FILE_PATH\" build \"${services[@]}\"");
         workflow.Should().Contain("REMOTE_ACTIVE_ENV:");
         workflow.Should().Contain("runtime_snapshot=\"$REMOTE_RUN_DIR/pre-deployment\"");
+        workflow.Should().Contain("runtime_snapshot_ready=false");
+        workflow.Should().Contain("if ! image_id=\"$(docker inspect --format '{{.Image}}'");
+        workflow.Should().Contain("! docker image inspect \"$image_id\" >/dev/null 2>&1; then");
+        workflow.Should().Contain("if [ \"$runtime_snapshot_ready\" = true ]; then");
         workflow.Should().Contain("postgres redis minio seq jaeger identityserver bolt-hub");
         workflow.Should().Contain("docker inspect --format '{{.Image}}'");
         workflow.Should().Contain("docker image inspect \"$value\"");
