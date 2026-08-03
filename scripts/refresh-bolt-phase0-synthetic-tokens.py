@@ -37,7 +37,7 @@ SERVICE_ALGORITHM = "RS256"
 SERVICE_TOKEN_TYPE = "JWT"
 PORTAL_SERVICE_SCOPES = ("bolt.service",)
 COMMUNICATIONS_SERVICE_SCOPES = ("bolt.service",)
-ACTOR_ALGORITHM = "HS512"
+ACTOR_ALGORITHM = "RS512"
 ACTOR_TOKEN_TYPE = "JWT"
 RECEIPT_SCHEMA = "bolt-phase0-token-refresh/v4"
 PRINCIPAL_REFERENCE = "bolt-phase0-synthetic"
@@ -80,7 +80,8 @@ class Config:
     port: int
     actor_issuer: str
     actor_audience: str
-    credential_generation: str
+    service_credential_generation: str
+    user_jwt_generation: str
     communications_secret: str
     portal_secret: str
     tenant_id: str
@@ -264,8 +265,11 @@ def load_config(values: dict[str, str]) -> Config:
     audience = _required(values, "JWT_AUDIENCE")
     if len(audience) > 512 or audience != audience.strip() or any(ord(c) < 33 for c in audience):
         _raise("CONFIGURATION")
-    generation = _required(values, "CREDENTIAL_GENERATION_ID")
-    if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,96}", generation):
+    service_generation = _required(values, "SERVICE_CREDENTIAL_GENERATION_ID")
+    if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,96}", service_generation):
+        _raise("CONFIGURATION")
+    user_generation = _required(values, "USER_JWT_GENERATION_ID")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", user_generation):
         _raise("CONFIGURATION")
 
     username = _required(values, "BOLT_SYNTHETIC_USER_USERNAME")
@@ -279,7 +283,8 @@ def load_config(values: dict[str, str]) -> Config:
         port=port,
         actor_issuer=raw_issuer,
         actor_audience=audience,
-        credential_generation=generation,
+        service_credential_generation=service_generation,
+        user_jwt_generation=user_generation,
         communications_secret=_validate_secret(
             _required(values, "COMMUNICATIONS_SERVICE_IDENTITY_SECRET"), minimum=32
         ),
@@ -527,7 +532,7 @@ def _validate_transport_jwt(
         or claims.get("service") != expected_client_id
         or claims.get("sub") != expected_client_id
         or claims.get("scope") != TRANSPORT_SCOPE
-        or claims.get("client_credential_generation") != config.credential_generation
+        or claims.get("client_credential_generation") != config.service_credential_generation
     ):
         _raise("TOKEN_IDENTITY")
     return evidence, claims
@@ -568,7 +573,7 @@ def _validate_service_jwt(
     if (
         claims.get("client_id") != expected_client_id
         or claims.get("sub") != expected_client_id
-        or claims.get("client_credential_generation") != config.credential_generation
+        or claims.get("client_credential_generation") != config.service_credential_generation
         or len(normalized_scopes) != len(expected_scopes)
         or set(normalized_scopes) != set(expected_scopes)
     ):
@@ -586,11 +591,11 @@ def _validate_actor_jwt(
     value, header, claims = _read_jwt(token)
     if set(header) != {"alg", "kid", "typ"} or header != {
         "alg": ACTOR_ALGORITHM,
-        "kid": config.credential_generation,
+        "kid": config.user_jwt_generation,
         "typ": ACTOR_TOKEN_TYPE,
     }:
         _raise("TOKEN_HEADER")
-    if claims.get(GENERATION_CLAIM) != config.credential_generation:
+    if claims.get(GENERATION_CLAIM) != config.user_jwt_generation:
         _raise("TOKEN_CLAIMS")
     evidence = _validate_temporal_claims(
         value,
