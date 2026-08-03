@@ -161,8 +161,8 @@ public sealed class ServiceIdentityComposeContractTests
         commonEnvironment.Should().Contain(
             "BoltConfiguration__ServerUrls__0: ws://bolt-hub:8080/bolt/ws");
         commonEnvironment.Should().Contain("BoltConfiguration__RequireSecureTransport: false");
-        commonEnvironment.Should().Contain("ServiceIdentity__Authority: https://identityserver:8443");
-        commonEnvironment.Should().Contain("ServiceIdentity__AllowInsecureHttp: false");
+        commonEnvironment.Should().Contain("ServiceIdentity__Authority: http://identityserver:8080");
+        commonEnvironment.Should().Contain("ServiceIdentity__AllowInsecureHttp: true");
         foreach (var service in CentralIdentityServices)
         {
             var serviceBlock = ExtractService(compose, service);
@@ -171,33 +171,31 @@ public sealed class ServiceIdentityComposeContractTests
                         "BoltConfiguration__GenerateServiceAccessToken: false",
                         StringComparison.Ordinal)
                     && serviceBlock.Contains(
-                        "ServiceIdentity__Authority: https://identityserver:8443",
+                        "ServiceIdentity__Authority: http://identityserver:8080",
                         StringComparison.Ordinal)
                     && serviceBlock.Contains(
-                        "ServiceIdentity__AllowInsecureHttp: false",
+                        "ServiceIdentity__AllowInsecureHttp: true",
                         StringComparison.Ordinal));
             hasEffectiveCentralIdentity.Should().BeTrue(
                 "Compose service {0} must receive the common central identity configuration",
                 service);
             if (!string.Equals(service, "identityserver", StringComparison.Ordinal))
-                serviceBlock.Should().Contain("secrets: *identityserver-ca-secrets");
+                serviceBlock.Should().Contain("secrets: *identity-user-jwt-public-key-secret");
         }
 
         hub.Should().Contain(
             "BoltTransportAuthentication__MetadataAddress: " +
-            "https://identityserver:8443/.well-known/openid-configuration");
+            "http://identityserver:8080/.well-known/openid-configuration");
         hub.Should().Contain("BoltTransportAuthentication__Issuer: XFramework.IdentityServer");
         hub.Should().Contain("BoltTransportAuthentication__Audience: XFramework.Bolt.Hub");
-        hub.Should().Contain("BoltTransportAuthentication__RequireHttpsMetadata: true");
+        hub.Should().Contain("BoltTransportAuthentication__RequireHttpsMetadata: false");
         hub.Should().Contain("ASPNETCORE_URLS: http://+:8080");
         hub.Should().Contain("Kestrel__Endpoints__Http__Url: http://0.0.0.0:8080");
-        hub.Should().Contain("secrets: *identityserver-ca-secrets");
+        hub.Should().Contain("secrets: *identity-user-jwt-public-key-secret");
 
-        identityServer.Should().Contain("ASPNETCORE_URLS: http://+:8080;https://+:8443");
+        identityServer.Should().Contain("ASPNETCORE_URLS: http://+:8080");
         identityServer.Should().Contain("Kestrel__Endpoints__Http__Url: http://0.0.0.0:8080");
-        identityServer.Should().Contain("Kestrel__Endpoints__Https__Url: https://0.0.0.0:8443");
-        identityServer.Should().Contain("/run/secrets/identityserver-tls-fullchain.pem");
-        identityServer.Should().Contain("/run/secrets/identityserver-tls-private-key.pem");
+        identityServer.Should().NotContain("Kestrel__Endpoints__Https");
         identityServer.Should().Contain(
             "TrustedProxyForwarding__KnownProxies__0: host.docker.internal");
         identityServer.Should().Contain("- \"host.docker.internal:host-gateway\"");
@@ -214,18 +212,18 @@ public sealed class ServiceIdentityComposeContractTests
         identityPorts.Should().Contain(
             "- \"127.0.0.1:${IDENTITYSERVER_EXPOSE_PORT:-8261}:8080\"");
 
-        dockerfile.Should().Contain("EXPOSE 8080 8443");
-        dockerfile.Should().Contain("update-ca-certificates");
-        compose.Should().Contain("Kestrel__Endpoints__Https");
-        compose.Should().Contain("identityserver-ca");
-        compose.Should().Contain("identityserver-tls");
-        compose.Should().Contain("/usr/local/share/ca-certificates");
-        envExample.Should().Contain("IDENTITYSERVER_TLS_CA_PATH");
-        envExample.Should().Contain("IDENTITYSERVER_TLS_FULLCHAIN_PATH");
-        envExample.Should().Contain("IDENTITYSERVER_TLS_PRIVATE_KEY_PATH");
-        deployWorkflow.Should().Contain("IDENTITYSERVER_TLS_CA_PATH:");
-        deployWorkflow.Should().Contain("IDENTITYSERVER_TLS_FULLCHAIN_PATH:");
-        deployWorkflow.Should().Contain("IDENTITYSERVER_TLS_PRIVATE_KEY_PATH:");
+        dockerfile.Should().Contain("EXPOSE 8080");
+        dockerfile.Should().NotContain("EXPOSE 8080 8443");
+        compose.Should().NotContain("Kestrel__Endpoints__Https");
+        compose.Should().NotContain("identityserver-ca");
+        compose.Should().NotContain("identityserver-tls");
+        compose.Should().NotContain("/usr/local/share/ca-certificates");
+        envExample.Should().NotContain("IDENTITYSERVER_TLS_CA_PATH");
+        envExample.Should().NotContain("IDENTITYSERVER_TLS_FULLCHAIN_PATH");
+        envExample.Should().NotContain("IDENTITYSERVER_TLS_PRIVATE_KEY_PATH");
+        deployWorkflow.Should().NotContain("IDENTITYSERVER_TLS_CA_PATH:");
+        deployWorkflow.Should().NotContain("IDENTITYSERVER_TLS_FULLCHAIN_PATH:");
+        deployWorkflow.Should().NotContain("IDENTITYSERVER_TLS_PRIVATE_KEY_PATH:");
         envExample.Should().NotContain("IDENTITYSERVER_PUBLIC_HTTPS_PORT");
         envExample.Should().NotContain("BOLT_SYNTHETIC_IDENTITYSERVER_CA_PATH");
         envExample.Should().Contain("IDENTITYSERVER_EXPOSE_PORT=8261");

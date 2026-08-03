@@ -87,9 +87,6 @@ jobs:
       PORTAL_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_TRUSTED_METADATA_SECRET: compose-validation-placeholder
-      IDENTITYSERVER_TLS_CA_PATH: /tmp/xframework-compose-identityserver-ca.crt
-      IDENTITYSERVER_TLS_FULLCHAIN_PATH: /tmp/xframework-compose-identityserver-fullchain.pem
-      IDENTITYSERVER_TLS_PRIVATE_KEY_PATH: /tmp/xframework-compose-identityserver-private-key.pem
       IDENTITY_USER_JWT_PUBLIC_KEY_PATH: /tmp/xframework-compose-identity-user-jwt-public-key.pem
       IDENTITY_USER_JWT_PRIVATE_KEY_PATH: /tmp/xframework-compose-identity-user-jwt-private-key.pem
       BOLT_SYNTHETIC_TENANT_ID: 00000000-0000-0000-0000-000000000001
@@ -407,6 +404,9 @@ jobs:
               "BOLT_HUB_TLS_FULLCHAIN_PATH",
               "BOLT_HUB_TLS_PRIVATE_KEY_PATH",
               "BOLT_HUB_PUBLIC_HOSTNAME",
+              "IDENTITYSERVER_TLS_CA_PATH",
+              "IDENTITYSERVER_TLS_FULLCHAIN_PATH",
+              "IDENTITYSERVER_TLS_PRIVATE_KEY_PATH",
               "IDENTITYSERVER_PUBLIC_HOSTNAME",
               "IDENTITYSERVER_PUBLIC_HTTPS_PORT",
               "BOLT_SYNTHETIC_IDENTITYSERVER_CA_PATH",

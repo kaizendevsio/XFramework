@@ -2899,8 +2899,8 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 return Result.Failure("Password reset verification could not be queued.", 503);
 
             _logger.LogInformation(
-                "Password reset token generated and delivery queued. CredentialId: {CredentialId}, Transport: {Transport}",
-                credential.Id, transportType);
+                "Password reset token generated and delivery queued. Transport: {Transport}",
+                transportType);
 
             return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
         }

@@ -224,16 +224,15 @@ public sealed partial class StorageService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to create storage upload session for tenant {TenantId}", tenantId);
+            logger.LogError(ex, "Failed to create storage upload session");
             await TryAbortProviderUploadAsync(provider, profile, bucket, file, session, ct);
             return Result<StorageUploadSessionResponse>.Failure("Failed to create storage upload session", 500);
         }
 
         logger.LogInformation(
-            "Created storage upload session {UploadSessionId} for file {StorageFileId} in tenant {TenantId}",
+            "Created storage upload session {UploadSessionId} for file {StorageFileId}",
             session.Id,
-            file.Id,
-            tenantId);
+            file.Id);
 
         return Result<StorageUploadSessionResponse>.Success(
             ToSessionResponse(session, file, uploadedParts: 0),

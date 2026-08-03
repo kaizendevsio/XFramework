@@ -8,10 +8,7 @@
 # Only secrets and infra overrides go in env vars / .env files.
 
 x-service-identity-audiences: &service-identity-audiences XFramework.Attendance,XFramework.Bolt.Hub,XFramework.Communications,XFramework.Portal,XFramework.IdentityServer,XFramework.Inventario,XFramework.Notifications,XFramework.Operations.Dashboard,XFramework.POS,XFramework.SmsGateway,XFramework.Storage,XFramework.Wallets
-x-identityserver-ca-secrets: &identityserver-ca-secrets
-  - source: identityserver-ca
-    target: /usr/local/share/ca-certificates/xframework-identityserver-ca.crt
-    mode: 0444
+x-identity-user-jwt-public-key-secret: &identity-user-jwt-public-key-secret
   - source: identity-user-jwt-public-key
     target: /run/secrets/identity-user-jwt-public-key.pem
     mode: 0444
@@ -27,8 +24,8 @@ x-common-env: &common-env
   BoltConfiguration__RequireSecureTransport: false
   BoltConfiguration__GenerateServiceAccessToken: false
   ServiceIdentity__Issuer: XFramework.IdentityServer
-  ServiceIdentity__Authority: https://identityserver:8443
-  ServiceIdentity__AllowInsecureHttp: false
+  ServiceIdentity__Authority: http://identityserver:8080
+  ServiceIdentity__AllowInsecureHttp: true
   ServiceIdentity__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
   CREDENTIAL_GENERATION_ID: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
   Seq__ApiKey: ${SEQ_API_KEY:-}
@@ -141,11 +138,11 @@ services:
       BoltConfiguration__MaxDurableSubscribersPerTopic: 128
       BoltConfiguration__MaxConnectionLifetimeSeconds: 1800
       BoltConfiguration__RegistrationIdentityBindingMode: Enforce
-      BoltTransportAuthentication__MetadataAddress: https://identityserver:8443/.well-known/openid-configuration
+      BoltTransportAuthentication__MetadataAddress: http://identityserver:8080/.well-known/openid-configuration
       BoltTransportAuthentication__Issuer: XFramework.IdentityServer
       BoltTransportAuthentication__Audience: XFramework.Bolt.Hub
-      BoltTransportAuthentication__RequireHttpsMetadata: true
-    secrets: *identityserver-ca-secrets
+      BoltTransportAuthentication__RequireHttpsMetadata: false
+    secrets: *identity-user-jwt-public-key-secret
     labels:
       org.xframework.bolt.security-baseline: phase0-v1
       org.xframework.bolt.single-replica: required
@@ -181,11 +178,8 @@ services:
         PROJECT_PATH: src/Modules/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj
     environment:
       <<: *common-env
-      ASPNETCORE_URLS: http://+:8080;https://+:8443
+      ASPNETCORE_URLS: http://+:8080
       Kestrel__Endpoints__Http__Url: http://0.0.0.0:8080
-      Kestrel__Endpoints__Https__Url: https://0.0.0.0:8443
-      Kestrel__Endpoints__Https__Certificate__Path: /run/secrets/identityserver-tls-fullchain.pem
-      Kestrel__Endpoints__Https__Certificate__KeyPath: /run/secrets/identityserver-tls-private-key.pem
       ServiceIdentity__ClientSecret: ${IDENTITYSERVER_SERVICE_IDENTITY_SECRET:?Set IDENTITYSERVER_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: storage.read
@@ -301,15 +295,6 @@ services:
     volumes:
       - identity-keydata:/var/lib/xframework/identity
     secrets:
-      - source: identityserver-ca
-        target: /usr/local/share/ca-certificates/xframework-identityserver-ca.crt
-        mode: 0444
-      - source: identityserver-tls-fullchain
-        target: /run/secrets/identityserver-tls-fullchain.pem
-        mode: 0444
-      - source: identityserver-tls-private-key
-        target: /run/secrets/identityserver-tls-private-key.pem
-        mode: 0400
       - source: identity-user-jwt-public-key
         target: /run/secrets/identity-user-jwt-public-key.pem
         mode: 0444
@@ -349,7 +334,7 @@ services:
       ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${COMMUNICATIONS_EXPOSE_PORT:-5148}:8080"
     depends_on:
@@ -381,7 +366,7 @@ services:
       ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${NOTIFICATIONS_EXPOSE_PORT:-5166}:8080"
     depends_on:
@@ -423,7 +408,7 @@ services:
       Storage__S3__UsePathStyle: ${STORAGE_S3_USE_PATH_STYLE:-true}
       Storage__S3__PublicBaseUrl: ${STORAGE_S3_PUBLIC_BASE_URL:-http://localhost:9000}
       Storage__AzureBlob__ConnectionString: ${STORAGE_AZURE_BLOB_CONNECTION_STRING:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${STORAGE_EXPOSE_PORT:-5190}:8080"
     depends_on:
@@ -459,7 +444,7 @@ services:
       ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${ATTENDANCE_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${ATTENDANCE_EXPOSE_PORT:-5182}:8080"
     depends_on:
@@ -490,7 +475,7 @@ services:
       ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${SMSGATEWAY_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${SMSGATEWAY_EXPOSE_PORT:-5274}:8080"
     depends_on:
@@ -522,7 +507,7 @@ services:
       ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${WALLETS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${WALLETS_EXPOSE_PORT:-9696}:8080"
     depends_on:
@@ -554,7 +539,7 @@ services:
       ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${INVENTARIO_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${INVENTARIO_EXPOSE_PORT:-8105}:8080"
     depends_on:
@@ -586,7 +571,7 @@ services:
       ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${POS_EXPOSE_PORT:-8115}:8080"
     depends_on:
@@ -624,7 +609,7 @@ services:
       ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${PORTAL_EXPOSE_PORT:-5000}:8080"
     depends_on:
@@ -674,8 +659,8 @@ services:
       JwtOptions__ValidAudience: ${JWT_AUDIENCE:-xframework}
       JwtOptions__ValidIssuer: ${JWT_ISSUER:-xframework}
       ServiceIdentity__Issuer: XFramework.IdentityServer
-      ServiceIdentity__Authority: https://identityserver:8443
-      ServiceIdentity__AllowInsecureHttp: false
+      ServiceIdentity__Authority: http://identityserver:8080
+      ServiceIdentity__AllowInsecureHttp: true
       ServiceIdentity__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
       CREDENTIAL_GENERATION_ID: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
       ServiceIdentity__ClientSecret: ${OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET:?Set OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET in .env}
@@ -689,7 +674,7 @@ services:
       OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
       OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-true}
       OpenTelemetry__Exporters__OTLP__Endpoint: ${OTEL_OTLP_ENDPOINT:-http://jaeger:4317}
-    secrets: *identityserver-ca-secrets
+    secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${OPERATIONS_DASHBOARD_EXPOSE_PORT:-5050}:8080"
     depends_on:
@@ -780,12 +765,6 @@ services:
       - "${JAEGER_OTLP_HTTP_EXPOSE_PORT:-4318}:4318"
 
 secrets:
-  identityserver-ca:
-    file: ${IDENTITYSERVER_TLS_CA_PATH:?Set IDENTITYSERVER_TLS_CA_PATH in the protected deployment env}
-  identityserver-tls-fullchain:
-    file: ${IDENTITYSERVER_TLS_FULLCHAIN_PATH:?Set IDENTITYSERVER_TLS_FULLCHAIN_PATH in the protected deployment env}
-  identityserver-tls-private-key:
-    file: ${IDENTITYSERVER_TLS_PRIVATE_KEY_PATH:?Set IDENTITYSERVER_TLS_PRIVATE_KEY_PATH in the protected deployment env}
   identity-user-jwt-public-key:
     file: ${IDENTITY_USER_JWT_PUBLIC_KEY_PATH:?Set IDENTITY_USER_JWT_PUBLIC_KEY_PATH in the protected deployment env}
   identity-user-jwt-private-key:
