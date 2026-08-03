@@ -480,18 +480,26 @@ jobs:
             postgres redis minio seq jaeger identityserver bolt-hub communications notifications storage attendance
             smsgateway wallets inventario pos portal operations-dashboard
           )
+          runtime_snapshot_ready=false
+          image_arguments=()
           if [ -f "$REMOTE_ACTIVE_ENV" ] && [ ! -L "$REMOTE_ACTIVE_ENV" ] && \
              [ -f "$REMOTE_COMPOSE_FILE" ] && [ ! -L "$REMOTE_COMPOSE_FILE" ]; then
+            runtime_snapshot_ready=true
+            for service in "${runtime_services[@]}"; do
+              if ! image_id="$(docker inspect --format '{{.Image}}' "xframework-${service}" 2>/dev/null)" ||
+                 [[ ! "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+                 ! docker image inspect "$image_id" >/dev/null 2>&1; then
+                runtime_snapshot_ready=false
+                image_arguments=()
+                break
+              fi
+              image_arguments+=("$service" "$image_id")
+            done
+          fi
+          if [ "$runtime_snapshot_ready" = true ]; then
             install -d -m 700 "$runtime_snapshot"
             install -m 600 "$REMOTE_COMPOSE_FILE" "$runtime_snapshot/docker-compose.yml"
             install -m 600 "$REMOTE_ACTIVE_ENV" "$runtime_snapshot/candidate.env"
-            image_arguments=()
-            for service in "${runtime_services[@]}"; do
-              image_id="$(docker inspect --format '{{.Image}}' "xframework-${service}")"
-              [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
-              docker image inspect "$image_id" >/dev/null
-              image_arguments+=("$service" "$image_id")
-            done
             python3 - "$runtime_snapshot/images.override.json" "${image_arguments[@]}" <<'PY'
           import json
           import pathlib
