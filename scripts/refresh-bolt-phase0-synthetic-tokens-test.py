@@ -32,7 +32,8 @@ SPEC.loader.exec_module(refresh)
 TENANT_ID = "11111111-1111-4111-8111-111111111111"
 CREDENTIAL_ID = "22222222-2222-4222-8222-222222222222"
 ROLE_ID = "33333333-3333-4333-8333-333333333333"
-GENERATION = "phase0-g2"
+SERVICE_GENERATION = "phase0-service-g2"
+USER_JWT_GENERATION = "phase0-user-g7"
 BASE_URL = "https://identity.test:8443"
 ISSUER = "xframework"
 AUDIENCE = "xframework-phase0"
@@ -60,8 +61,13 @@ def b64url(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
 
 
-def actor_jwt(claims: dict[str, Any], *, generation: str = GENERATION) -> str:
-    header = {"alg": "HS512", "kid": generation, "typ": "JWT"}
+def actor_jwt(
+    claims: dict[str, Any],
+    *,
+    algorithm: str = "RS512",
+    generation: str = USER_JWT_GENERATION,
+) -> str:
+    header = {"alg": algorithm, "kid": generation, "typ": "JWT"}
     encoded_header = b64url(json.dumps(header, separators=(",", ":"), sort_keys=True).encode())
     encoded_claims = b64url(json.dumps(claims, separators=(",", ":"), sort_keys=True).encode())
     signature = b64url(("signature-" + str(claims.get("jti", "missing"))).encode())
@@ -109,7 +115,7 @@ def service_claims(
         "nbf": now - 1,
         "iat": now - 1,
         "jti": jti,
-        "client_credential_generation": GENERATION,
+        "client_credential_generation": SERVICE_GENERATION,
         "client_id": client_id,
         "service": client_id,
         "sub": client_id,
@@ -132,7 +138,7 @@ def identity_service_claims(
         "nbf": now - 1,
         "iat": now - 1,
         "jti": jti,
-        "client_credential_generation": GENERATION,
+        "client_credential_generation": SERVICE_GENERATION,
         "client_id": client_id,
         "sub": client_id,
         "scope": "bolt.service",
@@ -148,7 +154,7 @@ def user_claims(now: int, jti: str, **overrides: Any) -> dict[str, Any]:
         "exp": now + 900,
         "nbf": now - 1,
         "jti": jti,
-        "credential_generation": GENERATION,
+        "credential_generation": USER_JWT_GENERATION,
         "credential_id": CREDENTIAL_ID,
         "tenant_id": TENANT_ID,
         "tenantId": TENANT_ID,
@@ -253,7 +259,8 @@ class Workspace:
             "BOLT_SYNTHETIC_IDENTITYSERVER_BASE_URL": BASE_URL,
             "JWT_ISSUER": ISSUER,
             "JWT_AUDIENCE": AUDIENCE,
-            "CREDENTIAL_GENERATION_ID": GENERATION,
+            "SERVICE_CREDENTIAL_GENERATION_ID": SERVICE_GENERATION,
+            "USER_JWT_GENERATION_ID": USER_JWT_GENERATION,
             "COMMUNICATIONS_SERVICE_IDENTITY_SECRET": CLIENT_SECRET,
             "PORTAL_SERVICE_IDENTITY_SECRET": PORTAL_CLIENT_SECRET,
             "BOLT_SYNTHETIC_TENANT_ID": TENANT_ID,
@@ -288,6 +295,17 @@ class Workspace:
 
 
 class RefreshTokenHookTests(unittest.TestCase):
+    def test_config_keeps_service_and_user_generations_distinct(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Workspace(Path(temporary)).config()
+
+            self.assertEqual(config.service_credential_generation, SERVICE_GENERATION)
+            self.assertEqual(config.user_jwt_generation, USER_JWT_GENERATION)
+            self.assertNotEqual(
+                config.service_credential_generation,
+                config.user_jwt_generation,
+            )
+
     def test_env_parser_accepts_crlf_and_full_line_comments_without_evaluation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Workspace(Path(temporary))
@@ -654,16 +672,23 @@ class RefreshTokenHookTests(unittest.TestCase):
                         now=now,
                     )
 
-    def test_actor_token_is_validated_as_hs512_application_jwt_only(self) -> None:
+    def test_actor_token_requires_rs512_and_user_jwt_generation(self) -> None:
         now = int(time.time())
         with tempfile.TemporaryDirectory() as temporary:
             config = Workspace(Path(temporary)).config()
             claims = user_claims(now, str(uuid.uuid4()))
-            response = user_response(claims)
-            response["accessToken"] = transport_jwt(claims)
-
-            with self.assertRaisesRegex(refresh.RefreshError, "TOKEN_HEADER"):
-                refresh._parse_user_token(response, config, now=now)
+            for name, token in {
+                "algorithm": actor_jwt(claims, algorithm="HS512"),
+                "service-generation": actor_jwt(
+                    claims,
+                    generation=SERVICE_GENERATION,
+                ),
+            }.items():
+                with self.subTest(name=name):
+                    response = user_response(claims)
+                    response["accessToken"] = token
+                    with self.assertRaisesRegex(refresh.RefreshError, "TOKEN_HEADER"):
+                        refresh._parse_user_token(response, config, now=now)
 
     def test_user_token_must_bind_expected_tenant_and_credential(self) -> None:
         now = int(time.time())

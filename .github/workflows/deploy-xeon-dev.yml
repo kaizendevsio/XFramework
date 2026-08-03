@@ -73,7 +73,7 @@ jobs:
       DB_PASSWORD: compose-validation-placeholder
       USER_JWT_GENERATION_ID: compose-validation-user-jwt-g1
       BOLT_SIGNATURE: compose-validation-placeholder
-      CREDENTIAL_GENERATION_ID: compose-validation-placeholder
+      SERVICE_CREDENTIAL_GENERATION_ID: compose-validation-placeholder
       IDENTITYSERVER_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       BOLT_HUB_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
@@ -350,8 +350,12 @@ jobs:
               values[name] = value
               order.append(name)
 
-          generation_id = values.get("USER_JWT_GENERATION_ID", "")
-          if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", generation_id):
+          service_generation_id = values.get("SERVICE_CREDENTIAL_GENERATION_ID", "")
+          if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,96}", service_generation_id):
+              raise SystemExit("SERVICE_CREDENTIAL_GENERATION_ID is missing or invalid")
+
+          user_generation_id = values.get("USER_JWT_GENERATION_ID", "")
+          if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", user_generation_id):
               raise SystemExit("USER_JWT_GENERATION_ID is missing or invalid")
 
           key_paths = {

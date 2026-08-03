@@ -302,6 +302,16 @@ public sealed class ServiceIdentityComposeContractTests
         }
 
         envExample.Should().Contain("USER_JWT_GENERATION_ID=");
+        envExample.Should().Contain("SERVICE_CREDENTIAL_GENERATION_ID=");
+        envExample.Should().Contain("SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID=");
+        envExample.Should().Contain("SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC=");
+        envExample.Should().NotContain("\nCREDENTIAL_GENERATION_ID=");
+        envExample.Should().NotContain("\nCREDENTIAL_SECONDARY_GENERATION_ID=");
+        envExample.Should().NotContain("\nCREDENTIAL_SECONDARY_VALID_UNTIL_UTC=");
+        compose.Should().NotContain("${CREDENTIAL_GENERATION_ID");
+        compose.Should().NotContain("${CREDENTIAL_SECONDARY_GENERATION_ID");
+        compose.Should().NotContain("${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC");
+        workflow.Should().Contain("SERVICE_CREDENTIAL_GENERATION_ID is missing or invalid");
         envExample.Should().Contain("IDENTITY_USER_JWT_PUBLIC_KEY_PATH=");
         envExample.Should().Contain("IDENTITY_USER_JWT_PRIVATE_KEY_PATH=");
         workflow.Should().Contain("Identity user JWT public and private keys do not match");

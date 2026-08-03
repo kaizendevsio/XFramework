@@ -26,8 +26,8 @@ x-common-env: &common-env
   ServiceIdentity__Issuer: XFramework.IdentityServer
   ServiceIdentity__Authority: http://identityserver:8080
   ServiceIdentity__AllowInsecureHttp: true
-  ServiceIdentity__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-  CREDENTIAL_GENERATION_ID: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
+  ServiceIdentity__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+  SERVICE_CREDENTIAL_GENERATION_ID: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
   Seq__ApiKey: ${SEQ_API_KEY:-}
   OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
   OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-true}
@@ -119,9 +119,9 @@ services:
       Kestrel__Endpoints__Http__Url: http://0.0.0.0:8080
       ServiceIdentity__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET:?Set BOLT_HUB_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       BoltConfiguration__Durable__RedisConnectionString: ${BOLT_REDIS_CONNECTION:-redis:6379}
       BoltConfiguration__MediaEnabled: false
       BoltConfiguration__QueueDepth: 256
@@ -185,9 +185,9 @@ services:
       ServiceIdentity__DefaultScopes__1: storage.read
       ServiceIdentity__DefaultScopes__2: storage.write
       DistributedSecurityRateLimiting__RedisConnectionString: ${IDENTITYSERVER_RATE_LIMIT_REDIS_CONNECTION:-redis:6379}
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${IDENTITYSERVER_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__BoltTransportTokenIssuer__Enabled: true
       ServiceIdentity__BoltTransportTokenIssuer__LifetimeSeconds: 120
       ServiceIdentity__BoltTransportTokenIssuer__SigningKeyPath: /var/lib/xframework/identity/bolt-transport-signing-key.pem
@@ -195,98 +195,98 @@ services:
       JwtOptions__SigningPrivateKeyPath: /run/secrets/identity-user-jwt-private-key.pem
       ServiceIdentity__Clients__0__ClientId: XFramework.IdentityServer
       ServiceIdentity__Clients__0__ClientSecret: ${IDENTITYSERVER_SERVICE_IDENTITY_SECRET:?Set IDENTITYSERVER_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__0__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__0__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__0__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__0__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__0__ValidationFallback__ClientSecret: ${IDENTITYSERVER_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__0__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__0__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__0__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__0__AllowedScopes: bolt.service,storage.read,storage.write
       ServiceIdentity__Clients__1__ClientId: XFramework.Portal
       ServiceIdentity__Clients__1__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET:?Set PORTAL_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__1__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__1__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__1__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__1__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__1__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__1__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__1__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__1__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__1__AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,identity.admin,identity.session.validate
       ServiceIdentity__Clients__2__ClientId: XFramework.Bolt.Hub
       ServiceIdentity__Clients__2__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET:?Set BOLT_HUB_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__2__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__2__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__2__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__2__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__2__ValidationFallback__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__2__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__2__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__2__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__2__AllowedScopes: bolt.service
       ServiceIdentity__Clients__3__ClientId: XFramework.Communications
       ServiceIdentity__Clients__3__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET:?Set COMMUNICATIONS_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__3__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__3__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__3__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__3__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__3__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__3__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__3__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__3__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__3__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__4__ClientId: XFramework.Notifications
       ServiceIdentity__Clients__4__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET:?Set NOTIFICATIONS_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__4__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__4__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__4__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__4__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__4__ValidationFallback__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__4__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__4__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__4__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__4__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__5__ClientId: XFramework.Storage
       ServiceIdentity__Clients__5__ClientSecret: ${STORAGE_SERVICE_IDENTITY_SECRET:?Set STORAGE_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__5__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__5__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__5__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__5__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__5__ValidationFallback__ClientSecret: ${STORAGE_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__5__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__5__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__5__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__5__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__6__ClientId: XFramework.Attendance
       ServiceIdentity__Clients__6__ClientSecret: ${ATTENDANCE_SERVICE_IDENTITY_SECRET:?Set ATTENDANCE_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__6__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__6__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__6__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__6__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__6__ValidationFallback__ClientSecret: ${ATTENDANCE_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__6__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__6__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__6__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__6__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__7__ClientId: XFramework.SmsGateway
       ServiceIdentity__Clients__7__ClientSecret: ${SMSGATEWAY_SERVICE_IDENTITY_SECRET:?Set SMSGATEWAY_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__7__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__7__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__7__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__7__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__7__ValidationFallback__ClientSecret: ${SMSGATEWAY_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__7__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__7__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__7__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__7__AllowedScopes: bolt.service
       ServiceIdentity__Clients__8__ClientId: XFramework.Wallets
       ServiceIdentity__Clients__8__ClientSecret: ${WALLETS_SERVICE_IDENTITY_SECRET:?Set WALLETS_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__8__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__8__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__8__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__8__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__8__ValidationFallback__ClientSecret: ${WALLETS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__8__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__8__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__8__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__8__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__9__ClientId: XFramework.Inventario
       ServiceIdentity__Clients__9__ClientSecret: ${INVENTARIO_SERVICE_IDENTITY_SECRET:?Set INVENTARIO_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__9__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__9__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__9__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__9__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__9__ValidationFallback__ClientSecret: ${INVENTARIO_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__9__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__9__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__9__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__9__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__10__ClientId: XFramework.POS
       ServiceIdentity__Clients__10__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET:?Set POS_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__10__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__10__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__10__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__10__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__10__ValidationFallback__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__10__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__10__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__10__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__10__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__11__ClientId: XFramework.Operations.Dashboard
       ServiceIdentity__Clients__11__ClientSecret: ${OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET:?Set OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET in .env}
-      ServiceIdentity__Clients__11__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      ServiceIdentity__Clients__11__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__11__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__11__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__Clients__11__ValidationFallback__ClientSecret: ${OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__Clients__11__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__11__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__11__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__11__AllowedScopes: bolt.service
       TrustedProxyForwarding__KnownProxies__0: host.docker.internal
@@ -331,9 +331,9 @@ services:
       ServiceIdentity__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET:?Set COMMUNICATIONS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${COMMUNICATIONS_EXPOSE_PORT:-5148}:8080"
@@ -363,9 +363,9 @@ services:
       ServiceIdentity__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET:?Set NOTIFICATIONS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${NOTIFICATIONS_EXPOSE_PORT:-5166}:8080"
@@ -394,9 +394,9 @@ services:
       ServiceIdentity__ClientSecret: ${STORAGE_SERVICE_IDENTITY_SECRET:?Set STORAGE_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${STORAGE_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       BoltConfiguration__ClientName: XFramework.Storage
       Storage__DefaultProvider: ${STORAGE_DEFAULT_PROVIDER:-S3Compatible}
       Storage__ProviderProfileName: ${STORAGE_PROVIDER_PROFILE_NAME:-default}
@@ -441,9 +441,9 @@ services:
       ServiceIdentity__ClientSecret: ${ATTENDANCE_SERVICE_IDENTITY_SECRET:?Set ATTENDANCE_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${ATTENDANCE_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${ATTENDANCE_EXPOSE_PORT:-5182}:8080"
@@ -472,9 +472,9 @@ services:
       <<: *common-env
       ServiceIdentity__ClientSecret: ${SMSGATEWAY_SERVICE_IDENTITY_SECRET:?Set SMSGATEWAY_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${SMSGATEWAY_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${SMSGATEWAY_EXPOSE_PORT:-5274}:8080"
@@ -504,9 +504,9 @@ services:
       ServiceIdentity__ClientSecret: ${WALLETS_SERVICE_IDENTITY_SECRET:?Set WALLETS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${WALLETS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${WALLETS_EXPOSE_PORT:-9696}:8080"
@@ -536,9 +536,9 @@ services:
       ServiceIdentity__ClientSecret: ${INVENTARIO_SERVICE_IDENTITY_SECRET:?Set INVENTARIO_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${INVENTARIO_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${INVENTARIO_EXPOSE_PORT:-8105}:8080"
@@ -568,9 +568,9 @@ services:
       ServiceIdentity__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET:?Set POS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${POS_EXPOSE_PORT:-8115}:8080"
@@ -606,9 +606,9 @@ services:
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.admin
       ServiceIdentity__DefaultScopes__2: identity.session.validate
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${PORTAL_EXPOSE_PORT:-5000}:8080"
@@ -661,13 +661,13 @@ services:
       ServiceIdentity__Issuer: XFramework.IdentityServer
       ServiceIdentity__Authority: http://identityserver:8080
       ServiceIdentity__AllowInsecureHttp: true
-      ServiceIdentity__GenerationId: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
-      CREDENTIAL_GENERATION_ID: ${CREDENTIAL_GENERATION_ID:?Set CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      SERVICE_CREDENTIAL_GENERATION_ID: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
       ServiceIdentity__ClientSecret: ${OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET:?Set OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
-      ServiceIdentity__ValidationFallback__GenerationId: ${CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET_SECONDARY:-}
-      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       Seq__Url: http://seq:80
       Seq__ApiKey: ${SEQ_API_KEY:-}
       Jaeger__QueryUrl: http://jaeger:16686
