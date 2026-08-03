@@ -9,7 +9,7 @@ using XFramework.Integration.Security;
 
 namespace SmsGateway.Integration.Drivers;
 
-public partial interface ISmsGatewayServiceWrapper : IServiceWrapper
+public interface ISmsGatewayServiceWrapper : IServiceWrapper
 {
     public Task<CmdResponse> CreateSmsMessage(CreateSmsMessageRequest request);
 
@@ -18,7 +18,7 @@ public partial interface ISmsGatewayServiceWrapper : IServiceWrapper
     public Task<QueryResponse<List<SmsNodeJob>>> GetScheduledSmsMessageList(GetScheduledSmsMessageListRequest request);
 }
 
-public partial record SmsGatewayServiceWrapper(
+public record SmsGatewayServiceWrapper(
     IMessageBusWrapper messageBusDriver,
     IConfiguration configuration
 ) : DriverBase(messageBusDriver, configuration), ISmsGatewayServiceWrapper

@@ -229,6 +229,8 @@ public class XFrameworkBoltClientConfigurationTests
         await start.Should().NotThrowAsync(
             "IdentityServer must serve HTTP before its downstream Bolt Hub is available");
         await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var stopAgain = async () => await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await stopAgain.Should().NotThrowAsync("hosted-service shutdown must be idempotent");
     }
 
     [Test]
