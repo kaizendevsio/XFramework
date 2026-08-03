@@ -75,10 +75,11 @@ public sealed class ServiceIdentityConfiguration
         var allowInsecureHttp = configuration.GetValue<bool>("ServiceIdentity:AllowInsecureHttp");
         if (allowInsecureHttp
             && !string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(environmentName, "Docker", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "ServiceIdentity:AllowInsecureHttp is permitted only in Development or Test environments.");
+                "ServiceIdentity:AllowInsecureHttp is permitted only in Development, Test, or Docker environments.");
         }
 
         var boltTransportTokenIssuerEnabled = configuration.GetValue<bool>(
