@@ -359,6 +359,10 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("src/Tools/**");
         workflow.Should().Contain("src/Modules/**");
         workflow.Should().Contain("src/Presentation/**");
+        workflow.Should().Contain("for service in \"${services[@]}\"; do");
+        workflow.Should().Contain("docker compose -f \"$COMPOSE_FILE_PATH\" build \"$service\"");
+        workflow.Should().NotContain(
+            "docker compose -f \"$COMPOSE_FILE_PATH\" build \"${services[@]}\"");
         workflow.Should().Contain("REMOTE_ACTIVE_ENV:");
         workflow.Should().Contain("runtime_snapshot=\"$REMOTE_RUN_DIR/pre-deployment\"");
         workflow.Should().Contain("postgres redis minio seq jaeger identityserver bolt-hub");

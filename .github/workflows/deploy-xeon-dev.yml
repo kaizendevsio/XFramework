@@ -266,8 +266,10 @@ jobs:
             notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard bolt-phase0-synthetics
           )
-          COMPOSE_PARALLEL_LIMIT=2 timeout --foreground --kill-after=30s 45m \
-            docker compose -f "$COMPOSE_FILE_PATH" build "${services[@]}"
+          for service in "${services[@]}"; do
+            timeout --foreground --kill-after=30s 15m \
+              docker compose -f "$COMPOSE_FILE_PATH" build "$service"
+          done
 
       - name: Push images
         shell: bash
