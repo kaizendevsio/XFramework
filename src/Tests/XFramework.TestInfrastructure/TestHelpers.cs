@@ -57,7 +57,10 @@ public static class TestHelpers
             Id = Guid.NewGuid(),
             FirstName = "Test",
             LastName = "User",
-            TenantId = TestConstants.TenantId
+            TenantId = TestConstants.TenantId,
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
         };
         db.Set<IdentityInformation>().Add(info);
 
@@ -69,7 +72,9 @@ public static class TestHelpers
                 BCrypt.Net.BCrypt.HashPassword(password, workFactor: 11)),
             IdentityInfoId = info.Id,
             IsEnabled = true,
-            TenantId = TestConstants.TenantId
+            TenantId = TestConstants.TenantId,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
         };
         db.Set<IdentityCredential>().Add(credential);
 
@@ -79,7 +84,10 @@ public static class TestHelpers
             CredentialId = credential.Id,
             TypeId = TestConstants.RoleTypeId,
             RoleExpiration = DateTime.UtcNow.AddYears(1),
-            TenantId = TestConstants.TenantId
+            TenantId = TestConstants.TenantId,
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
         };
         db.Set<IdentityRole>().Add(role);
 

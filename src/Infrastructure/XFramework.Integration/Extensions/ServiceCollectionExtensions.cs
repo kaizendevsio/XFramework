@@ -58,8 +58,6 @@ public static class ServiceCollectionExtensions
                     ? configuration["BoltConfiguration:ClientName"]
                     : options.ClientId;
 
-                if (options.DefaultScopes.Count == 0)
-                    options.DefaultScopes = XFrameworkServiceScopes.AdminDefaults.ToList();
             });
         if (UsesCentralTransportIdentity(boltConfig))
             serviceIdentityOptions.ValidateOnStart();

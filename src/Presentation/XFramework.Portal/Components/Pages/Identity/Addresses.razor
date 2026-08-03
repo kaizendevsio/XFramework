@@ -255,9 +255,7 @@
         {
             try
             {
-                _deletingAddress.IsDeleted = true;
-                _deletingAddress.IsEnabled = false;
-                DataContext.Update(_deletingAddress);
+                DataContext.Remove(_deletingAddress);
                 var result = await DataContext.SaveChangesAsync();
                 ShowSaveResult(result.IsSuccess, "Address deleted.", "Address could not be deleted.");
             }

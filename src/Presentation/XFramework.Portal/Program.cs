@@ -1,4 +1,5 @@
 using BlazorBlueprint.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using Attendance.Integration.Drivers;
 using Community.Integration.Drivers;
@@ -42,6 +43,7 @@ builder.Services.AddAuthentication(PortalAuthDefaults.AuthenticationScheme)
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.EventsType = typeof(PortalCookieAuthenticationEvents);
     });
 builder.Services.AddAuthorization();
 
@@ -95,6 +97,7 @@ builder.Services.AddScoped(sp =>
     var metadata = new RequestMetadata
     {
         TenantId = tenantFilter.SelectedTenantId ?? loginTenantId,
+        ActorTenantId = loginTenantId,
         CredentialId = TryGetGuidClaim(user, PortalAuthClaims.CredentialId),
         SessionId = TryGetGuidClaim(user, PortalAuthClaims.SessionId),
         RequestId = Guid.NewGuid(),
@@ -128,6 +131,9 @@ builder.Services.AddScoped<AttendancePortalReadService>();
 builder.Services.AddScoped<WalletsAdminBackendContractService>();
 builder.Services.AddScoped<WalletsPortalDisplayService>();
 builder.Services.AddScoped<PortalAuthService>();
+builder.Services.AddScoped<PortalIdentitySessionValidator>();
+builder.Services.AddScoped<PortalCookieAuthenticationEvents>();
+builder.Services.AddScoped<AuthenticationStateProvider, PortalRevalidatingAuthenticationStateProvider>();
 builder.Services.AddScoped<PortalBootstrapSeeder>();
 builder.Services.AddHostedService<PortalBootstrapHostedService>();
 

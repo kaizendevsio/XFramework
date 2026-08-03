@@ -14,28 +14,28 @@ public sealed class CommunicationsRequestContextResolverTests
     private const string CommunicationsClientName = "XFramework.Communications";
 
     [Test]
-    public void Resolve_ServiceTokenMetadata_ReturnsUnauthorized()
+    public async Task ResolveAsync_ServiceTokenMetadata_ReturnsUnauthorized()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
         var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidPortalToken);
         var resolver = Resolver();
 
-        var result = resolver.Resolve(metadata);
+        var result = await resolver.ResolveAsync(metadata);
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(401));
     }
 
     [Test]
-    public void ResolveTrustedInternal_ServiceTokenMetadata_ReturnsContext()
+    public async Task ResolveTrustedInternalAsync_ServiceTokenMetadata_ReturnsContext()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
         var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidPortalToken);
         var resolver = Resolver();
 
-        var result = resolver.ResolveTrustedInternal(metadata);
+        var result = await resolver.ResolveTrustedInternalAsync(metadata);
 
         Assert.That(result.IsSuccess, Is.True, result.Message);
         Assert.That(result.Data!.TenantId, Is.EqualTo(tenantId));
@@ -44,14 +44,14 @@ public sealed class CommunicationsRequestContextResolverTests
     }
 
     [Test]
-    public void ResolveAdmin_PortalServiceTokenMetadata_ReturnsAdminContext()
+    public async Task ResolveAdminAsync_PortalServiceTokenMetadata_ReturnsAdminContext()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
         var metadata = Metadata(tenantId, credentialId, token: FakeTrustedServiceInvocationResolver.ValidPortalToken);
         var resolver = Resolver();
 
-        var result = resolver.ResolveAdmin(metadata);
+        var result = await resolver.ResolveAdminAsync(metadata);
 
         Assert.That(result.IsSuccess, Is.True, result.Message);
         Assert.That(result.Data!.TenantId, Is.EqualTo(tenantId));
@@ -61,7 +61,7 @@ public sealed class CommunicationsRequestContextResolverTests
     }
 
     [Test]
-    public void ResolveTrustedInternal_ServiceTokenWithWrongAudience_ReturnsUnauthorized()
+    public async Task ResolveTrustedInternalAsync_ServiceTokenWithWrongAudience_ReturnsUnauthorized()
     {
         var metadata = Metadata(
             Guid.NewGuid(),
@@ -69,38 +69,38 @@ public sealed class CommunicationsRequestContextResolverTests
             token: FakeTrustedServiceInvocationResolver.WrongAudienceToken);
         var resolver = Resolver();
 
-        var result = resolver.ResolveTrustedInternal(metadata);
+        var result = await resolver.ResolveTrustedInternalAsync(metadata);
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(401));
     }
 
     [Test]
-    public void ResolveAdmin_ServiceTokenWithWrongServiceName_ReturnsForbidden()
+    public async Task ResolveAdminAsync_ServiceTokenWithWrongServiceName_ReturnsForbidden()
     {
         var metadata = Metadata(Guid.NewGuid(), Guid.NewGuid(), token: FakeTrustedServiceInvocationResolver.OtherServiceToken);
         var resolver = Resolver();
 
-        var result = resolver.ResolveAdmin(metadata);
+        var result = await resolver.ResolveAdminAsync(metadata);
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(403));
     }
 
     [Test]
-    public void Resolve_UnsignedInternalMetadata_ReturnsUnauthorized()
+    public async Task ResolveAsync_UnsignedInternalMetadata_ReturnsUnauthorized()
     {
         var metadata = Metadata(Guid.NewGuid(), Guid.NewGuid());
         var resolver = Resolver();
 
-        var result = resolver.Resolve(metadata);
+        var result = await resolver.ResolveAsync(metadata);
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(401));
     }
 
     [Test]
-    public void Resolve_AuthenticatedUserWithMismatchedTenantMetadata_ReturnsForbidden()
+    public async Task ResolveAsync_AuthenticatedUserWithMismatchedTenantMetadata_ReturnsForbidden()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
@@ -114,14 +114,14 @@ public sealed class CommunicationsRequestContextResolverTests
         var metadata = Metadata(Guid.NewGuid(), credentialId);
         var resolver = Resolver(accessor);
 
-        var result = resolver.Resolve(metadata);
+        var result = await resolver.ResolveAsync(metadata);
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(403));
     }
 
     [Test]
-    public void Resolve_AuthenticatedUserWithMismatchedCredentialMetadata_ReturnsForbidden()
+    public async Task ResolveAsync_AuthenticatedUserWithMismatchedCredentialMetadata_ReturnsForbidden()
     {
         var tenantId = Guid.NewGuid();
         var accessor = new HttpContextAccessor
@@ -134,10 +134,31 @@ public sealed class CommunicationsRequestContextResolverTests
         var metadata = Metadata(tenantId, Guid.NewGuid());
         var resolver = Resolver(accessor);
 
-        var result = resolver.Resolve(metadata);
+        var result = await resolver.ResolveAsync(metadata);
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(403));
+    }
+
+    [Test]
+    public void ResolveTrustedInternalAsync_CallerCancellation_IsPropagated()
+    {
+        var metadata = Metadata(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            token: FakeTrustedServiceInvocationResolver.ValidPortalToken);
+        var resolver = new CommunicationsRequestContextResolver(
+            new HttpContextAccessor(),
+            Configuration(),
+            serviceInvocationResolver: new CancelingTrustedServiceInvocationResolver());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var act = async () => await resolver.ResolveTrustedInternalAsync(
+            metadata,
+            ct: cancellation.Token);
+
+        Assert.That(act, Throws.InstanceOf<OperationCanceledException>());
     }
 
     private static CommunicationsRequestContextResolver Resolver(HttpContextAccessor? accessor = null) =>
@@ -172,4 +193,16 @@ public sealed class CommunicationsRequestContextResolverTests
                 ["BoltConfiguration:ClientName"] = CommunicationsClientName
             })
             .Build();
+
+    private sealed class CancelingTrustedServiceInvocationResolver : ITrustedServiceInvocationResolver
+    {
+        public Task<TrustedServiceInvocationResult> ResolveAsync(
+            RequestMetadata? metadata,
+            string expectedAudience,
+            IReadOnlyCollection<string>? requiredScopes = null,
+            IReadOnlyCollection<string>? allowedCallers = null,
+            bool requireTenant = true,
+            CancellationToken ct = default) =>
+            Task.FromCanceled<TrustedServiceInvocationResult>(ct);
+    }
 }

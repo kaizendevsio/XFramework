@@ -51,7 +51,8 @@ public sealed class ServiceIdentityConfiguration
 
     public static ServiceIdentityConfiguration FromConfiguration(
         IConfiguration configuration,
-        DateTimeOffset nowUtc)
+        DateTimeOffset nowUtc,
+        string environmentName = "Production")
     {
         var clients = new Dictionary<string, ServiceClientDefinition>(StringComparer.Ordinal);
         foreach (var section in configuration.GetSection("ServiceIdentity:Clients").GetChildren())
@@ -72,6 +73,14 @@ public sealed class ServiceIdentityConfiguration
             issuer = XFrameworkServiceNames.IdentityServer;
 
         var allowInsecureHttp = configuration.GetValue<bool>("ServiceIdentity:AllowInsecureHttp");
+        if (allowInsecureHttp
+            && !string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "ServiceIdentity:AllowInsecureHttp is permitted only in Development or Test environments.");
+        }
+
         var boltTransportTokenIssuerEnabled = configuration.GetValue<bool>(
             "ServiceIdentity:BoltTransportTokenIssuer:Enabled");
         var authorityValue = configuration["ServiceIdentity:Authority"]?.Trim();
@@ -212,6 +221,10 @@ internal sealed class ServiceClientDefinition
 
         var audiences = ParseList(section, "AllowedAudiences", StringComparer.Ordinal);
         var scopes = ParseList(section, "AllowedScopes", StringComparer.OrdinalIgnoreCase);
+        if (audiences.Count == 0)
+            throw new InvalidOperationException($"{section.Path}:AllowedAudiences must contain at least one audience.");
+        if (scopes.Count == 0)
+            throw new InvalidOperationException($"{section.Path}:AllowedScopes must contain at least one scope.");
 
         return new ServiceClientDefinition(
             clientId,
@@ -219,8 +232,8 @@ internal sealed class ServiceClientDefinition
             fallback is null
                 ? null
                 : fallback.Value with { GenerationId = fallback.Value.GenerationId.Trim() },
-            audiences.Count == 0 ? XFrameworkServiceNames.All.ToHashSet(StringComparer.Ordinal) : audiences,
-            scopes.Count == 0 ? XFrameworkServiceScopes.AdminDefaults.ToHashSet(StringComparer.OrdinalIgnoreCase) : scopes);
+            audiences,
+            scopes);
     }
 
     private static HashSet<string> ParseList(

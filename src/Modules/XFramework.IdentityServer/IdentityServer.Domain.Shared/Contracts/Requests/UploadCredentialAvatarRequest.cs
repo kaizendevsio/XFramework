@@ -5,7 +5,7 @@ using TResponse = QueryResponse<CredentialAvatarResponse>;
 
 [MemoryPackable]
 public partial record UploadCredentialAvatarRequest : RequestBase,
-    IQuery<TResponse>,
+    ICommand<TResponse>,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid CredentialId { get; set; }

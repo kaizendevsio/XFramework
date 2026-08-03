@@ -17,6 +17,7 @@ global using XFramework.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Shared.Contracts.Responses;
 global using XFramework.Domain.Shared.Enums;
 global using XFramework.Domain.Shared.Interfaces;
+global using XFramework.Domain.Shared.ServiceIdentity;
 global using XFramework.Integration.Abstractions;
 global using XFramework.Integration.Services.Helpers;
 global using XFramework.Extensions;

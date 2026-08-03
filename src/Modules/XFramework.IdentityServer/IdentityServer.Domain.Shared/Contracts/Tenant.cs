@@ -8,9 +8,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/tenants",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 1800,
-    CacheKeyPrefix = "tenants"
+    RequireAuthorization = true
 )]
 public partial class Tenant : BaseModel
 {

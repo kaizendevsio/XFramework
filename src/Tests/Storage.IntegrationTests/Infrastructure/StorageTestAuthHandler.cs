@@ -42,8 +42,10 @@ public sealed class StorageTestAuthHandler(
             new(ClaimTypes.Role, "Admin")
         };
 
-        if (TryGetGuidHeader(TestAuthHeaders.CredentialId, out var credentialId))
-            claims.Add(new Claim("credential_id", credentialId.ToString()));
+        var credentialId = TryGetGuidHeader(TestAuthHeaders.CredentialId, out var suppliedCredentialId)
+            ? suppliedCredentialId
+            : StorageIntegrationTestFixture.TestCredentialId;
+        claims.Add(new Claim("credential_id", credentialId.ToString()));
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);

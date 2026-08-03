@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Files.ValidateReference;
 
 public static class ValidateStorageFileReferenceEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageRead])]
     [MapPost("/api/storage/files/{storageFileId:guid}/validate-reference", Tags = ["Storage"],
         Summary = "Validate storage file reference",
         Description = "Validates tenant ownership and availability before another module references a file.")]

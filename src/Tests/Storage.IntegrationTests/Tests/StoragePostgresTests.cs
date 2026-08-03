@@ -3,7 +3,11 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using Storage.Api.Services;
+using Storage.IntegrationTests.Infrastructure;
 using Storage.Domain.Shared.Contracts.Requests;
 using Storage.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -44,11 +48,15 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
         var retentionIndexExists = await IndexExistsAsync(db, "ix_storagefile_tenant_retention_objectdeleted");
         var providerDefaultIndexExists = await IndexExistsAsync(db, "ix_storageproviderprofile_tenant_default");
         var bucketIndexExists = await IndexExistsAsync(db, "ix_storagetenantbucket_bucket");
+        var unclaimedIndexExists = await IndexExistsAsync(db, "ix_storagefile_global_unclaimed_due");
+        var expiredSessionIndexExists = await IndexExistsAsync(db, "ix_storageuploadsession_global_expired_due");
 
         tableCount.Should().Be(8);
         retentionIndexExists.Should().BeTrue();
         providerDefaultIndexExists.Should().BeTrue();
         bucketIndexExists.Should().BeTrue();
+        unclaimedIndexExists.Should().BeTrue();
+        expiredSessionIndexExists.Should().BeTrue();
     }
 
     [Test]
@@ -61,6 +69,69 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
         using var response = await HttpClient.SendAsync(request);
 
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    [Category(TestCategories.Wrappers)]
+    public async Task Wrapper_EnsureStorageUploadMetadata_RepeatedCallsReturnTenantScopedMetadata()
+    {
+        var metadata = CreateMetadata();
+        var suffix = Guid.NewGuid().ToString("N");
+        var contentType = $"image/x-integration-{suffix}";
+        var groupName = $"Integration Group {suffix}";
+        var identifierName = $"Integration Identifier {suffix}";
+        var request = new EnsureStorageUploadMetadataRequest
+        {
+            Metadata = metadata,
+            ContentType = contentType,
+            IdentifierGroupName = groupName,
+            IdentifierName = identifierName,
+            IdentifierDescription = "Storage wrapper integration metadata"
+        };
+
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, 8)
+                .Select(_ => ServiceWrapper.EnsureStorageUploadMetadata(request)));
+        var first = results[0];
+
+        first.IsSuccess.Should().BeTrue(first.Message);
+        first.Response.Should().NotBeNull();
+        results.Should().OnlyContain(result => result.IsSuccess && result.Response != null);
+        results.Select(result => result.Response).Should().OnlyContain(response => response == first.Response);
+        var ensuredMetadata = first.Response!;
+        var tenantId = metadata.TenantId!.Value;
+
+        await using var db = CreateDbContext();
+        var type = await db.Set<StorageFileType>()
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.Id == ensuredMetadata.TypeId);
+        var identifier = await db.Set<StorageFileIdentifier>()
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.Id == ensuredMetadata.StorageFileIdentifierId);
+        var group = await db.Set<StorageFileIdentifierGroup>()
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.Id == identifier.GroupId);
+
+        type.TenantId.Should().Be(tenantId);
+        type.Name.Should().Be(contentType);
+        group.TenantId.Should().Be(tenantId);
+        group.Name.Should().Be(groupName);
+        identifier.TenantId.Should().Be(tenantId);
+        identifier.Name.Should().Be(identifierName);
+        identifier.GroupId.Should().Be(group.Id);
+
+        (await db.Set<StorageFileType>()
+                .IgnoreQueryFilters()
+                .CountAsync(item => item.TenantId == tenantId && item.Name == contentType))
+            .Should().Be(1);
+        (await db.Set<StorageFileIdentifierGroup>()
+                .IgnoreQueryFilters()
+                .CountAsync(item => item.TenantId == tenantId && item.Name == groupName))
+            .Should().Be(1);
+        (await db.Set<StorageFileIdentifier>()
+                .IgnoreQueryFilters()
+                .CountAsync(item => item.TenantId == tenantId && item.Name == identifierName))
+            .Should().Be(1);
     }
 
     [Test]
@@ -103,6 +174,146 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
         file.Sha256Hash.Should().Be(expectedHash);
         file.ProviderProfileId.Should().NotBeNull();
         file.TenantBucketId.Should().NotBeNull();
+    }
+
+    [Test]
+    [Category(TestCategories.Wrappers)]
+    public async Task Wrapper_ClaimStorageFile_IsTenantScopedAndIdempotent()
+    {
+        var metadata = CreateMetadata();
+        var session = await CreateCompletedSessionAsync(
+            metadata,
+            visibility: StorageFileVisibility.Public,
+            requireClaim: true);
+
+        var first = await ServiceWrapper.ClaimStorageFile(new ClaimStorageFileRequest
+        {
+            Metadata = metadata,
+            StorageFileId = session.StorageFileId
+        });
+        var second = await ServiceWrapper.ClaimStorageFile(new ClaimStorageFileRequest
+        {
+            Metadata = metadata,
+            StorageFileId = session.StorageFileId
+        });
+
+        first.IsSuccess.Should().BeTrue(first.Message);
+        second.IsSuccess.Should().BeTrue(second.Message);
+        first.Response!.UnclaimedUntil.Should().BeNull();
+        second.Response!.UnclaimedUntil.Should().BeNull();
+
+        await using var db = CreateDbContext();
+        var file = await db.Set<StorageFile>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == session.StorageFileId);
+        file.UnclaimedUntil.Should().BeNull();
+    }
+
+    [Test]
+    [Category(TestCategories.Wrappers)]
+    public async Task Wrapper_ReadAbortAndValidationMethods_HaveDirectTransportCoverage()
+    {
+        var metadata = CreateMetadata();
+        var completed = await CreateCompletedSessionAsync(
+            metadata,
+            visibility: StorageFileVisibility.Public);
+
+        (await ServiceWrapper.GetStorageFile(new GetStorageFileRequest
+        {
+            Metadata = metadata,
+            StorageFileId = completed.StorageFileId
+        })).IsSuccess.Should().BeTrue();
+        (await ServiceWrapper.GetStorageFiles(new GetStorageFilesRequest
+        {
+            Metadata = metadata,
+            Page = 1,
+            PageSize = 10
+        })).IsSuccess.Should().BeTrue();
+        (await ServiceWrapper.GetStoragePublicUrl(new GetStoragePublicUrlRequest
+        {
+            Metadata = metadata,
+            StorageFileId = completed.StorageFileId
+        })).IsSuccess.Should().BeTrue();
+        (await ServiceWrapper.GetStorageDownloadUrl(new GetStorageDownloadUrlRequest
+        {
+            Metadata = metadata,
+            StorageFileId = completed.StorageFileId
+        })).IsSuccess.Should().BeTrue();
+        (await ServiceWrapper.ValidateStorageFileReference(new ValidateStorageFileReferenceRequest
+        {
+            Metadata = metadata,
+            StorageFileId = completed.StorageFileId
+        })).IsSuccess.Should().BeTrue();
+
+        var incomplete = await CreateUploadSessionAsync(metadata);
+        (await ServiceWrapper.AbortStorageUploadSession(new AbortStorageUploadSessionRequest
+        {
+            Metadata = metadata,
+            UploadSessionId = incomplete.Id
+        })).IsSuccess.Should().BeTrue();
+    }
+
+    [Test]
+    [Category(TestCategories.StorageProvider)]
+    public async Task Maintenance_RetriesProviderFailuresThenDeletesUnclaimedFileAndAbortsExpiredSession()
+    {
+        var metadata = CreateMetadata();
+        var completed = await CreateCompletedSessionAsync(metadata, requireClaim: true);
+        var incomplete = await CreateUploadSessionAsync(metadata);
+        var now = DateTime.UtcNow;
+
+        await using (var setupDb = CreateDbContext())
+        {
+            await setupDb.Set<StorageFile>()
+                .IgnoreQueryFilters()
+                .Where(file => file.Id == completed.StorageFileId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(file => file.UnclaimedUntil, now.AddMinutes(-1)));
+            await setupDb.Set<StorageUploadSession>()
+                .IgnoreQueryFilters()
+                .Where(session => session.Id == incomplete.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(session => session.ExpiresAt, now.AddMinutes(-1)));
+        }
+
+        StorageIntegrationTestFixture.Provider.FailNextDelete = true;
+        StorageIntegrationTestFixture.Provider.FailNextAbort = true;
+        await RunMaintenanceAsync();
+
+        await using (var failedDb = CreateDbContext())
+        {
+            var file = await failedDb.Set<StorageFile>()
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == completed.StorageFileId);
+            var session = await failedDb.Set<StorageUploadSession>()
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == incomplete.Id);
+            file.Status.Should().Be(StorageFileStatus.Deleted);
+            file.ObjectDeletedAt.Should().BeNull();
+            session.Status.Should().Be(StorageUploadSessionStatus.Expired);
+            session.AbortedAt.Should().BeNull();
+        }
+
+        var result = await RunMaintenanceAsync();
+
+        result.DeletedUnclaimedFiles.Should().Be(1);
+        result.ExpiredUploadSessions.Should().Be(1);
+        StorageIntegrationTestFixture.Provider.DeleteObjectAttemptCount.Should().Be(2);
+        StorageIntegrationTestFixture.Provider.DeleteObjectCount.Should().Be(1);
+        StorageIntegrationTestFixture.Provider.AbortUploadCount.Should().Be(2);
+
+        await using var db = CreateDbContext();
+        var deletedFile = await db.Set<StorageFile>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == completed.StorageFileId);
+        var expiredSession = await db.Set<StorageUploadSession>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == incomplete.Id);
+        deletedFile.ObjectDeletedAt.Should().NotBeNull();
+        expiredSession.AbortedAt.Should().NotBeNull();
     }
 
     [Test]
@@ -245,10 +456,17 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
         files.Should().ContainSingle(item => item.Id == session.StorageFileId);
     }
 
-    private static async Task<StorageUploadSessionResponse> CreateCompletedSessionAsync(RequestMetadata metadata)
+    private static async Task<StorageUploadSessionResponse> CreateCompletedSessionAsync(
+        RequestMetadata metadata,
+        StorageFileVisibility visibility = StorageFileVisibility.Private,
+        bool requireClaim = false)
     {
         var bytes = new byte[] { 1, 2, 3, 4 };
-        var session = await CreateUploadSessionAsync(metadata, expectedSha256Hash: Sha256(bytes));
+        var session = await CreateUploadSessionAsync(
+            metadata,
+            visibility: visibility,
+            expectedSha256Hash: Sha256(bytes),
+            requireClaim: requireClaim);
         _ = await UploadPartAsync(metadata, session.Id, 1, 0, bytes);
 
         var complete = await ServiceWrapper.CompleteStorageUploadSession(new CompleteStorageUploadSessionRequest
@@ -266,7 +484,8 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
         long totalSizeBytes = 4,
         int chunkSizeBytes = 4,
         StorageFileVisibility visibility = StorageFileVisibility.Private,
-        string? expectedSha256Hash = null)
+        string? expectedSha256Hash = null,
+        bool requireClaim = false)
     {
         var result = await ServiceWrapper.CreateStorageUploadSession(new CreateStorageUploadSessionRequest
         {
@@ -279,11 +498,24 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
             TotalSizeBytes = totalSizeBytes,
             ChunkSizeBytes = chunkSizeBytes,
             Visibility = visibility,
-            ExpectedSha256Hash = expectedSha256Hash
+            ExpectedSha256Hash = expectedSha256Hash,
+            RequireClaim = requireClaim
         });
 
         result.IsSuccess.Should().BeTrue(result.Message);
         return result.Response!;
+    }
+
+    private static async Task<StorageMaintenanceBatchResult> RunMaintenanceAsync()
+    {
+        await using var db = CreateDbContext();
+        var service = new StorageMaintenanceService(
+            db,
+            new IntegrationStorageProviderFactory(StorageIntegrationTestFixture.Provider),
+            Options.Create(new StorageOptions { MaintenanceBatchSize = 20 }),
+            TimeProvider.System,
+            NullLogger<StorageMaintenanceService>.Instance);
+        return await service.RunBatchAsync();
     }
 
     private static async Task<StorageUploadPartResponse> UploadPartAsync(

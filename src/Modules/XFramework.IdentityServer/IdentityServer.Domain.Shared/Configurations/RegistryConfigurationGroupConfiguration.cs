@@ -19,5 +19,10 @@ public class RegistryConfigurationGroupConfiguration : IEntityTypeConfiguration<
         entity.Property(e => e.Description).HasMaxLength(1000);
 
         entity.Property(e => e.Name).HasMaxLength(100);
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
+
+        entity.HasIndex(e => new { e.TenantId, e.SystemReferenceId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
     }
 }

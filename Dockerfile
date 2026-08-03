@@ -27,12 +27,12 @@ RUN basename "${PROJECT_PATH}" .csproj > /app/publish/.entrypoint
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:68abecb063cf367fdce0a7f0ab5678beaa99f60c7f616df862ca2a51c387d4e7 AS runtime
 WORKDIR /app
 
-# Install curl for health checks and CA tooling for the mounted Bolt Hub trust root.
+# Install curl for health checks and CA tooling for the mounted IdentityServer trust root.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8080
+EXPOSE 8080 8443
 
-ENTRYPOINT ["sh", "-c", "set -eu; exec dotnet \"$(cat .entrypoint).dll\""]
+ENTRYPOINT ["sh", "-c", "set -eu; if [ -f /usr/local/share/ca-certificates/xframework-identityserver-ca.crt ]; then update-ca-certificates >/dev/null; fi; exec dotnet \"$(cat .entrypoint).dll\""]

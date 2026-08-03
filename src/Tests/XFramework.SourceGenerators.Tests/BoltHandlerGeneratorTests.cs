@@ -393,6 +393,63 @@ public sealed record RestrictedRequest : RequestBase,
             "allowedCallers: new string[] { \"XFramework.Portal\" },");
     }
 
+    [Test]
+    public void GenerateRestEndpoint_WithNamedRateLimitPolicy_EmitsRateLimitingRequirement()
+    {
+        const string source = """
+
+namespace Sample.Features.Auth.Login;
+
+using System.Threading;
+using System.Threading.Tasks;
+using XFramework.Core.Patterns;
+using XFramework.Integration.Attributes;
+
+public static class LoginEndpoint
+{
+    [MapPost("/api/auth/login", RateLimitPolicy = "auth")]
+    public static Task<Result<LoginResponse>> Handle(
+        LoginRequest request,
+        CancellationToken ct) =>
+        Task.FromResult(Result<LoginResponse>.Success(new LoginResponse()));
+}
+
+public sealed record LoginRequest(string UserName);
+public sealed record LoginResponse;
+""";
+
+        var generatedSource = RunGenerator(source, "LoginEndpoint_Handle_RestEndpoint.g.cs");
+
+        generatedSource.Should().Contain(".RequireRateLimiting(\"auth\")");
+    }
+
+    [Test]
+    public void GenerateRestEndpoint_WithoutRateLimitPolicy_DoesNotEmitRateLimitingRequirement()
+    {
+        const string source = """
+
+namespace Sample.Features.Health.Check;
+
+using System.Threading;
+using System.Threading.Tasks;
+using XFramework.Core.Patterns;
+using XFramework.Integration.Attributes;
+
+public static class CheckHealthEndpoint
+{
+    [MapGet("/api/health")]
+    public static Task<Result<HealthResponse>> Handle(CancellationToken ct) =>
+        Task.FromResult(Result<HealthResponse>.Success(new HealthResponse()));
+}
+
+public sealed record HealthResponse;
+""";
+
+        var generatedSource = RunGenerator(source, "CheckHealthEndpoint_Handle_RestEndpoint.g.cs");
+
+        generatedSource.Should().NotContain("RequireRateLimiting");
+    }
+
     private static string RunGenerator(string source, string generatedHintName)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -469,6 +526,7 @@ namespace XFramework.Integration.Attributes
         public string? Summary { get; set; }
         public string? Description { get; set; }
         public bool ExcludeFromOpenApi { get; set; }
+        public string? RateLimitPolicy { get; set; }
     }
 
     [AttributeUsage(AttributeTargets.Method)]
@@ -707,6 +765,7 @@ namespace Microsoft.AspNetCore.Builder
         public RouteHandlerBuilder WithSummary(string summary) => this;
         public RouteHandlerBuilder WithDescription(string description) => this;
         public RouteHandlerBuilder ExcludeFromDescription() => this;
+        public RouteHandlerBuilder RequireRateLimiting(string policyName) => this;
     }
 }
 

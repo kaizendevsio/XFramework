@@ -1,4 +1,5 @@
 using Storage.Integration.Drivers;
+using IdentityServer.Integration.Extensions;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Extensions;
 
@@ -9,6 +10,7 @@ public sealed class WrapperInstaller : IInstaller
     public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
+        services.AddIdentityServerSessionValidation();
         services.AddStorageWrapperServices();
     }
 }

@@ -26,11 +26,94 @@ public sealed partial class StorageService(
     private const int S3MaximumPartCount = 10_000;
     private const int AzureMaximumBlockCount = 50_000;
 
+    public async Task<Result<StorageUploadMetadataResponse>> EnsureUploadMetadataAsync(
+        EnsureStorageUploadMetadataRequest request,
+        CancellationToken ct = default)
+    {
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
+        if (!tenantResult.IsSuccess)
+            return TenantFailure<StorageUploadMetadataResponse>(tenantResult);
+
+        var tenantId = tenantResult.Data;
+        var contentType = request.ContentType.Trim().ToLowerInvariant();
+        var groupName = request.IdentifierGroupName.Trim();
+        var identifierName = request.IdentifierName.Trim();
+
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var metadataLockKey = $"{tenantId:D}:{contentType}:{groupName}:{identifierName}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({metadataLockKey}, 0))",
+            ct);
+
+        var type = await db.Set<StorageFileType>()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Name == contentType && !x.IsDeleted, ct);
+        if (type is null)
+        {
+            type = new StorageFileType
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = contentType,
+                SystemReferenceId = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            db.Add(type);
+        }
+
+        var group = await db.Set<StorageFileIdentifierGroup>()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Name == groupName && !x.IsDeleted, ct);
+        if (group is null)
+        {
+            group = new StorageFileIdentifierGroup
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = groupName,
+                SystemReferenceId = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            db.Add(group);
+        }
+
+        var identifier = await db.Set<StorageFileIdentifier>()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Name == identifierName && !x.IsDeleted, ct);
+        if (identifier is null)
+        {
+            identifier = new StorageFileIdentifier
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = identifierName,
+                Description = request.IdentifierDescription?.Trim(),
+                GroupId = group.Id,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            db.Add(identifier);
+        }
+        else if (identifier.GroupId != group.Id)
+        {
+            return Result<StorageUploadMetadataResponse>.Failure(
+                "Storage identifier is already assigned to another group", 409);
+        }
+
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        return Result<StorageUploadMetadataResponse>.Success(new StorageUploadMetadataResponse
+        {
+            TypeId = type.Id,
+            StorageFileIdentifierId = identifier.Id
+        });
+    }
+
     public async Task<Result<StorageUploadSessionResponse>> CreateUploadSessionAsync(
         CreateStorageUploadSessionRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageUploadSessionResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -106,6 +189,7 @@ public sealed partial class StorageService(
             PublicUrl = publicUrl,
             CdnBaseUrl = cdnUrl,
             UploadStartedAt = now,
+            UnclaimedUntil = request.RequireClaim ? now : null,
             CreatedAt = now,
             IsEnabled = true,
             ConcurrencyStamp = Guid.NewGuid()
@@ -161,7 +245,7 @@ public sealed partial class StorageService(
         UploadStorageFilePartRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageUploadPartResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -283,7 +367,7 @@ public sealed partial class StorageService(
         ListStorageUploadPartsRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageUploadPartListResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -321,7 +405,7 @@ public sealed partial class StorageService(
         CompleteStorageUploadSessionRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageFileResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -412,6 +496,11 @@ public sealed partial class StorageService(
         session.StorageFile.ModifiedAt = now;
         session.StorageFile.Sha256Hash = actualSha256Hash;
         session.StorageFile.Hash = session.StorageFile.Sha256Hash;
+        if (session.StorageFile.UnclaimedUntil is not null)
+        {
+            session.StorageFile.UnclaimedUntil = now.AddMinutes(
+                Math.Max(1, storageOptions.UnclaimedFileTtlMinutes));
+        }
 
         await db.SaveChangesAsync(ct);
 
@@ -422,7 +511,7 @@ public sealed partial class StorageService(
         AbortStorageUploadSessionRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure(tenantResult);
         var tenantId = tenantResult.Data;
@@ -459,17 +548,60 @@ public sealed partial class StorageService(
         return Result.Success("Upload session aborted");
     }
 
+    public async Task<Result<StorageFileResponse>> ClaimFileAsync(
+        ClaimStorageFileRequest request,
+        CancellationToken ct = default)
+    {
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
+        if (!tenantResult.IsSuccess)
+            return TenantFailure<StorageFileResponse>(tenantResult);
+        var tenantId = tenantResult.Data;
+
+        var file = await db.Set<StorageFile>()
+            .AsTracking()
+            .FirstOrDefaultAsync(
+                item => item.Id == request.StorageFileId && item.TenantId == tenantId,
+                ct);
+        if (file is null)
+            return Result<StorageFileResponse>.NotFound("Storage file not found");
+
+        if (file.Status != StorageFileStatus.Available || file.ObjectDeletedAt is not null)
+            return Result<StorageFileResponse>.Conflict("Storage file is not available to claim");
+
+        if (file.UnclaimedUntil is { } unclaimedUntil && unclaimedUntil <= DateTime.UtcNow)
+            return Result<StorageFileResponse>.Conflict("Storage file claim period has expired");
+
+        if (file.UnclaimedUntil is not null)
+        {
+            file.UnclaimedUntil = null;
+            file.ModifiedAt = DateTime.UtcNow;
+            file.ConcurrencyStamp = Guid.NewGuid();
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Result<StorageFileResponse>.Conflict("Storage file claim conflicted with maintenance");
+            }
+        }
+
+        return Result<StorageFileResponse>.Success(ToFileResponse(file), "Storage file claimed");
+    }
+
     public async Task<Result<StorageFileResponse>> GetFileAsync(
         GetStorageFileRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageFileResponse>(tenantResult);
         var tenantId = tenantResult.Data;
 
         var file = await db.Set<StorageFile>()
             .AsNoTracking()
+            .Include(storageFile => storageFile.StorageFileIdentifier)
+            .ThenInclude(identifier => identifier!.Group)
             .FirstOrDefaultAsync(
                 storageFile => storageFile.Id == request.StorageFileId && storageFile.TenantId == tenantId,
                 ct);
@@ -483,7 +615,7 @@ public sealed partial class StorageService(
         GetStorageFilesRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageFileListResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -536,7 +668,7 @@ public sealed partial class StorageService(
         GetStorageDownloadUrlRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageDownloadUrlResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -600,7 +732,7 @@ public sealed partial class StorageService(
         GetStoragePublicUrlRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StoragePublicUrlResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -633,7 +765,7 @@ public sealed partial class StorageService(
         DeleteStorageFileRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure(tenantResult);
         var tenantId = tenantResult.Data;
@@ -661,7 +793,7 @@ public sealed partial class StorageService(
         RestoreStorageFileRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageFileResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -697,7 +829,7 @@ public sealed partial class StorageService(
         CleanupStorageRetentionRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageRetentionCleanupResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -770,7 +902,7 @@ public sealed partial class StorageService(
         ValidateStorageFileReferenceRequest request,
         CancellationToken ct = default)
     {
-        var tenantResult = ResolveTenantId(request.Metadata);
+        var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
             return TenantFailure<StorageFileValidationResponse>(tenantResult);
         var tenantId = tenantResult.Data;
@@ -942,10 +1074,14 @@ public sealed partial class StorageService(
                 .AsNoTracking()
                 .FirstOrDefaultAsync(bucket => bucket.Id == tenantBucketId && bucket.TenantId == tenantId, ct);
 
-    private Result<Guid> ResolveTenantId(RequestMetadata? metadata)
+    private async Task<Result<Guid>> ResolveTenantIdAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct)
     {
         var httpContext = httpContextAccessor.HttpContext;
-        var trustedInvocation = httpContext is null ? ResolveTrustedServerMetadata(metadata) : null;
+        var trustedInvocation = httpContext is null
+            ? await ResolveTrustedServerMetadataAsync(metadata, ct)
+            : null;
         var isSignedInternalRequest = trustedInvocation is not null;
         var trustedTenantId = TryGetClaimGuid(httpContext?.User, "tenant_id", "tenantId", "TenantId", "tenant", "tid")
             ?? TryGetItemGuid(httpContext, "TenantId")
@@ -971,18 +1107,19 @@ public sealed partial class StorageService(
         return Result<Guid>.Success(trustedTenantId.Value);
     }
 
-    private TrustedServiceInvocation? ResolveTrustedServerMetadata(RequestMetadata? metadata)
+    private async Task<TrustedServiceInvocation?> ResolveTrustedServerMetadataAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct)
     {
         if (serviceInvocationResolver is null)
             return null;
 
-        var result = serviceInvocationResolver.ResolveAsync(
-                metadata,
-                configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Storage,
-                [XFrameworkServiceScopes.BoltService],
-                requireTenant: true)
-            .GetAwaiter()
-            .GetResult();
+        var result = await serviceInvocationResolver.ResolveAsync(
+            metadata,
+            configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Storage,
+            [XFrameworkServiceScopes.BoltService],
+            requireTenant: true,
+            ct: ct);
 
         return result.IsSuccess ? result.Invocation : null;
     }
@@ -1182,11 +1319,14 @@ public sealed partial class StorageService(
         TypeId = file.TypeId,
         Identifier = file.Identifier,
         StorageFileIdentifierId = file.StorageFileIdentifierId,
+        StorageFileIdentifierName = file.StorageFileIdentifier?.Name,
+        StorageFileIdentifierGroupName = file.StorageFileIdentifier?.Group?.Name,
         Status = file.Status,
         Visibility = file.Visibility,
         ProviderProfileName = file.ProviderProfileName,
         BucketName = file.BucketName,
         ObjectKey = file.ObjectKey,
+        BlobContainer = file.BlobContainer,
         ContentLengthBytes = file.ContentLengthBytes,
         Sha256Hash = file.Sha256Hash,
         ETag = file.ETag,
@@ -1196,6 +1336,7 @@ public sealed partial class StorageService(
         CompletedAt = file.CompletedAt,
         RetentionUntil = file.RetentionUntil,
         ObjectDeletedAt = file.ObjectDeletedAt,
+        UnclaimedUntil = file.UnclaimedUntil,
         CreatedAt = file.CreatedAt
     };
 

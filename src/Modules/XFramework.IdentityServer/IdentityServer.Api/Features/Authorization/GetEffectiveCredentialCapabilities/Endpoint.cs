@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.GetEffectiveCredentialCapabi
 
 public static class GetEffectiveCredentialCapabilitiesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<EffectiveCredentialCapabilitiesResponse>> Handle(
         GetEffectiveCredentialCapabilitiesRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class GetEffectiveCredentialCapabilitiesEndpoint
     [MapPost("/api/identity/authorization/effective-capabilities", Tags = ["Identity Authorization"],
         Summary = "Get effective credential capabilities",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.View,
+        ExcludeFromOpenApi = false)]
     public static Task<Result<EffectiveCredentialCapabilitiesResponse>> HandleHttp(
         GetEffectiveCredentialCapabilitiesRequest request,
         HttpContext httpContext,

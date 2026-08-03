@@ -4,6 +4,7 @@ public static class XFrameworkServiceScopes
 {
     public const string BoltService = "bolt.service";
     public const string DataContextQuery = "datacontext.query";
+    public const string DataContextQueryAllTenants = "datacontext.query.all-tenants";
     public const string DataContextMutate = "datacontext.mutate";
 
     public const string AttendanceAdmin = "attendance.admin";
@@ -11,6 +12,7 @@ public static class XFrameworkServiceScopes
     public const string CommunicationsChat = "communications.chat";
     public const string CommunityAdmin = "community.admin";
     public const string IdentityAdmin = "identity.admin";
+    public const string IdentitySessionValidate = "identity.session.validate";
     public const string InventarioAdmin = "inventario.admin";
     public const string NotificationsSend = "notifications.send";
     public const string SmsGatewaySend = "smsgateway.send";
@@ -22,12 +24,14 @@ public static class XFrameworkServiceScopes
     [
         BoltService,
         DataContextQuery,
+        DataContextQueryAllTenants,
         DataContextMutate,
         AttendanceAdmin,
         CommunicationsAdmin,
         CommunicationsChat,
         CommunityAdmin,
         IdentityAdmin,
+        IdentitySessionValidate,
         InventarioAdmin,
         NotificationsSend,
         SmsGatewaySend,

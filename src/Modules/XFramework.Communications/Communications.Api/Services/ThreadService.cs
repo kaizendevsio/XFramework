@@ -36,7 +36,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CreateThreadResponse>(callerResult);
 
@@ -155,7 +155,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CreateThreadResponse>(callerResult);
 
@@ -289,7 +289,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<GetThreadListResponse>(callerResult);
 
@@ -412,7 +412,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<GetThreadResponse>(callerResult);
 
@@ -473,7 +473,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<GetUnreadCountsResponse>(callerResult);
 
@@ -515,7 +515,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -584,7 +584,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -650,7 +650,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -696,7 +696,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -742,7 +742,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -882,7 +882,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -957,7 +957,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -1069,7 +1069,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -1185,7 +1185,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -1269,7 +1269,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CreateThreadMessageResponse>(callerResult);
 
@@ -1482,7 +1482,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<GetThreadMessagesResponse>(callerResult);
 
@@ -1622,7 +1622,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<SearchMessagesResponse>(callerResult);
 
@@ -1714,7 +1714,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -1818,7 +1818,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -1894,7 +1894,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -1987,7 +1987,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2076,7 +2076,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2152,7 +2152,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2228,7 +2228,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2280,7 +2280,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2396,7 +2396,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<PaginatedResult<MessageFileResponse>>(callerResult);
 
@@ -2481,7 +2481,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2569,7 +2569,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2668,7 +2668,7 @@ public sealed class ThreadService(
             if (request.ThreadId == Guid.Empty || request.MessageId == Guid.Empty)
                 return Result<CmdResponse>.Failure("Thread ID and message ID are required to delete a reaction.", 400);
 
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2753,7 +2753,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2871,7 +2871,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2910,7 +2910,7 @@ public sealed class ThreadService(
     {
         try
         {
-            var callerResult = ResolveCaller(request.Metadata);
+            var callerResult = await ResolveCallerAsync(request.Metadata, ct);
             if (!callerResult.IsSuccess)
                 return CallerFailure<CmdResponse>(callerResult);
 
@@ -2949,8 +2949,10 @@ public sealed class ThreadService(
         }
     }
 
-    private Result<CommunicationsRequestContext> ResolveCaller(RequestMetadata? metadata) =>
-        requestContextResolver.Resolve(metadata);
+    private Task<Result<CommunicationsRequestContext>> ResolveCallerAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct) =>
+        requestContextResolver.ResolveAsync(metadata, ct);
 
     private static Result<T> CallerFailure<T>(Result<CommunicationsRequestContext> caller) =>
         caller.StatusCode switch

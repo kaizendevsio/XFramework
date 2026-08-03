@@ -13,6 +13,8 @@ public class AuthorizationLogConfiguration : IEntityTypeConfiguration<Authorizat
         entity.ToTable("AuthorizationLog", "Audit");
 
         entity.HasIndex(e => e.CredentialId, "IX_tbl_IdentityAuthorizationLogs_CredentialID");
+        entity.HasIndex(e => new { e.TenantId, e.CreatedAt },
+            "IX_AuthorizationLog_TenantId_CreatedAt");
 
 
         entity.Property(e => e.Id)

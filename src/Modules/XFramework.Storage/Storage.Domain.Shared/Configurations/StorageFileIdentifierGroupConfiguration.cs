@@ -10,6 +10,9 @@ public sealed class StorageFileIdentifierGroupConfiguration : IEntityTypeConfigu
     {
         entity.HasKey(e => e.Id).HasName("scheduleentitygroup_pk");
         entity.ToTable("StorageFileIdentifierGroup", "Storage");
+        entity.HasIndex(e => new { e.TenantId, e.Name }, "IX_StorageFileIdentifierGroup_TenantId_Name")
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
 
         entity.Property(e => e.Id)
             .HasColumnName("ID")

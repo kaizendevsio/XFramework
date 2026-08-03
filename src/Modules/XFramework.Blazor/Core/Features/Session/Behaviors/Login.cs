@@ -77,8 +77,8 @@ public partial class SessionState
             // Set Session State To Active
             await Mediator.Send(new SetState()
             {
-                Identity = response.Response.Identity,
-                Credential = response.Response.Credential,
+                Identity = ToIdentityInformation(response.Response.Identity),
+                Credential = ToIdentityCredential(response.Response.Credential),
                 State = CurrentSessionState.Active,
                 AccessToken = response.Response.AccessToken,
                 RefreshToken = response.Response.RefreshToken,
@@ -174,5 +174,41 @@ public partial class SessionState
                 }
             }
         }
+
+        private static IdentityInformation ToIdentityInformation(AuthenticatedIdentityResponse identity) => new()
+        {
+            Id = identity.Id,
+            TenantId = identity.TenantId,
+            FirstName = identity.FirstName,
+            MiddleName = identity.MiddleName,
+            LastName = identity.LastName,
+            Suffix = identity.Suffix,
+            IdentityName = identity.IdentityName,
+            IdentityDescription = identity.IdentityDescription,
+            BirthDate = identity.BirthDate,
+            Gender = identity.Gender,
+            IsVerified = identity.IsVerified,
+            CivilStatus = identity.CivilStatus
+        };
+
+        private static IdentityCredential ToIdentityCredential(AuthenticatedCredentialResponse credential) => new()
+        {
+            Id = credential.Id,
+            TenantId = credential.TenantId,
+            IdentityInfoId = credential.IdentityInfoId,
+            UserName = credential.UserName,
+            UserAlias = credential.UserAlias,
+            LogInStatus = credential.LogInStatus,
+            IsOnline = credential.IsOnline,
+            LastSeen = credential.LastSeen,
+            OnlineSince = credential.OnlineSince,
+            StatusMessage = credential.StatusMessage,
+            LastActivityType = credential.LastActivityType,
+            Device = credential.Device,
+            Location = credential.Location,
+            AvatarStorageFileId = credential.AvatarStorageFileId,
+            AvatarUrl = credential.AvatarUrl,
+            AvatarUpdatedAt = credential.AvatarUpdatedAt
+        };
     }
 }

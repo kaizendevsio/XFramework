@@ -1,4 +1,6 @@
 using XFramework.Domain.Shared.Attributes;
+using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace IdentityServer.Domain.Shared.Contracts;
 
@@ -8,9 +10,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-verifications",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "identity-verifications"
+    RequireAuthorization = true
 )]
 public partial class IdentityVerification : BaseModel
 {
@@ -27,11 +27,26 @@ public partial class IdentityVerification : BaseModel
     [MemoryPackOrder(3)]
     public DateTimeOffset? StatusUpdatedOn { get; set; }
 
-    [MemoryPackOrder(4)]
+    [JsonIgnore]
+    [MemoryPackIgnore]
+    [NotMapped]
     public string? Token { get; set; }
+
+    [JsonIgnore]
+    [MemoryPackIgnore]
+    public string? TokenHash { get; set; }
 
     [MemoryPackOrder(5)]
     public DateTime? Expiry { get; set; }
+
+    [MemoryPackOrder(8)]
+    public DateTimeOffset? ConsumedAt { get; set; }
+
+    [MemoryPackOrder(9)]
+    public string Purpose { get; set; } = IdentityConstants.VerificationPurpose.ContactVerification;
+
+    [MemoryPackOrder(10)]
+    public int FailedAttempts { get; set; }
 
 
     [MemoryPackOrder(6)]

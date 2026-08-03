@@ -42,6 +42,7 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly object _connectionsLock = new();
     private volatile bool _isRegistered;
     private volatile bool _disposed;
+    private int _disposeStarted;
     private long _totalSendFailures;
     private long _totalSendTimeouts;
     private long _totalReceiveLoopFaults;
@@ -2094,6 +2095,9 @@ public sealed class BoltClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
+            return;
+
         _disposed = true;
         foreach (var (requestId, _) in _pendingCalls)
         {
@@ -2101,7 +2105,10 @@ public sealed class BoltClient : IAsyncDisposable
                 call.SetException(new ObjectDisposedException(nameof(BoltClient)));
         }
         foreach (var cts in _inboundRequestCancellations.Values)
-            cts.Cancel();
+        {
+            try { cts.Cancel(); }
+            catch (ObjectDisposedException) { }
+        }
         var connections = ClearConnections();
         foreach (var connection in connections)
             RetireStreamsForConnection(connection, HttpStatusCode.ServiceUnavailable);

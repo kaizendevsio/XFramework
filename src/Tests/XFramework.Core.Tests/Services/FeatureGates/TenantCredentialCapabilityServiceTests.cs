@@ -137,6 +137,44 @@ public sealed class TenantCredentialCapabilityServiceTests
         result.StatusCode.Should().Be(403);
     }
 
+    [TestCase("tenant")]
+    [TestCase("identity")]
+    [TestCase("role-type")]
+    public async Task EnsureAllowedAsync_DisabledLifecycleDependencyDoesNotAuthorize(string dependency)
+    {
+        await using var db = CreateDbContext();
+        var subject = SeedSubject(db);
+        SeedRoleTypePermission(
+            db,
+            subject,
+            IdentityAuthorizationConstants.Manage,
+            RoleCapabilityPermissionEffect.Allow);
+
+        switch (dependency)
+        {
+            case "tenant":
+                db.Set<Tenant>().Local.Single(x => x.Id == subject.TenantId).IsEnabled = false;
+                break;
+            case "identity":
+                db.Set<IdentityInformation>().Local.Single(x => x.TenantId == subject.TenantId).IsEnabled = false;
+                break;
+            case "role-type":
+                db.Set<IdentityRoleType>().Local.Single(x => x.Id == subject.RoleTypeId).IsEnabled = false;
+                break;
+        }
+
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).EnsureAllowedAsync(
+            subject.TenantId,
+            subject.CredentialId,
+            TenantModuleFeatureKeys.Identity,
+            null,
+            IdentityAuthorizationConstants.View);
+
+        result.IsSuccess.Should().BeFalse();
+    }
+
     private static AppDbContext CreateDbContext()
     {
         _ = typeof(IdentityCredential);
@@ -158,6 +196,15 @@ public sealed class TenantCredentialCapabilityServiceTests
         var credentialId = Guid.NewGuid();
         var roleId = Guid.NewGuid();
         var identityInfoId = Guid.NewGuid();
+
+        db.Set<Tenant>().Add(new Tenant
+        {
+            Id = tenantId,
+            TenantId = tenantId,
+            Name = "Capability tenant",
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow
+        });
 
         db.Set<TenantAuthorizationPolicy>().Add(new TenantAuthorizationPolicy
         {

@@ -2,6 +2,14 @@ namespace IdentityServer.Api.Services;
 
 public interface IIdentityAuthorizationService
 {
+    Task<Result> AuthorizeCredentialOperationAsync(
+        RequestMetadata metadata,
+        Guid tenantId,
+        Guid? targetCredentialId,
+        string capabilityKey,
+        bool allowSelf,
+        CancellationToken ct = default);
+
     Task<Result<CredentialCapabilityCheckResponse>> CheckCredentialCapabilityAsync(
         CheckCredentialCapabilityRequest request,
         CancellationToken ct = default);
@@ -34,12 +42,16 @@ public interface IIdentityAuthorizationService
         SetCredentialRolePermissionOverridesRequest request,
         CancellationToken ct = default);
 
-    Task<Result<IdentityRole>> AssignCredentialRoleAsync(
+    Task<Result<AssignedCredentialRoleResponse>> AssignCredentialRoleAsync(
         AssignCredentialRoleRequest request,
         CancellationToken ct = default);
 
     Task<Result> RemoveCredentialRoleAsync(
         RemoveCredentialRoleRequest request,
+        CancellationToken ct = default);
+
+    Task<Result> SetTenantModuleFeaturesAsync(
+        SetTenantModuleFeaturesRequest request,
         CancellationToken ct = default);
 
     Task<Result> SeedRoleTypePermissionsAsync(

@@ -6,8 +6,8 @@ namespace IdentityServer.Api.Features.Authorization.AssignCredentialRole;
 
 public static class AssignCredentialRoleEndpoint
 {
-    [BoltHandler]
-    public static Task<Result<IdentityRole>> Handle(
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    public static Task<Result<AssignedCredentialRoleResponse>> Handle(
         AssignCredentialRoleRequest request,
         IIdentityAuthorizationService authorizationService,
         CancellationToken ct) =>
@@ -16,8 +16,8 @@ public static class AssignCredentialRoleEndpoint
     [MapPost("/api/identity/authorization/roles/assign", Tags = ["Identity Authorization"],
         Summary = "Assign a credential role",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
-    public static Task<Result<IdentityRole>> HandleHttp(
+        Capability = IdentityAuthorizationConstants.Manage)]
+    public static Task<Result<AssignedCredentialRoleResponse>> HandleHttp(
         AssignCredentialRoleRequest request,
         HttpContext httpContext,
         IIdentityAuthorizationService authorizationService,

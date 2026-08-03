@@ -197,16 +197,16 @@ public static partial class LogMessages
     [LoggerMessage(
         EventId = 4001,
         Level = LogLevel.Information,
-        Message = "User {UserId} authenticated successfully from {IpAddress}")]
+        Message = "Credential {CredentialId} authenticated successfully")]
     public static partial void UserAuthenticated(
-        this Microsoft.Extensions.Logging.ILogger logger, Guid userId, string ipAddress);
+        this Microsoft.Extensions.Logging.ILogger logger, Guid credentialId);
 
     [LoggerMessage(
         EventId = 4002,
         Level = LogLevel.Warning,
-        Message = "Failed login attempt for user {UserName} from {IpAddress}")]
+        Message = "Failed login attempt")]
     public static partial void LoginFailed(
-        this Microsoft.Extensions.Logging.ILogger logger, string userName, string ipAddress);
+        this Microsoft.Extensions.Logging.ILogger logger);
 
     [LoggerMessage(
         EventId = 4003,
@@ -239,9 +239,9 @@ public static partial class LogMessages
     [LoggerMessage(
         EventId = 4007,
         Level = LogLevel.Warning,
-        Message = "Multiple failed login attempts detected for user {UserName} from {IpAddress} - Count: {AttemptCount}")]
+        Message = "Multiple failed login attempts detected for credential {CredentialId} - Count: {AttemptCount}")]
     public static partial void MultipleFailedLogins(
-        this Microsoft.Extensions.Logging.ILogger logger, string userName, string ipAddress, int attemptCount);
+        this Microsoft.Extensions.Logging.ILogger logger, Guid credentialId, int attemptCount);
 
     [LoggerMessage(
         EventId = 4008,
@@ -732,9 +732,9 @@ public static partial class LogMessages
     [LoggerMessage(
         EventId = 11004,
         Level = LogLevel.Error,
-        Message = "Error creating direct message for recipient {Recipient}")]
+        Message = "Error creating direct message ({ErrorType})")]
     public static partial void CommunicationsCreateDirectError(
-        this Microsoft.Extensions.Logging.ILogger logger, string recipient, Exception exception);
+        this Microsoft.Extensions.Logging.ILogger logger, string errorType);
 
     [LoggerMessage(
         EventId = 11005,

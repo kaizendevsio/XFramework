@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
@@ -9,7 +10,8 @@ public static class IssueBoltTransportTokenEndpoint
     [MapPost("/api/service-identity/bolt-transport-token", Tags = ["Service Identity"],
         Summary = "Issue Bolt transport token",
         Description = "Issues a short-lived Bolt transport token for the authenticated service client.",
-        ExcludeFromOpenApi = true)]
+        RateLimitPolicy = "auth",
+        ExcludeFromOpenApi = false)]
     public static async Task<Result<ServiceTokenResponse>> Handle(
         IssueBoltTransportTokenRequest request,
         HttpRequest httpRequest,
@@ -31,4 +33,17 @@ public sealed record IssueBoltTransportTokenRequest
 {
     public string? ClientId { get; init; }
     public string? ClientSecret { get; init; }
+}
+
+public sealed class IssueBoltTransportTokenRequestValidator : AbstractValidator<IssueBoltTransportTokenRequest>
+{
+    public IssueBoltTransportTokenRequestValidator()
+    {
+        RuleFor(request => request.ClientId)
+            .NotEmpty()
+            .MaximumLength(200);
+        RuleFor(request => request.ClientSecret)
+            .NotEmpty()
+            .MaximumLength(1_024);
+    }
 }

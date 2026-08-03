@@ -92,6 +92,7 @@
     <PackageVersion Include="BlazorBlueprint.Components" Version="3.12.0" />
     <PackageVersion Include="BlazorBlueprint.Primitives" Version="3.12.0" />
     <PackageVersion Include="BlazorBlueprint.Icons.Lucide" Version="2.0.0" />
+    <PackageVersion Include="HtmlSanitizer" Version="9.1.973" />
     <PackageVersion Include="Blazored.LocalStorage" Version="4.5.0" />
     <PackageVersion Include="Blazored.SessionStorage" Version="2.4.0" />
     <PackageVersion Include="BlazorDownloadFile" Version="2.4.0.2" />
@@ -122,6 +123,7 @@
     <PackageVersion Include="NUnit" Version="4.5.1" />
     <PackageVersion Include="NUnit3TestAdapter" Version="6.1.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.4.0" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.14.0" />
     <PackageVersion Include="coverlet.collector" Version="8.0.0" />
 

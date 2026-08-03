@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.GetTenantAuthorizationPolicy
 
 public static class GetTenantAuthorizationPolicyEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<TenantAuthorizationPolicyResponse>> Handle(
         GetTenantAuthorizationPolicyRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class GetTenantAuthorizationPolicyEndpoint
     [MapPost("/api/identity/authorization/tenant-policy/get", Tags = ["Identity Authorization"],
         Summary = "Get tenant authorization policy",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.View,
+        ExcludeFromOpenApi = false)]
     public static Task<Result<TenantAuthorizationPolicyResponse>> HandleHttp(
         GetTenantAuthorizationPolicyRequest request,
         HttpContext httpContext,

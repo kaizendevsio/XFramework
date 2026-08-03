@@ -8,9 +8,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/session-types",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 3600,
-    CacheKeyPrefix = "session-types"
+    RequireAuthorization = true
 )]
 public partial class SessionType : BaseModel, IHasSystemReferenceId
 {

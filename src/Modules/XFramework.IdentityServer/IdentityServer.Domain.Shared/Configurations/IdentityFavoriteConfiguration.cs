@@ -15,6 +15,7 @@ public class IdentityFavoriteConfiguration : IEntityTypeConfiguration<IdentityFa
         entity.Property(e => e.Id)
             .HasColumnName("ID")
             .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.Data).HasMaxLength(5000);
         entity.Property(e => e.FavoriteTypeId).HasColumnName("FavoriteTypeID");

@@ -22,7 +22,6 @@ public sealed class BoltAccessTokenRedactionTests
 {
     private const string Issuer = "bolt-redaction-tests";
     private const string Audience = "bolt-redaction-tests-client";
-    private const string Secret = "bolt-redaction-tests-signing-key-with-at-least-64-bytes-0000000000000000";
 
     [Test]
     public async Task InvokeAsync_BoltWebSocketRequest_RemovesTokenAndPreservesOtherQueryParameters()
@@ -106,12 +105,12 @@ public sealed class BoltAccessTokenRedactionTests
     }
 
     [Test]
-    public async Task JwtAuthentication_PreRolloutTokenWithoutGenerationMetadata_RemainsValidDuringCurrentKeyWindow()
+    public async Task JwtAuthentication_TokenWithoutGenerationMetadata_IsRejected()
     {
         var token = CreateToken(includeGenerationMetadata: false);
         var result = await AuthenticateAsync("/bolt/ws", token);
 
-        result.IsAuthenticated.Should().BeTrue();
+        result.IsAuthenticated.Should().BeFalse();
         result.QueryString.Should().Be("?mode=full");
     }
 
@@ -154,7 +153,7 @@ public sealed class BoltAccessTokenRedactionTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["JwtOptions:GenerationId"] = "redaction-g0",
-                ["JwtOptions:Secret"] = Secret,
+                ["JwtOptions:SigningPublicKeyPath"] = TestJwtKeyMaterial.PublicKeyPath,
                 ["JwtOptions:ValidIssuer"] = Issuer,
                 ["JwtOptions:ValidAudience"] = Audience
             })
@@ -193,12 +192,12 @@ public sealed class BoltAccessTokenRedactionTests
 
     private static string CreateToken(bool includeGenerationMetadata = true)
     {
-        var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(Secret));
+        var key = TestJwtKeyMaterial.CreateSigningKey("redaction-g0");
         if (includeGenerationMetadata)
             key.KeyId = "redaction-g0";
         var credentials = new SigningCredentials(
             key,
-            SecurityAlgorithms.HmacSha512);
+            SecurityAlgorithms.RsaSha512);
         var token = new JwtSecurityToken(
             issuer: Issuer,
             audience: Audience,

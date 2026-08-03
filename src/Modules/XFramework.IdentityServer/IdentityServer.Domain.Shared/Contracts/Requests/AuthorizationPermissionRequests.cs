@@ -29,11 +29,12 @@ public partial record GetTenantAuthorizationPolicyRequest : RequestBase,
 
 [MemoryPackable]
 public partial record UpdateTenantAuthorizationPolicyRequest : RequestBase,
-    IQuery<QueryResponse<TenantAuthorizationPolicyResponse>>,
+    ICommand<QueryResponse<TenantAuthorizationPolicyResponse>>,
     IBoltRequest<UpdateTenantAuthorizationPolicyRequest, QueryResponse<TenantAuthorizationPolicyResponse>>
 {
     public Guid TenantId { get; set; }
     public MissingPermissionBehavior MissingPermissionBehavior { get; set; } = MissingPermissionBehavior.Deny;
+    public Guid ExpectedConcurrencyStamp { get; set; }
 }
 
 [MemoryPackable]
@@ -46,10 +47,11 @@ public partial record GetRoleTypePermissionsRequest : RequestBase,
 
 [MemoryPackable]
 public partial record SetRoleTypePermissionsRequest : RequestBase,
-    IQuery<QueryResponse<RoleTypePermissionsResponse>>,
+    ICommand<QueryResponse<RoleTypePermissionsResponse>>,
     IBoltRequest<SetRoleTypePermissionsRequest, QueryResponse<RoleTypePermissionsResponse>>
 {
     public Guid RoleTypeId { get; set; }
+    public Guid ExpectedConcurrencyStamp { get; set; }
     public List<CapabilityPermissionDto> Permissions { get; set; } = [];
 }
 
@@ -63,17 +65,18 @@ public partial record GetCredentialRolePermissionOverridesRequest : RequestBase,
 
 [MemoryPackable]
 public partial record SetCredentialRolePermissionOverridesRequest : RequestBase,
-    IQuery<QueryResponse<CredentialRolePermissionOverridesResponse>>,
+    ICommand<QueryResponse<CredentialRolePermissionOverridesResponse>>,
     IBoltRequest<SetCredentialRolePermissionOverridesRequest, QueryResponse<CredentialRolePermissionOverridesResponse>>
 {
     public Guid IdentityRoleId { get; set; }
+    public Guid ExpectedConcurrencyStamp { get; set; }
     public List<CapabilityPermissionDto> Overrides { get; set; } = [];
 }
 
 [MemoryPackable]
 public partial record AssignCredentialRoleRequest : RequestBase,
-    IQuery<QueryResponse<IdentityRole>>,
-    IBoltRequest<AssignCredentialRoleRequest, QueryResponse<IdentityRole>>
+    ICommand<QueryResponse<AssignedCredentialRoleResponse>>,
+    IBoltRequest<AssignCredentialRoleRequest, QueryResponse<AssignedCredentialRoleResponse>>
 {
     public Guid CredentialId { get; set; }
     public Guid RoleTypeId { get; set; }

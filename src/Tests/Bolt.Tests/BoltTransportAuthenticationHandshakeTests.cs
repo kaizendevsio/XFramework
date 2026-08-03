@@ -112,8 +112,8 @@ public sealed class BoltTransportAuthenticationHandshakeTests
             ["BoltTransportAuthentication:MetadataAddress"] = MetadataAddress,
             ["BoltTransportAuthentication:Issuer"] = BoltTransportAuthentication.ExpectedIssuer,
             ["BoltTransportAuthentication:Audience"] = BoltTransportAuthentication.ExpectedAudience,
-            ["JwtOptions:GenerationId"] = "shared-hmac-g0",
-            ["JwtOptions:Secret"] = new string('h', 64),
+            ["JwtOptions:GenerationId"] = "shared-rsa-g0",
+            ["JwtOptions:SigningPublicKeyPath"] = TestJwtKeyMaterial.PublicKeyPath,
             ["JwtOptions:ValidIssuer"] = "shared-issuer",
             ["JwtOptions:ValidAudience"] = "shared-audience"
         });

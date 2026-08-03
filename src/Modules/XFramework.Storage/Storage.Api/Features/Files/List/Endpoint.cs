@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Files.List;
 
 public static class GetStorageFilesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageRead])]
     [MapGet("/api/storage/files", Tags = ["Storage"],
         Summary = "List storage files",
         Description = "Lists tenant-scoped storage file metadata.")]

@@ -35,6 +35,11 @@ public class MessageDirectConfiguration : IEntityTypeConfiguration<MessageDirect
         entity.HasIndex(e => e.TemplateId)
             .HasDatabaseName("IX_MessageDirect_TemplateId");
 
+        entity.HasIndex(e => new { e.TenantId, e.IdempotencyRequestId })
+            .IsUnique()
+            .HasFilter("\"IdempotencyRequestId\" IS NOT NULL")
+            .HasDatabaseName("UX_MessageDirect_Tenant_IdempotencyRequest");
+
         entity.HasOne(d => d.ParentMessage).WithMany(p => p.InverseParentMessage)
             .HasForeignKey(d => d.ParentMessageId)
             .HasConstraintName("messagedirect_messagedirect_id_fk");

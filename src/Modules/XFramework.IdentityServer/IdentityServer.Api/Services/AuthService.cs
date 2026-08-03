@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Security.Claims;
@@ -6,279 +5,252 @@ using System.Text.Json;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using Communications.Domain.Shared;
-using Communications.Integration.Drivers;
 using Storage.Domain.Shared.Contracts.Requests;
 using Storage.Domain.Shared.Contracts.Responses;
 using Storage.Integration.Drivers;
+using IdentityServer.Api.Infrastructure;
+using Npgsql;
 using XFramework.Core.Loggers;
+using XFramework.Core.RateLimiting;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Integration.Security;
 using XFramework.Integration.Services;
 using Session = IdentityServer.Domain.Shared.Contracts.Session;
 
 namespace IdentityServer.Api.Services;
 
 /// <summary>
-/// In-memory account lockout tracking.
-/// Tracks failed login attempts and lockout expiration per credential.
-/// </summary>
-internal sealed class LockoutInfo
-{
-    public int FailedAttempts { get; set; }
-    public DateTime? LockoutEnd { get; set; }
-}
-
-
-/// <summary>
 /// Unified authentication service implementing all IdentityServer operations.
 /// Consolidates credential management, authentication, verification, and session management.
 /// </summary>
-public sealed class AuthService : IAuthService
+public sealed class AuthService : IAuthService, IPasswordResetProcessor
 {
     private const int MaxFailedLoginAttempts = 5;
     private const int LockoutDurationMinutes = 15;
     private const int DefaultSessionExpirationHours = 24;
     private const int RememberMeSessionExpirationDays = 30;
     private const int PasswordResetTokenExpirationMinutes = 30;
+    private const int MaxVerificationAttempts = 5;
+    private const string PasswordResetRequestConstraint = "UX_PasswordResetOutbox_Tenant_Request";
+    private static readonly TimeSpan AvatarCompensationTimeout = TimeSpan.FromSeconds(5);
 
-    private static readonly ConcurrentDictionary<Guid, LockoutInfo> LockoutCache = new();
     private static readonly JwtSecurityTokenHandler TokenHandler = new();
+    private static readonly byte[] DummyPasswordHash = Encoding.ASCII.GetBytes(
+        BCrypt.Net.BCrypt.HashPassword("identityserver-timing-equalizer", workFactor: 11));
 
     private readonly IDataContext _dataContext;
+    private readonly DbContext _dbContext;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ITenantResolver _tenantService;
     private readonly IJwtService _jwtService;
-    private readonly IHelperService _helperService;
+    private readonly TimeProvider _timeProvider;
+    private readonly IDistributedSecurityRateLimiter _securityRateLimiter;
+    private readonly ITrustedServiceInvocationResolver _trustedServiceInvocationResolver;
     private readonly CacheManager _cache;
-    private readonly ICommunicationsServiceWrapper _communicationsServiceWrapper;
     private readonly IStorageServiceWrapper _storageServiceWrapper;
+    private readonly IIdentityAuthorizationService _authorizationService;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IDataContext dataContext,
+        DbContext dbContext,
+        IServiceScopeFactory scopeFactory,
+        IHttpContextAccessor httpContextAccessor,
         ITenantResolver tenantService,
         IJwtService jwtService,
-        IHelperService helperService,
+        TimeProvider timeProvider,
+        IDistributedSecurityRateLimiter securityRateLimiter,
+        ITrustedServiceInvocationResolver trustedServiceInvocationResolver,
         CacheManager cache,
-        ICommunicationsServiceWrapper communicationsServiceWrapper,
         IStorageServiceWrapper storageServiceWrapper,
+        IIdentityAuthorizationService authorizationService,
         ILogger<AuthService> logger)
     {
         _dataContext = dataContext;
+        _dbContext = dbContext;
+        _scopeFactory = scopeFactory;
+        _httpContextAccessor = httpContextAccessor;
         _tenantService = tenantService;
         _jwtService = jwtService;
-        _helperService = helperService;
+        _timeProvider = timeProvider;
+        _securityRateLimiter = securityRateLimiter;
+        _trustedServiceInvocationResolver = trustedServiceInvocationResolver;
         _cache = cache;
-        _communicationsServiceWrapper = communicationsServiceWrapper;
         _storageServiceWrapper = storageServiceWrapper;
+        _authorizationService = authorizationService;
         _logger = logger;
     }
-
-    #region Tenant Administration
-
-    /// <inheritdoc />
-    public async Task<Result<Tenant>> CreateTenantAsync(
-        CreateTenantRequest request,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            var name = request.Name?.Trim();
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return Result<Tenant>.Failure("Tenant name is required", 400);
-            }
-
-            if (request.ParentTenantId is { } parentTenantId)
-            {
-                var parentExists = await _dataContext.Query<Tenant>()
-                    .IgnoreQueryFilters()
-                    .Where(tenant => tenant.Id == parentTenantId)
-                    .Where(tenant => !tenant.IsDeleted)
-                    .AnyAsync(ct);
-
-                if (!parentExists)
-                {
-                    return Result<Tenant>.NotFound("Parent tenant not found");
-                }
-            }
-
-            var tenantId = Guid.NewGuid();
-            var now = DateTime.UtcNow;
-            var tenant = new Tenant
-            {
-                Id = tenantId,
-                TenantId = tenantId,
-                Name = name,
-                Description = request.Description,
-                Version = request.Version > 0 ? request.Version : 1.0m,
-                Status = request.Status ?? 1,
-                Expiration = request.Expiration,
-                AvailabilityDate = request.AvailabilityDate,
-                ParentTenantId = request.ParentTenantId,
-                CreatedAt = now,
-                IsEnabled = true,
-                ConcurrencyStamp = Guid.NewGuid()
-            };
-
-            _dataContext.Add(tenant);
-            _dataContext.Add(new TenantAuthorizationPolicy
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                MissingPermissionBehavior = MissingPermissionBehavior.Deny,
-                CreatedAt = now,
-                IsEnabled = true,
-                ConcurrencyStamp = Guid.NewGuid()
-            });
-
-            foreach (var feature in TenantModuleFeatureKeys.All
-                         .Where(x => string.Equals(x.ModuleKey, TenantModuleFeatureKeys.Identity, StringComparison.OrdinalIgnoreCase)))
-            {
-                _dataContext.Add(new TenantModuleFeature
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = tenantId,
-                    ModuleKey = feature.ModuleKey,
-                    SubFeatureKey = feature.SubFeatureKey,
-                    DisplayName = feature.DisplayName,
-                    Description = feature.Description,
-                    CreatedAt = now,
-                    IsEnabled = true,
-                    ConcurrencyStamp = Guid.NewGuid()
-                });
-            }
-
-            var saveResult = await _dataContext.SaveChangesAsync(ct);
-            if (!saveResult.IsSuccess)
-            {
-                _logger.OperationFailed("CreateTenant", "Tenant", tenant.Id, saveResult.Message ?? string.Empty, null);
-                return Result<Tenant>.Failure("Tenant could not be created", saveResult.StatusCode);
-            }
-
-            _logger.EntityCreated("Tenant", tenant.Id);
-
-            return Result<Tenant>.Success(tenant);
-        }
-        catch (Exception ex)
-        {
-            _logger.OperationFailed("CreateTenant", "Tenant", Guid.Empty, ex.Message, ex);
-            return Result<Tenant>.Failure("Tenant could not be created", 500);
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task<Result> DeleteTenantAsync(
-        DeleteTenantRequest request,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            if (request.TenantId == Guid.Empty)
-            {
-                return Result.Failure("Tenant identifier is required", 400);
-            }
-
-            if (request.Metadata?.TenantId == request.TenantId)
-            {
-                return Result.Forbidden("The active tenant cannot be deleted");
-            }
-
-            var tenant = await _dataContext.Query<Tenant>()
-                .IgnoreQueryFilters()
-                .Where(x => x.Id == request.TenantId)
-                .FirstOrDefaultAsync(ct);
-
-            if (tenant is null || tenant.IsDeleted)
-            {
-                return Result.NotFound("Tenant not found");
-            }
-
-            tenant.IsEnabled = false;
-
-            _dataContext.Remove(tenant);
-            var saveResult = await _dataContext.SaveChangesAsync(ct);
-            if (!saveResult.IsSuccess)
-            {
-                _logger.OperationFailed("DeleteTenant", "Tenant", tenant.Id, saveResult.Message ?? string.Empty, null);
-                return Result.Failure("Tenant could not be deleted", saveResult.StatusCode);
-            }
-
-            _logger.EntityUpdated("Tenant", tenant.Id);
-
-            return Result.Success("Tenant deleted");
-        }
-        catch (Exception ex)
-        {
-            _logger.OperationFailed("DeleteTenant", "Tenant", request.TenantId, ex.Message, ex);
-            return Result.Failure("Tenant could not be deleted", 500);
-        }
-    }
-
-    #endregion
 
     #region Credential Management
 
     /// <inheritdoc />
-    public async Task<Result<IdentityCredential>> CreateCredentialAsync(
-        Create<IdentityCredential> request,
+    public async Task<Result<CredentialAdministrationResponse>> CreateCredentialAsync(
+        CreateCredentialRequest request,
         CancellationToken ct = default)
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(request.Password))
+                return Result<CredentialAdministrationResponse>.Failure("Password is required", 400);
+
+            if (!IdentityPasswordPolicy.IsWithinBcryptByteLimit(request.Password))
+                return Result<CredentialAdministrationResponse>.Failure("Password must not exceed 72 UTF-8 bytes", 400);
+
+            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+                return Result<CredentialAdministrationResponse>.Failure("Tenant context is required", 403);
+
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenantId,
+                targetCredentialId: null,
+                IdentityAuthorizationConstants.Create,
+                allowSelf: false,
+                ct);
+            if (!authorization.IsSuccess)
+                return Result<CredentialAdministrationResponse>.Failure(authorization.Message!, authorization.StatusCode);
+
+            var identityExists = await _dataContext.Query<IdentityInformation>()
+                .IgnoreQueryFilters()
+                .Where(identity => identity.Id == request.IdentityInfoId)
+                .Where(identity => identity.TenantId == tenantId)
+                .Where(identity => !identity.IsDeleted && identity.IsEnabled)
+                .AnyAsync(ct);
+
+            if (!identityExists)
+                return Result<CredentialAdministrationResponse>.NotFound("Identity information not found");
+
+            var credential = new IdentityCredential
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                IdentityInfoId = request.IdentityInfoId,
+                UserName = request.UserName?.Trim(),
+                UserAlias = request.UserAlias?.Trim(),
+                Password = request.Password,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
+
             // Hash password with BCrypt (workFactor 11) - SECURITY CRITICAL
             var hashPasswordByte = Encoding.ASCII.GetBytes(
-                BCrypt.Net.BCrypt.HashPassword(inputKey: request.Model.Password, workFactor: 11));
+                BCrypt.Net.BCrypt.HashPassword(inputKey: credential.Password, workFactor: 11));
 
-            request.Model.PasswordByte = hashPasswordByte;
+            credential.PasswordByte = hashPasswordByte;
 
             // Add credential to database
-            _dataContext.Add(request.Model);
-            await _dataContext.SaveChangesAsync(ct);
+            _dataContext.Add(credential);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<CredentialAdministrationResponse>.Failure("Credential could not be created", saveResult.StatusCode);
 
-            _logger.EntityCreated("IdentityCredential", request.Model.Id);
+            _logger.EntityCreated("IdentityCredential", credential.Id);
 
-            return Result<IdentityCredential>.Success(request.Model);
+            return Result<CredentialAdministrationResponse>.Success(
+                CreateCredentialAdministrationResponse(credential));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             _logger.OperationFailed("CreateCredential", "IdentityCredential", Guid.Empty, ex.Message, ex);
-            return Result<IdentityCredential>.Failure(
+            return Result<CredentialAdministrationResponse>.Failure(
                 "An error occurred while creating the credential", 500);
         }
     }
 
     /// <inheritdoc />
-    public async Task<Result<IdentityCredential>> UpdateCredentialAsync(
-        Patch<IdentityCredential> request,
+    public async Task<Result<CredentialAdministrationResponse>> UpdateCredentialAsync(
+        UpdateCredentialRequest request,
         CancellationToken ct = default)
     {
         try
         {
+            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+                return Result<CredentialAdministrationResponse>.Failure("Tenant context is required", 403);
+
+            if (request.CredentialId is not { } credentialId || credentialId == Guid.Empty)
+                return Result<CredentialAdministrationResponse>.Failure("Credential ID is required", 400);
+
+            if (request.ExpectedConcurrencyStamp == Guid.Empty)
+                return Result<CredentialAdministrationResponse>.Failure("Expected concurrency stamp is required", 400);
+
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenantId,
+                credentialId,
+                IdentityAuthorizationConstants.Update,
+                allowSelf: false,
+                ct);
+            if (!authorization.IsSuccess)
+                return Result<CredentialAdministrationResponse>.Failure(authorization.Message!, authorization.StatusCode);
+
             var credential = await _dataContext.Query<IdentityCredential>()
-                .Where(c => c.Id == request.Model.Id)
+                .Where(c => c.Id == credentialId)
+                .Where(c => c.TenantId == tenantId)
+                .Where(c => !c.IsDeleted)
                 .FirstOrDefaultAsync(ct);
 
             if (credential == null)
             {
-                return Result<IdentityCredential>.NotFound(
-                    $"Credential with id {request.Model.Id} not found");
+                return Result<CredentialAdministrationResponse>.NotFound(
+                    $"Credential with id {credentialId} not found");
             }
 
-            // Update credential properties (excluding password, which has its own method)
-            credential.UserName = request.Model.UserName ?? credential.UserName;
-            credential.IsEnabled = request.Model.IsEnabled;
+            if (credential.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
+            {
+                return Result<CredentialAdministrationResponse>.Conflict(
+                    "Credential was modified by another operation");
+            }
 
+            var disabling = request.IsEnabled == false && credential.IsEnabled;
+            await using var transaction = disabling && _dbContext.Database.CurrentTransaction is null
+                ? await _dbContext.Database.BeginTransactionAsync(ct)
+                : null;
+
+            // Update credential properties (excluding password, which has its own method)
             _dataContext.Update(credential);
-            await _dataContext.SaveChangesAsync(ct);
+            _dbContext.Entry(credential)
+                .Property(item => item.ConcurrencyStamp)
+                .OriginalValue = request.ExpectedConcurrencyStamp;
+            credential.UserName = request.UserName?.Trim() ?? credential.UserName;
+            credential.UserAlias = request.UserAlias?.Trim() ?? credential.UserAlias;
+            credential.IsEnabled = request.IsEnabled ?? credential.IsEnabled;
+            credential.ModifiedAt = DateTime.UtcNow;
+            credential.ConcurrencyStamp = Guid.NewGuid();
+
+            if (disabling)
+                await RevokeActiveSessionsAsync(tenantId, credential.Id, ct);
+
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<CredentialAdministrationResponse>.Failure("Credential could not be updated", saveResult.StatusCode);
+
+            if (transaction is not null)
+                await transaction.CommitAsync(ct);
 
             _logger.EntityUpdated("IdentityCredential", credential.Id);
 
-            return Result<IdentityCredential>.Success(credential);
+            return Result<CredentialAdministrationResponse>.Success(
+                CreateCredentialAdministrationResponse(credential));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.OperationFailed("UpdateCredential", "IdentityCredential", request.Model.Id, ex.Message, ex);
-            return Result<IdentityCredential>.Failure(
+            _logger.OperationFailed(
+                "UpdateCredential",
+                "IdentityCredential",
+                request.CredentialId ?? Guid.Empty,
+                ex.Message,
+                ex);
+            return Result<CredentialAdministrationResponse>.Failure(
                 "An error occurred while updating the credential", 500);
         }
     }
@@ -296,14 +268,33 @@ public sealed class AuthService : IAuthService
                 return Result.Failure("Identifier is required", 400);
             }
 
+            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+                return Result.Forbidden("Tenant context is required");
+
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenantId,
+                request.CreadentialId,
+                IdentityAuthorizationConstants.Update,
+                allowSelf: true,
+                ct);
+            if (!authorization.IsSuccess)
+                return authorization;
+
             if (string.IsNullOrWhiteSpace(request.NewPassword))
             {
                 _logger.ValidationFailed("ChangePassword", "Password is required");
                 return Result.Failure("Password is required", 400);
             }
 
+            if (!IdentityPasswordPolicy.IsWithinBcryptByteLimit(request.NewPassword))
+                return Result.Failure("Password must not exceed 72 UTF-8 bytes", 400);
+
             var credential = await _dataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
                 .Where(u => u.Id == request.CreadentialId)
+                .Where(u => u.TenantId == tenantId)
+                .Where(u => !u.IsDeleted && u.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (credential == null)
@@ -312,35 +303,58 @@ public sealed class AuthService : IAuthService
                 return Result.NotFound("User not found");
             }
 
-            // Check verification if required
-            if (request.RequireVerificationId)
-            {
-                var verification = await _dataContext.Query<IdentityVerification>()
-                    .Where(i => i.VerificationTypeId == IdentityConstants.VerificationType.Sms)
-                    .Where(i => i.CredentialId == request.CreadentialId)
-                    .Where(i => i.Status == (short?)GenericStatusType.Approved)
-                    .Where(i => i.Id == request.VerificationId)
-                    .Where(i => i.StatusUpdatedOn >= DateTime.UtcNow.AddMinutes(-10))
-                    .FirstOrDefaultAsync(ct);
+            var verification = await _dataContext.Query<IdentityVerification>()
+                .IgnoreQueryFilters()
+                .Where(i => i.TenantId == tenantId)
+                .Where(i => i.VerificationTypeId == IdentityConstants.VerificationType.Sms)
+                .Where(i => i.CredentialId == request.CreadentialId)
+                .Where(i => i.Purpose == IdentityConstants.VerificationPurpose.ContactVerification)
+                .Where(i => i.Status == (short?)GenericStatusType.Approved)
+                .Where(i => i.Id == request.VerificationId)
+                .Where(i => i.StatusUpdatedOn >= DateTime.UtcNow.AddMinutes(-10))
+                .Where(i => i.ConsumedAt == null)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
+                .FirstOrDefaultAsync(ct);
 
-                if (verification == null)
-                {
-                    _logger.TokenValidationFailed(request.CreadentialId, "Invalid verification code or expired");
-                    return Result.NotFound("Invalid verification code or expired");
-                }
+            if (verification == null)
+            {
+                _logger.TokenValidationFailed(request.CreadentialId, "Invalid verification code or expired");
+                return Result.NotFound("Invalid verification code or expired");
             }
+
+            await using var transaction = _dbContext.Database.CurrentTransaction is null
+                ? await _dbContext.Database.BeginTransactionAsync(ct)
+                : null;
 
             // Hash new password with BCrypt (workFactor 11) - SECURITY CRITICAL
             var hashPasswordByte = Encoding.ASCII.GetBytes(
                 BCrypt.Net.BCrypt.HashPassword(inputKey: request.NewPassword, workFactor: 11));
-            credential.PasswordByte = hashPasswordByte;
-
             _dataContext.Update(credential);
-            await _dataContext.SaveChangesAsync(ct);
+            _dataContext.Update(verification);
+            credential.PasswordByte = hashPasswordByte;
+            credential.FailedLoginAttempts = 0;
+            credential.LockoutEnd = null;
+            credential.ConcurrencyStamp = Guid.NewGuid();
+
+            verification.ConsumedAt = DateTimeOffset.UtcNow;
+            verification.ConcurrencyStamp = Guid.NewGuid();
+
+            await RevokeActiveSessionsAsync(tenantId, credential.Id, ct);
+
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result.Failure("Password could not be changed", saveResult.StatusCode);
+
+            if (transaction is not null)
+                await transaction.CommitAsync(ct);
 
             _logger.PasswordChanged(request.CreadentialId);
 
             return Result.Success("Password reset request successful");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -362,14 +376,33 @@ public sealed class AuthService : IAuthService
                 return Result<bool>.Failure("Please provide a valid password", 400);
             }
 
+            if (!IdentityPasswordPolicy.IsWithinBcryptByteLimit(request.Password))
+                return Result<bool>.Failure("Invalid credentials", 401);
+
             if (request.CredentialId == Guid.Empty)
             {
                 _logger.ValidationFailed("VerifyPassword", "Identifier is required");
                 return Result<bool>.Failure("An error occurred while processing your request", 400);
             }
 
+            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+                return Result<bool>.Forbidden("Tenant context is required");
+
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenantId,
+                request.CredentialId,
+                IdentityAuthorizationConstants.View,
+                allowSelf: true,
+                ct);
+            if (!authorization.IsSuccess)
+                return Result<bool>.Failure(authorization.Message!, authorization.StatusCode);
+
             var user = await _dataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
                 .Where(u => u.Id == request.CredentialId)
+                .Where(u => u.TenantId == tenantId)
+                .Where(u => !u.IsDeleted && u.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (user == null)
@@ -389,6 +422,10 @@ public sealed class AuthService : IAuthService
 
             return Result<bool>.Success(true);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.OperationFailed("VerifyPassword", "IdentityCredential", request.CredentialId, ex.Message, ex);
@@ -407,7 +444,9 @@ public sealed class AuthService : IAuthService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            if (request.AuthorizationType == AuthorizationType.Token)
+                return Result<AuthenticateIdentityResponse>.Failure(
+                    "Service token authentication is not supported by this endpoint", 400);
 
             // Validate inputs
             if (request.RoleId == Guid.Empty)
@@ -425,24 +464,50 @@ public sealed class AuthService : IAuthService
                 return Result<AuthenticateIdentityResponse>.Failure("Password is required", 400);
             }
 
+            if (!IdentityPasswordPolicy.IsWithinBcryptByteLimit(request.Password))
+                return Result<AuthenticateIdentityResponse>.Failure("Invalid credentials", 401);
+
+            var rateLimitDecision = await AcquireAuthenticationRateLimitAsync(request, ct);
+            if (!rateLimitDecision.IsAllowed)
+                return Result<AuthenticateIdentityResponse>.Failure("Too many requests.", 429);
+
+            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId, ct);
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+
             // Validate authorization (multi-type user lookup) - SECURITY CRITICAL
             var originalCredential = await ValidateAuthorization(
                 request, tenant, request.AuthorizationType, ct);
 
             if (originalCredential is null)
             {
-                return Result<AuthenticateIdentityResponse>.NotFound(
-                    "User or identity does not exist");
+                _ = VerifyPasswordHash(request.Password, DummyPasswordHash);
+                return Result<AuthenticateIdentityResponse>.Failure("Invalid credentials", 401);
+            }
+
+            await using var authenticationTransaction = _dbContext.Database.CurrentTransaction is null
+                ? await _dbContext.Database.BeginTransactionAsync(ct)
+                : null;
+
+            var credential = await LockCredentialForAuthenticationAsync(originalCredential.Id, ct);
+            var identity = originalCredential.IdentityInfo;
+
+            if (credential is null
+                || credential.TenantId != tenant.Id
+                || credential.IsDeleted
+                || !credential.IsEnabled
+                || identity is null)
+            {
+                _ = VerifyPasswordHash(request.Password, DummyPasswordHash);
+                return Result<AuthenticateIdentityResponse>.Failure("Invalid credentials", 401);
             }
 
             // Check account lockout - SECURITY CRITICAL
-            if (LockoutCache.TryGetValue(originalCredential.Id, out var lockoutInfo)
-                && lockoutInfo.LockoutEnd.HasValue
-                && lockoutInfo.LockoutEnd.Value > DateTime.UtcNow)
+            if (credential.LockoutEnd is { } lockoutEnd && lockoutEnd > now)
             {
+                _ = VerifyPasswordHash(request.Password, DummyPasswordHash);
                 await CreateAuthorizationLog(
                     tenant.Id,
-                    originalCredential.Id,
+                    credential.Id,
                     request.Metadata.IpAddress,
                     request.Metadata.Name,
                     request.Metadata.DeviceName,
@@ -450,38 +515,35 @@ public sealed class AuthService : IAuthService
                     AuthenticationState.Locked,
                     null);
 
-                await _dataContext.SaveChangesAsync(CancellationToken.None);
+                var lockedLogSave = await _dataContext.SaveChangesAsync(ct);
+                if (!lockedLogSave.IsSuccess)
+                    return Result<AuthenticateIdentityResponse>.Failure("Authentication state could not be persisted", lockedLogSave.StatusCode);
 
-                var remainingMinutes = (int)Math.Ceiling(
-                    (lockoutInfo.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes);
+                if (authenticationTransaction is not null)
+                    await authenticationTransaction.CommitAsync(ct);
 
                 _logger.MultipleFailedLogins(
-                    request.UserName ?? string.Empty,
-                    request.Metadata.IpAddress ?? string.Empty,
-                    lockoutInfo.FailedAttempts);
+                    credential.Id,
+                    credential.FailedLoginAttempts);
 
-                return Result<AuthenticateIdentityResponse>.Failure(
-                    $"Account is locked due to multiple failed login attempts. Try again in {remainingMinutes} minute(s).", 423);
+                return Result<AuthenticateIdentityResponse>.Failure("Invalid credentials", 401);
             }
 
             // Validate password - SECURITY CRITICAL
-            var credential = await ValidatePassword(
-                request, request.AuthorizationType, originalCredential, ct);
-
-            if (credential == null)
+            if (!VerifyPasswordHash(request.Password, credential.PasswordByte))
             {
                 // Track failed login attempt for lockout - SECURITY CRITICAL
-                var info = LockoutCache.GetOrAdd(originalCredential.Id, _ => new LockoutInfo());
-                info.FailedAttempts++;
+                credential.FailedLoginAttempts++;
 
-                if (info.FailedAttempts >= MaxFailedLoginAttempts)
+                if (credential.FailedLoginAttempts >= MaxFailedLoginAttempts)
                 {
-                    info.LockoutEnd = DateTime.UtcNow.AddMinutes(LockoutDurationMinutes);
+                    credential.LockoutEnd = now.AddMinutes(LockoutDurationMinutes);
                     _logger.MultipleFailedLogins(
-                        request.UserName ?? string.Empty,
-                        request.Metadata.IpAddress ?? string.Empty,
-                        info.FailedAttempts);
+                        credential.Id,
+                        credential.FailedLoginAttempts);
                 }
+
+                credential.ConcurrencyStamp = Guid.NewGuid();
 
                 // Log failed authentication attempt - SECURITY CRITICAL
                 await CreateAuthorizationLog(
@@ -494,13 +556,23 @@ public sealed class AuthService : IAuthService
                     AuthenticationState.WrongPassword,
                     null);
 
-                await _dataContext.SaveChangesAsync(CancellationToken.None);
+                var failedAttemptSave = await _dataContext.SaveChangesAsync(ct);
+                if (!failedAttemptSave.IsSuccess)
+                {
+                    _logger.OperationFailed("Authenticate", "IdentityCredential", credential.Id, failedAttemptSave.Message ?? string.Empty, null);
+                    return Result<AuthenticateIdentityResponse>.Failure("Authentication state could not be persisted", 409);
+                }
 
-                return Result<AuthenticateIdentityResponse>.Failure("Wrong password", 400);
+                if (authenticationTransaction is not null)
+                    await authenticationTransaction.CommitAsync(ct);
+
+                return Result<AuthenticateIdentityResponse>.Failure("Invalid credentials", 401);
             }
 
             // Reset lockout on successful password validation - SECURITY CRITICAL
-            LockoutCache.TryRemove(originalCredential.Id, out _);
+            credential.FailedLoginAttempts = 0;
+            credential.LockoutEnd = null;
+            credential.ConcurrencyStamp = Guid.NewGuid();
 
             // Check roles - SECURITY CRITICAL
             var roleList = await GetRoleList(credential, ct);
@@ -517,7 +589,12 @@ public sealed class AuthService : IAuthService
                     AuthenticationState.Unauthorized,
                     null);
 
-                await _dataContext.SaveChangesAsync(CancellationToken.None);
+                var unauthorizedLogSave = await _dataContext.SaveChangesAsync(ct);
+                if (!unauthorizedLogSave.IsSuccess)
+                    return Result<AuthenticateIdentityResponse>.Failure("Authentication state could not be persisted", unauthorizedLogSave.StatusCode);
+
+                if (authenticationTransaction is not null)
+                    await authenticationTransaction.CommitAsync(ct);
 
                 return Result<AuthenticateIdentityResponse>.Failure(
                     "You do not have permission to access this resource", 403);
@@ -538,20 +615,20 @@ public sealed class AuthService : IAuthService
                 ? GetAccessTokenLifetimeSeconds(token)
                 : 0;
 
-            // Determine session type based on authorization type
-            var sessionTypeId = await GetSessionTypeId(tenant.Id, request.AuthorizationType);
+            if (request.GenerateToken)
+            {
+                var sessionTypeId = await GetSessionTypeId(tenant.Id, request.AuthorizationType, ct);
+                var sessionExpiresAt = request.RememberMe
+                    ? now.AddDays(RememberMeSessionExpirationDays)
+                    : now.AddHours(DefaultSessionExpirationHours);
 
-            // Create session with expiration - SECURITY CRITICAL
-            var sessionExpiresAt = request.RememberMe
-                ? DateTime.UtcNow.AddDays(RememberMeSessionExpirationDays)
-                : DateTime.UtcNow.AddHours(DefaultSessionExpirationHours);
-
-            var session = await CreateSession(
-                tenant.Id,
-                credential.Id,
-                sessionTypeId,
-                token,
-                sessionExpiresAt);
+                CreateSession(
+                    tenant.Id,
+                    credential.Id,
+                    sessionTypeId,
+                    token,
+                    sessionExpiresAt);
+            }
 
             // Log successful authentication - SECURITY CRITICAL
             await CreateAuthorizationLog(
@@ -562,7 +639,7 @@ public sealed class AuthService : IAuthService
                 request.Metadata.DeviceName,
                 request.Metadata.DeviceAgent,
                 AuthenticationState.Authenticated,
-                token.SessionId);
+                request.GenerateToken ? token.SessionId : null);
 
             var saveResult = await _dataContext.SaveChangesAsync(ct);
             if (!saveResult.IsSuccess)
@@ -572,7 +649,10 @@ public sealed class AuthService : IAuthService
                     "Failed to persist authentication session", 500);
             }
 
-            _logger.UserAuthenticated(credential.Id, request.Metadata.IpAddress ?? string.Empty);
+            if (authenticationTransaction is not null)
+                await authenticationTransaction.CommitAsync(ct);
+
+            _logger.UserAuthenticated(credential.Id);
 
             return Result<AuthenticateIdentityResponse>.Success(
                 new AuthenticateIdentityResponse
@@ -582,9 +662,13 @@ public sealed class AuthService : IAuthService
                     ExpiresIn = expiresIn,
                     RefreshToken = token.RefreshToken,
                     SessionId = request.GenerateToken ? token.SessionId : null,
-                    Identity = credential.IdentityInfo,
-                    Credential = credential
+                    Identity = ToAuthenticatedIdentityResponse(identity),
+                    Credential = ToAuthenticatedCredentialResponse(credential)
                 });
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -595,6 +679,46 @@ public sealed class AuthService : IAuthService
     }
 
     #endregion
+
+    private static AuthenticatedIdentityResponse? ToAuthenticatedIdentityResponse(
+        IdentityInformation? identity) => identity is null
+        ? null
+        : new AuthenticatedIdentityResponse
+        {
+            Id = identity.Id,
+            TenantId = identity.TenantId,
+            FirstName = identity.FirstName,
+            MiddleName = identity.MiddleName,
+            LastName = identity.LastName,
+            Suffix = identity.Suffix,
+            IdentityName = identity.IdentityName,
+            IdentityDescription = identity.IdentityDescription,
+            BirthDate = identity.BirthDate,
+            Gender = identity.Gender,
+            IsVerified = identity.IsVerified,
+            CivilStatus = identity.CivilStatus
+        };
+
+    private static AuthenticatedCredentialResponse ToAuthenticatedCredentialResponse(
+        IdentityCredential credential) => new()
+        {
+            Id = credential.Id,
+            TenantId = credential.TenantId,
+            IdentityInfoId = credential.IdentityInfoId,
+            UserName = credential.UserName,
+            UserAlias = credential.UserAlias,
+            LogInStatus = credential.LogInStatus,
+            IsOnline = credential.IsOnline,
+            LastSeen = credential.LastSeen,
+            OnlineSince = credential.OnlineSince,
+            StatusMessage = credential.StatusMessage,
+            LastActivityType = credential.LastActivityType,
+            Device = credential.Device,
+            Location = credential.Location,
+            AvatarStorageFileId = credential.AvatarStorageFileId,
+            AvatarUrl = credential.AvatarUrl,
+            AvatarUpdatedAt = credential.AvatarUpdatedAt
+        };
 
     private static int GetAccessTokenLifetimeSeconds(JwtToken token)
     {
@@ -623,11 +747,22 @@ public sealed class AuthService : IAuthService
     {
         try
         {
+            var rateLimitDecision = await AcquireSecurityRateLimitAsync(
+                StrictSecurityRateLimitPolicyMap.Verification,
+                request.Metadata,
+                $"{request.Metadata.TenantId:D}:{request.Model.CredentialId:D}:{request.Model.VerificationTypeId:D}",
+                "verification issuance",
+                ct);
+            if (!rateLimitDecision.IsAllowed)
+                return Result<IdentityVerification>.Failure("Too many requests.", 429);
+
             var tenant = await _tenantService.GetTenant(
-                request.Metadata.TenantId ?? request.Model.TenantId);
+                request.Metadata.TenantId ?? request.Model.TenantId, ct);
 
             var verificationType = await _dataContext.Query<IdentityVerificationType>()
+                .IgnoreQueryFilters()
                 .Where(i => i.Id == request.Model.VerificationTypeId)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (verificationType is null)
@@ -638,6 +773,8 @@ public sealed class AuthService : IAuthService
 
             var identityCredential = await _dataContext.Query<IdentityCredential>()
                 .Where(i => i.Id == request.Model.CredentialId)
+                .Where(i => i.TenantId == tenant.Id)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (identityCredential == null)
@@ -645,6 +782,16 @@ public sealed class AuthService : IAuthService
                 return Result<IdentityVerification>.NotFound(
                     $"Credential with id {request.Model.CredentialId} does not exist");
             }
+
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenant.Id,
+                identityCredential.Id,
+                IdentityAuthorizationConstants.Create,
+                allowSelf: true,
+                ct);
+            if (!authorization.IsSuccess)
+                return Result<IdentityVerification>.Failure(authorization.Message!, authorization.StatusCode);
 
             if (verificationType.DefaultExpiry is not { } defaultExpiryMinutes)
             {
@@ -667,13 +814,15 @@ public sealed class AuthService : IAuthService
                     }
 
                     // Generate OTP code
-                    var otp = _helperService.GenerateRandomNumber(111111, 999999);
+                    var otp = RandomNumberGenerator.GetInt32(100000, 1000000);
                     var message = messageTemplate.Value.Replace("|Value|", $"{otp}");
 
                     // Get phone contact via separate query (avoids ThenInclude)
                     var phoneContact = await _dataContext.Query<IdentityContact>()
                         .Include(c => c.Type)
                         .Where(c => c.CredentialId == identityCredential.Id)
+                        .Where(c => c.TenantId == tenant.Id && !c.IsDeleted && c.IsEnabled)
+                        .Where(c => c.Type != null && !c.Type.IsDeleted && c.Type.IsEnabled)
                         .Where(c => c.Type != null && c.Type.Name == "Phone")
                         .FirstOrDefaultAsync(ct);
 
@@ -688,40 +837,33 @@ public sealed class AuthService : IAuthService
                     // Create verification entity
                     var verification = new IdentityVerification
                     {
+                        TenantId = tenant.Id,
                         Status = (short?)GenericStatusType.Pending,
                         StatusUpdatedOn = DateTime.UtcNow,
-                        Token = $"{otp}",
+                        TokenHash = HashVerificationCode(otp.ToString()),
+                        Purpose = IdentityConstants.VerificationPurpose.ContactVerification,
                         Expiry = DateTime.UtcNow.AddMinutes(defaultExpiryMinutes),
                         CredentialId = identityCredential.Id,
-                        VerificationTypeId = verificationType.Id
+                        VerificationTypeId = verificationType.Id,
+                        IsEnabled = true,
+                        ConcurrencyStamp = Guid.NewGuid()
                     };
 
                     _dataContext.Add(verification);
-                    await _dataContext.SaveChangesAsync(ct);
-
-                    // Send SMS with OTP
-                    var smsResult = await _communicationsServiceWrapper.CreateDirectMessageAsync(new()
-                    {
-                        MessageTransportType = MessageTransportType.Sms,
-                        Sender = GenericSender.System,
-                        Recipient = contact,
-                        Subject = "One Time Password",
-                        Intent = "OTP",
-                        Message = message,
-                        IsScheduled = false,
-                        Metadata = request.Metadata
-                    }, ct);
-
-                    if (!smsResult.IsSuccess)
-                    {
-                        var statusCode = smsResult.HttpStatusCode == 0 ? 502 : (int)smsResult.HttpStatusCode;
-                        return Result<IdentityVerification>.Failure(
-                            smsResult.Message ?? "SMS verification message could not be queued",
-                            statusCode);
-                    }
+                    QueueVerificationDelivery(
+                        verification,
+                        request.Metadata,
+                        MessageTransportType.Sms,
+                        contact,
+                        "One Time Password",
+                        "OTP",
+                        message);
+                    var smsSaveResult = await _dataContext.SaveChangesAsync(ct);
+                    if (!smsSaveResult.IsSuccess)
+                        return Result<IdentityVerification>.Failure("Verification could not be created", smsSaveResult.StatusCode);
 
                     _logger.LogInformation(
-                        "Verification created and SMS sent. VerificationId: {VerificationId}, CredentialId: {CredentialId}",
+                        "Verification created and SMS delivery queued. VerificationId: {VerificationId}, CredentialId: {CredentialId}",
                         verification.Id, identityCredential.Id);
 
                     return Result<IdentityVerification>.Success(verification);
@@ -739,13 +881,15 @@ public sealed class AuthService : IAuthService
                     }
 
                     // Generate OTP code for email
-                    var emailOtp = _helperService.GenerateRandomNumber(111111, 999999);
+                    var emailOtp = RandomNumberGenerator.GetInt32(100000, 1000000);
                     var emailMessage = emailMessageTemplate.Value.Replace("|Value|", $"{emailOtp}");
 
                     // Get email contact via separate query
                     var emailContact = await _dataContext.Query<IdentityContact>()
                         .Include(c => c.Type)
                         .Where(c => c.CredentialId == identityCredential.Id)
+                        .Where(c => c.TenantId == tenant.Id && !c.IsDeleted && c.IsEnabled)
+                        .Where(c => c.Type != null && !c.Type.IsDeleted && c.Type.IsEnabled)
                         .Where(c => c.Type != null && c.Type.Name == "Email")
                         .FirstOrDefaultAsync(ct);
 
@@ -760,40 +904,33 @@ public sealed class AuthService : IAuthService
                     // Create verification entity for email
                     var emailVerification = new IdentityVerification
                     {
+                        TenantId = tenant.Id,
                         Status = (short?)GenericStatusType.Pending,
                         StatusUpdatedOn = DateTime.UtcNow,
-                        Token = $"{emailOtp}",
+                        TokenHash = HashVerificationCode(emailOtp.ToString()),
+                        Purpose = IdentityConstants.VerificationPurpose.ContactVerification,
                         Expiry = DateTime.UtcNow.AddMinutes(defaultExpiryMinutes),
                         CredentialId = identityCredential.Id,
-                        VerificationTypeId = verificationType.Id
+                        VerificationTypeId = verificationType.Id,
+                        IsEnabled = true,
+                        ConcurrencyStamp = Guid.NewGuid()
                     };
 
                     _dataContext.Add(emailVerification);
-                    await _dataContext.SaveChangesAsync(ct);
-
-                    // Send Email with OTP
-                    var emailResult = await _communicationsServiceWrapper.CreateDirectMessageAsync(new()
-                    {
-                        MessageTransportType = MessageTransportType.Email,
-                        Sender = GenericSender.System,
-                        Recipient = emailAddress,
-                        Subject = "Verification Code",
-                        Intent = "OTP",
-                        Message = emailMessage,
-                        IsScheduled = false,
-                        Metadata = request.Metadata
-                    }, ct);
-
-                    if (!emailResult.IsSuccess)
-                    {
-                        var statusCode = emailResult.HttpStatusCode == 0 ? 502 : (int)emailResult.HttpStatusCode;
-                        return Result<IdentityVerification>.Failure(
-                            emailResult.Message ?? "Email verification message could not be queued",
-                            statusCode);
-                    }
+                    QueueVerificationDelivery(
+                        emailVerification,
+                        request.Metadata,
+                        MessageTransportType.Email,
+                        emailAddress,
+                        "Verification Code",
+                        "OTP",
+                        emailMessage);
+                    var emailSaveResult = await _dataContext.SaveChangesAsync(ct);
+                    if (!emailSaveResult.IsSuccess)
+                        return Result<IdentityVerification>.Failure("Verification could not be created", emailSaveResult.StatusCode);
 
                     _logger.LogInformation(
-                        "Verification created and email sent. VerificationId: {VerificationId}, CredentialId: {CredentialId}",
+                        "Verification created and email delivery queued. VerificationId: {VerificationId}, CredentialId: {CredentialId}",
                         emailVerification.Id, identityCredential.Id);
 
                     return Result<IdentityVerification>.Success(emailVerification);
@@ -801,6 +938,10 @@ public sealed class AuthService : IAuthService
 
             return Result<IdentityVerification>.Failure(
                 "Verification type not supported", 500);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -818,27 +959,75 @@ public sealed class AuthService : IAuthService
         try
         {
             var verification = await _dataContext.Query<IdentityVerification>()
+                .IgnoreQueryFilters()
+                .Where(i => i.Id == request.Model.Id)
+                .Where(i => i.Purpose == IdentityConstants.VerificationPurpose.ContactVerification)
                 .Where(i => i.Status == (short?)GenericStatusType.Pending)
-                .Where(i => i.Token == request.Model.Token)
                 .Where(i => i.Expiry > DateTime.UtcNow)
+                .Where(i => i.ConsumedAt == null)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
-            if (verification == null)
+            if (verification == null || verification.FailedAttempts >= MaxVerificationAttempts)
             {
-                return Result<IdentityVerification>.NotFound(
-                    "Verification token is invalid or expired");
+                return Result<IdentityVerification>.Failure("Verification code is invalid or expired", 400);
+            }
+
+            if (!VerifyVerificationCode(request.Model.Token, verification.TokenHash))
+            {
+                var deniedAt = _timeProvider.GetUtcNow();
+                var deniedStatus = (short?)GenericStatusType.AccessDenied;
+                await _dbContext.Set<IdentityVerification>()
+                    .IgnoreQueryFilters()
+                    .Where(item => item.Id == verification.Id)
+                    .Where(item => item.Purpose == IdentityConstants.VerificationPurpose.ContactVerification)
+                    .Where(item => item.Status == (short?)GenericStatusType.Pending)
+                    .Where(item => item.Expiry > deniedAt.UtcDateTime)
+                    .Where(item => item.ConsumedAt == null)
+                    .Where(item => !item.IsDeleted && item.IsEnabled)
+                    .Where(item => item.FailedAttempts < MaxVerificationAttempts)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(item => item.FailedAttempts, item => item.FailedAttempts + 1)
+                            .SetProperty(
+                                item => item.Status,
+                                item => item.FailedAttempts + 1 >= MaxVerificationAttempts
+                                    ? deniedStatus
+                                    : item.Status)
+                            .SetProperty(
+                                item => item.StatusUpdatedOn,
+                                item => item.FailedAttempts + 1 >= MaxVerificationAttempts
+                                    ? deniedAt
+                                    : item.StatusUpdatedOn)
+                            .SetProperty(
+                                item => item.ConsumedAt,
+                                item => item.FailedAttempts + 1 >= MaxVerificationAttempts
+                                    ? deniedAt
+                                    : item.ConsumedAt)
+                            .SetProperty(item => item.ConcurrencyStamp, Guid.NewGuid()),
+                        ct);
+
+                return Result<IdentityVerification>.Failure("Verification code is invalid or expired", 400);
             }
 
             // Update verification status to Approved
+            _dataContext.Update(verification);
             verification.Status = (short?)GenericStatusType.Approved;
             verification.StatusUpdatedOn = DateTime.UtcNow;
+            verification.FailedAttempts = 0;
+            verification.ConcurrencyStamp = Guid.NewGuid();
 
-            _dataContext.Update(verification);
-            await _dataContext.SaveChangesAsync(ct);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<IdentityVerification>.Failure("Verification could not be approved", saveResult.StatusCode);
 
             _logger.EntityUpdated("IdentityVerification", verification.Id);
 
             return Result<IdentityVerification>.Success(verification);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -855,10 +1044,11 @@ public sealed class AuthService : IAuthService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId, ct);
 
             var identityCredential = await _dataContext.Query<IdentityCredential>()
                 .Where(i => i.Id == request.CredentialId && i.TenantId == tenant.Id)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (identityCredential is null)
@@ -867,8 +1057,20 @@ public sealed class AuthService : IAuthService
                     $"Identity credential with id {request.CredentialId} does not exist");
             }
 
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenant.Id,
+                identityCredential.Id,
+                IdentityAuthorizationConstants.View,
+                allowSelf: true,
+                ct);
+            if (!authorization.IsSuccess)
+                return Result<CheckVerificationResponse>.Failure(authorization.Message!, authorization.StatusCode);
+
             var verificationType = await _dataContext.Query<IdentityVerificationType>()
+                .IgnoreQueryFilters()
                 .Where(i => i.Id == request.VerificationTypeId)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (verificationType is null)
@@ -883,6 +1085,7 @@ public sealed class AuthService : IAuthService
                 .Where(i => i.CredentialId == identityCredential.Id)
                 .Where(i => i.Status == (short?)GenericStatusType.Approved)
                 .Where(i => i.Expiry > DateTime.UtcNow)
+                .Where(i => i.ConsumedAt == null)
                 .AnyAsync(ct);
 
             if (anyVerification)
@@ -910,8 +1113,21 @@ public sealed class AuthService : IAuthService
                 new CheckVerificationResponse
                 {
                     IsVerified = false,
-                    LastVerification = lastVerification
+                    LastVerification = new VerificationStatusResponse
+                    {
+                        Id = lastVerification.Id,
+                        CredentialId = lastVerification.CredentialId,
+                        VerificationTypeId = lastVerification.VerificationTypeId,
+                        Status = lastVerification.Status,
+                        StatusUpdatedOn = lastVerification.StatusUpdatedOn,
+                        Expiry = lastVerification.Expiry,
+                        CreatedAt = lastVerification.CreatedAt
+                    }
                 });
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -929,6 +1145,9 @@ public sealed class AuthService : IAuthService
         UploadCredentialAvatarRequest request,
         CancellationToken ct = default)
     {
+        Guid? completedStorageFileId = null;
+        var avatarPersisted = false;
+
         try
         {
             var validation = ValidateCredentialAvatarRequest(request);
@@ -940,6 +1159,16 @@ public sealed class AuthService : IAuthService
             }
 
             var tenantId = request.Metadata.TenantId!.Value;
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenantId,
+                request.CredentialId,
+                IdentityAuthorizationConstants.Update,
+                allowSelf: false,
+                ct);
+            if (!authorization.IsSuccess)
+                return Result<CredentialAvatarResponse>.Failure(authorization.Message!, authorization.StatusCode);
+
             var credential = await FindCredentialForTenant(request.CredentialId, tenantId, ct);
             if (credential is null)
             {
@@ -947,18 +1176,26 @@ public sealed class AuthService : IAuthService
             }
 
             var contentType = CredentialAvatarPolicy.NormalizeContentType(request.ContentType)!;
-            var metadata = await EnsureAvatarStorageMetadata(tenantId, contentType, ct);
-            if (!metadata.IsSuccess)
+            var metadata = await _storageServiceWrapper.EnsureStorageUploadMetadata(
+                new EnsureStorageUploadMetadataRequest
+                {
+                    Metadata = request.Metadata,
+                    ContentType = contentType,
+                    IdentifierGroupName = CredentialAvatarPolicy.StorageIdentifierGroupName,
+                    IdentifierName = CredentialAvatarPolicy.StorageFileIdentifierName,
+                    IdentifierDescription = "Identity credential avatar image"
+                }, ct);
+            if (!metadata.IsSuccess || metadata.Response is null)
             {
                 return Result<CredentialAvatarResponse>.Failure(
                     metadata.Message ?? "Avatar storage metadata could not be prepared",
-                    metadata.StatusCode);
+                    ToStatusCode(metadata.HttpStatusCode));
             }
 
             var uploadResult = await UploadCredentialAvatarToStorageAsync(
                 request,
                 credential,
-                metadata.Data!,
+                metadata.Response,
                 contentType,
                 ct);
 
@@ -969,19 +1206,44 @@ public sealed class AuthService : IAuthService
                     uploadResult.StatusCode);
             }
 
+            completedStorageFileId = uploadResult.Data.Id;
             var now = DateTime.UtcNow;
+            _dataContext.Update(credential);
             credential.AvatarStorageFileId = uploadResult.Data.Id;
             credential.AvatarUrl = ResolveAvatarUrl(uploadResult.Data);
             credential.AvatarUpdatedAt = now;
+            credential.ConcurrencyStamp = Guid.NewGuid();
+            var claimOutbox = await StageStorageClaimAsync(
+                request.Metadata,
+                uploadResult.Data.Id,
+                ct);
 
-            _dataContext.Update(credential);
-            await _dataContext.SaveChangesAsync(ct);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+            {
+                await DeleteUnattachedAvatarFileAsync(
+                    request.Metadata,
+                    completedStorageFileId.Value);
+                return Result<CredentialAvatarResponse>.Failure("Credential avatar could not be saved", saveResult.StatusCode);
+            }
 
+            avatarPersisted = true;
+            await TryClaimStorageFileAsync(claimOutbox);
             return Result<CredentialAvatarResponse>.Success(
                 CreateCredentialAvatarResponse(credential, uploadResult.Data));
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            if (completedStorageFileId is { } storageFileId && !avatarPersisted)
+                await DeleteUnattachedAvatarFileAsync(request.Metadata, storageFileId);
+
+            throw;
+        }
         catch (Exception ex)
         {
+            if (completedStorageFileId is { } storageFileId && !avatarPersisted)
+                await DeleteUnattachedAvatarFileAsync(request.Metadata, storageFileId);
+
             _logger.OperationFailed("UploadCredentialAvatar", "IdentityCredential", request.CredentialId, ex.Message, ex);
             return Result<CredentialAvatarResponse>.Failure(
                 "Credential avatar could not be uploaded",
@@ -1000,22 +1262,36 @@ public sealed class AuthService : IAuthService
                 return Result<CredentialAvatarResponse>.Failure("Tenant context is required", 400);
             }
 
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenantId,
+                request.CredentialId,
+                IdentityAuthorizationConstants.Update,
+                allowSelf: false,
+                ct);
+            if (!authorization.IsSuccess)
+                return Result<CredentialAvatarResponse>.Failure(authorization.Message!, authorization.StatusCode);
+
             var credential = await FindCredentialForTenant(request.CredentialId, tenantId, ct);
             if (credential is null)
             {
                 return Result<CredentialAvatarResponse>.NotFound("Credential not found");
             }
 
-            var storageFile = await _dataContext.Query<StorageFile>()
-                .IgnoreQueryFilters()
-                .Where(file => file.Id == request.StorageFileId)
-                .Where(file => file.TenantId == tenantId)
-                .FirstOrDefaultAsync(ct);
+            var storageResult = await _storageServiceWrapper.GetStorageFile(new GetStorageFileRequest
+            {
+                Metadata = request.Metadata,
+                StorageFileId = request.StorageFileId
+            }, ct);
+            var storageFile = storageResult.Response;
 
-            if (storageFile is null)
+            if (!storageResult.IsSuccess || storageFile is null)
             {
                 return Result<CredentialAvatarResponse>.NotFound("Storage file not found");
             }
+
+            if (storageFile.TenantId != tenantId)
+                return Result<CredentialAvatarResponse>.NotFound("Storage file not found");
 
             if (storageFile.Identifier != credential.Id)
             {
@@ -1030,15 +1306,62 @@ public sealed class AuthService : IAuthService
                     400);
             }
 
-            credential.AvatarStorageFileId = storageFile.Id;
-            credential.AvatarUrl = storageFile.ContentPath;
-            credential.AvatarUpdatedAt = DateTime.UtcNow;
+            if (storageFile.Status != StorageFileStatus.Available ||
+                storageFile.ObjectDeletedAt is not null)
+            {
+                return Result<CredentialAvatarResponse>.Failure(
+                    "Storage file is not an available image",
+                    400);
+            }
+
+            if (storageFile.Visibility != StorageFileVisibility.Public ||
+                string.IsNullOrWhiteSpace(storageFile.PublicUrl))
+            {
+                return Result<CredentialAvatarResponse>.Failure(
+                    "Credential avatars must use a public storage file",
+                    400);
+            }
+
+            if (storageFile.ContentLengthBytes is not > 0 or > CredentialAvatarPolicy.MaxFileSizeBytes)
+            {
+                return Result<CredentialAvatarResponse>.Failure(
+                    $"Storage file must be no larger than {CredentialAvatarPolicy.MaxFileSizeBytes} bytes",
+                    400);
+            }
+
+            var expectedObjectKeyPrefix = $"{tenantId:N}/{storageFile.Id:N}/";
+            if (string.IsNullOrWhiteSpace(storageFile.BucketName) ||
+                !string.Equals(storageFile.BlobContainer, storageFile.BucketName, StringComparison.Ordinal) ||
+                !string.Equals(storageFile.StorageFileIdentifierName, CredentialAvatarPolicy.StorageFileIdentifierName, StringComparison.Ordinal) ||
+                !string.Equals(storageFile.StorageFileIdentifierGroupName, CredentialAvatarPolicy.StorageIdentifierGroupName, StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(storageFile.ObjectKey) ||
+                !storageFile.ObjectKey.StartsWith(expectedObjectKeyPrefix, StringComparison.Ordinal))
+            {
+                return Result<CredentialAvatarResponse>.Forbidden(
+                    "Storage file is not a credential avatar object");
+            }
 
             _dataContext.Update(credential);
-            await _dataContext.SaveChangesAsync(ct);
+            credential.AvatarStorageFileId = storageFile.Id;
+            credential.AvatarUrl = ResolveAvatarUrl(storageFile);
+            credential.AvatarUpdatedAt = DateTime.UtcNow;
+            credential.ConcurrencyStamp = Guid.NewGuid();
+            var claimOutbox = await StageStorageClaimAsync(
+                request.Metadata,
+                storageFile.Id,
+                ct);
 
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<CredentialAvatarResponse>.Failure("Credential avatar could not be saved", saveResult.StatusCode);
+
+            await TryClaimStorageFileAsync(claimOutbox);
             return Result<CredentialAvatarResponse>.Success(
                 CreateCredentialAvatarResponse(credential, storageFile));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -1060,21 +1383,38 @@ public sealed class AuthService : IAuthService
                 return Result<CredentialAvatarResponse>.Failure("Tenant context is required", 400);
             }
 
+            var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
+                request.Metadata,
+                tenantId,
+                request.CredentialId,
+                IdentityAuthorizationConstants.Update,
+                allowSelf: false,
+                ct);
+            if (!authorization.IsSuccess)
+                return Result<CredentialAvatarResponse>.Failure(authorization.Message!, authorization.StatusCode);
+
             var credential = await FindCredentialForTenant(request.CredentialId, tenantId, ct);
             if (credential is null)
             {
                 return Result<CredentialAvatarResponse>.NotFound("Credential not found");
             }
 
+            _dataContext.Update(credential);
             credential.AvatarStorageFileId = null;
             credential.AvatarUrl = null;
             credential.AvatarUpdatedAt = null;
+            credential.ConcurrencyStamp = Guid.NewGuid();
 
-            _dataContext.Update(credential);
-            await _dataContext.SaveChangesAsync(ct);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<CredentialAvatarResponse>.Failure("Credential avatar could not be removed", saveResult.StatusCode);
 
             return Result<CredentialAvatarResponse>.Success(
-                CreateCredentialAvatarResponse(credential, (StorageFile?)null));
+                CreateCredentialAvatarResponse(credential, (StorageFileResponse?)null));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -1097,6 +1437,7 @@ public sealed class AuthService : IAuthService
             .IgnoreQueryFilters()
             .Where(credential => credential.Id == credentialId)
             .Where(credential => credential.TenantId == tenantId)
+            .Where(credential => !credential.IsDeleted && credential.IsEnabled)
             .FirstOrDefaultAsync(ct);
     }
 
@@ -1127,90 +1468,31 @@ public sealed class AuthService : IAuthService
             return Result.Failure("Avatar image must be PNG, JPEG, or WebP", 400);
         }
 
+        var normalizedContentType = CredentialAvatarPolicy.NormalizeContentType(request.ContentType)!;
+        if (!HasMatchingImageSignature(request.FileBytes, normalizedContentType))
+        {
+            return Result.Failure("Avatar image content does not match its declared type", 400);
+        }
+
         return Result.Success();
     }
 
-    private async Task<Result<AvatarStorageMetadata>> EnsureAvatarStorageMetadata(
-        Guid tenantId,
-        string contentType,
-        CancellationToken ct)
-    {
-        var storageFileType = await _dataContext.Query<StorageFileType>()
-            .IgnoreQueryFilters()
-            .Where(type => type.TenantId == tenantId)
-            .Where(type => type.Name == contentType)
-            .FirstOrDefaultAsync(ct);
-
-        var group = await _dataContext.Query<StorageFileIdentifierGroup>()
-            .IgnoreQueryFilters()
-            .Where(identifierGroup => identifierGroup.TenantId == tenantId)
-            .Where(identifierGroup => identifierGroup.Name == CredentialAvatarPolicy.StorageIdentifierGroupName)
-            .FirstOrDefaultAsync(ct);
-
-        if (storageFileType is null)
+    private static bool HasMatchingImageSignature(byte[] bytes, string contentType) =>
+        contentType switch
         {
-            storageFileType = new StorageFileType
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                Name = contentType,
-                SystemReferenceId = Guid.NewGuid(),
-                IsEnabled = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            _dataContext.Add(storageFileType);
-        }
-
-        if (group is null)
-        {
-            group = new StorageFileIdentifierGroup
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                Name = CredentialAvatarPolicy.StorageIdentifierGroupName,
-                SystemReferenceId = Guid.NewGuid(),
-                IsEnabled = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            _dataContext.Add(group);
-        }
-
-        var identifier = await _dataContext.Query<StorageFileIdentifier>()
-            .IgnoreQueryFilters()
-            .Where(storageIdentifier => storageIdentifier.TenantId == tenantId)
-            .Where(storageIdentifier => storageIdentifier.Name == CredentialAvatarPolicy.StorageFileIdentifierName)
-            .FirstOrDefaultAsync(ct);
-
-        if (identifier is null)
-        {
-            identifier = new StorageFileIdentifier
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                Name = CredentialAvatarPolicy.StorageFileIdentifierName,
-                Description = "Identity credential avatar image",
-                GroupId = group.Id,
-                IsEnabled = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            _dataContext.Add(identifier);
-        }
-
-        var saveResult = await _dataContext.SaveChangesAsync(ct);
-        if (!saveResult.IsSuccess)
-        {
-            return Result<AvatarStorageMetadata>.Failure(
-                "Avatar storage metadata could not be saved",
-                saveResult.StatusCode);
-        }
-
-        return Result<AvatarStorageMetadata>.Success(new(storageFileType, identifier));
-    }
+            "image/png" => bytes.Length >= 8 && bytes.AsSpan(0, 8).SequenceEqual(
+                new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
+            "image/jpeg" => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF,
+            "image/webp" => bytes.Length >= 12
+                            && bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8)
+                            && bytes.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+            _ => false
+        };
 
     private async Task<Result<StorageFileResponse>> UploadCredentialAvatarToStorageAsync(
         UploadCredentialAvatarRequest request,
         IdentityCredential credential,
-        AvatarStorageMetadata metadata,
+        StorageUploadMetadataResponse metadata,
         string contentType,
         CancellationToken ct)
     {
@@ -1224,14 +1506,15 @@ public sealed class AuthService : IAuthService
                 Metadata = request.Metadata,
                 FileName = fileName,
                 ContentType = contentType,
-                TypeId = metadata.Type.Id,
+                TypeId = metadata.TypeId,
                 Identifier = credential.Id,
-                StorageFileIdentifierId = metadata.Identifier.Id,
+                StorageFileIdentifierId = metadata.StorageFileIdentifierId,
                 TotalSizeBytes = fileBytes.LongLength,
                 ExpectedSha256Hash = sha256Hash,
                 ChunkSizeBytes = fileBytes.Length,
-                Visibility = StorageFileVisibility.Public
-            });
+                Visibility = StorageFileVisibility.Public,
+                RequireClaim = true
+            }, ct);
 
         if (!session.IsSuccess || session.Response is null)
         {
@@ -1240,40 +1523,282 @@ public sealed class AuthService : IAuthService
                 ToStatusCode(session.HttpStatusCode));
         }
 
-        var uploadPart = await _storageServiceWrapper.UploadStorageFilePart(
-            new UploadStorageFilePartRequest
-            {
-                Metadata = request.Metadata,
-                UploadSessionId = session.Response.Id,
-                PartNumber = 1,
-                OffsetBytes = 0,
-                PartSha256Hash = sha256Hash,
-                ChunkBytes = fileBytes
-            });
-
-        if (!uploadPart.IsSuccess)
+        try
         {
-            return Result<StorageFileResponse>.Failure(
-                uploadPart.Message ?? "Avatar image could not be uploaded",
-                ToStatusCode(uploadPart.HttpStatusCode));
-        }
+            var uploadPart = await _storageServiceWrapper.UploadStorageFilePart(
+                new UploadStorageFilePartRequest
+                {
+                    Metadata = request.Metadata,
+                    UploadSessionId = session.Response.Id,
+                    PartNumber = 1,
+                    OffsetBytes = 0,
+                    PartSha256Hash = sha256Hash,
+                    ChunkBytes = fileBytes
+                }, ct);
 
-        var complete = await _storageServiceWrapper.CompleteStorageUploadSession(
-            new CompleteStorageUploadSessionRequest
+            if (!uploadPart.IsSuccess)
             {
-                Metadata = request.Metadata,
-                UploadSessionId = session.Response.Id,
-                ExpectedSha256Hash = sha256Hash
-            });
+                await AbortAvatarUploadSessionAsync(
+                    request.Metadata,
+                    session.Response.Id);
+                return Result<StorageFileResponse>.Failure(
+                    uploadPart.Message ?? "Avatar image could not be uploaded",
+                    ToStatusCode(uploadPart.HttpStatusCode));
+            }
 
-        if (!complete.IsSuccess || complete.Response is null)
-        {
-            return Result<StorageFileResponse>.Failure(
-                complete.Message ?? "Avatar upload could not be completed",
-                ToStatusCode(complete.HttpStatusCode));
+            var complete = await _storageServiceWrapper.CompleteStorageUploadSession(
+                new CompleteStorageUploadSessionRequest
+                {
+                    Metadata = request.Metadata,
+                    UploadSessionId = session.Response.Id,
+                    ExpectedSha256Hash = sha256Hash
+                }, ct);
+
+            if (!complete.IsSuccess || complete.Response is null)
+            {
+                await AbortAvatarUploadSessionAsync(
+                    request.Metadata,
+                    session.Response.Id);
+                return Result<StorageFileResponse>.Failure(
+                    complete.Message ?? "Avatar upload could not be completed",
+                    ToStatusCode(complete.HttpStatusCode));
+            }
+
+            return Result<StorageFileResponse>.Success(complete.Response);
         }
+        catch
+        {
+            await AbortAvatarUploadSessionAsync(
+                request.Metadata,
+                session.Response.Id);
+            throw;
+        }
+    }
 
-        return Result<StorageFileResponse>.Success(complete.Response);
+    private async Task AbortAvatarUploadSessionAsync(
+        RequestMetadata metadata,
+        Guid uploadSessionId)
+    {
+        using var compensationCts = new CancellationTokenSource(AvatarCompensationTimeout);
+        try
+        {
+            var abort = await _storageServiceWrapper.AbortStorageUploadSession(
+                new AbortStorageUploadSessionRequest
+                {
+                    Metadata = metadata,
+                    UploadSessionId = uploadSessionId
+                },
+                compensationCts.Token);
+
+            if (!abort.IsSuccess)
+            {
+                _logger.LogError(
+                    "Avatar upload session compensation failed. UploadSessionId: {UploadSessionId}, StatusCode: {StatusCode}",
+                    uploadSessionId,
+                    abort.HttpStatusCode);
+            }
+        }
+        catch (OperationCanceledException) when (compensationCts.IsCancellationRequested)
+        {
+            _logger.LogError(
+                "Avatar upload session compensation timed out. UploadSessionId: {UploadSessionId}",
+                uploadSessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Avatar upload session compensation threw. UploadSessionId: {UploadSessionId}",
+                uploadSessionId);
+        }
+    }
+
+    private async Task DeleteUnattachedAvatarFileAsync(
+        RequestMetadata metadata,
+        Guid storageFileId)
+    {
+        using var compensationCts = new CancellationTokenSource(AvatarCompensationTimeout);
+        try
+        {
+            var delete = await _storageServiceWrapper.DeleteStorageFile(
+                new DeleteStorageFileRequest
+                {
+                    Metadata = metadata,
+                    StorageFileId = storageFileId
+                },
+                compensationCts.Token);
+
+            if (!delete.IsSuccess)
+            {
+                _logger.LogError(
+                    "Unattached avatar file compensation failed. StorageFileId: {StorageFileId}, StatusCode: {StatusCode}",
+                    storageFileId,
+                    delete.HttpStatusCode);
+                await QueueStorageCleanupAsync(metadata, storageFileId);
+            }
+        }
+        catch (OperationCanceledException) when (compensationCts.IsCancellationRequested)
+        {
+            _logger.LogError(
+                "Unattached avatar file compensation timed out. StorageFileId: {StorageFileId}",
+                storageFileId);
+            await QueueStorageCleanupAsync(metadata, storageFileId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Unattached avatar file compensation threw. StorageFileId: {StorageFileId}",
+                storageFileId);
+            await QueueStorageCleanupAsync(metadata, storageFileId);
+        }
+    }
+
+    private async Task QueueStorageCleanupAsync(RequestMetadata metadata, Guid storageFileId)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            var tenantId = metadata.TenantId ?? Guid.Empty;
+            if (tenantId == Guid.Empty)
+                return;
+
+            var exists = await db.Set<StorageCleanupOutboxMessage>()
+                .IgnoreQueryFilters()
+                .AnyAsync(message => message.TenantId == tenantId && message.StorageFileId == storageFileId);
+            if (exists)
+                return;
+
+            db.Set<StorageCleanupOutboxMessage>().Add(new StorageCleanupOutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                StorageFileId = storageFileId,
+                RequestId = metadata.RequestId ?? Guid.NewGuid(),
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
+            });
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(
+                ex,
+                "Storage cleanup could not be persisted. StorageFileId: {StorageFileId}",
+                storageFileId);
+        }
+    }
+
+    private async Task<StorageClaimOutboxMessage?> StageStorageClaimAsync(
+        RequestMetadata metadata,
+        Guid storageFileId,
+        CancellationToken ct)
+    {
+        var tenantId = metadata.TenantId ?? Guid.Empty;
+        if (tenantId == Guid.Empty)
+            throw new InvalidOperationException("Tenant context is required to claim an avatar file.");
+
+        var requestId = metadata.RequestId ?? Guid.NewGuid();
+        var existing = await _dataContext.Query<StorageClaimOutboxMessage>()
+            .IgnoreQueryFilters()
+            .Where(message => message.TenantId == tenantId)
+            .Where(message => message.StorageFileId == storageFileId)
+            .Where(message => message.RequestId == requestId)
+            .FirstOrDefaultAsync(ct);
+        if (existing?.ProcessedAt is not null)
+            return null;
+        if (existing is not null)
+            return existing;
+
+        var outbox = new StorageClaimOutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            StorageFileId = storageFileId,
+            RequestId = requestId,
+            IsEnabled = true,
+            ConcurrencyStamp = Guid.NewGuid()
+        };
+        _dataContext.Add(outbox);
+        return outbox;
+    }
+
+    private async Task TryClaimStorageFileAsync(StorageClaimOutboxMessage? outbox)
+    {
+        if (outbox is null)
+            return;
+
+        using var claimCts = new CancellationTokenSource(AvatarCompensationTimeout);
+        try
+        {
+            var result = await _storageServiceWrapper.ClaimStorageFile(new ClaimStorageFileRequest
+            {
+                StorageFileId = outbox.StorageFileId,
+                Metadata = new RequestMetadata
+                {
+                    TenantId = outbox.TenantId,
+                    RequestId = outbox.RequestId
+                }
+            }, claimCts.Token);
+            if (!result.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Immediate avatar storage claim was not accepted. StorageFileId: {StorageFileId}, StatusCode: {StatusCode}",
+                    outbox.StorageFileId,
+                    result.HttpStatusCode);
+                return;
+            }
+
+            outbox.ProcessedAt = DateTime.UtcNow;
+            outbox.LastError = null;
+            outbox.NextAttemptAt = null;
+            outbox.ModifiedAt = DateTime.UtcNow;
+            outbox.ConcurrencyStamp = Guid.NewGuid();
+            _dataContext.Update(outbox);
+            var saveResult = await _dataContext.SaveChangesAsync();
+            if (!saveResult.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Immediate avatar storage claim acknowledgement could not be persisted. StorageFileId: {StorageFileId}",
+                    outbox.StorageFileId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Immediate avatar storage claim failed; the durable outbox will retry. StorageFileId: {StorageFileId}",
+                outbox.StorageFileId);
+        }
+    }
+
+    private void QueueVerificationDelivery(
+        IdentityVerification verification,
+        RequestMetadata metadata,
+        MessageTransportType transportType,
+        string recipient,
+        string subject,
+        string intent,
+        string message)
+    {
+        if (verification.Id == Guid.Empty)
+            verification.Id = Guid.NewGuid();
+
+        _dataContext.Add(new VerificationDeliveryOutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            TenantId = verification.TenantId,
+            VerificationId = verification.Id,
+            RequestId = metadata.RequestId ?? Guid.NewGuid(),
+            TransportType = (int)transportType,
+            Recipient = recipient,
+            Subject = subject,
+            Intent = intent,
+            Message = message,
+            IsEnabled = true,
+            ConcurrencyStamp = Guid.NewGuid()
+        });
     }
 
     private static string NormalizeAvatarFileName(string? fileName, string extension)
@@ -1301,6 +1826,115 @@ public sealed class AuthService : IAuthService
     private static string ComputeSha256(byte[] bytes) =>
         Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
+    private static string ComputeTokenHash(string? token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token ?? string.Empty)))
+            .ToLowerInvariant();
+
+    private async Task<DistributedSecurityRateLimitDecision> AcquireAuthenticationRateLimitAsync(
+        AuthenticateIdentityRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await _securityRateLimiter.AcquireAsync(
+                StrictSecurityRateLimitPolicyMap.Authentication,
+                await CreateTrustedRateLimitKeyAsync(request.Metadata, request.UserName, ct),
+                ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Distributed authentication throttling failed; authentication was denied");
+            return DistributedSecurityRateLimitDecision.Rejected(TimeSpan.Zero);
+        }
+    }
+
+    private async Task<DistributedSecurityRateLimitDecision> AcquireSecurityRateLimitAsync(
+        StrictSecurityRateLimitPolicy policy,
+        RequestMetadata metadata,
+        string identifier,
+        string operation,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await _securityRateLimiter.AcquireAsync(
+                policy,
+                await CreateTrustedRateLimitKeyAsync(metadata, identifier, ct),
+                ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Distributed throttling failed; {Operation} was denied", operation);
+            return DistributedSecurityRateLimitDecision.Rejected(TimeSpan.Zero);
+        }
+    }
+
+    private async Task<string> CreateTrustedRateLimitKeyAsync(
+        RequestMetadata metadata,
+        string? identifier,
+        CancellationToken ct)
+    {
+        var remoteIpAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+        if (!string.IsNullOrWhiteSpace(remoteIpAddress))
+        {
+            return StrictSecurityRateLimitPolicyMap.CreateAuthenticationClientKey(
+                remoteIpAddress,
+                identifier);
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata.ServiceAccessToken))
+        {
+            var trustedInvocation = await _trustedServiceInvocationResolver.ResolveAsync(
+                metadata,
+                XFrameworkServiceNames.IdentityServer,
+                requireTenant: false,
+                ct: ct);
+            if (trustedInvocation.IsSuccess)
+            {
+                return StrictSecurityRateLimitPolicyMap.CreateAuthenticationClientKey(
+                    null,
+                    $"service:{trustedInvocation.Invocation!.CallerClientId}:{identifier}");
+            }
+
+            _logger.LogWarning(
+                "Authentication throttling could not resolve trusted Bolt caller; using shared untrusted partition");
+        }
+
+        return StrictSecurityRateLimitPolicyMap.CreateAuthenticationClientKey(
+            null,
+            $"untrusted:{identifier}");
+    }
+
+    private async Task<IdentityCredential?> LockCredentialForAuthenticationAsync(
+        Guid credentialId,
+        CancellationToken ct)
+    {
+        var credentials = await _dbContext.Set<IdentityCredential>()
+            .FromSqlInterpolated(
+                $"SELECT * FROM \"Identity\".\"IdentityCredential\" WHERE \"ID\" = {credentialId} FOR UPDATE")
+            .IgnoreQueryFilters()
+            .AsTracking()
+            .ToListAsync(ct);
+
+        return credentials.SingleOrDefault();
+    }
+
+    private static string HashVerificationCode(string code) =>
+        BCrypt.Net.BCrypt.HashPassword(code, workFactor: 11);
+
+    private static bool VerifyVerificationCode(string? code, string? hash) =>
+        !string.IsNullOrWhiteSpace(code)
+        && !string.IsNullOrWhiteSpace(hash)
+        && BCrypt.Net.BCrypt.Verify(code, hash);
+
     private static int ToStatusCode(HttpStatusCode statusCode) =>
         statusCode == 0 ? 500 : (int)statusCode;
 
@@ -1321,7 +1955,7 @@ public sealed class AuthService : IAuthService
 
     private static CredentialAvatarResponse CreateCredentialAvatarResponse(
         IdentityCredential credential,
-        StorageFile? storageFile)
+        StorageFileResponse? storageFile)
     {
         return new CredentialAvatarResponse
         {
@@ -1334,28 +1968,26 @@ public sealed class AuthService : IAuthService
         };
     }
 
-    private static CredentialAvatarResponse CreateCredentialAvatarResponse(
-        IdentityCredential credential,
-        StorageFileResponse storageFile)
+    private static CredentialAdministrationResponse CreateCredentialAdministrationResponse(
+        IdentityCredential credential) => new()
     {
-        return new CredentialAvatarResponse
-        {
-            CredentialId = credential.Id,
-            StorageFileId = credential.AvatarStorageFileId,
-            AvatarUrl = credential.AvatarUrl,
-            ContentType = storageFile.ContentType,
-            FileName = storageFile.Name,
-            AvatarUpdatedAt = credential.AvatarUpdatedAt
-        };
-    }
-
-    private sealed record AvatarStorageMetadata(
-        StorageFileType Type,
-        StorageFileIdentifier Identifier);
+        Id = credential.Id,
+        TenantId = credential.TenantId,
+        IdentityInfoId = credential.IdentityInfoId,
+        UserName = credential.UserName,
+        UserAlias = credential.UserAlias,
+        IsEnabled = credential.IsEnabled,
+        ConcurrencyStamp = credential.ConcurrencyStamp,
+        CreatedAt = credential.CreatedAt,
+        ModifiedAt = credential.ModifiedAt,
+        AvatarStorageFileId = credential.AvatarStorageFileId,
+        AvatarUrl = credential.AvatarUrl,
+        AvatarUpdatedAt = credential.AvatarUpdatedAt
+    };
 
     /// <summary>
     /// Validates user authorization with multi-type authentication support.
-    /// Supports Username, Email, Phone, UsernameEmailPhone (combined), and Token authentication.
+    /// Supports Username, Email, Phone, and UsernameEmailPhone authentication.
     /// </summary>
     private async Task<IdentityCredential?> ValidateAuthorization(
         AuthenticateIdentityRequest request,
@@ -1374,6 +2006,7 @@ public sealed class AuthService : IAuthService
                 var getDefaults = await _dataContext.Query<RegistryConfiguration>()
                     .IgnoreQueryFilters()
                     .Where(i => i.TenantId == tenant.Id && i.Key == "DefaultAuthorizeBy")
+                    .Where(i => !i.IsDeleted && i.IsEnabled)
                     .FirstOrDefaultAsync(ct);
 
                 if (getDefaults is null)
@@ -1396,7 +2029,6 @@ public sealed class AuthService : IAuthService
                 result = await _dataContext.Query<IdentityCredential>()
                     .IgnoreQueryFilters()
                     .Include(i => i.IdentityInfo)
-                    .Include(i => i.IdentityRoles)
                     .Where(i => i.TenantId == tenant.Id && i.UserName == userName)
                     .FirstOrDefaultAsync(ct);
 
@@ -1407,9 +2039,11 @@ public sealed class AuthService : IAuthService
                         .IgnoreQueryFilters()
                         .Include(c => c.Type)
                         .Where(i =>
-                            i.Credential.TenantId == tenant.Id &&
+                            i.TenantId == tenant.Id &&
                             i.Value == userName &&
+                            !i.IsDeleted && i.IsEnabled &&
                             i.Type != null &&
+                            !i.Type.IsDeleted && i.Type.IsEnabled &&
                             i.Type.Name == nameof(GenericContactType.Email))
                         .FirstOrDefaultAsync(ct);
 
@@ -1418,7 +2052,6 @@ public sealed class AuthService : IAuthService
                         result = await _dataContext.Query<IdentityCredential>()
                             .IgnoreQueryFilters()
                             .Include(i => i.IdentityInfo)
-                            .Include(i => i.IdentityRoles)
                             .Where(i => i.Id == emailContact.CredentialId)
                             .FirstOrDefaultAsync(ct);
                     }
@@ -1431,9 +2064,11 @@ public sealed class AuthService : IAuthService
                         .IgnoreQueryFilters()
                         .Include(c => c.Type)
                         .Where(i =>
-                            i.Credential.TenantId == tenant.Id &&
+                            i.TenantId == tenant.Id &&
                             i.Value == userName.ValidatePhoneNumber(true) &&
+                            !i.IsDeleted && i.IsEnabled &&
                             i.Type != null &&
+                            !i.Type.IsDeleted && i.Type.IsEnabled &&
                             i.Type.Name == nameof(GenericContactType.Phone))
                         .FirstOrDefaultAsync(ct);
 
@@ -1442,7 +2077,6 @@ public sealed class AuthService : IAuthService
                         result = await _dataContext.Query<IdentityCredential>()
                             .IgnoreQueryFilters()
                             .Include(i => i.IdentityInfo)
-                            .Include(i => i.IdentityRoles)
                             .Where(i => i.Id == phoneContact.CredentialId)
                             .FirstOrDefaultAsync(ct);
                     }
@@ -1453,7 +2087,6 @@ public sealed class AuthService : IAuthService
                 result = await _dataContext.Query<IdentityCredential>()
                     .IgnoreQueryFilters()
                     .Include(i => i.IdentityInfo)
-                    .Include(i => i.IdentityRoles)
                     .Where(i => i.TenantId == tenant.Id && i.UserName == userName)
                     .FirstOrDefaultAsync(ct);
                 break;
@@ -1468,9 +2101,11 @@ public sealed class AuthService : IAuthService
                     .IgnoreQueryFilters()
                     .Include(c => c.Type)
                     .Where(i =>
-                        i.Credential.TenantId == tenant.Id &&
+                        i.TenantId == tenant.Id &&
                         i.Value == userName &&
+                        !i.IsDeleted && i.IsEnabled &&
                         i.Type != null &&
+                        !i.Type.IsDeleted && i.Type.IsEnabled &&
                         i.Type.Name == nameof(GenericContactType.Email))
                     .FirstOrDefaultAsync(ct);
 
@@ -1478,7 +2113,6 @@ public sealed class AuthService : IAuthService
                     ? await _dataContext.Query<IdentityCredential>()
                         .IgnoreQueryFilters()
                         .Include(i => i.IdentityInfo)
-                        .Include(i => i.IdentityRoles)
                         .Where(i => i.Id == emailContactForAuth.CredentialId)
                         .FirstOrDefaultAsync(ct)
                     : null;
@@ -1489,9 +2123,11 @@ public sealed class AuthService : IAuthService
                     .IgnoreQueryFilters()
                     .Include(c => c.Type)
                     .Where(i =>
-                        i.Credential.TenantId == tenant.Id &&
+                        i.TenantId == tenant.Id &&
                         i.Value == userName.ValidatePhoneNumber(true) &&
+                        !i.IsDeleted && i.IsEnabled &&
                         i.Type != null &&
+                        !i.Type.IsDeleted && i.Type.IsEnabled &&
                         i.Type.Name == nameof(GenericContactType.Phone))
                     .FirstOrDefaultAsync(ct);
 
@@ -1499,44 +2135,27 @@ public sealed class AuthService : IAuthService
                     ? await _dataContext.Query<IdentityCredential>()
                         .IgnoreQueryFilters()
                         .Include(i => i.IdentityInfo)
-                        .Include(i => i.IdentityRoles)
                         .Where(i => i.Id == phoneContactForAuth.CredentialId)
                         .FirstOrDefaultAsync(ct)
                     : null;
                 break;
 
             case AuthorizationType.Token:
-                result = await _dataContext.Query<IdentityCredential>()
-                    .IgnoreQueryFilters()
-                    .Include(i => i.IdentityRoles)
-                    .Include(i => i.IdentityInfo)
-                    .Where(i => i.UserName == userName)
-                    .FirstOrDefaultAsync(ct);
-                break;
+                throw new ArgumentOutOfRangeException(
+                    nameof(authorizationType),
+                    "Service token authentication is not supported by the user authentication endpoint.");
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(authorizationType));
         }
 
+        if (result is null || result.IsDeleted || !result.IsEnabled)
+            return null;
+
+        if (result.IdentityInfo is { IsDeleted: true } or { IsEnabled: false })
+            return null;
+
         return result;
-    }
-
-    /// <summary>
-    /// Validates password using BCrypt verification.
-    /// For token-based authentication, password validation is skipped.
-    /// </summary>
-    private async Task<IdentityCredential?> ValidatePassword(
-        AuthenticateIdentityRequest request,
-        AuthorizationType authorizationType,
-        IdentityCredential credential,
-        CancellationToken ct)
-    {
-        // Skip password validation for token-based authentication
-        if (authorizationType == AuthorizationType.Token)
-            return credential;
-
-        // Verify password using BCrypt - SECURITY CRITICAL
-        return VerifyPasswordHash(request.Password, credential.PasswordByte) ? credential : null;
     }
 
     private static bool VerifyPasswordHash(string? password, byte[]? passwordBytes)
@@ -1564,6 +2183,8 @@ public sealed class AuthService : IAuthService
             .Where(i => i.TenantId == credential.TenantId)
             .Where(i => i.CredentialId == credential.Id)
             .Where(i => !i.IsDeleted && i.IsEnabled)
+            .Where(i => i.Type != null && !i.Type.IsDeleted && i.Type.IsEnabled)
+            .Where(i => i.Type!.TenantId == credential.TenantId)
             .Where(i => i.RoleExpiration >= now)
             .ToListAsync(ct);
 
@@ -1594,7 +2215,9 @@ public sealed class AuthService : IAuthService
             LoginSource = loginSource,
             DeviceName = deviceName,
             DeviceAgent = deviceAgent,
-            SessionId = sessionId
+            SessionId = sessionId,
+            IsEnabled = true,
+            ConcurrencyStamp = Guid.NewGuid()
         };
 
         _dataContext.Add(authorizationLog);
@@ -1603,10 +2226,10 @@ public sealed class AuthService : IAuthService
     /// <summary>
     /// Creates a session entity for tracking user sessions with expiration.
     /// </summary>
-    private async Task<Session> CreateSession(
+    private Session CreateSession(
         Guid tenantId,
         Guid credentialId,
-        Guid? sessionTypeId,
+        Guid sessionTypeId,
         JwtToken token,
         DateTime? expiresAt = null)
     {
@@ -1616,29 +2239,66 @@ public sealed class AuthService : IAuthService
             TenantId = tenantId,
             SessionTypeId = sessionTypeId,
             CredentialId = credentialId,
-            SessionData = JsonSerializer.Serialize(token),
+            RefreshTokenHash = ComputeTokenHash(token.RefreshToken),
+            RefreshTokenExpiresAt = token.RefreshTokenExpiresAt,
             Status = CurrentSessionState.Active,
-            ExpiresAt = expiresAt ?? DateTime.UtcNow.AddHours(DefaultSessionExpirationHours)
+            ExpiresAt = expiresAt ?? DateTime.UtcNow.AddHours(DefaultSessionExpirationHours),
+            IsEnabled = true,
+            ConcurrencyStamp = Guid.NewGuid()
         };
 
         _dataContext.Add(session);
         return session;
     }
 
+    private async Task RevokeActiveSessionsAsync(
+        Guid tenantId,
+        Guid credentialId,
+        CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var concurrencyStamp = Guid.NewGuid();
+        await _dbContext.Set<Session>()
+            .IgnoreQueryFilters()
+            .Where(session => session.TenantId == tenantId)
+            .Where(session => session.CredentialId == credentialId)
+            .Where(session => session.Status == CurrentSessionState.Active && !session.IsDeleted)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(session => session.Status, CurrentSessionState.Inactive)
+                    .SetProperty(session => session.ModifiedAt, now)
+                    .SetProperty(session => session.ConcurrencyStamp, concurrencyStamp),
+                ct);
+    }
+
+    private async Task RevokeSessionAsync(Session session, CancellationToken ct)
+    {
+        _dataContext.Update(session);
+        session.Status = CurrentSessionState.Inactive;
+        session.ModifiedAt = DateTime.UtcNow;
+        session.ConcurrencyStamp = Guid.NewGuid();
+
+        var saveResult = await _dataContext.SaveChangesAsync(ct);
+        if (!saveResult.IsSuccess)
+            _logger.OperationFailed("RevokeSession", "Session", session.Id, saveResult.Message ?? string.Empty, null);
+    }
+
     /// <summary>
     /// Gets the session type ID based on authorization type.
     /// User session for standard auth, Service session for token-based auth.
     /// </summary>
-    private async Task<Guid?> GetSessionTypeId(
+    private async Task<Guid> GetSessionTypeId(
         Guid tenantId,
-        AuthorizationType authorizationType)
+        AuthorizationType authorizationType,
+        CancellationToken ct)
     {
         Guid? sessionTypeId;
 
         if (authorizationType is not AuthorizationType.Token)
         {
             // User session type
-            sessionTypeId = _cache.Get<Guid>("SessionTypeId:User");
+            var cacheKey = $"identity:tenant:{tenantId}:session-type:user";
+            sessionTypeId = _cache.Get<Guid>(cacheKey);
             if (sessionTypeId is null || sessionTypeId == Guid.Empty)
             {
                 var userSessionType = await _dataContext.Query<SessionType>()
@@ -1646,33 +2306,40 @@ public sealed class AuthService : IAuthService
                     .Where(i => i.TenantId == tenantId)
                     .Where(i => i.SystemReferenceId == IdentityConstants.SessionType.User)
                     .Where(i => i.Name == "User")
-                    .FirstOrDefaultAsync(CancellationToken.None);
+                    .FirstOrDefaultAsync(ct);
 
-                var userSessionTypeId = userSessionType?.Id ?? Guid.Empty;
-                await _cache.Set("SessionTypeId:User", userSessionTypeId);
-                sessionTypeId = userSessionTypeId;
+                sessionTypeId = userSessionType?.Id;
+                if (sessionTypeId is { } resolvedUserSessionTypeId && resolvedUserSessionTypeId != Guid.Empty)
+                    await _cache.Set(cacheKey, resolvedUserSessionTypeId);
             }
         }
         else
         {
             // Service/Token session type
-            sessionTypeId = _cache.Get<Guid>("SessionTypeId:Token");
-            if (sessionTypeId is null)
+            var cacheKey = $"identity:tenant:{tenantId}:session-type:token";
+            sessionTypeId = _cache.Get<Guid>(cacheKey);
+            if (sessionTypeId is null || sessionTypeId == Guid.Empty)
             {
                 var serviceSessionType = await _dataContext.Query<SessionType>()
                     .IgnoreQueryFilters()
                     .Where(i => i.TenantId == tenantId)
                     .Where(i => i.SystemReferenceId == IdentityConstants.SessionType.Service)
                     .Where(i => i.Name == "Service")
-                    .FirstOrDefaultAsync(CancellationToken.None);
+                    .FirstOrDefaultAsync(ct);
 
-                var serviceSessionTypeId = serviceSessionType?.Id ?? Guid.Empty;
-                await _cache.Set("SessionTypeId:Token", serviceSessionTypeId);
-                sessionTypeId = serviceSessionTypeId;
+                sessionTypeId = serviceSessionType?.Id;
+                if (sessionTypeId is { } resolvedServiceSessionTypeId && resolvedServiceSessionTypeId != Guid.Empty)
+                    await _cache.Set(cacheKey, resolvedServiceSessionTypeId);
             }
         }
 
-        return sessionTypeId;
+        if (sessionTypeId is null || sessionTypeId == Guid.Empty)
+        {
+            throw new InvalidOperationException(
+                $"Tenant '{tenantId}' does not have the required session type for '{authorizationType}'.");
+        }
+
+        return sessionTypeId.Value;
     }
 
     #endregion
@@ -1683,41 +2350,78 @@ public sealed class AuthService : IAuthService
     {
         try
         {
-            var session = await _dataContext.Query<Session>()
-                .Where(s => s.Id == request.SessionId)
-                .Where(s => s.CredentialId == request.CredentialId)
-                .FirstOrDefaultAsync(ct);
+            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+                return Result.Forbidden("Tenant context is required");
 
-            if (session is null)
+            var isTrustedServiceCall = !string.IsNullOrWhiteSpace(request.Metadata.ServiceAccessToken);
+            if (!isTrustedServiceCall &&
+                (request.Metadata.CredentialId is not { } actorCredentialId ||
+                 actorCredentialId == Guid.Empty ||
+                 actorCredentialId != request.CredentialId))
             {
+                return Result.Forbidden("Session does not belong to the authenticated credential");
+            }
+
+            await using var logoutTransaction = _dbContext.Database.CurrentTransaction is null
+                ? await _dbContext.Database.BeginTransactionAsync(ct)
+                : null;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var updated = await _dbContext.Set<Session>()
+                .IgnoreQueryFilters()
+                .Where(session => session.Id == request.SessionId)
+                .Where(session => session.CredentialId == request.CredentialId)
+                .Where(session => session.TenantId == tenantId)
+                .Where(session => !session.IsDeleted)
+                .Where(session => session.Status != CurrentSessionState.Inactive)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(session => session.Status, CurrentSessionState.Inactive)
+                        .SetProperty(session => session.ModifiedAt, now)
+                        .SetProperty(session => session.ConcurrencyStamp, Guid.NewGuid()),
+                    ct);
+
+            if (updated == 0)
+            {
+                var existingStatus = await _dbContext.Set<Session>()
+                    .IgnoreQueryFilters()
+                    .Where(session => session.Id == request.SessionId)
+                    .Where(session => session.CredentialId == request.CredentialId)
+                    .Where(session => session.TenantId == tenantId)
+                    .Where(session => !session.IsDeleted)
+                    .Select(session => (CurrentSessionState?)session.Status)
+                    .SingleOrDefaultAsync(ct);
+
+                if (existingStatus == CurrentSessionState.Inactive)
+                    return Result.Failure("Session is already inactive", 400);
+
                 _logger.EntityNotFound("Session", request.SessionId);
                 return Result.NotFound("Session not found");
             }
 
-            if (session.Status == CurrentSessionState.Inactive)
-            {
-                return Result.Failure("Session is already inactive", 400);
-            }
-
-            session.Status = CurrentSessionState.Inactive;
-            session.ModifiedAt = DateTime.UtcNow;
-            _dataContext.Update(session);
-
             await CreateAuthorizationLog(
-                session.TenantId,
+                tenantId,
                 request.CredentialId,
                 request.Metadata?.IpAddress ?? string.Empty,
                 request.Metadata?.Name ?? string.Empty,
                 request.Metadata?.DeviceName ?? string.Empty,
                 request.Metadata?.DeviceAgent ?? string.Empty,
                 AuthenticationState.NotAuthenticated,
-                session.Id);
+                request.SessionId);
 
-            await _dataContext.SaveChangesAsync(ct);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result.Failure("Logout could not be persisted", saveResult.StatusCode);
+
+            if (logoutTransaction is not null)
+                await logoutTransaction.CommitAsync(ct);
 
             _logger.UserLoggedOut(request.CredentialId);
 
             return Result.Success("Logged out successfully");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -1726,14 +2430,117 @@ public sealed class AuthService : IAuthService
         }
     }
 
+    public async Task<Result<ValidateIdentitySessionResponse>> ValidateIdentitySessionAsync(
+        ValidateIdentitySessionRequest request,
+        CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var sessionIsActive = await _dataContext.Query<Session>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(session => session.Id == request.SessionId)
+            .Where(session => session.TenantId == request.TenantId)
+            .Where(session => session.CredentialId == request.CredentialId)
+            .Where(session => session.Status == CurrentSessionState.Active)
+            .Where(session => !session.IsDeleted && session.IsEnabled)
+            .Where(session => session.ExpiresAt == null || session.ExpiresAt > now)
+            .AnyAsync(ct);
+        if (!sessionIsActive)
+            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
+
+        var tenantIsActive = await _dataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(tenant => tenant.Id == request.TenantId)
+            .Where(tenant => !tenant.IsDeleted && tenant.IsEnabled)
+            .Where(tenant => tenant.AvailabilityDate == null || tenant.AvailabilityDate <= now)
+            .Where(tenant => tenant.Expiration == null || tenant.Expiration > now)
+            .AnyAsync(ct);
+        if (!tenantIsActive)
+            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
+
+        var credential = await _dataContext.Query<IdentityCredential>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(item => item.Id == request.CredentialId)
+            .Where(item => item.TenantId == request.TenantId)
+            .Where(item => !item.IsDeleted && item.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+        if (credential is null)
+            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
+
+        var identityIsActive = await _dataContext.Query<IdentityInformation>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(identity => identity.Id == credential.IdentityInfoId)
+            .Where(identity => identity.TenantId == request.TenantId)
+            .Where(identity => !identity.IsDeleted && identity.IsEnabled)
+            .AnyAsync(ct);
+        if (!identityIsActive)
+            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
+
+        if (request.RoleTypeIds.Any(roleTypeId => roleTypeId == Guid.Empty))
+            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
+
+        var claimedRoleTypeIds = request.RoleTypeIds.Distinct().ToList();
+        if (claimedRoleTypeIds.Count > 0)
+        {
+            var activeRoles = await _dataContext.Query<IdentityRole>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(role => role.TenantId == request.TenantId)
+                .Where(role => role.CredentialId == request.CredentialId)
+                .Where(role => role.TypeId != null && claimedRoleTypeIds.Contains(role.TypeId.Value))
+                .Where(role => !role.IsDeleted && role.IsEnabled)
+                .Where(role => role.RoleExpiration >= now)
+                .ToListAsync(ct);
+
+            var activeRoleTypeIds = activeRoles
+                .Select(role => role.TypeId!.Value)
+                .Distinct()
+                .ToList();
+
+            var enabledRoleTypes = await _dataContext.Query<IdentityRoleType>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(roleType => roleType.TenantId == request.TenantId)
+                .Where(roleType => activeRoleTypeIds.Contains(roleType.Id))
+                .Where(roleType => !roleType.IsDeleted && roleType.IsEnabled)
+                .ToListAsync(ct);
+
+            if (claimedRoleTypeIds.Except(enabledRoleTypes.Select(roleType => roleType.Id)).Any())
+                return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
+        }
+
+        return Result<ValidateIdentitySessionResponse>.Success(new ValidateIdentitySessionResponse
+        {
+            TenantId = request.TenantId,
+            CredentialId = request.CredentialId,
+            SessionId = request.SessionId,
+            IsValid = true
+        });
+    }
+
     public async Task<Result<RefreshTokenResponse>> RefreshTokenAsync(
         RefreshTokenRequest request, CancellationToken ct = default)
     {
         try
         {
+            var rateLimitDecision = await AcquireSecurityRateLimitAsync(
+                StrictSecurityRateLimitPolicyMap.Refresh,
+                request.Metadata,
+                $"{request.Metadata.TenantId:D}:{request.SessionId:D}",
+                "refresh token",
+                ct);
+            if (!rateLimitDecision.IsAllowed)
+                return Result<RefreshTokenResponse>.Failure("Too many requests.", 429);
+
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             var session = await _dataContext.Query<Session>()
+                .IgnoreQueryFilters()
                 .Where(s => s.Id == request.SessionId)
                 .Where(s => s.Status == CurrentSessionState.Active)
+                .Where(s => !s.IsDeleted && s.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (session is null)
@@ -1743,20 +2550,68 @@ public sealed class AuthService : IAuthService
             }
 
             // Check session expiration - SECURITY CRITICAL
-            if (session.ExpiresAt.HasValue && session.ExpiresAt.Value <= DateTime.UtcNow)
+            if (session.ExpiresAt.HasValue && session.ExpiresAt.Value <= now)
             {
-                session.Status = CurrentSessionState.Expired;
-                session.ModifiedAt = DateTime.UtcNow;
                 _dataContext.Update(session);
-                await _dataContext.SaveChangesAsync(ct);
+                session.Status = CurrentSessionState.Expired;
+                session.ModifiedAt = now;
+                session.ConcurrencyStamp = Guid.NewGuid();
+                var expirySaveResult = await _dataContext.SaveChangesAsync(ct);
+                if (!expirySaveResult.IsSuccess)
+                    return Result<RefreshTokenResponse>.Failure("Session expiration could not be persisted", expirySaveResult.StatusCode);
 
                 _logger.TokenValidationFailed(session.CredentialId, "Session has expired");
                 return Result<RefreshTokenResponse>.Failure("Session has expired. Please log in again.", 401);
             }
 
-            // Validate refresh token against stored session data
-            var storedToken = JsonSerializer.Deserialize<JwtToken>(session.SessionData ?? "{}");
-            if (storedToken is null || storedToken.RefreshToken != request.RefreshToken)
+            if (!session.RefreshTokenExpiresAt.HasValue || session.RefreshTokenExpiresAt.Value <= now)
+            {
+                _dataContext.Update(session);
+                session.RefreshTokenHash = null;
+                session.ModifiedAt = now;
+                session.ConcurrencyStamp = Guid.NewGuid();
+                var refreshExpirySave = await _dataContext.SaveChangesAsync(ct);
+                if (!refreshExpirySave.IsSuccess)
+                    return Result<RefreshTokenResponse>.Failure(
+                        "Refresh-token expiration could not be persisted",
+                        refreshExpirySave.StatusCode);
+
+                _logger.TokenValidationFailed(session.CredentialId, "Refresh token has expired");
+                return Result<RefreshTokenResponse>.Failure("Invalid refresh token", 401);
+            }
+
+            var tenantIsActive = await _dataContext.Query<Tenant>()
+                .IgnoreQueryFilters()
+                .Where(t => t.Id == session.TenantId)
+                .Where(t => !t.IsDeleted && t.IsEnabled)
+                .Where(t => t.AvailabilityDate == null || t.AvailabilityDate <= now)
+                .Where(t => t.Expiration == null || t.Expiration > now)
+                .AnyAsync(ct);
+
+            var credential = await _dataContext.Query<IdentityCredential>()
+                .IgnoreQueryFilters()
+                .Include(c => c.IdentityInfo)
+                .Where(c => c.Id == session.CredentialId && c.TenantId == session.TenantId)
+                .Where(c => !c.IsDeleted && c.IsEnabled)
+                .Where(c => c.IdentityInfo != null && !c.IdentityInfo.IsDeleted && c.IdentityInfo.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+
+            var activeRoles = credential is null
+                ? []
+                : await GetRoleList(credential, ct) ?? [];
+
+            if (!tenantIsActive || credential is null || activeRoles.Count == 0)
+            {
+                await RevokeSessionAsync(session, ct);
+                return Result<RefreshTokenResponse>.Failure("Session is no longer authorized", 401);
+            }
+
+            // Validate the one-way refresh-token hash without persisting bearer tokens.
+            var suppliedRefreshHash = ComputeTokenHash(request.RefreshToken);
+            if (string.IsNullOrWhiteSpace(session.RefreshTokenHash) ||
+                !CryptographicOperations.FixedTimeEquals(
+                    Encoding.ASCII.GetBytes(session.RefreshTokenHash),
+                    Encoding.ASCII.GetBytes(suppliedRefreshHash)))
             {
                 _logger.TokenValidationFailed(session.CredentialId, "Invalid refresh token");
                 return Result<RefreshTokenResponse>.Failure("Invalid refresh token", 401);
@@ -1783,20 +2638,54 @@ public sealed class AuthService : IAuthService
                 return Result<RefreshTokenResponse>.Failure("Invalid access token", 401);
             }
 
-            // Generate new token pair from existing claims
-            var newToken = await _jwtService.GenerateToken(principal.Claims.ToList());
-            newToken.SessionId = session.Id;
+            var tenantIdClaim = principal.FindFirstValue("tenant_id")
+                                ?? principal.FindFirstValue("tenantId");
+            if (!Guid.TryParse(tenantIdClaim, out var tokenTenantId) ||
+                tokenTenantId != session.TenantId)
+            {
+                _logger.TokenValidationFailed(session.CredentialId, "Access token does not match session tenant");
+                return Result<RefreshTokenResponse>.Failure("Invalid access token", 401);
+            }
 
-            // Update session with new tokens
-            session.SessionData = JsonSerializer.Serialize(newToken);
-            session.ModifiedAt = DateTime.UtcNow;
+            var sessionIdClaim = principal.FindFirstValue("session_id");
+            if (!Guid.TryParse(sessionIdClaim, out var tokenSessionId) ||
+                tokenSessionId != session.Id)
+            {
+                _logger.TokenValidationFailed(session.CredentialId, "Access token does not match refresh session");
+                return Result<RefreshTokenResponse>.Failure("Invalid access token", 401);
+            }
+
+            // Generate new token pair from existing claims
+            var renewedClaims = new List<Claim>
+            {
+                new(ClaimTypes.GivenName, credential.UserName ?? credential.UserAlias ?? credential.Id.ToString("D")),
+                new(ClaimTypes.Role, JsonSerializer.Serialize(
+                    activeRoles.Where(role => role.TypeId.HasValue).Select(role => role.TypeId!.Value).ToList())),
+                new(ClaimTypes.Name, credential.Id.ToString("D")),
+                new("credential_id", credential.Id.ToString("D")),
+                new("tenant_id", credential.TenantId.ToString("D")),
+                new("tenantId", credential.TenantId.ToString("D")),
+                new("session_id", session.Id.ToString("D")),
+                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("D")),
+                new(JwtRegisteredClaimNames.AuthTime,
+                    principal.FindFirstValue(JwtRegisteredClaimNames.AuthTime) ?? now.ToString("O"))
+            };
+            var newToken = await _jwtService.GenerateToken(renewedClaims);
+
+            // Rotate the refresh token and concurrency stamp as a single-use transition.
             _dataContext.Update(session);
-            await _dataContext.SaveChangesAsync(ct);
+            session.RefreshTokenHash = ComputeTokenHash(newToken.RefreshToken);
+            session.RefreshTokenExpiresAt = newToken.RefreshTokenExpiresAt;
+            session.ModifiedAt = now;
+            session.ConcurrencyStamp = Guid.NewGuid();
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<RefreshTokenResponse>.Failure("Refresh token has already been used", 409);
 
             // Extract expiration from the newly generated token
             var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
             var jwt = handler.ReadJwtToken(newToken.AccessToken);
-            var expiresIn = (int)(jwt.ValidTo - DateTime.UtcNow).TotalSeconds;
+            var expiresIn = (int)(jwt.ValidTo - now).TotalSeconds;
 
             return Result<RefreshTokenResponse>.Success(new RefreshTokenResponse
             {
@@ -1805,6 +2694,10 @@ public sealed class AuthService : IAuthService
                 SessionId = newToken.SessionId,
                 ExpiresIn = expiresIn
             });
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -1821,9 +2714,76 @@ public sealed class AuthService : IAuthService
     public async Task<Result> ForgotPasswordAsync(
         ForgotPasswordRequest request, CancellationToken ct = default)
     {
+        var resetIdentifier = request.Email ?? request.Phone ?? string.Empty;
+        var rateLimitDecision = await AcquireSecurityRateLimitAsync(
+            StrictSecurityRateLimitPolicyMap.PasswordReset,
+            request.Metadata,
+            $"{request.Metadata.TenantId:D}:{resetIdentifier}",
+            "password reset request",
+            ct);
+        if (!rateLimitDecision.IsAllowed)
+            return Result.Failure("Too many requests.", 429);
+
+        if (request.Metadata.TenantId is not { } tenantId)
+            return Result.Failure("Tenant context is required.", 400);
+
+        var requestId = request.Metadata.RequestId ?? Guid.NewGuid();
+        var alreadyAccepted = await _dataContext.Query<PasswordResetOutboxMessage>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(message => message.TenantId == tenantId && message.RequestId == requestId)
+            .AnyAsync(ct);
+        if (!alreadyAccepted)
+        {
+            var outboxMessage = new PasswordResetOutboxMessage
+            {
+                TenantId = tenantId,
+                RequestId = requestId,
+                Email = request.Email,
+                Phone = request.Phone,
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
+            _dbContext.Add(outboxMessage);
+            try
+            {
+                await _dbContext.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (IsPasswordResetRequestConflict(ex))
+            {
+                _dbContext.Entry(outboxMessage).State = EntityState.Detached;
+                var acceptedByConcurrentRequest = await _dbContext.Set<PasswordResetOutboxMessage>()
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .AnyAsync(message =>
+                        message.TenantId == tenantId && message.RequestId == requestId, ct);
+                if (!acceptedByConcurrentRequest)
+                    return Result.Failure("Password reset request could not be accepted.", 503);
+            }
+            catch (DbUpdateException ex)
+            {
+                _dbContext.Entry(outboxMessage).State = EntityState.Detached;
+                _logger.LogError(ex, "Password reset outbox request {RequestId} could not be persisted.", requestId);
+                return Result.Failure("Password reset request could not be accepted.", 503);
+            }
+        }
+
+        return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
+    }
+
+    private static bool IsPasswordResetRequestConflict(DbUpdateException exception) =>
+        exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: PasswordResetRequestConstraint
+        };
+
+    public async Task<Result> ProcessForgotPasswordAsync(
+        ForgotPasswordRequest request, CancellationToken ct = default)
+    {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId, ct);
 
             // Determine lookup method based on input
             IdentityCredential? credential = null;
@@ -1835,8 +2795,10 @@ public sealed class AuthService : IAuthService
                 // Lookup credential by email contact
                 var emailContact = await _dataContext.Query<IdentityContact>()
                     .Include(c => c.Type)
-                    .Where(c => c.Credential.TenantId == tenant.Id)
+                    .Where(c => c.TenantId == tenant.Id)
                     .Where(c => c.Value == request.Email)
+                    .Where(c => !c.IsDeleted && c.IsEnabled)
+                    .Where(c => c.Type != null && !c.Type.IsDeleted && c.Type.IsEnabled)
                     .Where(c => c.Type != null && c.Type.Name == nameof(GenericContactType.Email))
                     .FirstOrDefaultAsync(ct);
 
@@ -1844,6 +2806,9 @@ public sealed class AuthService : IAuthService
                 {
                     credential = await _dataContext.Query<IdentityCredential>()
                         .Where(c => c.Id == emailContact.CredentialId)
+                        .Where(c => c.TenantId == tenant.Id)
+                        .Where(c => !c.IsDeleted && c.IsEnabled)
+                        .Where(c => c.IdentityInfo != null && !c.IdentityInfo.IsDeleted && c.IdentityInfo.IsEnabled)
                         .FirstOrDefaultAsync(ct);
                     recipientAddress = emailContact.Value;
                 }
@@ -1855,8 +2820,10 @@ public sealed class AuthService : IAuthService
                 // Lookup credential by phone contact
                 var phoneContact = await _dataContext.Query<IdentityContact>()
                     .Include(c => c.Type)
-                    .Where(c => c.Credential.TenantId == tenant.Id)
+                    .Where(c => c.TenantId == tenant.Id)
                     .Where(c => c.Value == request.Phone)
+                    .Where(c => !c.IsDeleted && c.IsEnabled)
+                    .Where(c => c.Type != null && !c.Type.IsDeleted && c.Type.IsEnabled)
                     .Where(c => c.Type != null && c.Type.Name == nameof(GenericContactType.Phone))
                     .FirstOrDefaultAsync(ct);
 
@@ -1864,6 +2831,9 @@ public sealed class AuthService : IAuthService
                 {
                     credential = await _dataContext.Query<IdentityCredential>()
                         .Where(c => c.Id == phoneContact.CredentialId)
+                        .Where(c => c.TenantId == tenant.Id)
+                        .Where(c => !c.IsDeleted && c.IsEnabled)
+                        .Where(c => c.IdentityInfo != null && !c.IdentityInfo.IsDeleted && c.IdentityInfo.IsEnabled)
                         .FirstOrDefaultAsync(ct);
                     recipientAddress = phoneContact.Value;
                 }
@@ -1895,18 +2865,19 @@ public sealed class AuthService : IAuthService
             // Create verification entity with the reset token
             var verification = new IdentityVerification
             {
+                TenantId = tenant.Id,
                 Status = (short?)GenericStatusType.Pending,
                 StatusUpdatedOn = DateTime.UtcNow,
-                Token = resetToken,
+                TokenHash = ComputeTokenHash(resetToken),
+                Purpose = IdentityConstants.VerificationPurpose.PasswordReset,
                 Expiry = DateTime.UtcNow.AddMinutes(PasswordResetTokenExpirationMinutes),
                 CredentialId = credential.Id,
-                VerificationTypeId = verificationTypeId
+                VerificationTypeId = verificationTypeId,
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
             };
 
             _dataContext.Add(verification);
-            await _dataContext.SaveChangesAsync(ct);
-
-            // Get message template for password reset
             var messageTemplate = await _dataContext.Query<RegistryConfiguration>()
                 .Where(i => i.TenantId == tenant.Id)
                 .Where(i => i.Group != null && i.Group.Name == "CommunicationsService_PasswordReset")
@@ -1915,42 +2886,32 @@ public sealed class AuthService : IAuthService
             var message = messageTemplate?.Value?.Replace("|Token|", resetToken)
                 ?? $"Your password reset token is: {resetToken}. This token expires in {PasswordResetTokenExpirationMinutes} minutes.";
 
-            // Send reset token via appropriate transport
-            var deliveryResult = await _communicationsServiceWrapper.CreateDirectMessageAsync(new()
-            {
-                MessageTransportType = transportType,
-                Sender = GenericSender.System,
-                Recipient = recipientAddress,
-                Subject = "Password Reset Request",
-                Intent = "PasswordReset",
-                Message = message,
-                IsScheduled = false,
-                Metadata = request.Metadata
-            }, ct);
-
-            if (!deliveryResult.IsSuccess)
-            {
-                _logger.LogWarning(
-                    "Password reset token delivery failed. CredentialId: {CredentialId}, Transport: {Transport}, StatusCode: {StatusCode}, Message: {Message}",
-                    credential.Id,
-                    transportType,
-                    deliveryResult.HttpStatusCode,
-                    deliveryResult.Message);
-
-                return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
-            }
+            QueueVerificationDelivery(
+                verification,
+                request.Metadata,
+                transportType,
+                recipientAddress,
+                "Password Reset Request",
+                "PasswordReset",
+                message);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result.Failure("Password reset verification could not be queued.", 503);
 
             _logger.LogInformation(
-                "Password reset token generated and sent. CredentialId: {CredentialId}, Transport: {Transport}",
+                "Password reset token generated and delivery queued. CredentialId: {CredentialId}, Transport: {Transport}",
                 credential.Id, transportType);
 
             return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.OperationFailed("ForgotPassword", "IdentityCredential", Guid.Empty, ex.Message, ex);
-            // Still return success to not reveal internal errors
-            return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
+            return Result.Failure("Password reset dispatch failed.", 500);
         }
     }
 
@@ -1960,11 +2921,31 @@ public sealed class AuthService : IAuthService
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(request.NewPassword))
+                return Result.Failure("New password is required", 400);
+
+            if (!IdentityPasswordPolicy.IsWithinBcryptByteLimit(request.NewPassword))
+                return Result.Failure("Password must not exceed 72 UTF-8 bytes", 400);
+
+            var tokenHash = ComputeTokenHash(request.Token);
+            var rateLimitDecision = await AcquireSecurityRateLimitAsync(
+                StrictSecurityRateLimitPolicyMap.PasswordReset,
+                request.Metadata,
+                tokenHash,
+                "password reset",
+                ct);
+            if (!rateLimitDecision.IsAllowed)
+                return Result.Failure("Too many requests.", 429);
+
             // Look up verification by token, must be pending and not expired
             var verification = await _dataContext.Query<IdentityVerification>()
-                .Where(i => i.Token == request.Token)
+                .IgnoreQueryFilters()
+                .Where(i => i.TokenHash == tokenHash)
+                .Where(i => i.Purpose == IdentityConstants.VerificationPurpose.PasswordReset)
                 .Where(i => i.Status == (short?)GenericStatusType.Pending)
                 .Where(i => i.Expiry > DateTime.UtcNow)
+                .Where(i => i.ConsumedAt == null)
+                .Where(i => !i.IsDeleted && i.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (verification is null)
@@ -1972,9 +2953,21 @@ public sealed class AuthService : IAuthService
                 return Result.Failure("Invalid or expired reset token", 400);
             }
 
+            var tenantIsActive = await _dataContext.Query<Tenant>()
+                .IgnoreQueryFilters()
+                .Where(t => t.Id == verification.TenantId)
+                .Where(t => !t.IsDeleted && t.IsEnabled)
+                .Where(t => t.AvailabilityDate == null || t.AvailabilityDate <= DateTime.UtcNow)
+                .Where(t => t.Expiration == null || t.Expiration > DateTime.UtcNow)
+                .AnyAsync(ct);
+            if (!tenantIsActive)
+                return Result.Failure("Invalid or expired reset token", 400);
+
             // Look up the credential
             var credential = await _dataContext.Query<IdentityCredential>()
                 .Where(c => c.Id == verification.CredentialId)
+                .Where(c => c.TenantId == verification.TenantId)
+                .Where(c => !c.IsDeleted && c.IsEnabled)
                 .FirstOrDefaultAsync(ct);
 
             if (credential is null)
@@ -1982,26 +2975,57 @@ public sealed class AuthService : IAuthService
                 return Result.NotFound("Associated account not found");
             }
 
+            await using var transaction = _dbContext.Database.CurrentTransaction is null
+                ? await _dbContext.Database.BeginTransactionAsync(ct)
+                : null;
+
             // Hash new password with BCrypt (workFactor 11) - SECURITY CRITICAL
             var hashPasswordByte = Encoding.ASCII.GetBytes(
                 BCrypt.Net.BCrypt.HashPassword(inputKey: request.NewPassword, workFactor: 11));
-            credential.PasswordByte = hashPasswordByte;
-
             _dataContext.Update(credential);
+            _dataContext.Update(verification);
+            credential.PasswordByte = hashPasswordByte;
+            credential.FailedLoginAttempts = 0;
+            credential.LockoutEnd = null;
+            credential.ConcurrencyStamp = Guid.NewGuid();
 
             // Invalidate the token (mark verification as used)
             verification.Status = (short?)GenericStatusType.Approved;
             verification.StatusUpdatedOn = DateTime.UtcNow;
-            _dataContext.Update(verification);
+            verification.ConsumedAt = DateTimeOffset.UtcNow;
+            verification.ConcurrencyStamp = Guid.NewGuid();
 
-            await _dataContext.SaveChangesAsync(ct);
+            var canceledAt = DateTimeOffset.UtcNow;
+            await _dbContext.Set<IdentityVerification>()
+                .IgnoreQueryFilters()
+                .Where(i => i.TenantId == credential.TenantId)
+                .Where(i => i.CredentialId == credential.Id)
+                .Where(i => i.Purpose == IdentityConstants.VerificationPurpose.PasswordReset)
+                .Where(i => i.Id != verification.Id)
+                .Where(i => i.Status == (short?)GenericStatusType.Pending && i.ConsumedAt == null)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(i => i.Status, (short?)GenericStatusType.Canceled)
+                        .SetProperty(i => i.ConsumedAt, canceledAt)
+                        .SetProperty(i => i.StatusUpdatedOn, canceledAt)
+                        .SetProperty(i => i.ConcurrencyStamp, Guid.NewGuid()),
+                    ct);
 
-            // Clear any lockout on successful password reset
-            LockoutCache.TryRemove(credential.Id, out _);
+            await RevokeActiveSessionsAsync(credential.TenantId, credential.Id, ct);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result.Failure("Password reset could not be completed", saveResult.StatusCode);
+
+            if (transaction is not null)
+                await transaction.CommitAsync(ct);
 
             _logger.PasswordChanged(credential.Id);
 
             return Result.Success("Password has been reset successfully");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

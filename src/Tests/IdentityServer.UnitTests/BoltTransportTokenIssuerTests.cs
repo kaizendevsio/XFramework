@@ -84,7 +84,7 @@ public sealed class BoltTransportTokenIssuerTests
     }
 
     [Test]
-    public void Configuration_AllowInsecureHttp_DefaultsToFalseAndCanBeExplicitlyEnabled()
+    public void Configuration_AllowInsecureHttp_IsLimitedToDevelopmentAndTest()
     {
         var now = DateTimeOffset.Parse("2026-07-13T01:00:00Z");
         var secureByDefault = ServiceIdentityConfiguration.FromConfiguration(
@@ -96,10 +96,22 @@ public sealed class BoltTransportTokenIssuerTests
                 enabled: false,
                 allowInsecureHttp: true,
                 includeSigningKeyPath: false),
-            now);
+            now,
+            "Development");
+
+        var productionParse = () => ServiceIdentityConfiguration.FromConfiguration(
+            CreateConfiguration(
+                now,
+                enabled: false,
+                allowInsecureHttp: true,
+                includeSigningKeyPath: false),
+            now,
+            "Production");
 
         secureByDefault.AllowInsecureHttp.Should().BeFalse();
         explicitlyInsecure.AllowInsecureHttp.Should().BeTrue();
+        productionParse.Should().Throw<InvalidOperationException>()
+            .WithMessage("*only in Development or Test environments*");
     }
 
     [Test]
@@ -194,7 +206,7 @@ public sealed class BoltTransportTokenIssuerTests
     }
 
     [Test]
-    public void CredentialEndpoints_AreHttpOnlyAndExcludedFromOpenApi()
+    public void CredentialEndpoints_AreHttpOnlyRateLimitedAndDocumented()
     {
         AssertCredentialEndpoint(
             typeof(IssueBoltTransportTokenEndpoint),
@@ -542,7 +554,10 @@ public sealed class BoltTransportTokenIssuerTests
             fallbackValidUntilUtc,
             allowInsecureHttp,
             includeSigningKeyPath);
-        var parsed = ServiceIdentityConfiguration.FromConfiguration(configuration, clock.GetUtcNow());
+        var parsed = ServiceIdentityConfiguration.FromConfiguration(
+            configuration,
+            clock.GetUtcNow(),
+            "Development");
         var signer = includeSigningKeyPath
             ? _signer
             : new FileBackedBoltTransportTokenSigner(parsed);
@@ -578,6 +593,7 @@ public sealed class BoltTransportTokenIssuerTests
             ["ServiceIdentity:Clients:0:ValidationFallback:ClientSecret"] = FallbackClientSecret,
             ["ServiceIdentity:Clients:0:ValidationFallback:ValidUntilUtc"] =
                 (fallbackValidUntilUtc ?? now.AddMinutes(10)).ToString("O"),
+            ["ServiceIdentity:Clients:0:AllowedAudiences:0"] = XFrameworkServiceNames.IdentityServer,
             ["ServiceIdentity:Clients:0:AllowedScopes:0"] = XFrameworkServiceScopes.BoltService
         };
 
@@ -606,7 +622,8 @@ public sealed class BoltTransportTokenIssuerTests
         var mapPost = endpointMethod.GetCustomAttribute<MapPostAttribute>();
         mapPost.Should().NotBeNull();
         mapPost!.Route.Should().Be(route);
-        mapPost.ExcludeFromOpenApi.Should().BeTrue();
+        mapPost.RateLimitPolicy.Should().Be("auth");
+        mapPost.ExcludeFromOpenApi.Should().BeFalse();
     }
 
     private static RSA CreatePublicRsa(BoltTransportJsonWebKey key)

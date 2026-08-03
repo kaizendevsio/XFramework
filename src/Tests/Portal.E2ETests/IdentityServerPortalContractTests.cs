@@ -162,6 +162,7 @@ public sealed class IdentityServerPortalContractTests
         var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
         var credentials = File.ReadAllText(Path.Combine(pagesRoot, "Credentials.razor"));
         var tenants = File.ReadAllText(Path.Combine(pagesRoot, "Tenants.razor"));
+        var tenantDetail = File.ReadAllText(Path.Combine(pagesRoot, "TenantDetail.razor"));
 
         userDetail.Should().Contain("[Inject] private IIdentityServerServiceWrapper IdentityServer");
         userDetail.Should().Contain("IdentityServer.CreateCredential(new CreateCredentialRequest");
@@ -181,10 +182,21 @@ public sealed class IdentityServerPortalContractTests
         tenants.Should().Contain("IdentityServer.CreateTenant(request)");
         tenants.Should().Contain("new DeleteTenantRequest");
         tenants.Should().Contain("IdentityServer.DeleteTenant(new DeleteTenantRequest");
+        tenants.Should().Contain("ExpectedConcurrencyStamp = _deletingTenant.ConcurrencyStamp");
         tenants.Should().NotContain("DataContext.Add(tenant)");
         tenants.Should().NotContain("DataContext.Update(");
         tenants.Should().NotContain("SaveChangesAsync(");
         tenants.Should().NotContain("TenantId = tenantId");
+        tenantDetail.Should().Contain("private UpdateTenantRequest CreateTenantUpdateRequest() => new()");
+        tenantDetail.Should().Contain("IdentityServer.UpdateTenant(request)");
+
+        var lifecycleStart = tenantDetail.IndexOf("private async Task SaveTenant()", StringComparison.Ordinal);
+        var lifecycleEnd = tenantDetail.IndexOf("private static string GetStatusText", lifecycleStart, StringComparison.Ordinal);
+        lifecycleStart.Should().BeGreaterThanOrEqualTo(0);
+        lifecycleEnd.Should().BeGreaterThan(lifecycleStart);
+        var lifecycleSource = tenantDetail[lifecycleStart..lifecycleEnd];
+        lifecycleSource.Should().NotContain("DataContext.Update(");
+        lifecycleSource.Should().NotContain("DataContext.SaveChangesAsync(");
         userDetail.Should().NotContain("BCrypt.Net.BCrypt.HashPassword");
         userDetail.Should().NotContain("DataContext.Add(credential)");
         userDetail.Should().NotContain("DataContext.Add(role)");
@@ -384,7 +396,9 @@ public sealed class IdentityServerPortalContractTests
             source.Should().Contain(
                 "RequireAuthorization = true",
                 $"{Path.GetFileName(Path.GetDirectoryName(endpointFile))} must require HTTP authorization");
-            source.Should().Contain("[BoltHandler]");
+            source.Should().Contain(
+                "[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]",
+                $"{Path.GetFileName(Path.GetDirectoryName(endpointFile))} must require the Identity admin service scope");
             source.Should().Contain("HandleHttp(");
             source.Should().Contain("HttpContext httpContext");
             source.Should().Contain("IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);");
@@ -397,6 +411,8 @@ public sealed class IdentityServerPortalContractTests
         endpointMetadata.Should().Contain("metadata.TenantId = ResolveGuidClaim(httpContext.User");
         endpointMetadata.Should().Contain("metadata.CredentialId = ResolveGuidClaim(");
         endpointMetadata.Should().Contain("metadata.ServiceAccessToken = null");
+        endpointMetadata.Should().Contain("metadata.HasTrustedActorContext = httpContext.User.Identity?.IsAuthenticated == true");
+        endpointMetadata.Should().Contain("metadata.TrustedActorRoles = httpContext.User.FindAll(ClaimTypes.Role)");
 
         var serviceSource = File.ReadAllText(Path.Combine(
             repositoryRoot.FullName,
@@ -408,11 +424,13 @@ public sealed class IdentityServerPortalContractTests
             "IdentityAuthorizationService.cs"));
 
         serviceSource.Should().Contain("ITrustedServiceInvocationResolver trustedServiceInvocationResolver");
-        serviceSource.Should().Contain("IHttpContextAccessor httpContextAccessor");
         serviceSource.Should().Contain("EnsureCallerCapabilityAsync(");
         serviceSource.Should().Contain("EnsureCanInspectCredentialCapabilitiesAsync(");
-        serviceSource.Should().Contain("TryResolveAuthenticatedHttpCredential(");
-        serviceSource.Should().Contain("httpContextAccessor.HttpContext?.User");
+        serviceSource.Should().Contain("TryResolveAuthenticatedCredential(");
+        serviceSource.Should().Contain("metadata.HasTrustedActorContext");
+        serviceSource.Should().Contain("metadata.TrustedActorRoles.Contains(\"SuperAdmin\")");
+        serviceSource.Should().NotContain("IHttpContextAccessor");
+        serviceSource.Should().NotContain("HttpContext");
         serviceSource.Should().Contain("XFrameworkServiceNames.IdentityServer");
         serviceSource.Should().Contain("XFrameworkServiceScopes.IdentityAdmin");
         serviceSource.Should().Contain("metadata.TenantId.Value == targetTenantId");
@@ -420,17 +438,28 @@ public sealed class IdentityServerPortalContractTests
         serviceSource.Should().Contain("RequiresTenantFeature(moduleKey, subFeatureKey)");
         serviceSource.Should().NotContain("IsCoreIdentityFeature(");
 
-        var authServiceSource = File.ReadAllText(Path.Combine(
+        var tenantLifecycleSource = File.ReadAllText(Path.Combine(
             repositoryRoot.FullName,
             "src",
             "Modules",
             "XFramework.IdentityServer",
             "IdentityServer.Api",
-            "Services",
-            "AuthService.cs"));
-        authServiceSource.Should().Contain("TenantModuleFeatureKeys.All");
-        authServiceSource.Should().Contain("TenantModuleFeatureKeys.Identity");
-        authServiceSource.Should().Contain("new TenantModuleFeature");
+            "Features",
+            "Tenants",
+            "TenantLifecycleOperations.cs"));
+        tenantLifecycleSource.Should().Contain("TenantModuleFeatureKeys.All");
+
+        var tenantAdministrationSource = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Features",
+            "Tenants",
+            "TenantAdministrationService.cs"));
+        tenantAdministrationSource.Should().Contain("TenantModuleFeatureKeys.Identity");
+        tenantAdministrationSource.Should().Contain("new TenantModuleFeature");
     }
 
     [Test]
@@ -464,6 +493,7 @@ public sealed class IdentityServerPortalContractTests
         tenantPolicyRouteIndex.Should().BeGreaterThanOrEqualTo(0);
         authorizationRouteIndex.Should().BeGreaterThanOrEqualTo(0);
         tenantPolicyRouteIndex.Should().BeLessThan(authorizationRouteIndex);
+        routes.Should().Contain("TenantModuleFeatureKeys.IdentityUsers, \"/api/identities\"");
 
         identityRole.Should().Contain("Actions = EndpointActions.Get | EndpointActions.GetList");
         identityRole.Should().NotContain("EndpointActions.Create");
@@ -559,6 +589,432 @@ public sealed class IdentityServerPortalContractTests
         source.Should().Contain("ToastService.Success(");
         source.Should().Contain("ToastService.Error(");
         source.Should().Contain("ToastService.Warning(");
+    }
+
+    [Test]
+    public void PortalBootstrap_UsesOneIdentityServerOwnedWrapperWorkflow()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var seeder = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal",
+            "Services",
+            "PortalBootstrapSeeder.cs"));
+        var service = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Features",
+            "PortalBootstrap",
+            "PortalBootstrapService.cs"));
+        var response = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Domain.Shared",
+            "Contracts",
+            "Responses",
+            "PortalBootstrapAdminResponse.cs"));
+
+        seeder.Should().Contain("IdentityServerServiceWrapper");
+        seeder.Should().Contain("EnsurePortalBootstrapAdmin(");
+        seeder.Should().NotContain("IDataContext");
+        seeder.Should().NotContain("DataContext.Add(");
+        seeder.Should().NotContain("DataContext.Update(");
+        seeder.Should().NotContain("DataContext.Remove(");
+        seeder.Should().NotContain("SaveChangesAsync(");
+        seeder.Should().NotContain("BCrypt");
+
+        service.Should().Contain("pg_advisory_xact_lock");
+        service.Should().Contain("BCrypt.Net.BCrypt.HashPassword");
+        service.Split("SaveChangesAsync(", StringSplitOptions.None)
+            .Should().HaveCount(2, "the server-owned bootstrap workflow must save exactly once");
+        service.Should().Contain("TenantModuleFeatureKeys.All");
+        service.Should().Contain("IdentityAuthorizationConstants.CapabilityKeys");
+        response.Should().NotContain("PasswordByte");
+        response.Should().NotContain("PasswordHash");
+    }
+
+    [Test]
+    public void UserDetail_SessionAndAuthorizationLogReads_AreTenantBoundedSingleQueries()
+    {
+        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+        var sessionsStart = userDetail.IndexOf("private async Task LoadSessions()", StringComparison.Ordinal);
+        var authLogsStart = userDetail.IndexOf("private async Task LoadAuthLogs()", sessionsStart, StringComparison.Ordinal);
+        var walletsStart = userDetail.IndexOf("private async Task LoadWallets()", authLogsStart, StringComparison.Ordinal);
+
+        sessionsStart.Should().BeGreaterThanOrEqualTo(0);
+        authLogsStart.Should().BeGreaterThan(sessionsStart);
+        walletsStart.Should().BeGreaterThan(authLogsStart);
+
+        var sessions = userDetail[sessionsStart..authLogsStart];
+        var authLogs = userDetail[authLogsStart..walletsStart];
+
+        sessions.Should().Contain("credentialIds.Contains(session.CredentialId)");
+        sessions.Should().Contain("session.TenantId == tenantId");
+        sessions.Should().Contain(".Take(100)");
+        sessions.Should().NotContain("foreach");
+        sessions.Split("DataContext.Query<Session>()", StringSplitOptions.None).Should().HaveCount(2);
+
+        authLogs.Should().Contain("credentialIds.Contains(log.CredentialId)");
+        authLogs.Should().Contain("log.TenantId == tenantId");
+        authLogs.Should().Contain(".Take(100)");
+        authLogs.Should().NotContain("foreach");
+        authLogs.Split("DataContext.Query<AuthorizationLog>()", StringSplitOptions.None).Should().HaveCount(2);
+    }
+
+    [Test]
+    public void UserDetail_LoadsOnlyTheActiveSection_AndBatchesCredentialRelationships()
+    {
+        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+
+        var reloadStart = userDetail.IndexOf("private async Task ReloadAllData()", StringComparison.Ordinal);
+        var dispatcherStart = userDetail.IndexOf("private async Task LoadActiveSectionData(string section)", reloadStart, StringComparison.Ordinal);
+        var clearStart = userDetail.IndexOf("private void ClearChildData()", dispatcherStart, StringComparison.Ordinal);
+        reloadStart.Should().BeGreaterThanOrEqualTo(0);
+        dispatcherStart.Should().BeGreaterThan(reloadStart);
+        clearStart.Should().BeGreaterThan(dispatcherStart);
+
+        var reload = userDetail[reloadStart..dispatcherStart];
+        reload.Should().Contain("await LoadActiveSectionData(CurrentSection);");
+        reload.Should().NotContain("await LoadCredentials();");
+        reload.Should().NotContain("await LoadRoles();");
+        reload.Should().NotContain("await LoadContacts();");
+        reload.Should().NotContain("await LoadAddresses();");
+        reload.Should().NotContain("await LoadSessions();");
+        reload.Should().NotContain("await LoadAuthLogs();");
+        reload.Should().NotContain("await LoadWallets();");
+        reload.Should().NotContain("await LoadAttendance();");
+
+        var dispatcher = userDetail[dispatcherStart..clearStart];
+        static string GetCase(string source, string name, string? nextName)
+        {
+            var start = source.IndexOf($"case \"{name}\":", StringComparison.Ordinal);
+            var end = nextName is null
+                ? source.Length
+                : source.IndexOf($"case \"{nextName}\":", start, StringComparison.Ordinal);
+            start.Should().BeGreaterThanOrEqualTo(0);
+            end.Should().BeGreaterThan(start);
+            return source[start..end];
+        }
+
+        var summaryCase = GetCase(dispatcher, "summary", "credentials");
+        var credentialsCase = GetCase(dispatcher, "credentials", "roles");
+        var rolesCase = GetCase(dispatcher, "roles", "contacts");
+        var contactsCase = GetCase(dispatcher, "contacts", "addresses");
+        var addressesCase = GetCase(dispatcher, "addresses", "sessions");
+        var sessionsCase = GetCase(dispatcher, "sessions", "auth-logs");
+        var authLogsCase = GetCase(dispatcher, "auth-logs", "attendance");
+        var attendanceCase = GetCase(dispatcher, "attendance", "wallets");
+        var walletsCase = GetCase(dispatcher, "wallets", null);
+
+        summaryCase.Should().NotContain("await Load");
+        credentialsCase.Should().Contain("await LoadCredentials();");
+        credentialsCase.Split("await Load", StringSplitOptions.None).Should().HaveCount(2);
+        rolesCase.Should().ContainAll("await LoadCredentials();", "await LoadRoles();", "await LoadRoleTypes();");
+        rolesCase.Split("await Load", StringSplitOptions.None).Should().HaveCount(4);
+        contactsCase.Should().ContainAll("await LoadCredentials();", "await LoadContacts();", "await LoadContactLookups();");
+        contactsCase.Split("await Load", StringSplitOptions.None).Should().HaveCount(4);
+        addressesCase.Should().Contain("await LoadAddresses();");
+        addressesCase.Split("await Load", StringSplitOptions.None).Should().HaveCount(2);
+        sessionsCase.Should().ContainAll("await LoadCredentials();", "await LoadSessions();");
+        sessionsCase.Split("await Load", StringSplitOptions.None).Should().HaveCount(3);
+        authLogsCase.Should().ContainAll("await LoadCredentials();", "await LoadAuthLogs();");
+        authLogsCase.Split("await Load", StringSplitOptions.None).Should().HaveCount(3);
+        attendanceCase.Should().ContainAll("await LoadCredentials();", "await LoadAttendance();");
+        attendanceCase.Split("await Load", StringSplitOptions.None).Should().HaveCount(3);
+        walletsCase.Should().ContainAll("await LoadCredentials();", "await LoadWallets();");
+        walletsCase.Split("await Load", StringSplitOptions.None).Should().HaveCount(3);
+        userDetail.Should().Contain("string.Equals(_loadedSection, normalizedSection, StringComparison.OrdinalIgnoreCase)");
+        userDetail.Should().Contain("_loadedSection = normalizedSection;");
+
+        var rolesStart = userDetail.IndexOf("private async Task LoadRoles()", StringComparison.Ordinal);
+        var contactsStart = userDetail.IndexOf("private async Task LoadContacts()", rolesStart, StringComparison.Ordinal);
+        var addressesStart = userDetail.IndexOf("private async Task LoadAddresses()", contactsStart, StringComparison.Ordinal);
+        var walletsStart = userDetail.IndexOf("private async Task LoadWallets()", addressesStart, StringComparison.Ordinal);
+        var attendanceStart = userDetail.IndexOf("private async Task LoadAttendance()", walletsStart, StringComparison.Ordinal);
+
+        var roles = userDetail[rolesStart..contactsStart];
+        var contacts = userDetail[contactsStart..addressesStart];
+        var wallets = userDetail[walletsStart..attendanceStart];
+
+        roles.Should().Contain("credentialIds.Contains(role.CredentialId)");
+        roles.Should().Contain("role.TenantId == tenantId");
+        roles.Should().NotContain("foreach");
+        roles.Split("DataContext.Query<IdentityRole>()", StringSplitOptions.None).Should().HaveCount(2);
+
+        contacts.Should().Contain("credentialIds.Contains(contact.CredentialId)");
+        contacts.Should().Contain("contact.TenantId == tenantId");
+        contacts.Should().NotContain("foreach");
+        contacts.Split("DataContext.Query<IdentityContact>()", StringSplitOptions.None).Should().HaveCount(2);
+
+        wallets.Should().Contain("credentialIds.Contains(wallet.CredentialId)");
+        wallets.Should().Contain("wallet.TenantId == tenantId");
+        wallets.Should().NotContain("foreach");
+        wallets.Split("DataContext.Query<Wallet>()", StringSplitOptions.None).Should().HaveCount(2);
+    }
+
+    [Test]
+    public void PortalBrowserCoverage_UsesRouteBackedUserSectionsAndPermissionDialogWorkflow()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var browserTests = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Tests",
+            "Portal.E2ETests",
+            "PortalE2ETests.cs"));
+        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+
+        browserTests.Should().Contain("AriaRole.Link, new() { Name = \"Credentials\", Exact = true }");
+        browserTests.Should().Contain("/credentials$");
+        browserTests.Should().Contain("/roles$");
+        browserTests.Should().Contain("/wallets$");
+        browserTests.Should().NotContain("AriaRole.Tab, new() { NameRegex = new Regex(\"Credentials\")");
+        browserTests.Should().Contain("Users_RolePermissionDialog_CanBeOpenedRepeatedly");
+        browserTests.Should().Contain("for (var attempt = 0; attempt < 3; attempt++)");
+        browserTests.Should().Contain("Name = \"Role Permission Overrides\"");
+        browserTests.Should().Contain("Name = \"Save Overrides\"");
+
+        userDetail.Should().Contain("private async Task OpenRolePermissionsDialog");
+        userDetail.Should().Contain("await IdentityServer.GetCredentialRolePermissionOverrides");
+        userDetail.Should().Contain("private async Task SaveRolePermissionOverrides");
+        userDetail.Should().Contain("IdentityServer.SetCredentialRolePermissionOverrides");
+        userDetail.Should().Contain("InvalidateRolePermissionDialogState();");
+    }
+
+    [Test]
+    public void IdentityInformationAdministration_UsesNarrowWrappersAndKeepsVerificationReadOnly()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var identityContract = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Domain.Shared",
+            "Contracts",
+            "IdentityInformation.cs"));
+        var administrationRequests = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Domain.Shared",
+            "Contracts",
+            "Requests",
+            "IdentityAdministrationRequests.cs"));
+        var administrationService = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Services",
+            "IdentityAdministrationService.cs"));
+        var users = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "Users.razor"));
+        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+
+        identityContract.Should().Contain("Actions = EndpointActions.Get | EndpointActions.GetList");
+        identityContract.Should().NotContain("[AllowRemoteDataContextMutation]");
+        identityContract.Should().NotContain("class CreateIdentityInformationRequest");
+        identityContract.Should().NotContain("class UpdateIdentityInformationRequest");
+
+        administrationRequests.Should().Contain("CreateIdentityRequest");
+        administrationRequests.Should().Contain("UpdateIdentityProfileRequest");
+        administrationRequests.Should().Contain("SetIdentityEnabledRequest");
+        administrationRequests.Should().Contain("SoftDeleteIdentityRequest");
+        administrationRequests.Should().NotContain("IsVerified");
+
+        administrationService.Should().Contain("request.Metadata");
+        administrationService.Should().Contain("item.TenantId == tenantIdResult.Data");
+        administrationService.Should().Contain("identity.ConcurrencyStamp != expectedConcurrencyStamp");
+        administrationService.Should().Contain("RevokeActiveSessionsAsync");
+
+        users.Should().Contain("IdentityServer.CreateIdentity(");
+        users.Should().Contain("IdentityServer.SetIdentityEnabled(");
+        users.Should().Contain("IdentityServer.SoftDeleteIdentity(");
+        users.Should().NotContain("DataContext.Add(user)");
+        users.Should().NotContain("DataContext.Update(fresh)");
+
+        userDetail.Should().Contain("IdentityServer.UpdateIdentityProfile(");
+        userDetail.Should().Contain("Label=\"Verified\"");
+        userDetail.Should().Contain("ReadOnly=\"true\"");
+        userDetail.Should().NotContain("@bind-Value=\"_editIsVerified\"");
+        userDetail.Should().NotContain("fresh.IsVerified =");
+    }
+
+    [Test]
+    public void IdentityInformationAdministrationEndpoints_RequireAdminAuthorization()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var featuresRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Features",
+            "Identities");
+
+        var endpointFiles = Directory.EnumerateFiles(featuresRoot, "Endpoint.cs", SearchOption.AllDirectories)
+            .ToArray();
+        endpointFiles.Should().HaveCount(4);
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(endpointFile);
+            source.Should().Contain("[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]");
+            source.Should().Contain("RequireAuthorization = true");
+            source.Should().Contain("Roles = [\"SuperAdmin\"]");
+            source.Should().Contain("IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);");
+        }
+    }
+
+    [Test]
+    public void SigningKeyAdministrationEndpoints_RequireAdminAuthorization()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        foreach (var operation in new[] { "RotateSigningKey", "RetireSigningKey" })
+        {
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot.FullName,
+                "src",
+                "Modules",
+                "XFramework.IdentityServer",
+                "IdentityServer.Api",
+                "Features",
+                "ServiceIdentity",
+                operation,
+                "Endpoint.cs"));
+
+            source.Should().Contain(
+                "[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]");
+            source.Should().Contain("RequireAuthorization = true");
+            source.Should().Contain("Roles = [\"SuperAdmin\"]");
+        }
+    }
+
+    [Test]
+    public void TenantAdministrationEndpoints_DelegateBusinessWorkflowsToService()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var tenantsRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Features",
+            "Tenants");
+
+        foreach (var operation in new[] { "Create", "Update", "Delete" })
+        {
+            var source = File.ReadAllText(Path.Combine(tenantsRoot, operation, "Endpoint.cs"));
+            source.Should().Contain("ITenantAdministrationService service");
+            source.Should().NotContain("IDataContext dataContext");
+            source.Should().NotContain("DbContext dbContext");
+            source.Should().NotContain("SaveChangesAsync(");
+        }
+
+        var service = File.ReadAllText(Path.Combine(tenantsRoot, "TenantAdministrationService.cs"));
+        service.Should().Contain("BeginTransactionAsync(ct)");
+        service.Should().Contain("RevokeActiveSessionsAsync");
+        service.Should().Contain("ExpectedConcurrencyStamp");
+    }
+
+    [Test]
+    public void IdentityAuthorizationBoltHandlers_RequireAdminScopeAndServicesHaveSingleRegistrationOwner()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var authorizationRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Features",
+            "Authorization");
+        foreach (var endpoint in Directory.EnumerateFiles(authorizationRoot, "Endpoint.cs", SearchOption.AllDirectories))
+        {
+            File.ReadAllText(endpoint).Should().Contain(
+                "[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]",
+                $"{Path.GetRelativePath(authorizationRoot, endpoint)} is an Identity authorization surface");
+        }
+
+        var serviceIdentityRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Features",
+            "ServiceIdentity");
+        foreach (var operation in new[] { "GetSigningKeys", "RotateSigningKey", "RetireSigningKey" })
+        {
+            File.ReadAllText(Path.Combine(serviceIdentityRoot, operation, "Endpoint.cs")).Should().Contain(
+                "[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]",
+                $"{operation} is an Identity service-administration surface");
+        }
+
+        var program = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Program.cs"));
+        var installer = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Installers",
+            "ServicesInstaller.cs"));
+        foreach (var service in new[]
+                 {
+                     "IAuthService", "IIdentityAuthorizationService", "IIdentityAdministrationService",
+                     "ITenantAdministrationService"
+                 })
+        {
+            program.Should().NotContain($"AddScoped<{service}");
+            installer.Should().Contain(service);
+        }
+    }
+
+    [Test]
+    public void IdentityServerBusinessEndpoints_AreIncludedInOpenApi()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var featuresRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api",
+            "Features");
+        var discoveryEndpoints = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.Combine("ServiceIdentity", "GetBoltTransportJwks", "Endpoint.cs"),
+            Path.Combine("ServiceIdentity", "GetBoltTransportMetadata", "Endpoint.cs")
+        };
+
+        foreach (var endpoint in Directory.EnumerateFiles(featuresRoot, "Endpoint.cs", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(featuresRoot, endpoint);
+            if (discoveryEndpoints.Contains(relativePath))
+                continue;
+
+            File.ReadAllText(endpoint).Should().NotContain(
+                "ExcludeFromOpenApi = true",
+                $"{relativePath} is a documented IdentityServer business endpoint");
+        }
     }
 
     [Test]

@@ -650,6 +650,11 @@ public sealed class ThreadServiceSecurityTests
         public IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(byte[] queryDescriptorBytes, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage query streams are not used by these tests.");
 
+        public Task<QueryResponse<StorageUploadMetadataResponse>> EnsureStorageUploadMetadata(
+            EnsureStorageUploadMetadataRequest request,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage upload metadata is not used by these tests.");
+
         public Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(CreateStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload sessions are not used by these tests.");
 
@@ -661,6 +666,9 @@ public sealed class ThreadServiceSecurityTests
 
         public Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(CompleteStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload completion is not used by these tests.");
+
+        public Task<QueryResponse<StorageFileResponse>> ClaimStorageFile(ClaimStorageFileRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage claims are not used by these tests.");
 
         public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload abort is not used by these tests.");

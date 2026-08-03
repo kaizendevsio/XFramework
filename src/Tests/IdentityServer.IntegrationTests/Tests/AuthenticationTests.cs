@@ -94,7 +94,7 @@ public class AuthenticationTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Http_Authenticate_WithWrongPassword_Returns400()
+    public async Task Http_Authenticate_WithWrongPassword_Returns401()
     {
         var username = UniqueUsername();
         await SeedCredentialWithRole(username, "CorrectPassword123!");
@@ -102,17 +102,17 @@ public class AuthenticationTests : IntegrationTestBase
         var (response, elapsed) = await TimedHttpPost("/api/auth/authenticate",
             CreateAuthRequest(username, "WrongPassword!"));
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         LogTiming("HTTP", elapsed);
     }
 
     [Test]
-    public async Task Http_Authenticate_WithNonExistentUser_Returns404()
+    public async Task Http_Authenticate_WithNonExistentUser_Returns401()
     {
         var (response, elapsed) = await TimedHttpPost("/api/auth/authenticate",
             CreateAuthRequest("nonexistent_" + Guid.NewGuid().ToString("N"), "SomePassword!"));
 
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         LogTiming("HTTP", elapsed);
     }
 
@@ -213,7 +213,7 @@ public class AuthenticationTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Bolt_Authenticate_WithWrongPassword_Returns400()
+    public async Task Bolt_Authenticate_WithWrongPassword_Returns401()
     {
         var username = UniqueUsername();
         await SeedCredentialWithRole(username, "CorrectPassword123!");
@@ -221,18 +221,18 @@ public class AuthenticationTests : IntegrationTestBase
         var (result, elapsed) = await TimedBoltCall(CreateAuthRequest(username, "WrongPassword!"));
 
         result.Should().NotBeNull();
-        result!.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
+        result!.HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
         LogTiming("Bolt", elapsed);
     }
 
     [Test]
-    public async Task Bolt_Authenticate_WithNonExistentUser_Returns404()
+    public async Task Bolt_Authenticate_WithNonExistentUser_Returns401()
     {
         var (result, elapsed) = await TimedBoltCall(
             CreateAuthRequest("nonexistent_" + Guid.NewGuid().ToString("N"), "SomePassword!"));
 
         result.Should().NotBeNull();
-        result!.HttpStatusCode.Should().Be(HttpStatusCode.NotFound);
+        result!.HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
         LogTiming("Bolt", elapsed);
     }
 
@@ -392,6 +392,7 @@ public class AuthenticationTests : IntegrationTestBase
             Id = Guid.NewGuid(),
             FirstName = "Test",
             LastName = "User",
+            IsEnabled = true,
             TenantId = IntegrationTestFixture.TestTenantId
         };
         db.Set<IdentityInformation>().Add(info);

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.IO;
+using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -24,6 +26,23 @@ public sealed class CredentialGenerationTests
     private const string G0Secret = "g0-secret-credential-material-0000000000000000000000000000000000000000";
     private const string G1Secret = "g1-secret-credential-material-1111111111111111111111111111111111111111";
     private static readonly JwtSecurityTokenHandler Handler = new();
+    private static readonly string JwtKeyDirectory = Path.Combine(
+        Path.GetTempPath(),
+        "XFramework.CredentialGenerationTests",
+        Guid.NewGuid().ToString("N"));
+    private static readonly IReadOnlyDictionary<string, TestJwtKeyPair> JwtKeys =
+        new Dictionary<string, TestJwtKeyPair>(StringComparer.Ordinal)
+        {
+            [G0Secret] = CreateKeyPair("g0"),
+            [G1Secret] = CreateKeyPair("g1")
+        };
+
+    [OneTimeTearDown]
+    public void DeleteJwtKeys()
+    {
+        if (Directory.Exists(JwtKeyDirectory))
+            Directory.Delete(JwtKeyDirectory, recursive: true);
+    }
 
     [Test]
     public async Task JwtValidation_G1PreStagedAsFallback_AcceptsG1ButIssuesWithG0()
@@ -121,6 +140,24 @@ public sealed class CredentialGenerationTests
         var service = new JwtService(options, clock);
 
         var decode = async () => await service.DecodeJwtToken(token);
+
+        await decode.Should().ThrowAsync<SecurityTokenException>();
+    }
+
+    [Test]
+    public async Task JwtValidation_MissingGenerationClaim_RejectsToken()
+    {
+        var clock = new MutableTimeProvider(DateTimeOffset.UtcNow);
+        var options = CreateJwtOptions("g1", G1Secret, "g0", G0Secret, clock.GetUtcNow().AddMinutes(5));
+        var key = CreatePrivateSecurityKey(G1Secret, "g1");
+        var token = new JwtSecurityToken(
+            options.ValidIssuer,
+            options.ValidAudience,
+            expires: clock.GetUtcNow().UtcDateTime.AddMinutes(20),
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.RsaSha512));
+        var service = new JwtService(options, clock);
+
+        var decode = async () => await service.DecodeJwtToken(Handler.WriteToken(token));
 
         await decode.Should().ThrowAsync<SecurityTokenException>();
     }
@@ -299,9 +336,9 @@ public sealed class CredentialGenerationTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["JwtOptions:GenerationId"] = "jwt-g1",
-                ["JwtOptions:Secret"] = G1Secret,
+                ["JwtOptions:SigningPublicKeyPath"] = JwtKeys[G1Secret].PublicKeyPath,
                 ["JwtOptions:ValidationFallback:GenerationId"] = "jwt-g0",
-                ["JwtOptions:ValidationFallback:Secret"] = G0Secret,
+                ["JwtOptions:ValidationFallback:SigningPublicKeyPath"] = JwtKeys[G0Secret].PublicKeyPath,
                 ["JwtOptions:ValidationFallback:ValidUntilUtc"] = validUntil.ToString("O"),
                 ["ServiceIdentity:GenerationId"] = "client-g1",
                 ["ServiceIdentity:ClientSecret"] = G1Secret,
@@ -352,6 +389,81 @@ public sealed class CredentialGenerationTests
         registrations[0].Tags.Should().Contain("ready");
     }
 
+    [Test]
+    public void JwtCredentialSet_RejectsRsaKeysBelow2048Bits()
+    {
+        var directory = Path.Combine(JwtKeyDirectory, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var privatePath = Path.Combine(directory, "private.pem");
+        var publicPath = Path.Combine(directory, "public.pem");
+        using (var rsa = RSA.Create(1024))
+        {
+            File.WriteAllText(privatePath, rsa.ExportPkcs8PrivateKeyPem());
+            File.WriteAllText(publicPath, rsa.ExportSubjectPublicKeyInfoPem());
+        }
+
+        var options = new JwtOptions
+        {
+            GenerationId = "weak-key-test",
+            SigningPrivateKeyPath = privatePath,
+            SigningPublicKeyPath = publicPath,
+            ValidIssuer = "credential-tests",
+            ValidAudience = "credential-tests"
+        };
+
+        var validate = () => JwtCredentialSet.Validate(options, DateTimeOffset.UtcNow);
+
+        validate.Should().Throw<InvalidOperationException>()
+            .WithMessage("*at least 2048 bits*");
+    }
+
+    [TestCase("Production")]
+    [TestCase("Staging")]
+    public void JwtCredentialSet_MissingSigningKeysOutsideDevelopmentOrTest_FailsClosed(
+        string environmentName)
+    {
+        var directory = Path.Combine(JwtKeyDirectory, Guid.NewGuid().ToString("N"));
+        var options = MissingJwtKeyOptions(directory);
+
+        var validate = () => JwtCredentialSet.Validate(
+            options,
+            DateTimeOffset.UtcNow,
+            environmentName);
+
+        validate.Should().Throw<InvalidOperationException>()
+            .WithMessage("*must be provisioned outside Development or Test environments*");
+        File.Exists(options.SigningPrivateKeyPath).Should().BeFalse();
+        File.Exists(options.SigningPublicKeyPath).Should().BeFalse();
+    }
+
+    [TestCase("Development")]
+    [TestCase("Test")]
+    public void JwtCredentialSet_MissingSigningKeysInAllowedEnvironment_CreatesSecureKeyPair(
+        string environmentName)
+    {
+        var directory = Path.Combine(JwtKeyDirectory, Guid.NewGuid().ToString("N"));
+        var options = MissingJwtKeyOptions(directory);
+
+        JwtCredentialSet.Validate(options, DateTimeOffset.UtcNow, environmentName);
+
+        File.Exists(options.SigningPrivateKeyPath).Should().BeTrue();
+        File.Exists(options.SigningPublicKeyPath).Should().BeTrue();
+        if (!OperatingSystem.IsWindows())
+        {
+            File.GetUnixFileMode(options.SigningPrivateKeyPath!).Should().Be(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
+    private static JwtOptions MissingJwtKeyOptions(string directory) => new()
+    {
+        GenerationId = $"generated-{Guid.NewGuid():N}",
+        SigningPrivateKeyPath = Path.Combine(directory, "private.pem"),
+        SigningPublicKeyPath = Path.Combine(directory, "public.pem"),
+        ValidIssuer = "credential-tests",
+        ValidAudience = "credential-tests"
+    };
+
     private static void AssertInvalid(
         CredentialGenerationDescriptor current,
         CredentialGenerationDescriptor? fallback,
@@ -369,11 +481,14 @@ public sealed class CredentialGenerationTests
         DateTimeOffset validUntilUtc) => new()
     {
         GenerationId = currentId,
-        Secret = currentSecret,
+        SigningPrivateKeyPath = JwtKeys[currentSecret].PrivateKeyPath,
+        SigningPublicKeyPath = JwtKeys[currentSecret].PublicKeyPath,
         ValidationFallback = new JwtValidationFallbackOptions
         {
             GenerationId = fallbackId,
-            Secret = fallbackSecret,
+            SigningPublicKeyPath = string.IsNullOrWhiteSpace(fallbackSecret)
+                ? string.Empty
+                : JwtKeys[fallbackSecret].PublicKeyPath,
             ValidUntilUtc = validUntilUtc
         },
         ValidIssuer = "credential-tests",
@@ -389,16 +504,13 @@ public sealed class CredentialGenerationTests
         DateTimeOffset now,
         string? signingKeyId = null)
     {
-        var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(secret))
-        {
-            KeyId = signingKeyId ?? generationId
-        };
+        var key = CreatePrivateSecurityKey(secret, signingKeyId ?? generationId);
         var token = new JwtSecurityToken(
             options.ValidIssuer,
             options.ValidAudience,
             [new Claim(JwtCredentialSet.GenerationClaim, generationId)],
             expires: now.UtcDateTime.AddMinutes(20),
-            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha512));
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.RsaSha512));
         return Handler.WriteToken(token);
     }
 
@@ -407,16 +519,31 @@ public sealed class CredentialGenerationTests
         string secret,
         JwtOptions options)
     {
-        var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(secret))
-        {
-            KeyId = generationId
-        };
+        var key = CreatePrivateSecurityKey(secret, generationId);
         var token = new JwtSecurityToken(
             options.ValidIssuer,
             options.ValidAudience,
             [new Claim(JwtCredentialSet.GenerationClaim, generationId)],
-            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha512));
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.RsaSha512));
         return Handler.WriteToken(token);
+    }
+
+    private static TestJwtKeyPair CreateKeyPair(string generationId)
+    {
+        Directory.CreateDirectory(JwtKeyDirectory);
+        var privateKeyPath = Path.Combine(JwtKeyDirectory, $"{generationId}-private.pem");
+        var publicKeyPath = Path.Combine(JwtKeyDirectory, $"{generationId}-public.pem");
+        using var rsa = RSA.Create(2048);
+        File.WriteAllText(privateKeyPath, rsa.ExportPkcs8PrivateKeyPem());
+        File.WriteAllText(publicKeyPath, rsa.ExportSubjectPublicKeyInfoPem());
+        return new TestJwtKeyPair(privateKeyPath, publicKeyPath);
+    }
+
+    private static RsaSecurityKey CreatePrivateSecurityKey(string keyName, string keyId)
+    {
+        var rsa = RSA.Create();
+        rsa.ImportFromPem(File.ReadAllText(JwtKeys[keyName].PrivateKeyPath));
+        return new RsaSecurityKey(rsa) { KeyId = keyId };
     }
 
     private sealed class MutableTimeProvider(DateTimeOffset utcNow) : TimeProvider
@@ -425,4 +552,6 @@ public sealed class CredentialGenerationTests
 
         public void Advance(TimeSpan duration) => utcNow = utcNow.Add(duration);
     }
+
+    private sealed record TestJwtKeyPair(string PrivateKeyPath, string PublicKeyPath);
 }

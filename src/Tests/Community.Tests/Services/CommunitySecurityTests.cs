@@ -337,6 +337,11 @@ public sealed class CommunitySecurityTests
         public IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(byte[] queryDescriptorBytes, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage query streams should not be called by these security tests.");
 
+        public Task<QueryResponse<StorageUploadMetadataResponse>> EnsureStorageUploadMetadata(
+            EnsureStorageUploadMetadataRequest request,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage upload metadata should not be called by these security tests.");
+
         public Task<QueryResponse<StorageUploadSessionResponse>> CreateStorageUploadSession(CreateStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload sessions should not be called by these security tests.");
 
@@ -348,6 +353,9 @@ public sealed class CommunitySecurityTests
 
         public Task<QueryResponse<StorageFileResponse>> CompleteStorageUploadSession(CompleteStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload completion should not be called by these security tests.");
+
+        public Task<QueryResponse<StorageFileResponse>> ClaimStorageFile(ClaimStorageFileRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Storage claims should not be called by these security tests.");
 
         public Task<CmdResponse> AbortStorageUploadSession(AbortStorageUploadSessionRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException("Storage upload abort should not be called by these security tests.");

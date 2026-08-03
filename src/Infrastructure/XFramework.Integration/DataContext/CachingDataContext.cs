@@ -1,5 +1,6 @@
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext.Cache;
+using Microsoft.Extensions.Logging;
 
 namespace XFramework.Integration.DataContext;
 
@@ -8,20 +9,26 @@ public class CachingDataContext : IDataContext, ICacheControl
     private readonly IDataContext _inner;
     private readonly IClientCacheService _cache;
     private readonly DataContextOptions _options;
+    private readonly ILogger<CachingDataContext> _logger;
     private readonly List<string> _affectedEntityTypes = [];
 
-    public CachingDataContext(IDataContext inner, IClientCacheService cache, DataContextOptions options)
+    public CachingDataContext(
+        IDataContext inner,
+        IClientCacheService cache,
+        DataContextOptions options,
+        ILogger<CachingDataContext> logger)
     {
         _inner = inner;
         _cache = cache;
         _options = options;
+        _logger = logger;
     }
 
     public IRemoteQuery<T> Query<T>() where T : class
     {
         var innerQuery = _inner.Query<T>();
         var policy = _options.GetCachePolicy<T>();
-        return new CachingQuery<T>(innerQuery, _cache, policy);
+        return new CachingQuery<T>(innerQuery, _cache, policy, _logger);
     }
 
     public void Add<T>(T entity) where T : class
@@ -48,12 +55,22 @@ public class CachingDataContext : IDataContext, ICacheControl
 
         if (result.IsSuccess)
         {
-            // Invalidate cache for all affected entity types
-            foreach (var entityType in _affectedEntityTypes)
+            foreach (var entityType in _affectedEntityTypes.ToArray())
             {
-                await _cache.RemoveByPrefixAsync(CacheKeyBuilder.PrefixForEntity(entityType), ct);
+                try
+                {
+                    await _cache.RemoveByPrefixAsync(CacheKeyBuilder.PrefixForEntity(entityType), ct);
+                    _affectedEntityTypes.Remove(entityType);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Remote data-context cache invalidation failed for {EntityType}.", entityType);
+                }
             }
-            _affectedEntityTypes.Clear();
         }
 
         return result;
@@ -63,7 +80,7 @@ public class CachingDataContext : IDataContext, ICacheControl
         => await _cache.RemoveByPrefixAsync(CacheKeyBuilder.PrefixForEntity<T>(), ct);
 
     public async Task InvalidateAsync<T>(Guid id, CancellationToken ct = default) where T : class
-        => await _cache.RemoveByPrefixAsync($"{typeof(T).Name}:id:{id}", ct);
+        => await _cache.RemoveByPrefixAsync(CacheKeyBuilder.PrefixForEntity<T>(), ct);
 
     public async Task PrefetchAsync<T>(IRemoteQuery<T> query, CancellationToken ct = default) where T : class
         => await query.ToListAsync(ct); // The CachingQuery wrapper will cache the result

@@ -1,21 +1,31 @@
 using FluentValidation;
+using IdentityServer.Api.Features.Authorization.Shared;
 using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Api.Features.Credentials.Avatar.Remove;
 
 public static class RemoveCredentialAvatarEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    public static Task<Result<CredentialAvatarResponse>> Handle(
+        RemoveCredentialAvatarRequest request,
+        IAuthService authService,
+        CancellationToken ct) => authService.RemoveCredentialAvatarAsync(request, ct);
+
     [MapPost("/api/credentials/avatar/remove", Tags = ["Credentials"],
         Summary = "Remove a credential avatar",
         Description = "Clears credential avatar metadata without deleting the stored file.",
-        ExcludeFromOpenApi = true)]
-    public static async Task<Result<CredentialAvatarResponse>> Handle(
+        RequireAuthorization = true,
+        Capability = IdentityAuthorizationConstants.Update,
+        ExcludeFromOpenApi = false)]
+    public static Task<Result<CredentialAvatarResponse>> HandleHttp(
         RemoveCredentialAvatarRequest request,
+        HttpContext httpContext,
         IAuthService authService,
         CancellationToken ct)
     {
-        return await authService.RemoveCredentialAvatarAsync(request, ct);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        return authService.RemoveCredentialAvatarAsync(request, ct);
     }
 }
 

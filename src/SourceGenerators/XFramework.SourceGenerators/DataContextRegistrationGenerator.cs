@@ -147,7 +147,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
 
         sb.AppendLine("    public static HashSet<string> GetDataContextMutableEntityTypes() => new(StringComparer.OrdinalIgnoreCase)");
         sb.AppendLine("    {");
-        foreach (var entity in validEntities.Where(static e => HasMutatingEndpointActions(e.EndpointActionsValue) || e.AllowRemoteMutation))
+        foreach (var entity in validEntities.Where(static e => e.AllowRemoteMutation))
         {
             sb.AppendLine($"        \"{entity.ClassName}\",");
         }

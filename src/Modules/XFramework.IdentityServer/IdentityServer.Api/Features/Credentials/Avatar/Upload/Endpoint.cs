@@ -1,22 +1,32 @@
 using FluentValidation;
 using IdentityServer.Domain.Shared;
+using IdentityServer.Api.Features.Authorization.Shared;
 using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Api.Features.Credentials.Avatar.Upload;
 
 public static class UploadCredentialAvatarEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    public static Task<Result<CredentialAvatarResponse>> Handle(
+        UploadCredentialAvatarRequest request,
+        IAuthService authService,
+        CancellationToken ct) => authService.UploadCredentialAvatarAsync(request, ct);
+
     [MapPost("/api/credentials/avatar/upload", Tags = ["Credentials"],
         Summary = "Upload a credential avatar",
         Description = "Uploads an image avatar for an identity credential and stores only metadata on the credential.",
-        ExcludeFromOpenApi = true)]
-    public static async Task<Result<CredentialAvatarResponse>> Handle(
+        RequireAuthorization = true,
+        Capability = IdentityAuthorizationConstants.Update,
+        ExcludeFromOpenApi = false)]
+    public static Task<Result<CredentialAvatarResponse>> HandleHttp(
         UploadCredentialAvatarRequest request,
+        HttpContext httpContext,
         IAuthService authService,
         CancellationToken ct)
     {
-        return await authService.UploadCredentialAvatarAsync(request, ct);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        return authService.UploadCredentialAvatarAsync(request, ct);
     }
 }
 

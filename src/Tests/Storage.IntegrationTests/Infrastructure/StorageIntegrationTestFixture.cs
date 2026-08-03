@@ -1,11 +1,17 @@
 using System.Runtime.CompilerServices;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Bolt.Client;
 using Bolt.Hub.Extensions;
 using FluentValidation;
+using IdentityServer.Api.Services;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.IdentityModel.Tokens;
 using NUnit.Framework;
 using Storage.Api.Features.Sessions.UploadPart;
 using Storage.Api.Generated;
@@ -22,6 +28,8 @@ using XFramework.Domain.Interceptors;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.Extensions;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Extensions;
 using XFramework.Integration.Extensions;
 using XFramework.TestInfrastructure;
@@ -32,7 +40,12 @@ namespace Storage.IntegrationTests;
 public sealed class StorageIntegrationTestFixture
 {
     private const string ExternalConnectionStringEnvironmentVariable = "STORAGE_TEST_POSTGRES_CONNECTION";
-    private const string BoltSignature = "storage-bolt-test-secret";
+    private const string StorageServiceGenerationId = "storage-test-g1";
+    private const string StorageServiceSecret = "storage-integration-service-secret-2026";
+    private const string TestClientGenerationId = "storage-client-test-g1";
+    private const string TestClientSecret = "storage-integration-client-secret-2026";
+    private static readonly Guid TestIdentityId = Guid.Parse("74c5c42e-8035-454f-a3ba-da3844759c6f");
+    public static readonly Guid TestCredentialId = Guid.Parse("ef70fc0d-eed3-4b97-a111-808b31e0cd4c");
 
     private static PostgreSqlContainer postgres = null!;
     private static bool ownsPostgresContainer;
@@ -42,6 +55,10 @@ public sealed class StorageIntegrationTestFixture
     private static Task? boltTask;
     private static Task? storageTask;
     private static Task? testClientTask;
+    private static string transportSigningKeyPath = null!;
+    private static string userJwtPublicKeyPath = null!;
+    private static RSA serviceSigningKey = null!;
+    private static string serviceSigningKeyId = null!;
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => TestConstants.Ports.StorageBolt;
@@ -89,6 +106,16 @@ public sealed class StorageIntegrationTestFixture
         }
 
         await MigrateAndSeed();
+        transportSigningKeyPath = Path.Combine(
+            Path.GetTempPath(),
+            $"xframework-storage-tests-{Guid.NewGuid():N}",
+            "bolt-transport-signing-key.pem");
+        userJwtPublicKeyPath = Path.Combine(
+            Path.GetDirectoryName(transportSigningKeyPath)!,
+            "user-jwt-public-key.pem");
+        Directory.CreateDirectory(Path.GetDirectoryName(userJwtPublicKeyPath)!);
+        using (var userJwtKey = RSA.Create(3072))
+            await File.WriteAllTextAsync(userJwtPublicKeyPath, userJwtKey.ExportSubjectPublicKeyInfoPem());
 
         boltApp = StartBolt();
         await TestHostWaiter.WaitForHealth($"{BoltUrl}/health/live", boltTask);
@@ -105,12 +132,46 @@ public sealed class StorageIntegrationTestFixture
     [OneTimeTearDown]
     public async Task GlobalTeardown()
     {
-        try { if (testClientApp is not null) await testClientApp.StopAsync(); } catch { }
-        try { if (storageApp is not null) await storageApp.StopAsync(); } catch { }
-        try { if (boltApp is not null) await boltApp.StopAsync(); } catch { }
+        await StopApplicationAsync(testClientApp);
+        await StopApplicationAsync(storageApp);
+        await StopApplicationAsync(boltApp);
+        serviceSigningKey?.Dispose();
+
+        var signingKeyDirectory = Path.GetDirectoryName(transportSigningKeyPath);
+        if (!string.IsNullOrWhiteSpace(signingKeyDirectory) && Directory.Exists(signingKeyDirectory))
+            Directory.Delete(signingKeyDirectory, recursive: true);
 
         if (ownsPostgresContainer && postgres is not null)
-            await postgres.DisposeAsync();
+        {
+            try
+            {
+                await postgres.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15));
+            }
+            catch (TimeoutException)
+            {
+                TestContext.Progress.WriteLine("Storage test PostgreSQL cleanup exceeded 15 seconds.");
+            }
+        }
+    }
+
+    private static async Task StopApplicationAsync(WebApplication? app)
+    {
+        if (app is null)
+            return;
+
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            await app.StopAsync(cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            TestContext.Progress.WriteLine("Storage test host shutdown exceeded 5 seconds.");
+        }
+        catch (Exception ex)
+        {
+            TestContext.Progress.WriteLine($"Storage test host shutdown failed: {ex.GetType().Name}");
+        }
     }
 
     public static AppDbContext CreateDbContext()
@@ -119,7 +180,6 @@ public sealed class StorageIntegrationTestFixture
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         var configuration = new ConfigurationBuilder()
@@ -134,16 +194,29 @@ public sealed class StorageIntegrationTestFixture
 
     private static WebApplication StartBolt()
     {
-        var builder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Development
+        });
         builder.WebHost.UseUrls(BoltUrl);
-        OverrideConfig(builder, "Bolt.StorageTest", "00000000-0000-0000-0000-000000000690");
+        OverrideConfig(builder, "Bolt.StorageTest", "00000000-0000-0000-0000-000000000690", BoltUrl);
+        builder.Services.InstallServicesInAssembly<Bolt.Hub.Installers.BoltInstaller>(
+            builder.Configuration,
+            builder.Environment);
+        builder.Services.InstallSwagger(builder.Configuration);
+        builder.Services.InstallOData(builder.Configuration);
+        builder.Services.InstallJwt(builder.Configuration);
+        builder.Services.InstallStandardServices<Bolt.Hub.Installers.BoltInstaller>(builder.Configuration);
+        builder.Services.InstallRuntimeServices(builder.Configuration);
 
         var app = (WebApplication)builder.Build();
+        MapTestTokenAuthority(app, builder.Configuration);
         app.UseCorrelationId();
         app.UseAppServices();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        boltTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        boltTask = app.WaitForShutdownAsync();
         return app;
     }
 
@@ -151,7 +224,11 @@ public sealed class StorageIntegrationTestFixture
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls(StorageUrl);
-        OverrideConfig(builder, "Storage", "2cc8a10f-54f1-44da-99e4-d49e3f663d19");
+        OverrideConfig(
+            builder,
+            XFrameworkServiceNames.Storage,
+            "2cc8a10f-54f1-44da-99e4-d49e3f663d19",
+            StorageUrl);
         builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
         builder.Services.AddHttpContextAccessor();
@@ -161,8 +238,7 @@ public sealed class StorageIntegrationTestFixture
                 npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .ConfigureWarnings(w => w.Ignore(
-                RelationalEventId.BoolWithDefaultWarning,
-                RelationalEventId.PendingModelChangesWarning))
+                RelationalEventId.BoolWithDefaultWarning))
             .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
         builder.Services.AddServerDataContext<AppDbContext>();
         builder.Services.InstallStandardServices<StorageService>(builder.Configuration);
@@ -196,7 +272,8 @@ public sealed class StorageIntegrationTestFixture
         securedRoutes.MapUploadStorageFilePartRestEndpoint();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        storageTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        storageTask = app.WaitForShutdownAsync();
         return app;
     }
 
@@ -209,8 +286,20 @@ public sealed class StorageIntegrationTestFixture
             ["BoltConfiguration:ClientName"] = "StorageTestClient",
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
-            ["BoltConfiguration:Signature"] = BoltSignature,
+            ["BoltConfiguration:GenerateServiceAccessToken"] = "false",
+            ["ServiceIdentity:ClientId"] = "StorageTestClient",
+            ["ServiceIdentity:Authority"] = BoltUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
+            ["ServiceIdentity:GenerationId"] = TestClientGenerationId,
+            ["ServiceIdentity:ClientSecret"] = TestClientSecret,
+            ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.StorageRead,
+            ["ServiceIdentity:DefaultScopes:1"] = XFrameworkServiceScopes.StorageWrite,
+            ["ServiceIdentity:DefaultScopes:2"] = XFrameworkServiceScopes.BoltService,
+            ["ServiceIdentity:DefaultScopes:3"] = XFrameworkServiceScopes.DataContextQuery,
+            ["ServiceIdentity:DefaultScopes:4"] = XFrameworkServiceScopes.DataContextMutate,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
+            ["Kestrel:Endpoints:Http:Url"] = TestClientUrl,
+            ["urls"] = TestClientUrl,
             ["Logging:LogLevel:Default"] = "Warning"
         });
 
@@ -228,8 +317,17 @@ public sealed class StorageIntegrationTestFixture
         var app = builder.Build();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        testClientTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        testClientTask = app.WaitForShutdownAsync();
         return app;
+    }
+
+    private static void StartApplication(WebApplication app)
+    {
+        app.StartAsync()
+            .WaitAsync(TimeSpan.FromSeconds(30))
+            .GetAwaiter()
+            .GetResult();
     }
 
     private static void RegisterStorageBoltHandlers(WebApplication app)
@@ -282,7 +380,11 @@ public sealed class StorageIntegrationTestFixture
         }
     }
 
-    private static void OverrideConfig(WebApplicationBuilder builder, string clientName, string clientGuid)
+    private static void OverrideConfig(
+        WebApplicationBuilder builder,
+        string clientName,
+        string clientGuid,
+        string serverUrl)
     {
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -290,8 +392,51 @@ public sealed class StorageIntegrationTestFixture
             ["DefaultDatabaseConnection"] = ConnectionString,
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
-            ["BoltConfiguration:Signature"] = BoltSignature,
+            ["BoltConfiguration:GenerateServiceAccessToken"] = "false",
+            ["ServiceIdentity:ClientId"] = clientName,
+            ["ServiceIdentity:Authority"] = BoltUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
+            ["ServiceIdentity:GenerationId"] = StorageServiceGenerationId,
+            ["ServiceIdentity:ClientSecret"] = StorageServiceSecret,
+            ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.StorageRead,
+            ["ServiceIdentity:DefaultScopes:1"] = XFrameworkServiceScopes.StorageWrite,
+            ["ServiceIdentity:DefaultScopes:2"] = XFrameworkServiceScopes.BoltService,
+            ["ServiceIdentity:BoltTransportTokenIssuer:Enabled"] = "true",
+            ["ServiceIdentity:BoltTransportTokenIssuer:SigningKeyPath"] = transportSigningKeyPath,
+            ["ServiceIdentity:Clients:0:ClientId"] = XFrameworkServiceNames.Storage,
+            ["ServiceIdentity:Clients:0:GenerationId"] = StorageServiceGenerationId,
+            ["ServiceIdentity:Clients:0:ClientSecret"] = StorageServiceSecret,
+            ["ServiceIdentity:Clients:0:AllowedAudiences"] = string.Join(',',
+                XFrameworkServiceNames.Storage,
+                XFrameworkServiceNames.BoltHub),
+            ["ServiceIdentity:Clients:0:AllowedScopes"] = string.Join(',',
+                XFrameworkServiceScopes.BoltService,
+                XFrameworkServiceScopes.StorageRead,
+                XFrameworkServiceScopes.StorageWrite),
+            ["ServiceIdentity:Clients:1:ClientId"] = "StorageTestClient",
+            ["ServiceIdentity:Clients:1:GenerationId"] = TestClientGenerationId,
+            ["ServiceIdentity:Clients:1:ClientSecret"] = TestClientSecret,
+            ["ServiceIdentity:Clients:1:AllowedAudiences"] = XFrameworkServiceNames.Storage,
+            ["ServiceIdentity:Clients:1:AllowedScopes"] = string.Join(',',
+                XFrameworkServiceScopes.BoltService,
+                XFrameworkServiceScopes.StorageRead,
+                XFrameworkServiceScopes.StorageWrite,
+                XFrameworkServiceScopes.DataContextQuery,
+                XFrameworkServiceScopes.DataContextMutate),
+            ["BoltTransportAuthentication:MetadataAddress"] = $"{BoltUrl}{BoltTransportTokenConstants.MetadataPath}",
+            ["BoltTransportAuthentication:Issuer"] = XFrameworkServiceNames.IdentityServer,
+            ["BoltTransportAuthentication:Audience"] = XFrameworkServiceNames.BoltHub,
+            ["BoltTransportAuthentication:RequireHttpsMetadata"] = "false",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
+            ["Kestrel:Endpoints:Http:Url"] = serverUrl,
+            ["urls"] = serverUrl,
+            ["JwtOptions:ValidAudience"] = "http://localhost:18301",
+            ["JwtOptions:ValidIssuer"] = "http://localhost:18301",
+            ["JwtOptions:GenerationId"] = "storage-test-jwt-g1",
+            ["JwtOptions:SigningPublicKeyPath"] = userJwtPublicKeyPath,
+            ["JwtOptions:SigningPrivateKeyPath"] = string.Empty,
+            ["JwtOptions:AccessTokenLifespan"] = "00:30:00",
+            ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",
             ["Storage:DefaultProvider"] = "S3Compatible",
             ["Storage:ProviderProfileName"] = "integration",
             ["Storage:BucketPrefix"] = "xframework-test",
@@ -304,13 +449,150 @@ public sealed class StorageIntegrationTestFixture
         });
     }
 
+    private static void MapTestTokenAuthority(WebApplication app, IConfiguration configuration)
+    {
+        var serviceIdentity = ServiceIdentityConfiguration.FromConfiguration(
+            configuration,
+            TimeProvider.System.GetUtcNow(),
+            "Test");
+        var signer = new FileBackedBoltTransportTokenSigner(serviceIdentity);
+        serviceSigningKey = RSA.Create(3072);
+        serviceSigningKeyId = $"service-{Base64UrlEncoder.Encode(SHA256.HashData(serviceSigningKey.ExportSubjectPublicKeyInfo()))}";
+
+        app.MapGet(BoltTransportTokenConstants.MetadataPath, () => Results.Json(new
+        {
+            issuer = XFrameworkServiceNames.IdentityServer,
+            jwks_uri = $"{BoltUrl}{BoltTransportTokenConstants.JsonWebKeySetPath}",
+            token_endpoint = $"{BoltUrl}{BoltTransportTokenConstants.TokenEndpointPath}",
+            id_token_signing_alg_values_supported = new[] { BoltTransportTokenConstants.Algorithm }
+        }));
+        app.MapGet(
+            BoltTransportTokenConstants.JsonWebKeySetPath,
+            () => Results.Json(signer.GetJsonWebKeySet()));
+        app.MapPost(
+            BoltTransportTokenConstants.TokenEndpointPath,
+            (TestBoltTransportTokenRequest request) => IssueTestBoltTransportToken(request, signer));
+        app.MapPost(
+            "/api/service-identity/token",
+            (IssueServiceTokenRequest request) => IssueTestServiceToken(request));
+        app.MapPost(
+            "/api/service-identity/signing-keys/query",
+            () => Results.Json(new ServiceSigningKeysResponse
+            {
+                Keys =
+                [
+                    new ServiceSigningKeyResponse
+                    {
+                        KeyId = serviceSigningKeyId,
+                        Algorithm = SecurityAlgorithms.RsaSha256,
+                        PublicKeyPem = serviceSigningKey.ExportSubjectPublicKeyInfoPem(),
+                        CreatedAtUtc = DateTime.UtcNow,
+                        ActivatedAtUtc = DateTime.UtcNow,
+                        IsActive = true
+                    }
+                ]
+            }));
+    }
+
+    private static IResult IssueTestBoltTransportToken(
+        TestBoltTransportTokenRequest request,
+        IBoltTransportTokenSigner signer)
+    {
+        var generationId = request.ClientId switch
+        {
+            XFrameworkServiceNames.Storage when SecretsMatch(request.ClientSecret, StorageServiceSecret) => StorageServiceGenerationId,
+            "StorageTestClient" when SecretsMatch(request.ClientSecret, TestClientSecret) => TestClientGenerationId,
+            _ => null
+        };
+        if (generationId is null)
+            return Results.Unauthorized();
+
+        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        var expiresAt = issuedAt.AddSeconds(ServiceIdentityConfiguration.DefaultBoltTransportTokenLifetimeSeconds);
+        return Results.Json(new ServiceTokenResponse
+        {
+            AccessToken = signer.Sign(request.ClientId, generationId, issuedAt, expiresAt),
+            ExpiresAtUtc = expiresAt.UtcDateTime,
+            TokenType = "Bearer"
+        });
+    }
+
+    private static IResult IssueTestServiceToken(IssueServiceTokenRequest request)
+    {
+        var generationId = ResolveCredentialGeneration(request.ClientId, request.ClientSecret);
+        if (generationId is null)
+            return Results.Unauthorized();
+        if (string.IsNullOrWhiteSpace(request.Audience))
+            return Results.BadRequest();
+
+        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds()).UtcDateTime;
+        var expiresAt = issuedAt.AddMinutes(5);
+        List<Claim> claims =
+        [
+            new("client_id", request.ClientId),
+            new("client_credential_generation", generationId),
+            new(JwtRegisteredClaimNames.Sub, request.ClientId),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new(
+                JwtRegisteredClaimNames.Iat,
+                EpochTime.GetIntDate(issuedAt).ToString(),
+                ClaimValueTypes.Integer64)
+        ];
+        if (request.Scopes.Count > 0)
+            claims.Add(new Claim("scope", string.Join(' ', request.Scopes)));
+
+        var token = new JwtSecurityToken(
+            issuer: XFrameworkServiceNames.IdentityServer,
+            audience: request.Audience,
+            claims: claims,
+            notBefore: issuedAt,
+            expires: expiresAt,
+            signingCredentials: new SigningCredentials(
+                new RsaSecurityKey(serviceSigningKey) { KeyId = serviceSigningKeyId },
+                SecurityAlgorithms.RsaSha256));
+
+        return Results.Json(new ServiceTokenResponse
+        {
+            AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
+            ExpiresAtUtc = expiresAt,
+            TokenType = "Bearer"
+        });
+    }
+
+    private static string? ResolveCredentialGeneration(string clientId, string? clientSecret) => clientId switch
+    {
+        XFrameworkServiceNames.Storage when SecretsMatch(clientSecret, StorageServiceSecret) => StorageServiceGenerationId,
+        "StorageTestClient" when SecretsMatch(clientSecret, TestClientSecret) => TestClientGenerationId,
+        _ => null
+    };
+
+    private static bool SecretsMatch(string? supplied, string expected)
+    {
+        if (supplied is null)
+            return false;
+
+        var suppliedBytes = Encoding.UTF8.GetBytes(supplied);
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        try
+        {
+            return suppliedBytes.Length == expectedBytes.Length &&
+                   CryptographicOperations.FixedTimeEquals(suppliedBytes, expectedBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(suppliedBytes);
+            CryptographicOperations.ZeroMemory(expectedBytes);
+        }
+    }
+
+    private sealed record TestBoltTransportTokenRequest(string ClientId, string ClientSecret);
+
     private static async Task MigrateAndSeed()
     {
         ForceModelAssemblies();
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         await using var db = new AppDbContext(options);
@@ -322,6 +604,49 @@ public sealed class StorageIntegrationTestFixture
 
     private static async Task SeedStorageReferenceData(AppDbContext db)
     {
+        if (!await db.Set<IdentityInformation>().IgnoreQueryFilters().AnyAsync(item => item.Id == TestIdentityId))
+        {
+            db.Set<IdentityInformation>().Add(new IdentityInformation
+            {
+                Id = TestIdentityId,
+                TenantId = TestTenantId,
+                IdentityName = "Storage Integration User",
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
+            });
+        }
+
+        if (!await db.Set<IdentityCredential>().IgnoreQueryFilters().AnyAsync(item => item.Id == TestCredentialId))
+        {
+            db.Set<IdentityCredential>().Add(new IdentityCredential
+            {
+                Id = TestCredentialId,
+                TenantId = TestTenantId,
+                IdentityInfoId = TestIdentityId,
+                UserName = "storage-integration-user",
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
+            });
+        }
+
+        if (!await db.Set<IdentityRole>().IgnoreQueryFilters().AnyAsync(item =>
+                item.CredentialId == TestCredentialId && item.TypeId == TestConstants.RoleTypeId))
+        {
+            db.Set<IdentityRole>().Add(new IdentityRole
+            {
+                Id = Guid.NewGuid(),
+                TenantId = TestTenantId,
+                CredentialId = TestCredentialId,
+                TypeId = TestConstants.RoleTypeId,
+                RoleExpiration = DateTime.UtcNow.AddYears(1),
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
+            });
+        }
+
         if (!await db.Set<StorageFileType>().IgnoreQueryFilters().AnyAsync(item => item.Id == TestConstants.StorageFileTypeId))
         {
             db.Set<StorageFileType>().Add(new StorageFileType
@@ -367,8 +692,6 @@ public sealed class StorageIntegrationTestFixture
 
     private static void ForceModelAssemblies()
     {
-        RuntimeHelpers.RunClassConstructor(typeof(StorageFile).TypeHandle);
-        RuntimeHelpers.RunClassConstructor(typeof(TenantModuleFeature).TypeHandle);
-        RuntimeHelpers.RunClassConstructor(typeof(Wallets.Domain.Shared.Contracts.WalletType).TypeHandle);
+        TestDatabaseModel.LoadMigrationAssemblies();
     }
 }

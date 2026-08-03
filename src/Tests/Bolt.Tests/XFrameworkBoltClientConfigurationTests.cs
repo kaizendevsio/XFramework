@@ -185,6 +185,7 @@ public class XFrameworkBoltClientConfigurationTests
         configuration["ServiceIdentity:ClientId"] = "Bolt.TestClient";
         configuration["ServiceIdentity:GenerationId"] = "test-g0";
         configuration["ServiceIdentity:ClientSecret"] = "test-client-secret-material-at-least-32-bytes";
+        configuration["ServiceIdentity:DefaultScopes:0"] = "bolt.test";
         var services = CreateServices();
 
         services.AddXFrameworkBoltClient(configuration, autoConnect: false);
@@ -204,6 +205,7 @@ public class XFrameworkBoltClientConfigurationTests
         configuration["ServiceIdentity:ClientId"] = "Bolt.TestClient";
         configuration["ServiceIdentity:GenerationId"] = "test-g0";
         configuration["ServiceIdentity:ClientSecret"] = "test-client-secret-material-at-least-32-bytes";
+        configuration["ServiceIdentity:DefaultScopes:0"] = "bolt.test";
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             EnvironmentName = Environments.Production
@@ -350,7 +352,8 @@ public class XFrameworkBoltClientConfigurationTests
             AllowInsecureHttp = allowInsecureHttp,
             ClientId = "Bolt.TestClient",
             GenerationId = "test-g0",
-            ClientSecret = "test-client-secret-material-at-least-32-bytes"
+            ClientSecret = "test-client-secret-material-at-least-32-bytes",
+            DefaultScopes = ["bolt.test"]
         };
         var validator = new ServiceIdentityOptionsValidator(TimeProvider.System);
 

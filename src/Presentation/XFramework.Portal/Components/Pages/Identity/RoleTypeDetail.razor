@@ -201,6 +201,8 @@ else
     private List<PermissionFeatureTreeNode> _permissionTreeNodes = [];
     private Dictionary<string, string> _permissionValues = new(StringComparer.OrdinalIgnoreCase);
     private string _missingPermissionBehaviorValue = MissingPermissionDeny;
+    private Guid _policyConcurrencyStamp;
+    private Guid _roleTypeConcurrencyStamp;
 
     private const string PermissionDefault = "default";
     private const string PermissionAllow = "allow";
@@ -288,6 +290,7 @@ else
 
         if (policyResult.IsSuccess && policyResult.Response is not null)
         {
+            _policyConcurrencyStamp = policyResult.Response.ConcurrencyStamp;
             _missingPermissionBehaviorValue = policyResult.Response.MissingPermissionBehavior == MissingPermissionBehavior.Allow
                 ? MissingPermissionAllow
                 : MissingPermissionDeny;
@@ -309,6 +312,8 @@ else
             ToastService.Error("Role type permissions could not be loaded.", "Permissions failed");
             return;
         }
+
+        _roleTypeConcurrencyStamp = permissionsResult.Response.ConcurrencyStamp;
 
         foreach (var permission in permissionsResult.Response.Permissions)
         {
@@ -353,6 +358,7 @@ else
                 MissingPermissionBehavior = _missingPermissionBehaviorValue == MissingPermissionAllow
                     ? MissingPermissionBehavior.Allow
                     : MissingPermissionBehavior.Deny,
+                ExpectedConcurrencyStamp = _policyConcurrencyStamp,
                 Metadata = CreateMetadata(TenantId)
             });
 
@@ -361,16 +367,19 @@ else
                 ToastService.Error("Tenant permission default could not be saved.", "Permissions failed");
                 return;
             }
+            _policyConcurrencyStamp = policyResult.Response?.ConcurrencyStamp ?? _policyConcurrencyStamp;
 
             var permissionsResult = await IdentityServer.SetRoleTypePermissions(new SetRoleTypePermissionsRequest
             {
                 RoleTypeId = RoleTypeId,
+                ExpectedConcurrencyStamp = _roleTypeConcurrencyStamp,
                 Permissions = BuildRoleTypePermissions(),
                 Metadata = CreateMetadata(TenantId)
             });
 
             if (permissionsResult.IsSuccess)
             {
+                _roleTypeConcurrencyStamp = permissionsResult.Response?.ConcurrencyStamp ?? _roleTypeConcurrencyStamp;
                 ToastService.Success("Role type permissions saved.", "Permissions saved");
             }
             else

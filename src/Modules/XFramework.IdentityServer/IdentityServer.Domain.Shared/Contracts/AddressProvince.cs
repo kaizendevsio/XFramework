@@ -8,9 +8,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/address-provinces",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 3600,
-    CacheKeyPrefix = "address-provinces"
+    RequireAuthorization = true
 )]
 public partial class AddressProvince : BaseModel
 {

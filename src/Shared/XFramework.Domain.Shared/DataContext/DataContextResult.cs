@@ -6,12 +6,16 @@ public partial class DataContextResult
     [MemoryPackOrder(0)] public bool IsSuccess { get; set; }
     [MemoryPackOrder(1)] public string? Message { get; set; }
     [MemoryPackOrder(2)] public int StatusCode { get; set; }
+    [MemoryPackOrder(3)] public List<PersistedEntityState> PersistedEntities { get; set; } = [];
 
-    public static DataContextResult Success(string? message = null) => new()
+    public static DataContextResult Success(
+        string? message = null,
+        List<PersistedEntityState>? persistedEntities = null) => new()
     {
         IsSuccess = true,
         StatusCode = 200,
-        Message = message
+        Message = message,
+        PersistedEntities = persistedEntities ?? []
     };
 
     public static DataContextResult Failure(string message, int statusCode = 400) => new()

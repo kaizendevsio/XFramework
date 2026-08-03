@@ -63,6 +63,7 @@ public class XDbContext : DbContext
 
             var implementsSoftDeletable = typeof(ISoftDeletable).IsAssignableFrom(clrType);
             var implementsHasTenantId = typeof(IHasTenantId).IsAssignableFrom(clrType);
+            var allowsGlobalTenantRows = typeof(IAllowsGlobalTenantRows).IsAssignableFrom(clrType);
 
             if (!implementsSoftDeletable && !implementsHasTenantId)
                 continue;
@@ -87,6 +88,12 @@ public class XDbContext : DbContext
                 var contextRef = Expression.Constant(this, typeof(XDbContext));
                 var currentTenantProperty = Expression.Property(contextRef, nameof(CurrentTenantId));
                 var tenantFilter = Expression.Equal(tenantIdProperty, currentTenantProperty);
+                if (allowsGlobalTenantRows)
+                {
+                    tenantFilter = Expression.OrElse(
+                        tenantFilter,
+                        Expression.Equal(tenantIdProperty, Expression.Constant(Guid.Empty)));
+                }
 
                 filterExpression = filterExpression is null
                     ? tenantFilter
@@ -103,7 +110,7 @@ public class XDbContext : DbContext
 
     /// <summary>
     /// Retrieves the current tenant ID from (in priority order):
-    ///   1. HttpContext claims (tenantId / TenantId / tid)
+    ///   1. HttpContext claims (tenant_id / tenantId / TenantId / tid / tenant)
     ///   2. Configuration fallback (Tenant:DefaultId) — for unauthenticated endpoints like auth/verify
     ///   3. Guid.Empty — design-time / migration-only (global filter excludes everything)
     /// </summary>
@@ -112,9 +119,11 @@ public class XDbContext : DbContext
         var httpContext = _httpContextAccessor?.HttpContext;
         if (httpContext?.User?.Identity?.IsAuthenticated == true)
         {
-            var tenantIdClaim = httpContext.User.FindFirst("tenantId")?.Value
+            var tenantIdClaim = httpContext.User.FindFirst("tenant_id")?.Value
+                ?? httpContext.User.FindFirst("tenantId")?.Value
                 ?? httpContext.User.FindFirst("TenantId")?.Value
-                ?? httpContext.User.FindFirst("tid")?.Value;
+                ?? httpContext.User.FindFirst("tid")?.Value
+                ?? httpContext.User.FindFirst("tenant")?.Value;
 
             if (!string.IsNullOrEmpty(tenantIdClaim) && Guid.TryParse(tenantIdClaim, out var tenantId))
             {
@@ -123,7 +132,7 @@ public class XDbContext : DbContext
 
             throw new InvalidOperationException(
                 "Authenticated user does not have a tenant ID claim. " +
-                "Ensure the authentication provider includes a 'tenantId' or 'tid' claim.");
+                "Ensure the authentication provider includes a supported tenant claim.");
         }
 
         // Unauthenticated requests (auth, verify, register) — use configured default tenant

@@ -8,11 +8,9 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-address-types",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 3600,
-    CacheKeyPrefix = "identity-address-types"
+    RequireAuthorization = true
 )]
-public partial class IdentityAddressType : BaseModel, IHasSystemReferenceId
+public partial class IdentityAddressType : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows
 {
     
     [MemoryPackOrder(0)]

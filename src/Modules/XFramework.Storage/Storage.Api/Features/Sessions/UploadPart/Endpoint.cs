@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Sessions.UploadPart;
 
 public static class UploadStorageFilePartEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite])]
     public static Task<Result<StorageUploadPartResponse>> Handle(
         UploadStorageFilePartRequest request,
         StorageService storageService,

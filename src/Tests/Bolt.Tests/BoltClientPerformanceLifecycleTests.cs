@@ -180,6 +180,21 @@ public sealed class BoltClientPerformanceLifecycleTests
         (await received.Task.WaitAsync(TimeSpan.FromSeconds(2))).Should().Equal(1, 2, 3);
     }
 
+    [Test]
+    public async Task DisposeAsync_WhenInboundCancellationCompletesConcurrently_IsIdempotent()
+    {
+        var client = CreateClient(new BoltClientOptions());
+        var cancellation = new CancellationTokenSource();
+        var cancellations = (ConcurrentDictionary<Guid, CancellationTokenSource>)GetField(
+            client,
+            "_inboundRequestCancellations");
+        cancellations.TryAdd(Guid.NewGuid(), cancellation).Should().BeTrue();
+        cancellation.Dispose();
+
+        await client.DisposeAsync();
+        await client.DisposeAsync();
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task InternalLargeRpc_MissingOrMalformedMetadata_ReleasesAllState(bool sendMalformedMetadata)

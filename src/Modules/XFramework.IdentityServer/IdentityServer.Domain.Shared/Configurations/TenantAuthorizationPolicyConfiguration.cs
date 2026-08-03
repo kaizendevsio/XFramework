@@ -24,6 +24,8 @@ public sealed class TenantAuthorizationPolicyConfiguration : IEntityTypeConfigur
             .IsRequired()
             .HasDefaultValue(MissingPermissionBehavior.Deny);
 
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
+
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");

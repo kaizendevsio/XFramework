@@ -24,7 +24,8 @@ public static class RemoteDataContextExtensions
             var remote = sp.GetRequiredService<RemoteDataContext>();
             var cache = sp.GetRequiredService<IClientCacheService>();
             var opts = sp.GetRequiredService<DataContextOptions>();
-            return new CachingDataContext(remote, cache, opts);
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachingDataContext>>();
+            return new CachingDataContext(remote, cache, opts, logger);
         });
         services.AddScoped<ICacheControl>(sp => (CachingDataContext)sp.GetRequiredService<IDataContext>());
 

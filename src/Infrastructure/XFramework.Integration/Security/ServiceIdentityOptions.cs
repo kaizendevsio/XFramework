@@ -100,6 +100,13 @@ public sealed class ServiceIdentityOptionsValidator(TimeProvider timeProvider)
             if (string.IsNullOrWhiteSpace(options.ClientId))
                 return ValidateOptionsResult.Fail($"{ServiceIdentityOptions.SectionName}:ClientId is required.");
 
+            if (options.DefaultScopes.Count == 0 ||
+                options.DefaultScopes.Any(string.IsNullOrWhiteSpace))
+            {
+                return ValidateOptionsResult.Fail(
+                    $"{ServiceIdentityOptions.SectionName}:DefaultScopes must contain at least one explicit scope.");
+            }
+
             options.ResolveAuthority();
             options.ValidateClientCredential(timeProvider.GetUtcNow());
             return ValidateOptionsResult.Success;

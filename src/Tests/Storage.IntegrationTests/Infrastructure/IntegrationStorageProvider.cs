@@ -17,6 +17,10 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
 
     public StorageProviderKind Kind => StorageProviderKind.S3Compatible;
     public int DeleteObjectCount { get; private set; }
+    public int DeleteObjectAttemptCount { get; private set; }
+    public int AbortUploadCount { get; private set; }
+    public bool FailNextDelete { get; set; }
+    public bool FailNextAbort { get; set; }
 
     public void Reset()
     {
@@ -24,6 +28,10 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
         {
             bytesByFileId.Clear();
             DeleteObjectCount = 0;
+            DeleteObjectAttemptCount = 0;
+            AbortUploadCount = 0;
+            FailNextDelete = false;
+            FailNextAbort = false;
         }
     }
 
@@ -94,8 +102,17 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
         StorageTenantBucket bucket,
         StorageFile file,
         StorageUploadSession session,
-        CancellationToken ct) =>
-        Task.CompletedTask;
+        CancellationToken ct)
+    {
+        AbortUploadCount++;
+        if (FailNextAbort)
+        {
+            FailNextAbort = false;
+            throw new InvalidOperationException("Injected abort failure.");
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task DeleteObjectAsync(
         StorageProviderProfile profile,
@@ -103,6 +120,13 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
         StorageFile file,
         CancellationToken ct)
     {
+        DeleteObjectAttemptCount++;
+        if (FailNextDelete)
+        {
+            FailNextDelete = false;
+            throw new InvalidOperationException("Injected delete failure.");
+        }
+
         DeleteObjectCount++;
         return Task.CompletedTask;
     }

@@ -541,6 +541,7 @@ else
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleFeatureDefinitionResolver ModuleFeatureDefinitionResolver { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityServer { get; set; } = default!;
     [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private Tenant? _tenant;
@@ -791,26 +792,26 @@ else
 
             if (missingDefinitions.Count > 0)
             {
-                foreach (var resolved in missingDefinitions)
+                var seedResult = await IdentityServer.SetTenantModuleFeatures(new SetTenantModuleFeaturesRequest
                 {
-                    var definition = resolved.Definition;
-                    DataContext.Add(new TenantModuleFeature
+                    TenantId = Id,
+                    ExpectedConcurrencyStamp = _tenant!.ConcurrencyStamp,
+                    Features = missingDefinitions.Select(resolved => new TenantModuleFeatureUpdate
                     {
-                        Id = Guid.NewGuid(),
-                        TenantId = Id,
-                        ModuleKey = definition.ModuleKey,
-                        SubFeatureKey = definition.SubFeatureKey,
-                        DisplayName = definition.DisplayName,
-                        Description = definition.Description,
-                        IsEnabled = definition.DefaultEnabled && !resolved.IsBlocked,
-                        CreatedAt = DateTime.UtcNow
-                    });
-                }
-
-                var seedResult = await DataContext.SaveChangesAsync();
+                        ModuleKey = resolved.Definition.ModuleKey,
+                        SubFeatureKey = resolved.Definition.SubFeatureKey,
+                        DisplayName = resolved.Definition.DisplayName,
+                        Description = resolved.Definition.Description,
+                        IsEnabled = resolved.Definition.DefaultEnabled && !resolved.IsBlocked
+                    }).ToList()
+                });
                 if (!seedResult.IsSuccess)
                 {
                     ToastService.Error("Module toggles could not be initialized.", "Initialization failed");
+                }
+                else
+                {
+                    await RefreshTenantConcurrencyStamp();
                 }
 
                 _detailModuleFeatures = (await DataContext.Query<TenantModuleFeature>()
@@ -1031,32 +1032,31 @@ else
         _savingModuleFeatureIds.Add(row.Id);
         try
         {
-            var feature = await DataContext.Query<TenantModuleFeature>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == row.Id)
-                .FirstOrDefaultAsync();
-
-            if (feature is null)
+            var result = await IdentityServer.SetTenantModuleFeatures(new SetTenantModuleFeaturesRequest
             {
-                ToastService.Warning("Module toggle was not found.", "Toggle unavailable");
-                await LoadModuleFeatures();
-                return;
-            }
-
-            feature.IsEnabled = enabled;
-            feature.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(feature);
-
-            var result = await DataContext.SaveChangesAsync();
+                TenantId = Id,
+                ExpectedConcurrencyStamp = _tenant!.ConcurrencyStamp,
+                Features =
+                [
+                    new TenantModuleFeatureUpdate
+                    {
+                        ModuleKey = row.ModuleKey,
+                        SubFeatureKey = row.SubFeatureKey,
+                        DisplayName = row.DisplayName,
+                        Description = row.Description,
+                        IsEnabled = enabled
+                    }
+                ]
+            });
             if (result.IsSuccess)
             {
+                await RefreshTenantConcurrencyStamp();
                 row.IsEnabled = enabled;
                 var cachedFeature = _detailModuleFeatures.FirstOrDefault(item => item.Id == row.Id);
                 if (cachedFeature is not null)
                 {
                     cachedFeature.IsEnabled = enabled;
-                    cachedFeature.ModifiedAt = feature.ModifiedAt;
+                    cachedFeature.ModifiedAt = DateTime.UtcNow;
                 }
 
                 SyncModuleTreeCheckedState();
@@ -1080,30 +1080,46 @@ else
         }
     }
 
+    private async Task RefreshTenantConcurrencyStamp()
+    {
+        if (_tenant is null)
+        {
+            return;
+        }
+
+        var refreshed = await DataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(tenant => tenant.Id == Id)
+            .FirstOrDefaultAsync();
+        if (refreshed is not null)
+        {
+            _tenant.ConcurrencyStamp = refreshed.ConcurrencyStamp;
+        }
+    }
+
     private async Task SaveTenant()
     {
         if (string.IsNullOrWhiteSpace(_editName)) { ToastService.Warning("Tenant name is required.", "Missing name"); return; }
+        if (_tenant is null) return;
         _saving = true;
         try
         {
-            var tenant = await DataContext.Query<Tenant>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
-            if (tenant is null) { ToastService.Warning("Tenant was not found.", "Tenant unavailable"); return; }
+            var request = CreateTenantUpdateRequest();
+            request.Name = _editName;
+            request.Description = _editDescription;
+            request.Version = decimal.TryParse(_editVersion, out var version) ? version : _tenant.Version;
+            request.Status = short.TryParse(_editStatus, out var status) ? status : _tenant.Status;
+            request.Expiration = DateTime.TryParse(_editExpiration, out var expiration) ? expiration : null;
+            request.AvailabilityDate = DateTime.TryParse(_editAvailability, out var availability) ? availability : null;
 
-            tenant.Name = _editName;
-            tenant.Description = _editDescription;
-            tenant.Version = decimal.TryParse(_editVersion, out var v) ? v : tenant.Version;
-            tenant.Status = short.TryParse(_editStatus, out var s) ? s : tenant.Status;
-            tenant.Expiration = DateTime.TryParse(_editExpiration, out var exp) ? exp : null;
-            tenant.AvailabilityDate = DateTime.TryParse(_editAvailability, out var avail) ? avail : null;
-            tenant.ModifiedAt = DateTime.UtcNow;
-
-            DataContext.Update(tenant);
-            var result = await DataContext.SaveChangesAsync();
-            if (result.IsSuccess) { ToastService.Success("Tenant updated.", "Tenant saved"); _tenant = tenant; _editableForm?.ExitEditMode(); }
+            var result = await IdentityServer.UpdateTenant(request);
+            if (result.IsSuccess)
+            {
+                await LoadTenant();
+                ToastService.Success("Tenant updated.", "Tenant saved");
+                _editableForm?.ExitEditMode();
+            }
             else { ToastService.Error("Tenant could not be updated.", "Save failed"); }
         }
         catch { ToastService.Error("Tenant could not be updated.", "Save failed"); }
@@ -1130,29 +1146,15 @@ else
         _saving = true;
         try
         {
-            var tenant = await DataContext.Query<Tenant>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
-
-            if (tenant is null)
-            {
-                ToastService.Error("Tenant was not found.", "Save failed");
-                return;
-            }
-
-            tenant.ParentTenantId = Guid.TryParse(_parentTenantId, out var parentTenantId)
+            if (_tenant is null) return;
+            var request = CreateTenantUpdateRequest();
+            request.ParentTenantId = Guid.TryParse(_parentTenantId, out var parentTenantId)
                 ? parentTenantId
                 : null;
-            tenant.ModifiedAt = DateTime.UtcNow;
-
-            DataContext.Update(tenant);
-            var result = await DataContext.SaveChangesAsync();
+            var result = await IdentityServer.UpdateTenant(request);
             if (result.IsSuccess)
             {
-                _tenant = tenant;
-                SyncEditFields();
+                await LoadTenant();
                 _parentTenantDialogOpen = false;
                 ToastService.Success("Parent tenant updated.", "Tenant updated");
             }
@@ -1176,21 +1178,32 @@ else
         if (_tenant is null) return;
         try
         {
-            var fresh = await DataContext.Query<Tenant>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
-            if (fresh is null) { ToastService.Warning("Tenant was not found.", "Tenant unavailable"); return; }
-            fresh.IsEnabled = !fresh.IsEnabled;
-            fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
-            if (result.IsSuccess) { ToastService.Success(fresh.IsEnabled ? "Tenant enabled." : "Tenant disabled.", "Tenant updated"); _tenant = fresh; }
+            var request = CreateTenantUpdateRequest();
+            request.IsEnabled = !_tenant.IsEnabled;
+            var result = await IdentityServer.UpdateTenant(request);
+            if (result.IsSuccess)
+            {
+                await LoadTenant();
+                ToastService.Success(request.IsEnabled ? "Tenant enabled." : "Tenant disabled.", "Tenant updated");
+            }
             else { ToastService.Error("Tenant status could not be updated.", "Save failed"); }
         }
         catch { ToastService.Error("Tenant status could not be updated.", "Save failed"); }
     }
+
+    private UpdateTenantRequest CreateTenantUpdateRequest() => new()
+    {
+        TenantId = Id,
+        Name = _tenant!.Name ?? string.Empty,
+        Description = _tenant.Description,
+        Status = _tenant.Status,
+        Expiration = _tenant.Expiration,
+        AvailabilityDate = _tenant.AvailabilityDate,
+        ParentTenantId = _tenant.ParentTenantId,
+        Version = _tenant.Version,
+        IsEnabled = _tenant.IsEnabled,
+        ConcurrencyStamp = _tenant.ConcurrencyStamp
+    };
 
     private static string GetStatusText(short? status) => status switch { 0 => "Pending", 1 => "Active", 2 => "Suspended", 3 => "Inactive", _ => "Unknown" };
     private static string GetStatusKey(short? status) => status switch { 0 => "pending", 1 => "active", 2 => "suspended", 3 => "inactive", _ => "inactive" };
@@ -1384,9 +1397,7 @@ else
         if (_deletingConfig is null) return;
         try
         {
-            _deletingConfig.IsDeleted = true;
-            _deletingConfig.IsEnabled = false;
-            DataContext.Update(_deletingConfig);
+            DataContext.Remove(_deletingConfig);
             var r = await DataContext.SaveChangesAsync();
             ShowConfigMutationResult(r.IsSuccess, "Configuration deleted.", "Configuration could not be deleted.");
             _deleteConfigDialogOpen = false; _deletingConfig = null;

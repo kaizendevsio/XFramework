@@ -18,6 +18,7 @@ public class IdentityRoleTypeConfiguration : IEntityTypeConfiguration<IdentityRo
         entity.Property(e => e.TenantId);
 
         entity.Property(e => e.Name).HasMaxLength(100);
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
 
         entity.HasOne(d => d.Tenant).WithMany(p => p.IdentityRoleTypes)
             .HasForeignKey(d => d.TenantId)

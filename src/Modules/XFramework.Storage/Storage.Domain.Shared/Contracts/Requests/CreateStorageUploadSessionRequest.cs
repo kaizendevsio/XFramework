@@ -18,4 +18,5 @@ public partial record CreateStorageUploadSessionRequest : RequestBase,
     public int? ChunkSizeBytes { get; set; }
     public StorageFileVisibility Visibility { get; set; } = StorageFileVisibility.Private;
     public string? ProviderProfileName { get; set; }
+    public bool RequireClaim { get; set; }
 }

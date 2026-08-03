@@ -72,6 +72,20 @@ public sealed class ServiceIdentityComposeContractTests
     ];
 
     [Test]
+    public void Repository_IgnoresGeneratedJwtKeyDirectories()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var gitIgnore = File.ReadAllText(Path.Combine(repositoryRoot.FullName, ".gitignore"));
+
+        gitIgnore.Should().Contain("**/.data/",
+            "development JWT keys must never be staged from module working directories");
+        Directory.GetFiles(repositoryRoot.FullName, "*.pem", SearchOption.AllDirectories)
+            .Where(path => path.Contains($"{Path.DirectorySeparatorChar}.data{Path.DirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase))
+            .Should().BeEmpty("generated JWT key material must not remain in the repository worktree");
+    }
+
+    [Test]
     public void DockerCompose_UsesExplicitServiceIdentityClientsInsteadOfDevelopmentFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -117,7 +131,7 @@ public sealed class ServiceIdentityComposeContractTests
         compose.Should().Contain("ServiceIdentity__Clients__");
         compose.Should().Contain("AllowedAudiences: *service-identity-audiences");
         compose.Should().Contain("AllowedScopes: bolt.service");
-        compose.Should().Contain("AllowedScopes: bolt.service,datacontext.query,datacontext.mutate,identity.admin");
+        compose.Should().Contain("AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,identity.admin");
     }
 
     [Test]
@@ -127,6 +141,11 @@ public sealed class ServiceIdentityComposeContractTests
         var compose = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "docker-compose.yml"));
         var envExample = File.ReadAllText(Path.Combine(repositoryRoot.FullName, ".env.example"));
         var dockerfile = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "Dockerfile"));
+        var deployWorkflow = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            ".github",
+            "workflows",
+            "deploy-xeon-dev.yml"));
         var commonEnvironment = ExtractSection(compose, "x-common-env: &common-env", "services:");
         var hub = ExtractService(compose, "bolt-hub");
         var identityServer = ExtractService(compose, "identityserver");
@@ -142,8 +161,8 @@ public sealed class ServiceIdentityComposeContractTests
         commonEnvironment.Should().Contain(
             "BoltConfiguration__ServerUrls__0: ws://bolt-hub:8080/bolt/ws");
         commonEnvironment.Should().Contain("BoltConfiguration__RequireSecureTransport: false");
-        commonEnvironment.Should().Contain("ServiceIdentity__Authority: http://identityserver:8080");
-        commonEnvironment.Should().Contain("ServiceIdentity__AllowInsecureHttp: true");
+        commonEnvironment.Should().Contain("ServiceIdentity__Authority: https://identityserver:8443");
+        commonEnvironment.Should().Contain("ServiceIdentity__AllowInsecureHttp: false");
         foreach (var service in CentralIdentityServices)
         {
             var serviceBlock = ExtractService(compose, service);
@@ -152,33 +171,41 @@ public sealed class ServiceIdentityComposeContractTests
                         "BoltConfiguration__GenerateServiceAccessToken: false",
                         StringComparison.Ordinal)
                     && serviceBlock.Contains(
-                        "ServiceIdentity__Authority: http://identityserver:8080",
+                        "ServiceIdentity__Authority: https://identityserver:8443",
                         StringComparison.Ordinal)
                     && serviceBlock.Contains(
-                        "ServiceIdentity__AllowInsecureHttp: true",
+                        "ServiceIdentity__AllowInsecureHttp: false",
                         StringComparison.Ordinal));
             hasEffectiveCentralIdentity.Should().BeTrue(
                 "Compose service {0} must receive the common central identity configuration",
                 service);
+            if (!string.Equals(service, "identityserver", StringComparison.Ordinal))
+                serviceBlock.Should().Contain("secrets: *identityserver-ca-secrets");
         }
 
         hub.Should().Contain(
             "BoltTransportAuthentication__MetadataAddress: " +
-            "http://identityserver:8080/.well-known/openid-configuration");
+            "https://identityserver:8443/.well-known/openid-configuration");
         hub.Should().Contain("BoltTransportAuthentication__Issuer: XFramework.IdentityServer");
         hub.Should().Contain("BoltTransportAuthentication__Audience: XFramework.Bolt.Hub");
-        hub.Should().Contain("BoltTransportAuthentication__RequireHttpsMetadata: false");
+        hub.Should().Contain("BoltTransportAuthentication__RequireHttpsMetadata: true");
         hub.Should().Contain("ASPNETCORE_URLS: http://+:8080");
         hub.Should().Contain("Kestrel__Endpoints__Http__Url: http://0.0.0.0:8080");
-        hub.Should().NotContain("    secrets:");
+        hub.Should().Contain("secrets: *identityserver-ca-secrets");
 
-        identityServer.Should().Contain("ASPNETCORE_URLS: http://+:8080");
+        identityServer.Should().Contain("ASPNETCORE_URLS: http://+:8080;https://+:8443");
         identityServer.Should().Contain("Kestrel__Endpoints__Http__Url: http://0.0.0.0:8080");
+        identityServer.Should().Contain("Kestrel__Endpoints__Https__Url: https://0.0.0.0:8443");
+        identityServer.Should().Contain("/run/secrets/identityserver-tls-fullchain.pem");
+        identityServer.Should().Contain("/run/secrets/identityserver-tls-private-key.pem");
+        identityServer.Should().Contain(
+            "TrustedProxyForwarding__KnownProxies__0: host.docker.internal");
+        identityServer.Should().Contain("- \"host.docker.internal:host-gateway\"");
         identityServer.Should().Contain(
             "ServiceIdentity__BoltTransportTokenIssuer__SigningKeyPath: " +
             "/var/lib/xframework/identity/bolt-transport-signing-key.pem");
         identityServer.Should().Contain("- identity-keydata:/var/lib/xframework/identity");
-        identityServer.Should().NotContain("    secrets:");
+        identityServer.Should().Contain("    secrets:");
 
         var hubPorts = ExtractSection(hub, "    ports:", "    depends_on:");
         hubPorts.Should().Contain(
@@ -187,19 +214,18 @@ public sealed class ServiceIdentityComposeContractTests
         identityPorts.Should().Contain(
             "- \"127.0.0.1:${IDENTITYSERVER_EXPOSE_PORT:-8261}:8080\"");
 
-        compose.Should().NotContain("wss://");
-        compose.Should().NotContain(":8443");
-        dockerfile.Should().NotContain("EXPOSE 8080 8443");
-        dockerfile.Should().NotContain("update-ca-certificates");
-        compose.Should().NotContain("Kestrel__Endpoints__Https");
-        compose.Should().NotContain("x-bolt-ca-secrets");
-        compose.Should().NotContain("bolt-hub-ca");
-        compose.Should().NotContain("bolt-hub-tls");
-        compose.Should().NotContain("identityserver-ca");
-        compose.Should().NotContain("identityserver-tls");
-        compose.Should().NotContain("/usr/local/share/ca-certificates");
-        envExample.Should().NotContain("BOLT_HUB_TLS_");
-        envExample.Should().NotContain("IDENTITYSERVER_TLS_");
+        dockerfile.Should().Contain("EXPOSE 8080 8443");
+        dockerfile.Should().Contain("update-ca-certificates");
+        compose.Should().Contain("Kestrel__Endpoints__Https");
+        compose.Should().Contain("identityserver-ca");
+        compose.Should().Contain("identityserver-tls");
+        compose.Should().Contain("/usr/local/share/ca-certificates");
+        envExample.Should().Contain("IDENTITYSERVER_TLS_CA_PATH");
+        envExample.Should().Contain("IDENTITYSERVER_TLS_FULLCHAIN_PATH");
+        envExample.Should().Contain("IDENTITYSERVER_TLS_PRIVATE_KEY_PATH");
+        deployWorkflow.Should().Contain("IDENTITYSERVER_TLS_CA_PATH:");
+        deployWorkflow.Should().Contain("IDENTITYSERVER_TLS_FULLCHAIN_PATH:");
+        deployWorkflow.Should().Contain("IDENTITYSERVER_TLS_PRIVATE_KEY_PATH:");
         envExample.Should().NotContain("IDENTITYSERVER_PUBLIC_HTTPS_PORT");
         envExample.Should().NotContain("BOLT_SYNTHETIC_IDENTITYSERVER_CA_PATH");
         envExample.Should().Contain("IDENTITYSERVER_EXPOSE_PORT=8261");
@@ -247,6 +273,41 @@ public sealed class ServiceIdentityComposeContractTests
             ExtractService(compose, service).Should().Contain(
                 "      identityserver:\n        condition: service_healthy");
         }
+    }
+
+    [Test]
+    public void UserJwtSigning_IsAsymmetricAndPrivateKeyIsOwnedOnlyByIdentityServer()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var compose = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "docker-compose.yml"));
+        var envExample = File.ReadAllText(Path.Combine(repositoryRoot.FullName, ".env.example"));
+        var workflow = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            ".github",
+            "workflows",
+            "deploy-xeon-dev.yml"));
+        var commonEnvironment = ExtractSection(compose, "x-common-env: &common-env", "services:");
+        var identityServer = ExtractService(compose, "identityserver");
+
+        compose.Should().NotContain("JwtOptions__Secret");
+        compose.Should().NotContain("JWT_SECRET");
+        envExample.Should().NotContain("JWT_SECRET");
+        commonEnvironment.Should().Contain("JwtOptions__SigningPublicKeyPath");
+        commonEnvironment.Should().NotContain("JwtOptions__SigningPrivateKeyPath");
+        identityServer.Should().Contain(
+            "JwtOptions__SigningPrivateKeyPath: /run/secrets/identity-user-jwt-private-key.pem");
+        identityServer.Should().Contain("identity-user-jwt-private-key");
+
+        foreach (var service in CentralIdentityServices.Where(service => service != "identityserver"))
+        {
+            ExtractService(compose, service).Should().NotContain("JwtOptions__SigningPrivateKeyPath");
+        }
+
+        envExample.Should().Contain("USER_JWT_GENERATION_ID=");
+        envExample.Should().Contain("IDENTITY_USER_JWT_PUBLIC_KEY_PATH=");
+        envExample.Should().Contain("IDENTITY_USER_JWT_PRIVATE_KEY_PATH=");
+        workflow.Should().Contain("Identity user JWT public and private keys do not match");
+        workflow.Should().Contain("openssl\", \"pkey");
     }
 
     [Test]

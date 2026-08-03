@@ -5,11 +5,9 @@ namespace IdentityServer.Domain.Shared.Contracts;
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Both,
-    Actions = EndpointActions.All,
+    Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/tenant-module-features",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "tenant-module-features"
+    RequireAuthorization = true
 )]
 public partial class TenantModuleFeature : BaseModel
 {

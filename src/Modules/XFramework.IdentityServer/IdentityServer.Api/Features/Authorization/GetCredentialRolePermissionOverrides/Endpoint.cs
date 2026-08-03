@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Authorization.GetCredentialRolePermissionO
 
 public static class GetCredentialRolePermissionOverridesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<CredentialRolePermissionOverridesResponse>> Handle(
         GetCredentialRolePermissionOverridesRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -16,7 +16,8 @@ public static class GetCredentialRolePermissionOverridesEndpoint
     [MapPost("/api/identity/authorization/credential-role-overrides/get", Tags = ["Identity Authorization"],
         Summary = "Get credential role permission overrides",
         RequireAuthorization = true,
-        ExcludeFromOpenApi = true)]
+        Capability = IdentityAuthorizationConstants.View,
+        ExcludeFromOpenApi = false)]
     public static Task<Result<CredentialRolePermissionOverridesResponse>> HandleHttp(
         GetCredentialRolePermissionOverridesRequest request,
         HttpContext httpContext,

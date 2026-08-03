@@ -27,6 +27,12 @@ public static class IdentityConstants
         public static readonly Guid Email = new("fe1197ba-dfee-4a4e-b2d3-f8f8c48796be");
         public static readonly Guid Kyc = new("41b5d12c-ce50-4af6-b68f-79443bd5c489");
     }
+
+    public static class VerificationPurpose
+    {
+        public const string ContactVerification = "contact-verification";
+        public const string PasswordReset = "password-reset";
+    }
     
     public static class AddressType
     {

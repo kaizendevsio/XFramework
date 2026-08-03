@@ -69,7 +69,7 @@ public sealed class CommunicationsModerationService(
         GetCommunicationsModerationRulesRequest request,
         CancellationToken ct = default)
     {
-        var tenant = ResolveAdminTenant(request.Metadata);
+        var tenant = await ResolveAdminTenantAsync(request.Metadata, ct);
         if (!tenant.IsSuccess)
             return Result<GetCommunicationsModerationRulesResponse>.Failure(tenant.Message ?? "Tenant could not be resolved", tenant.StatusCode);
 
@@ -93,7 +93,7 @@ public sealed class CommunicationsModerationService(
         CreateCommunicationsModerationRuleRequest request,
         CancellationToken ct = default)
     {
-        var tenant = ResolveAdminTenant(request.Metadata);
+        var tenant = await ResolveAdminTenantAsync(request.Metadata, ct);
         if (!tenant.IsSuccess)
             return Result<CommunicationsModerationRuleResponse>.Failure(tenant.Message ?? "Tenant could not be resolved", tenant.StatusCode);
 
@@ -137,7 +137,7 @@ public sealed class CommunicationsModerationService(
         UpdateCommunicationsModerationRuleRequest request,
         CancellationToken ct = default)
     {
-        var tenant = ResolveAdminTenant(request.Metadata);
+        var tenant = await ResolveAdminTenantAsync(request.Metadata, ct);
         if (!tenant.IsSuccess)
             return Result<CommunicationsModerationRuleResponse>.Failure(tenant.Message ?? "Tenant could not be resolved", tenant.StatusCode);
 
@@ -185,7 +185,7 @@ public sealed class CommunicationsModerationService(
         DeleteCommunicationsModerationRuleRequest request,
         CancellationToken ct = default)
     {
-        var tenant = ResolveAdminTenant(request.Metadata);
+        var tenant = await ResolveAdminTenantAsync(request.Metadata, ct);
         if (!tenant.IsSuccess)
             return Result<CmdResponse>.Failure(tenant.Message ?? "Tenant could not be resolved", tenant.StatusCode);
 
@@ -218,7 +218,7 @@ public sealed class CommunicationsModerationService(
         ReviewMessageReportRequest request,
         CancellationToken ct = default)
     {
-        var tenant = ResolveAdminTenant(request.Metadata);
+        var tenant = await ResolveAdminTenantAsync(request.Metadata, ct);
         if (!tenant.IsSuccess)
             return Result<CommunicationsReportWorkflowResponse>.Failure(tenant.Message ?? "Tenant could not be resolved", tenant.StatusCode);
 
@@ -268,9 +268,11 @@ public sealed class CommunicationsModerationService(
         }, "Message report updated.");
     }
 
-    private Result<CommunicationsTenantContext> ResolveAdminTenant(RequestMetadata? metadata)
+    private async Task<Result<CommunicationsTenantContext>> ResolveAdminTenantAsync(
+        RequestMetadata? metadata,
+        CancellationToken ct)
     {
-        var admin = requestContextResolver.ResolveAdmin(metadata);
+        var admin = await requestContextResolver.ResolveAdminAsync(metadata, ct);
         return admin.IsSuccess
             ? admin
             : Result<CommunicationsTenantContext>.Failure(admin.Message ?? "Communications moderation requires an admin context", admin.StatusCode);

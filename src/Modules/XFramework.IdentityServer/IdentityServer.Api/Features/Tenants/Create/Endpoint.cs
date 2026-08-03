@@ -1,21 +1,35 @@
 using FluentValidation;
+using IdentityServer.Api.Features.Authorization.Shared;
 using XFramework.Integration.Attributes;
+using IdentityServer.Api.Features.Tenants;
 
 namespace IdentityServer.Api.Features.Tenants.Create;
 
 public static class CreateTenantEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    public static Task<Result<TenantAdministrationResponse>> Handle(
+        CreateTenantRequest request,
+        ITenantAdministrationService service,
+        CancellationToken ct) => service.CreateAsync(request, ct);
+
     [MapPost("/api/tenants", Tags = ["Tenants"],
         Summary = "Create a tenant",
         Description = "Creates a tenant through the IdentityServer admin workflow.",
-        ExcludeFromOpenApi = true)]
-    public static async Task<Result<Tenant>> Handle(
+        RequireAuthorization = true,
+        Capability = IdentityAuthorizationConstants.Create,
+        Roles = ["SuperAdmin"])]
+    public static Task<Result<TenantAdministrationResponse>> HandleHttp(
         CreateTenantRequest request,
-        IAuthService authService,
+        HttpContext httpContext,
+        ITenantAdministrationService service,
         CancellationToken ct)
     {
-        return await authService.CreateTenantAsync(request, ct);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        return Handle(
+            request,
+            service,
+            ct);
     }
 }
 

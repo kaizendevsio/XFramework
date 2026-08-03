@@ -17,7 +17,6 @@ public static class TestSeedData
         await SeedTenantModuleFeatures(db);
         await SeedIdentityRoles(db);
         await SeedRegistryConfig(db);
-        await SeedVerificationTypes(db);
         await SeedSessionTypes(db);
         await SeedWalletTypes(db);
         await db.SaveChangesAsync();
@@ -32,7 +31,10 @@ public static class TestSeedData
                 Id = TestConstants.TenantId,
                 TenantId = TestConstants.TenantId,
                 Name = "Test Tenant",
-                Description = "Shared integration test tenant"
+                Description = "Shared integration test tenant",
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
             });
         }
 
@@ -58,7 +60,8 @@ public static class TestSeedData
                 Id = TestConstants.RoleGroupId,
                 Name = "Default",
                 Description = "Default role group",
-                TenantId = TestConstants.TenantId
+                TenantId = TestConstants.TenantId,
+                IsEnabled = true
             });
         }
 
@@ -69,7 +72,8 @@ public static class TestSeedData
                 Id = TestConstants.RoleTypeId,
                 Name = "User",
                 GroupId = TestConstants.RoleGroupId,
-                TenantId = TestConstants.TenantId
+                TenantId = TestConstants.TenantId,
+                IsEnabled = true
             });
         }
 
@@ -147,7 +151,10 @@ public static class TestSeedData
                 Id = TestConstants.RegistryGroupId,
                 Name = "Config",
                 Description = "Test configuration",
-                TenantId = TestConstants.TenantId
+                TenantId = TestConstants.TenantId,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
             });
         }
 
@@ -168,20 +175,10 @@ public static class TestSeedData
                 Key = key,
                 Value = value,
                 GroupId = TestConstants.RegistryGroupId,
-                TenantId = TestConstants.TenantId
-            });
-        }
-    }
-
-    private static async Task SeedVerificationTypes(AppDbContext db)
-    {
-        if (!await db.Set<IdentityContracts.IdentityVerificationType>().AnyAsync(v => v.Name == "Sms"))
-        {
-            db.Set<IdentityContracts.IdentityVerificationType>().Add(new IdentityContracts.IdentityVerificationType
-            {
-                Id = Guid.NewGuid(),
-                Name = "Sms",
-                TenantId = TestConstants.TenantId
+                TenantId = TestConstants.TenantId,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
             });
         }
     }

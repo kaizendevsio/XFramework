@@ -1010,6 +1010,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("ExternalSender")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("IdempotencyRequestId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Intent")
                         .HasColumnType("character varying");
 
@@ -1092,6 +1095,11 @@ namespace XFramework.Domain.Migrations
                         .HasDatabaseName("IX_MessageDirect_TemplateId");
 
                     b.HasIndex("TypeId");
+
+                    b.HasIndex("TenantId", "IdempotencyRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MessageDirect_Tenant_IdempotencyRequest")
+                        .HasFilter("\"IdempotencyRequestId\" IS NOT NULL");
 
                     b.ToTable("MessageDirect", "Communications");
                 });
@@ -3353,6 +3361,8 @@ namespace XFramework.Domain.Migrations
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityAuthorizationLogs");
 
+                    b.HasIndex(new[] { "TenantId", "CreatedAt" }, "IX_AuthorizationLog_TenantId_CreatedAt");
+
                     b.HasIndex(new[] { "CredentialId" }, "IX_tbl_IdentityAuthorizationLogs_CredentialID");
 
                     b.ToTable("AuthorizationLog", "Audit");
@@ -3381,6 +3391,7 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<string>("ConsolidatedName")
@@ -3583,6 +3594,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -3621,6 +3633,11 @@ namespace XFramework.Domain.Migrations
                         .HasName("PK_tbl_IdentityContacts");
 
                     b.HasIndex("GroupId");
+
+                    b.HasIndex("TenantId", "Value", "TypeId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_IdentityContact_ActiveAuthenticationContact")
+                        .HasFilter("\"IsDeleted\" = false AND \"IsEnabled\" = true AND \"TypeId\" IN ('03f26cc1-e4c2-424f-9d5b-b22d006ae45b'::uuid, 'cdc88887-c7e7-415e-9d43-cc0050d523d3'::uuid)");
 
                     b.HasIndex(new[] { "TypeId" }, "IX_tbl_IdentityContacts_TypeID");
 
@@ -3851,6 +3868,7 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("character varying(2048)");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -3861,6 +3879,9 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<string>("Device")
                         .HasColumnType("text");
+
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("IdentityInfoId")
                         .HasColumnType("uuid")
@@ -3883,6 +3904,9 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<string>("Location")
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<short?>("LogInStatus")
                         .HasColumnType("smallint");
@@ -3918,14 +3942,14 @@ namespace XFramework.Domain.Migrations
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityCredentials");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex(new[] { "TenantId", "CreatedAt", "Id" }, "IX_IdentityCredential_TenantId_CreatedAt_Id");
+
+                    b.HasIndex(new[] { "TenantId", "UserName" }, "IX_IdentityCredential_TenantId_UserName")
+                        .IsUnique();
 
                     b.HasIndex(new[] { "AvatarStorageFileId" }, "IX_tbl_IdentityCredentials_AvatarStorageFileId");
 
                     b.HasIndex(new[] { "IdentityInfoId" }, "IX_tbl_IdentityCredentials_IdentityInfoID");
-
-                    b.HasIndex(new[] { "UserName" }, "tbl_identitycredentials_un")
-                        .IsUnique();
 
                     b.ToTable("IdentityCredential", "Identity");
                 });
@@ -3939,6 +3963,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4003,6 +4028,7 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("integer");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4070,6 +4096,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4104,6 +4131,11 @@ namespace XFramework.Domain.Migrations
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityRoles");
 
+                    b.HasIndex("TenantId", "CredentialId", "TypeId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_IdentityRole_Tenant_Credential_Type")
+                        .HasFilter("\"IsDeleted\" = false");
+
                     b.HasIndex(new[] { "TypeId" }, "IX_tbl_IdentityRoles_RoleTypeID");
 
                     b.HasIndex(new[] { "CredentialId" }, "IX_tbl_IdentityRoles_UserCredID");
@@ -4125,6 +4157,7 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("character varying");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4194,6 +4227,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4251,6 +4285,7 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("character varying");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4372,7 +4407,11 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4387,6 +4426,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTime?>("Expiry")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -4396,17 +4438,24 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<short?>("Status")
                         .HasColumnType("smallint");
 
                     b.Property<DateTimeOffset?>("StatusUpdatedOn")
-                        .HasColumnType("time with time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Token")
-                        .HasColumnType("character varying");
+                    b.Property<string>("TokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("Token");
 
                     b.Property<Guid?>("VerificationTypeId")
                         .HasColumnType("uuid")
@@ -4414,6 +4463,10 @@ namespace XFramework.Domain.Migrations
 
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityVerifications");
+
+                    b.HasIndex(new[] { "TenantId", "CreatedAt", "Id" }, "IX_IdentityVerification_TenantId_CreatedAt_Id");
+
+                    b.HasIndex(new[] { "TenantId", "Purpose", "TokenHash", "Status", "Expiry" }, "IX_IdentityVerification_TenantId_TokenHash_Status_Expiry");
 
                     b.HasIndex(new[] { "CredentialId" }, "IX_tbl_IdentityVerifications_CredentialID");
 
@@ -4477,9 +4530,9 @@ namespace XFramework.Domain.Migrations
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             DefaultExpiry = 10L,
                             IsDeleted = false,
-                            IsEnabled = false,
+                            IsEnabled = true,
                             Name = "SMS",
-                            SystemReferenceId = new Guid("00000000-0000-0000-0000-000000000000"),
+                            SystemReferenceId = new Guid("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4"),
                             TenantId = new Guid("00000000-0000-0000-0000-000000000000")
                         },
                         new
@@ -4489,9 +4542,9 @@ namespace XFramework.Domain.Migrations
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             DefaultExpiry = 120L,
                             IsDeleted = false,
-                            IsEnabled = false,
+                            IsEnabled = true,
                             Name = "Email",
-                            SystemReferenceId = new Guid("00000000-0000-0000-0000-000000000000"),
+                            SystemReferenceId = new Guid("fe1197ba-dfee-4a4e-b2d3-f8f8c48796be"),
                             TenantId = new Guid("00000000-0000-0000-0000-000000000000")
                         },
                         new
@@ -4501,11 +4554,102 @@ namespace XFramework.Domain.Migrations
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             DefaultExpiry = 1051200L,
                             IsDeleted = false,
-                            IsEnabled = false,
+                            IsEnabled = true,
                             Name = "KYC",
-                            SystemReferenceId = new Guid("00000000-0000-0000-0000-000000000000"),
+                            SystemReferenceId = new Guid("41b5d12c-ce50-4af6-b68f-79443bd5c489"),
                             TenantId = new Guid("00000000-0000-0000-0000-000000000000")
                         });
+                });
+
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.PasswordResetOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeadLetteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DispatchStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_PasswordResetOutboxMessage");
+
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PasswordResetOutbox_Tenant_Request");
+
+                    b.HasIndex("NextAttemptAt", "LeaseExpiresAt", "CreatedAt")
+                        .HasDatabaseName("IX_PasswordResetOutbox_Global_Due")
+                        .HasFilter("\"ProcessedAt\" IS NULL AND \"DeadLetteredAt\" IS NULL AND \"IsDeleted\" = FALSE AND \"IsEnabled\" = TRUE");
+
+                    b.HasIndex("TenantId", "DeadLetteredAt", "ProcessedAt", "NextAttemptAt", "LeaseExpiresAt")
+                        .HasDatabaseName("IX_PasswordResetOutbox_Tenant_Due_Lease");
+
+                    b.ToTable("PasswordResetOutboxMessage", "Identity");
                 });
 
             modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.RegistryConfiguration", b =>
@@ -4517,6 +4661,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4556,7 +4701,10 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RegistryConfiguration_Tenant_Key")
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("RegistryConfiguration", "Registry");
                 });
@@ -4570,6 +4718,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4603,6 +4752,10 @@ namespace XFramework.Domain.Migrations
 
                     b.HasKey("Id")
                         .HasName("tbl_configurationgroup_pk");
+
+                    b.HasIndex("TenantId", "SystemReferenceId")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("RegistryConfigurationGroup", "Registry");
                 });
@@ -4688,9 +4841,10 @@ namespace XFramework.Domain.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<string>("PrivateKeyPem")
+                    b.Property<string>("PrivateKeyFileName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PublicKeyPem")
                         .IsRequired()
@@ -4701,7 +4855,9 @@ namespace XFramework.Domain.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsActive");
+                    b.HasIndex("IsActive")
+                        .IsUnique()
+                        .HasFilter("\"IsActive\" = true");
 
                     b.HasIndex("KeyId")
                         .IsUnique();
@@ -4718,6 +4874,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4742,6 +4899,13 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("RefreshTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RefreshTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("SessionData")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -4760,6 +4924,12 @@ namespace XFramework.Domain.Migrations
 
                     b.HasKey("Id")
                         .HasName("PK_tbl_SessionData");
+
+                    b.HasIndex(new[] { "TenantId", "CreatedAt", "Id" }, "IX_Session_TenantId_CreatedAt_Id");
+
+                    b.HasIndex(new[] { "TenantId", "Status", "ExpiresAt" }, "IX_Session_TenantId_Status_ExpiresAt");
+
+                    b.HasIndex(new[] { "TenantId", "Status", "RefreshTokenExpiresAt" }, "IX_Session_TenantId_Status_RefreshTokenExpiresAt");
 
                     b.HasIndex(new[] { "CredentialId" }, "IX_tbl_SessionData_CredentialID");
 
@@ -4807,6 +4977,169 @@ namespace XFramework.Domain.Migrations
                         .HasName("PK_tbl_SessionType");
 
                     b.ToTable("SessionType", "Identity");
+                });
+
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.StorageClaimOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeadLetteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StorageFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_StorageClaimOutboxMessage");
+
+                    b.HasIndex("NextAttemptAt", "LeaseExpiresAt", "CreatedAt")
+                        .HasDatabaseName("IX_StorageClaimOutbox_Global_Due")
+                        .HasFilter("\"ProcessedAt\" IS NULL AND \"DeadLetteredAt\" IS NULL AND \"IsDeleted\" = FALSE AND \"IsEnabled\" = TRUE");
+
+                    b.HasIndex("TenantId", "StorageFileId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StorageClaimOutbox_Tenant_File_Request");
+
+                    b.ToTable("StorageClaimOutboxMessage", "Identity");
+                });
+
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.StorageCleanupOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeadLetteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StorageFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_StorageCleanupOutboxMessage");
+
+                    b.HasIndex("TenantId", "StorageFileId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StorageCleanupOutbox_Tenant_File");
+
+                    b.HasIndex("NextAttemptAt", "LeaseExpiresAt", "CreatedAt")
+                        .HasDatabaseName("IX_StorageCleanupOutbox_Global_Due")
+                        .HasFilter("\"ProcessedAt\" IS NULL AND \"DeadLetteredAt\" IS NULL AND \"IsDeleted\" = FALSE AND \"IsEnabled\" = TRUE");
+
+                    b.HasIndex("TenantId", "DeadLetteredAt", "ProcessedAt", "NextAttemptAt", "LeaseExpiresAt")
+                        .HasDatabaseName("IX_StorageCleanupOutbox_Tenant_Due_Lease");
+
+                    b.ToTable("StorageCleanupOutboxMessage", "Identity");
                 });
 
             modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.Subscription", b =>
@@ -4937,6 +5270,7 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4992,6 +5326,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -5044,6 +5379,7 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -5099,6 +5435,110 @@ namespace XFramework.Domain.Migrations
                         .HasDatabaseName("IX_TenantModuleFeature_Tenant_Module_SubFeature");
 
                     b.ToTable("TenantModuleFeature", "Identity");
+                });
+
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.VerificationDeliveryOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeadLetteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DispatchStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Intent")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Message")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Recipient")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TransportType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("VerificationId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_VerificationDeliveryOutboxMessage");
+
+                    b.HasIndex("TenantId", "VerificationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_VerificationDeliveryOutbox_Tenant_Verification");
+
+                    b.HasIndex("NextAttemptAt", "LeaseExpiresAt", "CreatedAt")
+                        .HasDatabaseName("IX_VerificationDeliveryOutbox_Global_Due")
+                        .HasFilter("\"ProcessedAt\" IS NULL AND \"DeadLetteredAt\" IS NULL AND \"IsDeleted\" = FALSE AND \"IsEnabled\" = TRUE");
+
+                    b.HasIndex("TenantId", "DeadLetteredAt", "ProcessedAt", "LeaseExpiresAt")
+                        .HasDatabaseName("IX_VerificationDeliveryOutbox_Tenant_Due_Lease");
+
+                    b.ToTable("VerificationDeliveryOutboxMessage", "Identity");
                 });
 
             modelBuilder.Entity("Notifications.Domain.Shared.Contracts.NotificationDeliveryAttempt", b =>
@@ -9526,6 +9966,7 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<long?>("ContentLengthBytes")
@@ -9624,6 +10065,9 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("UnclaimedUntil")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("UploadStartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -9648,6 +10092,10 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("TenantId", "Identifier")
                         .HasDatabaseName("ix_storagefile_tenant_identifier");
+
+                    b.HasIndex("UnclaimedUntil", "CreatedAt")
+                        .HasDatabaseName("ix_storagefile_global_unclaimed_due")
+                        .HasFilter("\"UnclaimedUntil\" IS NOT NULL AND \"ObjectDeletedAt\" IS NULL");
 
                     b.HasIndex("TenantId", "BucketName", "ObjectKey")
                         .HasDatabaseName("ix_storagefile_tenant_bucket_object");
@@ -9713,6 +10161,10 @@ namespace XFramework.Domain.Migrations
 
                     b.HasIndex("GroupId");
 
+                    b.HasIndex(new[] { "TenantId", "Name" }, "IX_StorageFileIdentifier_TenantId_Name")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
                     b.ToTable("StorageFileIdentifier", "Storage");
                 });
 
@@ -9765,6 +10217,10 @@ namespace XFramework.Domain.Migrations
                     b.HasKey("Id")
                         .HasName("scheduleentitygroup_pk");
 
+                    b.HasIndex(new[] { "TenantId", "Name" }, "IX_StorageFileIdentifierGroup_TenantId_Name")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
                     b.ToTable("StorageFileIdentifierGroup", "Storage");
                 });
 
@@ -9816,6 +10272,10 @@ namespace XFramework.Domain.Migrations
 
                     b.HasKey("Id")
                         .HasName("storagefileentity_pk");
+
+                    b.HasIndex(new[] { "TenantId", "Name" }, "IX_StorageFileType_TenantId_Name")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("StorageFileType", "Storage");
                 });
@@ -10089,6 +10549,7 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -10152,6 +10613,10 @@ namespace XFramework.Domain.Migrations
                     b.HasIndex("UploadId")
                         .IsUnique()
                         .HasDatabaseName("ix_storageuploadsession_uploadid");
+
+                    b.HasIndex("ExpiresAt", "CreatedAt")
+                        .HasDatabaseName("ix_storageuploadsession_global_expired_due")
+                        .HasFilter("\"AbortedAt\" IS NULL AND \"Status\" IN (0, 1, 4, 5)");
 
                     b.HasIndex("TenantId", "Status", "ExpiresAt")
                         .HasDatabaseName("ix_storageuploadsession_tenant_status_expires");
@@ -12575,12 +13040,6 @@ namespace XFramework.Domain.Migrations
 
             modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.IdentityCredential", b =>
                 {
-                    b.HasOne("XFramework.Domain.Shared.Contracts.StorageFile", "AvatarStorageFile")
-                        .WithMany()
-                        .HasForeignKey("AvatarStorageFileId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("tbl_identitycredentials_avatar_storagefile_fk");
-
                     b.HasOne("IdentityServer.Domain.Shared.Contracts.IdentityInformation", "IdentityInfo")
                         .WithMany("IdentityCredentials")
                         .HasForeignKey("IdentityInfoId")
@@ -12593,8 +13052,6 @@ namespace XFramework.Domain.Migrations
                         .HasForeignKey("TenantId")
                         .IsRequired()
                         .HasConstraintName("tbl_identitycredentials___fk");
-
-                    b.Navigation("AvatarStorageFile");
 
                     b.Navigation("IdentityInfo");
 

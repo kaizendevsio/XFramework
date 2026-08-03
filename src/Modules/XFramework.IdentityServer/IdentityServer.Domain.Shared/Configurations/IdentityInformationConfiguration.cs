@@ -17,6 +17,7 @@ public class IdentityInformationConfiguration : IEntityTypeConfiguration<Identit
             .HasColumnName("ID")
             .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
         entity.Property(e => e.TenantId).HasColumnName("TenantId");
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
         entity.Property(e => e.FirstName).HasMaxLength(100);
 
         entity.Property(e => e.IdentityDescription).HasMaxLength(100);

@@ -1,4 +1,5 @@
 using XFramework.Domain.Shared.Attributes;
+using System.Text.Json.Serialization;
 
 namespace IdentityServer.Domain.Shared.Contracts;
 
@@ -8,9 +9,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/sessions",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 60,
-    CacheKeyPrefix = "sessions"
+    RequireAuthorization = true
 )]
 public partial class Session : BaseModel
 {
@@ -21,8 +20,16 @@ public partial class Session : BaseModel
     [MemoryPackOrder(1)]
     public Guid CredentialId { get; set; }
 
-    [MemoryPackOrder(2)]
+    [JsonIgnore]
+    [MemoryPackIgnore]
     public string? SessionData { get; set; }
+
+    [JsonIgnore]
+    [MemoryPackIgnore]
+    public string? RefreshTokenHash { get; set; }
+
+    [MemoryPackOrder(7)]
+    public DateTime? RefreshTokenExpiresAt { get; set; }
 
     [MemoryPackOrder(5)]
     public CurrentSessionState Status { get; set; } = CurrentSessionState.Active;

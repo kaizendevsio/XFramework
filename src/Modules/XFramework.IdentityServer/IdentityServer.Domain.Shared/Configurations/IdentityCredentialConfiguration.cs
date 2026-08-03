@@ -16,7 +16,10 @@ public class IdentityCredentialConfiguration : IEntityTypeConfiguration<Identity
 
         entity.HasIndex(e => e.AvatarStorageFileId, "IX_tbl_IdentityCredentials_AvatarStorageFileId");
 
-        entity.HasIndex(e => e.UserName, "tbl_identitycredentials_un").IsUnique();
+        entity.HasIndex(e => new { e.TenantId, e.UserName }, "IX_IdentityCredential_TenantId_UserName")
+            .IsUnique();
+        entity.HasIndex(e => new { e.TenantId, e.CreatedAt, e.Id },
+            "IX_IdentityCredential_TenantId_CreatedAt_Id");
 
         entity.Property(e => e.Id)
             .HasColumnName("ID")
@@ -28,6 +31,7 @@ public class IdentityCredentialConfiguration : IEntityTypeConfiguration<Identity
         entity.Property(e => e.UserAlias).HasMaxLength(100);
         entity.Property(e => e.UserName).HasMaxLength(100);
         entity.Property(e => e.AvatarUrl).HasMaxLength(2048);
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
 
         entity.HasOne(d => d.Tenant).WithMany(p => p.IdentityCredentials)
             .HasForeignKey(d => d.TenantId)
@@ -39,9 +43,5 @@ public class IdentityCredentialConfiguration : IEntityTypeConfiguration<Identity
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("tbl_identitycredentials_fk");
 
-        entity.HasOne(d => d.AvatarStorageFile).WithMany()
-            .HasForeignKey(d => d.AvatarStorageFileId)
-            .OnDelete(DeleteBehavior.SetNull)
-            .HasConstraintName("tbl_identitycredentials_avatar_storagefile_fk");
     }
 }

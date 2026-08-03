@@ -378,9 +378,7 @@ else
 
         try
         {
-            _contact.IsDeleted = true;
-            _contact.IsEnabled = false;
-            DataContext.Update(_contact);
+            DataContext.Remove(_contact);
             var result = await DataContext.SaveChangesAsync();
             if (result.IsSuccess)
             {

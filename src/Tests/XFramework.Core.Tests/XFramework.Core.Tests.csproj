@@ -16,6 +16,7 @@
         <PackageReference Include="FluentAssertions" />
         <PackageReference Include="Moq" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />

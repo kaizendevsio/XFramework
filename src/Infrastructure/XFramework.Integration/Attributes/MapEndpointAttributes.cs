@@ -44,6 +44,12 @@ public abstract class MapEndpointAttribute : Attribute
     /// </summary>
     public string[]? Roles { get; set; }
 
+    /// <summary>Named ASP.NET Core rate-limit policy required by the endpoint.</summary>
+    public string? RateLimitPolicy { get; set; }
+
+    /// <summary>Tenant capability required by the endpoint.</summary>
+    public string? Capability { get; set; }
+
     protected MapEndpointAttribute(string route) => Route = route;
 }
 

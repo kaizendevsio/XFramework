@@ -89,9 +89,9 @@ else
                                        FieldType="EditableFieldType.Select"
                                        Options="_civilStatusOptions"
                                        DisplayValue="@(_user.CivilStatus?.ToString() ?? "N/A")" />
-                        <EditableField Label="Verified" @bind-Value="_editIsVerified"
-                                       FieldType="EditableFieldType.Switch"
-                                       DisplayValue="@(_user.IsVerified ? "Verified" : "Unverified")" />
+                        <EditableField Label="Verified"
+                                       DisplayValue="@(_user.IsVerified ? "Verified" : "Unverified")"
+                                       ReadOnly="true" />
                         <EditableField Label="Created" DisplayValue="@_user.CreatedAt.ToString("g")" ReadOnly="true" />
                     </div>
                 </EditableForm>
@@ -1070,6 +1070,7 @@ else
     private bool _outsideTenantContext;
     private bool _attendanceModuleEnabled;
     private Guid? _loadedId;
+    private string? _loadedSection;
     private string _attendanceCredentialFilter = AllAttendanceCredentialsValue;
     private string CurrentSection => NormalizeSection(Section);
 
@@ -1083,7 +1084,6 @@ else
     private string? _editBirthDate;
     private string? _editGender;
     private string? _editCivilStatus;
-    private string? _editIsVerified;
 
     // Select options
     private List<SelectOption<string>> _genderOptions = Enum.GetValues<Gender>().Select(g => new SelectOption<string>(g.ToString(), g.ToString())).ToList();
@@ -1114,6 +1114,7 @@ else
     private bool _savingRolePermissions;
     private long _rolePermissionOperationVersion;
     private bool _rolePermissionOverridesLoaded;
+    private Guid _rolePermissionConcurrencyStamp;
     private IdentityRole? _permissionRole;
     private CancellationTokenSource? _rolePermissionLoadCts;
     private Dictionary<string, string> _rolePermissionValues = new(StringComparer.OrdinalIgnoreCase);
@@ -1160,12 +1161,14 @@ else
             Navigation.NavigateTo(GetSectionHref(normalizedSection), replace: true);
         }
 
-        if (_loadedId == Id)
+        if (_loadedId == Id
+            && string.Equals(_loadedSection, normalizedSection, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
         _loadedId = Id;
+        _loadedSection = normalizedSection;
         await ReloadAllData();
     }
 
@@ -1214,9 +1217,8 @@ else
         _loading = true;
         try
         {
+            ClearChildData();
             _outsideTenantContext = false;
-            await ModuleNavigation.EnsureLoadedAsync();
-            _attendanceModuleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Attendance);
             _user = await DataContext.Query<IdentityInformation>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -1236,15 +1238,7 @@ else
             }
 
             SyncEditFields();
-            await LoadCredentials();
-            await LoadRoles();
-            await LoadContacts();
-            await LoadAddresses();
-            await LoadSessions();
-            await LoadAuthLogs();
-            await LoadWallets();
-            await LoadAttendance();
-            await LoadLookups();
+            await LoadActiveSectionData(CurrentSection);
         }
         catch
         {
@@ -1253,6 +1247,49 @@ else
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task LoadActiveSectionData(string section)
+    {
+        switch (section)
+        {
+            case "summary":
+                break;
+            case "credentials":
+                await LoadCredentials();
+                break;
+            case "roles":
+                await LoadCredentials();
+                await LoadRoles();
+                await LoadRoleTypes();
+                break;
+            case "contacts":
+                await LoadCredentials();
+                await LoadContacts();
+                await LoadContactLookups();
+                break;
+            case "addresses":
+                await LoadAddresses();
+                break;
+            case "sessions":
+                await LoadCredentials();
+                await LoadSessions();
+                break;
+            case "auth-logs":
+                await LoadCredentials();
+                await LoadAuthLogs();
+                break;
+            case "attendance":
+                await ModuleNavigation.EnsureLoadedAsync();
+                _attendanceModuleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Attendance);
+                await LoadCredentials();
+                await LoadAttendance();
+                break;
+            case "wallets":
+                await LoadCredentials();
+                await LoadWallets();
+                break;
         }
     }
 
@@ -1267,6 +1304,10 @@ else
         _wallets = [];
         _attendanceParticipations = [];
         _attendanceRecords = [];
+        _roleTypes = [];
+        _contactTypes = [];
+        _contactGroups = [];
+        _attendanceModuleEnabled = false;
     }
 
     private async Task LoadCredentials()
@@ -1289,21 +1330,23 @@ else
     {
         try
         {
-            var credentialIds = _credentials.Select(c => c.Id).ToList();
-            _roles = [];
-            foreach (var credId in credentialIds)
-            {
-                var roles = await DataContext.Query<IdentityRole>()
+            var tenantId = _user?.TenantId ?? Guid.Empty;
+            var credentialIds = _credentials
+                .Where(credential => credential.TenantId == tenantId)
+                .Select(credential => credential.Id)
+                .ToArray();
+            _roles = credentialIds.Length == 0
+                ? []
+                : (await DataContext.Query<IdentityRole>()
                     .IgnoreQueryFilters()
                     .NoCache()
-                    .Where(x => x.CredentialId == credId)
+                    .Where(role => role.TenantId == tenantId)
+                    .Where(role => credentialIds.Contains(role.CredentialId))
                     .Include(x => x.Type)
                     .OrderByDescending(x => x.CreatedAt)
-                    .Take(100)
-                    .ToListAsync();
-                _roles.AddRange(roles);
-            }
-            _roles = _roles.OrderByDescending(x => x.CreatedAt).ToList();
+                    .Take(10_000)
+                    .ToListAsync())
+                .ToList();
         }
         catch { _roles = []; }
     }
@@ -1312,21 +1355,23 @@ else
     {
         try
         {
-            var credentialIds = _credentials.Select(c => c.Id).ToList();
-            _contacts = [];
-            foreach (var credId in credentialIds)
-            {
-                var contacts = await DataContext.Query<IdentityContact>()
+            var tenantId = _user?.TenantId ?? Guid.Empty;
+            var credentialIds = _credentials
+                .Where(credential => credential.TenantId == tenantId)
+                .Select(credential => credential.Id)
+                .ToArray();
+            _contacts = credentialIds.Length == 0
+                ? []
+                : (await DataContext.Query<IdentityContact>()
                     .IgnoreQueryFilters()
                     .NoCache()
-                    .Where(x => x.CredentialId == credId)
+                    .Where(contact => contact.TenantId == tenantId)
+                    .Where(contact => credentialIds.Contains(contact.CredentialId))
                     .Include(x => x.Type)
                     .OrderByDescending(x => x.CreatedAt)
-                    .Take(100)
-                    .ToListAsync();
-                _contacts.AddRange(contacts);
-            }
-            _contacts = _contacts.OrderByDescending(x => x.CreatedAt).ToList();
+                    .Take(10_000)
+                    .ToListAsync())
+                .ToList();
         }
         catch { _contacts = []; }
     }
@@ -1351,21 +1396,23 @@ else
     {
         try
         {
-            var credentialIds = _credentials.Select(c => c.Id).ToList();
-            _sessions = [];
-            foreach (var credId in credentialIds)
-            {
-                var sessions = await DataContext.Query<Session>()
+            var tenantId = _user?.TenantId ?? Guid.Empty;
+            var credentialIds = _credentials
+                .Where(credential => credential.TenantId == tenantId)
+                .Select(credential => credential.Id)
+                .ToArray();
+            _sessions = credentialIds.Length == 0
+                ? []
+                : (await DataContext.Query<Session>()
                     .IgnoreQueryFilters()
                     .NoCache()
-                    .Where(x => x.CredentialId == credId)
-                    .Include(x => x.SessionType)
-                    .OrderByDescending(x => x.CreatedAt)
+                    .Where(session => session.TenantId == tenantId)
+                    .Where(session => credentialIds.Contains(session.CredentialId))
+                    .Include(session => session.SessionType)
+                    .OrderByDescending(session => session.CreatedAt)
                     .Take(100)
-                    .ToListAsync();
-                _sessions.AddRange(sessions);
-            }
-            _sessions = _sessions.OrderByDescending(x => x.CreatedAt).ToList();
+                    .ToListAsync())
+                .ToList();
         }
         catch { _sessions = []; }
     }
@@ -1374,20 +1421,22 @@ else
     {
         try
         {
-            var credentialIds = _credentials.Select(c => c.Id).ToList();
-            _authLogs = [];
-            foreach (var credId in credentialIds)
-            {
-                var authLogs = await DataContext.Query<AuthorizationLog>()
+            var tenantId = _user?.TenantId ?? Guid.Empty;
+            var credentialIds = _credentials
+                .Where(credential => credential.TenantId == tenantId)
+                .Select(credential => credential.Id)
+                .ToArray();
+            _authLogs = credentialIds.Length == 0
+                ? []
+                : (await DataContext.Query<AuthorizationLog>()
                     .IgnoreQueryFilters()
                     .NoCache()
-                    .Where(x => x.CredentialId == credId)
-                    .OrderByDescending(x => x.CreatedAt)
+                    .Where(log => log.TenantId == tenantId)
+                    .Where(log => credentialIds.Contains(log.CredentialId))
+                    .OrderByDescending(log => log.CreatedAt)
                     .Take(100)
-                    .ToListAsync();
-                _authLogs.AddRange(authLogs);
-            }
-            _authLogs = _authLogs.OrderByDescending(x => x.CreatedAt).ToList();
+                    .ToListAsync())
+                .ToList();
         }
         catch { _authLogs = []; }
     }
@@ -1396,20 +1445,22 @@ else
     {
         try
         {
-            var credentialIds = _credentials.Select(c => c.Id).ToList();
-            _wallets = [];
-            foreach (var credId in credentialIds)
-            {
-                var wallets = await DataContext.Query<Wallet>()
+            var tenantId = _user?.TenantId ?? Guid.Empty;
+            var credentialIds = _credentials
+                .Where(credential => credential.TenantId == tenantId)
+                .Select(credential => credential.Id)
+                .ToArray();
+            _wallets = credentialIds.Length == 0
+                ? []
+                : (await DataContext.Query<Wallet>()
                     .IgnoreQueryFilters()
                     .NoCache()
-                    .Where(x => x.CredentialId == credId)
+                    .Where(wallet => wallet.TenantId == tenantId)
+                    .Where(wallet => credentialIds.Contains(wallet.CredentialId))
                     .OrderByDescending(x => x.CreatedAt)
-                    .Take(100)
-                    .ToListAsync();
-                _wallets.AddRange(wallets);
-            }
-            _wallets = _wallets.OrderByDescending(x => x.CreatedAt).ToList();
+                    .Take(10_000)
+                    .ToListAsync())
+                .ToList();
         }
         catch { _wallets = []; }
     }
@@ -1448,7 +1499,7 @@ else
         await LoadAttendance();
     }
 
-    private async Task LoadLookups()
+    private async Task LoadRoleTypes()
     {
         try
         {
@@ -1459,7 +1510,14 @@ else
                     .Take(100)
                     .ToListAsync())
                 .ToList();
+        }
+        catch { _roleTypes = []; }
+    }
 
+    private async Task LoadContactLookups()
+    {
+        try
+        {
             _contactTypes = (await DataContext.Query<IdentityContactType>()
                     .IgnoreQueryFilters()
                     .NoCache()
@@ -1476,7 +1534,11 @@ else
                     .ToListAsync())
                 .ToList();
         }
-        catch { /* lookups may fail */ }
+        catch
+        {
+            _contactTypes = [];
+            _contactGroups = [];
+        }
     }
 
     // --- Edit User ----------------------------------------------------
@@ -1492,7 +1554,6 @@ else
         _editBirthDate = _user.BirthDate?.ToString("yyyy-MM-dd") ?? "";
         _editGender = _user.Gender?.ToString() ?? "";
         _editCivilStatus = _user.CivilStatus?.ToString() ?? "";
-        _editIsVerified = _user.IsVerified.ToString().ToLower();
     }
 
     private void DiscardUserEdit() => SyncEditFields();
@@ -1502,36 +1563,30 @@ else
         _saving = true;
         try
         {
-            var fresh = await DataContext.Query<IdentityInformation>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
-
-            if (fresh is null)
-            {
-                ToastService.Warning("User was not found.", "User unavailable");
+            if (_user is null)
                 return;
-            }
 
-            fresh.FirstName = _editFirstName;
-            fresh.MiddleName = _editMiddleName;
-            fresh.LastName = _editLastName;
-            fresh.Suffix = _editSuffix;
-            fresh.IdentityName = _editIdentityName;
-            fresh.BirthDate = DateOnly.TryParse(_editBirthDate, out var d) ? d : null;
-            fresh.Gender = Enum.TryParse<Gender>(_editGender, out var g) ? g : null;
-            fresh.CivilStatus = Enum.TryParse<CivilStatus>(_editCivilStatus, out var cs) ? cs : null;
-            fresh.IsVerified = _editIsVerified == "true";
-            fresh.ModifiedAt = DateTime.UtcNow;
-
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            var result = await IdentityServer.UpdateIdentityProfile(new UpdateIdentityProfileRequest
+            {
+                IdentityId = _user.Id,
+                ExpectedConcurrencyStamp = _user.ConcurrencyStamp,
+                FirstName = _editFirstName,
+                MiddleName = _editMiddleName,
+                LastName = _editLastName,
+                Suffix = _editSuffix,
+                IdentityName = _editIdentityName,
+                IdentityDescription = _user.IdentityDescription,
+                BirthDate = DateOnly.TryParse(_editBirthDate, out var d) ? d : null,
+                Gender = Enum.TryParse<Gender>(_editGender, out var g) ? g : null,
+                CivilStatus = Enum.TryParse<CivilStatus>(_editCivilStatus, out var cs) ? cs : null,
+                Metadata = new RequestMetadata { TenantId = _user.TenantId }
+            });
 
             if (result.IsSuccess)
             {
                 ToastService.Success("User updated successfully.", "User saved");
-                _user = fresh;
+                if (result.Response is { } updated)
+                    ApplyIdentityResponse(_user, updated);
                 SyncEditFields();
                 _editableForm?.ExitEditMode();
             }
@@ -1548,6 +1603,25 @@ else
         {
             _saving = false;
         }
+    }
+
+    private static void ApplyIdentityResponse(
+        IdentityInformation target,
+        IdentityAdministrationResponse source)
+    {
+        target.FirstName = source.FirstName;
+        target.MiddleName = source.MiddleName;
+        target.LastName = source.LastName;
+        target.Suffix = source.Suffix;
+        target.IdentityName = source.IdentityName;
+        target.IdentityDescription = source.IdentityDescription;
+        target.BirthDate = source.BirthDate;
+        target.Gender = source.Gender;
+        target.CivilStatus = source.CivilStatus;
+        target.IsVerified = source.IsVerified;
+        target.IsEnabled = source.IsEnabled;
+        target.ConcurrencyStamp = source.ConcurrencyStamp;
+        target.ModifiedAt = source.ModifiedAt;
     }
 
     // --- Credentials --------------------------------------------------
@@ -1882,6 +1956,7 @@ else
             }
 
             _permissionRole = role;
+            _rolePermissionConcurrencyStamp = result.Response.ConcurrencyStamp;
             _rolePermissionValues = permissionValues;
             _rolePermissionTreeNodes = BuildPermissionTree();
             _expandedRolePermissionFeatureKeys = _rolePermissionTreeNodes
@@ -1961,6 +2036,7 @@ else
         _expandedRolePermissionFeatureKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         _selectedRolePermissionFeatureKey = TenantModuleFeatureKeys.Identity;
         _rolePermissionOverridesLoaded = false;
+        _rolePermissionConcurrencyStamp = Guid.Empty;
     }
 
     private bool IsRolePermissionLoadCurrent(
@@ -2022,6 +2098,7 @@ else
             var result = await IdentityServer.SetCredentialRolePermissionOverrides(new SetCredentialRolePermissionOverridesRequest
             {
                 IdentityRoleId = permissionRole.Id,
+                ExpectedConcurrencyStamp = _rolePermissionConcurrencyStamp,
                 Overrides = overrides,
                 Metadata = CreateMetadata(permissionRole.TenantId)
             });

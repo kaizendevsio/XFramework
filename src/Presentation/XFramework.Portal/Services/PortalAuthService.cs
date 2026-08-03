@@ -68,10 +68,8 @@ public sealed class PortalAuthService(
         if (!response.IsSuccess || response.Response?.Credential is null || response.Response.Identity is null)
         {
             logger.LogWarning(
-                "Portal login failed for {UserName}. Status={StatusCode}; Message={Message}",
-                username,
-                (int)response.HttpStatusCode,
-                response.Message);
+                "Portal login failed. Status={StatusCode}",
+                (int)response.HttpStatusCode);
 
             var message = response.HttpStatusCode switch
             {

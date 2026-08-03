@@ -22,8 +22,7 @@ public sealed class DbInstaller : IInstaller
                 npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .ConfigureWarnings(warnings => warnings.Ignore(
-                RelationalEventId.BoolWithDefaultWarning,
-                RelationalEventId.PendingModelChangesWarning))
+                RelationalEventId.BoolWithDefaultWarning))
             .AddInterceptors(serviceProvider.GetRequiredService<AuditInterceptor>()));
 
         services.AddServerDataContext<AppDbContext>();

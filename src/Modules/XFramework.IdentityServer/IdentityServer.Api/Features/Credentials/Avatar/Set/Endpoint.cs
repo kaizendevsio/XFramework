@@ -1,21 +1,31 @@
 using FluentValidation;
+using IdentityServer.Api.Features.Authorization.Shared;
 using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Api.Features.Credentials.Avatar.Set;
 
 public static class SetCredentialAvatarEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    public static Task<Result<CredentialAvatarResponse>> Handle(
+        SetCredentialAvatarRequest request,
+        IAuthService authService,
+        CancellationToken ct) => authService.SetCredentialAvatarAsync(request, ct);
+
     [MapPost("/api/credentials/avatar/set", Tags = ["Credentials"],
         Summary = "Set a credential avatar",
         Description = "Attaches an existing image storage file as the credential avatar.",
-        ExcludeFromOpenApi = true)]
-    public static async Task<Result<CredentialAvatarResponse>> Handle(
+        RequireAuthorization = true,
+        Capability = IdentityAuthorizationConstants.Update,
+        ExcludeFromOpenApi = false)]
+    public static Task<Result<CredentialAvatarResponse>> HandleHttp(
         SetCredentialAvatarRequest request,
+        HttpContext httpContext,
         IAuthService authService,
         CancellationToken ct)
     {
-        return await authService.SetCredentialAvatarAsync(request, ct);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        return authService.SetCredentialAvatarAsync(request, ct);
     }
 }
 

@@ -1,6 +1,6 @@
 namespace IdentityServer.Domain.Shared.Contracts.Requests;
 
-using TResponse = CmdResponse;
+using TResponse = CmdResponse<TenantAdministrationResponse>;
 
 [MemoryPackable]
 public partial record CreateTenantRequest : RequestBase,

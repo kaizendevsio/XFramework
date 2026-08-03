@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using IdentityServer.Domain.Shared.Contracts;
-using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -19,12 +18,15 @@ public sealed class ServiceIdentityService(
     IBoltTransportTokenSigner boltTransportTokenSigner,
     TimeProvider timeProvider,
     ILogger<ServiceIdentityService> logger,
-    IHttpContextAccessor? httpContextAccessor = null,
-    ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
+    ITrustedServiceInvocationResolver? serviceInvocationResolver = null,
+    AppDbContext? appDbContext = null)
     : IServiceIdentityService
 {
     private const string Algorithm = "RS256";
+    private const int MaxPublishedSigningKeys = 32;
+    private const int SigningKeyMaintenanceBatchSize = 128;
     private static readonly JwtSecurityTokenHandler TokenHandler = new();
+    private static readonly SemaphoreSlim SigningKeyRotationLock = new(1, 1);
 
     public async Task<Result<ServiceTokenResponse>> IssueTokenAsync(
         IssueServiceTokenRequest request,
@@ -41,7 +43,7 @@ public sealed class ServiceIdentityService(
         if (client.AllowedAudiences.Count > 0 && !client.AllowedAudiences.Contains(request.Audience))
             return Result<ServiceTokenResponse>.Forbidden("Service client is not allowed to request this audience");
 
-        var requestedScopes = request.Scopes
+        var requestedScopes = (request.Scopes ?? [])
             .Where(static scope => !string.IsNullOrWhiteSpace(scope))
             .Select(static scope => scope.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -58,7 +60,7 @@ public sealed class ServiceIdentityService(
 
         var signingKey = await GetOrCreateActiveSigningKeyAsync(ct);
         using var rsa = RSA.Create();
-        rsa.ImportFromPem(signingKey.PrivateKeyPem);
+        rsa.ImportFromPem(await File.ReadAllTextAsync(GetPrivateKeyPath(signingKey), ct));
 
         var key = new RsaSecurityKey(rsa)
         {
@@ -157,16 +159,35 @@ public sealed class ServiceIdentityService(
         GetServiceSigningKeysRequest request,
         CancellationToken ct = default)
     {
+        await CleanupExpiredSigningKeysAsync(ct);
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var query = dataContext.Query<ServiceSigningKey>()
-            .Where(key => !key.RetiredAtUtc.HasValue || key.RetiredAtUtc > DateTime.UtcNow);
+            .Where(key =>
+                key.IsActive ||
+                key.RetiredAtUtc > now ||
+                !key.RetiredAtUtc.HasValue);
 
+        List<ServiceSigningKey> keys;
         if (!string.IsNullOrWhiteSpace(request.KeyId))
-            query = query.Where(key => key.KeyId == request.KeyId.Trim());
+        {
+            keys = await query
+                .Where(key => key.KeyId == request.KeyId.Trim())
+                .Take(1)
+                .ToListAsync(ct);
+        }
+        else
+        {
+            keys = await query
+                .OrderByDescending(key => key.IsActive)
+                .ThenByDescending(key => key.CreatedAtUtc)
+                .Take(MaxPublishedSigningKeys)
+                .ToListAsync(ct);
+        }
 
-        var keys = await query.ToListAsync(ct);
         if (keys.Count == 0 && string.IsNullOrWhiteSpace(request.KeyId))
         {
-            var active = await RotateSigningKeyCoreAsync("auto-bootstrap", ct);
+            var active = await RotateSigningKeyCoreAsync("auto-bootstrap", reuseActiveKey: true, ct);
             keys = [active];
         }
 
@@ -188,7 +209,10 @@ public sealed class ServiceIdentityService(
         if (!adminResult.IsSuccess)
             return Result<ServiceSigningKeyResponse>.Failure(adminResult.Message!, adminResult.StatusCode);
 
-        var key = await RotateSigningKeyCoreAsync(request.Reason ?? request.Metadata?.Name ?? "manual", ct);
+        var key = await RotateSigningKeyCoreAsync(
+            request.Reason?.Trim() ?? request.Metadata?.Name?.Trim() ?? "manual",
+            reuseActiveKey: false,
+            ct);
         return Result<ServiceSigningKeyResponse>.Success(ToResponse(key));
     }
 
@@ -204,7 +228,7 @@ public sealed class ServiceIdentityService(
             return Result<ServiceSigningKeyResponse>.Failure("KeyId is required", 400);
 
         var key = await dataContext.Query<ServiceSigningKey>()
-            .Where(item => item.KeyId == request.KeyId)
+            .Where(item => item.KeyId == request.KeyId.Trim())
             .FirstOrDefaultAsync(ct);
 
         if (key is null)
@@ -213,9 +237,11 @@ public sealed class ServiceIdentityService(
         if (key.IsActive)
             return Result<ServiceSigningKeyResponse>.Failure("Active signing key cannot be retired before rotation", 400);
 
-        key.RetiredAtUtc ??= DateTime.UtcNow;
+        key.RetiredAtUtc ??= timeProvider.GetUtcNow().UtcDateTime;
         dataContext.Update(key);
-        await dataContext.SaveChangesAsync(ct);
+        var saveResult = await dataContext.SaveChangesAsync(ct);
+        if (!saveResult.IsSuccess)
+            return Result<ServiceSigningKeyResponse>.Failure("Signing key could not be retired", saveResult.StatusCode);
 
         return Result<ServiceSigningKeyResponse>.Success(ToResponse(key));
     }
@@ -226,39 +252,235 @@ public sealed class ServiceIdentityService(
             .Where(key => key.IsActive && !key.RetiredAtUtc.HasValue)
             .FirstOrDefaultAsync(ct);
 
-        return active ?? await RotateSigningKeyCoreAsync("auto-bootstrap", ct);
+        return active ?? await RotateSigningKeyCoreAsync("auto-bootstrap", reuseActiveKey: true, ct);
     }
 
-    private async Task<ServiceSigningKey> RotateSigningKeyCoreAsync(string createdBy, CancellationToken ct)
+    private async Task<ServiceSigningKey> RotateSigningKeyCoreAsync(
+        string createdBy,
+        bool reuseActiveKey,
+        CancellationToken ct)
     {
-        var currentKeys = await dataContext.Query<ServiceSigningKey>()
-            .Where(key => key.IsActive)
+        await SigningKeyRotationLock.WaitAsync(ct);
+        string? createdPrivateKeyPath = null;
+        try
+        {
+            await using var transaction = appDbContext is not null && appDbContext.Database.IsRelational()
+                ? await appDbContext.Database.BeginTransactionAsync(ct)
+                : null;
+            if (transaction is not null)
+            {
+                await appDbContext!.Database.ExecuteSqlRawAsync(
+                    "SELECT pg_advisory_xact_lock(hashtextextended('identity:service-signing-key-rotation', 0))",
+                    ct);
+            }
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            await CleanupExpiredSigningKeysCoreAsync(now, ct);
+
+            if (reuseActiveKey)
+            {
+                var activeKey = await dataContext.Query<ServiceSigningKey>()
+                    .Where(key => key.IsActive && !key.RetiredAtUtc.HasValue)
+                    .OrderByDescending(key => key.ActivatedAtUtc)
+                    .FirstOrDefaultAsync(ct);
+                if (activeKey is not null)
+                {
+                    if (transaction is not null)
+                        await transaction.CommitAsync(ct);
+                    return activeKey;
+                }
+            }
+
+            var publishedKeys = await dataContext.Query<ServiceSigningKey>()
+                .Where(key =>
+                    key.IsActive ||
+                    key.RetiredAtUtc > now ||
+                    !key.RetiredAtUtc.HasValue)
+                .Take(MaxPublishedSigningKeys)
+                .ToListAsync(ct);
+            if (publishedKeys.Count >= MaxPublishedSigningKeys)
+            {
+                throw new InvalidOperationException(
+                    "Service signing key rotation is temporarily unavailable because the live key window is full.");
+            }
+
+            var currentKeys = await dataContext.Query<ServiceSigningKey>()
+                .Where(key => key.IsActive)
+                .ToListAsync(ct);
+
+            foreach (var key in currentKeys)
+            {
+                key.IsActive = false;
+                key.RetiredAtUtc = now.Add(GetSigningKeyRetirementOverlap());
+                dataContext.Update(key);
+            }
+
+            using var rsa = RSA.Create(3072);
+            var keyId = $"svc-{Guid.NewGuid():N}";
+            var fileName = $"{keyId}.pem";
+            WritePrivateKeyAtomically(fileName, rsa.ExportPkcs8PrivateKeyPem());
+            createdPrivateKeyPath = Path.Combine(GetSigningKeyDirectory(), fileName);
+            var newKey = new ServiceSigningKey
+            {
+                Id = Guid.NewGuid(),
+                KeyId = keyId,
+                Algorithm = Algorithm,
+                PrivateKeyFileName = fileName,
+                PublicKeyPem = rsa.ExportSubjectPublicKeyInfoPem(),
+                CreatedAtUtc = now,
+                ActivatedAtUtc = now,
+                IsActive = true,
+                CreatedBy = createdBy
+            };
+
+            dataContext.Add(newKey);
+            var saveResult = await dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                throw new InvalidOperationException("Service signing key rotation could not be persisted.");
+
+            if (transaction is not null)
+                await transaction.CommitAsync(ct);
+
+            createdPrivateKeyPath = null;
+            return newKey;
+        }
+        catch
+        {
+            if (createdPrivateKeyPath is not null && File.Exists(createdPrivateKeyPath))
+                File.Delete(createdPrivateKeyPath);
+            throw;
+        }
+        finally
+        {
+            SigningKeyRotationLock.Release();
+        }
+    }
+
+    private TimeSpan GetSigningKeyRetirementOverlap() =>
+        TimeSpan.FromMinutes(serviceIdentityConfiguration.TokenLifetimeMinutes);
+
+    private async Task CleanupExpiredSigningKeysAsync(CancellationToken ct)
+    {
+        await SigningKeyRotationLock.WaitAsync(ct);
+        try
+        {
+            await CleanupExpiredSigningKeysCoreAsync(timeProvider.GetUtcNow().UtcDateTime, ct);
+        }
+        finally
+        {
+            SigningKeyRotationLock.Release();
+        }
+    }
+
+    private async Task CleanupExpiredSigningKeysCoreAsync(DateTime now, CancellationToken ct)
+    {
+        var expiredKeys = await dataContext.Query<ServiceSigningKey>()
+            .Where(key => !key.IsActive && key.RetiredAtUtc.HasValue && key.RetiredAtUtc <= now)
+            .OrderBy(key => key.RetiredAtUtc)
+            .Take(SigningKeyMaintenanceBatchSize)
             .ToListAsync(ct);
 
-        foreach (var key in currentKeys)
+        var remainingCapacity = SigningKeyMaintenanceBatchSize - expiredKeys.Count;
+        var legacyKeys = remainingCapacity > 0
+            ? await dataContext.Query<ServiceSigningKey>()
+                .Where(key => !key.IsActive && !key.RetiredAtUtc.HasValue)
+                .OrderBy(key => key.CreatedAtUtc)
+                .Take(remainingCapacity)
+                .ToListAsync(ct)
+            : [];
+
+        var changed = false;
+        foreach (var key in expiredKeys.Concat(legacyKeys).DistinctBy(key => key.Id))
         {
-            key.IsActive = false;
-            dataContext.Update(key);
+            if (!key.RetiredAtUtc.HasValue)
+            {
+                key.RetiredAtUtc = now.Add(GetSigningKeyRetirementOverlap());
+                dataContext.Update(key);
+                changed = true;
+            }
+
+            if (key.RetiredAtUtc > now || !TryDeletePrivateKeyFile(key))
+                continue;
+
+            dataContext.Remove(key);
+            changed = true;
         }
 
-        using var rsa = RSA.Create(3072);
-        var now = DateTime.UtcNow;
-        var newKey = new ServiceSigningKey
-        {
-            Id = Guid.NewGuid(),
-            KeyId = $"svc-{Guid.NewGuid():N}",
-            Algorithm = Algorithm,
-            PrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem(),
-            PublicKeyPem = rsa.ExportSubjectPublicKeyInfoPem(),
-            CreatedAtUtc = now,
-            ActivatedAtUtc = now,
-            IsActive = true,
-            CreatedBy = createdBy
-        };
+        if (!changed)
+            return;
 
-        dataContext.Add(newKey);
-        await dataContext.SaveChangesAsync(ct);
-        return newKey;
+        var saveResult = await dataContext.SaveChangesAsync(ct);
+        if (!saveResult.IsSuccess)
+            throw new InvalidOperationException("Expired service signing keys could not be cleaned up.");
+    }
+
+    private bool TryDeletePrivateKeyFile(ServiceSigningKey key)
+    {
+        var path = GetPrivateKeyPath(key);
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Expired service signing key file could not be deleted. KeyId={KeyId}",
+                key.KeyId);
+            return false;
+        }
+    }
+
+    private string GetPrivateKeyPath(ServiceSigningKey key) =>
+        Path.Combine(GetSigningKeyDirectory(), Path.GetFileName(key.PrivateKeyFileName));
+
+    private string GetSigningKeyDirectory()
+    {
+        var configured = configuration["ServiceIdentity:ServiceTokenSigningKeyDirectory"]?.Trim();
+        if (!string.IsNullOrWhiteSpace(configured))
+            return Path.GetFullPath(configured);
+
+        var transportKeyPath = serviceIdentityConfiguration.BoltTransportSigningKeyPath;
+        var parent = string.IsNullOrWhiteSpace(transportKeyPath)
+            ? Path.Combine(AppContext.BaseDirectory, ".keys")
+            : Path.GetDirectoryName(Path.GetFullPath(transportKeyPath))!;
+        return Path.Combine(parent, "service-token-signing-keys");
+    }
+
+    private void WritePrivateKeyAtomically(string fileName, string privateKeyPem)
+    {
+        var directory = GetSigningKeyDirectory();
+        Directory.CreateDirectory(directory);
+        var destination = Path.Combine(directory, Path.GetFileName(fileName));
+        var temporary = Path.Combine(directory, $".{fileName}.{Guid.NewGuid():N}.tmp");
+        var bytes = Encoding.ASCII.GetBytes(privateKeyPem);
+        try
+        {
+            var options = new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None
+            };
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
+                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
+            using (var stream = new FileStream(temporary, options))
+            {
+                stream.Write(bytes);
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(temporary, destination, overwrite: false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+            if (File.Exists(temporary))
+                File.Delete(temporary);
+        }
     }
 
     private string ResolveIssuer() =>
@@ -268,9 +490,11 @@ public sealed class ServiceIdentityService(
         RequestMetadata? metadata,
         CancellationToken ct)
     {
-        var user = httpContextAccessor?.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated == true && user.IsInRole("SuperAdmin"))
+        if (metadata?.HasTrustedActorContext == true &&
+            metadata.TrustedActorRoles.Contains("SuperAdmin"))
+        {
             return Result.Success();
+        }
 
         if (serviceInvocationResolver is not null)
         {

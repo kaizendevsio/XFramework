@@ -31,8 +31,6 @@ app.UseTenantModuleFeatureGate(options =>
     options.RequireFeature(TenantModuleFeatureKeys.Storage, "/api/storage-files");
     options.RequireFeature(TenantModuleFeatureKeys.Storage, "/api/storage-file-types");
 });
-app.EnsureDatabase<AppDbContext>();
-
 app.MapXFrameworkHealthChecks("Storage");
 var securedStorageEndpoints = app.MapGroup(string.Empty).RequireAuthorization();
 securedStorageEndpoints.MapGeneratedEndpoints();

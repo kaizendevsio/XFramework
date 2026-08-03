@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Hosting;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Security;
 
@@ -14,15 +15,35 @@ public sealed class JwtService : IJwtService
     private readonly JwtOptions _jwtOptions;
     private readonly TimeProvider _timeProvider;
 
+    public JwtService(
+        JwtOptions jwtOptions,
+        IHostEnvironment hostEnvironment,
+        TimeProvider? timeProvider = null)
+        : this(jwtOptions, hostEnvironment.EnvironmentName, timeProvider)
+    {
+    }
+
     public JwtService(JwtOptions jwtOptions, TimeProvider? timeProvider = null)
+        : this(jwtOptions, Environments.Production, timeProvider)
+    {
+    }
+
+    private JwtService(
+        JwtOptions jwtOptions,
+        string environmentName,
+        TimeProvider? timeProvider)
     {
         _jwtOptions = jwtOptions;
         _timeProvider = timeProvider ?? TimeProvider.System;
-        JwtCredentialSet.Validate(jwtOptions, _timeProvider.GetUtcNow());
+        JwtCredentialSet.Validate(
+            jwtOptions,
+            _timeProvider.GetUtcNow(),
+            environmentName);
     }
 
     public async Task<JwtToken> GenerateToken(string username, Guid id, List<Guid> Type, Guid? tenantId = null)
     {
+        var sessionId = Guid.NewGuid();
         List<Claim> authClaims =
         [
             new(ClaimTypes.GivenName, username),
@@ -31,7 +52,8 @@ public sealed class JwtService : IJwtService
             new("credential_id", id.ToString("D")),
             new(JwtCredentialSet.GenerationClaim, _jwtOptions.GenerationId.Trim()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new(JwtRegisteredClaimNames.AuthTime, _timeProvider.GetUtcNow().UtcDateTime.ToString("O"))
+            new(JwtRegisteredClaimNames.AuthTime, _timeProvider.GetUtcNow().UtcDateTime.ToString("O")),
+            new("session_id", sessionId.ToString("D"))
         ];
 
         if (tenantId is Guid resolvedTenantId && resolvedTenantId != Guid.Empty)
@@ -49,7 +71,7 @@ public sealed class JwtService : IJwtService
             notBefore: now,
             expires: now.Add(ParseLifespan(_jwtOptions.AccessTokenLifespan, TimeSpan.FromMinutes(30))),
             claims: authClaims,
-            signingCredentials: new(securityKey, SecurityAlgorithms.HmacSha512)
+            signingCredentials: new(securityKey, SecurityAlgorithms.RsaSha512)
         );
 
         var refreshToken = new RefreshToken
@@ -63,7 +85,8 @@ public sealed class JwtService : IJwtService
         {
             AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
             RefreshToken = refreshToken.Token,
-            SessionId = Guid.NewGuid()
+            RefreshTokenExpiresAt = refreshToken.ExpireAt,
+            SessionId = sessionId
         };
     }
 
@@ -74,6 +97,15 @@ public sealed class JwtService : IJwtService
             .Where(static claim => claim.Type != JwtCredentialSet.GenerationClaim)
             .ToList();
         tokenClaims.Add(new Claim(JwtCredentialSet.GenerationClaim, _jwtOptions.GenerationId.Trim()));
+        var sessionId = tokenClaims
+            .Where(static claim => claim.Type == "session_id")
+            .Select(static claim => Guid.TryParse(claim.Value, out var value) ? value : Guid.Empty)
+            .FirstOrDefault();
+        if (sessionId == Guid.Empty)
+        {
+            sessionId = Guid.NewGuid();
+            tokenClaims.Add(new Claim("session_id", sessionId.ToString("D")));
+        }
 
         var securityKey = JwtCredentialSet.CreateCurrentSigningKey(_jwtOptions);
 
@@ -83,7 +115,7 @@ public sealed class JwtService : IJwtService
             notBefore: now,
             expires: now.Add(ParseLifespan(_jwtOptions.AccessTokenLifespan, TimeSpan.FromMinutes(30))),
             claims: tokenClaims,
-            signingCredentials: new(securityKey, SecurityAlgorithms.HmacSha512)
+            signingCredentials: new(securityKey, SecurityAlgorithms.RsaSha512)
         );
 
         var refreshToken = new RefreshToken
@@ -96,7 +128,8 @@ public sealed class JwtService : IJwtService
         {
             AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
             RefreshToken = refreshToken.Token,
-            SessionId = Guid.NewGuid()
+            RefreshTokenExpiresAt = refreshToken.ExpireAt,
+            SessionId = sessionId
         };
     }
 
@@ -155,4 +188,5 @@ public sealed class JwtService : IJwtService
 
     private static TimeSpan ParseLifespan(string value, TimeSpan fallback) =>
         TimeSpan.TryParse(value, out var parsed) && parsed > TimeSpan.Zero ? parsed : fallback;
+
 }

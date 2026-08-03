@@ -150,7 +150,8 @@ public sealed class BoltTransportAuthenticationConfigurationTests
         sharedOptions.MetadataAddress.Should().BeNull();
         sharedOptions.TokenValidationParameters.IssuerSigningKeyResolver.Should().NotBeNull();
         sharedOptions.TokenValidationParameters.IssuerSigningKeyValidator.Should().NotBeNull();
-        sharedOptions.TokenValidationParameters.ValidAlgorithms.Should().Contain(SecurityAlgorithms.HmacSha512);
+        sharedOptions.TokenValidationParameters.ValidAlgorithms.Should().Contain(SecurityAlgorithms.RsaSha512);
+        sharedOptions.TokenValidationParameters.ValidAlgorithms.Should().NotContain(SecurityAlgorithms.HmacSha512);
         sharedOptions.TokenValidationParameters.ValidIssuer.Should().Be("shared-issuer");
         sharedOptions.TokenValidationParameters.ValidAudience.Should().Be("shared-audience");
     }
@@ -167,8 +168,8 @@ public sealed class BoltTransportAuthenticationConfigurationTests
             ["BoltTransportAuthentication:Issuer"] = issuer,
             ["BoltTransportAuthentication:Audience"] = audience,
             ["BoltTransportAuthentication:RequireHttpsMetadata"] = requireHttpsMetadata.ToString(),
-            ["JwtOptions:GenerationId"] = "shared-hmac-g0",
-            ["JwtOptions:Secret"] = new string('h', 64),
+            ["JwtOptions:GenerationId"] = "shared-rsa-g0",
+            ["JwtOptions:SigningPublicKeyPath"] = TestJwtKeyMaterial.PublicKeyPath,
             ["JwtOptions:ValidIssuer"] = "shared-issuer",
             ["JwtOptions:ValidAudience"] = "shared-audience"
         };

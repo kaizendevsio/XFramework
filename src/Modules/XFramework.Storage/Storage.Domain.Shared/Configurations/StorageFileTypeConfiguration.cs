@@ -10,6 +10,9 @@ public sealed class StorageFileTypeConfiguration : IEntityTypeConfiguration<Stor
     {
         entity.HasKey(e => e.Id).HasName("storagefileentity_pk");
         entity.ToTable("StorageFileType", "Storage");
+        entity.HasIndex(e => new { e.TenantId, e.Name }, "IX_StorageFileType_TenantId_Name")
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
 
         entity.Property(e => e.Id)
             .HasColumnName("ID")

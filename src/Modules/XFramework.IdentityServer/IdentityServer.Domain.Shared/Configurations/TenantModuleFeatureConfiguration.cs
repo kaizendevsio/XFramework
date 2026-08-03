@@ -38,6 +38,8 @@ public sealed class TenantModuleFeatureConfiguration : IEntityTypeConfiguration<
         entity.Property(e => e.Description)
             .HasColumnType("character varying");
 
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
+
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");

@@ -22,8 +22,15 @@
         <ProjectReference Include="..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
         <ProjectReference Include="..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Bolt\Bolt.Hub\Bolt.Hub.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Attendance\Attendance.Domain.Shared\Attendance.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Community\Community.Domain.Shared\Community.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Communications\Communications.Domain.Shared\Communications.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Notifications\Notifications.Domain.Shared\Notifications.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.POS\POS.Domain.Shared\POS.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Storage\Storage.Domain.Shared\Storage.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
     </ItemGroup>
 

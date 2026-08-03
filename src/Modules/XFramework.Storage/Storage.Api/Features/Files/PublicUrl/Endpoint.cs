@@ -5,7 +5,7 @@ namespace Storage.Api.Features.Files.PublicUrl;
 
 public static class GetStoragePublicUrlEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageRead])]
     [MapGet("/api/storage/files/{storageFileId:guid}/public-url", Tags = ["Storage"],
         Summary = "Get public URL",
         Description = "Returns the configured public/CDN URL for public storage assets.")]

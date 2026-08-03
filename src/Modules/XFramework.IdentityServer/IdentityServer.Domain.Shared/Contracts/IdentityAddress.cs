@@ -3,13 +3,12 @@ using XFramework.Domain.Shared.Attributes;
 namespace IdentityServer.Domain.Shared.Contracts;
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.All,
     RoutePrefix = "api/identity-addresses",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "identity-addresses"
+    RequireAuthorization = true
 )]
 public partial class IdentityAddress : BaseModel
 {

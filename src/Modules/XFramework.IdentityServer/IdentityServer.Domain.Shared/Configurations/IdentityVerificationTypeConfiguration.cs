@@ -20,9 +20,30 @@ public class IdentityVerificationTypeConfiguration : IEntityTypeConfiguration<Id
         entity.Property(e => e.Name).HasMaxLength(100);
 
         entity.HasData(
-            new IdentityVerificationType{ Id = IdentityConstants.VerificationType.Sms, IsEnabled = false, Name = "SMS", DefaultExpiry = 10 },
-            new IdentityVerificationType{ Id = IdentityConstants.VerificationType.Email, IsEnabled = false, Name = "Email", DefaultExpiry = 120 },
-            new IdentityVerificationType{ Id = IdentityConstants.VerificationType.Kyc, IsEnabled = false, Name = "KYC", DefaultExpiry = 1051200 }
+            new IdentityVerificationType
+            {
+                Id = IdentityConstants.VerificationType.Sms,
+                SystemReferenceId = IdentityConstants.VerificationType.Sms,
+                IsEnabled = true,
+                Name = "SMS",
+                DefaultExpiry = 10
+            },
+            new IdentityVerificationType
+            {
+                Id = IdentityConstants.VerificationType.Email,
+                SystemReferenceId = IdentityConstants.VerificationType.Email,
+                IsEnabled = true,
+                Name = "Email",
+                DefaultExpiry = 120
+            },
+            new IdentityVerificationType
+            {
+                Id = IdentityConstants.VerificationType.Kyc,
+                SystemReferenceId = IdentityConstants.VerificationType.Kyc,
+                IsEnabled = true,
+                Name = "KYC",
+                DefaultExpiry = 1051200
+            }
         );
     }
 }

@@ -3,7 +3,6 @@ namespace IdentityServer.Domain.Shared;
 public static class CredentialAvatarPolicy
 {
     public const int MaxFileSizeBytes = 5 * 1024 * 1024;
-    public const string BlobContainer = "identity-credential-avatars";
     public const string StorageIdentifierGroupName = "IdentityServer";
     public const string StorageFileIdentifierName = "IdentityCredentialAvatar";
 

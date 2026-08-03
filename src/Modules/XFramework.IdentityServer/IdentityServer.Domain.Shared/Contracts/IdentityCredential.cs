@@ -10,9 +10,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-credentials",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "identity-credentials"
+    RequireAuthorization = true
 )]
 public partial class IdentityCredential : BaseModel, IHasOnlineStatus
 {
@@ -30,16 +28,16 @@ public partial class IdentityCredential : BaseModel, IHasOnlineStatus
     public short? LogInStatus { get; set; }
 
     [JsonIgnore]
-    [MemoryPackOrder(4)]
+    [MemoryPackIgnore]
     public byte[]? PasswordByte { get; set; }
     
     [NotMapped]
     [JsonIgnore]
-    [MemoryPackOrder(5)]
+    [MemoryPackIgnore]
     public string? Password { get; set; }
 
     [JsonIgnore]
-    [MemoryPackOrder(6)]
+    [MemoryPackIgnore]
     public string? Token { get; set; }
     
     [MemoryPackOrder(7)]
@@ -71,6 +69,12 @@ public partial class IdentityCredential : BaseModel, IHasOnlineStatus
 
     [MemoryPackOrder(30)]
     public DateTime? AvatarUpdatedAt { get; set; }
+
+    [MemoryPackOrder(32)]
+    public int FailedLoginAttempts { get; set; }
+
+    [MemoryPackOrder(33)]
+    public DateTime? LockoutEnd { get; set; }
     
     
     [MemoryPackOrder(14)]
@@ -99,9 +103,6 @@ public partial class IdentityCredential : BaseModel, IHasOnlineStatus
 
     [MemoryPackOrder(27)]
     public virtual ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
-
-    [MemoryPackOrder(31)]
-    public virtual StorageFile? AvatarStorageFile { get; set; }
 
 }
 

@@ -29,6 +29,11 @@ public sealed class MessageModelConfigurationTests
             db,
             "UX_MessageReaction_Message_Type_Member_Active",
             "\"IsDeleted\" = false");
+
+        AssertUniqueIndex<MessageDirect>(
+            db,
+            "UX_MessageDirect_Tenant_IdempotencyRequest",
+            "\"IdempotencyRequestId\" IS NOT NULL");
     }
 
     [Test]

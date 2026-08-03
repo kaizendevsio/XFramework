@@ -19,6 +19,7 @@ public class IdentityAddressConfiguration : IEntityTypeConfiguration<IdentityAdd
         entity.Property(e => e.Id)
             .HasColumnName("ID")
             .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
+        entity.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
         entity.Property(e => e.AddressTypeId).HasColumnName("AddressTypeID");
         entity.Property(e => e.Building).HasMaxLength(500);
 

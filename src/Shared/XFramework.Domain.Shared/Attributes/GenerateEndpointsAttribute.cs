@@ -199,6 +199,9 @@ public sealed class GenerateEndpointsAttribute : Attribute
     /// </example>
     public string[]? Roles { get; set; }
 
+    /// <summary>Explicit scalar properties exposed by generated response DTOs.</summary>
+    public string[]? ResponseProperties { get; set; }
+
     /// <summary>
     /// Gets or sets the cache duration in seconds for GET operations.
     /// </summary>

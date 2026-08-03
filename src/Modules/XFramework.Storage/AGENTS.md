@@ -27,10 +27,12 @@ Historical compatibility note: moved `StorageFile*` entity namespaces currently 
 ## Upload Contract
 
 - Bolt is the primary module-to-module path. Upload parts are binary `byte[]` chunks over MemoryPack request contracts.
+- Use `EnsureStorageUploadMetadata` through `IStorageServiceWrapper` when another module needs tenant-scoped file type and identifier metadata. The operation owns creation and must remain idempotent for repeated tenant/name inputs.
 - Do not send file content as JSON base64 or JSON byte arrays for normal module integrations.
 - The manual REST upload-part endpoint exists only for external/manual binary upload cases where generated binding is insufficient. It must remain `application/octet-stream`.
 - Part upload retries must remain idempotent when the part number, offset, length, and SHA-256 match. Mismatched retries must return conflict.
 - Require and validate SHA-256 for uploaded parts. Completion must validate expected final hash when supplied.
+- Uploads created with `RequireClaim` receive a Storage-owned `UnclaimedUntil` deadline on completion. The owning module must call `ClaimStorageFile` through `IStorageServiceWrapper`; claiming is tenant-scoped and idempotent.
 - Keep provider limits explicit. S3-compatible production uploads must respect S3 multipart limits unless a test fixture explicitly disables provider-limit enforcement.
 
 ## Provider Rules
@@ -49,6 +51,7 @@ Historical compatibility note: moved `StorageFile*` entity namespaces currently 
 - Delete is metadata-first soft delete. Physical object deletion happens through retention cleanup.
 - Restore must work only before physical deletion. After `ObjectDeletedAt` is set, do not silently restore metadata.
 - Retention cleanup must be idempotent and must not repeatedly delete objects already marked physically deleted.
+- Storage background maintenance owns expired incomplete-session aborts and physical deletion of expired unclaimed files. Failed provider operations remain due for the next bounded poll; existing files with a null `UnclaimedUntil` are unaffected.
 
 ## Database And Migration Rules
 

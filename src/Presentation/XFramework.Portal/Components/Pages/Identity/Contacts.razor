@@ -301,9 +301,7 @@
         {
             try
             {
-                _deletingContact.IsDeleted = true;
-                _deletingContact.IsEnabled = false;
-                DataContext.Update(_deletingContact);
+                DataContext.Remove(_deletingContact);
                 var result = await DataContext.SaveChangesAsync();
                 ShowSaveResult(result.IsSuccess, "Contact deleted.", "Contact could not be deleted.");
             }
