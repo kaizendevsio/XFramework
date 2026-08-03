@@ -181,6 +181,28 @@ def result_list(document: Any, keys: tuple[str, ...], code: str) -> list[Any]:
         fail(code)
     return values
 
+
+def scan_jaeger_service(jaeger_url: str, service: str, start: dt.datetime, end: dt.datetime,
+                        needles: Sequence[bytes], budget: dict[str, float | int]) -> int:
+    pending = [(int(start.timestamp() * 1_000_000), int(end.timestamp() * 1_000_000))]
+    traces = 0
+    while pending:
+        window_start, window_end = pending.pop()
+        query = urllib.parse.urlencode({"service": service, "start": window_start,
+                                        "end": window_end, "limit": MAX_TRACES + 1})
+        found = result_list(request_json(f"{jaeger_url}/api/traces?{query}", {}, needles, budget),
+                            ("data",), "JAEGER_RESPONSE")
+        if len(found) <= MAX_TRACES:
+            traces += len(found)
+            continue
+
+        midpoint = (window_start + window_end) // 2
+        if midpoint <= window_start or midpoint >= window_end:
+            fail("JAEGER_LIMIT")
+        pending.extend(((midpoint + 1, window_end), (window_start, midpoint)))
+    return traces
+
+
 def scan_sinks(seq_url: str, jaeger_url: str, start: dt.datetime, end: dt.datetime,
                needles: Sequence[bytes], api_key: str) -> tuple[int, int, int, int]:
     budget: dict[str, float | int] = {"started": time.monotonic(), "requests": 0}
@@ -209,15 +231,7 @@ def scan_sinks(seq_url: str, jaeger_url: str, start: dt.datetime, end: dt.dateti
         fail("JAEGER_LIMIT")
     traces = 0
     for service in services:
-        query = urllib.parse.urlencode({"service": service,
-                                        "start": int(start.timestamp() * 1_000_000),
-                                        "end": int(end.timestamp() * 1_000_000),
-                                        "limit": MAX_TRACES + 1})
-        found = result_list(request_json(f"{jaeger_url}/api/traces?{query}", {}, needles, budget),
-                            ("data",), "JAEGER_RESPONSE")
-        if len(found) > MAX_TRACES:
-            fail("JAEGER_LIMIT")
-        traces += len(found)
+        traces += scan_jaeger_service(jaeger_url, service, start, end, needles, budget)
     return len(events), len(services), traces, int(budget["requests"])
 
 def write_evidence(path: str, counts: dict[str, int]) -> None:

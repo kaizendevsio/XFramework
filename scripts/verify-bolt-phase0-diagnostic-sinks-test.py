@@ -15,7 +15,7 @@ import urllib.parse
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 SCRIPT = Path(__file__).with_name("verify-bolt-phase0-diagnostic-sinks.py")
@@ -39,6 +39,10 @@ def _jwt(jti: str, serial: int) -> str:
     )
 
 
+def _utc_microseconds(value: str) -> int:
+    return int(dt.datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp() * 1_000_000)
+
+
 @dataclass
 class Response:
     document: Any = None
@@ -59,7 +63,7 @@ class SinkState:
         self.requests: list[tuple[str, dict[str, str]]] = []
         self.seq = Response([])
         self.services = Response({"data": ["bolt-hub", "identityserver"], "total": 2})
-        self.traces: dict[str, Response] = {
+        self.traces: dict[str, Response | Callable[[dict[str, list[str]]], Response]] = {
             "bolt-hub": Response({"data": [], "total": 0}),
             "identityserver": Response({"data": [], "total": 0}),
         }
@@ -87,8 +91,10 @@ class SinkHandler(BaseHTTPRequestHandler):
         elif state.role == "jaeger" and parsed.path == "/api/services":
             response = state.services
         elif state.role == "jaeger" and parsed.path == "/api/traces":
-            service = urllib.parse.parse_qs(parsed.query).get("service", [""])[0]
-            response = state.traces.get(service, Response(status=404, document={}))
+            query = urllib.parse.parse_qs(parsed.query)
+            service = query.get("service", [""])[0]
+            configured = state.traces.get(service, Response(status=404, document={}))
+            response = configured(query) if callable(configured) else configured
         else:
             response = Response(status=404, document={})
 
@@ -292,6 +298,49 @@ class DiagnosticSinkVerifierTests(unittest.TestCase):
 
         self._assert_failed_without_secrets(result, output)
 
+    def test_saturated_jaeger_window_is_subdivided_and_fully_scanned(self) -> None:
+        start = _utc_microseconds(self.window_start)
+        end = _utc_microseconds(self.window_end)
+        timestamps = [start + ((end - start) * index // 239) for index in range(240)]
+
+        def traces(query: dict[str, list[str]]) -> Response:
+            window_start = int(query["start"][0])
+            window_end = int(query["end"][0])
+            limit = int(query["limit"][0])
+            count = sum(window_start <= timestamp <= window_end for timestamp in timestamps)
+            return Response({"data": [{}] * min(count, limit)})
+
+        self.jaeger_server.state.traces["bolt-hub"] = traces
+
+        result, output = self._run()
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        evidence = json.loads(output.read_text(encoding="ascii"))
+        self.assertEqual(240, evidence["counts"]["jaegerTraces"])
+        bolt_requests = [
+            path for path, _ in self.jaeger_server.state.requests
+            if "service=bolt-hub" in path
+        ]
+        self.assertEqual(3, len(bolt_requests))
+
+    def test_jaeger_leak_in_subdivided_window_fails(self) -> None:
+        start = _utc_microseconds(self.window_start)
+        end = _utc_microseconds(self.window_end)
+
+        def traces(query: dict[str, list[str]]) -> Response:
+            window_start = int(query["start"][0])
+            window_end = int(query["end"][0])
+            if window_start == start and window_end == end:
+                return Response({"data": [{}] * 201})
+            leak = self.tokens[0] if window_start > start else "clean"
+            return Response({"data": [{"tag": leak}]})
+
+        self.jaeger_server.state.traces["bolt-hub"] = traces
+
+        result, output = self._run()
+
+        self._assert_failed_without_secrets(result, output)
+
     def test_malformed_sink_responses_fail_closed(self) -> None:
         cases = (
             ("seq-json", lambda: setattr(self.seq_server.state, "seq", Response(raw=b"{"))),
@@ -311,6 +360,8 @@ class DiagnosticSinkVerifierTests(unittest.TestCase):
                 configure()
                 result, output = self._run()
                 self._assert_failed_without_secrets(result, output)
+                if name == "trace-cap":
+                    self.assertIn("BOLT_PHASE0_DIAGNOSTIC_SINKS_JAEGER_LIMIT", result.stderr)
 
     def test_capped_or_truncated_results_fail_closed(self) -> None:
         cases = (
