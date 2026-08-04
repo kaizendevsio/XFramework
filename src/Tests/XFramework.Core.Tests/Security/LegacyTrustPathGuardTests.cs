@@ -267,6 +267,24 @@ public sealed class LegacyTrustPathGuardTests
         }
     }
 
+    [Test]
+    public void SmsGateway_RegistersFeatureGateRequiredByGeneratedEndpoints()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var installerPath = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.SmsGateway",
+            "SmsGateway.Api",
+            "Installers",
+            "ServicesInstaller.cs");
+
+        File.ReadAllText(installerPath).Should().Contain(
+            "AddTenantModuleFeatures()",
+            "generated secured SmsGateway endpoints resolve ITrustedInvocationFeatureGate at startup");
+    }
+
     private static DirectoryInfo FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
