@@ -147,6 +147,17 @@ public sealed class ServiceIdentityComposeContractTests
             XFrameworkServiceScopes.SmsGatewayAgent,
             XFrameworkServiceScopes.TenantTarget
         ]);
+        ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.Wallets).Should().Contain(
+        [
+            XFrameworkServiceScopes.TenantTarget,
+            XFrameworkServiceScopes.WalletsAdmin,
+            XFrameworkServiceScopes.DataContextQueryAllTenants
+        ]);
+
+        var wallets = ExtractService(compose, "wallets");
+        wallets.Should().NotContain("ServiceIdentity__DefaultScopes__2:");
+        wallets.Should().NotContain("ServiceIdentity__DefaultScopes__3:");
+        wallets.Should().NotContain("ServiceIdentity__DefaultScopes__4:");
     }
 
     [Test]

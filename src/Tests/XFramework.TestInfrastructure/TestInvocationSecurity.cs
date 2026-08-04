@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -193,11 +194,20 @@ public static class TestInvocationIdentityExtensions
 
     public static IServiceCollection AddTestInvocationServer(
         this IServiceCollection services,
-        TestInvocationIdentityOptions options)
+        TestInvocationIdentityOptions options,
+        string? localServiceClientId = null)
     {
         services.AddSingleton(options);
         services.AddSingleton<IActorIdentityProvider, TestActorIdentityProvider>();
         services.AddSingleton<IServiceIdentityProvider, TestServiceIdentityProvider>();
+        if (!string.IsNullOrWhiteSpace(localServiceClientId))
+        {
+            services.AddSingleton(new TestLocalServiceTokenRegistry(
+                localServiceClientId.Trim(),
+                $"{options.ServiceToken}.local.{localServiceClientId.Trim()}"));
+            services.AddSingleton<IServiceTokenProvider, TestLocalServiceTokenProvider>();
+        }
+
         return services;
     }
 
@@ -271,6 +281,38 @@ internal sealed class TestServiceTokenProvider(TestInvocationIdentityOptions opt
     }
 }
 
+internal sealed class TestLocalServiceTokenProvider(TestLocalServiceTokenRegistry registry)
+    : IServiceTokenProvider
+{
+    public ValueTask<string> GetTokenAsync(
+        string audience,
+        IReadOnlyCollection<string>? scopes = null,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(registry.Issue(scopes ?? []));
+    }
+}
+
+internal sealed class TestLocalServiceTokenRegistry(
+    string clientId,
+    string tokenPrefix)
+{
+    private readonly ConcurrentDictionary<string, IReadOnlySet<string>> _issuedTokens = new();
+
+    public string ClientId { get; } = clientId;
+
+    public string Issue(IReadOnlyCollection<string> scopes)
+    {
+        var token = $"{tokenPrefix}.{Guid.NewGuid():N}";
+        _issuedTokens[token] = new HashSet<string>(scopes, StringComparer.OrdinalIgnoreCase);
+        return token;
+    }
+
+    public bool TryValidate(string token, out IReadOnlySet<string> scopes) =>
+        _issuedTokens.TryGetValue(token, out scopes!);
+}
+
 internal sealed class TestActorIdentityProvider(TestInvocationIdentityOptions options)
     : IActorIdentityProvider
 {
@@ -299,7 +341,9 @@ internal sealed class TestActorIdentityProvider(TestInvocationIdentityOptions op
     }
 }
 
-internal sealed class TestServiceIdentityProvider(TestInvocationIdentityOptions options)
+internal sealed class TestServiceIdentityProvider(
+    TestInvocationIdentityOptions options,
+    IEnumerable<TestLocalServiceTokenRegistry> localServiceTokenRegistries)
     : IServiceIdentityProvider
 {
     public Task<ServiceIdentityValidationResult> ValidateAsync(
@@ -308,12 +352,27 @@ internal sealed class TestServiceIdentityProvider(TestInvocationIdentityOptions 
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return Task.FromResult(string.Equals(token, options.ServiceToken, StringComparison.Ordinal)
-            ? ServiceIdentityValidationResult.Success(new TrustedServiceIdentity(
+        if (string.Equals(token, options.ServiceToken, StringComparison.Ordinal))
+        {
+            return Task.FromResult(ServiceIdentityValidationResult.Success(new TrustedServiceIdentity(
                 options.ServiceClientId,
                 expectedAudience,
                 new HashSet<string>(XFrameworkServiceScopes.AdminDefaults, StringComparer.Ordinal),
-                "integration-tests-g1"))
-            : ServiceIdentityValidationResult.Failure("Invalid test service token."));
+                "integration-tests-g1")));
+        }
+
+        foreach (var registry in localServiceTokenRegistries)
+        {
+            if (registry.TryValidate(token, out var scopes))
+            {
+                return Task.FromResult(ServiceIdentityValidationResult.Success(new TrustedServiceIdentity(
+                    registry.ClientId,
+                    expectedAudience,
+                    scopes,
+                    "integration-tests-g1")));
+            }
+        }
+
+        return Task.FromResult(ServiceIdentityValidationResult.Failure("Invalid test service token."));
     }
 }

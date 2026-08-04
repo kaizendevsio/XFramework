@@ -3,6 +3,8 @@ using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Wallets.Api.Services;
 
@@ -11,6 +13,7 @@ public sealed class WalletOutboxService(
     IWalletRequestContextResolver contextResolver,
     IWalletFeatureGateService featureGateService,
     IWalletOutboxPublisher publisher,
+    ITrustedInvocationContextAccessor invocationContextAccessor,
     ILogger<WalletOutboxService> logger) : IWalletOutboxService
 {
     private readonly string _workerId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
@@ -24,8 +27,45 @@ public sealed class WalletOutboxService(
     public Task<Result<WalletOutboxActionResponse>> DeadLetterAsync(WalletOutboxActionRequest request, CancellationToken ct = default) =>
         UpdateStatusAsync(request, WalletOutboxStatus.DeadLetter, resetAttempts: false, ct);
 
+    public async Task<IReadOnlyList<Guid>> GetDueTenantIdsAsync(CancellationToken ct = default)
+    {
+        EnsureTenantDiscoveryAuthorization();
+        var now = DateTime.UtcNow;
+        return await dbContext.Set<WalletOutboxMessage>()
+            .IgnoreQueryFilters()
+            .Where(message => !message.IsDeleted &&
+                ((message.Status == WalletOutboxStatus.Pending || message.Status == WalletOutboxStatus.Failed) &&
+                 (message.NextAttemptAt == null || message.NextAttemptAt <= now) &&
+                 (message.LockedUntil == null || message.LockedUntil <= now) ||
+                 message.Status == WalletOutboxStatus.Processing &&
+                 message.LockedUntil != null &&
+                 message.LockedUntil <= now))
+            .Select(message => message.TenantId)
+            .Distinct()
+            .Take(50)
+            .ToListAsync(ct);
+    }
+
+    private void EnsureTenantDiscoveryAuthorization()
+    {
+        var context = invocationContextAccessor.Current;
+        if (context?.Actor is not null ||
+            context?.EffectiveTenantId is not null ||
+            context?.RequestedTargetTenantId is not null ||
+            context?.Service is not { } service ||
+            !string.Equals(service.ClientId, XFrameworkServiceNames.Wallets, StringComparison.Ordinal) ||
+            !service.Scopes.Contains(XFrameworkServiceScopes.WalletsAdmin) ||
+            !service.Scopes.Contains(XFrameworkServiceScopes.DataContextQueryAllTenants))
+        {
+            throw new UnauthorizedAccessException(
+                "Wallet outbox tenant discovery requires the authorized Wallets service identity.");
+        }
+    }
+
     public async Task DispatchDueAsync(CancellationToken ct = default)
     {
+        var tenantId = ResolveDispatchTenantId();
+
         var now = DateTime.UtcNow;
         const int batchSize = 50;
         var pending = (int)WalletOutboxStatus.Pending;
@@ -38,6 +78,7 @@ public sealed class WalletOutboxService(
                 SELECT *
                 FROM "Wallet"."WalletOutboxMessage"
                 WHERE "IsDeleted" = false
+                  AND "TenantId" = {tenantId}
                   AND (
                     (
                       "Status" IN ({pending}, {failed})
@@ -113,6 +154,28 @@ public sealed class WalletOutboxService(
         }
 
         await dbContext.SaveChangesAsync(ct);
+    }
+
+    private Guid ResolveDispatchTenantId()
+    {
+        var context = invocationContextAccessor.Current;
+        if (context?.EffectiveTenantId is not { } tenantId || tenantId == Guid.Empty)
+        {
+            throw new InvalidOperationException(
+                "Wallet outbox dispatch requires an authorized service target tenant.");
+        }
+
+        if (context.Actor is not null ||
+            context.Service is not { } service ||
+            !string.Equals(service.ClientId, XFrameworkServiceNames.Wallets, StringComparison.Ordinal) ||
+            !service.Scopes.Contains(XFrameworkServiceScopes.TenantTarget) ||
+            !service.Scopes.Contains(XFrameworkServiceScopes.WalletsAdmin))
+        {
+            throw new UnauthorizedAccessException(
+                "Wallet outbox dispatch requires the Wallets background-service identity.");
+        }
+
+        return tenantId;
     }
 
     private async Task<Result<WalletOutboxActionResponse>> UpdateStatusAsync(

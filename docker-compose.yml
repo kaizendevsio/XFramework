@@ -266,7 +266,7 @@ services:
       ServiceIdentity__Clients__8__ValidationFallback__ClientSecret: ${WALLETS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__8__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__8__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__8__AllowedScopes: bolt.service,identity.session.validate
+      ServiceIdentity__Clients__8__AllowedScopes: bolt.service,identity.session.validate,tenant.target,wallets.admin,datacontext.query.all-tenants
       ServiceIdentity__Clients__9__ClientId: XFramework.Inventario
       ServiceIdentity__Clients__9__ClientSecret: ${INVENTARIO_SERVICE_IDENTITY_SECRET:?Set INVENTARIO_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__9__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}

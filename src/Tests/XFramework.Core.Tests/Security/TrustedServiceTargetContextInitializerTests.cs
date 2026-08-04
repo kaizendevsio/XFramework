@@ -89,6 +89,52 @@ public sealed class TrustedServiceTargetContextInitializerTests
     }
 
     [Test]
+    public async Task EstablishTenantlessAsync_UsesServiceOnlyPolicyAndStoresResolvedContext()
+    {
+        var requestId = Guid.NewGuid();
+        var context = new TrustedInvocationContext(
+            null,
+            new TrustedServiceIdentity(
+                XFrameworkServiceNames.Wallets,
+                XFrameworkServiceNames.Wallets,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    XFrameworkServiceScopes.WalletsAdmin,
+                    XFrameworkServiceScopes.DataContextQueryAllTenants
+                },
+                "generation"),
+            null,
+            null,
+            requestId);
+        var tokenProvider = new RecordingServiceTokenProvider();
+        var resolver = new RecordingResolver(TrustedInvocationResult.Success(context));
+        var store = new RecordingContextStore();
+        var initializer = new TrustedServiceTargetContextInitializer(tokenProvider, resolver, store);
+
+        var result = await initializer.EstablishTenantlessAsync(
+            XFrameworkServiceNames.Wallets,
+            [
+                XFrameworkServiceScopes.WalletsAdmin,
+                XFrameworkServiceScopes.DataContextQueryAllTenants
+            ],
+            XFrameworkServiceNames.Wallets,
+            requestId);
+
+        result.IsSuccess.Should().BeTrue(result.Error);
+        tokenProvider.Scopes.Should().BeEquivalentTo(
+            XFrameworkServiceScopes.WalletsAdmin,
+            XFrameworkServiceScopes.DataContextQueryAllTenants);
+        resolver.Metadata!.RequestedTenantId.Should().BeNull();
+        resolver.Metadata.RequestId.Should().Be(requestId);
+        resolver.Policy!.ActorRequirement.Should().Be(ActorRequirement.None);
+        resolver.Policy.TenantAccessMode.Should().Be(TenantAccessMode.Tenantless);
+        resolver.Policy.RequireServiceIdentity.Should().BeTrue();
+        resolver.Policy.RequiredServiceScopes.Should().BeEquivalentTo(tokenProvider.Scopes);
+        resolver.Policy.AllowedServiceCallers.Should().Equal(XFrameworkServiceNames.Wallets);
+        store.Current.Should().BeSameAs(context);
+    }
+
+    [Test]
     public void AddTrustedInvocationSecurity_PreservesReplacementInitializer()
     {
         var services = new ServiceCollection();
@@ -169,6 +215,14 @@ public sealed class TrustedServiceTargetContextInitializerTests
     {
         public Task<TrustedInvocationResult> EstablishAsync(
             Guid targetTenantId,
+            string audience,
+            IReadOnlyCollection<string> requiredServiceScopes,
+            string allowedServiceCaller,
+            Guid? correlationId = null,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TrustedInvocationResult> EstablishTenantlessAsync(
             string audience,
             IReadOnlyCollection<string> requiredServiceScopes,
             string allowedServiceCaller,

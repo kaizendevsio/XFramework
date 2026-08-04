@@ -1190,9 +1190,43 @@ public class WalletAdvancedSystemTests : WalletsTestBase
             await db.SaveChangesAsync();
         }
 
-        await using (var scope = WalletsTestFixture.Services.CreateAsyncScope())
+        await using (var discoveryScope = WalletsTestFixture.Services.CreateAsyncScope())
         {
-            var outbox = scope.ServiceProvider.GetRequiredService<IWalletOutboxService>();
+            var authorization = await discoveryScope.ServiceProvider
+                .GetRequiredService<ITrustedServiceTargetContextInitializer>()
+                .EstablishTenantlessAsync(
+                    XFrameworkServiceNames.Wallets,
+                    [
+                        XFrameworkServiceScopes.WalletsAdmin,
+                        XFrameworkServiceScopes.DataContextQueryAllTenants
+                    ],
+                    XFrameworkServiceNames.Wallets);
+            authorization.IsSuccess.Should().BeTrue(authorization.Error);
+            authorization.Context!.Service!.Scopes.Should().BeEquivalentTo(
+                XFrameworkServiceScopes.WalletsAdmin,
+                XFrameworkServiceScopes.DataContextQueryAllTenants);
+
+            var tenantIds = await discoveryScope.ServiceProvider
+                .GetRequiredService<IWalletOutboxService>()
+                .GetDueTenantIdsAsync();
+            tenantIds.Should().Contain(WalletsTestFixture.TestTenantId);
+        }
+
+        await using (var dispatchScope = WalletsTestFixture.Services.CreateAsyncScope())
+        {
+            var authorization = await dispatchScope.ServiceProvider
+                .GetRequiredService<ITrustedServiceTargetContextInitializer>()
+                .EstablishAsync(
+                    WalletsTestFixture.TestTenantId,
+                    XFrameworkServiceNames.Wallets,
+                    [XFrameworkServiceScopes.WalletsAdmin],
+                    XFrameworkServiceNames.Wallets);
+            authorization.IsSuccess.Should().BeTrue(authorization.Error);
+            authorization.Context!.Service!.Scopes.Should().BeEquivalentTo(
+                XFrameworkServiceScopes.WalletsAdmin,
+                XFrameworkServiceScopes.TenantTarget);
+
+            var outbox = dispatchScope.ServiceProvider.GetRequiredService<IWalletOutboxService>();
             await outbox.DispatchDueAsync();
         }
 
@@ -1203,6 +1237,82 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         message.LockedBy.Should().BeNull();
         message.LockedUntil.Should().BeNull();
         message.LastError.Should().BeNull();
+    }
+
+    [Test]
+    public async Task OutboxDispatcher_WithoutTrustedServiceTarget_IsRejected()
+    {
+        await using var scope = WalletsTestFixture.Services.CreateAsyncScope();
+        var outbox = scope.ServiceProvider.GetRequiredService<IWalletOutboxService>();
+
+        var act = () => outbox.DispatchDueAsync();
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*authorized service target tenant*");
+    }
+
+    [TestCase(XFrameworkServiceNames.Portal, true, true)]
+    [TestCase(XFrameworkServiceNames.Wallets, false, true)]
+    [TestCase(XFrameworkServiceNames.Wallets, true, false)]
+    public async Task OutboxDispatcher_WithInvalidServiceAuthorization_IsRejected(
+        string clientId,
+        bool hasTenantTarget,
+        bool hasWalletsAdmin)
+    {
+        await using var scope = WalletsTestFixture.Services.CreateAsyncScope();
+        var scopes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (hasTenantTarget)
+            scopes.Add(XFrameworkServiceScopes.TenantTarget);
+        if (hasWalletsAdmin)
+            scopes.Add(XFrameworkServiceScopes.WalletsAdmin);
+        scope.ServiceProvider.GetRequiredService<ITrustedInvocationContextStore>().Set(
+            new TrustedInvocationContext(
+                null,
+                new TrustedServiceIdentity(
+                    clientId,
+                    XFrameworkServiceNames.Wallets,
+                    scopes,
+                    "wallets-integration-tests-g1"),
+                WalletsTestFixture.TestTenantId,
+                WalletsTestFixture.TestTenantId,
+                Guid.NewGuid()));
+        var outbox = scope.ServiceProvider.GetRequiredService<IWalletOutboxService>();
+
+        var act = () => outbox.DispatchDueAsync();
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("*Wallets background-service identity*");
+    }
+
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public async Task OutboxTenantDiscovery_WithMissingScope_IsRejected(
+        bool hasWalletsAdmin,
+        bool hasAllTenantQuery)
+    {
+        await using var scope = WalletsTestFixture.Services.CreateAsyncScope();
+        var scopes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (hasWalletsAdmin)
+            scopes.Add(XFrameworkServiceScopes.WalletsAdmin);
+        if (hasAllTenantQuery)
+            scopes.Add(XFrameworkServiceScopes.DataContextQueryAllTenants);
+        scope.ServiceProvider.GetRequiredService<ITrustedInvocationContextStore>().Set(
+            new TrustedInvocationContext(
+                null,
+                new TrustedServiceIdentity(
+                    XFrameworkServiceNames.Wallets,
+                    XFrameworkServiceNames.Wallets,
+                    scopes,
+                    "wallets-integration-tests-g1"),
+                null,
+                null,
+                Guid.NewGuid()));
+        var outbox = scope.ServiceProvider.GetRequiredService<IWalletOutboxService>();
+
+        var act = () => outbox.GetDueTenantIdsAsync();
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("*tenant discovery*");
     }
 
     [Test]

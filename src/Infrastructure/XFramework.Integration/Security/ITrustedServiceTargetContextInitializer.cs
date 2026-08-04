@@ -9,4 +9,11 @@ public interface ITrustedServiceTargetContextInitializer
         string allowedServiceCaller,
         Guid? correlationId = null,
         CancellationToken ct = default);
+
+    Task<TrustedInvocationResult> EstablishTenantlessAsync(
+        string audience,
+        IReadOnlyCollection<string> requiredServiceScopes,
+        string allowedServiceCaller,
+        Guid? correlationId = null,
+        CancellationToken ct = default);
 }

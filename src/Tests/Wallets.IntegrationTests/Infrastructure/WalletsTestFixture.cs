@@ -209,7 +209,9 @@ public class WalletsTestFixture
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
         builder.Services.AddSingleton(
             TransportAuthority.CreateTokenProvider(XFrameworkServiceNames.Wallets));
-        builder.Services.AddTestInvocationServer(InvocationIdentity);
+        builder.Services.AddTestInvocationServer(
+            InvocationIdentity,
+            XFrameworkServiceNames.Wallets);
         builder.Services.AddDataContextHandler(typeof(Wallets.Api.Services.WalletOperationsService).Assembly);
 
         var app = (WebApplication)builder.Build();
