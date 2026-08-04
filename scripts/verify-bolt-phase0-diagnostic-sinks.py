@@ -203,23 +203,41 @@ def scan_jaeger_service(jaeger_url: str, service: str, start: dt.datetime, end: 
     return traces
 
 
+def scan_seq(seq_url: str, start: dt.datetime, end: dt.datetime,
+             needles: Sequence[bytes], api_key: str,
+             budget: dict[str, float | int]) -> int:
+    pending = [(start, end)]
+    events = 0
+    headers = {"X-Seq-ApiKey": api_key} if api_key else {}
+    while pending:
+        window_start, window_end = pending.pop()
+        query = urllib.parse.urlencode({"count": MAX_EVENTS + 1, "render": "true",
+                                        "fromDateUtc": format_utc(window_start),
+                                        "toDateUtc": format_utc(window_end)})
+        document = request_json(f"{seq_url}/api/events?{query}", headers, needles, budget)
+        found = document if isinstance(document, list) else result_list(
+            document, ("Events", "events"), "SEQ_RESPONSE"
+        )
+        if len(found) <= MAX_EVENTS:
+            events += len(found)
+            continue
+
+        midpoint = window_start + (window_end - window_start) / 2
+        later_start = midpoint + dt.timedelta(microseconds=1)
+        if midpoint <= window_start or later_start > window_end:
+            fail("SEQ_LIMIT")
+        pending.extend(((later_start, window_end), (window_start, midpoint)))
+    return events
+
+
 def scan_sinks(seq_url: str, jaeger_url: str, start: dt.datetime, end: dt.datetime,
                needles: Sequence[bytes], api_key: str) -> tuple[int, int, int, int]:
     budget: dict[str, float | int] = {"started": time.monotonic(), "requests": 0}
-    query = urllib.parse.urlencode({"count": MAX_EVENTS + 1, "render": "true",
-                                    "fromDateUtc": format_utc(start),
-                                    "toDateUtc": format_utc(end)})
     if api_key and (
         not 16 <= len(api_key) <= 512 or not api_key.isascii() or any(c.isspace() for c in api_key)
     ):
         fail("SEQ_API_KEY")
-    seq_document = request_json(f"{seq_url}/api/events?{query}",
-                                {"X-Seq-ApiKey": api_key} if api_key else {}, needles, budget)
-    events = seq_document if isinstance(seq_document, list) else result_list(
-        seq_document, ("Events", "events"), "SEQ_RESPONSE"
-    )
-    if len(events) > MAX_EVENTS:
-        fail("SEQ_LIMIT")
+    events = scan_seq(seq_url, start, end, needles, api_key, budget)
 
     services = result_list(request_json(f"{jaeger_url}/api/services", {}, needles, budget),
                            ("data",), "JAEGER_RESPONSE")
@@ -232,7 +250,7 @@ def scan_sinks(seq_url: str, jaeger_url: str, start: dt.datetime, end: dt.dateti
     traces = 0
     for service in services:
         traces += scan_jaeger_service(jaeger_url, service, start, end, needles, budget)
-    return len(events), len(services), traces, int(budget["requests"])
+    return events, len(services), traces, int(budget["requests"])
 
 def write_evidence(path: str, counts: dict[str, int]) -> None:
     payload = json.dumps({"status": "passed", "counts": counts}, sort_keys=True,

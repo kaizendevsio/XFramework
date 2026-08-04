@@ -61,7 +61,7 @@ class SinkState:
     def __init__(self, role: str):
         self.role = role
         self.requests: list[tuple[str, dict[str, str]]] = []
-        self.seq = Response([])
+        self.seq: Response | Callable[[dict[str, list[str]]], Response] = Response([])
         self.services = Response({"data": ["bolt-hub", "identityserver"], "total": 2})
         self.traces: dict[str, Response | Callable[[dict[str, list[str]]], Response]] = {
             "bolt-hub": Response({"data": [], "total": 0}),
@@ -87,7 +87,8 @@ class SinkHandler(BaseHTTPRequestHandler):
         self.server.state.requests.append((self.path, headers))
         state: SinkState = self.server.state
         if state.role == "seq" and parsed.path == "/api/events":
-            response = state.seq
+            query = urllib.parse.parse_qs(parsed.query)
+            response = state.seq(query) if callable(state.seq) else state.seq
         elif state.role == "jaeger" and parsed.path == "/api/services":
             response = state.services
         elif state.role == "jaeger" and parsed.path == "/api/traces":
@@ -288,6 +289,31 @@ class DiagnosticSinkVerifierTests(unittest.TestCase):
         result, output = self._run()
 
         self._assert_failed_without_secrets(result, output)
+
+    def test_saturated_seq_window_is_subdivided_and_fully_scanned(self) -> None:
+        start = _utc_microseconds(self.window_start)
+        end = _utc_microseconds(self.window_end)
+        timestamps = [start + ((end - start) * index // 1499) for index in range(1500)]
+
+        def events(query: dict[str, list[str]]) -> Response:
+            window_start = _utc_microseconds(query["fromDateUtc"][0])
+            window_end = _utc_microseconds(query["toDateUtc"][0])
+            limit = int(query["count"][0])
+            count = sum(window_start <= timestamp <= window_end for timestamp in timestamps)
+            return Response([{}] * min(count, limit))
+
+        self.seq_server.state.seq = events
+
+        result, output = self._run()
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        evidence = json.loads(output.read_text(encoding="ascii"))
+        self.assertEqual(1500, evidence["counts"]["seqEvents"])
+        seq_requests = [
+            path for path, _ in self.seq_server.state.requests
+            if urllib.parse.urlsplit(path).path == "/api/events"
+        ]
+        self.assertEqual(3, len(seq_requests))
 
     def test_jaeger_trace_token_leak_fails(self) -> None:
         self.jaeger_server.state.traces["bolt-hub"] = Response(
