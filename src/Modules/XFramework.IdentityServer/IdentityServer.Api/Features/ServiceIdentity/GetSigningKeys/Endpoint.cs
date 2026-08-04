@@ -18,7 +18,10 @@ public static class GetServiceSigningKeysEndpoint
     {
         return await serviceIdentityService.GetSigningKeysAsync(request, ct);
     }
+}
 
+public static class GetServiceSigningKeysHttpEndpoint
+{
     [MapPost("/api/service-identity/signing-keys/query", Tags = ["Service Identity"],
         Summary = "Get service signing public keys",
         Description = "Returns public service signing keys for internal JWT validation.",
