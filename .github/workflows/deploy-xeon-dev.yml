@@ -795,7 +795,7 @@ jobs:
           /usr/bin/timeout --foreground --kill-after=30s 300s \
             "${compose[@]}" up -d --no-build --no-deps --force-recreate identityserver
           for attempt in $(seq 1 40); do
-            if curl -fsS --connect-timeout 3 --max-time 10 "$IDENTITY_PUBLIC_URL/health/live" >/dev/null; then
+            if curl -fsS --connect-timeout 3 --max-time 10 "$IDENTITY_PUBLIC_URL/health/ready" >/dev/null; then
               exit 0
             fi
             echo "IdentityServer not ready; attempt ${attempt}/40"

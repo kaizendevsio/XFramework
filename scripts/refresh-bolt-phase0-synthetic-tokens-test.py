@@ -438,6 +438,48 @@ class RefreshTokenHookTests(unittest.TestCase):
                             context_factory=lambda: FakeContext(),
                         )
 
+    def test_transient_rate_limit_honors_retry_after_and_recovers(self) -> None:
+        now = int(time.time())
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Workspace(Path(temporary)).config()
+            factory = ConnectionFactory(
+                [
+                    FakeResponse(status=429, headers={"Retry-After": "12"}),
+                    FakeResponse(service_response(service_claims(now, uuid.uuid4().hex))),
+                ]
+            )
+
+            with mock.patch.object(refresh.time, "sleep") as sleep:
+                document = refresh._post_json(
+                    config,
+                    "/api/service-identity/bolt-transport-token",
+                    {},
+                    connection_factory=factory,
+                    context_factory=lambda: FakeContext(),
+                )
+
+            self.assertEqual(document["tokenType"], "Bearer")
+            self.assertEqual(len(factory.requests), 2)
+            sleep.assert_called_once_with(12)
+
+    def test_non_transient_http_status_fails_without_retry_and_reports_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Workspace(Path(temporary)).config()
+            factory = ConnectionFactory([FakeResponse(status=401)])
+
+            with mock.patch.object(refresh.time, "sleep") as sleep:
+                with self.assertRaisesRegex(refresh.RefreshError, "HTTP_STATUS_401"):
+                    refresh._post_json(
+                        config,
+                        "/api/service-identity/bolt-transport-token",
+                        {},
+                        connection_factory=factory,
+                        context_factory=lambda: FakeContext(),
+                    )
+
+            self.assertEqual(len(factory.requests), 1)
+            sleep.assert_not_called()
+
     def test_bare_response_schemas_require_exact_key_sets(self) -> None:
         now = int(time.time())
         with tempfile.TemporaryDirectory() as temporary:
