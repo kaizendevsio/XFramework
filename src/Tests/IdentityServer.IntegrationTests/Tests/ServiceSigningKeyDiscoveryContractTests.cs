@@ -1,6 +1,9 @@
 using FluentAssertions;
 using IdentityServer.Api.Features.ServiceIdentity.GetSigningKeys;
 using NUnit.Framework;
+using System.Net;
+using System.Net.Http.Json;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 using XFramework.Integration.Security;
 
@@ -15,8 +18,8 @@ public sealed class ServiceSigningKeyDiscoveryContractTests
     [Test]
     public void HttpSigningKeyDiscovery_IsExplicitlyAnonymousAndTenantless()
     {
-        var endpoint = typeof(GetServiceSigningKeysEndpoint)
-            .GetMethod(nameof(GetServiceSigningKeysEndpoint.HandleHttp))!;
+        var endpoint = typeof(GetServiceSigningKeysHttpEndpoint)
+            .GetMethod(nameof(GetServiceSigningKeysHttpEndpoint.HandleHttp))!;
         var attribute = endpoint.GetCustomAttributes(typeof(MapPostAttribute), inherit: false)
             .Cast<MapPostAttribute>()
             .Single();
@@ -26,5 +29,17 @@ public sealed class ServiceSigningKeyDiscoveryContractTests
         attribute.TenantAccessMode.Should().Be(TenantAccessMode.Tenantless);
         attribute.RequiredServiceScopes.Should().BeNull();
         attribute.AllowedServiceCallers.Should().BeNull();
+    }
+
+    [Test]
+    public async Task HttpSigningKeyDiscovery_WithoutAuthorization_ReturnsPublicKeys()
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(IntegrationTestFixture.IdentityServerUrl) };
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/service-identity/signing-keys/query",
+            new GetServiceSigningKeysRequest());
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
 }
