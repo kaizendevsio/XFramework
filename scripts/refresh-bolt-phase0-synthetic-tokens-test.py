@@ -953,11 +953,23 @@ class RefreshTokenHookTests(unittest.TestCase):
                 },
             )
             self.assertEqual(user_body["password"], PASSWORD)
-            self.assertEqual(user_body["metadata"]["tenantId"], TENANT_ID)
-            self.assertEqual(user_body["metadata"]["credentialId"], CREDENTIAL_ID)
-            self.assertEqual(user_body["metadata"]["name"], "bolt-phase0-synthetic")
+            self.assertEqual(
+                set(user_body["metadata"]),
+                {
+                    "requestedTenantId",
+                    "operationName",
+                    "deviceName",
+                    "userAgent",
+                    "requestId",
+                },
+            )
+            self.assertEqual(user_body["metadata"]["requestedTenantId"], TENANT_ID)
+            self.assertEqual(
+                user_body["metadata"]["operationName"],
+                "Authenticate Bolt Phase 0 synthetic user",
+            )
             self.assertEqual(user_body["metadata"]["deviceName"], "bolt-phase0-synthetic")
-            self.assertEqual(user_body["metadata"]["deviceAgent"], "bolt-phase0-synthetic")
+            self.assertEqual(user_body["metadata"]["userAgent"], "bolt-phase0-synthetic")
 
     def test_communications_identity_service_token_participates_in_distinctness(self) -> None:
         now = int(time.time())
