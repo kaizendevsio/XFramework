@@ -273,6 +273,7 @@ public class IntegrationTestFixture
         builder.Services.InstallStandardServices<Bolt.Hub.Installers.BoltInstaller>(builder.Configuration);
         builder.Services.InstallRuntimeServices(builder.Configuration);
         builder.Services.AddSingleton<IServiceTokenProvider, DeferredIntegrationServiceTokenProvider>();
+        builder.Services.AddTestTrustedServiceTargetContext();
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();

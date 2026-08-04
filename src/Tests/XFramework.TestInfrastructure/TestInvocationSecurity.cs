@@ -218,6 +218,12 @@ public static class TestInvocationIdentityExtensions
         services.AddSingleton(options);
         services.AddSingleton<IActorAccessTokenProvider, TestActorAccessTokenProvider>();
         services.AddSingleton<IServiceTokenProvider, TestServiceTokenProvider>();
+        services.AddTestTrustedServiceTargetContext();
+        return services;
+    }
+
+    public static IServiceCollection AddTestTrustedServiceTargetContext(this IServiceCollection services)
+    {
         services.AddScoped<ITrustedServiceTargetContextInitializer, TestTrustedServiceTargetContextInitializer>();
         return services;
     }
