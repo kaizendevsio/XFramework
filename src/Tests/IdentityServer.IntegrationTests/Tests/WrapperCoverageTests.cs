@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Security.Cryptography;
 using IdentityServer.Domain.Shared;
+using IdentityServer.Api.Services;
 using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
@@ -12,6 +13,7 @@ using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Enums;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Security;
 using XFramework.TestInfrastructure;
 using Session = IdentityServer.Domain.Shared.Contracts.Session;
 
@@ -30,6 +32,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     [Test]
     public async Task ServiceSigningKeys_ThroughAuthorizedWrapper_SupportQueryRotationAndRetirement()
     {
+        using var actorSuppression = IntegrationTestFixture.SuppressActorAccessToken();
         var initial = await IntegrationTestFixture.ServiceWrapper.GetServiceSigningKeys(
             new GetServiceSigningKeysRequest());
 
@@ -76,6 +79,66 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
 
         result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
         result.IsSuccess.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task RotateServiceSigningKey_LimitedActorCannotInheritServiceAdminScope()
+    {
+        var username = UniqueUsername();
+        const string password = "LimitedSigningKeyActor123!";
+        await SeedCredentialWithRole(username, password);
+        var authentication = await AuthenticateExistingCredential(username, password);
+
+        using var actorAccessToken = IntegrationTestFixture.UseActorAccessToken(
+            authentication.Response!.AccessToken!);
+        var result = await IntegrationTestFixture.ServiceWrapper.RotateServiceSigningKey(
+            new RotateServiceSigningKeyRequest
+            {
+                Reason = "limited-actor-must-not-inherit-service-admin"
+            });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+        result.IsSuccess.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task TenantAdministration_LimitedActorCannotInheritServiceAdminScopeAtServiceBoundary()
+    {
+        using var scope = IntegrationTestFixture.Services.CreateScope();
+        var actor = new TrustedActorIdentity(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            IntegrationTestFixture.TestTenantId,
+            Guid.NewGuid(),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            "limited-actor-g1",
+            DateTimeOffset.UtcNow.AddMinutes(5));
+        var service = new TrustedServiceIdentity(
+            XFrameworkServiceNames.Portal,
+            XFrameworkServiceNames.IdentityServer,
+            new HashSet<string>([XFrameworkServiceScopes.IdentityAdmin], StringComparer.OrdinalIgnoreCase),
+            "portal-service-g1");
+        scope.ServiceProvider.GetRequiredService<ITrustedInvocationContextStore>().Set(
+            new TrustedInvocationContext(
+                actor,
+                service,
+                IntegrationTestFixture.TestTenantId,
+                null,
+                Guid.NewGuid()));
+        var authorizationService = scope.ServiceProvider.GetRequiredService<IIdentityAuthorizationService>();
+
+        var result = await authorizationService.SetTenantModuleFeaturesAsync(
+            new SetTenantModuleFeaturesRequest
+            {
+                TenantId = IntegrationTestFixture.TestTenantId,
+                ExpectedConcurrencyStamp = Guid.NewGuid(),
+                Features = [],
+                Metadata = CreateMetadata()
+            });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be((int)HttpStatusCode.Forbidden);
     }
 
     [Test]
@@ -282,6 +345,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         var sessionId = auth.Response!.SessionId!.Value;
         var credentialId = auth.Response.Credential!.Id;
 
+        using var actorAccessToken = IntegrationTestFixture.UseActorAccessToken(auth.Response.AccessToken!);
         var result = await IntegrationTestFixture.ServiceWrapper.Logout(new LogoutRequest
         {
             SessionId = sessionId,
@@ -307,7 +371,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         var result = await IntegrationTestFixture.ServiceWrapper.Logout(new LogoutRequest
         {
             SessionId = Guid.NewGuid(),
-            CredentialId = Guid.NewGuid(),
+            CredentialId = IntegrationTestFixture.TestCredentialId,
             Metadata = CreateMetadata()
         });
 
@@ -360,13 +424,10 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     {
         var auth = await AuthenticateThroughWrapper();
 
+        using var actorAccessToken = IntegrationTestFixture.UseActorAccessToken(auth.Response!.AccessToken!);
         var result = await IntegrationTestFixture.ServiceWrapper.ValidateIdentitySession(
             new ValidateIdentitySessionRequest
             {
-                TenantId = IntegrationTestFixture.TestTenantId,
-                CredentialId = auth.Response!.Credential!.Id,
-                SessionId = auth.Response.SessionId!.Value,
-                RoleTypeIds = [TestData.RoleTypeId],
                 Metadata = CreateMetadata()
             });
 
@@ -382,6 +443,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         var credentialId = auth.Response!.Credential!.Id;
         var sessionId = auth.Response.SessionId!.Value;
 
+        using var actorAccessToken = IntegrationTestFixture.UseActorAccessToken(auth.Response.AccessToken!);
         var logout = await IntegrationTestFixture.ServiceWrapper.Logout(new LogoutRequest
         {
             SessionId = sessionId,
@@ -393,10 +455,6 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         var result = await IntegrationTestFixture.ServiceWrapper.ValidateIdentitySession(
             new ValidateIdentitySessionRequest
             {
-                TenantId = IntegrationTestFixture.TestTenantId,
-                CredentialId = credentialId,
-                SessionId = sessionId,
-                RoleTypeIds = [TestData.RoleTypeId],
                 Metadata = CreateMetadata()
             });
 
@@ -881,7 +939,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task UploadCredentialAvatar_WithTenantMismatch_ReturnsNotFound()
+    public async Task UploadCredentialAvatar_WithUnknownDelegatedTenant_ReturnsForbiddenWithoutDisclosure()
     {
         var credential = await SeedCredentialWithRole(UniqueUsername(), "AvatarPassword123!");
 
@@ -894,7 +952,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
             Metadata = CreateMetadata(Guid.NewGuid())
         });
 
-        result.HttpStatusCode.Should().Be(HttpStatusCode.NotFound);
+        result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
         result.IsSuccess.Should().BeFalse();
     }
 
@@ -984,6 +1042,13 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     [Test]
     public async Task TenantAuthorizationPolicy_WrapperCanGetAndUpdateMissingPermissionBehavior()
     {
+        var actorSnapshot = await IntegrationTestFixture.ServiceWrapper.ValidateIdentitySession(
+            new ValidateIdentitySessionRequest { Metadata = CreateMetadata() });
+        actorSnapshot.HttpStatusCode.Should().Be(HttpStatusCode.OK, actorSnapshot.Message);
+        actorSnapshot.Response!.Capabilities.Should().Contain(
+            "identity.tenants:manage",
+            $"the integration administrator must carry tenant delegation authority; actual capabilities: {string.Join(", ", actorSnapshot.Response.Capabilities)}");
+
         var tenantName = $"Authorization Policy Tenant {Guid.NewGuid():N}";
         var create = await IntegrationTestFixture.ServiceWrapper.CreateTenant(new CreateTenantRequest
         {
@@ -997,11 +1062,24 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         create.HttpStatusCode.Should().Be(HttpStatusCode.OK);
 
         await using var db = CreateDbContext();
-        var tenantId = await db.Set<Tenant>()
+        var createdTenant = await db.Set<Tenant>()
             .IgnoreQueryFilters()
             .Where(t => t.Name == tenantName)
-            .Select(t => t.Id)
             .FirstAsync();
+        createdTenant.IsEnabled.Should().BeTrue();
+        createdTenant.IsDeleted.Should().BeFalse();
+        createdTenant.AvailabilityDate.Should().BeNull();
+        createdTenant.Expiration.Should().BeNull();
+        var tenantId = createdTenant.Id;
+
+        var initializedIdentityFeatures = await db.Set<TenantModuleFeature>()
+            .IgnoreQueryFilters()
+            .Where(feature => feature.TenantId == tenantId &&
+                              feature.ModuleKey == TenantModuleFeatureKeys.Identity &&
+                              feature.IsEnabled &&
+                              !feature.IsDeleted)
+            .CountAsync();
+        initializedIdentityFeatures.Should().BeGreaterThan(0);
 
         var initial = await IntegrationTestFixture.ServiceWrapper.GetTenantAuthorizationPolicy(new GetTenantAuthorizationPolicyRequest
         {
@@ -1009,7 +1087,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
             Metadata = CreateMetadata(tenantId)
         });
 
-        initial.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        initial.HttpStatusCode.Should().Be(HttpStatusCode.OK, initial.Message);
         initial.Response.Should().NotBeNull();
         initial.Response!.MissingPermissionBehavior.Should().Be(MissingPermissionBehavior.Deny);
 
@@ -1021,7 +1099,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
             Metadata = CreateMetadata(tenantId)
         });
 
-        update.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+        update.HttpStatusCode.Should().Be(HttpStatusCode.OK, update.Message);
         update.Response.Should().NotBeNull();
         update.Response!.MissingPermissionBehavior.Should().Be(MissingPermissionBehavior.Allow);
     }
@@ -1289,7 +1367,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task AuthorizationWrappers_WithUnknownResources_ReturnNotFound()
+    public async Task AuthorizationWrappers_DoNotDiscloseUnknownDelegatedTenants()
     {
         var unknownTenantId = Guid.NewGuid();
         var unknownCredentialId = Guid.NewGuid();
@@ -1302,7 +1380,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
                 TenantId = unknownTenantId,
                 Metadata = CreateMetadata(unknownTenantId)
             });
-        getPolicy.HttpStatusCode.Should().Be(HttpStatusCode.NotFound);
+        getPolicy.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         var updatePolicy = await IntegrationTestFixture.ServiceWrapper.UpdateTenantAuthorizationPolicy(
             new UpdateTenantAuthorizationPolicyRequest
@@ -1311,7 +1389,7 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
                 MissingPermissionBehavior = MissingPermissionBehavior.Deny,
                 Metadata = CreateMetadata(unknownTenantId)
             });
-        updatePolicy.HttpStatusCode.Should().Be(HttpStatusCode.NotFound);
+        updatePolicy.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         var getRolePermissions = await IntegrationTestFixture.ServiceWrapper.GetRoleTypePermissions(
             new GetRoleTypePermissionsRequest
@@ -1389,15 +1467,19 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
         string password)
     {
 
-        var result = await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(new AuthenticateIdentityRequest
+        QueryResponse<AuthenticateIdentityResponse> result;
+        using (IntegrationTestFixture.SuppressActorAccessToken())
         {
-            UserName = username,
-            Password = password,
-            RoleId = TestData.RoleTypeId,
-            AuthorizationType = AuthorizationType.Default,
-            GenerateToken = true,
-            Metadata = CreateMetadata()
-        });
+            result = await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(new AuthenticateIdentityRequest
+            {
+                UserName = username,
+                Password = password,
+                RoleId = TestData.RoleTypeId,
+                AuthorizationType = AuthorizationType.Default,
+                GenerateToken = true,
+                Metadata = CreateMetadata(IntegrationTestFixture.TestTenantId)
+            });
+        }
 
         result.HttpStatusCode.Should().Be(HttpStatusCode.OK, result.Message);
         result.Response.Should().NotBeNull();
@@ -1707,11 +1789,11 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
 
     private static RequestMetadata CreateMetadata(Guid? tenantId = null) => new()
     {
-        TenantId = tenantId ?? IntegrationTestFixture.TestTenantId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "IntegrationTest",
+        OperationName = "IntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 }

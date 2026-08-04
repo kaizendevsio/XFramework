@@ -25,6 +25,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NUnit.Framework;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Abstractions;
@@ -40,15 +41,15 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
     public async Task GeneratedHandler_AuthorizationFailure_ReturnsBeforeEndpointServiceResolution(int statusCode)
     {
         var authorizer = new StubAuthorizer(
-            TrustedServiceInvocationResult.Failure("denied", statusCode));
+            TrustedInvocationResult.Failure("denied", statusCode));
         using var provider = CreateProvider(authorizer);
         await using var client = CreateClient();
         var handler = RegisterGeneratedHandler(client, provider);
         var context = new BoltInboundRequestContext(Guid.NewGuid(), 12345);
-        var payload = MemoryPackSerializer.Serialize(new GetCommunicationsSettingsRequest
+        var payload = Envelope(new GetCommunicationsSettingsRequest
         {
-            Metadata = new RequestMetadata { ServiceAccessToken = "token" }
-        });
+            Metadata = new RequestMetadata()
+        }, "token");
 
         var result = await handler(payload, context, CancellationToken.None);
 
@@ -60,24 +61,17 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
     [Test]
     public async Task GeneratedHandler_ValidAuthorization_ContinuesToEndpointService()
     {
-        var invocation = new TrustedServiceInvocation(
-            XFrameworkServiceNames.Portal,
-            XFrameworkServiceNames.Communications,
-            null,
-            null,
-            new RequestMetadata { ServiceAccessToken = "valid" },
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
-        var authorizer = new StubAuthorizer(TrustedServiceInvocationResult.Success(invocation));
+        var authorizer = new StubAuthorizer(SuccessfulInvocation());
         var settingsService = new StubSettingsService();
         using var provider = CreateProvider(authorizer, settingsService);
         await using var client = CreateClient();
         var handler = RegisterGeneratedHandler(client, provider);
 
         var result = await handler(
-            MemoryPackSerializer.Serialize(new GetCommunicationsSettingsRequest
+            Envelope(new GetCommunicationsSettingsRequest
             {
-                Metadata = new RequestMetadata { ServiceAccessToken = "valid" }
-            }),
+                Metadata = new RequestMetadata()
+            }, "valid"),
             new BoltInboundRequestContext(Guid.NewGuid(), 12345),
             CancellationToken.None);
 
@@ -88,16 +82,11 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
     [Test]
     public async Task GeneratedHandler_ValidAuthorizationThenValidationFailure_PreservesBadRequestEnvelope()
     {
-        var invocation = new TrustedServiceInvocation(
-            XFrameworkServiceNames.Portal,
-            XFrameworkServiceNames.Communications,
-            null,
-            null,
-            new RequestMetadata { ServiceAccessToken = "valid" },
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
-        var authorizer = new StubAuthorizer(TrustedServiceInvocationResult.Success(invocation));
+        var authorizer = new StubAuthorizer(SuccessfulInvocation());
         var services = new ServiceCollection();
         services.AddSingleton<IBoltServiceInvocationAuthorizer>(authorizer);
+        services.AddSingleton<IActorAccessTokenScope, TestActorAccessTokenScope>();
+        services.AddSingleton<ITrustedInvocationFeatureGate, AllowingFeatureGate>();
         services.AddSingleton<IValidator<UpdateThreadRequest>, UpdateThreadValidator>();
         using var provider = services.BuildServiceProvider();
         await using var client = CreateClient();
@@ -108,10 +97,10 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
             nameof(UpdateThreadRequest));
 
         var result = await handler(
-            MemoryPackSerializer.Serialize(new UpdateThreadRequest
+            Envelope(new UpdateThreadRequest
             {
-                Metadata = new RequestMetadata { ServiceAccessToken = "valid" }
-            }),
+                Metadata = new RequestMetadata()
+            }, "valid"),
             new BoltInboundRequestContext(Guid.NewGuid(), 12345),
             CancellationToken.None);
         var response = MemoryPackSerializer.Deserialize<CmdResponse>(result.Item2.Span);
@@ -127,16 +116,9 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
     [TestCase(200)]
     public async Task GeneratedHandler_LargeRpcPath_EnforcesSameAuthorization(int statusCode)
     {
-        var invocation = new TrustedServiceInvocation(
-            XFrameworkServiceNames.Portal,
-            XFrameworkServiceNames.Communications,
-            null,
-            null,
-            new RequestMetadata { ServiceAccessToken = "valid" },
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         var authorization = statusCode == 200
-            ? TrustedServiceInvocationResult.Success(invocation)
-            : TrustedServiceInvocationResult.Failure("denied", statusCode);
+            ? SuccessfulInvocation()
+            : TrustedInvocationResult.Failure("denied", statusCode);
         var authorizer = new StubAuthorizer(authorization);
         var settingsService = new StubSettingsService();
         using var provider = CreateProvider(authorizer, settingsService);
@@ -161,10 +143,10 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
         var result = await caller.InvokeAsync(
             "generated-recipient",
             nameof(GetCommunicationsSettingsRequest),
-            MemoryPackSerializer.Serialize(new GetCommunicationsSettingsRequest
+            Envelope(new GetCommunicationsSettingsRequest
             {
-                Metadata = new RequestMetadata { ServiceAccessToken = "token" }
-            }));
+                Metadata = new RequestMetadata()
+            }, "token"));
 
         Assert.That((int)result.StatusCode, Is.EqualTo(statusCode));
         Assert.That(authorizer.CallCount, Is.EqualTo(1));
@@ -187,17 +169,22 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
                 GenerationId = "generation-1"
             }),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ServiceTokenValidator>.Instance);
+        var serviceIdentityProvider = new ServiceIdentityProvider(validator);
         var authorizer = new BoltServiceInvocationAuthorizer(
-            new TrustedServiceInvocationResolver(validator),
+            new TrustedInvocationResolver(
+                new FixedActorProvider(),
+                serviceIdentityProvider),
+            serviceIdentityProvider,
+            new TestContextStore(),
             Options.Create(new ServiceIdentityOptions { ClientId = XFrameworkServiceNames.Communications }));
         var settingsService = new StubSettingsService();
         using var provider = CreateProvider(authorizer, settingsService);
         await using var client = CreateClient();
         var handler = RegisterGeneratedHandler(client, provider);
-        var payload = MemoryPackSerializer.Serialize(new GetCommunicationsSettingsRequest
+        var payload = Envelope(new GetCommunicationsSettingsRequest
         {
-            Metadata = new RequestMetadata { ServiceAccessToken = token }
-        });
+            Metadata = new RequestMetadata()
+        }, token, "test-actor-token");
         var context = new BoltInboundRequestContext(
             Guid.NewGuid(),
             BoltCodec.Fnv1aHash(XFrameworkServiceNames.Portal.ToSha256()));
@@ -260,9 +247,21 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(authorizer);
+        services.AddSingleton<IActorAccessTokenScope, TestActorAccessTokenScope>();
+        services.AddSingleton<ITrustedInvocationFeatureGate, AllowingFeatureGate>();
         if (settingsService is not null)
             services.AddSingleton(settingsService);
         return services.BuildServiceProvider();
+    }
+
+    private sealed class AllowingFeatureGate : ITrustedInvocationFeatureGate
+    {
+        public Task<Result> EnsureAllowedAsync(
+            string route,
+            string httpMethod,
+            string? declaredCapability,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result.Success());
     }
 
     private static BoltClient CreateClient() =>
@@ -318,23 +317,80 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
         return handlers[BoltCodec.Fnv1aHash(commandName)];
     }
 
-    private sealed class StubAuthorizer(TrustedServiceInvocationResult result)
+    private static byte[] Envelope<T>(
+        T request,
+        string serviceAccessToken,
+        string? actorAccessToken = null) =>
+        MemoryPackSerializer.Serialize(new BoltInvocationEnvelope
+        {
+            Payload = MemoryPackSerializer.Serialize(request),
+            ServiceAccessToken = serviceAccessToken,
+            ActorAccessToken = actorAccessToken
+        });
+
+    private static TrustedInvocationResult SuccessfulInvocation() =>
+        TrustedInvocationResult.Success(new TrustedInvocationContext(
+            Actor: null,
+            Service: new TrustedServiceIdentity(
+                XFrameworkServiceNames.Portal,
+                XFrameworkServiceNames.Communications,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                "test-generation"),
+            EffectiveTenantId: null,
+            RequestedTargetTenantId: null,
+            CorrelationId: Guid.NewGuid()));
+
+    private sealed class StubAuthorizer(TrustedInvocationResult result)
         : IBoltServiceInvocationAuthorizer
     {
         public int CallCount { get; private set; }
         public BoltInboundRequestContext LastContext { get; private set; }
 
-        public Task<TrustedServiceInvocationResult> AuthorizeAsync(
-            RequestMetadata? metadata,
+        public Task<TrustedInvocationResult> AuthorizeAsync(
+            InvocationCredentials credentials,
+            RequestMetadata metadata,
             BoltInboundRequestContext requestContext,
-            IReadOnlyCollection<string>? requiredScopes = null,
-            IReadOnlyCollection<string>? allowedCallers = null,
+            InvocationAuthorizationPolicy policy,
             CancellationToken ct = default)
         {
             CallCount++;
             LastContext = requestContext;
             return Task.FromResult(result);
         }
+    }
+
+    private sealed class TestActorAccessTokenScope : IActorAccessTokenScope
+    {
+        public IDisposable Push(string actorAccessToken) => new NoopDisposable();
+        private sealed class NoopDisposable : IDisposable { public void Dispose() { } }
+    }
+
+    private sealed class RejectingActorProvider : IActorIdentityProvider
+    {
+        public Task<ActorIdentityValidationResult> ValidateAsync(string token, CancellationToken ct = default) =>
+            Task.FromResult(ActorIdentityValidationResult.Failure("unexpected actor"));
+    }
+
+    private sealed class FixedActorProvider : IActorIdentityProvider
+    {
+        private static readonly TrustedActorIdentity Identity = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            "test-generation",
+            DateTimeOffset.UtcNow.AddMinutes(5));
+
+        public Task<ActorIdentityValidationResult> ValidateAsync(string token, CancellationToken ct = default) =>
+            Task.FromResult(ActorIdentityValidationResult.Success(Identity));
+    }
+
+    private sealed class TestContextStore : ITrustedInvocationContextStore
+    {
+        public TrustedInvocationContext? Current { get; private set; }
+        public void Set(TrustedInvocationContext context) => Current = context;
     }
 
     private sealed class StubSettingsService : ICommunicationsSettingsService
@@ -356,7 +412,7 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
     }
 
     private sealed class StaticSigningKeyProvider(string publicKeyPem, string keyId)
-        : IIdentitySigningKeyProvider
+        : IIdentitySigningKeyProvider, IServiceCredentialGenerationProvider
     {
         public Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
             string? requestedKeyId = null,
@@ -373,5 +429,11 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
                     IsActive = true
                 }
             ]);
+
+        public Task<bool> IsAcceptedAsync(
+            string clientId,
+            string generationId,
+            CancellationToken ct = default) =>
+            Task.FromResult(generationId == "generation-1");
     }
 }

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using XFramework.Domain.Shared.ServiceIdentity;
 
 namespace Portal.E2ETests;
 
@@ -131,7 +132,21 @@ public sealed class ServiceIdentityComposeContractTests
         compose.Should().Contain("ServiceIdentity__Clients__");
         compose.Should().Contain("AllowedAudiences: *service-identity-audiences");
         compose.Should().Contain("AllowedScopes: bolt.service");
-        compose.Should().Contain("AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,identity.admin");
+        ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.Portal).Should().BeEquivalentTo(
+        [
+            XFrameworkServiceScopes.BoltService,
+            XFrameworkServiceScopes.DataContextQuery,
+            XFrameworkServiceScopes.DataContextQueryAllTenants,
+            XFrameworkServiceScopes.DataContextMutate,
+            XFrameworkServiceScopes.TenantTarget,
+            XFrameworkServiceScopes.IdentityAdmin,
+            XFrameworkServiceScopes.IdentitySessionValidate
+        ]);
+        ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.SmsGateway).Should().Contain(
+        [
+            XFrameworkServiceScopes.SmsGatewayAgent,
+            XFrameworkServiceScopes.TenantTarget
+        ]);
     }
 
     [Test]
@@ -440,6 +455,29 @@ public sealed class ServiceIdentityComposeContractTests
             end = lines.Length;
 
         return string.Join('\n', lines[start..end]);
+    }
+
+    private static IReadOnlySet<string> ExtractAllowedScopesForClient(
+        string compose,
+        string clientId)
+    {
+        var lines = NormalizeLines(compose).Split('\n');
+        var clientIndex = Array.FindIndex(
+            lines,
+            line => line.Trim().EndsWith($"ClientId: {clientId}", StringComparison.Ordinal));
+        if (clientIndex < 0)
+            throw new InvalidOperationException($"Could not locate service identity client '{clientId}'.");
+
+        var scopesLine = lines
+            .Skip(clientIndex + 1)
+            .TakeWhile(line => !line.TrimStart().Contains("ClientId:", StringComparison.Ordinal))
+            .FirstOrDefault(line => line.TrimStart().Contains("AllowedScopes:", StringComparison.Ordinal));
+        if (scopesLine is null)
+            throw new InvalidOperationException($"Could not locate allowed scopes for '{clientId}'.");
+
+        return scopesLine[(scopesLine.IndexOf("AllowedScopes:", StringComparison.Ordinal) + "AllowedScopes:".Length)..]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static string ExtractSection(string text, string startMarker, string endMarker)

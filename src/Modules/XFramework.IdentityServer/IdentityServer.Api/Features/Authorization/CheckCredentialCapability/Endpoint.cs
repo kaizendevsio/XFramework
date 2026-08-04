@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Authorization.CheckCredentialCapability;
 
 public static class CheckCredentialCapabilityEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<CredentialCapabilityCheckResponse>> Handle(
         CheckCredentialCapabilityRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -24,7 +27,7 @@ public static class CheckCredentialCapabilityEndpoint
         IIdentityAuthorizationService authorizationService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authorizationService.CheckCredentialCapabilityAsync(request, ct);
     }
 }

@@ -38,24 +38,20 @@ public interface ICommunicationsRequestContextResolver
 
 public sealed class CommunicationsRequestContextResolver : ICommunicationsRequestContextResolver
 {
-    private readonly IHttpContextAccessor httpContextAccessor;
     private readonly IConfiguration configuration;
-    private readonly IJwtService? jwtService;
     private readonly ITenantModuleFeatureService? featureService;
-    private readonly ITrustedServiceInvocationResolver? serviceInvocationResolver;
+    private readonly ITrustedInvocationContextAccessor? trustedInvocationContextAccessor;
 
     public CommunicationsRequestContextResolver(
         IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
         IJwtService? jwtService = null,
         ITenantModuleFeatureService? featureService = null,
-        ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
+        ITrustedInvocationContextAccessor? serviceInvocationResolver = null)
     {
-        this.httpContextAccessor = httpContextAccessor;
         this.configuration = configuration;
-        this.jwtService = jwtService;
+        trustedInvocationContextAccessor = serviceInvocationResolver;
         this.featureService = featureService;
-        this.serviceInvocationResolver = serviceInvocationResolver;
     }
 
     public async Task<Result<CommunicationsRequestContext>> ResolveAsync(
@@ -73,18 +69,13 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         RequestMetadata? metadata,
         CancellationToken ct = default)
     {
-        var httpContext = httpContextAccessor.HttpContext;
-        var user = httpContext?.User;
         var userContext = await ResolveUserContextAsync(metadata, enforceChatFeature: false, ct);
-        var trustedInvocation = await ResolveTrustedServerMetadataAsync(metadata, ct);
-        var isTrustedInternalRequest = trustedInvocation is not null;
-        var trustedServiceName = trustedInvocation?.CallerClientId;
-        var tenantId = ResolveTenantId(user)
-            ?? TryGetItemGuid(httpContext, "TenantId")
-            ?? (userContext.IsSuccess ? (Guid?)userContext.Data!.TenantId : null)
-            ?? (isTrustedInternalRequest ? metadata?.TenantId : null);
+        var invocation = trustedInvocationContextAccessor?.Current;
+        var isTrustedInternalRequest = invocation is { Actor: null, Service: not null };
+        var trustedServiceName = invocation?.Service?.ClientId;
+        var tenantId = invocation?.EffectiveTenantId;
 
-        if (metadata?.TenantId is { } suppliedTenantId &&
+        if (metadata?.RequestedTenantId is { } suppliedTenantId &&
             suppliedTenantId != Guid.Empty &&
             tenantId.HasValue &&
             suppliedTenantId != tenantId.Value)
@@ -92,20 +83,7 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
             return Result<CommunicationsTenantContext>.Forbidden("Request tenant does not match trusted tenant context");
         }
 
-        var credentialId = ResolveCredentialId(user)
-            ?? TryGetItemGuid(httpContext, "CredentialId")
-            ?? (userContext.IsSuccess ? (Guid?)userContext.Data!.CredentialId : null)
-            ?? (isTrustedInternalRequest ? metadata?.CredentialId : null);
-
-        if (metadata?.CredentialId is { } suppliedCredentialId &&
-            suppliedCredentialId != Guid.Empty &&
-            credentialId.HasValue &&
-            suppliedCredentialId != credentialId.Value &&
-            !IsAdmin(user) &&
-            !isTrustedInternalRequest)
-        {
-            return Result<CommunicationsTenantContext>.Forbidden("Request credential does not match trusted actor context");
-        }
+        var credentialId = invocation?.Actor?.CredentialId;
 
         if (tenantId is null || tenantId == Guid.Empty)
             return Result<CommunicationsTenantContext>.Unauthorized("Authenticated tenant could not be resolved");
@@ -123,7 +101,8 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
             tenantId.Value,
             credentialId is Guid id && id != Guid.Empty ? id : null,
             isTrustedInternalRequest,
-            IsAdmin(user),
+            invocation?.Actor?.Roles.Contains("Admin") == true ||
+            invocation?.Actor?.Roles.Contains("SuperAdmin") == true,
             trustedServiceName));
     }
 
@@ -168,61 +147,21 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
         return contextResult;
     }
 
-    private async Task<TrustedServiceInvocation?> ResolveTrustedServerMetadataAsync(
-        RequestMetadata? metadata,
-        CancellationToken ct)
-    {
-        if (serviceInvocationResolver is null)
-            return null;
-
-        var result = await serviceInvocationResolver.ResolveAsync(
-            metadata,
-            GetExpectedAudience(),
-            [XFrameworkServiceScopes.BoltService],
-            requireTenant: true,
-            ct: ct);
-
-        return result.IsSuccess ? result.Invocation : null;
-    }
-
-    private string GetExpectedAudience() =>
-        configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Communications;
-
     private async Task<Result<CommunicationsRequestContext>> ResolveUserContextAsync(
         RequestMetadata? metadata,
         bool enforceChatFeature,
         CancellationToken ct)
     {
-        var httpContext = httpContextAccessor.HttpContext;
-        var user = httpContext?.User;
-        var tenantId = ResolveTenantId(user) ?? TryGetItemGuid(httpContext, "TenantId");
-        var credentialId = ResolveCredentialId(user) ?? TryGetItemGuid(httpContext, "CredentialId");
+        var invocation = trustedInvocationContextAccessor?.Current;
+        var tenantId = invocation?.EffectiveTenantId;
+        var credentialId = invocation?.Actor?.CredentialId;
 
-        if ((tenantId is null || credentialId is null) &&
-            !string.IsNullOrWhiteSpace(metadata?.ActorAccessToken))
-        {
-            var tokenPrincipal = await DecodeActorTokenAsync(metadata.ActorAccessToken);
-            if (tokenPrincipal is not null)
-            {
-                tenantId ??= ResolveTenantId(tokenPrincipal);
-                credentialId ??= ResolveCredentialId(tokenPrincipal);
-            }
-        }
-
-        if (metadata?.TenantId is { } suppliedTenantId &&
+        if (metadata?.RequestedTenantId is { } suppliedTenantId &&
             suppliedTenantId != Guid.Empty &&
             tenantId.HasValue &&
             suppliedTenantId != tenantId.Value)
         {
             return Result<CommunicationsRequestContext>.Forbidden("Request tenant does not match authenticated actor context");
-        }
-
-        if (metadata?.CredentialId is { } suppliedCredentialId &&
-            suppliedCredentialId != Guid.Empty &&
-            credentialId.HasValue &&
-            suppliedCredentialId != credentialId.Value)
-        {
-            return Result<CommunicationsRequestContext>.Forbidden("Request credential does not match authenticated actor context");
         }
 
         if (tenantId is null || tenantId == Guid.Empty)
@@ -267,79 +206,6 @@ public sealed class CommunicationsRequestContextResolver : ICommunicationsReques
             return Result.Failure("Communications feature gate could not be evaluated", 503);
         }
     }
-
-    private async Task<ClaimsPrincipal?> DecodeActorTokenAsync(string token)
-    {
-        if (jwtService is null)
-            return null;
-
-        try
-        {
-            return (await jwtService.DecodeJwtToken(token)).Item1;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static Guid? ResolveCredentialId(ClaimsPrincipal? user)
-    {
-        if (user?.Identity?.IsAuthenticated != true)
-            return null;
-
-        return ParseClaim(
-            user,
-            "credential_id",
-            ClaimTypes.Name,
-            ClaimTypes.NameIdentifier,
-            "credentialId",
-            "CredentialId",
-            "sub");
-    }
-
-    private static Guid? ResolveTenantId(ClaimsPrincipal? user)
-    {
-        if (user?.Identity?.IsAuthenticated != true)
-            return null;
-
-        return ParseClaim(
-            user,
-            "tenant_id",
-            "tenantId",
-            "TenantId",
-            "tid",
-            "tenant");
-    }
-
-    private static Guid? ParseClaim(ClaimsPrincipal user, params string[] claimTypes)
-    {
-        foreach (var claimType in claimTypes)
-        {
-            var value = user.Claims.FirstOrDefault(c =>
-                string.Equals(c.Type, claimType, StringComparison.OrdinalIgnoreCase))?.Value;
-            if (Guid.TryParse(value, out var id))
-                return id;
-        }
-
-        return null;
-    }
-
-    private static Guid? TryGetItemGuid(HttpContext? context, string key)
-    {
-        if (context?.Items.TryGetValue(key, out var value) != true)
-            return null;
-
-        return value switch
-        {
-            Guid id => id,
-            string text when Guid.TryParse(text, out var id) => id,
-            _ => null
-        };
-    }
-
-    private static bool IsAdmin(ClaimsPrincipal? user) =>
-        user?.IsInRole("Admin") == true || user?.IsInRole("SuperAdmin") == true;
 
     private bool IsTrustedAdminService(string? serviceName)
     {

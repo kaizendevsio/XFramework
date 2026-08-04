@@ -119,6 +119,7 @@ services:
       Kestrel__Endpoints__Http__Url: http://0.0.0.0:8080
       ServiceIdentity__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET:?Set BOLT_HUB_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
+      ServiceIdentity__DefaultScopes__1: identity.session.validate
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
@@ -184,6 +185,7 @@ services:
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: storage.read
       ServiceIdentity__DefaultScopes__2: storage.write
+      ServiceIdentity__DefaultScopes__3: tenant.target
       DistributedSecurityRateLimiting__RedisConnectionString: ${IDENTITYSERVER_RATE_LIMIT_REDIS_CONNECTION:-redis:6379}
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${IDENTITYSERVER_SERVICE_IDENTITY_SECRET_SECONDARY:-}
@@ -200,7 +202,7 @@ services:
       ServiceIdentity__Clients__0__ValidationFallback__ClientSecret: ${IDENTITYSERVER_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__0__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__0__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__0__AllowedScopes: bolt.service,storage.read,storage.write
+      ServiceIdentity__Clients__0__AllowedScopes: bolt.service,storage.read,storage.write,tenant.target
       ServiceIdentity__Clients__1__ClientId: XFramework.Portal
       ServiceIdentity__Clients__1__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET:?Set PORTAL_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__1__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -208,7 +210,7 @@ services:
       ServiceIdentity__Clients__1__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__1__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__1__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__1__AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,identity.admin,identity.session.validate
+      ServiceIdentity__Clients__1__AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,tenant.target,identity.admin,identity.session.validate
       ServiceIdentity__Clients__2__ClientId: XFramework.Bolt.Hub
       ServiceIdentity__Clients__2__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET:?Set BOLT_HUB_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__2__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -216,7 +218,7 @@ services:
       ServiceIdentity__Clients__2__ValidationFallback__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__2__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__2__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__2__AllowedScopes: bolt.service
+      ServiceIdentity__Clients__2__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__3__ClientId: XFramework.Communications
       ServiceIdentity__Clients__3__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET:?Set COMMUNICATIONS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__3__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -224,7 +226,7 @@ services:
       ServiceIdentity__Clients__3__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__3__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__3__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__3__AllowedScopes: bolt.service,identity.session.validate
+      ServiceIdentity__Clients__3__AllowedScopes: bolt.service,identity.session.validate,notifications.send,storage.read,storage.write,tenant.target
       ServiceIdentity__Clients__4__ClientId: XFramework.Notifications
       ServiceIdentity__Clients__4__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET:?Set NOTIFICATIONS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__4__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -232,7 +234,7 @@ services:
       ServiceIdentity__Clients__4__ValidationFallback__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__4__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__4__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__4__AllowedScopes: bolt.service,identity.session.validate
+      ServiceIdentity__Clients__4__AllowedScopes: bolt.service,identity.session.validate,smsgateway.send,tenant.target
       ServiceIdentity__Clients__5__ClientId: XFramework.Storage
       ServiceIdentity__Clients__5__ClientSecret: ${STORAGE_SERVICE_IDENTITY_SECRET:?Set STORAGE_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__5__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -256,7 +258,7 @@ services:
       ServiceIdentity__Clients__7__ValidationFallback__ClientSecret: ${SMSGATEWAY_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__7__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__7__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__7__AllowedScopes: bolt.service
+      ServiceIdentity__Clients__7__AllowedScopes: bolt.service,smsgateway.agent,tenant.target
       ServiceIdentity__Clients__8__ClientId: XFramework.Wallets
       ServiceIdentity__Clients__8__ClientSecret: ${WALLETS_SERVICE_IDENTITY_SECRET:?Set WALLETS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__8__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -331,6 +333,8 @@ services:
       ServiceIdentity__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET:?Set COMMUNICATIONS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
+      ServiceIdentity__DefaultScopes__2: notifications.send
+      ServiceIdentity__DefaultScopes__3: tenant.target
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
@@ -363,6 +367,8 @@ services:
       ServiceIdentity__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET:?Set NOTIFICATIONS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
+      ServiceIdentity__DefaultScopes__2: smsgateway.send
+      ServiceIdentity__DefaultScopes__3: tenant.target
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${NOTIFICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
@@ -472,6 +478,8 @@ services:
       <<: *common-env
       ServiceIdentity__ClientSecret: ${SMSGATEWAY_SERVICE_IDENTITY_SECRET:?Set SMSGATEWAY_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
+      ServiceIdentity__DefaultScopes__1: tenant.target
+      ServiceIdentity__DefaultScopes__2: smsgateway.agent
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${SMSGATEWAY_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
@@ -606,6 +614,7 @@ services:
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.admin
       ServiceIdentity__DefaultScopes__2: identity.session.validate
+      ServiceIdentity__DefaultScopes__3: tenant.target
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}

@@ -21,8 +21,7 @@ public class WalletCrudTests : WalletsTestBase
         {
             CredentialId = credential.Id,
             WalletTypeId = WalletsTestFixture.TestWalletTypeId,
-            InitialBalance = 500m,
-            TenantId = WalletsTestFixture.TestTenantId
+            InitialBalance = 500m
         };
 
         var response = await HttpClient.PostAsJsonAsync("/api/wallets", request);
@@ -48,8 +47,7 @@ public class WalletCrudTests : WalletsTestBase
         {
             CredentialId = credential.Id,
             WalletTypeId = WalletsTestFixture.TestWalletTypeId,
-            InitialBalance = 0m,
-            TenantId = WalletsTestFixture.TestTenantId
+            InitialBalance = 0m
         };
 
         var response = await HttpClient.PostAsJsonAsync("/api/wallets", request);

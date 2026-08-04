@@ -1,0 +1,12 @@
+using XFramework.Core.Patterns;
+
+namespace XFramework.Core.Services.FeatureGates;
+
+public interface ITrustedInvocationFeatureGate
+{
+    Task<Result> EnsureAllowedAsync(
+        string route,
+        string httpMethod,
+        string? declaredCapability,
+        CancellationToken ct = default);
+}

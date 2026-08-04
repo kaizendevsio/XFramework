@@ -16,6 +16,8 @@ public static class TenantModuleFeatureExtensions
         services.AddMemoryCache();
         services.TryAddScoped<ITenantModuleFeatureService, TenantModuleFeatureService>();
         services.TryAddScoped<ITenantCredentialCapabilityService, TenantCredentialCapabilityService>();
+        services.TryAddSingleton(new TenantModuleFeatureGateOptions());
+        services.TryAddScoped<ITrustedInvocationFeatureGate, TrustedInvocationFeatureGate>();
 
         return services;
     }
@@ -29,7 +31,19 @@ public static class TenantModuleFeatureExtensions
         services.AddMemoryCache();
         services.TryAddScoped<ITenantModuleFeatureService, TenantModuleFeatureService>();
         services.TryAddScoped<ITenantCredentialCapabilityService, TenantCredentialCapabilityService>();
+        services.TryAddSingleton(new TenantModuleFeatureGateOptions());
+        services.TryAddScoped<ITrustedInvocationFeatureGate, TrustedInvocationFeatureGate>();
 
+        return services;
+    }
+
+    public static IServiceCollection ConfigureTenantModuleFeatureGate(
+        this IServiceCollection services,
+        Action<TenantModuleFeatureGateOptions> configure)
+    {
+        var options = new TenantModuleFeatureGateOptions();
+        configure(options);
+        services.Replace(ServiceDescriptor.Singleton(options));
         return services;
     }
 
@@ -37,9 +51,8 @@ public static class TenantModuleFeatureExtensions
         this IApplicationBuilder app,
         Action<TenantModuleFeatureGateOptions> configure)
     {
-        var options = new TenantModuleFeatureGateOptions();
+        var options = app.ApplicationServices.GetRequiredService<TenantModuleFeatureGateOptions>();
         configure(options);
-
-        return app.UseMiddleware<TenantModuleFeatureGateMiddleware>(options);
+        return app;
     }
 }

@@ -16,8 +16,7 @@ namespace XFramework.Core.DataContext;
 public sealed class QueryExecutionService(
     IServiceProvider serviceProvider,
     ILogger<QueryExecutionService> logger,
-    IConfiguration? configuration = null,
-    ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
+    ITrustedInvocationContextAccessor invocationContextAccessor)
     : IQueryExecutionService
 {
     public const int MaximumMutationBatchSize = 100;
@@ -26,6 +25,7 @@ public sealed class QueryExecutionService(
 
     private static readonly HashSet<string> ProtectedRemoteUpdateProperties =
     [
+        nameof(IHasId.Id),
         nameof(IHasTenantId.TenantId),
         nameof(IHasConcurrencyStamp.ConcurrencyStamp),
         "CreatedAt",
@@ -77,27 +77,25 @@ public sealed class QueryExecutionService(
             return SerializeError(descriptorError);
 
         var trustError = await ValidateTrustedDataContextAsync(
-            descriptor.Metadata,
-            descriptor.IgnoreQueryFilters
-                ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
-                : [XFrameworkServiceScopes.DataContextQuery],
+            RequiredScopes(
+                descriptor.IgnoreQueryFilters
+                    ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
+                    : [XFrameworkServiceScopes.DataContextQuery]),
             requireTenant: RequiresTenantMetadata(entityType),
             ct);
         if (trustError is not null)
             return SerializeError(trustError);
 
-        if (!HasRequiredQueryTenantMetadata(entityType, descriptor.Metadata))
-            return SerializeError($"Entity type '{descriptor.EntityTypeName}' requires tenant metadata for remote DataContext query.");
+        if (!HasRequiredQueryTenant(entityType))
+            return SerializeError($"Entity type '{descriptor.EntityTypeName}' requires a trusted tenant for remote DataContext query.");
 
         try
         {
-            using var scope = serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
+            var dbContext = serviceProvider.GetRequiredService<DbContext>();
 
             var capabilityError = await ValidateCredentialCapabilityAsync(
-                scope.ServiceProvider,
+                serviceProvider,
                 entityType,
-                descriptor.Metadata,
                 IdentityAuthorizationConstants.View,
                 ct);
             if (capabilityError is not null)
@@ -106,9 +104,8 @@ public sealed class QueryExecutionService(
             if (descriptor.IgnoreQueryFilters)
             {
                 var bypassCapabilityError = await ValidateCredentialCapabilityAsync(
-                    scope.ServiceProvider,
+                    serviceProvider,
                     entityType,
-                    descriptor.Metadata,
                     IdentityAuthorizationConstants.Manage,
                     ct);
                 if (bypassCapabilityError is not null)
@@ -116,14 +113,19 @@ public sealed class QueryExecutionService(
             }
 
             var featureError = await ValidateTargetFeatureAsync(
-                scope.ServiceProvider,
+                serviceProvider,
                 entityType,
-                descriptor.Metadata,
                 ct);
             if (featureError is not null)
                 return SerializeError(featureError);
 
-            var result = await QueryDescriptorExecutor.ExecuteAsync(dbContext, entityType, descriptor, ct);
+            var result = await QueryDescriptorExecutor.ExecuteAsync(
+                dbContext,
+                entityType,
+                descriptor,
+                invocationContextAccessor.Current?.EffectiveTenantId,
+                ct,
+                allowAllTenants: descriptor.IgnoreQueryFilters);
 
             // MemoryPackSerializer.Serialize(object?) uses the object formatter which fails
             // for runtime-typed results. Use the actual result type for correct serialization.
@@ -180,25 +182,23 @@ public sealed class QueryExecutionService(
             yield break;
 
         var trustError = await ValidateTrustedDataContextAsync(
-            descriptor.Metadata,
-            descriptor.IgnoreQueryFilters
-                ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
-                : [XFrameworkServiceScopes.DataContextQuery],
+            RequiredScopes(
+                descriptor.IgnoreQueryFilters
+                    ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
+                    : [XFrameworkServiceScopes.DataContextQuery]),
             requireTenant: RequiresTenantMetadata(entityType),
             ct);
         if (trustError is not null)
             yield break;
 
-        if (!HasRequiredQueryTenantMetadata(entityType, descriptor.Metadata))
+        if (!HasRequiredQueryTenant(entityType))
             yield break;
 
-        using var scope = serviceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
+        var dbContext = serviceProvider.GetRequiredService<DbContext>();
 
         var capabilityError = await ValidateCredentialCapabilityAsync(
-            scope.ServiceProvider,
+            serviceProvider,
             entityType,
-            descriptor.Metadata,
             IdentityAuthorizationConstants.View,
             ct);
         if (capabilityError is not null)
@@ -207,9 +207,8 @@ public sealed class QueryExecutionService(
         if (descriptor.IgnoreQueryFilters)
         {
             var bypassCapabilityError = await ValidateCredentialCapabilityAsync(
-                scope.ServiceProvider,
+                serviceProvider,
                 entityType,
-                descriptor.Metadata,
                 IdentityAuthorizationConstants.Manage,
                 ct);
             if (bypassCapabilityError is not null)
@@ -217,14 +216,19 @@ public sealed class QueryExecutionService(
         }
 
         var featureError = await ValidateTargetFeatureAsync(
-            scope.ServiceProvider,
+            serviceProvider,
             entityType,
-            descriptor.Metadata,
             ct);
         if (featureError is not null)
             yield break;
 
-        await foreach (var item in QueryDescriptorExecutor.ExecuteStreamAsync(dbContext, entityType, descriptor, ct))
+        await foreach (var item in QueryDescriptorExecutor.ExecuteStreamAsync(
+                           dbContext,
+                           entityType,
+                           descriptor,
+                           invocationContextAccessor.Current?.EffectiveTenantId,
+                           ct,
+                           allowAllTenants: descriptor.IgnoreQueryFilters))
         {
             yield return MemoryPack.MemoryPackSerializer.Serialize(item);
         }
@@ -263,8 +267,7 @@ public sealed class QueryExecutionService(
 
         try
         {
-            using var scope = serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
+            var dbContext = serviceProvider.GetRequiredService<DbContext>();
             var changedTenantModuleFeatures = new List<(Guid TenantId, string ModuleKey, string SubFeatureKey)>();
             var persistedEntities = new List<(string EntityTypeName, object Entity)>();
 
@@ -277,26 +280,23 @@ public sealed class QueryExecutionService(
                     return SerializeError($"Entity type '{change.EntityTypeName}' is not registered for remote mutation.");
 
                 var trustError = await ValidateTrustedDataContextAsync(
-                    request.Metadata,
-                    [XFrameworkServiceScopes.DataContextMutate],
+                    RequiredScopes([XFrameworkServiceScopes.DataContextMutate]),
                     requireTenant: RequiresTenantMetadata(entityType),
                     ct);
                 if (trustError is not null)
                     return SerializeError(trustError);
 
                 var capabilityError = await ValidateCredentialCapabilityAsync(
-                    scope.ServiceProvider,
+                    serviceProvider,
                     entityType,
-                    request.Metadata,
                     ResolveMutationCapability(change.Operation),
                     ct);
                 if (capabilityError is not null)
                     return SerializeError(capabilityError);
 
                 var featureError = await ValidateTargetFeatureAsync(
-                    scope.ServiceProvider,
+                    serviceProvider,
                     entityType,
-                    request.Metadata,
                     ct);
                 if (featureError is not null)
                     return SerializeError(featureError);
@@ -327,7 +327,7 @@ public sealed class QueryExecutionService(
                             existingEntry = dbContext.Entry(existing);
                         }
 
-                        if (!ValidateTenantMetadata(existing, request.Metadata, entityType, out var patchMetadataError))
+                        if (!ValidateTenantContext(existing, entityType, out var patchMetadataError))
                             return SerializeError(patchMetadataError);
 
                         if (existing is IHasConcurrencyStamp patchStamped)
@@ -358,7 +358,7 @@ public sealed class QueryExecutionService(
                         }
 
                         var patchValidationError = await ValidateRemoteMutationAsync(
-                            scope.ServiceProvider,
+                            serviceProvider,
                             entityType,
                             existing,
                             ct);
@@ -387,11 +387,62 @@ public sealed class QueryExecutionService(
                 if (entity is null)
                     return SerializeError($"Failed to deserialize entity of type '{change.EntityTypeName}'.");
 
-                if (!ValidateTenantMetadata(entity, request.Metadata, entityType, out var metadataError))
+                if (change.Operation == ChangeOperation.Remove)
+                {
+                    if (entity is not IHasId requestedEntity || requestedEntity.Id == Guid.Empty)
+                        return SerializeError($"Entity '{change.EntityTypeName}' requires a valid ID for remote deletion.");
+
+                    var persisted = await dbContext.FindAsync(entityType, [requestedEntity.Id], ct);
+                    if (persisted is null)
+                    {
+                        return SerializeError(
+                            $"Entity '{change.EntityTypeName}' with PK '{requestedEntity.Id}' not found.");
+                    }
+
+                    if (!ValidateTenantContext(persisted, entityType, out var persistedTenantError))
+                        return SerializeError(persistedTenantError);
+
+                    var removeValidationError = await ValidateRemoteMutationAsync(
+                        serviceProvider,
+                        entityType,
+                        persisted,
+                        ct);
+                    if (removeValidationError is not null)
+                        return SerializeError(removeValidationError);
+
+                    if (persisted is IHasConcurrencyStamp persistedStamp)
+                    {
+                        if (entity is not IHasConcurrencyStamp requestedStamp ||
+                            requestedStamp.ConcurrencyStamp == Guid.Empty)
+                        {
+                            return SerializeError(
+                                $"Entity '{change.EntityTypeName}' requires a concurrency stamp for remote mutation.");
+                        }
+
+                        dbContext.Entry(persisted)
+                            .Property(nameof(IHasConcurrencyStamp.ConcurrencyStamp))
+                            .OriginalValue = requestedStamp.ConcurrencyStamp;
+                    }
+
+                    dbContext.Remove(persisted);
+                    persistedEntities.Add((change.EntityTypeName, persisted));
+
+                    if (persisted is TenantModuleFeature removedFeature)
+                    {
+                        changedTenantModuleFeatures.Add((
+                            removedFeature.TenantId,
+                            removedFeature.ModuleKey,
+                            removedFeature.SubFeatureKey));
+                    }
+
+                    continue;
+                }
+
+                if (!ValidateTenantContext(entity, entityType, out var metadataError))
                     return SerializeError(metadataError);
 
                 var validationError = await ValidateRemoteMutationAsync(
-                    scope.ServiceProvider,
+                    serviceProvider,
                     entityType,
                     entity,
                     ct);
@@ -439,7 +490,7 @@ public sealed class QueryExecutionService(
             }
 
             await dbContext.SaveChangesAsync(ct);
-            InvalidateTenantModuleFeatureCache(scope.ServiceProvider, changedTenantModuleFeatures);
+            InvalidateTenantModuleFeatureCache(serviceProvider, changedTenantModuleFeatures);
 
             var persistedStates = persistedEntities.Select(static persisted =>
             {
@@ -463,7 +514,7 @@ public sealed class QueryExecutionService(
             logger.LogWarning(
                 ex,
                 "Remote DataContext concurrency conflict for tenant {TenantId}; change count {ChangeCount}; entity types {EntityTypes}",
-                request.Metadata?.TenantId,
+                invocationContextAccessor.Current?.EffectiveTenantId,
                 request.Changes.Count,
                 string.Join(", ", request.Changes.Select(static change => change.EntityTypeName).Distinct()));
             var result = DataContextResult.Failure(
@@ -476,7 +527,7 @@ public sealed class QueryExecutionService(
             logger.LogError(
                 ex,
                 "Remote DataContext mutation failed for tenant {TenantId}; change count {ChangeCount}; entity types {EntityTypes}",
-                request.Metadata?.TenantId,
+                invocationContextAccessor.Current?.EffectiveTenantId,
                 request.Changes.Count,
                 string.Join(", ", request.Changes.Select(static change => change.EntityTypeName).Distinct()));
             var result = DataContextResult.Failure(
@@ -488,7 +539,7 @@ public sealed class QueryExecutionService(
             logger.LogError(
                 ex,
                 "Remote DataContext mutation failed for tenant {TenantId}; change count {ChangeCount}; entity types {EntityTypes}",
-                request.Metadata?.TenantId,
+                invocationContextAccessor.Current?.EffectiveTenantId,
                 request.Changes.Count,
                 string.Join(", ", request.Changes.Select(static change => change.EntityTypeName).Distinct()));
             return MemoryPack.MemoryPackSerializer.Serialize(
@@ -496,112 +547,117 @@ public sealed class QueryExecutionService(
         }
     }
 
-    private static bool ValidateTenantMetadata(
+    private bool ValidateTenantContext(
         object entity,
-        RequestMetadata? metadata,
         Type entityType,
         out string error)
     {
         error = string.Empty;
 
-        if (entity is not IHasTenantId tenantEntity || IsControlPlaneTenantRecord(entityType))
+        if (entity is not IHasTenantId tenantEntity)
             return true;
 
-        if (metadata?.TenantId is not { } metadataTenantId || metadataTenantId == Guid.Empty)
+        if (invocationContextAccessor.Current?.EffectiveTenantId is not { } effectiveTenantId ||
+            effectiveTenantId == Guid.Empty)
         {
-            error = $"Entity '{entityType.Name}' requires tenant metadata for remote DataContext mutation.";
+            error = $"Entity '{entityType.Name}' requires a trusted tenant for remote DataContext mutation.";
+            return false;
+        }
+
+        if (entity is Tenant tenant)
+        {
+            if (tenant.Id == effectiveTenantId)
+                return true;
+
+            error = $"Entity '{entityType.Name}' Id does not match the trusted invocation tenant.";
             return false;
         }
 
         if (tenantEntity.TenantId == Guid.Empty)
         {
-            tenantEntity.TenantId = metadataTenantId;
+            tenantEntity.TenantId = effectiveTenantId;
             return true;
         }
 
-        if (tenantEntity.TenantId == metadataTenantId)
+        if (tenantEntity.TenantId == effectiveTenantId)
             return true;
 
-        error = $"Entity '{entityType.Name}' TenantId does not match request tenant metadata.";
+        error = $"Entity '{entityType.Name}' TenantId does not match the trusted invocation tenant.";
         return false;
     }
 
-    private static bool IsControlPlaneTenantRecord(Type entityType) =>
-        entityType == typeof(Tenant) ||
-        entityType == typeof(TenantModuleFeature);
-
-    private static bool HasRequiredQueryTenantMetadata(Type entityType, RequestMetadata? metadata) =>
+    private bool HasRequiredQueryTenant(Type entityType) =>
         !RequiresTenantMetadata(entityType) ||
-        metadata?.TenantId is { } tenantId && tenantId != Guid.Empty;
+        invocationContextAccessor.Current?.EffectiveTenantId is { } tenantId && tenantId != Guid.Empty;
 
     private static bool RequiresTenantMetadata(Type entityType) =>
-        typeof(IHasTenantId).IsAssignableFrom(entityType) &&
-        !IsControlPlaneTenantRecord(entityType);
+        typeof(IHasTenantId).IsAssignableFrom(entityType);
+
+    private IReadOnlyCollection<string> RequiredScopes(IReadOnlyCollection<string> operationScopes)
+    {
+        if (invocationContextAccessor.Current?.Actor is not null)
+            return operationScopes;
+
+        return operationScopes
+            .Append(XFrameworkServiceScopes.TenantTarget)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 
     private async Task<string?> ValidateTrustedDataContextAsync(
-        RequestMetadata? metadata,
         IReadOnlyCollection<string> scopes,
         bool requireTenant,
         CancellationToken ct)
     {
-        if (serviceInvocationResolver is null)
-            return null;
+        var context = invocationContextAccessor.Current;
+        if (context?.Service is null)
+            return "A trusted service identity is required for remote DataContext access.";
+        if (!XFrameworkServiceNames.All.Contains(context.Service.ClientId, StringComparer.OrdinalIgnoreCase))
+            return "The trusted service identity is not an allowed remote DataContext caller.";
+        if (requireTenant &&
+            (context.EffectiveTenantId is not { } tenantId || tenantId == Guid.Empty))
+            return "A trusted tenant is required for remote DataContext access.";
 
-        var expectedAudience = configuration?["BoltConfiguration:ClientName"];
-        if (string.IsNullOrWhiteSpace(expectedAudience))
-            return "BoltConfiguration:ClientName is required for remote DataContext trust validation.";
+        if (scopes.Contains(XFrameworkServiceScopes.DataContextQueryAllTenants, StringComparer.OrdinalIgnoreCase) &&
+            (context.Actor is null || !context.Actor.Capabilities.Contains("identity.tenants:manage")))
+        {
+            return "Query-filter bypass requires an authorized actor.";
+        }
 
-        var result = await serviceInvocationResolver.ResolveAsync(
-            metadata,
-            expectedAudience,
-            scopes,
-            requireTenant: requireTenant,
-            ct: ct);
-
-        return result.IsSuccess ? null : result.Error;
+        var missingScopes = scopes.Where(scope => !context.Service.Scopes.Contains(scope)).ToArray();
+        return missingScopes.Length == 0
+            ? null
+            : $"Trusted service identity is missing required scope(s): {string.Join(", ", missingScopes)}.";
     }
 
-    private static async Task<string?> ValidateCredentialCapabilityAsync(
+    private Task<string?> ValidateCredentialCapabilityAsync(
         IServiceProvider scopedServices,
         Type entityType,
-        RequestMetadata? metadata,
         string capabilityKey,
         CancellationToken ct)
     {
-        if (metadata?.CredentialId is not { } credentialId || credentialId == Guid.Empty)
-            return null;
+        var actor = invocationContextAccessor.Current?.Actor;
+        if (actor is null)
+            return Task.FromResult<string?>(null);
 
         var feature = ResolveIdentityFeature(entityType);
         if (feature is null)
-            return null;
+            return Task.FromResult<string?>(null);
 
-        var actorTenantId = metadata.ActorTenantId ?? metadata.TenantId;
-        if (actorTenantId is null || actorTenantId == Guid.Empty)
-            return "Credential capability validation requires an actor tenant context.";
-
-        var capabilityService = scopedServices.GetService<ITenantCredentialCapabilityService>();
-        if (capabilityService is null)
-            return "Credential capability validation is unavailable.";
-
-        var result = await capabilityService.EnsureAllowedAsync(
-            actorTenantId.Value,
-            credentialId,
-            feature.Value.ModuleKey,
-            feature.Value.SubFeatureKey,
-            capabilityKey,
-            ct);
-
-        return result.IsSuccess ? null : "Credential capability is not allowed for this operation.";
+        var trustedCapability =
+            $"{TenantModuleFeatureKeys.Combine(feature.Value.ModuleKey, feature.Value.SubFeatureKey)}:{capabilityKey}";
+        return Task.FromResult<string?>(actor.Capabilities.Contains(trustedCapability)
+            ? null
+            : "Credential capability is not allowed for this operation.");
     }
 
-    private static async Task<string?> ValidateTargetFeatureAsync(
+    private async Task<string?> ValidateTargetFeatureAsync(
         IServiceProvider scopedServices,
         Type entityType,
-        RequestMetadata? metadata,
         CancellationToken ct)
     {
         var feature = ResolveIdentityFeature(entityType);
-        if (feature is null || metadata?.TenantId is not { } targetTenantId || targetTenantId == Guid.Empty)
+        if (feature is null || invocationContextAccessor.Current?.EffectiveTenantId is not { } targetTenantId || targetTenantId == Guid.Empty)
             return null;
 
         var featureService = scopedServices.GetService<ITenantModuleFeatureService>();

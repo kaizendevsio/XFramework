@@ -422,13 +422,13 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("using System.Threading;");
         sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using FluentValidation;");
-        sb.AppendLine("using Microsoft.AspNetCore.Http;");
         sb.AppendLine("using Microsoft.EntityFrameworkCore;");
         sb.AppendLine("using Microsoft.Extensions.Logging;");
         sb.AppendLine("using Mapster;");
         sb.AppendLine("using XFramework.Core.Patterns;");
         sb.AppendLine("using XFramework.Core.Services;");
         sb.AppendLine("using XFramework.Domain.Shared.Contracts.Base;");
+        sb.AppendLine("using XFramework.Integration.Security;");
         sb.AppendLine();
 
         // Namespace
@@ -477,7 +477,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine($"        private readonly ILogger<{entityName}Service> _logger;");
         if (entity.HasTenantId)
         {
-            sb.AppendLine("        private readonly IHttpContextAccessor _httpContextAccessor;");
+            sb.AppendLine("        private readonly ITrustedInvocationContextAccessor _trustedInvocationContextAccessor;");
         }
         sb.AppendLine();
 
@@ -486,7 +486,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("            DbContext context,");
         if (entity.HasTenantId)
         {
-            sb.AppendLine("            IHttpContextAccessor httpContextAccessor,");
+            sb.AppendLine("            ITrustedInvocationContextAccessor trustedInvocationContextAccessor,");
             sb.AppendLine($"            IEnumerable<IValidator<{entityName}>> entityValidators,");
             sb.AppendLine($"            ILogger<{entityName}Service> logger)");
         }
@@ -500,7 +500,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("            _entityValidators = entityValidators;");
         if (entity.HasTenantId)
         {
-            sb.AppendLine("            _httpContextAccessor = httpContextAccessor;");
+            sb.AppendLine("            _trustedInvocationContextAccessor = trustedInvocationContextAccessor;");
         }
         sb.AppendLine("            _logger = logger;");
         sb.AppendLine("        }");
@@ -511,12 +511,8 @@ public class EntityServiceGenerator : IIncrementalGenerator
         {
             sb.AppendLine("        private Guid GetCurrentTenantId()");
             sb.AppendLine("        {");
-            sb.AppendLine("            var principal = _httpContextAccessor.HttpContext?.User;");
-            sb.AppendLine("            foreach (var claimName in new[] { \"tenant_id\", \"tenantId\", \"TenantId\", \"tid\", \"tenant\" })");
-            sb.AppendLine("            {");
-            sb.AppendLine("                if (Guid.TryParse(principal?.FindFirst(claimName)?.Value, out var tenantId) && tenantId != Guid.Empty)");
-            sb.AppendLine("                    return tenantId;");
-            sb.AppendLine("            }");
+            sb.AppendLine("            if (_trustedInvocationContextAccessor.Current?.EffectiveTenantId is { } tenantId && tenantId != Guid.Empty)");
+            sb.AppendLine("                return tenantId;");
             sb.AppendLine("            throw new UnauthorizedAccessException(\"No valid tenant context found\");");
             sb.AppendLine("        }");
             sb.AppendLine();

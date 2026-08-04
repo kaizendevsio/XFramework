@@ -375,12 +375,12 @@ public class AuthenticationTests : IntegrationTestBase
 
     private static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = IntegrationTestFixture.TestTenantId,
+        RequestedTenantId = IntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "IntegrationTest",
+        OperationName = "IntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 
     private async Task<IdentityCredential> SeedCredentialWithRole(string username, string password)

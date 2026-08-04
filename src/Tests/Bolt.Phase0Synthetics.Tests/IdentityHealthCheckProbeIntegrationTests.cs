@@ -51,9 +51,10 @@ public sealed class IdentityHealthCheckProbeIntegrationTests
                 nameof(HealthCheckRequest),
                 (payload, _) =>
                 {
-                    var request = MemoryPackSerializer.Deserialize<HealthCheckRequest>(payload.Span);
-                    actorAccessToken = request?.Metadata?.ActorAccessToken;
-                    serviceAccessToken = request?.Metadata?.ServiceAccessToken;
+                    var envelope = MemoryPackSerializer.Deserialize<BoltInvocationEnvelope>(payload.Span);
+                    var request = MemoryPackSerializer.Deserialize<HealthCheckRequest>(envelope!.Payload);
+                    actorAccessToken = envelope.ActorAccessToken;
+                    serviceAccessToken = envelope.ServiceAccessToken;
                     var response = new QueryResponse<HealthCheckResponse>
                     {
                         HttpStatusCode = HttpStatusCode.OK,
@@ -80,7 +81,7 @@ public sealed class IdentityHealthCheckProbeIntegrationTests
                 CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
 
             IdentityHealthCheckProbe.CommandName.Should().Be(nameof(HealthCheckRequest));
-            actorAccessToken.Should().Be("user-actor-test-token");
+            actorAccessToken.Should().BeNull();
             serviceAccessToken.Should().Be("portal-identity-service-test-token");
         }
         finally

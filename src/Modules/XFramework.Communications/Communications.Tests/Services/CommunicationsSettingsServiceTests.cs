@@ -139,7 +139,7 @@ public sealed class CommunicationsSettingsServiceTests
             new CommunicationsRequestContextResolver(
                 new HttpContextAccessor(),
                 TestConfiguration(),
-                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver()),
+                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver(tenantIds[0])),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())));
 
     private static GetCommunicationsSettingsRequest Request(Guid tenantId) => new()
@@ -169,9 +169,8 @@ public sealed class CommunicationsSettingsServiceTests
     {
         var metadata = new RequestMetadata
         {
-            TenantId = tenantId,
-            Name = "XFramework.Portal",
-            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidPortalToken
+            RequestedTenantId = tenantId,
+            OperationName = "CommunicationsSettings"
         };
         return metadata;
     }

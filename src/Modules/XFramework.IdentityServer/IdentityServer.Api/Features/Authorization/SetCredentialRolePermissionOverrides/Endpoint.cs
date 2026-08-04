@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Authorization.SetCredentialRolePermissionO
 
 public static class SetCredentialRolePermissionOverridesEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<CredentialRolePermissionOverridesResponse>> Handle(
         SetCredentialRolePermissionOverridesRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -24,7 +27,7 @@ public static class SetCredentialRolePermissionOverridesEndpoint
         IIdentityAuthorizationService authorizationService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authorizationService.SetCredentialRolePermissionOverridesAsync(request, ct);
     }
 }

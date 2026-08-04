@@ -29,17 +29,21 @@ public static class TestHelpers
             })
             .Build();
 
-        return new AppDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor(), config);
+        return new AppDbContext(
+            options,
+            new Microsoft.AspNetCore.Http.HttpContextAccessor(),
+            config,
+            new TestEffectiveTenantContextAccessor(TestConstants.TenantId));
     }
 
     public static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = TestConstants.TenantId,
+        RequestedTenantId = TestConstants.TenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "IntegrationTest",
+        OperationName = "IntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 
     /// <summary>

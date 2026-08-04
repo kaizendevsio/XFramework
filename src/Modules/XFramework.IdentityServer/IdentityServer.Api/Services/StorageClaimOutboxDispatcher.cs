@@ -38,22 +38,40 @@ public sealed class StorageClaimOutboxDispatcher(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<DbContext>();
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var id = await db.Set<StorageClaimOutboxMessage>()
+        var candidate = await db.Set<StorageClaimOutboxMessage>()
             .IgnoreQueryFilters()
             .Where(message => !message.IsDeleted && message.IsEnabled)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .Where(message => message.NextAttemptAt == null || message.NextAttemptAt <= now)
             .Where(message => message.LeaseExpiresAt == null || message.LeaseExpiresAt <= now)
             .OrderBy(message => message.CreatedAt)
-            .Select(message => (Guid?)message.Id)
+            .Select(message => new OutboxCandidate(message.Id, message.TenantId, message.RequestId))
             .FirstOrDefaultAsync(ct);
-        if (id is null)
+        if (candidate is null)
             return;
+
+        var contextInitializer = scope.ServiceProvider
+            .GetRequiredService<ITrustedServiceTargetContextInitializer>();
+        var authorization = await contextInitializer.EstablishAsync(
+            candidate.TenantId,
+            XFrameworkServiceNames.Storage,
+            [XFrameworkServiceScopes.StorageWrite],
+            XFrameworkServiceNames.IdentityServer,
+            candidate.RequestId,
+            ct);
+        if (!authorization.IsSuccess)
+        {
+            logger.LogWarning(
+                "Storage claim outbox candidate {OutboxMessageId} could not establish trusted tenant context: {Error}",
+                candidate.Id,
+                authorization.Error);
+            return;
+        }
 
         var leaseOwner = $"{Environment.MachineName}:{Guid.NewGuid():N}";
         var claimed = await db.Set<StorageClaimOutboxMessage>()
             .IgnoreQueryFilters()
-            .Where(message => message.Id == id)
+            .Where(message => message.Id == candidate.Id && message.TenantId == candidate.TenantId)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .Where(message => message.NextAttemptAt == null || message.NextAttemptAt <= now)
             .Where(message => message.LeaseExpiresAt == null || message.LeaseExpiresAt <= now)
@@ -69,7 +87,10 @@ public sealed class StorageClaimOutboxDispatcher(
         var message = await db.Set<StorageClaimOutboxMessage>()
             .IgnoreQueryFilters()
             .AsTracking()
-            .SingleAsync(item => item.Id == id && item.LeaseOwner == leaseOwner, ct);
+            .SingleAsync(item =>
+                item.Id == candidate.Id &&
+                item.TenantId == candidate.TenantId &&
+                item.LeaseOwner == leaseOwner, ct);
         try
         {
             var wrapper = scope.ServiceProvider.GetRequiredService<IStorageServiceWrapper>();
@@ -78,7 +99,7 @@ public sealed class StorageClaimOutboxDispatcher(
                 StorageFileId = message.StorageFileId,
                 Metadata = new RequestMetadata
                 {
-                    TenantId = message.TenantId,
+                    RequestedTenantId = authorization.Context!.EffectiveTenantId,
                     RequestId = message.RequestId
                 }
             }, ct);
@@ -126,4 +147,6 @@ public sealed class StorageClaimOutboxDispatcher(
         message.NextAttemptAt = now.Add(
             TimeSpan.FromSeconds(Math.Min(300, Math.Pow(2, Math.Clamp(message.Attempts, 1, 8)) * 5)));
     }
+
+    private sealed record OutboxCandidate(Guid Id, Guid TenantId, Guid RequestId);
 }

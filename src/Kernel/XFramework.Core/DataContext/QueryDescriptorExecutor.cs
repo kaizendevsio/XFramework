@@ -24,34 +24,44 @@ public static class QueryDescriptorExecutor
         DbContext dbContext,
         Type entityType,
         QueryDescriptor descriptor,
-        CancellationToken ct = default)
+        Guid? trustedTenantId,
+        CancellationToken ct = default,
+        bool allowAllTenants = false)
     {
         var method = typeof(QueryDescriptorExecutor)
             .GetMethod(nameof(ExecuteTypedAsync), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(entityType);
 
-        return await (Task<object?>)method.Invoke(null, [dbContext, descriptor, ct])!;
+        return await (Task<object?>)method.Invoke(
+            null,
+            [dbContext, descriptor, trustedTenantId, ct, allowAllTenants])!;
     }
 
     public static IAsyncEnumerable<object> ExecuteStreamAsync(
         DbContext dbContext,
         Type entityType,
         QueryDescriptor descriptor,
-        CancellationToken ct = default)
+        Guid? trustedTenantId,
+        CancellationToken ct = default,
+        bool allowAllTenants = false)
     {
         var method = typeof(QueryDescriptorExecutor)
             .GetMethod(nameof(ExecuteStreamTypedAsync), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(entityType);
 
-        return (IAsyncEnumerable<object>)method.Invoke(null, [dbContext, descriptor, ct])!;
+        return (IAsyncEnumerable<object>)method.Invoke(
+            null,
+            [dbContext, descriptor, trustedTenantId, ct, allowAllTenants])!;
     }
 
     private static async Task<object?> ExecuteTypedAsync<T>(
         DbContext dbContext,
         QueryDescriptor descriptor,
-        CancellationToken ct) where T : class
+        Guid? trustedTenantId,
+        CancellationToken ct,
+        bool allowAllTenants) where T : class
     {
-        var queryable = BuildQueryable<T>(dbContext, descriptor);
+        var queryable = BuildQueryable<T>(dbContext, descriptor, trustedTenantId, allowAllTenants);
 
         return descriptor.Mode switch
         {
@@ -77,9 +87,11 @@ public static class QueryDescriptorExecutor
     private static async IAsyncEnumerable<object> ExecuteStreamTypedAsync<T>(
         DbContext dbContext,
         QueryDescriptor descriptor,
-        [EnumeratorCancellation] CancellationToken ct) where T : class
+        Guid? trustedTenantId,
+        [EnumeratorCancellation] CancellationToken ct,
+        bool allowAllTenants) where T : class
     {
-        var queryable = BuildQueryable<T>(dbContext, descriptor);
+        var queryable = BuildQueryable<T>(dbContext, descriptor, trustedTenantId, allowAllTenants);
 
         await foreach (var item in queryable.AsAsyncEnumerable().WithCancellation(ct))
         {
@@ -87,13 +99,15 @@ public static class QueryDescriptorExecutor
         }
     }
 
-    private static IQueryable<T> BuildQueryable<T>(DbContext dbContext, QueryDescriptor descriptor) where T : class
+    private static IQueryable<T> BuildQueryable<T>(
+        DbContext dbContext,
+        QueryDescriptor descriptor,
+        Guid? trustedTenantId,
+        bool allowAllTenants) where T : class
     {
         IQueryable<T> queryable = dbContext.Set<T>().AsNoTracking();
 
-        var isTenantOwned = typeof(IHasTenantId).IsAssignableFrom(typeof(T)) &&
-                            typeof(T) != typeof(Tenant) &&
-                            typeof(T) != typeof(TenantModuleFeature);
+        var isTenantOwned = typeof(IHasTenantId).IsAssignableFrom(typeof(T));
         if (isTenantOwned)
         {
             // The service's configured tenant is not the caller's tenant boundary.
@@ -107,7 +121,7 @@ public static class QueryDescriptorExecutor
             queryable = queryable.IgnoreQueryFilters();
         }
 
-        queryable = ApplyRequestTenantBoundary(queryable, descriptor);
+        queryable = ApplyTrustedTenantBoundary(queryable, trustedTenantId, allowAllTenants);
 
         // Apply filters
         if (descriptor.Filters.Count > 0)
@@ -217,22 +231,26 @@ public static class QueryDescriptorExecutor
         return queryable.Where(predicate);
     }
 
-    private static IQueryable<T> ApplyRequestTenantBoundary<T>(
+    private static IQueryable<T> ApplyTrustedTenantBoundary<T>(
         IQueryable<T> queryable,
-        QueryDescriptor descriptor) where T : class
+        Guid? trustedTenantId,
+        bool allowAllTenants) where T : class
     {
-        if (!typeof(IHasTenantId).IsAssignableFrom(typeof(T)) ||
-            typeof(T) == typeof(Tenant) ||
-            typeof(T) == typeof(TenantModuleFeature))
+        if (!typeof(IHasTenantId).IsAssignableFrom(typeof(T)))
         {
             return queryable;
         }
 
-        if (descriptor.Metadata?.TenantId is not { } tenantId || tenantId == Guid.Empty)
-            throw new InvalidOperationException("Tenant metadata is required for tenant-owned remote queries.");
+        if (allowAllTenants)
+            return queryable;
+
+        if (trustedTenantId is not { } tenantId || tenantId == Guid.Empty)
+            throw new InvalidOperationException("A trusted tenant is required for tenant-owned remote queries.");
 
         var parameter = Expression.Parameter(typeof(T), "entity");
-        var tenantProperty = Expression.Property(parameter, nameof(IHasTenantId.TenantId));
+        var tenantProperty = typeof(T) == typeof(Tenant)
+            ? Expression.Property(parameter, nameof(IHasId.Id))
+            : Expression.Property(parameter, nameof(IHasTenantId.TenantId));
         Expression tenantBoundary = Expression.Equal(tenantProperty, Expression.Constant(tenantId));
         if (typeof(IAllowsGlobalTenantRows).IsAssignableFrom(typeof(T)))
         {

@@ -1,12 +1,16 @@
 using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.Auth.Refresh;
 
 public static class RefreshTokenEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.Optional,
+        TenantAccessMode = TenantAccessMode.PublicTenantLookup,
+        AllowAnonymous = true)]
     [MapPost("/api/auth/refresh", Tags = ["Auth"],
         Summary = "Refresh an access token",
         Description = "Validates the refresh token against stored session data, generates a new token pair, and updates the session.",

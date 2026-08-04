@@ -1579,7 +1579,7 @@ else
                 BirthDate = DateOnly.TryParse(_editBirthDate, out var d) ? d : null,
                 Gender = Enum.TryParse<Gender>(_editGender, out var g) ? g : null,
                 CivilStatus = Enum.TryParse<CivilStatus>(_editCivilStatus, out var cs) ? cs : null,
-                Metadata = new RequestMetadata { TenantId = _user.TenantId }
+                Metadata = new RequestMetadata { RequestedTenantId = _user.TenantId }
             });
 
             if (result.IsSuccess)
@@ -2472,11 +2472,11 @@ else
 
     private static RequestMetadata CreateMetadata(Guid? tenantId) => new()
     {
-        TenantId = tenantId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal",
+        OperationName = "Portal",
         DeviceName = "Portal",
-        DeviceAgent = "Portal",
+        UserAgent = "Portal",
         IpAddress = "Portal"
     };
 

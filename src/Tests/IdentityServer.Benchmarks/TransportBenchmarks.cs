@@ -50,6 +50,7 @@ public class TransportBenchmarks
     private Task? _testClientTask;
     private HttpClient _httpClient = null!;
     private IIdentityServerServiceWrapper _serviceWrapper = null!;
+    private IServiceScope _testClientScope = null!;
 
     // Thin protocol
     private BoltClient _thinServiceClient = null!;
@@ -127,17 +128,17 @@ public class TransportBenchmarks
 
         // 8. Create reusable objects
         _httpClient = new HttpClient { BaseAddress = new Uri(IdentityServerUrl) };
-        _serviceWrapper = _testClientApp.Services.GetRequiredService<IIdentityServerServiceWrapper>();
+        _testClientScope = _testClientApp.Services.CreateScope();
+        _serviceWrapper = _testClientScope.ServiceProvider.GetRequiredService<IIdentityServerServiceWrapper>();
         _request = new HealthCheckRequest
         {
             Metadata = new RequestMetadata
             {
-                TenantId = TestTenantId,
                 RequestId = Guid.NewGuid(),
                 IpAddress = "127.0.0.1",
-                Name = "Benchmark",
+                OperationName = "Benchmark",
                 DeviceName = "BenchDevice",
-                DeviceAgent = "BenchAgent"
+                UserAgent = "BenchAgent"
             }
         };
 
@@ -149,9 +150,9 @@ public class TransportBenchmarks
             {
                 Metadata = new RequestMetadata
                 {
-                    TenantId = TestTenantId, RequestId = Guid.NewGuid(),
-                    IpAddress = "127.0.0.1", Name = "Benchmark",
-                    DeviceName = "BenchDevice", DeviceAgent = "BenchAgent"
+                    RequestId = Guid.NewGuid(),
+                    IpAddress = "127.0.0.1", OperationName = "Benchmark",
+                    DeviceName = "BenchDevice", UserAgent = "BenchAgent"
                 }
             });
         }
@@ -276,6 +277,7 @@ public class TransportBenchmarks
     [GlobalCleanup]
     public async Task Cleanup()
     {
+        _testClientScope?.Dispose();
         _httpClient?.Dispose();
         _grpcChannel?.Dispose();
         try { await _grpcHubApp.StopAsync(); } catch { }
@@ -303,12 +305,11 @@ public class TransportBenchmarks
         {
             Metadata = new RequestMetadata
             {
-                TenantId = TestTenantId,
                 RequestId = Guid.NewGuid(),
                 IpAddress = "127.0.0.1",
-                Name = "Benchmark",
+                OperationName = "Benchmark",
                 DeviceName = "BenchDevice",
-                DeviceAgent = "BenchAgent"
+                UserAgent = "BenchAgent"
             }
         };
         var response = await _serviceWrapper.HealthCheck(req);
@@ -337,12 +338,11 @@ public class TransportBenchmarks
         {
             Metadata = new RequestMetadata
             {
-                TenantId = TestTenantId,
                 RequestId = Guid.NewGuid(),
                 IpAddress = "127.0.0.1",
-                Name = "Benchmark",
+                OperationName = "Benchmark",
                 DeviceName = "BenchDevice",
-                DeviceAgent = "BenchAgent"
+                UserAgent = "BenchAgent"
             }
         };
 

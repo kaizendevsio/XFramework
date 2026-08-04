@@ -5,10 +5,14 @@ using Attendance.Domain.Shared.Contracts.Responses;
 using Attendance.Domain.Shared.Enums;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Security;
 
 namespace Attendance.Api.Services;
 
-public sealed class AttendanceService(AppDbContext db, ILogger<AttendanceService> logger)
+public sealed class AttendanceService(
+    AppDbContext db,
+    ILogger<AttendanceService> logger,
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor)
 {
     private const int DefaultGracePeriodMinutes = 5;
     private const int DefaultEarlyCheckoutGraceMinutes = 0;
@@ -410,7 +414,7 @@ public sealed class AttendanceService(AppDbContext db, ILogger<AttendanceService
             EventType = request.EventType,
             Source = request.Source,
             OccurredAt = occurredAt,
-            RecordedByCredentialId = request.RecordedByCredentialId ?? request.Metadata.CredentialId,
+            RecordedByCredentialId = request.RecordedByCredentialId ?? trustedInvocationContextAccessor.Current?.Actor?.CredentialId,
             IdempotencyKey = request.IdempotencyKey.Trim(),
             SourceReference = NormalizeOptional(request.SourceReference),
             Notes = NormalizeOptional(request.Notes),
@@ -791,9 +795,16 @@ public sealed class AttendanceService(AppDbContext db, ILogger<AttendanceService
         return AttendanceRecordStatus.Present;
     }
 
-    private static bool TryResolveTenantId(Guid? requestTenantId, RequestMetadata metadata, out Guid tenantId)
+    private bool TryResolveTenantId(Guid? requestTenantId, RequestMetadata metadata, out Guid tenantId)
     {
-        tenantId = requestTenantId ?? metadata.TenantId ?? Guid.Empty;
+        tenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId ?? Guid.Empty;
+        if (requestTenantId is { } suppliedTenantId &&
+            suppliedTenantId != Guid.Empty &&
+            suppliedTenantId != tenantId)
+        {
+            return false;
+        }
+
         return tenantId != Guid.Empty;
     }
 

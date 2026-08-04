@@ -112,10 +112,6 @@ public interface IAuthService
         LogoutRequest request,
         CancellationToken ct = default);
 
-    Task<Result<ValidateIdentitySessionResponse>> ValidateIdentitySessionAsync(
-        ValidateIdentitySessionRequest request,
-        CancellationToken ct = default);
-
     /// <summary>
     /// Refreshes an expired access token using a valid refresh token.
     /// Validates the refresh token against stored session data,

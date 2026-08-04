@@ -104,7 +104,7 @@ public class VerificationTests : IntegrationTestBase
 
         var response = await HttpClient.PatchAsJsonAsync(
             $"/api/verifications/{verificationId}/confirm",
-            new { token });
+            new { token, tenantId = IntegrationTestFixture.TestTenantId });
 
         response.StatusCode.Should().Be(
             HttpStatusCode.OK,
@@ -132,7 +132,7 @@ public class VerificationTests : IntegrationTestBase
         var verificationId = await SeedPendingVerification(credential.Id, "valid-token");
         var response = await HttpClient.PatchAsJsonAsync(
             $"/api/verifications/{verificationId}/confirm",
-            new { token = "invalid_token_999" });
+            new { token = "invalid_token_999", tenantId = IntegrationTestFixture.TestTenantId });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
@@ -143,7 +143,7 @@ public class VerificationTests : IntegrationTestBase
     {
         var response = await HttpClient.PatchAsJsonAsync(
             $"/api/verifications/{Guid.NewGuid()}/confirm",
-            new { token = "" });
+            new { token = "", tenantId = IntegrationTestFixture.TestTenantId });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
@@ -164,13 +164,17 @@ public class VerificationTests : IntegrationTestBase
         {
             var invalid = await HttpClient.PatchAsJsonAsync(
                 $"/api/verifications/{verificationId}/confirm",
-                new { token = $"invalid_{attempt}_{Guid.NewGuid():N}" });
+                new
+                {
+                    token = $"invalid_{attempt}_{Guid.NewGuid():N}",
+                    tenantId = IntegrationTestFixture.TestTenantId
+                });
             invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
         var validAfterLimit = await HttpClient.PatchAsJsonAsync(
             $"/api/verifications/{verificationId}/confirm",
-            new { token = validToken });
+            new { token = validToken, tenantId = IntegrationTestFixture.TestTenantId });
         validAfterLimit.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
         await using var db = CreateDbContext();
@@ -196,7 +200,11 @@ public class VerificationTests : IntegrationTestBase
                 await start.Task;
                 return await HttpClient.PatchAsJsonAsync(
                     $"/api/verifications/{verificationId}/confirm",
-                    new { token = $"invalid_{attempt}_{Guid.NewGuid():N}" });
+                    new
+                    {
+                        token = $"invalid_{attempt}_{Guid.NewGuid():N}",
+                        tenantId = IntegrationTestFixture.TestTenantId
+                    });
             })
             .ToArray();
 
@@ -226,7 +234,7 @@ public class VerificationTests : IntegrationTestBase
 
         var response = await HttpClient.PatchAsJsonAsync(
             $"/api/verifications/{verificationId}/confirm",
-            new { token });
+            new { token, tenantId = IntegrationTestFixture.TestTenantId });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
@@ -252,7 +260,7 @@ public class VerificationTests : IntegrationTestBase
             {
                 CredentialId = credential.Id,
                 VerificationTypeId = verificationType.Id,
-                Metadata = CreateMetadata()
+                Metadata = CreateMetadata(targetTenant: true)
             });
 
         response.StatusCode.Should().Be(
@@ -278,7 +286,7 @@ public class VerificationTests : IntegrationTestBase
         {
             CredentialId = credential.Id,
             VerificationTypeId = verificationType.Id,
-            Metadata = CreateMetadata()
+            Metadata = CreateMetadata(targetTenant: true)
         });
 
         result.Should().NotBeNull();
@@ -295,7 +303,7 @@ public class VerificationTests : IntegrationTestBase
         {
             CredentialId = credential.Id,
             VerificationTypeId = verificationType.Id,
-            Metadata = CreateMetadata()
+            Metadata = CreateMetadata(targetTenant: true)
         });
 
         result.HttpStatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -305,14 +313,14 @@ public class VerificationTests : IntegrationTestBase
 
     #region Helpers
 
-    private static RequestMetadata CreateMetadata() => new()
+    private static RequestMetadata CreateMetadata(bool targetTenant = false) => new()
     {
-        TenantId = IntegrationTestFixture.TestTenantId,
+        RequestedTenantId = targetTenant ? IntegrationTestFixture.TestTenantId : null,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "IntegrationTest",
+        OperationName = "IntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 
     private async Task<IdentityCredential> SeedCredentialOnly()

@@ -201,11 +201,15 @@ public sealed class WorkflowCompensationTests : IntegrationTestBase
     {
         var credential = await SeedCredentialAsync();
         IdentityServerWorkflowFailureInjection.StorageFailurePoint = TestStorageFailurePoint.CancelUploadPart;
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+        using var cancellation = new CancellationTokenSource();
 
-        var action = async () => await IntegrationTestFixture.ServiceWrapper.UploadCredentialAvatar(
+        var upload = IntegrationTestFixture.ServiceWrapper.UploadCredentialAvatar(
             CreateAvatarRequest(credential.Id),
             cancellation.Token);
+        await IdentityServerWorkflowFailureInjection.CancelUploadPartReached.WaitAsync(
+            TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+        var action = async () => await upload;
 
         await action.Should().ThrowAsync<OperationCanceledException>();
         (await WaitForAbortCountAsync()).Should().Be(1);
@@ -216,7 +220,7 @@ public sealed class WorkflowCompensationTests : IntegrationTestBase
     {
         var (credential, email) = await SeedCredentialWithEmailAsync();
         IdentityServerWorkflowFailureInjection.FailCommunicationsDelivery = true;
-        var metadata = CreateMetadata();
+        var metadata = CreateMetadata(targetTenant: true);
 
         var result = await IntegrationTestFixture.ServiceWrapper.ForgotPassword(
             new ForgotPasswordRequest { Email = email, Metadata = metadata });
@@ -262,7 +266,7 @@ public sealed class WorkflowCompensationTests : IntegrationTestBase
                 Email = $"missing-{Guid.NewGuid():N}@example.test",
                 Metadata = new RequestMetadata
                 {
-                    TenantId = IntegrationTestFixture.TestTenantId,
+                    RequestedTenantId = IntegrationTestFixture.TestTenantId,
                     RequestId = requestId,
                     IpAddress = "127.0.0.1"
                 }
@@ -303,7 +307,7 @@ public sealed class WorkflowCompensationTests : IntegrationTestBase
             Email = $"missing-{Guid.NewGuid():N}@example.test",
             Metadata = new RequestMetadata
             {
-                TenantId = IntegrationTestFixture.TestTenantId,
+                RequestedTenantId = IntegrationTestFixture.TestTenantId,
                 RequestId = requestId,
                 IpAddress = "127.0.0.1"
             }
@@ -321,7 +325,7 @@ public sealed class WorkflowCompensationTests : IntegrationTestBase
     {
         var (credential, email) = await SeedCredentialWithEmailAsync();
         IdentityServerWorkflowFailureInjection.RejectNextCommunicationsDeliveries(1);
-        var metadata = CreateMetadata();
+        var metadata = CreateMetadata(targetTenant: true);
 
         var result = await IntegrationTestFixture.ServiceWrapper.ForgotPassword(
             new ForgotPasswordRequest { Email = email, Metadata = metadata });
@@ -432,7 +436,7 @@ public sealed class WorkflowCompensationTests : IntegrationTestBase
             Email = email,
             Metadata = new RequestMetadata
             {
-                TenantId = IntegrationTestFixture.TestTenantId,
+                RequestedTenantId = IntegrationTestFixture.TestTenantId,
                 RequestId = requestId,
                 IpAddress = "127.0.0.1"
             }
@@ -668,13 +672,13 @@ public sealed class WorkflowCompensationTests : IntegrationTestBase
         Metadata = CreateMetadata()
     };
 
-    private static RequestMetadata CreateMetadata() => new()
+    private static RequestMetadata CreateMetadata(bool targetTenant = false) => new()
     {
-        TenantId = IntegrationTestFixture.TestTenantId,
+        RequestedTenantId = targetTenant ? IntegrationTestFixture.TestTenantId : null,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = nameof(WorkflowCompensationTests),
+        OperationName = nameof(WorkflowCompensationTests),
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 }

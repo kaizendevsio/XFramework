@@ -31,11 +31,11 @@ public abstract class StorageIntegrationTestBase
 
     protected static RequestMetadata CreateMetadata(Guid? tenantId = null) => new()
     {
-        TenantId = tenantId ?? StorageIntegrationTestFixture.TestTenantId,
+        RequestedTenantId = tenantId ?? StorageIntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "StorageIntegrationTest",
+        OperationName = "StorageIntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 }

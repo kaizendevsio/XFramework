@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Credentials.Avatar.Remove;
 
 public static class RemoveCredentialAvatarEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<CredentialAvatarResponse>> Handle(
         RemoveCredentialAvatarRequest request,
         IAuthService authService,
@@ -24,7 +27,7 @@ public static class RemoveCredentialAvatarEndpoint
         IAuthService authService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authService.RemoveCredentialAvatarAsync(request, ct);
     }
 }

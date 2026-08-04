@@ -64,15 +64,16 @@ public class BoltDriverIntegrationTests
 
         target.RegisterHandler(nameof(BoltDriverTestRequest), (payload, _) =>
         {
-            var request = MemoryPackSerializer.Deserialize<BoltDriverTestRequest>(payload.Span);
+            var envelope = MemoryPackSerializer.Deserialize<BoltInvocationEnvelope>(payload.Span);
+            var request = MemoryPackSerializer.Deserialize<BoltDriverTestRequest>(envelope!.Payload);
             request.Should().NotBeNull();
-            request!.Metadata!.ServiceAccessToken.Should().Be("service-token");
+            envelope.ServiceAccessToken.Should().Be("service-token");
 
             var response = new QueryResponse<BoltDriverTestResponse>
             {
                 HttpStatusCode = HttpStatusCode.OK,
                 Message = "OK",
-                Response = new BoltDriverTestResponse { Text = request.Text }
+                Response = new BoltDriverTestResponse { Text = request!.Text }
             };
             return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(response)));
         });
@@ -120,6 +121,81 @@ public class BoltDriverIntegrationTests
         received.Should().ContainSingle();
         received.TryPeek(out var message).Should().BeTrue();
         message!.Id.Should().Be(1);
+    }
+
+    [Test]
+    public async Task Dispose_CancelsTransientSubscriptionAndWaitsForActiveHandler()
+    {
+        await using var subscriber = CreateClient("driver-transient-dispose", "DriverTransientDispose");
+        await using var publisher = CreateClient("driver-transient-publisher", "DriverTransientPublisher");
+        var driver = CreateDriver(subscriber, new RecordingServiceTokenProvider());
+        var topic = $"driver.transient.dispose.{Guid.NewGuid():N}";
+        var handlerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = 0;
+
+        await subscriber.ConnectAsync();
+        await publisher.ConnectAsync();
+        await driver.SubscribeAsync<TestPubSubMessage>(topic, async _ =>
+        {
+            Interlocked.Increment(ref received);
+            handlerStarted.TrySetResult();
+            await releaseHandler.Task;
+        });
+        await Task.Delay(300);
+
+        await publisher.PublishAsync(topic, new TestPubSubMessage(1, "before"));
+        await handlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var disposeTask = Task.Run(driver.Dispose);
+        await Task.Delay(100);
+        disposeTask.IsCompleted.Should().BeFalse(
+            "the scoped driver must not be released while its handler still uses scoped dependencies");
+
+        releaseHandler.TrySetResult();
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await publisher.PublishAsync(topic, new TestPubSubMessage(2, "after"));
+        await Task.Delay(300);
+
+        received.Should().Be(1);
+    }
+
+    [Test]
+    public async Task Dispose_CancelsDurableSubscriptionAndWaitsForActiveHandler()
+    {
+        await using var subscriber = CreateClient("driver-durable-dispose", "DriverDurableDispose");
+        await using var publisher = CreateClient("driver-durable-publisher", "DriverDurablePublisher");
+        var driver = CreateDriver(subscriber, new RecordingServiceTokenProvider());
+        var topic = $"driver.durable.dispose.{Guid.NewGuid():N}";
+        var subscriberId = $"driver-durable-{Guid.NewGuid():N}";
+        var handlerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = 0;
+
+        await subscriber.ConnectAsync();
+        await publisher.ConnectAsync();
+        await driver.SubscribeDurableAsync<TestPubSubMessage>(topic, subscriberId, async _ =>
+        {
+            Interlocked.Increment(ref received);
+            handlerStarted.TrySetResult();
+            await releaseHandler.Task;
+        });
+        await Task.Delay(300);
+
+        await publisher.PublishAsync(topic, new TestPubSubMessage(1, "before"), durable: true);
+        await handlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var disposeTask = Task.Run(driver.Dispose);
+        await Task.Delay(100);
+        disposeTask.IsCompleted.Should().BeFalse(
+            "the scoped driver must not be released while its durable handler still uses scoped dependencies");
+
+        releaseHandler.TrySetResult();
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await publisher.PublishAsync(topic, new TestPubSubMessage(2, "after"), durable: true);
+        await Task.Delay(300);
+
+        received.Should().Be(1);
     }
 
     [Test]
@@ -203,6 +279,7 @@ public class BoltDriverIntegrationTests
                 ClientGuid = Guid.NewGuid()
             }),
             tokenProvider,
+            new NullActorAccessTokenProvider(),
             NullLogger<BoltDriver>.Instance);
 
     private static int GetActiveStreamCount(BoltClient client)
@@ -237,6 +314,12 @@ public class BoltDriverIntegrationTests
             Audiences.Enqueue(audience);
             return ValueTask.FromResult("service-token");
         }
+    }
+
+    private sealed class NullActorAccessTokenProvider : IActorAccessTokenProvider
+    {
+        public ValueTask<string?> GetTokenAsync(CancellationToken ct = default) =>
+            ValueTask.FromResult<string?>(null);
     }
 }
 

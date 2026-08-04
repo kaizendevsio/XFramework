@@ -1,13 +1,19 @@
 using FluentValidation;
 using IdentityServer.Api.Features.Authorization.Shared;
 using IdentityServer.Domain.Shared.Contracts.Responses;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.Verification.Check;
 
 public static class CheckVerificationEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.Optional,
+        TenantAccessMode = TenantAccessMode.ServiceTargetTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentitySessionValidate, XFrameworkServiceScopes.TenantTarget],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal])]
     public static Task<Result<CheckVerificationResponse>> Handle(
         CheckVerificationRequest request,
         IAuthService authService,
@@ -25,7 +31,7 @@ public static class CheckVerificationEndpoint
         IAuthService authService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authService.CheckVerificationAsync(request, ct);
     }
 }

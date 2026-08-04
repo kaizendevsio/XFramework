@@ -106,7 +106,7 @@ public sealed class NotificationDeliveryDispatcher(
             NotificationDeliveryJobId = job.Id,
             Metadata = new RequestMetadata
             {
-                TenantId = job.TenantId
+                RequestedTenantId = job.TenantId
             }
         });
 

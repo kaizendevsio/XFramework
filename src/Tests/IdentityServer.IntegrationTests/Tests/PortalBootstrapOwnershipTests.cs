@@ -19,7 +19,19 @@ namespace IdentityServer.IntegrationTests.Tests;
 [Category(TestCategories.Wrappers)]
 public sealed class PortalBootstrapOwnershipTests : IntegrationTestBase
 {
-    private static readonly Guid ExpectedAdminTenantId = new("9a7c6f3e-4a56-4e9e-bb6b-3d082af71d70");
+    private static readonly Guid ExpectedAdminTenantId = PortalBootstrapConstants.AdminTenantId;
+    private IDisposable? _actorAccessTokenSuppression;
+
+    [SetUp]
+    public void SuppressAmbientActorAccessToken() =>
+        _actorAccessTokenSuppression = IntegrationTestFixture.SuppressActorAccessToken();
+
+    [TearDown]
+    public void RestoreAmbientActorAccessToken()
+    {
+        _actorAccessTokenSuppression?.Dispose();
+        _actorAccessTokenSuppression = null;
+    }
 
     [Test]
     public async Task EnsurePortalBootstrapAdmin_ThroughWrapper_IsServerOwnedSafeAndIdempotent()
@@ -126,6 +138,39 @@ public sealed class PortalBootstrapOwnershipTests : IntegrationTestBase
         result.Response.Should().BeNull();
     }
 
+    [Test]
+    public async Task EnsurePortalBootstrapAdmin_WithoutTenantTargetScope_IsForbidden()
+    {
+        var wrapper = await IntegrationTestFixture.CreatePortalWrapperWithoutTenantTargetScope();
+
+        var result = await wrapper.EnsurePortalBootstrapAdmin(
+            CreateRequest($"Bootstrap-{Guid.NewGuid():N}!"));
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task EnsurePortalBootstrapAdmin_FromUnauthorizedServiceCaller_IsForbidden()
+    {
+        var wrapper = await IntegrationTestFixture.CreateUnauthorizedCallerServiceWrapper();
+
+        var result = await wrapper.EnsurePortalBootstrapAdmin(
+            CreateRequest($"Bootstrap-{Guid.NewGuid():N}!"));
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task EnsurePortalBootstrapAdmin_WithoutRequestedTenant_IsRejectedBeforeValidation()
+    {
+        var request = CreateRequest($"Bootstrap-{Guid.NewGuid():N}!");
+        request.Metadata.RequestedTenantId = null;
+
+        var result = await IntegrationTestFixture.ServiceWrapper.EnsurePortalBootstrapAdmin(request);
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static EnsurePortalBootstrapAdminRequest CreateRequest(string password) => new()
     {
         TenantName = "Portal Admin",
@@ -134,9 +179,9 @@ public sealed class PortalBootstrapOwnershipTests : IntegrationTestBase
         Password = password,
         Metadata = new RequestMetadata
         {
-            TenantId = IntegrationTestFixture.TestTenantId,
             RequestId = Guid.NewGuid(),
-            Name = nameof(PortalBootstrapOwnershipTests)
+            OperationName = nameof(PortalBootstrapOwnershipTests),
+            RequestedTenantId = PortalBootstrapConstants.AdminTenantId
         }
     };
 }

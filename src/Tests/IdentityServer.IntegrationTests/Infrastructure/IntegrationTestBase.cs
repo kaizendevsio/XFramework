@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Net.Http.Headers;
 using XFramework.Domain.Contexts;
 
 namespace IdentityServer.IntegrationTests.Infrastructure;
@@ -14,6 +15,11 @@ public abstract class IntegrationTestBase
         {
             BaseAddress = new Uri(IntegrationTestFixture.IdentityServerUrl)
         };
+        HttpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", IntegrationTestFixture.TestActorAccessToken);
+        HttpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+            "X-XFramework-Service-Authorization",
+            $"Bearer {IntegrationTestFixture.TestServiceAccessToken}");
     }
 
     [TearDown]
@@ -39,7 +45,13 @@ public abstract class IntegrationTestBase
             })
             .Build();
 
-        return new AppDbContext(options, new HttpContextAccessor(), config);
+        return new AppDbContext(
+            options,
+            new HttpContextAccessor(),
+            config,
+            new XFramework.TestInfrastructure.TestEffectiveTenantContextAccessor(
+                IntegrationTestFixture.TestTenantId),
+            new XFramework.TestInfrastructure.TestCrossTenantWriteAuthorizationAccessor());
     }
 
     protected static string UniqueUsername() => $"testuser_{Guid.NewGuid():N}";

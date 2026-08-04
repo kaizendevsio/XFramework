@@ -268,22 +268,11 @@ public sealed class ProductServiceTests
         FakeCacheService cache,
         Guid? tenantId)
     {
-        var httpContextAccessor = new HttpContextAccessor();
-        if (tenantId.HasValue)
-        {
-            httpContextAccessor.HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("tenantId", tenantId.Value.ToString())],
-                    authenticationType: "Test"))
-            };
-        }
-
         return new ProductService(
             dataContext,
             cache,
             NullLogger<ProductService>.Instance,
-            httpContextAccessor);
+            new TestTrustedInvocationContextAccessor(tenantId));
     }
 
     private static AppDbContext CreateModelOnlyDbContext(Guid tenantId)
@@ -304,7 +293,11 @@ public sealed class ProductServiceTests
         };
 
         var configuration = new ConfigurationBuilder().Build();
-        return new AppDbContext(options, httpContextAccessor, configuration);
+        return new AppDbContext(
+            options,
+            httpContextAccessor,
+            configuration,
+            new TestTrustedInvocationContextAccessor(tenantId));
     }
 
     private sealed class FakeDataContext : IDataContext

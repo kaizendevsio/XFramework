@@ -3,8 +3,10 @@ using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Services;
 
-public sealed class IdentityServerLocalSigningKeyProvider(IServiceScopeFactory scopeFactory)
-    : IIdentitySigningKeyProvider
+public sealed class IdentityServerLocalSigningKeyProvider(
+    IServiceScopeFactory scopeFactory,
+    ServiceIdentityConfiguration configuration)
+    : IIdentitySigningKeyProvider, IServiceCredentialGenerationProvider
 {
     public async Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
         string? keyId = null,
@@ -17,5 +19,16 @@ public sealed class IdentityServerLocalSigningKeyProvider(IServiceScopeFactory s
             throw new InvalidOperationException(result.Message ?? "IdentityServer signing keys are unavailable.");
 
         return result.Data.Keys;
+    }
+
+    public Task<bool> IsAcceptedAsync(
+        string clientId,
+        string generationId,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            configuration.ValidationGenerationIdsByClient.TryGetValue(clientId, out var generations) &&
+            generations.Contains(generationId, StringComparer.Ordinal));
     }
 }

@@ -12,6 +12,6 @@ public class WrapperInstaller : IInstaller
     {
         services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
         services.AddIdentityServerSessionValidation();
-        services.AddSingleton<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
+        services.AddScoped<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
     }
 }

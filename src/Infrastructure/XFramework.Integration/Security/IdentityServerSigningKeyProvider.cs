@@ -7,12 +7,13 @@ namespace XFramework.Integration.Security;
 public sealed class IdentityServerSigningKeyProvider(
     IHttpClientFactory httpClientFactory,
     IOptions<ServiceIdentityOptions> options)
-    : IIdentitySigningKeyProvider
+    : IIdentitySigningKeyProvider, IServiceCredentialGenerationProvider
 {
     private static readonly TimeSpan UnknownKeyRefreshInterval = TimeSpan.FromSeconds(5);
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private CachedKeys? _cache;
     private DateTime _lastUnknownKeyRefreshAttemptUtc = DateTime.MinValue;
+    private DateTime _lastGenerationRefreshAttemptUtc = DateTime.MinValue;
     private Exception? _lastUnknownKeyRefreshError;
 
     public async Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
@@ -70,7 +71,7 @@ public sealed class IdentityServerSigningKeyProvider(
             {
                 Metadata = new RequestMetadata
                 {
-                    Name = options.Value.ClientId,
+                    OperationName = "Get service signing keys",
                     RequestId = Guid.NewGuid()
                 }
             };
@@ -78,14 +79,7 @@ public sealed class IdentityServerSigningKeyProvider(
             ServiceSigningKeysResponse response;
             try
             {
-                response = await ServiceIdentityHttpClient.PostForResponseAsync<
-                    GetServiceSigningKeysRequest,
-                    ServiceSigningKeysResponse>(
-                    httpClientFactory,
-                    options.Value,
-                    ServiceIdentityHttpClient.SigningKeysPath,
-                    request,
-                    ct);
+                response = await FetchAsync(request, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -101,7 +95,11 @@ public sealed class IdentityServerSigningKeyProvider(
             now = DateTime.UtcNow;
             var keys = response.Keys;
             var cacheMinutes = Math.Clamp(options.Value.SigningKeyCacheMinutes, 1, 60);
-            _cache = new CachedKeys(keys, now.AddMinutes(cacheMinutes));
+            _cache = new CachedKeys(
+                keys,
+                response.CredentialGenerationsByClient,
+                now.AddMinutes(cacheMinutes),
+                GetGenerationPolicyExpiry(now));
             var result = SelectKeys(keys, keyId);
             if (refreshingUnknownKey || (requestedSpecificKey && result.Count == 0))
                 _lastUnknownKeyRefreshAttemptUtc = now;
@@ -114,6 +112,78 @@ public sealed class IdentityServerSigningKeyProvider(
             _refreshGate.Release();
         }
     }
+
+    public async Task<bool> IsAcceptedAsync(
+        string clientId,
+        string generationId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(generationId))
+            return false;
+
+        var now = DateTime.UtcNow;
+        if (_cache is { } cached && cached.GenerationPolicyExpiresAtUtc > now &&
+            IsAccepted(cached, clientId, generationId))
+        {
+            return true;
+        }
+
+        await _refreshGate.WaitAsync(ct);
+        try
+        {
+            now = DateTime.UtcNow;
+            if (_cache is { } refreshed && refreshed.GenerationPolicyExpiresAtUtc > now &&
+                IsAccepted(refreshed, clientId, generationId))
+            {
+                return true;
+            }
+
+            if (now - _lastGenerationRefreshAttemptUtc < GetGenerationPolicyRefreshInterval())
+                return false;
+
+            _lastGenerationRefreshAttemptUtc = now;
+            var response = await FetchAsync(
+                new GetServiceSigningKeysRequest
+                {
+                    Metadata = new RequestMetadata
+                    {
+                        OperationName = "Refresh service credential generations",
+                        RequestId = Guid.NewGuid()
+                    }
+                },
+                ct);
+            var cacheMinutes = Math.Clamp(options.Value.SigningKeyCacheMinutes, 1, 60);
+            _cache = new CachedKeys(
+                response.Keys,
+                response.CredentialGenerationsByClient,
+                DateTime.UtcNow.AddMinutes(cacheMinutes),
+                GetGenerationPolicyExpiry(DateTime.UtcNow));
+            return IsAccepted(_cache, clientId, generationId);
+        }
+        finally
+        {
+            _refreshGate.Release();
+        }
+    }
+
+    private async Task<ServiceSigningKeysResponse> FetchAsync(
+        GetServiceSigningKeysRequest request,
+        CancellationToken ct) =>
+        await ServiceIdentityHttpClient.PostForResponseAsync<
+            GetServiceSigningKeysRequest,
+            ServiceSigningKeysResponse>(
+            httpClientFactory,
+            options.Value,
+            ServiceIdentityHttpClient.SigningKeysPath,
+            request,
+            ct);
+
+    private static bool IsAccepted(
+        CachedKeys cached,
+        string clientId,
+        string generationId) =>
+        cached.CredentialGenerationsByClient.TryGetValue(clientId, out var generations) &&
+        generations.Contains(generationId, StringComparer.Ordinal);
 
     private static IReadOnlyList<ServiceSigningKeyResponse> SelectKeys(
         IReadOnlyList<ServiceSigningKeyResponse> keys,
@@ -128,5 +198,15 @@ public sealed class IdentityServerSigningKeyProvider(
             .ToList();
     }
 
-    private sealed record CachedKeys(IReadOnlyList<ServiceSigningKeyResponse> Keys, DateTime ExpiresAtUtc);
+    private DateTime GetGenerationPolicyExpiry(DateTime now) =>
+        now.Add(GetGenerationPolicyRefreshInterval());
+
+    private TimeSpan GetGenerationPolicyRefreshInterval() =>
+        TimeSpan.FromSeconds(Math.Clamp(options.Value.CredentialGenerationCacheSeconds, 0, 60));
+
+    private sealed record CachedKeys(
+        IReadOnlyList<ServiceSigningKeyResponse> Keys,
+        IReadOnlyDictionary<string, List<string>> CredentialGenerationsByClient,
+        DateTime ExpiresAtUtc,
+        DateTime GenerationPolicyExpiresAtUtc);
 }

@@ -47,11 +47,13 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     private readonly IJwtService _jwtService;
     private readonly TimeProvider _timeProvider;
     private readonly IDistributedSecurityRateLimiter _securityRateLimiter;
-    private readonly ITrustedServiceInvocationResolver _trustedServiceInvocationResolver;
+    private readonly ITrustedInvocationContextAccessor _trustedInvocationContextAccessor;
     private readonly CacheManager _cache;
     private readonly IStorageServiceWrapper _storageServiceWrapper;
     private readonly IIdentityAuthorizationService _authorizationService;
     private readonly ILogger<AuthService> _logger;
+
+    private Guid? CurrentTenantId => _trustedInvocationContextAccessor.Current?.EffectiveTenantId;
 
     public AuthService(
         IDataContext dataContext,
@@ -62,7 +64,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
         IJwtService jwtService,
         TimeProvider timeProvider,
         IDistributedSecurityRateLimiter securityRateLimiter,
-        ITrustedServiceInvocationResolver trustedServiceInvocationResolver,
+        ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
         CacheManager cache,
         IStorageServiceWrapper storageServiceWrapper,
         IIdentityAuthorizationService authorizationService,
@@ -76,7 +78,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
         _jwtService = jwtService;
         _timeProvider = timeProvider;
         _securityRateLimiter = securityRateLimiter;
-        _trustedServiceInvocationResolver = trustedServiceInvocationResolver;
+        _trustedInvocationContextAccessor = trustedInvocationContextAccessor;
         _cache = cache;
         _storageServiceWrapper = storageServiceWrapper;
         _authorizationService = authorizationService;
@@ -98,7 +100,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
             if (!IdentityPasswordPolicy.IsWithinBcryptByteLimit(request.Password))
                 return Result<CredentialAdministrationResponse>.Failure("Password must not exceed 72 UTF-8 bytes", 400);
 
-            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
                 return Result<CredentialAdministrationResponse>.Failure("Tenant context is required", 403);
 
             var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
@@ -170,7 +172,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     {
         try
         {
-            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
                 return Result<CredentialAdministrationResponse>.Failure("Tenant context is required", 403);
 
             if (request.CredentialId is not { } credentialId || credentialId == Guid.Empty)
@@ -268,7 +270,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 return Result.Failure("Identifier is required", 400);
             }
 
-            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
                 return Result.Forbidden("Tenant context is required");
 
             var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
@@ -385,7 +387,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 return Result<bool>.Failure("An error occurred while processing your request", 400);
             }
 
-            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
                 return Result<bool>.Forbidden("Tenant context is required");
 
             var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
@@ -471,7 +473,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
             if (!rateLimitDecision.IsAllowed)
                 return Result<AuthenticateIdentityResponse>.Failure("Too many requests.", 429);
 
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId, ct);
+            var tenant = await _tenantService.GetTenant(CurrentTenantId, ct);
             var now = _timeProvider.GetUtcNow().UtcDateTime;
 
             // Validate authorization (multi-type user lookup) - SECURITY CRITICAL
@@ -509,9 +511,9 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                     tenant.Id,
                     credential.Id,
                     request.Metadata.IpAddress,
-                    request.Metadata.Name,
+                    request.Metadata.OperationName,
                     request.Metadata.DeviceName,
-                    request.Metadata.DeviceAgent,
+                    request.Metadata.UserAgent,
                     AuthenticationState.Locked,
                     null);
 
@@ -550,9 +552,9 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                     tenant.Id,
                     originalCredential.Id,
                     request.Metadata.IpAddress,
-                    request.Metadata.Name,
+                    request.Metadata.OperationName,
                     request.Metadata.DeviceName,
-                    request.Metadata.DeviceAgent,
+                    request.Metadata.UserAgent,
                     AuthenticationState.WrongPassword,
                     null);
 
@@ -583,9 +585,9 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                     tenant.Id,
                     credential.Id,
                     request.Metadata.IpAddress,
-                    request.Metadata.Name,
+                    request.Metadata.OperationName,
                     request.Metadata.DeviceName,
-                    request.Metadata.DeviceAgent,
+                    request.Metadata.UserAgent,
                     AuthenticationState.Unauthorized,
                     null);
 
@@ -635,9 +637,9 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 tenant.Id,
                 credential.Id,
                 request.Metadata.IpAddress,
-                request.Metadata.Name,
+                request.Metadata.OperationName,
                 request.Metadata.DeviceName,
-                request.Metadata.DeviceAgent,
+                request.Metadata.UserAgent,
                 AuthenticationState.Authenticated,
                 request.GenerateToken ? token.SessionId : null);
 
@@ -750,14 +752,14 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
             var rateLimitDecision = await AcquireSecurityRateLimitAsync(
                 StrictSecurityRateLimitPolicyMap.Verification,
                 request.Metadata,
-                $"{request.Metadata.TenantId:D}:{request.Model.CredentialId:D}:{request.Model.VerificationTypeId:D}",
+                $"{CurrentTenantId:D}:{request.Model.CredentialId:D}:{request.Model.VerificationTypeId:D}",
                 "verification issuance",
                 ct);
             if (!rateLimitDecision.IsAllowed)
                 return Result<IdentityVerification>.Failure("Too many requests.", 429);
 
             var tenant = await _tenantService.GetTenant(
-                request.Metadata.TenantId ?? request.Model.TenantId, ct);
+                CurrentTenantId, ct);
 
             var verificationType = await _dataContext.Query<IdentityVerificationType>()
                 .IgnoreQueryFilters()
@@ -958,9 +960,13 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     {
         try
         {
+            if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
+                return Result<IdentityVerification>.Forbidden("A trusted tenant context is required");
+
             var verification = await _dataContext.Query<IdentityVerification>()
                 .IgnoreQueryFilters()
                 .Where(i => i.Id == request.Model.Id)
+                .Where(i => i.TenantId == tenantId)
                 .Where(i => i.Purpose == IdentityConstants.VerificationPurpose.ContactVerification)
                 .Where(i => i.Status == (short?)GenericStatusType.Pending)
                 .Where(i => i.Expiry > DateTime.UtcNow)
@@ -1044,7 +1050,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId, ct);
+            var tenant = await _tenantService.GetTenant(CurrentTenantId, ct);
 
             var identityCredential = await _dataContext.Query<IdentityCredential>()
                 .Where(i => i.Id == request.CredentialId && i.TenantId == tenant.Id)
@@ -1158,7 +1164,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                     validation.StatusCode);
             }
 
-            var tenantId = request.Metadata.TenantId!.Value;
+            var tenantId = CurrentTenantId!.Value;
             var authorization = await _authorizationService.AuthorizeCredentialOperationAsync(
                 request.Metadata,
                 tenantId,
@@ -1257,7 +1263,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     {
         try
         {
-            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
             {
                 return Result<CredentialAvatarResponse>.Failure("Tenant context is required", 400);
             }
@@ -1378,7 +1384,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     {
         try
         {
-            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
             {
                 return Result<CredentialAvatarResponse>.Failure("Tenant context is required", 400);
             }
@@ -1441,9 +1447,9 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
             .FirstOrDefaultAsync(ct);
     }
 
-    private static Result ValidateCredentialAvatarRequest(UploadCredentialAvatarRequest request)
+    private Result ValidateCredentialAvatarRequest(UploadCredentialAvatarRequest request)
     {
-        if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+        if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
         {
             return Result.Failure("Tenant context is required", 400);
         }
@@ -1658,11 +1664,29 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     {
         try
         {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
-            var tenantId = metadata.TenantId ?? Guid.Empty;
+            var tenantId = CurrentTenantId ?? Guid.Empty;
             if (tenantId == Guid.Empty)
                 return;
+
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var authorization = await scope.ServiceProvider
+                .GetRequiredService<ITrustedServiceTargetContextInitializer>()
+                .EstablishAsync(
+                    tenantId,
+                    XFrameworkServiceNames.IdentityServer,
+                    [],
+                    XFrameworkServiceNames.IdentityServer,
+                    metadata.RequestId);
+            if (!authorization.IsSuccess)
+            {
+                _logger.LogCritical(
+                    "Storage cleanup could not establish trusted tenant context. StorageFileId: {StorageFileId}, Error: {Error}",
+                    storageFileId,
+                    authorization.Error);
+                return;
+            }
+
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
 
             var exists = await db.Set<StorageCleanupOutboxMessage>()
                 .IgnoreQueryFilters()
@@ -1695,7 +1719,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
         Guid storageFileId,
         CancellationToken ct)
     {
-        var tenantId = metadata.TenantId ?? Guid.Empty;
+        var tenantId = CurrentTenantId ?? Guid.Empty;
         if (tenantId == Guid.Empty)
             throw new InvalidOperationException("Tenant context is required to claim an avatar file.");
 
@@ -1737,7 +1761,7 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 StorageFileId = outbox.StorageFileId,
                 Metadata = new RequestMetadata
                 {
-                    TenantId = outbox.TenantId,
+                    RequestedTenantId = outbox.TenantId,
                     RequestId = outbox.RequestId
                 }
             }, claimCts.Token);
@@ -1890,22 +1914,11 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 identifier);
         }
 
-        if (!string.IsNullOrWhiteSpace(metadata.ServiceAccessToken))
+        if (_trustedInvocationContextAccessor.Current?.Service is { } service)
         {
-            var trustedInvocation = await _trustedServiceInvocationResolver.ResolveAsync(
-                metadata,
-                XFrameworkServiceNames.IdentityServer,
-                requireTenant: false,
-                ct: ct);
-            if (trustedInvocation.IsSuccess)
-            {
-                return StrictSecurityRateLimitPolicyMap.CreateAuthenticationClientKey(
-                    null,
-                    $"service:{trustedInvocation.Invocation!.CallerClientId}:{identifier}");
-            }
-
-            _logger.LogWarning(
-                "Authentication throttling could not resolve trusted Bolt caller; using shared untrusted partition");
+            return StrictSecurityRateLimitPolicyMap.CreateAuthenticationClientKey(
+                null,
+                $"service:{service.ClientId}:{identifier}");
         }
 
         return StrictSecurityRateLimitPolicyMap.CreateAuthenticationClientKey(
@@ -2350,12 +2363,16 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
     {
         try
         {
-            if (request.Metadata.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            if (CurrentTenantId is not { } tenantId || tenantId == Guid.Empty)
                 return Result.Forbidden("Tenant context is required");
 
-            var isTrustedServiceCall = !string.IsNullOrWhiteSpace(request.Metadata.ServiceAccessToken);
+            var isTrustedServiceCall = _trustedInvocationContextAccessor.Current is
+            {
+                Actor: null,
+                Service: not null
+            };
             if (!isTrustedServiceCall &&
-                (request.Metadata.CredentialId is not { } actorCredentialId ||
+                (_trustedInvocationContextAccessor.Current?.Actor?.CredentialId is not { } actorCredentialId ||
                  actorCredentialId == Guid.Empty ||
                  actorCredentialId != request.CredentialId))
             {
@@ -2402,9 +2419,9 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 tenantId,
                 request.CredentialId,
                 request.Metadata?.IpAddress ?? string.Empty,
-                request.Metadata?.Name ?? string.Empty,
+                request.Metadata?.OperationName ?? string.Empty,
                 request.Metadata?.DeviceName ?? string.Empty,
-                request.Metadata?.DeviceAgent ?? string.Empty,
+                request.Metadata?.UserAgent ?? string.Empty,
                 AuthenticationState.NotAuthenticated,
                 request.SessionId);
 
@@ -2430,111 +2447,12 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
         }
     }
 
-    public async Task<Result<ValidateIdentitySessionResponse>> ValidateIdentitySessionAsync(
-        ValidateIdentitySessionRequest request,
-        CancellationToken ct = default)
-    {
-        var now = DateTime.UtcNow;
-        var sessionIsActive = await _dataContext.Query<Session>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(session => session.Id == request.SessionId)
-            .Where(session => session.TenantId == request.TenantId)
-            .Where(session => session.CredentialId == request.CredentialId)
-            .Where(session => session.Status == CurrentSessionState.Active)
-            .Where(session => !session.IsDeleted && session.IsEnabled)
-            .Where(session => session.ExpiresAt == null || session.ExpiresAt > now)
-            .AnyAsync(ct);
-        if (!sessionIsActive)
-            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
-
-        var tenantIsActive = await _dataContext.Query<Tenant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(tenant => tenant.Id == request.TenantId)
-            .Where(tenant => !tenant.IsDeleted && tenant.IsEnabled)
-            .Where(tenant => tenant.AvailabilityDate == null || tenant.AvailabilityDate <= now)
-            .Where(tenant => tenant.Expiration == null || tenant.Expiration > now)
-            .AnyAsync(ct);
-        if (!tenantIsActive)
-            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
-
-        var credential = await _dataContext.Query<IdentityCredential>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(item => item.Id == request.CredentialId)
-            .Where(item => item.TenantId == request.TenantId)
-            .Where(item => !item.IsDeleted && item.IsEnabled)
-            .FirstOrDefaultAsync(ct);
-        if (credential is null)
-            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
-
-        var identityIsActive = await _dataContext.Query<IdentityInformation>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(identity => identity.Id == credential.IdentityInfoId)
-            .Where(identity => identity.TenantId == request.TenantId)
-            .Where(identity => !identity.IsDeleted && identity.IsEnabled)
-            .AnyAsync(ct);
-        if (!identityIsActive)
-            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
-
-        if (request.RoleTypeIds.Any(roleTypeId => roleTypeId == Guid.Empty))
-            return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
-
-        var claimedRoleTypeIds = request.RoleTypeIds.Distinct().ToList();
-        if (claimedRoleTypeIds.Count > 0)
-        {
-            var activeRoles = await _dataContext.Query<IdentityRole>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(role => role.TenantId == request.TenantId)
-                .Where(role => role.CredentialId == request.CredentialId)
-                .Where(role => role.TypeId != null && claimedRoleTypeIds.Contains(role.TypeId.Value))
-                .Where(role => !role.IsDeleted && role.IsEnabled)
-                .Where(role => role.RoleExpiration >= now)
-                .ToListAsync(ct);
-
-            var activeRoleTypeIds = activeRoles
-                .Select(role => role.TypeId!.Value)
-                .Distinct()
-                .ToList();
-
-            var enabledRoleTypes = await _dataContext.Query<IdentityRoleType>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(roleType => roleType.TenantId == request.TenantId)
-                .Where(roleType => activeRoleTypeIds.Contains(roleType.Id))
-                .Where(roleType => !roleType.IsDeleted && roleType.IsEnabled)
-                .ToListAsync(ct);
-
-            if (claimedRoleTypeIds.Except(enabledRoleTypes.Select(roleType => roleType.Id)).Any())
-                return Result<ValidateIdentitySessionResponse>.Failure("Identity session is no longer valid", 401);
-        }
-
-        return Result<ValidateIdentitySessionResponse>.Success(new ValidateIdentitySessionResponse
-        {
-            TenantId = request.TenantId,
-            CredentialId = request.CredentialId,
-            SessionId = request.SessionId,
-            IsValid = true
-        });
-    }
-
     public async Task<Result<RefreshTokenResponse>> RefreshTokenAsync(
         RefreshTokenRequest request, CancellationToken ct = default)
     {
         try
         {
-            var rateLimitDecision = await AcquireSecurityRateLimitAsync(
-                StrictSecurityRateLimitPolicyMap.Refresh,
-                request.Metadata,
-                $"{request.Metadata.TenantId:D}:{request.SessionId:D}",
-                "refresh token",
-                ct);
-            if (!rateLimitDecision.IsAllowed)
-                return Result<RefreshTokenResponse>.Failure("Too many requests.", 429);
-
+            request.Metadata ??= new RequestMetadata();
             var now = _timeProvider.GetUtcNow().UtcDateTime;
             var session = await _dataContext.Query<Session>()
                 .IgnoreQueryFilters()
@@ -2548,6 +2466,22 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
                 _logger.EntityNotFound("Session", request.SessionId);
                 return Result<RefreshTokenResponse>.NotFound("Session not found or inactive");
             }
+
+            if (request.Metadata.RequestedTenantId is { } requestedTenantId &&
+                requestedTenantId != session.TenantId)
+            {
+                _logger.TokenValidationFailed(session.CredentialId, "Refresh request tenant does not match session tenant");
+                return Result<RefreshTokenResponse>.Failure("Invalid refresh token", 401);
+            }
+
+            var rateLimitDecision = await AcquireSecurityRateLimitAsync(
+                StrictSecurityRateLimitPolicyMap.Refresh,
+                request.Metadata,
+                $"{session.TenantId:D}:{request.SessionId:D}",
+                "refresh token",
+                ct);
+            if (!rateLimitDecision.IsAllowed)
+                return Result<RefreshTokenResponse>.Failure("Too many requests.", 429);
 
             // Check session expiration - SECURITY CRITICAL
             if (session.ExpiresAt.HasValue && session.ExpiresAt.Value <= now)
@@ -2718,13 +2652,13 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
         var rateLimitDecision = await AcquireSecurityRateLimitAsync(
             StrictSecurityRateLimitPolicyMap.PasswordReset,
             request.Metadata,
-            $"{request.Metadata.TenantId:D}:{resetIdentifier}",
+            $"{CurrentTenantId:D}:{resetIdentifier}",
             "password reset request",
             ct);
         if (!rateLimitDecision.IsAllowed)
             return Result.Failure("Too many requests.", 429);
 
-        if (request.Metadata.TenantId is not { } tenantId)
+        if (CurrentTenantId is not { } tenantId)
             return Result.Failure("Tenant context is required.", 400);
 
         var requestId = request.Metadata.RequestId ?? Guid.NewGuid();
@@ -2779,11 +2713,13 @@ public sealed class AuthService : IAuthService, IPasswordResetProcessor
         };
 
     public async Task<Result> ProcessForgotPasswordAsync(
-        ForgotPasswordRequest request, CancellationToken ct = default)
+        Guid tenantId,
+        ForgotPasswordRequest request,
+        CancellationToken ct = default)
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId, ct);
+            var tenant = await _tenantService.GetTenant(tenantId, ct);
 
             // Determine lookup method based on input
             IdentityCredential? credential = null;

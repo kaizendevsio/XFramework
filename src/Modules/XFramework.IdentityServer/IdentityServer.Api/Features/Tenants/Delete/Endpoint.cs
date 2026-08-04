@@ -7,7 +7,10 @@ namespace IdentityServer.Api.Features.Tenants.Delete;
 
 public static class DeleteTenantEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result> Handle(
         DeleteTenantRequest request,
         ITenantAdministrationService service,
@@ -26,7 +29,7 @@ public static class DeleteTenantEndpoint
         ITenantAdministrationService service,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return Handle(
             request,
             service,

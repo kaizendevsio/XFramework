@@ -1,5 +1,6 @@
 using Community.Api.Generated;
 using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Integration.Extensions;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -10,6 +11,7 @@ using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
 builder.Logging.AddXFrameworkLogging(builder.Configuration);
+builder.Services.AddIdentityServerSessionValidation();
 
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Community.Api");
 builder.Services.AddXFrameworkHealthChecks<AppDbContext>(

@@ -89,13 +89,11 @@ public static class PortalAuthEndpointExtensions
                     CredentialId = credentialId,
                     Metadata = new RequestMetadata
                     {
-                        TenantId = tenantId,
-                        CredentialId = credentialId,
-                        SessionId = sessionId,
+                        RequestedTenantId = tenantId,
                         RequestId = Guid.NewGuid(),
-                        Name = "Portal logout",
+                        OperationName = "Portal logout",
                         DeviceName = Environment.MachineName,
-                        DeviceAgent = context.Request.Headers.UserAgent.ToString(),
+                        UserAgent = context.Request.Headers.UserAgent.ToString(),
                         IpAddress = context.Connection.RemoteIpAddress?.ToString()
                     }
                 };

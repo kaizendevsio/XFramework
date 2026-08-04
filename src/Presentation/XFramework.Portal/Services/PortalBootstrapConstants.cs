@@ -13,13 +13,5 @@ internal static class PortalBootstrapConstants
     public static readonly Guid DefaultAuthorizeById = new("934ce9b2-6513-411b-a32f-5dc74f61975c");
     public static readonly Guid AdminRoleGroupSystemReferenceId = new("1208681c-a202-453b-95f2-f0cbf682f9dd");
     public static readonly Guid RegistryGroupSystemReferenceId = new("35ab856b-7f99-4d2e-ac46-e5093bb27b59");
-    public static readonly string[] LegacyAdminTenantNames = ["XFramework Admin"];
-
-    public static string[] BuildAdminTenantLookupNames(string tenantName) =>
-        LegacyAdminTenantNames
-            .Append(tenantName)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
 }
 

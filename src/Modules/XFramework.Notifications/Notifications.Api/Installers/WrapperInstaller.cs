@@ -14,6 +14,6 @@ public sealed class WrapperInstaller : IInstaller
     {
         services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
         services.AddIdentityServerSessionValidation();
-        services.AddSingleton<ISmsGatewayServiceWrapper, SmsGatewayServiceWrapper>();
+        services.AddScoped<ISmsGatewayServiceWrapper, SmsGatewayServiceWrapper>();
     }
 }

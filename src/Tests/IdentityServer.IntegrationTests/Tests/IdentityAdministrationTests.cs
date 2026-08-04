@@ -117,6 +117,10 @@ public sealed class IdentityAdministrationTests : IntegrationTestBase
         var commandCounter = IntegrationTestFixture.Services
             .GetRequiredService<DbCommandCounterInterceptor>();
         using var measurement = commandCounter.BeginMeasurement();
+        IntegrationTestFixture.EstablishTrustedActorContext(
+            scope.ServiceProvider,
+            IntegrationTestFixture.TestTenantId,
+            IntegrationTestFixture.TestCredentialId);
 
         var result = await scope.ServiceProvider
             .GetRequiredService<IIdentityAdministrationService>()
@@ -284,11 +288,10 @@ public sealed class IdentityAdministrationTests : IntegrationTestBase
 
     private static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = IntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = nameof(IdentityAdministrationTests),
+        OperationName = nameof(IdentityAdministrationTests),
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 }

@@ -306,7 +306,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         {
             return MemoryPackSerializer.Deserialize<TQueryResult>(resultBytes);
         }
-        catch (Exception ex) when (ex is MemoryPackSerializationException or OverflowException or InvalidOperationException)
+        catch (Exception ex) when (ex is MemoryPackSerializationException or ArgumentException or OverflowException or InvalidOperationException)
         {
             if (TryDeserializeFailure(resultBytes, out var failure))
             {

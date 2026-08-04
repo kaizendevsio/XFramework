@@ -12,6 +12,7 @@ using NSubstitute;
 using NUnit.Framework;
 using XFramework.Domain.Contexts;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Security;
 
 namespace Bolt.Tests;
 
@@ -122,16 +123,16 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
     }
 
     [Test]
-    public async Task TokenValidationException_IsContainedAsDenial()
+    public async Task ActorProviderException_IsContainedAsDenial()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
-        var scopeFactory = Substitute.For<IServiceScopeFactory>();
-        var jwtService = Substitute.For<IJwtService>();
-        jwtService.DecodeJwtToken("invalid-token")
-            .Returns(Task.FromException<(ClaimsPrincipal, System.IdentityModel.Tokens.Jwt.JwtSecurityToken)>(
-                new InvalidOperationException("token failure")));
-        var authorizer = CreateAuthorizer(scopeFactory, jwtService);
+        await using var provider = new ServiceCollection()
+            .AddScoped<IActorIdentityProvider, ThrowingActorIdentityProvider>()
+            .BuildServiceProvider();
+        var authorizer = CreateAuthorizer(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            Substitute.For<IJwtService>());
         var context = CreateContext(
             $"communications.tenant.{tenantId:N}.user.{credentialId:N}",
             durable: true,
@@ -141,7 +142,6 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         var action = async () => await authorizer.AuthorizeAsync(context);
 
         (await action.Should().NotThrowAsync()).Which.Should().BeFalse();
-        scopeFactory.DidNotReceive().CreateScope();
     }
 
     [Test]
@@ -194,6 +194,7 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         var context = CreateContext(
             $"communications.tenant.{tenantId:N}.presence",
             subscriberId: "client",
+            actorAccessToken: "actor-token",
             user: principal);
 
         var allowed = await authorizer.AuthorizeAsync(context);
@@ -217,7 +218,7 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
             ],
             "Test"));
         await using var provider = await CreateDatabaseProviderAsync(
-            servicePrincipal,
+            actorPrincipal,
             new IdentityCredential
             {
                 Id = credentialId,
@@ -226,10 +227,9 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
                 IsEnabled = true,
                 IsDeleted = false
             });
-        var jwtService = Substitute.For<IJwtService>();
-        jwtService.DecodeJwtToken("actor-token")
-            .Returns(Task.FromResult((actorPrincipal, new System.IdentityModel.Tokens.Jwt.JwtSecurityToken())));
-        var authorizer = CreateAuthorizer(provider.GetRequiredService<IServiceScopeFactory>(), jwtService);
+        var authorizer = CreateAuthorizer(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            Substitute.For<IJwtService>());
         var context = CreateContext(
             $"communications.tenant.{tenantId:N}.presence",
             subscriberId: "client",
@@ -239,7 +239,6 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         var allowed = await authorizer.AuthorizeAsync(context);
 
         allowed.Should().BeTrue();
-        _ = jwtService.Received(1).DecodeJwtToken("actor-token");
     }
 
     [TestCase(false, false, false)]
@@ -294,6 +293,15 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddDbContext<DbContext, AppDbContext>((_, options) =>
             options.UseInMemoryDatabase(databaseName));
+        services.AddScoped<IActorIdentityProvider>(_ =>
+        {
+            var credentialId = Guid.Parse(httpPrincipal.FindFirstValue(ClaimTypes.Name)!);
+            var claimedTenantId = Guid.Parse(httpPrincipal.FindFirstValue("tenantId")!);
+            var result = credential.IsEnabled && !credential.IsDeleted && credential.TenantId == claimedTenantId
+                ? ActorIdentityValidationResult.Success(CreateActor(credentialId, claimedTenantId))
+                : ActorIdentityValidationResult.Failure("Actor identity is invalid.");
+            return new StubActorIdentityProvider(result);
+        });
 
         var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
@@ -306,7 +314,29 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
     private static CommunicationsBoltTopicAuthorizer CreateAuthorizer(
         IServiceScopeFactory scopeFactory,
         IJwtService jwtService) =>
-        new(scopeFactory, jwtService, NullLogger<CommunicationsBoltTopicAuthorizer>.Instance);
+        new(scopeFactory, NullLogger<CommunicationsBoltTopicAuthorizer>.Instance);
+
+    private static TrustedActorIdentity CreateActor(Guid credentialId, Guid tenantId) => new(
+        credentialId,
+        Guid.NewGuid(),
+        tenantId,
+        Guid.NewGuid(),
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        "test-generation",
+        DateTimeOffset.UtcNow.AddMinutes(5));
+
+    private sealed class StubActorIdentityProvider(ActorIdentityValidationResult result) : IActorIdentityProvider
+    {
+        public Task<ActorIdentityValidationResult> ValidateAsync(string token, CancellationToken ct = default) =>
+            Task.FromResult(result);
+    }
+
+    private sealed class ThrowingActorIdentityProvider : IActorIdentityProvider
+    {
+        public Task<ActorIdentityValidationResult> ValidateAsync(string token, CancellationToken ct = default) =>
+            throw new InvalidOperationException("provider failure");
+    }
 
     private static BoltTopicAuthorizationContext CreateContext(
         string topic,

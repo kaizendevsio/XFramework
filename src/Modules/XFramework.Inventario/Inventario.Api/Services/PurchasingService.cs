@@ -14,9 +14,11 @@ using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Inventario.Api.Services;
 
+using XFramework.Integration.Security;
+
 public sealed class PurchasingService(
     IDataContext dataContext,
-    IHttpContextAccessor httpContextAccessor,
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     StockPostingService stockPostingService,
     ProductVariationService productVariationService,
     ITenantModuleFeatureService featureService)
@@ -477,7 +479,7 @@ public sealed class PurchasingService(
         var stockResult = await stockPostingService.StageAsync(
             new PostStockMovementRequest
             {
-                Metadata = new() { TenantId = tenantId },
+                Metadata = new() { RequestedTenantId = tenantId },
                 ProductId = lineRequest.ProductId,
                 ProductVariationId = lineRequest.ProductVariationId,
                 WarehouseId = document.WarehouseId,
@@ -651,21 +653,10 @@ public sealed class PurchasingService(
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)
     {
-        if (request?.Metadata?.TenantId is { } metadataTenantId && metadataTenantId != Guid.Empty)
-            return Result<Guid>.Success(metadataTenantId);
-
-        var user = httpContextAccessor.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated != true)
+        var tenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId;
+        if (tenantId is null || tenantId == Guid.Empty)
             return Result<Guid>.Unauthorized("Authentication is required for purchasing operations.");
-
-        var tenantIdClaim = user.FindFirst("tenantId")?.Value
-            ?? user.FindFirst("TenantId")?.Value
-            ?? user.FindFirst("tid")?.Value;
-
-        if (Guid.TryParse(tenantIdClaim, out var tenantId) && tenantId != Guid.Empty)
-            return Result<Guid>.Success(tenantId);
-
-        return Result<Guid>.Forbidden("Authenticated user does not have a valid tenant context.");
+        return Result<Guid>.Success(tenantId.Value);
     }
 
     private static string GenerateDocumentNumber(string prefix) =>

@@ -321,7 +321,7 @@
                 BirthDate = DateOnly.TryParse(_form.BirthDateString, out var d) ? d : null,
                 Gender = Enum.TryParse<Gender>(_form.GenderString, out var g) ? g : null,
                 CivilStatus = Enum.TryParse<CivilStatus>(_form.CivilStatusString, out var cs) ? cs : null,
-                Metadata = new RequestMetadata { TenantId = tenant.Id }
+                Metadata = new RequestMetadata { RequestedTenantId = tenant.Id }
             });
 
             if (result.IsSuccess)
@@ -354,7 +354,7 @@
                 IdentityId = user.Id,
                 ExpectedConcurrencyStamp = user.ConcurrencyStamp,
                 IsEnabled = !user.IsEnabled,
-                Metadata = new RequestMetadata { TenantId = user.TenantId }
+                Metadata = new RequestMetadata { RequestedTenantId = user.TenantId }
             });
 
             if (result.IsSuccess)
@@ -389,7 +389,7 @@
             {
                 IdentityId = _deletingUser.Id,
                 ExpectedConcurrencyStamp = _deletingUser.ConcurrencyStamp,
-                Metadata = new RequestMetadata { TenantId = _deletingUser.TenantId }
+                Metadata = new RequestMetadata { RequestedTenantId = _deletingUser.TenantId }
             });
 
             if (result.IsSuccess)

@@ -10,7 +10,7 @@ public sealed class PortalBootstrapService
     private const string BootstrapLockSql =
         "SELECT pg_advisory_xact_lock(hashtextextended('identity:portal-bootstrap-admin', 0))";
 
-    private static readonly Guid AdminTenantId = new("9a7c6f3e-4a56-4e9e-bb6b-3d082af71d70");
+    private static readonly Guid AdminTenantId = PortalBootstrapConstants.AdminTenantId;
     private static readonly Guid AdminIdentityId = new("e9c13537-9726-4508-94e6-62806cb706f1");
     private static readonly Guid AdminCredentialId = new("2f63b5be-c45d-4b9f-80a5-39549341f417");
     private static readonly Guid AdminRoleGroupId = new("f5149783-49dd-4c88-8f3e-33c07f2f7797");

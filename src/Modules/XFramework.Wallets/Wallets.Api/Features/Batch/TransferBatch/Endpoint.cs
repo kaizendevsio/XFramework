@@ -1,5 +1,7 @@
 using Wallets.Api.Services;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Integration.Security;
 
 namespace Wallets.Api.Features.Batch.TransferBatch;
 
@@ -18,7 +20,10 @@ public static class Endpoint
     /// <returns>Batch operation result</returns>
     public static async Task<IResult> HandleAsync(
         [FromBody] BatchTransferRequestWrapper request,
+        HttpContext httpContext,
         [FromServices] IBatchWalletService batchService,
+        [FromServices] IHttpTrustedInvocationAuthorizer invocationAuthorizer,
+        [FromServices] ITrustedInvocationFeatureGate featureGate,
         [FromServices] IWalletRequestContextResolver contextResolver,
         CancellationToken cancellationToken = default)
     {
@@ -26,6 +31,28 @@ public static class Endpoint
         {
             return Results.BadRequest(new { error = "Request list cannot be empty" });
         }
+
+        var invocationResult = await invocationAuthorizer.AuthorizeAsync(
+            httpContext.Request.Headers.Authorization.ToString(),
+            httpContext.Request.Headers["X-XFramework-Service-Authorization"].ToString(),
+            request.Metadata,
+            new InvocationAuthorizationPolicy
+            {
+                ActorRequirement = ActorRequirement.Required,
+                TenantAccessMode = TenantAccessMode.ActorTenant,
+                RequireServiceIdentity = false
+            },
+            cancellationToken);
+        if (!invocationResult.IsSuccess)
+            return Results.Problem(detail: invocationResult.Error, statusCode: invocationResult.StatusCode);
+
+        var featureResult = await featureGate.EnsureAllowedAsync(
+            "/api/wallets/batch/transfer",
+            HttpMethods.Post,
+            null,
+            cancellationToken);
+        if (!featureResult.IsSuccess)
+            return Results.Problem(detail: featureResult.Message, statusCode: featureResult.StatusCode);
 
         var contextResult = contextResolver.Resolve(request);
         if (!contextResult.IsSuccess)

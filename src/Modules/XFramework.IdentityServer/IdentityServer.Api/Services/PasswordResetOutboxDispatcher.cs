@@ -2,7 +2,10 @@ namespace IdentityServer.Api.Services;
 
 public interface IPasswordResetProcessor
 {
-    Task<Result> ProcessForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken ct);
+    Task<Result> ProcessForgotPasswordAsync(
+        Guid tenantId,
+        ForgotPasswordRequest request,
+        CancellationToken ct);
 }
 
 public sealed class PasswordResetOutboxDispatcher(
@@ -12,7 +15,6 @@ public sealed class PasswordResetOutboxDispatcher(
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(5);
-    private const int BatchSize = 1;
     private const int MaxAttempts = 5;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -44,9 +46,7 @@ public sealed class PasswordResetOutboxDispatcher(
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var leaseOwner = $"{Environment.MachineName}:{Guid.NewGuid():N}";
 
-        await RecoverExpiredClaimsAsync(db, now, ct);
-
-        var candidateIds = await db.Set<PasswordResetOutboxMessage>()
+        var candidate = await db.Set<PasswordResetOutboxMessage>()
             .IgnoreQueryFilters()
             .Where(message => !message.IsDeleted && message.IsEnabled)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
@@ -54,16 +54,35 @@ public sealed class PasswordResetOutboxDispatcher(
             .Where(message => message.NextAttemptAt == null || message.NextAttemptAt <= now)
             .Where(message => message.LeaseExpiresAt == null || message.LeaseExpiresAt <= now)
             .OrderBy(message => message.CreatedAt)
-            .Take(BatchSize)
-            .Select(message => message.Id)
-            .ToListAsync(ct);
-        if (candidateIds.Count == 0)
+            .Select(message => new OutboxCandidate(message.Id, message.TenantId, message.RequestId))
+            .FirstOrDefaultAsync(ct);
+        if (candidate is null)
             return;
+
+        var contextInitializer = scope.ServiceProvider
+            .GetRequiredService<ITrustedServiceTargetContextInitializer>();
+        var authorization = await contextInitializer.EstablishAsync(
+            candidate.TenantId,
+            XFrameworkServiceNames.IdentityServer,
+            [],
+            XFrameworkServiceNames.IdentityServer,
+            candidate.RequestId,
+            ct);
+        if (!authorization.IsSuccess)
+        {
+            logger.LogWarning(
+                "Password reset outbox candidate {OutboxMessageId} could not establish trusted tenant context: {Error}",
+                candidate.Id,
+                authorization.Error);
+            return;
+        }
+
+        await RecoverExpiredClaimAsync(db, candidate.Id, candidate.TenantId, now, ct);
 
         var leaseExpiresAt = now.Add(LeaseDuration);
         await db.Set<PasswordResetOutboxMessage>()
             .IgnoreQueryFilters()
-            .Where(message => candidateIds.Contains(message.Id))
+            .Where(message => message.Id == candidate.Id && message.TenantId == candidate.TenantId)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .Where(message => message.LeaseExpiresAt == null || message.LeaseExpiresAt <= now)
             .ExecuteUpdateAsync(setters => setters
@@ -76,7 +95,8 @@ public sealed class PasswordResetOutboxDispatcher(
         var due = await db.Set<PasswordResetOutboxMessage>()
             .IgnoreQueryFilters()
             .AsTracking()
-            .Where(message => candidateIds.Contains(message.Id) && message.LeaseOwner == leaseOwner)
+            .Where(message => message.Id == candidate.Id && message.TenantId == candidate.TenantId)
+            .Where(message => message.LeaseOwner == leaseOwner)
             .OrderBy(message => message.CreatedAt)
             .ToListAsync(ct);
         foreach (var message in due)
@@ -101,16 +121,18 @@ public sealed class PasswordResetOutboxDispatcher(
 
             try
             {
-                var result = await processor.ProcessForgotPasswordAsync(new ForgotPasswordRequest
-                {
-                    Email = message.Email,
-                    Phone = message.Phone,
-                    Metadata = new RequestMetadata
+                var result = await processor.ProcessForgotPasswordAsync(
+                    message.TenantId,
+                    new ForgotPasswordRequest
                     {
-                        TenantId = message.TenantId,
-                        RequestId = message.RequestId
-                    }
-                }, ct);
+                        Email = message.Email,
+                        Phone = message.Phone,
+                        Metadata = new RequestMetadata
+                        {
+                            RequestId = message.RequestId
+                        }
+                    },
+                    ct);
 
                 if (result.IsSuccess)
                 {
@@ -148,10 +170,16 @@ public sealed class PasswordResetOutboxDispatcher(
         await db.SaveChangesAsync(ct);
     }
 
-    private static async Task RecoverExpiredClaimsAsync(DbContext db, DateTime now, CancellationToken ct)
+    private static async Task RecoverExpiredClaimAsync(
+        DbContext db,
+        Guid messageId,
+        Guid tenantId,
+        DateTime now,
+        CancellationToken ct)
     {
         await db.Set<PasswordResetOutboxMessage>()
             .IgnoreQueryFilters()
+            .Where(message => message.Id == messageId && message.TenantId == tenantId)
             .Where(message => !message.IsDeleted && message.IsEnabled)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .Where(message => message.Attempts < MaxAttempts)
@@ -165,6 +193,7 @@ public sealed class PasswordResetOutboxDispatcher(
 
         await db.Set<PasswordResetOutboxMessage>()
             .IgnoreQueryFilters()
+            .Where(message => message.Id == messageId && message.TenantId == tenantId)
             .Where(message => !message.IsDeleted && message.IsEnabled)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .Where(message => message.LeaseExpiresAt <= now)
@@ -215,4 +244,6 @@ public sealed class PasswordResetOutboxDispatcher(
 
     private static TimeSpan GetRetryDelay(int attempts) =>
         TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, Math.Clamp(attempts, 1, 6))));
+
+    private sealed record OutboxCandidate(Guid Id, Guid TenantId, Guid RequestId);
 }

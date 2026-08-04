@@ -12,9 +12,4 @@ public partial record CreateWalletRequest : RequestBase,
     public Guid CredentialId { get; set; }
     public Guid WalletTypeId { get; set; }
     public decimal InitialBalance { get; set; }
-
-    /// <summary>
-    /// Compatibility for existing REST callers. Metadata.TenantId is preferred.
-    /// </summary>
-    public Guid? TenantId { get; set; }
 }

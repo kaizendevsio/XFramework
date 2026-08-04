@@ -12,6 +12,7 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext;
 using XFramework.Integration.DataContext.Cache;
+using XFramework.Integration.Security;
 
 namespace XFramework.Core.Tests.DataContext;
 
@@ -55,18 +56,83 @@ public sealed partial class CachingQuerySecurityTests
 
         cache.SetKeys.Should().OnlyHaveUniqueItems().And.HaveCount(3);
         cache.SetKeys.Should().Contain(key =>
-            key.Contains($"tenant:{tenantOne:N}", StringComparison.OrdinalIgnoreCase) &&
-            key.Contains($"credential:{credentialOne:N}", StringComparison.OrdinalIgnoreCase));
+            key.Contains($"tenant:{tenantOne:N}", StringComparison.OrdinalIgnoreCase));
         cache.SetKeys.Should().Contain(key =>
-            key.Contains($"tenant:{tenantOne:N}", StringComparison.OrdinalIgnoreCase) &&
-            key.Contains($"credential:{credentialTwo:N}", StringComparison.OrdinalIgnoreCase));
-        cache.SetKeys.Should().Contain(key =>
-            key.Contains($"tenant:{tenantTwo:N}", StringComparison.OrdinalIgnoreCase) &&
-            key.Contains($"credential:{credentialOne:N}", StringComparison.OrdinalIgnoreCase));
+            key.Contains($"tenant:{tenantTwo:N}", StringComparison.OrdinalIgnoreCase));
+        cache.SetKeys.Should().OnlyContain(key =>
+            key.Contains(":authority:", StringComparison.OrdinalIgnoreCase));
     }
 
     [Test]
-    public async Task CachedQuery_WithoutTenantMetadata_BypassesCache()
+    public async Task CachedQueries_PartitionKeysBySessionGenerationAndCapabilities()
+    {
+        var tenantId = Guid.NewGuid();
+        var credentialId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var cache = new RecordingClientCacheService();
+        using var services = CreateServices();
+
+        await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(tenantId, credentialId, sessionId, "generation-1", Capabilities("inventory.read")));
+        await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(tenantId, credentialId, Guid.NewGuid(), "generation-1", Capabilities("inventory.read")));
+        await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(tenantId, credentialId, sessionId, "generation-2", Capabilities("inventory.read")));
+        await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(
+                tenantId,
+                credentialId,
+                sessionId,
+                "generation-1",
+                Capabilities("inventory.read", "inventory.write")));
+
+        cache.SetKeys.Should().OnlyHaveUniqueItems().And.HaveCount(4);
+        cache.SetKeys.Should().OnlyContain(key =>
+            key.Contains($"tenant:{tenantId:N}", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Test]
+    public async Task CachedQueries_UseStableAuthorizationPartitionRegardlessOfCapabilityOrder()
+    {
+        var tenantId = Guid.NewGuid();
+        var credentialId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var cache = new RecordingClientCacheService();
+        using var services = CreateServices();
+
+        await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(
+                tenantId,
+                credentialId,
+                sessionId,
+                "generation-1",
+                Capabilities("inventory.read", "inventory.write")));
+        await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(
+                tenantId,
+                credentialId,
+                sessionId,
+                "generation-1",
+                Capabilities("inventory.write", "inventory.read")));
+
+        cache.SetKeys.Should().HaveCount(2);
+        cache.SetKeys.Should().OnlyContain(key => key == cache.SetKeys[0]);
+    }
+
+    [Test]
+    public async Task CachedQuery_WithoutTrustedTenant_BypassesCache()
     {
         var cache = new RecordingClientCacheService();
         var wrapper = new CachePartitionWrapper();
@@ -76,12 +142,13 @@ public sealed partial class CachingQuerySecurityTests
         var remoteQuery = new RemoteQuery<CachePartitionEntity>(
             services,
             [],
-            new RequestMetadata { CredentialId = Guid.NewGuid() });
+            new RequestMetadata { RequestedTenantId = Guid.NewGuid() });
         var query = new CachingQuery<CachePartitionEntity>(
             remoteQuery,
             cache,
             new CachePolicy { Enabled = true },
-            NullLogger.Instance);
+            NullLogger.Instance,
+            CreateTrustedContext());
 
         await query.ToListAsync();
 
@@ -98,12 +165,14 @@ public sealed partial class CachingQuerySecurityTests
         var remoteQuery = new RemoteQuery<CachePartitionEntity>(
             services,
             [],
-            new RequestMetadata { TenantId = Guid.NewGuid(), CredentialId = Guid.NewGuid() });
+            new RequestMetadata { RequestedTenantId = Guid.NewGuid() });
+        var tenantId = Guid.NewGuid();
         var query = new CachingQuery<CachePartitionEntity>(
             remoteQuery,
             new ThrowingClientCacheService(),
             new CachePolicy { Enabled = true },
-            NullLogger.Instance);
+            NullLogger.Instance,
+            CreateTrustedContext(tenantId, Guid.NewGuid()));
 
         var result = await query.ToListAsync();
 
@@ -118,7 +187,8 @@ public sealed partial class CachingQuerySecurityTests
             new SuccessfulDataContext(),
             new ThrowingClientCacheService(),
             new DataContextOptions(),
-            NullLogger<CachingDataContext>.Instance);
+            NullLogger<CachingDataContext>.Instance,
+            CreateTrustedContext());
 
         context.Add(new CachePartitionEntity { Id = Guid.NewGuid() });
         var result = await context.SaveChangesAsync();
@@ -134,7 +204,8 @@ public sealed partial class CachingQuerySecurityTests
             new SuccessfulDataContext(),
             cache,
             new DataContextOptions(),
-            NullLogger<CachingDataContext>.Instance);
+            NullLogger<CachingDataContext>.Instance,
+            CreateTrustedContext());
 
         await context.InvalidateAsync<CachePartitionEntity>(Guid.NewGuid());
 
@@ -146,26 +217,71 @@ public sealed partial class CachingQuerySecurityTests
         .AddSingleton<CachePartitionWrapper>()
         .BuildServiceProvider();
 
+    private static HashSet<string> Capabilities(params string[] values) =>
+        new(values, StringComparer.OrdinalIgnoreCase);
+
     private static async Task ExecuteCachedQueryAsync(
         IServiceProvider services,
         IClientCacheService cache,
         Guid tenantId,
         Guid credentialId)
+        => await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(tenantId, credentialId));
+
+    private static async Task ExecuteCachedQueryAsync(
+        IServiceProvider services,
+        IClientCacheService cache,
+        ITrustedInvocationContextAccessor trustedContext)
     {
         var remoteQuery = new RemoteQuery<CachePartitionEntity>(
             services,
             [],
             new RequestMetadata
             {
-                TenantId = tenantId,
-                CredentialId = credentialId
+                RequestedTenantId = trustedContext.Current?.EffectiveTenantId
             });
         var query = new CachingQuery<CachePartitionEntity>(
             remoteQuery,
             cache,
             new CachePolicy { Enabled = true },
-            NullLogger.Instance);
+            NullLogger.Instance,
+            trustedContext);
         await query.ToListAsync();
+    }
+
+    private static ITrustedInvocationContextAccessor CreateTrustedContext(
+        Guid? effectiveTenantId = null,
+        Guid? credentialId = null,
+        Guid? sessionId = null,
+        string generationId = "test-actor-generation",
+        IReadOnlySet<string>? capabilities = null)
+    {
+        var actor = credentialId is { } trustedCredentialId
+            ? new TrustedActorIdentity(
+                trustedCredentialId,
+                Guid.NewGuid(),
+                effectiveTenantId ?? Guid.NewGuid(),
+                sessionId ?? Guid.NewGuid(),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                capabilities ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                generationId,
+                DateTimeOffset.UtcNow.AddMinutes(5))
+            : null;
+
+        return new TestTrustedInvocationContextAccessor(new TrustedInvocationContext(
+            actor,
+            null,
+            effectiveTenantId,
+            effectiveTenantId,
+            Guid.NewGuid()));
+    }
+
+    private sealed class TestTrustedInvocationContextAccessor(TrustedInvocationContext current)
+        : ITrustedInvocationContextAccessor
+    {
+        public TrustedInvocationContext? Current => current;
     }
 
     [MemoryPackable]

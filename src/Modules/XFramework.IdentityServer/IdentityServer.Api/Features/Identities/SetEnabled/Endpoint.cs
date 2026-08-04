@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Identities.SetEnabled;
 
 public static class SetIdentityEnabledEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<IdentityAdministrationResponse>> Handle(
         SetIdentityEnabledRequest request,
         IIdentityAdministrationService service,
@@ -25,7 +28,7 @@ public static class SetIdentityEnabledEndpoint
         IIdentityAdministrationService service,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return service.SetEnabledAsync(request, ct);
     }
 }

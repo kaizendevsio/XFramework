@@ -96,6 +96,63 @@ public sealed class IdentityServerSigningKeyProviderTests
         Assert.That(handler.RequestCount, Is.EqualTo(2));
     }
 
+    [Test]
+    public async Task IsAcceptedAsync_NewCredentialGeneration_ForcesPolicyRefresh()
+    {
+        var handler = new SigningKeyHandler();
+        var provider = new IdentityServerSigningKeyProvider(
+            new TestHttpClientFactory(handler),
+            Options.Create(new ServiceIdentityOptions
+            {
+                Authority = "http://identity.local",
+                AllowInsecureHttp = true,
+                ClientId = XFrameworkServiceNames.Communications,
+                SigningKeyCacheMinutes = 15
+            }));
+
+        await provider.GetSigningKeysAsync(SigningKeyHandler.KnownKeyId);
+        handler.RotateGeneration();
+
+        var accepted = await provider.IsAcceptedAsync(
+            XFrameworkServiceNames.Portal,
+            "generation-2");
+        var retired = await provider.IsAcceptedAsync(
+            XFrameworkServiceNames.Portal,
+            "generation-1");
+
+        Assert.That(accepted, Is.True);
+        Assert.That(retired, Is.False);
+        Assert.That(handler.RequestCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task IsAcceptedAsync_PreviouslyAcceptedGeneration_IsRejectedAfterPolicyRetiresIt()
+    {
+        var handler = new SigningKeyHandler();
+        var provider = new IdentityServerSigningKeyProvider(
+            new TestHttpClientFactory(handler),
+            Options.Create(new ServiceIdentityOptions
+            {
+                Authority = "http://identity.local",
+                AllowInsecureHttp = true,
+                ClientId = XFrameworkServiceNames.Communications,
+                SigningKeyCacheMinutes = 15,
+                CredentialGenerationCacheSeconds = 0
+            }));
+
+        var initiallyAccepted = await provider.IsAcceptedAsync(
+            XFrameworkServiceNames.Portal,
+            "generation-1");
+        handler.RotateGeneration();
+        var acceptedAfterRetirement = await provider.IsAcceptedAsync(
+            XFrameworkServiceNames.Portal,
+            "generation-1");
+
+        Assert.That(initiallyAccepted, Is.True);
+        Assert.That(acceptedAfterRetirement, Is.False);
+        Assert.That(handler.RequestCount, Is.EqualTo(2));
+    }
+
     private sealed class TestHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
@@ -107,11 +164,13 @@ public sealed class IdentityServerSigningKeyProviderTests
         public const string RotatedKeyId = "rotated-key";
         private int _requestCount;
         private int _rotated;
+        private int _generationRotated;
 
         public int RequestCount => Volatile.Read(ref _requestCount);
         public bool FailRequests { get; set; }
 
         public void Rotate() => Volatile.Write(ref _rotated, 1);
+        public void RotateGeneration() => Volatile.Write(ref _generationRotated, 1);
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -134,7 +193,12 @@ public sealed class IdentityServerSigningKeyProviderTests
                         ActivatedAtUtc = DateTime.UtcNow,
                         IsActive = true
                     }
-                ]
+                ],
+                CredentialGenerationsByClient = new Dictionary<string, List<string>>(StringComparer.Ordinal)
+                {
+                    [XFrameworkServiceNames.Portal] =
+                    [Volatile.Read(ref _generationRotated) == 0 ? "generation-1" : "generation-2"]
+                }
             };
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)

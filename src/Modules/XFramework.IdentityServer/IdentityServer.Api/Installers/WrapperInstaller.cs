@@ -11,6 +11,6 @@ public class WrapperInstaller : IInstaller
             configuration,
             connectAfterApplicationStarted: true,
             hostEnvironment: hostEnvironment);
-        services.AddSingleton<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
+        services.AddScoped<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
     }
 }

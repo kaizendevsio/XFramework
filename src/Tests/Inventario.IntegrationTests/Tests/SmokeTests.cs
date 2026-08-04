@@ -66,7 +66,16 @@ public sealed class SmokeTests : InventarioTestBase
         }
 
         var metadata = CreateMetadata();
-        metadata.TenantId = tenantId;
+        metadata.RequestedTenantId = tenantId;
+
+        var actorToken = TestInvocationIdentityExtensions.CreateTestActorToken(
+            tenantId,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            roles: ["SuperAdmin"],
+            capabilities: []);
+        using var actorScope = TestInvocationActorTokenScope.Push(actorToken);
 
         var result = await InventarioIntegrationTestFixture.ServiceWrapper.CreateWarehouse(
             new CreateWarehouseRequest
@@ -78,6 +87,62 @@ public sealed class SmokeTests : InventarioTestBase
 
         result.IsSuccess.Should().BeFalse();
         result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    [Category(TestCategories.Auth)]
+    public async Task CreateWarehouse_WithCallerSuppliedDifferentTenant_IsRejectedWithoutWriting()
+    {
+        var requestedTenantId = Guid.NewGuid();
+        var code = UniqueCode("SPOOF");
+        var metadata = CreateMetadata();
+        metadata.RequestedTenantId = requestedTenantId;
+
+        var result = await InventarioIntegrationTestFixture.ServiceWrapper.CreateWarehouse(
+            new CreateWarehouseRequest
+            {
+                Metadata = metadata,
+                Code = code,
+                Name = "Rejected cross-tenant warehouse"
+            });
+
+        result.IsSuccess.Should().BeFalse();
+        result.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        await using var db = CreateDbContext();
+        var wasWritten = await db.Set<Warehouse>()
+            .IgnoreQueryFilters()
+            .AnyAsync(x => x.Code == code);
+        wasWritten.Should().BeFalse();
+    }
+
+    [Test]
+    [Category(TestCategories.Auth)]
+    public async Task CreateWarehouse_RestBodyRequestedTenantSpoof_IsRejectedWithoutWriting()
+    {
+        var requestedTenantId = Guid.NewGuid();
+        var code = UniqueCode("REST-SPOOF");
+        using var response = await HttpClient.PostAsJsonAsync(
+            "/api/inventario/warehouses",
+            new CreateWarehouseRequest
+            {
+                Metadata = new XFramework.Domain.Shared.BusinessObjects.RequestMetadata
+                {
+                    RequestedTenantId = requestedTenantId,
+                    IpAddress = "203.0.113.55",
+                    UserAgent = "spoofed-agent"
+                },
+                Code = code,
+                Name = "Rejected REST cross-tenant warehouse"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        await using var db = CreateDbContext();
+        var wasWritten = await db.Set<Warehouse>()
+            .IgnoreQueryFilters()
+            .AnyAsync(x => x.Code == code);
+        wasWritten.Should().BeFalse();
     }
 
     [Test]
@@ -93,5 +158,29 @@ public sealed class SmokeTests : InventarioTestBase
             .ToListAsync();
 
         products.Should().ContainSingle(x => x.Id == product.Id);
+    }
+
+    [Test]
+    [Category(TestCategories.Auth)]
+    [Category(TestCategories.DataContext)]
+    public async Task RemoteQuery_IgnoreQueryFiltersWithoutActorCapability_IsRejected()
+    {
+        var actorToken = TestInvocationIdentityExtensions.CreateTestActorToken(
+            InventarioIntegrationTestFixture.TestTenantId,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            roles: [],
+            capabilities: []);
+
+        using var actorScope = TestInvocationActorTokenScope.Push(actorToken);
+        var ctx = InventarioIntegrationTestFixture.DataContext;
+
+        var query = async () => await ctx.Query<Product>()
+            .IgnoreQueryFilters()
+            .ToListAsync();
+
+        await query.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*failed*");
     }
 }

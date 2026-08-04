@@ -212,11 +212,11 @@ public sealed class TenantLifecycleTests : IntegrationTestBase
 
     private static RequestMetadata CreateMetadata(Guid? tenantId = null) => new()
     {
-        TenantId = tenantId ?? IntegrationTestFixture.TestTenantId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "TenantLifecycleTests",
+        OperationName = "TenantLifecycleTests",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 }

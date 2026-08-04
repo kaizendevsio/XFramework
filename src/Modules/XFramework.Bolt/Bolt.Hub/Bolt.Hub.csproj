@@ -12,6 +12,7 @@
       <ProjectReference Include="..\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\..\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
       <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
+      <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
       <ProjectReference Include="..\..\XFramework.Communications\Communications.Domain.Shared\Communications.Domain.Shared.csproj" />
     </ItemGroup>
 

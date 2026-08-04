@@ -1,4 +1,5 @@
 using FluentValidation;
+using IdentityServer.Integration.Extensions;
 using Inventario.Api.Features.Products.Update;
 using Inventario.Api.Infrastructure;
 using Microsoft.Extensions.Caching.Distributed;
@@ -11,6 +12,7 @@ using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
 builder.Logging.AddXFrameworkLogging(builder.Configuration);
+builder.Services.AddIdentityServerSessionValidation();
 
 // Configure OpenTelemetry for distributed tracing and metrics
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Inventario.Api");

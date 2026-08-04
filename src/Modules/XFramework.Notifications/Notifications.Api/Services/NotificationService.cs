@@ -9,8 +9,7 @@ namespace Notifications.Api.Services;
 public sealed class NotificationService(
     AppDbContext db,
     ILogger<NotificationService> logger,
-    IConfiguration configuration,
-    ITrustedServiceInvocationResolver? serviceInvocationResolver = null)
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor)
 {
     private const char TemplateKeySeparator = '\n';
 
@@ -318,30 +317,20 @@ public sealed class NotificationService(
     {
         tenantId = Guid.Empty;
 
-        if (requestTenantId is { } suppliedTenantId &&
-            metadata.TenantId is { } metadataTenantId &&
-            suppliedTenantId != Guid.Empty &&
-            metadataTenantId != Guid.Empty &&
-            suppliedTenantId != metadataTenantId)
+        var effectiveTenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId;
+        if (effectiveTenantId is null || effectiveTenantId == Guid.Empty)
         {
             return false;
         }
 
-        if (serviceInvocationResolver is not null)
+        if (requestTenantId is { } suppliedTenantId &&
+            suppliedTenantId != Guid.Empty &&
+            suppliedTenantId != effectiveTenantId)
         {
-            var trusted = serviceInvocationResolver.ResolveAsync(
-                    metadata,
-                    configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Notifications,
-                    [XFrameworkServiceScopes.BoltService],
-                    requireTenant: true)
-                .GetAwaiter()
-                .GetResult();
-
-            if (!trusted.IsSuccess)
-                return false;
+            return false;
         }
 
-        tenantId = metadata.TenantId ?? requestTenantId ?? Guid.Empty;
+        tenantId = effectiveTenantId.Value;
         return tenantId != Guid.Empty;
     }
 

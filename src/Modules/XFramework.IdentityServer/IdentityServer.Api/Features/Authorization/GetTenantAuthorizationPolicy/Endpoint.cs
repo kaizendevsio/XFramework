@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Authorization.GetTenantAuthorizationPolicy
 
 public static class GetTenantAuthorizationPolicyEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<TenantAuthorizationPolicyResponse>> Handle(
         GetTenantAuthorizationPolicyRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -24,7 +27,7 @@ public static class GetTenantAuthorizationPolicyEndpoint
         IIdentityAuthorizationService authorizationService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authorizationService.GetTenantAuthorizationPolicyAsync(request, ct);
     }
 }

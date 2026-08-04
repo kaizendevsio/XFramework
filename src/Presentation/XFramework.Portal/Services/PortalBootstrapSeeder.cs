@@ -1,4 +1,5 @@
 using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
 
@@ -19,8 +20,9 @@ public sealed class PortalBootstrapSeeder(
                 Password = options.Password!,
                 Metadata = new RequestMetadata
                 {
-                    Name = "Portal",
-                    RequestId = Guid.NewGuid()
+                    OperationName = "Portal",
+                    RequestId = Guid.NewGuid(),
+                    RequestedTenantId = PortalBootstrapConstants.AdminTenantId
                 }
             }).WaitAsync(ct);
 

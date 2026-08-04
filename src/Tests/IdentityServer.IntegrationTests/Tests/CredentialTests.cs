@@ -183,8 +183,18 @@ public class CredentialTests : IntegrationTestBase
             .GetRequiredService<DbCommandCounterInterceptor>();
         using var measurement = commandCounter.BeginMeasurement();
         var metadata = CreateMetadata();
-        metadata.HasTrustedActorContext = true;
-        metadata.TrustedActorRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" };
+        var credentialFeatureKey = TenantModuleFeatureKeys.Combine(
+            TenantModuleFeatureKeys.Identity,
+            TenantModuleFeatureKeys.CredentialsSubFeature);
+        var updateCapability = $"{credentialFeatureKey}:{IdentityAuthorizationConstants.Update}";
+        IntegrationTestFixture.EstablishTrustedActorContext(
+            scope.ServiceProvider,
+            IntegrationTestFixture.TestTenantId,
+            IntegrationTestFixture.TestCredentialId,
+            capabilities: new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                updateCapability
+            });
         var result = await scope.ServiceProvider.GetRequiredService<IAuthService>()
             .UpdateCredentialAsync(
                 new UpdateCredentialRequest
@@ -214,12 +224,11 @@ public class CredentialTests : IntegrationTestBase
 
     private static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = IntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "IntegrationTest",
+        OperationName = "IntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 
     private async Task<IdentityInformation> SeedIdentityInfo()

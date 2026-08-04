@@ -45,9 +45,13 @@ public sealed class CatalogTests : InventarioTestBase
         await using var db = CreateDbContext();
         var category = await TestInventarioSeed.SeedCategory(db);
         var ctx = InventarioIntegrationTestFixture.DataContext;
+        var remoteCategory = await ctx.Query<ProductCategory>()
+            .Where(x => x.Id == category.Id)
+            .FirstOrDefaultAsync();
+        remoteCategory.Should().NotBeNull();
 
-        category.Description = $"Updated {Guid.NewGuid():N}";
-        ctx.Update(category);
+        remoteCategory!.Description = $"Updated {Guid.NewGuid():N}";
+        ctx.Update(remoteCategory);
         var save = await ctx.SaveChangesAsync();
 
         save.IsSuccess.Should().BeTrue(save.Message);
@@ -56,7 +60,7 @@ public sealed class CatalogTests : InventarioTestBase
             .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstAsync(x => x.Id == category.Id);
-        persisted.Description.Should().Be(category.Description);
+        persisted.Description.Should().Be(remoteCategory.Description);
     }
 
     [Test]
@@ -117,10 +121,14 @@ public sealed class CatalogTests : InventarioTestBase
         await using var db = CreateDbContext();
         var product = await TestInventarioSeed.SeedProduct(db);
         var ctx = InventarioIntegrationTestFixture.DataContext;
+        var remoteProduct = await ctx.Query<Product>()
+            .Where(x => x.Id == product.Id)
+            .FirstOrDefaultAsync();
+        remoteProduct.Should().NotBeNull();
 
-        product.Name = $"Updated Product {Guid.NewGuid():N}";
-        product.Price = 42m;
-        ctx.Update(product);
+        remoteProduct!.Name = $"Updated Product {Guid.NewGuid():N}";
+        remoteProduct.Price = 42m;
+        ctx.Update(remoteProduct);
         var save = await ctx.SaveChangesAsync();
 
         save.IsSuccess.Should().BeTrue(save.Message);
@@ -129,7 +137,7 @@ public sealed class CatalogTests : InventarioTestBase
             .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstAsync(x => x.Id == product.Id);
-        persisted.Name.Should().Be(product.Name);
+        persisted.Name.Should().Be(remoteProduct.Name);
         persisted.Price.Should().Be(42m);
     }
 

@@ -19,6 +19,7 @@ global using XFramework.Domain.Shared.Enums;
 global using XFramework.Domain.Shared.Interfaces;
 global using XFramework.Domain.Shared.ServiceIdentity;
 global using XFramework.Integration.Abstractions;
+global using XFramework.Integration.Security;
 global using XFramework.Integration.Services.Helpers;
 global using XFramework.Extensions;
 global using IdentityServer.Api.Extensions;

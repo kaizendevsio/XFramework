@@ -13,6 +13,8 @@ using Wallets.Domain.Shared.Enums;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Enums;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 using SharedContracts = XFramework.Domain.Shared.Contracts;
 
 namespace Wallets.IntegrationTests.Tests;
@@ -1221,8 +1223,13 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         }
 
         await using var reportScope = WalletsTestFixture.Services.CreateAsyncScope();
-        var accessor = reportScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
-        accessor.HttpContext = CreateActorHttpContext(owner.Id, privileged: false);
+        var contextStore = reportScope.ServiceProvider.GetRequiredService<ITrustedInvocationContextStore>();
+        contextStore.Set(new TrustedInvocationContext(
+            Actor(WalletsTestFixture.TestTenantId, owner.Id),
+            null,
+            WalletsTestFixture.TestTenantId,
+            WalletsTestFixture.TestTenantId,
+            Guid.NewGuid()));
         var reporting = reportScope.ServiceProvider.GetRequiredService<IWalletReportingService>();
 
         var ledgerEntries = await reporting.GetLedgerEntriesAsync(new WalletLedgerEntriesRequest
@@ -1404,23 +1411,15 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     [Test]
     public void Resolver_AuthenticatedRequestRejectsSpoofedMetadataTenant()
     {
-        var httpContext = new DefaultHttpContext();
-        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
-        [
-            new Claim("tenantId", WalletsTestFixture.TestTenantId.ToString()),
-            new Claim("credentialId", Guid.NewGuid().ToString())
-        ], "WalletsTest"));
-
         var resolver = new WalletRequestContextResolver(
-            new HttpContextAccessor { HttpContext = httpContext },
-            new ConfigurationBuilder().Build());
+            TrustedContext(Actor(WalletsTestFixture.TestTenantId, Guid.NewGuid())));
         var spoofedTenantId = Guid.NewGuid();
 
         var result = resolver.Resolve(new RequestBase
         {
             Metadata = new XFramework.Domain.Shared.BusinessObjects.RequestMetadata
             {
-                TenantId = spoofedTenantId,
+                RequestedTenantId = spoofedTenantId,
                 RequestId = Guid.NewGuid()
             }
         });
@@ -1431,30 +1430,20 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     }
 
     [Test]
-    public void Resolver_AuthenticatedRequestDoesNotTrustTargetCredentialOrMetadataNetworkAsActor()
+    public void Resolver_RequestMetadataDoesNotEstablishActorIdentity()
     {
         var targetCredentialId = Guid.NewGuid();
-        var httpContext = new DefaultHttpContext();
-        httpContext.Connection.RemoteIpAddress = IPAddress.Parse("10.10.10.10");
-        httpContext.Request.Headers.UserAgent = "TrustedServerAgent";
-        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
-        [
-            new Claim("tenantId", WalletsTestFixture.TestTenantId.ToString())
-        ], "WalletsTest"));
-
         var resolver = new WalletRequestContextResolver(
-            new HttpContextAccessor { HttpContext = httpContext },
-            new ConfigurationBuilder().Build());
+            TrustedContext(effectiveTenantId: WalletsTestFixture.TestTenantId));
 
         var contextRequest = new RequestBase
         {
             Metadata = new XFramework.Domain.Shared.BusinessObjects.RequestMetadata
             {
-                TenantId = WalletsTestFixture.TestTenantId,
-                CredentialId = targetCredentialId,
+                RequestedTenantId = WalletsTestFixture.TestTenantId,
                 RequestId = Guid.NewGuid(),
                 IpAddress = "203.0.113.20",
-                DeviceAgent = "SpoofedAgent"
+                UserAgent = "DiagnosticAgent"
             }
         };
 
@@ -1462,8 +1451,8 @@ public class WalletAdvancedSystemTests : WalletsTestBase
 
         metadataOnlyResult.IsSuccess.Should().BeTrue(metadataOnlyResult.Message);
         metadataOnlyResult.Data!.ActorCredentialId.Should().BeNull();
-        metadataOnlyResult.Data.IpAddress.Should().Be("10.10.10.10");
-        metadataOnlyResult.Data.UserAgent.Should().Be("TrustedServerAgent");
+        metadataOnlyResult.Data.IpAddress.Should().Be("203.0.113.20");
+        metadataOnlyResult.Data.UserAgent.Should().Be("DiagnosticAgent");
         metadataOnlyResult.Data.IsPrivilegedActor.Should().BeFalse();
 
         var targetOperationResult = resolver.Resolve(contextRequest, targetCredentialId);
@@ -1471,6 +1460,47 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         targetOperationResult.IsSuccess.Should().BeFalse();
         targetOperationResult.StatusCode.Should().Be(403);
         targetOperationResult.Message.Should().Contain("Actor credential");
+    }
+
+    [Test]
+    public void Resolver_ActorPlusServiceCannotOperateOnAnotherCredential()
+    {
+        var actorCredentialId = Guid.NewGuid();
+        var resolver = new WalletRequestContextResolver(
+            TrustedContext(
+                actor: Actor(WalletsTestFixture.TestTenantId, actorCredentialId),
+                service: Service()));
+
+        var result = resolver.Resolve(
+            new RequestBase
+            {
+                Metadata = new XFramework.Domain.Shared.BusinessObjects.RequestMetadata
+                {
+                    RequestedTenantId = WalletsTestFixture.TestTenantId
+                }
+            },
+            requestCredentialId: Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(403);
+        result.Message.Should().Contain("cannot operate");
+    }
+
+    [Test]
+    public void Resolver_ServiceOnlyContext_RemainsSystemAuthority()
+    {
+        var resolver = new WalletRequestContextResolver(
+            TrustedContext(
+                effectiveTenantId: WalletsTestFixture.TestTenantId,
+                service: Service()));
+
+        var result = resolver.Resolve(
+            new RequestBase { Metadata = new XFramework.Domain.Shared.BusinessObjects.RequestMetadata() },
+            requestCredentialId: Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.IsSystemActor.Should().BeTrue();
+        result.Data.IsPrivilegedActor.Should().BeTrue();
     }
 
     [Test]
@@ -1841,6 +1871,39 @@ public class WalletAdvancedSystemTests : WalletsTestBase
         using var hmac = new System.Security.Cryptography.HMACSHA256(
             System.Text.Encoding.UTF8.GetBytes("wallets-webhook-test-secret"));
         return Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+    }
+
+    private static ITrustedInvocationContextAccessor TrustedContext(
+        TrustedActorIdentity? actor = null,
+        Guid? effectiveTenantId = null,
+        TrustedServiceIdentity? service = null) =>
+        new TestTrustedInvocationContextAccessor(new TrustedInvocationContext(
+            actor,
+            service,
+            effectiveTenantId ?? actor?.TenantId,
+            null,
+            Guid.NewGuid()));
+
+    private static TrustedActorIdentity Actor(Guid tenantId, Guid credentialId) => new(
+        credentialId,
+        Guid.NewGuid(),
+        tenantId,
+        Guid.NewGuid(),
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        "test-generation",
+        DateTimeOffset.UtcNow.AddMinutes(5));
+
+    private static TrustedServiceIdentity Service() => new(
+        XFrameworkServiceNames.Portal,
+        XFrameworkServiceNames.Wallets,
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        "test-service-generation");
+
+    private sealed class TestTrustedInvocationContextAccessor(TrustedInvocationContext context)
+        : ITrustedInvocationContextAccessor
+    {
+        public TrustedInvocationContext? Current => context;
     }
 
     private async Task SetTenantFeatureEnabled(string featureKey, bool enabled)

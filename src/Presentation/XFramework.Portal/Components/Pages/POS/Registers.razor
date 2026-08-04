@@ -365,11 +365,9 @@ else
 
     private RequestMetadata BuildMetadata() => new()
     {
-        TenantId = TenantFilter.SelectedTenantId,
-        CredentialId = RequestMetadata.CredentialId,
-        SessionId = RequestMetadata.SessionId,
+        RequestedTenantId = TenantFilter.SelectedTenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal"
+        OperationName = "Portal"
     };
 
     private string GetWarehouseName(Guid id) => _warehouses.FirstOrDefault(item => item.Id == id)?.Name ?? id.ToString()[..8];

@@ -37,28 +37,29 @@ public sealed class DataContextBoltHandlerTests
 
         authorizer
             .Setup(x => x.AuthorizeAsync(
-                It.Is<RequestMetadata>(value => HasSameIdentity(value, metadata)),
+                It.Is<InvocationCredentials>(value => HasExpectedCredentials(value)),
+                It.Is<RequestMetadata>(value => HasSameMetadata(value, metadata)),
                 context,
-                It.Is<IReadOnlyCollection<string>>(scopes =>
-                    scopes.Count == 1 && scopes.Contains(XFrameworkServiceScopes.DataContextQuery)),
-                null,
+                It.Is<InvocationAuthorizationPolicy>(policy =>
+                    HasPolicy(policy, XFrameworkServiceScopes.DataContextQuery)),
                 cancellationToken))
             .ReturnsAsync(Authorized(metadata));
         queryService
             .Setup(x => x.ExecuteAsync(It.IsAny<byte[]>(), cancellationToken))
             .ReturnsAsync(expectedResponse);
 
-        var payload = MemoryPackSerializer.Serialize(new QueryDescriptor
+        var requestPayload = MemoryPackSerializer.Serialize(new QueryDescriptor
         {
             EntityTypeName = "Tenant",
             Metadata = metadata
         });
+        var payload = Envelope(requestPayload);
         var result = await handler(payload, context, cancellationToken);
 
         result.Item1.Should().Be(HttpStatusCode.OK);
         result.Item2.ToArray().Should().Equal(expectedResponse);
         authorizer.VerifyAll();
-        queryService.Verify(x => x.ExecuteAsync(It.Is<byte[]>(bytes => bytes.SequenceEqual(payload)), cancellationToken), Times.Once);
+        queryService.Verify(x => x.ExecuteAsync(It.Is<byte[]>(bytes => bytes.SequenceEqual(requestPayload)), cancellationToken), Times.Once);
         queryService.Verify(x => x.ExecuteChangesAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -72,22 +73,23 @@ public sealed class DataContextBoltHandlerTests
 
         authorizer
             .Setup(x => x.AuthorizeAsync(
-                It.Is<RequestMetadata>(value => HasSameIdentity(value, metadata)),
+                It.Is<InvocationCredentials>(value => HasExpectedCredentials(value)),
+                It.Is<RequestMetadata>(value => HasSameMetadata(value, metadata)),
                 context,
-                It.Is<IReadOnlyCollection<string>>(scopes =>
-                    scopes.Count == 2 &&
-                    scopes.Contains(XFrameworkServiceScopes.DataContextQuery) &&
-                    scopes.Contains(XFrameworkServiceScopes.DataContextQueryAllTenants)),
-                null,
+                It.Is<InvocationAuthorizationPolicy>(policy => HasPolicy(
+                    policy,
+                    XFrameworkServiceScopes.DataContextQuery,
+                    XFrameworkServiceScopes.DataContextQueryAllTenants)),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(TrustedServiceInvocationResult.Failure("missing cross-tenant scope", 403));
+            .ReturnsAsync(TrustedInvocationResult.Failure("missing cross-tenant scope", 403));
 
-        var payload = MemoryPackSerializer.Serialize(new QueryDescriptor
+        var requestPayload = MemoryPackSerializer.Serialize(new QueryDescriptor
         {
             EntityTypeName = "Tenant",
             IgnoreQueryFilters = true,
             Metadata = metadata
         });
+        var payload = Envelope(requestPayload);
         var result = await handler(payload, context, CancellationToken.None);
 
         result.Item1.Should().Be(HttpStatusCode.Forbidden);
@@ -107,25 +109,124 @@ public sealed class DataContextBoltHandlerTests
 
         authorizer
             .Setup(x => x.AuthorizeAsync(
-                It.Is<RequestMetadata>(value => HasSameIdentity(value, metadata)),
+                It.Is<InvocationCredentials>(value => HasExpectedCredentials(value)),
+                It.Is<RequestMetadata>(value => HasSameMetadata(value, metadata)),
                 context,
-                It.Is<IReadOnlyCollection<string>>(scopes =>
-                    scopes.Count == 1 && scopes.Contains(XFrameworkServiceScopes.DataContextMutate)),
-                null,
+                It.Is<InvocationAuthorizationPolicy>(policy =>
+                    HasPolicy(policy, XFrameworkServiceScopes.DataContextMutate)),
                 cancellationToken))
             .ReturnsAsync(Authorized(metadata));
         queryService
             .Setup(x => x.ExecuteChangesAsync(It.IsAny<byte[]>(), cancellationToken))
             .ReturnsAsync(expectedResponse);
 
-        var payload = MemoryPackSerializer.Serialize(new SaveChangesRequest { Metadata = metadata });
+        var requestPayload = MemoryPackSerializer.Serialize(new SaveChangesRequest { Metadata = metadata });
+        var payload = Envelope(requestPayload);
         var result = await handler(payload, context, cancellationToken);
 
         result.Item1.Should().Be(HttpStatusCode.OK);
         result.Item2.ToArray().Should().Equal(expectedResponse);
         authorizer.VerifyAll();
-        queryService.Verify(x => x.ExecuteChangesAsync(It.Is<byte[]>(bytes => bytes.SequenceEqual(payload)), cancellationToken), Times.Once);
+        queryService.Verify(x => x.ExecuteChangesAsync(It.Is<byte[]>(bytes => bytes.SequenceEqual(requestPayload)), cancellationToken), Times.Once);
         queryService.Verify(x => x.ExecuteAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Test]
+    public async Task QueryRoute_ActorlessTargeting_UsesScopedServiceTargetPolicy()
+    {
+        var metadata = CreateMetadata();
+        var context = new BoltInboundRequestContext(Guid.NewGuid(), BoltCodec.Fnv1aHash("portal"));
+        var (client, authorizer, queryService, handler) = CreateHandler("__db_query__");
+        await using var disposableClient = client;
+
+        authorizer
+            .Setup(x => x.AuthorizeAsync(
+                It.Is<InvocationCredentials>(value => HasExpectedCredentials(value, hasActor: false)),
+                It.Is<RequestMetadata>(value => HasSameMetadata(value, metadata)),
+                context,
+                It.Is<InvocationAuthorizationPolicy>(policy =>
+                    HasServiceTargetPolicy(
+                        policy,
+                        XFrameworkServiceScopes.DataContextQuery,
+                        XFrameworkServiceScopes.TenantTarget)),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AuthorizedService(metadata));
+        queryService
+            .Setup(x => x.ExecuteAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([1, 2, 3]);
+
+        var requestPayload = MemoryPackSerializer.Serialize(new QueryDescriptor
+        {
+            EntityTypeName = "Tenant",
+            Metadata = metadata
+        });
+        var result = await handler(Envelope(requestPayload, actorAccessToken: null), context, CancellationToken.None);
+
+        result.Item1.Should().Be(HttpStatusCode.OK);
+        queryService.Verify(x => x.ExecuteAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        authorizer.VerifyAll();
+    }
+
+    [Test]
+    public async Task MutationRoute_ActorlessTargeting_UsesScopedServiceTargetPolicy()
+    {
+        var metadata = CreateMetadata();
+        var context = new BoltInboundRequestContext(Guid.NewGuid(), BoltCodec.Fnv1aHash("portal"));
+        var (client, authorizer, queryService, handler) = CreateHandler("__db_changes__");
+        await using var disposableClient = client;
+
+        authorizer
+            .Setup(x => x.AuthorizeAsync(
+                It.Is<InvocationCredentials>(value => HasExpectedCredentials(value, hasActor: false)),
+                It.Is<RequestMetadata>(value => HasSameMetadata(value, metadata)),
+                context,
+                It.Is<InvocationAuthorizationPolicy>(policy =>
+                    HasServiceTargetPolicy(
+                        policy,
+                        XFrameworkServiceScopes.DataContextMutate,
+                        XFrameworkServiceScopes.TenantTarget)),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AuthorizedService(metadata));
+        queryService
+            .Setup(x => x.ExecuteChangesAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([4, 5, 6]);
+
+        var requestPayload = MemoryPackSerializer.Serialize(new SaveChangesRequest { Metadata = metadata });
+        var result = await handler(Envelope(requestPayload, actorAccessToken: null), context, CancellationToken.None);
+
+        result.Item1.Should().Be(HttpStatusCode.OK);
+        queryService.Verify(x => x.ExecuteChangesAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        authorizer.VerifyAll();
+    }
+
+    [Test]
+    public async Task Register_DoesNotExposeUnauthenticatedRemoteQueryStream()
+    {
+        var authorizer = new Mock<IBoltServiceInvocationAuthorizer>(MockBehavior.Strict);
+        var queryService = new Mock<IQueryExecutionService>(MockBehavior.Strict);
+        var services = new ServiceCollection()
+            .AddSingleton(authorizer.Object)
+            .AddSingleton(queryService.Object)
+            .BuildServiceProvider();
+        await using var client = new BoltClient(
+            new Uri("ws://localhost/bolt"),
+            "identityserver",
+            "IdentityServer",
+            new BoltClientOptions(),
+            NullLogger<BoltClient>.Instance);
+
+        new DataContextBoltHandler().Register(
+            client,
+            NullLogger<DataContextBoltHandler>.Instance,
+            services.GetRequiredService<IServiceScopeFactory>());
+
+        var field = typeof(BoltClient).GetField("_streamHandlers", BindingFlags.Instance | BindingFlags.NonPublic);
+        field.Should().NotBeNull();
+        var handlers = field!.GetValue(client).Should()
+            .BeOfType<ConcurrentDictionary<int, Func<BoltStream, Task>>>()
+            .Subject;
+        handlers.Should().NotContainKey(BoltCodec.Fnv1aHash("__db_query_stream__"),
+            "Bolt rejects unregistered stream commands with 501 Not Implemented");
     }
 
     [Test]
@@ -138,19 +239,20 @@ public sealed class DataContextBoltHandlerTests
 
         authorizer
             .Setup(x => x.AuthorizeAsync(
-                It.Is<RequestMetadata>(value => HasSameIdentity(value, metadata)),
+                It.Is<InvocationCredentials>(value => HasExpectedCredentials(value)),
+                It.Is<RequestMetadata>(value => HasSameMetadata(value, metadata)),
                 context,
-                It.Is<IReadOnlyCollection<string>>(scopes =>
-                    scopes.Count == 1 && scopes.Contains(XFrameworkServiceScopes.DataContextQuery)),
-                null,
+                It.Is<InvocationAuthorizationPolicy>(policy =>
+                    HasPolicy(policy, XFrameworkServiceScopes.DataContextQuery)),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(TrustedServiceInvocationResult.Failure("Service token caller does not match the authenticated Bolt sender.", 403));
+            .ReturnsAsync(TrustedInvocationResult.Failure("Service token caller does not match the authenticated Bolt sender.", 403));
 
-        var payload = MemoryPackSerializer.Serialize(new QueryDescriptor
+        var requestPayload = MemoryPackSerializer.Serialize(new QueryDescriptor
         {
             EntityTypeName = "Tenant",
             Metadata = metadata
         });
+        var payload = Envelope(requestPayload);
         var result = await handler(payload, context, CancellationToken.None);
 
         result.Item1.Should().Be(HttpStatusCode.Forbidden);
@@ -171,15 +273,16 @@ public sealed class DataContextBoltHandlerTests
 
         authorizer
             .Setup(x => x.AuthorizeAsync(
-                It.Is<RequestMetadata>(value => HasSameIdentity(value, metadata)),
+                It.Is<InvocationCredentials>(value => HasExpectedCredentials(value)),
+                It.Is<RequestMetadata>(value => HasSameMetadata(value, metadata)),
                 context,
-                It.Is<IReadOnlyCollection<string>>(scopes =>
-                    scopes.Count == 1 && scopes.Contains(XFrameworkServiceScopes.DataContextMutate)),
-                null,
+                It.Is<InvocationAuthorizationPolicy>(policy =>
+                    HasPolicy(policy, XFrameworkServiceScopes.DataContextMutate)),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(TrustedServiceInvocationResult.Failure("Service caller is not allowed.", 403));
+            .ReturnsAsync(TrustedInvocationResult.Failure("Service caller is not allowed.", 403));
 
-        var payload = MemoryPackSerializer.Serialize(new SaveChangesRequest { Metadata = metadata });
+        var requestPayload = MemoryPackSerializer.Serialize(new SaveChangesRequest { Metadata = metadata });
+        var payload = Envelope(requestPayload);
         var result = await handler(payload, context, CancellationToken.None);
 
         result.Item1.Should().Be(HttpStatusCode.Forbidden);
@@ -227,22 +330,87 @@ public sealed class DataContextBoltHandlerTests
 
     private static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = Guid.NewGuid(),
-        CredentialId = Guid.NewGuid(),
-        ServiceAccessToken = "service-token"
+        RequestedTenantId = Guid.NewGuid(),
+        RequestId = Guid.NewGuid(),
+        OperationName = "DataContextBoltHandlerTests"
     };
 
-    private static bool HasSameIdentity(RequestMetadata actual, RequestMetadata expected) =>
-        actual.TenantId == expected.TenantId &&
-        actual.CredentialId == expected.CredentialId &&
-        actual.ServiceAccessToken == expected.ServiceAccessToken;
+    private static bool HasSameMetadata(RequestMetadata actual, RequestMetadata expected) =>
+        actual.RequestedTenantId == expected.RequestedTenantId &&
+        actual.RequestId == expected.RequestId &&
+        actual.OperationName == expected.OperationName;
 
-    private static TrustedServiceInvocationResult Authorized(RequestMetadata metadata) =>
-        TrustedServiceInvocationResult.Success(new TrustedServiceInvocation(
-            "portal",
-            "identityserver",
-            metadata.TenantId,
-            metadata.CredentialId,
-            metadata,
-            new HashSet<string>(StringComparer.Ordinal) { XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextMutate }));
+    private static bool HasExpectedCredentials(InvocationCredentials credentials, bool hasActor = true) =>
+        credentials.ActorAccessToken == (hasActor ? "actor-token" : null) &&
+        credentials.ServiceAccessToken == "service-token";
+
+    private static bool HasPolicy(InvocationAuthorizationPolicy policy, params string[] scopes) =>
+        policy.ActorRequirement == ActorRequirement.Required &&
+        policy.TenantAccessMode == TenantAccessMode.DelegatedTenant &&
+        policy.RequiredActorCapabilities.SequenceEqual(
+            scopes.Contains(XFrameworkServiceScopes.DataContextQueryAllTenants)
+                ? ["identity.tenants:manage"]
+                : []) &&
+        policy.RequiredCrossTenantActorCapabilities.SequenceEqual(["identity.tenants:manage"]) &&
+        policy.RequiredServiceScopes.Count == scopes.Length &&
+        scopes.All(policy.RequiredServiceScopes.Contains);
+
+    private static bool HasServiceTargetPolicy(
+        InvocationAuthorizationPolicy policy,
+        params string[] scopes) =>
+        policy.ActorRequirement == ActorRequirement.None &&
+        policy.TenantAccessMode == TenantAccessMode.ServiceTargetTenant &&
+        policy.AllowedServiceCallers.SequenceEqual(XFrameworkServiceNames.All) &&
+        policy.RequiredServiceScopes.Count == scopes.Length &&
+        scopes.All(policy.RequiredServiceScopes.Contains);
+
+    private static byte[] Envelope(byte[] payload, string? actorAccessToken = "actor-token") =>
+        MemoryPackSerializer.Serialize(new BoltInvocationEnvelope
+        {
+            Payload = payload,
+            ActorAccessToken = actorAccessToken,
+            ServiceAccessToken = "service-token"
+        });
+
+    private static TrustedInvocationResult Authorized(RequestMetadata metadata)
+    {
+        var tenantId = metadata.RequestedTenantId!.Value;
+        return TrustedInvocationResult.Success(new TrustedInvocationContext(
+            new TrustedActorIdentity(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                tenantId,
+                Guid.NewGuid(),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                "actor-generation",
+                DateTimeOffset.UtcNow.AddMinutes(5)),
+            new TrustedServiceIdentity(
+                "portal",
+                "identityserver",
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    XFrameworkServiceScopes.DataContextQuery,
+                    XFrameworkServiceScopes.DataContextMutate
+                },
+                "service-generation"),
+            tenantId,
+            tenantId,
+            metadata.RequestId!.Value));
+    }
+
+    private static TrustedInvocationResult AuthorizedService(RequestMetadata metadata)
+    {
+        var tenantId = metadata.RequestedTenantId!.Value;
+        return TrustedInvocationResult.Success(new TrustedInvocationContext(
+            null,
+            new TrustedServiceIdentity(
+                XFrameworkServiceNames.Portal,
+                XFrameworkServiceNames.IdentityServer,
+                new HashSet<string>(XFrameworkServiceScopes.AdminDefaults, StringComparer.OrdinalIgnoreCase),
+                "service-generation"),
+            tenantId,
+            tenantId,
+            metadata.RequestId!.Value));
+    }
 }

@@ -188,29 +188,18 @@ public sealed class InventoryPlanningReportingServiceTests
 
     private static InventoryPlanningService CreatePlanningService(FakeDataContext dataContext, Guid tenantId)
     {
-        var httpContextAccessor = CreateHttpContextAccessor(tenantId);
+        var invocationContext = new TestTrustedInvocationContextAccessor(tenantId);
         var featureService = new FakeTenantModuleFeatureService();
-        var productVariationService = new ProductVariationService(dataContext, httpContextAccessor, featureService);
+        var productVariationService = new ProductVariationService(dataContext, invocationContext, featureService);
 
-        return new InventoryPlanningService(dataContext, httpContextAccessor, featureService, productVariationService);
+        return new InventoryPlanningService(dataContext, invocationContext, featureService, productVariationService);
     }
 
     private static InventoryReportingService CreateReportingService(
         FakeDataContext dataContext,
         Guid tenantId,
         InventoryPlanningService planningService) =>
-        new(dataContext, CreateHttpContextAccessor(tenantId), planningService, new FakeTenantModuleFeatureService());
-
-    private static HttpContextAccessor CreateHttpContextAccessor(Guid tenantId) =>
-        new()
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("tenantId", tenantId.ToString())],
-                    authenticationType: "Test"))
-            }
-        };
+        new(dataContext, new TestTrustedInvocationContextAccessor(tenantId), planningService, new FakeTenantModuleFeatureService());
 
     private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService
     {

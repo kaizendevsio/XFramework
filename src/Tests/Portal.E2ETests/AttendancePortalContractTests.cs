@@ -80,7 +80,8 @@ public sealed class AttendancePortalContractTests
         sessionDetail.Should().Contain("IdempotencyKey = $\"portal:");
         sessionDetail.Should().Contain("ActorCredentialId = actorCredentialId");
         sessionDetail.Should().Contain("Reason = _adjustmentForm.Reason.Trim()");
-        sessionDetail.Should().Contain("ManualActionsDisabled => RequestMetadata.CredentialId is null");
+        sessionDetail.Should().Contain("ManualActionsDisabled => ActorContext.CredentialId is null");
+        sessionDetail.Should().NotContain("RequestMetadata.CredentialId");
     }
 
     [Test]

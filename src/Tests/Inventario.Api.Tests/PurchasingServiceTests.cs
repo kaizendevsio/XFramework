@@ -217,23 +217,15 @@ public sealed class PurchasingServiceTests
 
     private static PurchasingService CreateService(FakeDataContext dataContext, Guid tenantId)
     {
-        var httpContextAccessor = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("tenantId", tenantId.ToString())],
-                    authenticationType: "Test"))
-            }
-        };
+        var invocationContext = new TestTrustedInvocationContextAccessor(tenantId);
         var featureService = new FakeTenantModuleFeatureService();
-        var productVariationService = new ProductVariationService(dataContext, httpContextAccessor, featureService);
+        var productVariationService = new ProductVariationService(dataContext, invocationContext, featureService);
         var stockPostingService = new StockPostingService(
             dataContext,
-            httpContextAccessor,
+            invocationContext,
             featureService,
             productVariationService);
-        return new PurchasingService(dataContext, httpContextAccessor, stockPostingService, productVariationService, featureService);
+        return new PurchasingService(dataContext, invocationContext, stockPostingService, productVariationService, featureService);
     }
 
     private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService

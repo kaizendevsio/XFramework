@@ -1,5 +1,7 @@
 namespace XFramework.Integration.Attributes;
 
+using XFramework.Integration.Security;
+
 /// <summary>
 /// Base class for REST endpoint mapping attributes.
 /// The source generator uses these to generate the endpoint registration code
@@ -27,10 +29,28 @@ public abstract class MapEndpointAttribute : Attribute
     public bool ExcludeFromOpenApi { get; set; }
 
     /// <summary>
-    /// Whether the generated endpoint should require authorization.
-    /// Defaults to <c>false</c> to preserve existing method-level endpoint behavior.
+    /// Whether the generated endpoint should establish a trusted invocation and require ASP.NET authorization.
+    /// Defaults to <c>true</c>. Public endpoints must declare an explicit anonymous invocation policy.
     /// </summary>
-    public bool RequireAuthorization { get; set; }
+    public bool RequireAuthorization { get; set; } = true;
+
+    /// <summary>Service-token scopes required by this REST endpoint.</summary>
+    public string[]? RequiredServiceScopes { get; set; }
+
+    /// <summary>Service client IDs allowed to invoke this REST endpoint.</summary>
+    public string[]? AllowedServiceCallers { get; set; }
+
+    /// <summary>Whether the invocation must carry a validated actor identity.</summary>
+    public ActorRequirement ActorRequirement { get; set; } = ActorRequirement.Required;
+
+    /// <summary>How the effective tenant is derived for this REST endpoint.</summary>
+    public TenantAccessMode TenantAccessMode { get; set; } = TenantAccessMode.ActorTenant;
+
+    /// <summary>Actor capabilities required by this REST endpoint.</summary>
+    public string[]? RequiredActorCapabilities { get; set; }
+
+    /// <summary>Whether this endpoint intentionally accepts requests without actor or service identity.</summary>
+    public bool AllowAnonymous { get; set; }
 
     /// <summary>
     /// Named authorization policy required by the generated endpoint.

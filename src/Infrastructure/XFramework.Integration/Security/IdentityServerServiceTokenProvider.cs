@@ -109,7 +109,7 @@ public sealed class IdentityServerServiceTokenProvider : IServiceTokenProvider
             Scopes = scopes.ToList(),
             Metadata = new RequestMetadata
             {
-                Name = clientId,
+                OperationName = "Issue service token",
                 RequestId = Guid.NewGuid()
             }
         };

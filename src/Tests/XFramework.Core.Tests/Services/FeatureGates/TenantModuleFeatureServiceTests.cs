@@ -92,7 +92,7 @@ public sealed class TenantModuleFeatureServiceTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
 
-        return new AppDbContext(options);
+        return TestTrustedPersistence.Create(options);
     }
 
     private static TenantModuleFeatureService CreateService(AppDbContext db) =>

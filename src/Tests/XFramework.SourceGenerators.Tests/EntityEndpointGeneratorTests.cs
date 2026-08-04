@@ -53,6 +53,27 @@ public sealed class EntityEndpointGeneratorTests
     }
 
     [Test]
+    public void GenerateEndpoints_AuthorizedRoutesEstablishTrustedActorContextBeforeServicesRun()
+    {
+        var generatedSource = RunGenerator(includeValidators: false);
+
+        generatedSource.Should().Contain(
+            "global::XFramework.Integration.Security.IHttpTrustedInvocationAuthorizer invocationAuthorizer",
+            Exactly.Times(5));
+        generatedSource.Should().Contain(
+            "global::XFramework.Integration.Security.IActorAccessTokenScope actorAccessTokenScope",
+            Exactly.Times(5));
+        generatedSource.Should().Contain(
+            "ActorRequirement = global::XFramework.Integration.Security.ActorRequirement.Required",
+            Exactly.Times(5));
+        generatedSource.Should().Contain(
+            "TenantAccessMode = global::XFramework.Integration.Security.TenantAccessMode.ActorTenant",
+            Exactly.Times(5));
+        generatedSource.IndexOf("invocationAuthorizer.AuthorizeAsync(", StringComparison.Ordinal)
+            .Should().BeLessThan(generatedSource.IndexOf("service.GetByIdAsync(", StringComparison.Ordinal));
+    }
+
+    [Test]
     public void GenerateEndpoints_BaseModelMutationsRequireConcurrencyStampAndMapConflicts()
     {
         var generatedSource = RunGenerator(includeValidators: false);

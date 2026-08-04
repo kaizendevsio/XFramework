@@ -30,6 +30,7 @@ public class ServicesInstaller : IInstaller
         services.AddScoped<IWalletOperationsService, WalletOperationsService>();
         services.AddScoped<IBatchWalletService, BatchWalletService>();
         services.AddScoped<IWalletWorkflowService, WalletWorkflowService>();
+        services.AddScoped<IWalletProviderWorkflowService, WalletWorkflowService>();
         services.AddScoped<IWalletApprovalWorkflowService, WalletWorkflowService>();
         services.AddScoped<IWalletCaseWorkflowService, WalletWorkflowService>();
         services.AddScoped<IWalletReportingService, WalletWorkflowService>();

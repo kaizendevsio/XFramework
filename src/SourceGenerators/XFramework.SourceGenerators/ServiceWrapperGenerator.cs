@@ -221,7 +221,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                 "IMessageBusWrapper messageBusDriver",
                 "IConfiguration configuration",
                 "BoltClient boltClient",
-                "XFramework.Integration.Security.IServiceTokenProvider serviceTokenProvider"
+                "XFramework.Integration.Security.IServiceTokenProvider serviceTokenProvider",
+                "XFramework.Integration.Security.IActorAccessTokenProvider actorAccessTokenProvider"
             ])
             .ToList();
         for (int i = 0; i < constructorParameters.Count; i++)
@@ -239,8 +240,14 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                                 var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
                                 var descriptor = MemoryPack.MemoryPackSerializer.Deserialize<QueryDescriptor>((System.ReadOnlySpan<byte>)queryDescriptorBytes)
                                     ?? throw new System.InvalidOperationException("Query descriptor could not be deserialized.");
-                                await descriptor.AttachServiceTokenAsync(serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient), ct);
-                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor), ct);
+                                descriptor.Metadata ??= new RequestMetadata();
+                                descriptor.Metadata.RequestId ??= System.Guid.NewGuid();
+                                System.Collections.Generic.IReadOnlyCollection<string> scopes = descriptor.IgnoreQueryFilters
+                                    ? new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQueryAllTenants, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget }
+                                    : new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget };
+                                var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateAsync(
+                                    descriptor, targetClient, scopes, serviceTokenProvider, actorAccessTokenProvider, ct);
+                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", payload, ct);
                                 if ((int)status < 200 || (int)status >= 300)
                                     throw new System.InvalidOperationException($"DataContext query request failed with status {(int)status} ({status}).");
 
@@ -253,8 +260,16 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                                 var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
                                 var request = MemoryPack.MemoryPackSerializer.Deserialize<SaveChangesRequest>((System.ReadOnlySpan<byte>)saveChangesRequestBytes)
                                     ?? throw new System.InvalidOperationException("SaveChanges request could not be deserialized.");
-                                await request.AttachServiceTokenAsync(serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient), ct);
-                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", MemoryPack.MemoryPackSerializer.Serialize(request), ct);
+                                request.Metadata ??= new RequestMetadata();
+                                request.Metadata.RequestId ??= System.Guid.NewGuid();
+                                var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateAsync(
+                                    request,
+                                    targetClient,
+                                    new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextMutate, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget },
+                                    serviceTokenProvider,
+                                    actorAccessTokenProvider,
+                                    ct);
+                                var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", payload, ct);
                                 if ((int)status < 200 || (int)status >= 300)
                                 {
                                     var failure = DataContextResult.Failure($"DataContext change request failed with status {(int)status} ({status}).", (int)status);
@@ -272,14 +287,27 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                                 var targetClient = TargetClient ?? throw new System.InvalidOperationException("Target client was not initialized.");
                                 var descriptor = MemoryPack.MemoryPackSerializer.Deserialize<QueryDescriptor>((System.ReadOnlySpan<byte>)queryDescriptorBytes)
                                     ?? throw new System.InvalidOperationException("Query descriptor could not be deserialized.");
-                                await descriptor.AttachServiceTokenAsync(serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient), ct);
+                                descriptor.Metadata ??= new RequestMetadata();
+                                descriptor.Metadata.RequestId ??= System.Guid.NewGuid();
+                                System.Collections.Generic.IReadOnlyCollection<string> scopes = descriptor.IgnoreQueryFilters
+                                    ? new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQueryAllTenants, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget }
+                                    : new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget };
+                                var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateAsync(
+                                    descriptor, targetClient, scopes, serviceTokenProvider, actorAccessTokenProvider, ct);
                                 var stream = await boltClient.OpenStreamAsync(targetClient, "__db_query_stream__", ct);
                                 try
                                 {
-                                    await stream.SendAsync((System.ReadOnlyMemory<byte>)MemoryPack.MemoryPackSerializer.Serialize(descriptor), ct);
+                                    await stream.SendAsync((System.ReadOnlyMemory<byte>)payload, ct);
                                     await foreach (var chunk in stream.ReadAllAsync(ct))
                                     {
                                         yield return chunk.ToArray();
+                                    }
+
+                                    if (stream.CloseStatus is { } closeStatus &&
+                                        ((int)closeStatus < 200 || (int)closeStatus >= 300))
+                                    {
+                                        throw new System.InvalidOperationException(
+                                            $"DataContext streaming request failed with status {(int)closeStatus} ({closeStatus}).");
                                     }
                                 }
                                 finally
@@ -309,6 +337,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                       private readonly ILogger _logger;
                       private readonly string _targetClient = "{{serviceId}}";
                       private readonly XFramework.Integration.Security.IServiceTokenProvider _serviceTokenProvider;
+                      private readonly XFramework.Integration.Security.IActorAccessTokenProvider _actorAccessTokenProvider;
 
                       private static readonly JsonSerializerOptions _jsonOpts = new()
                       {
@@ -324,11 +353,16 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                           catch { return default; }
                       }
 
-                      public {{model}}CrudService(BoltClient boltClient, ILoggerFactory loggerFactory, XFramework.Integration.Security.IServiceTokenProvider serviceTokenProvider)
+                      public {{model}}CrudService(
+                          BoltClient boltClient,
+                          ILoggerFactory loggerFactory,
+                          XFramework.Integration.Security.IServiceTokenProvider serviceTokenProvider,
+                          XFramework.Integration.Security.IActorAccessTokenProvider actorAccessTokenProvider)
                       {
                           _boltClient = boltClient;
                           _logger = loggerFactory.CreateLogger("Bolt.Crud.{{model}}");
                           _serviceTokenProvider = serviceTokenProvider;
+                          _actorAccessTokenProvider = actorAccessTokenProvider;
                       }
 
                       public async Task<CmdResponse<{{model}}>> Create({{model}} entity)
@@ -385,10 +419,15 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               NoCache = noCache,
                               Includes = includes ?? new List<string>(),
                               Filters = filter ?? new List<QueryFilter>(),
-                              Metadata = new RequestMetadata { TenantId = tenantId }
+                              Metadata = new RequestMetadata { RequestedTenantId = tenantId }
                           };
-                          await descriptor.AttachServiceTokenAsync(_serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(_targetClient));
-                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
+                          var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateAsync(
+                              descriptor,
+                              _targetClient,
+                              new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget },
+                              _serviceTokenProvider,
+                              _actorAccessTokenProvider);
+                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", payload);
                           var items = data.IsEmpty ? new List<{{model}}>() : MemoryPack.MemoryPackSerializer.Deserialize<List<{{model}}>>(data.Span) ?? new List<{{model}}>();
 
                           _logger.LogDebug("GetList<{{model}}> | {StatusCode} in {Elapsed}ms | Request={Request} Response={Response}",
@@ -412,10 +451,15 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               NoCache = noCache,
                               Includes = includes ?? new List<string>(),
                               Filters = new List<QueryFilter> { new() { PropertyName = "Id", Operation = global::XFramework.Domain.Shared.Enums.QueryFilterOperation.Equal, Value = id } },
-                              Metadata = new RequestMetadata { TenantId = tenantId }
+                              Metadata = new RequestMetadata { RequestedTenantId = tenantId }
                           };
-                          await descriptor.AttachServiceTokenAsync(_serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(_targetClient));
-                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
+                          var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateAsync(
+                              descriptor,
+                              _targetClient,
+                              new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget },
+                              _serviceTokenProvider,
+                              _actorAccessTokenProvider);
+                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", payload);
                           var entity = data.IsEmpty ? default : MemoryPack.MemoryPackSerializer.Deserialize<{{model}}>(data.Span);
 
                           _logger.LogDebug("Get<{{model}}> | {StatusCode} | Request={Request} Response={Response}",
@@ -432,16 +476,27 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
                       private async Task<DataContextResult> ExecuteChange(string entityType, ChangeOperation op, byte[] serializedEntity, object? entityForLog = null)
                       {
+                          var requestedTenantId = entityForLog is XFramework.Domain.Shared.Contracts.Base.IHasTenantId tenantOwned &&
+                                                  tenantOwned.TenantId != System.Guid.Empty
+                              ? tenantOwned.TenantId
+                              : (System.Guid?)null;
                           var request = new SaveChangesRequest
                           {
                               Changes = new List<ChangeEntry>
                               {
                                   new() { EntityTypeName = entityType, Operation = op, SerializedEntity = serializedEntity }
                               },
-                              Metadata = BuildRequestMetadata(entityForLog)
+                              Metadata = new RequestMetadata { RequestedTenantId = requestedTenantId }
                           };
-                          await request.AttachServiceTokenAsync(_serviceTokenProvider, XFramework.Integration.Security.ServiceTokenMetadataExtensions.ResolveCanonicalAudience(_targetClient));
-                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_changes__", MemoryPack.MemoryPackSerializer.Serialize(request));
+                          request.Metadata ??= new RequestMetadata();
+                          request.Metadata.RequestId ??= System.Guid.NewGuid();
+                          var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateAsync(
+                              request,
+                              _targetClient,
+                              new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextMutate, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget },
+                              _serviceTokenProvider,
+                              _actorAccessTokenProvider);
+                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_changes__", payload);
                           var result = data.IsEmpty
                               ? DataContextResult.Failure("Empty response", (int)status)
                               : MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span) ?? DataContextResult.Failure("Deserialize failed");
@@ -455,16 +510,6 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                           return result;
                       }
 
-                      private static RequestMetadata? BuildRequestMetadata(object? entityForLog)
-                      {
-                          var tenantIdProperty = entityForLog?.GetType().GetProperty("TenantId");
-                          if (tenantIdProperty?.GetValue(entityForLog) is Guid tenantId && tenantId != Guid.Empty)
-                          {
-                              return new RequestMetadata { TenantId = tenantId };
-                          }
-
-                          return null;
-                      }
                   }
                   """);
         }
@@ -476,11 +521,11 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                              public static void Add{{serviceName}}WrapperServices(this IServiceCollection services)
                              {
                                      // Service wrapper registration
-                                 services.AddSingleton<I{{serviceName}}ServiceWrapper, {{serviceName}}ServiceWrapper>();
+                                 services.AddScoped<I{{serviceName}}ServiceWrapper, {{serviceName}}ServiceWrapper>();
                          """);
         foreach (var model in models)
         {
-            sb.AppendLine($"        services.AddSingleton<I{model}CrudService>(sp => new {model}CrudService(sp.GetRequiredService<BoltClient>(), sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<XFramework.Integration.Security.IServiceTokenProvider>()));");
+            sb.AppendLine($"        services.AddScoped<I{model}CrudService>(sp => new {model}CrudService(sp.GetRequiredService<BoltClient>(), sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<XFramework.Integration.Security.IServiceTokenProvider>(), sp.GetRequiredService<XFramework.Integration.Security.IActorAccessTokenProvider>()));");
         }
         sb.AppendLine("    }");
         sb.AppendLine("}");

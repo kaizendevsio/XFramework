@@ -1,4 +1,6 @@
 using FluentAssertions;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 using XFramework.Portal.Services;
 
@@ -78,13 +80,14 @@ public sealed class PortalSessionRevocationContractTests
         validator.Should().Contain("PortalAuthClaims.CredentialId");
         validator.Should().Contain("PortalAuthClaims.SessionId");
         validator.Should().Contain("PortalAuthClaims.RoleTypeId");
-        validator.Should().Contain("RoleTypeIds = [roleTypeId]");
-        validator.Should().Contain("identityServer.ValidateIdentitySession(request)");
-        validator.Should().Contain(".WaitAsync(ValidationTimeout, ct)");
-        validator.Should().Contain("response.TenantId == tenantId");
-        validator.Should().Contain("response.CredentialId == credentialId");
-        validator.Should().Contain("response.SessionId == sessionId");
-        validator.Should().Contain("catch (TimeoutException ex)");
+        validator.Should().Contain("IActorIdentityProvider actorIdentityProvider");
+        validator.Should().Contain("PortalAuthClaims.ActorAccessToken");
+        validator.Should().Contain("actorIdentityProvider.ValidateAsync(");
+        validator.Should().Contain("timeout.CancelAfter(ValidationTimeout)");
+        validator.Should().Contain("actor.TenantId == tenantId");
+        validator.Should().Contain("actor.CredentialId == credentialId");
+        validator.Should().Contain("actor.SessionId == sessionId");
+        validator.Should().Contain("catch (OperationCanceledException ex)");
         validator.Should().Contain("catch (Exception ex)");
         validator.Should().NotContain("return true;", "validation must not have an availability fallback");
 
@@ -135,10 +138,109 @@ public sealed class PortalSessionRevocationContractTests
         provider.Should().Contain("validator.ValidateAsync(authenticationState.User, cancellationToken)");
     }
 
+    [Test]
+    public async Task BlazorCircuitActorToken_DoesNotDependOnAnActiveHttpRequest()
+    {
+        var credentialId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var actorToken = "actor-token";
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(PortalAuthClaims.CredentialId, credentialId.ToString()),
+            new Claim(PortalAuthClaims.SessionId, sessionId.ToString()),
+            new Claim(PortalAuthClaims.ActorAccessToken, actorToken)
+        ], PortalAuthDefaults.AuthenticationScheme));
+        var actorContext = new PortalActorContext(
+            new HttpContextAccessor(),
+            new FixedAuthenticationStateProvider(principal));
+        var tokenProvider = new PortalActorAccessTokenProvider(actorContext);
+
+        var token = await tokenProvider.GetTokenAsync();
+
+        token.Should().Be(actorToken);
+        actorContext.CredentialId.Should().Be(credentialId);
+        actorContext.SessionId.Should().Be(sessionId);
+
+        using (tokenProvider.Push("validation-token"))
+        {
+            (await tokenProvider.GetTokenAsync()).Should().Be("validation-token");
+        }
+
+        (await tokenProvider.GetTokenAsync()).Should().Be(actorToken);
+    }
+
+    [Test]
+    public async Task BlazorCircuitActorToken_TakesPrecedenceOverRequestTimePrincipal()
+    {
+        var requestPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(PortalAuthClaims.ActorAccessToken, "request-token")],
+            PortalAuthDefaults.AuthenticationScheme));
+        var circuitPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(PortalAuthClaims.ActorAccessToken, "circuit-token")],
+            PortalAuthDefaults.AuthenticationScheme));
+        var httpContextAccessor = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext { User = requestPrincipal }
+        };
+        var actorContext = new PortalActorContext(
+            httpContextAccessor,
+            new FixedAuthenticationStateProvider(circuitPrincipal));
+
+        var token = await new PortalActorAccessTokenProvider(actorContext).GetTokenAsync();
+
+        token.Should().Be("circuit-token");
+    }
+
+    [Test]
+    public async Task BackgroundScope_WithoutCircuitOrRequest_HasNoActorToken()
+    {
+        var actorContext = new PortalActorContext(
+            new HttpContextAccessor(),
+            new UninitializedAuthenticationStateProvider());
+
+        var token = await new PortalActorAccessTokenProvider(actorContext).GetTokenAsync();
+
+        token.Should().BeNull();
+        actorContext.CredentialId.Should().BeNull();
+        actorContext.SessionId.Should().BeNull();
+    }
+
+    [Test]
+    public void PortalActorTokenProvider_IsCircuitScopedAndUsesAuthenticationState()
+    {
+        var portalRoot = GetPortalRoot();
+        var program = File.ReadAllText(Path.Combine(portalRoot, "Program.cs"));
+        var context = File.ReadAllText(Path.Combine(portalRoot, "Services", "PortalActorContext.cs"));
+
+        program.Should().Contain("builder.Services.AddScoped<PortalActorContext>();");
+        program.Should().Contain("builder.Services.AddScoped<PortalActorAccessTokenProvider>();");
+        program.Should().Contain("ServiceDescriptor.Scoped<IActorAccessTokenProvider>");
+        program.Should().Contain("ServiceDescriptor.Scoped<IActorAccessTokenScope>");
+        program.Should().NotContain(
+            "ServiceDescriptor.Singleton<IActorAccessTokenProvider, PortalActorAccessTokenProvider>()");
+        context.Should().Contain("AuthenticationStateProvider authenticationStateProvider");
+        context.Should().Contain("authenticationStateProvider.GetAuthenticationStateAsync()");
+    }
+
     private static string GetPortalRoot()
     {
         var repositoryRoot = FindRepositoryRoot();
         return Path.Combine(repositoryRoot.FullName, "src", "Presentation", "XFramework.Portal");
+    }
+
+    [Test]
+    public void Login_DoesNotQueryRemoteDataContextBeforeActorAuthentication()
+    {
+        var authService = File.ReadAllText(Path.Combine(
+            GetPortalRoot(),
+            "Services",
+            "PortalAuthService.cs"));
+
+        authService.Should().Contain("PortalBootstrapConstants.AdminTenantId");
+        authService.Should().Contain("PortalBootstrapConstants.AdminRoleTypeId");
+        authService.Should().NotContain("IDataContext");
+        authService.Should().NotContain("IgnoreQueryFilters()");
+        authService.Should().NotContain("FindBootstrapTenantAsync");
     }
 
     private static ClaimsPrincipal CreatePrincipal(
@@ -169,6 +271,19 @@ public sealed class PortalSessionRevocationContractTests
         "not-a-guid" => value,
         _ => Guid.NewGuid().ToString()
     };
+
+    private sealed class FixedAuthenticationStateProvider(ClaimsPrincipal principal)
+        : AuthenticationStateProvider
+    {
+        public override Task<AuthenticationState> GetAuthenticationStateAsync() =>
+            Task.FromResult(new AuthenticationState(principal));
+    }
+
+    private sealed class UninitializedAuthenticationStateProvider : AuthenticationStateProvider
+    {
+        public override Task<AuthenticationState> GetAuthenticationStateAsync() =>
+            throw new InvalidOperationException("No circuit authentication state is available.");
+    }
 
     private static DirectoryInfo FindRepositoryRoot()
     {

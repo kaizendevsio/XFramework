@@ -1,5 +1,6 @@
 using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Integration.Extensions;
 using Bolt.Client;
 using POS.Api.Generated;
 using XFramework.Core.DataContext;
@@ -12,6 +13,7 @@ using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
 builder.Logging.AddXFrameworkLogging(builder.Configuration);
+builder.Services.AddIdentityServerSessionValidation();
 
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.POS.Api");
 builder.Services.AddXFrameworkHealthChecks<AppDbContext>(

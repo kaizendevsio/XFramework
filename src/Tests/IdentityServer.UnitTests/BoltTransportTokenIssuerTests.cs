@@ -573,11 +573,11 @@ public sealed class BoltTransportTokenIssuerTests
 
         var service = new ServiceIdentityService(
             new Mock<IDataContext>(MockBehavior.Strict).Object,
-            configuration,
             parsed,
             signer,
             clock,
-            logger ?? Mock.Of<ILogger<ServiceIdentityService>>());
+            logger ?? Mock.Of<ILogger<ServiceIdentityService>>(),
+            signingKeyStore: new FileSystemServiceSigningKeyStore(configuration, parsed));
 
         return new ServiceFixture(service, parsed, signer);
     }

@@ -25,17 +25,18 @@ public static class IdentityHealthCheckProbe
         {
             Metadata = new RequestMetadata
             {
-                TenantId = options.TenantId,
-                CredentialId = options.CredentialId,
                 RequestId = Guid.NewGuid(),
-                Name = "Bolt Phase 0 Synthetic",
+                OperationName = "Bolt Phase 0 Synthetic",
                 DeviceName = options.DeviceId,
-                DeviceAgent = "XFramework.Bolt.Phase0Synthetics",
-                ActorAccessToken = options.UserActorToken.Reveal(),
-                ServiceAccessToken = serviceAccessToken.Reveal()
+                UserAgent = "XFramework.Bolt.Phase0Synthetics"
             }
         };
-        var payload = MemoryPackSerializer.Serialize(request);
+        var payload = MemoryPackSerializer.Serialize(new BoltInvocationEnvelope
+        {
+            Payload = MemoryPackSerializer.Serialize(request),
+            ActorAccessToken = null,
+            ServiceAccessToken = serviceAccessToken.Reveal()
+        });
         var (statusCode, data) = await client.InvokeAsync(
             Sha256Hex(IdentityServerServiceName),
             CommandName,

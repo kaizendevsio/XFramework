@@ -227,8 +227,13 @@ public sealed class EntityServiceGeneratorTests
     {
         var generatedSource = RunGeneratorForReferencedTenantEntity();
 
-        generatedSource.Should().Contain("private readonly IHttpContextAccessor _httpContextAccessor;");
-        generatedSource.Should().Contain("principal?.FindFirst(claimName)?.Value");
+        generatedSource.Should().Contain(
+            "private readonly ITrustedInvocationContextAccessor _trustedInvocationContextAccessor;");
+        generatedSource.Should().Contain(
+            "_trustedInvocationContextAccessor.Current?.EffectiveTenantId");
+        generatedSource.Should().NotContain("IHttpContextAccessor");
+        generatedSource.Should().NotContain("HttpContext");
+        generatedSource.Should().NotContain("FindFirst(");
         generatedSource.Should().Contain("((IHasTenantId)entity).TenantId = tenantId", Exactly.Times(2));
 
         var createTenantAssignment = generatedSource.IndexOf(

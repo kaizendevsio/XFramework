@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Security;
@@ -32,7 +33,8 @@ public sealed record AttendanceServiceWrapper(
     IMessageBusWrapper messageBusDriver,
     IConfiguration configuration,
     BoltClient boltClient,
-    IServiceTokenProvider serviceTokenProvider
+    IServiceTokenProvider serviceTokenProvider,
+    IActorAccessTokenProvider actorAccessTokenProvider
 ) : DriverBase(messageBusDriver, configuration), IAttendanceServiceWrapper
 {
     public override void Initialize()
@@ -82,11 +84,14 @@ public sealed record AttendanceServiceWrapper(
         var targetClient = TargetClient ?? throw new InvalidOperationException("Target client was not initialized.");
         var descriptor = MemoryPackSerializer.Deserialize<QueryDescriptor>((ReadOnlySpan<byte>)queryDescriptorBytes)
             ?? throw new InvalidOperationException("Query descriptor could not be deserialized.");
-        await descriptor.AttachServiceTokenAsync(
-            serviceTokenProvider,
-            ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient),
-            ct);
-        var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", MemoryPackSerializer.Serialize(descriptor), ct);
+        descriptor.Metadata ??= new RequestMetadata();
+        descriptor.Metadata.RequestId ??= Guid.NewGuid();
+        IReadOnlyCollection<string> scopes = descriptor.IgnoreQueryFilters
+            ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
+            : [XFrameworkServiceScopes.DataContextQuery];
+        var payload = await BoltInvocationEnvelopeFactory.CreateAsync(
+            descriptor, targetClient, scopes, serviceTokenProvider, actorAccessTokenProvider, ct);
+        var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", payload, ct);
         if ((int)status < 200 || (int)status >= 300)
         {
             throw new InvalidOperationException(
@@ -102,11 +107,16 @@ public sealed record AttendanceServiceWrapper(
         var targetClient = TargetClient ?? throw new InvalidOperationException("Target client was not initialized.");
         var request = MemoryPackSerializer.Deserialize<SaveChangesRequest>((ReadOnlySpan<byte>)saveChangesRequestBytes)
             ?? throw new InvalidOperationException("SaveChanges request could not be deserialized.");
-        await request.AttachServiceTokenAsync(
+        request.Metadata ??= new RequestMetadata();
+        request.Metadata.RequestId ??= Guid.NewGuid();
+        var payload = await BoltInvocationEnvelopeFactory.CreateAsync(
+            request,
+            targetClient,
+            [XFrameworkServiceScopes.DataContextMutate],
             serviceTokenProvider,
-            ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient),
+            actorAccessTokenProvider,
             ct);
-        var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", MemoryPackSerializer.Serialize(request), ct);
+        var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_changes__", payload, ct);
         if ((int)status < 200 || (int)status >= 300)
         {
             var failure = DataContextResult.Failure(
@@ -126,14 +136,17 @@ public sealed record AttendanceServiceWrapper(
         var targetClient = TargetClient ?? throw new InvalidOperationException("Target client was not initialized.");
         var descriptor = MemoryPackSerializer.Deserialize<QueryDescriptor>((ReadOnlySpan<byte>)queryDescriptorBytes)
             ?? throw new InvalidOperationException("Query descriptor could not be deserialized.");
-        await descriptor.AttachServiceTokenAsync(
-            serviceTokenProvider,
-            ServiceTokenMetadataExtensions.ResolveCanonicalAudience(targetClient),
-            ct);
+        descriptor.Metadata ??= new RequestMetadata();
+        descriptor.Metadata.RequestId ??= Guid.NewGuid();
+        IReadOnlyCollection<string> scopes = descriptor.IgnoreQueryFilters
+            ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
+            : [XFrameworkServiceScopes.DataContextQuery];
+        var payload = await BoltInvocationEnvelopeFactory.CreateAsync(
+            descriptor, targetClient, scopes, serviceTokenProvider, actorAccessTokenProvider, ct);
         var stream = await boltClient.OpenStreamAsync(targetClient, "__db_query_stream__", ct);
         try
         {
-            await stream.SendAsync((ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(descriptor), ct);
+            await stream.SendAsync((ReadOnlyMemory<byte>)payload, ct);
             await foreach (var chunk in stream.ReadAllAsync(ct))
             {
                 yield return chunk.ToArray();
@@ -150,6 +163,6 @@ public static class AttendanceServiceWrapperExtensions
 {
     public static void AddAttendanceWrapperServices(this IServiceCollection services)
     {
-        services.AddSingleton<IAttendanceServiceWrapper, AttendanceServiceWrapper>();
+        services.AddScoped<IAttendanceServiceWrapper, AttendanceServiceWrapper>();
     }
 }

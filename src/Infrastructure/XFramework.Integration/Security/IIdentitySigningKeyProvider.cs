@@ -8,3 +8,11 @@ public interface IIdentitySigningKeyProvider
         string? keyId = null,
         CancellationToken ct = default);
 }
+
+public interface IServiceCredentialGenerationProvider
+{
+    Task<bool> IsAcceptedAsync(
+        string clientId,
+        string generationId,
+        CancellationToken ct = default);
+}

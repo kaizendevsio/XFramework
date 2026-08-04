@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Authorization.GetEffectiveCredentialCapabi
 
 public static class GetEffectiveCredentialCapabilitiesEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<EffectiveCredentialCapabilitiesResponse>> Handle(
         GetEffectiveCredentialCapabilitiesRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -24,7 +27,7 @@ public static class GetEffectiveCredentialCapabilitiesEndpoint
         IIdentityAuthorizationService authorizationService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authorizationService.GetEffectiveCredentialCapabilitiesAsync(request, ct);
     }
 }

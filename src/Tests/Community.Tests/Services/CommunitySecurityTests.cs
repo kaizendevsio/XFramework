@@ -21,6 +21,7 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Integration.Security;
 
 namespace Community.Tests.Services;
 
@@ -35,7 +36,7 @@ public sealed class CommunitySecurityTests
     private static readonly Guid OtherIdentityId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
     [Test]
-    public async Task GetRequiredAsync_TokenWithoutTenantClaim_DerivesTenantFromCredential()
+    public async Task GetRequiredAsync_UsesTrustedActorTenantAndCredential()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -80,16 +81,14 @@ public sealed class CommunitySecurityTests
         };
 
         var requestContext = new CommunityRequestContext(
-            httpContextAccessor,
-            dbContext,
+            new TestTrustedInvocationContextAccessor(CreateTrustedContext()),
             new FakeDataContext());
 
-        var result = await requestContext.GetRequiredAsync(new RequestMetadata { TenantId = TenantId });
+        var result = await requestContext.GetRequiredAsync(new RequestMetadata { RequestedTenantId = TenantId });
 
         result.IsSuccess.Should().BeTrue();
         result.Data!.CredentialId.Should().Be(CredentialId);
         result.Data.TenantId.Should().Be(TenantId);
-        httpContextAccessor.HttpContext.User.FindFirst("tenantId")?.Value.Should().Be(TenantId.ToString());
     }
 
     [Test]
@@ -138,15 +137,13 @@ public sealed class CommunitySecurityTests
         };
 
         var requestContext = new CommunityRequestContext(
-            httpContextAccessor,
-            dbContext,
+            new TestTrustedInvocationContextAccessor(CreateTrustedContext()),
             new FakeDataContext());
 
-        var result = await requestContext.GetRequiredAsync(new RequestMetadata { TenantId = OtherTenantId });
+        var result = await requestContext.GetRequiredAsync(new RequestMetadata { RequestedTenantId = OtherTenantId });
 
         result.IsSuccess.Should().BeFalse();
         result.StatusCode.Should().Be(403);
-        httpContextAccessor.HttpContext.User.FindFirst("tenantId").Should().BeNull();
     }
 
     [Test]
@@ -208,7 +205,7 @@ public sealed class CommunitySecurityTests
 
         var result = await service.CreateContentAsync(new CreateContentRequest
         {
-            Metadata = new RequestMetadata { TenantId = TenantId },
+            Metadata = new RequestMetadata { RequestedTenantId = TenantId },
             TypeId = typeId,
             Text = "owned by current identity"
         });
@@ -387,6 +384,27 @@ public sealed class CommunitySecurityTests
 
     private static StubCommunityRequestContext RequesterContext() =>
         new(new CommunityRequester(CredentialId, TenantId, CurrentIdentity()));
+
+    private static TrustedInvocationContext CreateTrustedContext() => new(
+        new TrustedActorIdentity(
+            CredentialId,
+            IdentityInfoId,
+            TenantId,
+            Guid.NewGuid(),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            "test-generation",
+            DateTimeOffset.UtcNow.AddMinutes(5)),
+        Service: null,
+        EffectiveTenantId: TenantId,
+        RequestedTargetTenantId: null,
+        CorrelationId: Guid.NewGuid());
+
+    private sealed class TestTrustedInvocationContextAccessor(TrustedInvocationContext context)
+        : ITrustedInvocationContextAccessor
+    {
+        public TrustedInvocationContext? Current => context;
+    }
 
     private static CommunityIdentity CurrentIdentity() => new()
     {

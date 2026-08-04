@@ -510,11 +510,11 @@ else
 
     private static RequestMetadata CreateMetadata(Guid tenantId) => new()
     {
-        TenantId = tenantId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal",
+        OperationName = "Portal",
         DeviceName = "Portal",
-        DeviceAgent = "Portal",
+        UserAgent = "Portal",
         IpAddress = "Portal"
     };
 

@@ -41,7 +41,7 @@ public sealed class CommunicationsAdminReadServiceTests
             otherMember,
             Message(Guid.NewGuid(), tenantId, thread, member, "tenant message"),
             Message(Guid.NewGuid(), otherTenantId, otherThread, otherMember, "other message"));
-        var service = CreateService(dataContext);
+        var service = CreateService(dataContext, tenantId);
 
         var result = await service.QueryUsersAsync(new QueryCommunicationsAdminUsersRequest
         {
@@ -77,7 +77,7 @@ public sealed class CommunicationsAdminReadServiceTests
             generalMember,
             Message(Guid.NewGuid(), tenantId, supportThread, supportMember, new string('x', 150)),
             Message(Guid.NewGuid(), tenantId, generalThread, generalMember, "short text"));
-        var service = CreateService(dataContext);
+        var service = CreateService(dataContext, tenantId);
 
         var result = await service.QueryThreadsAsync(new QueryCommunicationsAdminThreadsRequest
         {
@@ -104,7 +104,7 @@ public sealed class CommunicationsAdminReadServiceTests
         var otherCredential = Credential(Guid.NewGuid(), otherTenantId, "other-user");
         var dataContext = new InMemoryDataContext();
         dataContext.Seed(otherCredential.IdentityInfo!, otherCredential);
-        var service = CreateService(dataContext);
+        var service = CreateService(dataContext, tenantId);
 
         var result = await service.GetUserDetailAsync(new GetCommunicationsAdminUserDetailRequest
         {
@@ -147,7 +147,7 @@ public sealed class CommunicationsAdminReadServiceTests
             otherMessage,
             Report(Guid.NewGuid(), tenantId, message, member),
             Report(Guid.NewGuid(), otherTenantId, otherMessage, otherMember));
-        var service = CreateService(dataContext);
+        var service = CreateService(dataContext, tenantId);
 
         var result = await service.GetModerationAsync(new GetCommunicationsAdminModerationRequest
         {
@@ -166,7 +166,7 @@ public sealed class CommunicationsAdminReadServiceTests
         var tenantId = Guid.NewGuid();
         var dataContext = new InMemoryDataContext();
         dataContext.Seed(PolicySetting(tenantId, "Moderation.AdminAuditVisible", "false"));
-        var service = CreateService(dataContext);
+        var service = CreateService(dataContext, tenantId);
 
         var result = await service.GetModerationAsync(new GetCommunicationsAdminModerationRequest
         {
@@ -180,22 +180,21 @@ public sealed class CommunicationsAdminReadServiceTests
         Assert.That(result.Data.Policies, Is.Not.Empty);
     }
 
-    private static CommunicationsAdminReadService CreateService(InMemoryDataContext dataContext) =>
+    private static CommunicationsAdminReadService CreateService(InMemoryDataContext dataContext, Guid tenantId) =>
         new(
             dataContext,
             new CommunicationsRequestContextResolver(
                 new HttpContextAccessor(),
                 TestConfiguration(),
-                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver()),
+                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver(tenantId)),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())));
 
     private static RequestMetadata Metadata(Guid tenantId)
     {
         var metadata = new RequestMetadata
         {
-            TenantId = tenantId,
-            Name = "XFramework.Portal",
-            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidPortalToken
+            RequestedTenantId = tenantId,
+            OperationName = "CommunicationsAdminRead"
         };
         return metadata;
     }

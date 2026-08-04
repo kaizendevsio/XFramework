@@ -347,12 +347,18 @@ public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserReq
         var generatedSource = RunGenerator(source, "CreateUserEndpoint_Handle_BoltHandler.g.cs");
 
         generatedSource.Should().Contain("BoltInboundRequestContext context");
+        generatedSource.Should().Contain("BoltInvocationEnvelope>(payload.Span)");
+        generatedSource.Should().Contain("new global::XFramework.Domain.Shared.BusinessObjects.InvocationCredentials(");
         generatedSource.Should().Contain("GetRequiredService<IBoltServiceInvocationAuthorizer>()");
         generatedSource.Should().Contain("request.Metadata,");
-        generatedSource.Should().Contain("requiredScopes: null,");
-        generatedSource.Should().Contain("allowedCallers: null,");
+        generatedSource.Should().Contain("ActorRequirement = (ActorRequirement)0");
+        generatedSource.Should().Contain("TenantAccessMode = (TenantAccessMode)0");
         generatedSource.Should().Contain("(System.Net.HttpStatusCode)authorization.StatusCode");
         generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
+            .Should().BeLessThan(generatedSource.IndexOf("ValidateAsync(request, ct)", StringComparison.Ordinal));
+        generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
+            .Should().BeLessThan(generatedSource.IndexOf("EnsureAllowedAsync(", StringComparison.Ordinal));
+        generatedSource.IndexOf("EnsureAllowedAsync(", StringComparison.Ordinal)
             .Should().BeLessThan(generatedSource.IndexOf("ValidateAsync(request, ct)", StringComparison.Ordinal));
         generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
             .Should().BeLessThan(generatedSource.IndexOf("GetRequiredService<global::Sample.Features.Users.Create.UserService>", StringComparison.Ordinal));
@@ -388,9 +394,245 @@ public sealed record RestrictedRequest : RequestBase,
         var generatedSource = RunGenerator(source, "RestrictedEndpoint_Handle_BoltHandler.g.cs");
 
         generatedSource.Should().Contain(
-            "requiredScopes: new string[] { \"wallets.write\", \"wallets.approve\" },");
+            "RequiredServiceScopes = new string[] { \"wallets.write\", \"wallets.approve\" }");
         generatedSource.Should().Contain(
-            "allowedCallers: new string[] { \"XFramework.Portal\" },");
+            "AllowedServiceCallers = new string[] { \"XFramework.Portal\" }");
+    }
+
+    [Test]
+    public void GenerateRestEndpoint_WithBoltHandler_UsesSharedInvocationPolicyWithoutRequiringAspNetAuthorization()
+    {
+        const string source = """
+
+namespace Sample.Features.Auth.Login;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
+
+public static class LoginEndpoint
+{
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.Optional,
+        TenantAccessMode = TenantAccessMode.PublicTenantLookup,
+        AllowAnonymous = true)]
+    [MapPost("/api/auth/login")]
+    public static Task<Result<LoginResponse>> Handle(LoginRequest request, CancellationToken ct) =>
+        Task.FromResult(Result<LoginResponse>.Success(new LoginResponse()));
+}
+
+public sealed record LoginRequest : RequestBase, IBoltRequest<LoginRequest, QueryResponse<LoginResponse>>;
+public sealed record LoginResponse;
+""";
+
+        var generatedSource = RunGenerator(source, "LoginEndpoint_Handle_RestEndpoint.g.cs");
+
+        generatedSource.Should().Contain("IHttpTrustedInvocationAuthorizer invocationAuthorizer");
+        generatedSource.Should().Contain("ActorRequirement = (global::XFramework.Integration.Security.ActorRequirement)1");
+        generatedSource.Should().Contain("TenantAccessMode = (global::XFramework.Integration.Security.TenantAccessMode)4");
+        generatedSource.Should().Contain("RequireServiceIdentity = false");
+        generatedSource.Should().NotContain(".RequireAuthorization()");
+    }
+
+    [Test]
+    public void GenerateEndpoints_WithExplicitAnonymousPolicy_DoesNotRequireServiceIdentity()
+    {
+        const string source = """
+
+namespace Sample.Features.Discovery.Keys;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
+
+public static class KeysEndpoint
+{
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.None,
+        TenantAccessMode = TenantAccessMode.Tenantless,
+        AllowAnonymous = true)]
+    [MapPost("/api/discovery/keys")]
+    public static Task<Result> Handle(KeysRequest request, CancellationToken ct) =>
+        Task.FromResult(new Result());
+}
+
+public sealed record KeysRequest : RequestBase, IBoltRequest<KeysRequest, CmdResponse>;
+""";
+
+        var boltSource = RunGenerator(source, "KeysEndpoint_Handle_BoltHandler.g.cs");
+        var restSource = RunGenerator(source, "KeysEndpoint_Handle_RestEndpoint.g.cs");
+
+        boltSource.Should().Contain("RequireServiceIdentity = false");
+        boltSource.Should().Contain("AllowAnonymous = true");
+        restSource.Should().Contain("RequireServiceIdentity = false");
+        restSource.Should().Contain("AllowAnonymous = true");
+    }
+
+    [Test]
+    public void GenerateRestEndpoint_WithServiceOnlyBoltHandler_RequiresServiceIdentityAndCopiesRestrictions()
+    {
+        const string source = """
+
+namespace Sample.Features.Background.Dispatch;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
+
+public static class DispatchEndpoint
+{
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.None,
+        RequiredServiceScopes = ["notifications.dispatch"],
+        AllowedServiceCallers = ["XFramework.Communications"])]
+    [MapPost("/api/background/dispatch")]
+    public static Task<Result> Handle(DispatchRequest request, CancellationToken ct) =>
+        Task.FromResult(new Result());
+}
+
+public sealed record DispatchRequest : RequestBase, IBoltRequest<DispatchRequest, CmdResponse>;
+""";
+
+        var generatedSource = RunGenerator(source, "DispatchEndpoint_Handle_RestEndpoint.g.cs");
+
+        generatedSource.Should().Contain("RequireServiceIdentity = true");
+        generatedSource.Should().Contain(
+            "RequiredServiceScopes = new string[] { \"notifications.dispatch\" }");
+        generatedSource.Should().Contain(
+            "AllowedServiceCallers = new string[] { \"XFramework.Communications\" }");
+    }
+
+    [Test]
+    public void GenerateAuthorizedRestEndpoint_WithoutBoltHandler_EstablishesRequiredActorContext()
+    {
+        const string source = """
+
+namespace Sample.Features.Profile.Update;
+
+using System.Threading;
+using System.Threading.Tasks;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+
+public static class UpdateEndpoint
+{
+    [MapPost("/api/profile/update")]
+    public static Task<Result> Handle(UpdateProfileRequest request, CancellationToken ct) =>
+        Task.FromResult(new Result());
+}
+
+public sealed record UpdateProfileRequest : RequestBase;
+""";
+
+        var generatedSource = RunGenerator(source, "UpdateEndpoint_Handle_RestEndpoint.g.cs");
+
+        generatedSource.Should().Contain("IHttpTrustedInvocationAuthorizer invocationAuthorizer");
+        generatedSource.Should().Contain("ActorRequirement = (global::XFramework.Integration.Security.ActorRequirement)0");
+        generatedSource.Should().Contain("TenantAccessMode = (global::XFramework.Integration.Security.TenantAccessMode)0");
+        generatedSource.Should().Contain("RequireServiceIdentity = false");
+        generatedSource.Should().Contain("var invocationMetadata = request.Metadata;");
+        generatedSource.Should().Contain("invocationMetadata.IpAddress = invocationHttpContext.Connection.RemoteIpAddress?.ToString()");
+        generatedSource.Should().Contain("invocationMetadata.UserAgent = invocationHttpContext.Request.Headers.UserAgent.ToString()");
+        generatedSource.Should().Contain("ITrustedInvocationFeatureGate trustedInvocationFeatureGate");
+        generatedSource.Should().Contain(".RequireAuthorization()");
+    }
+
+    [Test]
+    public void GenerateRestEndpoint_WithExplicitServicePolicy_CopiesRestInvocationRestrictions()
+    {
+        const string source = """
+
+namespace Sample.Features.Background.Dispatch;
+
+using System.Threading;
+using System.Threading.Tasks;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
+
+public static class DispatchEndpoint
+{
+    [MapPost(
+        "/api/background/dispatch",
+        ActorRequirement = ActorRequirement.None,
+        TenantAccessMode = TenantAccessMode.ServiceTargetTenant,
+        RequiredServiceScopes = ["notifications.dispatch", "tenant.target"],
+        AllowedServiceCallers = ["XFramework.Communications"])]
+    public static Task<Result> Handle(DispatchRequest request, CancellationToken ct) =>
+        Task.FromResult(new Result());
+}
+
+public sealed record DispatchRequest : RequestBase;
+""";
+
+        var generatedSource = RunGenerator(source, "DispatchEndpoint_Handle_RestEndpoint.g.cs");
+
+        generatedSource.Should().Contain("ActorRequirement = (global::XFramework.Integration.Security.ActorRequirement)2");
+        generatedSource.Should().Contain("TenantAccessMode = (global::XFramework.Integration.Security.TenantAccessMode)2");
+        generatedSource.Should().Contain("new string[] { \"notifications.dispatch\", \"tenant.target\" }");
+        generatedSource.Should().Contain("new string[] { \"XFramework.Communications\" }");
+        generatedSource.Should().Contain("RequireServiceIdentity = true");
+    }
+
+    [Test]
+    public void GenerateSplitRestAndBoltHandlers_RestInheritsBoltInvocationPolicy()
+    {
+        const string source = """
+
+namespace Sample.Features.Tenants.SetFeatures;
+
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
+
+public static class SetFeaturesEndpoint
+{
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.Optional,
+        TenantAccessMode = TenantAccessMode.ServiceTargetTenant,
+        RequiredServiceScopes = ["tenant.target"],
+        AllowedServiceCallers = ["Portal"])]
+    public static Task<Result> Handle(SetFeaturesRequest request, CancellationToken ct) =>
+        Task.FromResult(new Result());
+
+    [MapPost("/api/tenants/features", RequireAuthorization = true, Capability = "manage")]
+    public static Task<Result> HandleHttp(SetFeaturesRequest request, CancellationToken ct) =>
+        Task.FromResult(new Result());
+}
+
+public sealed record SetFeaturesRequest : RequestBase,
+    IBoltRequest<SetFeaturesRequest, CmdResponse>;
+""";
+
+        var generatedSource = RunGenerator(
+            source,
+            "SetFeaturesEndpoint_HandleHttp_RestEndpoint.g.cs");
+
+        generatedSource.Should().Contain("ActorRequirement = (global::XFramework.Integration.Security.ActorRequirement)1");
+        generatedSource.Should().Contain("TenantAccessMode = (global::XFramework.Integration.Security.TenantAccessMode)2");
+        generatedSource.Should().Contain("new string[] { \"tenant.target\" }");
+        generatedSource.Should().Contain("new string[] { \"Portal\" }");
+        generatedSource.Should().Contain("RequireServiceIdentity = true");
+        generatedSource.Should().Contain("\"/api/tenants/features\",");
+        generatedSource.Should().Contain("\"manage\",");
     }
 
     [Test]
@@ -516,6 +758,10 @@ namespace XFramework.Integration.Attributes
     {
         public string[]? RequiredServiceScopes { get; set; }
         public string[]? AllowedServiceCallers { get; set; }
+        public XFramework.Integration.Security.ActorRequirement ActorRequirement { get; set; }
+        public XFramework.Integration.Security.TenantAccessMode TenantAccessMode { get; set; }
+        public string[]? RequiredActorCapabilities { get; set; }
+        public bool AllowAnonymous { get; set; }
     }
 
     [AttributeUsage(AttributeTargets.Method)]
@@ -526,7 +772,15 @@ namespace XFramework.Integration.Attributes
         public string? Summary { get; set; }
         public string? Description { get; set; }
         public bool ExcludeFromOpenApi { get; set; }
+        public bool RequireAuthorization { get; set; } = true;
+        public string[]? RequiredServiceScopes { get; set; }
+        public string[]? AllowedServiceCallers { get; set; }
+        public XFramework.Integration.Security.ActorRequirement ActorRequirement { get; set; }
+        public XFramework.Integration.Security.TenantAccessMode TenantAccessMode { get; set; }
+        public string[]? RequiredActorCapabilities { get; set; }
+        public bool AllowAnonymous { get; set; }
         public string? RateLimitPolicy { get; set; }
+        public string? Capability { get; set; }
     }
 
     [AttributeUsage(AttributeTargets.Method)]
@@ -537,6 +791,13 @@ namespace XFramework.Integration.Attributes
         public string? Summary { get; set; }
         public string? Description { get; set; }
         public bool ExcludeFromOpenApi { get; set; }
+        public bool RequireAuthorization { get; set; } = true;
+        public string[]? RequiredServiceScopes { get; set; }
+        public string[]? AllowedServiceCallers { get; set; }
+        public XFramework.Integration.Security.ActorRequirement ActorRequirement { get; set; }
+        public XFramework.Integration.Security.TenantAccessMode TenantAccessMode { get; set; }
+        public string[]? RequiredActorCapabilities { get; set; }
+        public bool AllowAnonymous { get; set; }
     }
 
     [AttributeUsage(AttributeTargets.Method)]
@@ -547,6 +808,13 @@ namespace XFramework.Integration.Attributes
         public string? Summary { get; set; }
         public string? Description { get; set; }
         public bool ExcludeFromOpenApi { get; set; }
+        public bool RequireAuthorization { get; set; } = true;
+        public string[]? RequiredServiceScopes { get; set; }
+        public string[]? AllowedServiceCallers { get; set; }
+        public XFramework.Integration.Security.ActorRequirement ActorRequirement { get; set; }
+        public XFramework.Integration.Security.TenantAccessMode TenantAccessMode { get; set; }
+        public string[]? RequiredActorCapabilities { get; set; }
+        public bool AllowAnonymous { get; set; }
     }
 }
 
@@ -583,20 +851,63 @@ namespace Bolt.Client
 
 namespace XFramework.Integration.Security
 {
-    public interface IBoltServiceInvocationAuthorizer
+    public enum ActorRequirement
     {
-        Task<TrustedServiceInvocationResult> AuthorizeAsync(
-            XFramework.Domain.Shared.BusinessObjects.RequestMetadata? metadata,
-            Bolt.Client.BoltInboundRequestContext requestContext,
-            IReadOnlyCollection<string>? requiredScopes = null,
-            IReadOnlyCollection<string>? allowedCallers = null,
+        Required,
+        Optional,
+        None
+    }
+
+    public enum TenantAccessMode
+    {
+        ActorTenant,
+        DelegatedTenant,
+        ServiceTargetTenant,
+        Tenantless,
+        PublicTenantLookup
+    }
+
+    public sealed class InvocationAuthorizationPolicy
+    {
+        public ActorRequirement ActorRequirement { get; set; }
+        public TenantAccessMode TenantAccessMode { get; set; }
+        public bool RequireServiceIdentity { get; set; }
+        public IReadOnlyCollection<string> RequiredServiceScopes { get; set; } = [];
+        public IReadOnlyCollection<string> AllowedServiceCallers { get; set; } = [];
+        public IReadOnlyCollection<string> RequiredActorCapabilities { get; set; } = [];
+        public bool AllowAnonymous { get; set; }
+    }
+
+    public interface IActorAccessTokenScope
+    {
+        IDisposable Push(string token);
+    }
+
+    public interface IHttpTrustedInvocationAuthorizer
+    {
+        Task<TrustedInvocationResult> AuthorizeAsync(
+            string? authorizationHeader,
+            string? serviceAuthorizationHeader,
+            XFramework.Domain.Shared.BusinessObjects.RequestMetadata metadata,
+            InvocationAuthorizationPolicy policy,
             System.Threading.CancellationToken ct = default);
     }
 
-    public sealed class TrustedServiceInvocationResult
+    public interface IBoltServiceInvocationAuthorizer
+    {
+        Task<TrustedInvocationResult> AuthorizeAsync(
+            XFramework.Domain.Shared.BusinessObjects.InvocationCredentials credentials,
+            XFramework.Domain.Shared.BusinessObjects.RequestMetadata metadata,
+            Bolt.Client.BoltInboundRequestContext requestContext,
+            InvocationAuthorizationPolicy policy,
+            System.Threading.CancellationToken ct = default);
+    }
+
+    public sealed class TrustedInvocationResult
     {
         public bool IsSuccess { get; init; }
         public int StatusCode { get; init; }
+        public string? Error { get; init; }
     }
 }
 
@@ -674,7 +985,20 @@ namespace XFramework.Core.Patterns
 
 namespace XFramework.Domain.Shared.BusinessObjects
 {
-    public sealed class RequestMetadata;
+    public sealed class RequestMetadata
+    {
+        public string? IpAddress { get; set; }
+        public string? UserAgent { get; set; }
+    }
+
+    public sealed record InvocationCredentials(string? ActorAccessToken, string? ServiceAccessToken);
+
+    public sealed class BoltInvocationEnvelope
+    {
+        public byte[] Payload { get; set; } = [];
+        public string? ActorAccessToken { get; set; }
+        public string? ServiceAccessToken { get; set; }
+    }
 
     public record RequestBase
     {
@@ -762,15 +1086,54 @@ namespace Microsoft.AspNetCore.Builder
     {
         public RouteHandlerBuilder WithName(string name) => this;
         public RouteHandlerBuilder WithTags(params string[] tags) => this;
+        public RouteHandlerBuilder WithMetadata(params object[] metadata) => this;
         public RouteHandlerBuilder WithSummary(string summary) => this;
         public RouteHandlerBuilder WithDescription(string description) => this;
         public RouteHandlerBuilder ExcludeFromDescription() => this;
+        public RouteHandlerBuilder RequireAuthorization() => this;
         public RouteHandlerBuilder RequireRateLimiting(string policyName) => this;
+    }
+}
+
+namespace XFramework.Core.Services.FeatureGates
+{
+    public sealed record TenantCapabilityRequirement(string CapabilityKey);
+
+    public interface ITrustedInvocationFeatureGate
+    {
+        Task<XFramework.Core.Patterns.Result> EnsureAllowedAsync(
+            string route,
+            string httpMethod,
+            string? declaredCapability,
+            System.Threading.CancellationToken ct = default);
     }
 }
 
 namespace Microsoft.AspNetCore.Http
 {
+    public sealed class HttpContext
+    {
+        public HttpRequest Request { get; } = new();
+        public ConnectionInfo Connection { get; } = new();
+    }
+
+    public sealed class ConnectionInfo
+    {
+        public System.Net.IPAddress? RemoteIpAddress { get; set; }
+    }
+
+    public sealed class HttpRequest
+    {
+        public HeaderDictionary Headers { get; } = new();
+    }
+
+    public sealed class HeaderDictionary
+    {
+        public string Authorization { get; set; } = string.Empty;
+        public string UserAgent { get; set; } = string.Empty;
+        public string this[string key] => string.Empty;
+    }
+
     public static class TypedResults
     {
         public static Microsoft.AspNetCore.Http.HttpResults.Ok<T> Ok<T>(T value) => new();

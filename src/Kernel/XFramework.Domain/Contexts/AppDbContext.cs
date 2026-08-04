@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Shared.Contracts;
+using XFramework.Domain.Shared.Security;
 
 namespace XFramework.Domain.Contexts;
 
@@ -32,6 +33,30 @@ public partial class AppDbContext : XDbContext
 
     public AppDbContext(DbContextOptions options, IHttpContextAccessor httpContextAccessor, IConfiguration configuration)
         : base(options, httpContextAccessor, configuration)
+    {
+    }
+
+    public AppDbContext(
+        DbContextOptions options,
+        IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration,
+        IEffectiveTenantContextAccessor effectiveTenantContextAccessor)
+        : base(options, httpContextAccessor, configuration, effectiveTenantContextAccessor)
+    {
+    }
+
+    public AppDbContext(
+        DbContextOptions options,
+        IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration,
+        IEffectiveTenantContextAccessor effectiveTenantContextAccessor,
+        ICrossTenantWriteAuthorizationAccessor crossTenantWriteAuthorizationAccessor)
+        : base(
+            options,
+            httpContextAccessor,
+            configuration,
+            effectiveTenantContextAccessor,
+            crossTenantWriteAuthorizationAccessor)
     {
     }
 
