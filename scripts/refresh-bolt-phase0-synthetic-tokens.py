@@ -13,6 +13,7 @@ import socket
 import ssl
 import stat
 import tempfile
+import time
 import unicodedata
 import uuid
 from dataclasses import dataclass
@@ -25,6 +26,9 @@ MAX_ENV_BYTES = 1024 * 1024
 MAX_RESPONSE_BYTES = 1024 * 1024
 MAX_TOKEN_BYTES = 16 * 1024
 HTTP_TIMEOUT_SECONDS = 20
+MAX_HTTP_ATTEMPTS = 3
+MAX_RETRY_AFTER_SECONDS = 60
+RETRYABLE_HTTP_STATUSES = {429, 502, 503, 504}
 COMMUNICATIONS_CLIENT_ID = "XFramework.Communications"
 PORTAL_CLIENT_ID = "XFramework.Portal"
 TRANSPORT_ISSUER = "XFramework.IdentityServer"
@@ -377,55 +381,64 @@ def _post_json(
     context = context_factory()
     if not context.check_hostname or context.verify_mode != ssl.CERT_REQUIRED:
         _raise("TLS_CONFIGURATION")
-    connection = connection_factory(
-        config.host,
-        config.port,
-        context=context,
-        timeout=HTTP_TIMEOUT_SECONDS,
-    )
-    try:
-        connection.request(
-            "POST",
-            path,
-            body=serialized,
-            headers={
-                "Accept": "application/json",
-                "Accept-Encoding": "identity",
-                "Content-Type": "application/json; charset=utf-8",
-                "Content-Length": str(len(serialized)),
-            },
+    for attempt in range(MAX_HTTP_ATTEMPTS):
+        connection = connection_factory(
+            config.host,
+            config.port,
+            context=context,
+            timeout=HTTP_TIMEOUT_SECONDS,
         )
-        response = connection.getresponse()
-        if response.status != 200:
-            _raise("HTTP_STATUS")
-        content_type = response.getheader("Content-Type", "")
-        content_encoding = response.getheader("Content-Encoding", "identity")
-        content_length = response.getheader("Content-Length")
-        if not content_type.lower().split(";", 1)[0].strip() == "application/json":
-            _raise("HTTP_RESPONSE")
-        if content_encoding.lower().strip() not in ("", "identity"):
-            _raise("HTTP_RESPONSE")
-        if content_length is not None:
-            try:
-                if int(content_length) < 2 or int(content_length) > MAX_RESPONSE_BYTES:
-                    _raise("HTTP_RESPONSE")
-            except ValueError:
-                _raise("HTTP_RESPONSE")
-        response_bytes = response.read(MAX_RESPONSE_BYTES + 1)
-        if len(response_bytes) < 2 or len(response_bytes) > MAX_RESPONSE_BYTES:
-            _raise("HTTP_RESPONSE")
-        return _parse_json(response_bytes, code="RESPONSE_JSON")
-    except RefreshError:
-        raise
-    except (ssl.SSLError, ssl.CertificateError):
-        _raise("TLS_CONNECTION")
-    except (OSError, socket.error, http.client.HTTPException):
-        _raise("HTTP_CONNECTION")
-    finally:
         try:
-            connection.close()
-        except Exception:
-            pass
+            connection.request(
+                "POST",
+                path,
+                body=serialized,
+                headers={
+                    "Accept": "application/json",
+                    "Accept-Encoding": "identity",
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Content-Length": str(len(serialized)),
+                },
+            )
+            response = connection.getresponse()
+            if response.status != 200:
+                response.read(MAX_RESPONSE_BYTES + 1)
+                if response.status in RETRYABLE_HTTP_STATUSES and attempt + 1 < MAX_HTTP_ATTEMPTS:
+                    retry_after = response.getheader("Retry-After", "")
+                    delay = int(retry_after) if retry_after.isascii() and retry_after.isdigit() else 2**attempt
+                    time.sleep(min(max(delay, 1), MAX_RETRY_AFTER_SECONDS))
+                    continue
+                _raise(f"HTTP_STATUS_{response.status}")
+            content_type = response.getheader("Content-Type", "")
+            content_encoding = response.getheader("Content-Encoding", "identity")
+            content_length = response.getheader("Content-Length")
+            if not content_type.lower().split(";", 1)[0].strip() == "application/json":
+                _raise("HTTP_RESPONSE")
+            if content_encoding.lower().strip() not in ("", "identity"):
+                _raise("HTTP_RESPONSE")
+            if content_length is not None:
+                try:
+                    if int(content_length) < 2 or int(content_length) > MAX_RESPONSE_BYTES:
+                        _raise("HTTP_RESPONSE")
+                except ValueError:
+                    _raise("HTTP_RESPONSE")
+            response_bytes = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(response_bytes) < 2 or len(response_bytes) > MAX_RESPONSE_BYTES:
+                _raise("HTTP_RESPONSE")
+            return _parse_json(response_bytes, code="RESPONSE_JSON")
+        except RefreshError:
+            raise
+        except (ssl.SSLError, ssl.CertificateError):
+            _raise("TLS_CONNECTION")
+        except (OSError, socket.error, http.client.HTTPException):
+            _raise("HTTP_CONNECTION")
+        finally:
+            try:
+                connection.close()
+            except Exception:
+                pass
+
+    _raise("HTTP_STATUS")
 
 
 def _base64url_decode(segment: str) -> bytes:
