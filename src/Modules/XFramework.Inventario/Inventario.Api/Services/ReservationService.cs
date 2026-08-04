@@ -8,9 +8,11 @@ using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Inventario.Api.Services;
 
+using XFramework.Integration.Security;
+
 public sealed class ReservationService(
     IDataContext dataContext,
-    IHttpContextAccessor httpContextAccessor,
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     InventoryAllocationService allocationService)
 {
     public async Task<Result<List<Reservation>>> GetReservationsAsync(
@@ -289,21 +291,10 @@ public sealed class ReservationService(
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)
     {
-        if (request?.Metadata?.TenantId is { } metadataTenantId && metadataTenantId != Guid.Empty)
-            return Result<Guid>.Success(metadataTenantId);
-
-        var user = httpContextAccessor.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated != true)
+        var tenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId;
+        if (tenantId is null || tenantId == Guid.Empty)
             return Result<Guid>.Unauthorized("Authentication is required for reservation operations.");
-
-        var tenantIdClaim = user.FindFirst("tenantId")?.Value
-            ?? user.FindFirst("TenantId")?.Value
-            ?? user.FindFirst("tid")?.Value;
-
-        if (Guid.TryParse(tenantIdClaim, out var tenantId) && tenantId != Guid.Empty)
-            return Result<Guid>.Success(tenantId);
-
-        return Result<Guid>.Forbidden("Authenticated user does not have a valid tenant context.");
+        return Result<Guid>.Success(tenantId.Value);
     }
 
     private static string? NormalizeOptional(string? value) =>

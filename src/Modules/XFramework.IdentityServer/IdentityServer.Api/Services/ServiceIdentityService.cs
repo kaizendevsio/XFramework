@@ -13,13 +13,13 @@ namespace IdentityServer.Api.Services;
 
 public sealed class ServiceIdentityService(
     IDataContext dataContext,
-    IConfiguration configuration,
     ServiceIdentityConfiguration serviceIdentityConfiguration,
     IBoltTransportTokenSigner boltTransportTokenSigner,
     TimeProvider timeProvider,
     ILogger<ServiceIdentityService> logger,
-    ITrustedServiceInvocationResolver? serviceInvocationResolver = null,
-    AppDbContext? appDbContext = null)
+    ITrustedInvocationContextAccessor? trustedInvocationContextAccessor = null,
+    AppDbContext? appDbContext = null,
+    IServiceSigningKeyStore? signingKeyStore = null)
     : IServiceIdentityService
 {
     private const string Algorithm = "RS256";
@@ -27,6 +27,9 @@ public sealed class ServiceIdentityService(
     private const int SigningKeyMaintenanceBatchSize = 128;
     private static readonly JwtSecurityTokenHandler TokenHandler = new();
     private static readonly SemaphoreSlim SigningKeyRotationLock = new(1, 1);
+    private readonly IServiceSigningKeyStore _signingKeyStore = signingKeyStore ??
+        throw new InvalidOperationException(
+            "A service signing-key store must be registered by the application composition root.");
 
     public async Task<Result<ServiceTokenResponse>> IssueTokenAsync(
         IssueServiceTokenRequest request,
@@ -60,7 +63,7 @@ public sealed class ServiceIdentityService(
 
         var signingKey = await GetOrCreateActiveSigningKeyAsync(ct);
         using var rsa = RSA.Create();
-        rsa.ImportFromPem(await File.ReadAllTextAsync(GetPrivateKeyPath(signingKey), ct));
+        rsa.ImportFromPem(await _signingKeyStore.ReadPrivateKeyAsync(signingKey.PrivateKeyFileName, ct));
 
         var key = new RsaSecurityKey(rsa)
         {
@@ -197,7 +200,12 @@ public sealed class ServiceIdentityService(
                 .OrderByDescending(static key => key.IsActive)
                 .ThenByDescending(static key => key.CreatedAtUtc)
                 .Select(ToResponse)
-                .ToList()
+                .ToList(),
+            CredentialGenerationsByClient = serviceIdentityConfiguration.ValidationGenerationIdsByClient
+                .ToDictionary(
+                    static pair => pair.Key,
+                    static pair => pair.Value.ToList(),
+                    StringComparer.Ordinal)
         });
     }
 
@@ -210,7 +218,7 @@ public sealed class ServiceIdentityService(
             return Result<ServiceSigningKeyResponse>.Failure(adminResult.Message!, adminResult.StatusCode);
 
         var key = await RotateSigningKeyCoreAsync(
-            request.Reason?.Trim() ?? request.Metadata?.Name?.Trim() ?? "manual",
+            request.Reason?.Trim() ?? request.Metadata?.OperationName?.Trim() ?? "manual",
             reuseActiveKey: false,
             ct);
         return Result<ServiceSigningKeyResponse>.Success(ToResponse(key));
@@ -261,7 +269,7 @@ public sealed class ServiceIdentityService(
         CancellationToken ct)
     {
         await SigningKeyRotationLock.WaitAsync(ct);
-        string? createdPrivateKeyPath = null;
+        string? createdPrivateKeyReference = null;
         try
         {
             await using var transaction = appDbContext is not null && appDbContext.Database.IsRelational()
@@ -317,15 +325,17 @@ public sealed class ServiceIdentityService(
 
             using var rsa = RSA.Create(3072);
             var keyId = $"svc-{Guid.NewGuid():N}";
-            var fileName = $"{keyId}.pem";
-            WritePrivateKeyAtomically(fileName, rsa.ExportPkcs8PrivateKeyPem());
-            createdPrivateKeyPath = Path.Combine(GetSigningKeyDirectory(), fileName);
+            var keyReference = await _signingKeyStore.StorePrivateKeyAsync(
+                keyId,
+                rsa.ExportPkcs8PrivateKeyPem(),
+                ct);
+            createdPrivateKeyReference = keyReference;
             var newKey = new ServiceSigningKey
             {
                 Id = Guid.NewGuid(),
                 KeyId = keyId,
                 Algorithm = Algorithm,
-                PrivateKeyFileName = fileName,
+                PrivateKeyFileName = keyReference,
                 PublicKeyPem = rsa.ExportSubjectPublicKeyInfoPem(),
                 CreatedAtUtc = now,
                 ActivatedAtUtc = now,
@@ -341,13 +351,13 @@ public sealed class ServiceIdentityService(
             if (transaction is not null)
                 await transaction.CommitAsync(ct);
 
-            createdPrivateKeyPath = null;
+            createdPrivateKeyReference = null;
             return newKey;
         }
         catch
         {
-            if (createdPrivateKeyPath is not null && File.Exists(createdPrivateKeyPath))
-                File.Delete(createdPrivateKeyPath);
+            if (createdPrivateKeyReference is not null)
+                await _signingKeyStore.DeletePrivateKeyAsync(createdPrivateKeyReference, CancellationToken.None);
             throw;
         }
         finally
@@ -399,7 +409,7 @@ public sealed class ServiceIdentityService(
                 changed = true;
             }
 
-            if (key.RetiredAtUtc > now || !TryDeletePrivateKeyFile(key))
+            if (key.RetiredAtUtc > now || !await TryDeletePrivateKeyAsync(key, ct))
                 continue;
 
             dataContext.Remove(key);
@@ -414,14 +424,16 @@ public sealed class ServiceIdentityService(
             throw new InvalidOperationException("Expired service signing keys could not be cleaned up.");
     }
 
-    private bool TryDeletePrivateKeyFile(ServiceSigningKey key)
+    private async Task<bool> TryDeletePrivateKeyAsync(ServiceSigningKey key, CancellationToken ct)
     {
-        var path = GetPrivateKeyPath(key);
         try
         {
-            if (File.Exists(path))
-                File.Delete(path);
+            await _signingKeyStore.DeletePrivateKeyAsync(key.PrivateKeyFileName, ct);
             return true;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -433,87 +445,29 @@ public sealed class ServiceIdentityService(
         }
     }
 
-    private string GetPrivateKeyPath(ServiceSigningKey key) =>
-        Path.Combine(GetSigningKeyDirectory(), Path.GetFileName(key.PrivateKeyFileName));
-
-    private string GetSigningKeyDirectory()
-    {
-        var configured = configuration["ServiceIdentity:ServiceTokenSigningKeyDirectory"]?.Trim();
-        if (!string.IsNullOrWhiteSpace(configured))
-            return Path.GetFullPath(configured);
-
-        var transportKeyPath = serviceIdentityConfiguration.BoltTransportSigningKeyPath;
-        var parent = string.IsNullOrWhiteSpace(transportKeyPath)
-            ? Path.Combine(AppContext.BaseDirectory, ".keys")
-            : Path.GetDirectoryName(Path.GetFullPath(transportKeyPath))!;
-        return Path.Combine(parent, "service-token-signing-keys");
-    }
-
-    private void WritePrivateKeyAtomically(string fileName, string privateKeyPem)
-    {
-        var directory = GetSigningKeyDirectory();
-        Directory.CreateDirectory(directory);
-        var destination = Path.Combine(directory, Path.GetFileName(fileName));
-        var temporary = Path.Combine(directory, $".{fileName}.{Guid.NewGuid():N}.tmp");
-        var bytes = Encoding.ASCII.GetBytes(privateKeyPem);
-        try
-        {
-            var options = new FileStreamOptions
-            {
-                Mode = FileMode.CreateNew,
-                Access = FileAccess.Write,
-                Share = FileShare.None
-            };
-            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-
-            using (var stream = new FileStream(temporary, options))
-            {
-                stream.Write(bytes);
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporary, destination, overwrite: false);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-            if (File.Exists(temporary))
-                File.Delete(temporary);
-        }
-    }
-
     private string ResolveIssuer() =>
         serviceIdentityConfiguration.Issuer;
 
-    private async Task<Result> EnsureSigningKeyAdminAsync(
+    private Task<Result> EnsureSigningKeyAdminAsync(
         RequestMetadata? metadata,
         CancellationToken ct)
     {
-        if (metadata?.HasTrustedActorContext == true &&
-            metadata.TrustedActorRoles.Contains("SuperAdmin"))
+        ct.ThrowIfCancellationRequested();
+        var context = trustedInvocationContextAccessor?.Current;
+        if (context?.Actor is { } actor)
         {
-            return Result.Success();
+            return Task.FromResult(actor.Roles.Contains("SuperAdmin")
+                ? Result.Success()
+                : Result.Forbidden("Service signing key administration requires a SuperAdmin actor"));
         }
 
-        if (serviceInvocationResolver is not null)
+        if (context?.Service?.Scopes.Contains(XFrameworkServiceScopes.IdentityAdmin) == true)
         {
-            var invocation = await serviceInvocationResolver.ResolveAsync(
-                metadata,
-                configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.IdentityServer,
-                [XFrameworkServiceScopes.IdentityAdmin],
-                requireTenant: false,
-                ct: ct);
-
-            if (invocation.IsSuccess)
-                return Result.Success();
-
-            return Result.Failure(
-                invocation.Error ?? "Trusted identity.admin service metadata is required for service signing key administration",
-                invocation.StatusCode);
+            return Task.FromResult(Result.Success());
         }
 
-        return Result.Forbidden("Service signing key administration requires SuperAdmin or trusted identity.admin service metadata");
+        return Task.FromResult(
+            Result.Forbidden("Service signing key administration requires SuperAdmin or a trusted identity.admin service identity"));
     }
 
     private static ServiceSigningKeyResponse ToResponse(ServiceSigningKey key) => new()

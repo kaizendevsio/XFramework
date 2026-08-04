@@ -57,7 +57,15 @@ public sealed class ServiceWrapperGeneratorTests
         generatedSource.Should().Contain("public partial record JuanBarangayServiceWrapper(");
         generatedSource.Should().Contain($"TargetClient = \"{"XFramework.JuanBarangay".ToSha256()}\"");
         generatedSource.Should().Contain("IServiceTokenProvider serviceTokenProvider");
+        generatedSource.Should().Contain("IActorAccessTokenProvider actorAccessTokenProvider");
+        generatedSource.Should().Contain("BoltInvocationEnvelopeFactory.CreateAsync(");
+        generatedSource.Should().Contain("entityForLog is XFramework.Domain.Shared.Contracts.Base.IHasTenantId tenantOwned");
+        generatedSource.Should().Contain("Metadata = new RequestMetadata { RequestedTenantId = requestedTenantId }");
         generatedSource.Should().Contain("public IResidentCrudService Resident { get; init; }");
+        generatedSource.Should().Contain("services.AddScoped<IJuanBarangayServiceWrapper, JuanBarangayServiceWrapper>();");
+        generatedSource.Should().Contain("services.AddScoped<IResidentCrudService>");
+        generatedSource.Should().NotContain("services.AddSingleton<IJuanBarangayServiceWrapper");
+        generatedSource.Should().NotContain("GetProperty(\"TenantId\")");
         generatedSource.Should().Contain("Task<QueryResponse<Juan.Barangay.Domain.Shared.Contracts.Residents.ResidentResponse>> ValidateBarangayId(Juan.Barangay.Domain.Shared.Contracts.Residents.ValidateBarangayIdRequest request, System.Threading.CancellationToken ct = default);");
         generatedSource.Should().Contain("SendAsync<Juan.Barangay.Domain.Shared.Contracts.Residents.ValidateBarangayIdRequest, Juan.Barangay.Domain.Shared.Contracts.Residents.ResidentResponse>(request, ct);");
         generatedSource.Should().NotContain("namespace Juan.Integration.Drivers");
@@ -99,6 +107,10 @@ public sealed class ServiceWrapperGeneratorTests
         generatedSource.Should().Contain("public partial interface IInventarioServiceWrapper");
         generatedSource.Should().Contain($"TargetClient = \"{"XFramework.Inventario".ToSha256()}\"");
         generatedSource.Should().Contain("IServiceTokenProvider serviceTokenProvider");
+        generatedSource.Should().Contain("IActorAccessTokenProvider actorAccessTokenProvider");
+        generatedSource.Should().Contain("BoltInvocationEnvelopeFactory.CreateAsync(");
+        generatedSource.Should().Contain("if (stream.CloseStatus is { } closeStatus");
+        generatedSource.Should().Contain("DataContext streaming request failed with status");
         generatedSource.Should().Contain("public IProductCrudService Product { get; init; }");
         generatedSource.Should().Contain("Task<CmdResponse> ReserveInventory(XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations.ReserveInventoryRequest request, System.Threading.CancellationToken ct = default);");
         generatedSource.Should().Contain("SendVoidAsync(request, ct);");

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using XFramework.Domain.Contexts;
+using XFramework.Integration.Security;
 
 namespace Attendance.Tests.Services;
 
@@ -19,7 +20,7 @@ public sealed class AttendanceServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var seed = await SeedAttendanceAsync(database);
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var checkIn = await service.RecordEventAsync(new RecordAttendanceEventRequest
         {
@@ -53,7 +54,7 @@ public sealed class AttendanceServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var seed = await SeedAttendanceAsync(database);
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
         var request = new RecordAttendanceEventRequest
         {
             TenantId = database.TenantId,
@@ -78,7 +79,7 @@ public sealed class AttendanceServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var seed = await SeedAttendanceAsync(database);
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var result = await service.GetRecordAsync(new GetAttendanceRecordRequest
         {
@@ -97,7 +98,7 @@ public sealed class AttendanceServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var seed = await SeedAttendanceAsync(database);
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var result = await service.RecordEventAsync(new RecordAttendanceEventRequest
         {
@@ -118,7 +119,7 @@ public sealed class AttendanceServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var seed = await SeedAttendanceAsync(database);
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var result = await service.RecordEventAsync(new RecordAttendanceEventRequest
         {
@@ -139,7 +140,7 @@ public sealed class AttendanceServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var seed = await SeedAttendanceAsync(database);
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var result = await service.RecordEventAsync(new RecordAttendanceEventRequest
         {
@@ -161,7 +162,7 @@ public sealed class AttendanceServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var seed = await SeedAttendanceAsync(database);
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var result = await service.CreateAdjustmentAsync(new CreateAttendanceAdjustmentRequest
         {
@@ -184,7 +185,7 @@ public sealed class AttendanceServiceTests
     public async Task CreateContextAsync_MissingTenant_ReturnsFailure()
     {
         await using var database = await TestDatabase.CreateAsync();
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, null);
 
         var result = await service.CreateContextAsync(new CreateAttendanceContextRequest
         {
@@ -197,8 +198,15 @@ public sealed class AttendanceServiceTests
         result.Message.Should().Contain("Tenant ID");
     }
 
-    private static AttendanceService CreateService(AppDbContext db) =>
-        new(db, NullLogger<AttendanceService>.Instance);
+    private static AttendanceService CreateService(AppDbContext db, Guid? tenantId) =>
+        new(db, NullLogger<AttendanceService>.Instance, new TestInvocationContextAccessor(tenantId));
+
+    private sealed class TestInvocationContextAccessor(Guid? tenantId) : ITrustedInvocationContextAccessor
+    {
+        public TrustedInvocationContext? Current { get; } = tenantId is { } value
+            ? new TrustedInvocationContext(null, null, value, null, Guid.NewGuid())
+            : null;
+    }
 
     private static async Task<SeedData> SeedAttendanceAsync(TestDatabase database)
     {
@@ -292,7 +300,11 @@ public sealed class AttendanceServiceTests
                 })
                 .Build();
 
-            var context = new AppDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor(), configuration);
+            var context = new AppDbContext(
+                options,
+                new Microsoft.AspNetCore.Http.HttpContextAccessor(),
+                configuration,
+                new TestEffectiveTenantContextAccessor(tenantId));
 
             _ = typeof(AttendanceContext).Assembly;
             await context.Database.EnsureCreatedAsync();
@@ -304,6 +316,13 @@ public sealed class AttendanceServiceTests
         {
             await Context.DisposeAsync();
             await connection.DisposeAsync();
+        }
+
+        private sealed class TestEffectiveTenantContextAccessor(Guid tenantId)
+            : XFramework.Domain.Shared.Security.IEffectiveTenantContextAccessor
+        {
+            public bool HasTrustedInvocation => true;
+            public Guid? EffectiveTenantId => tenantId;
         }
     }
 }

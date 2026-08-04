@@ -19,6 +19,7 @@ public sealed class WalletWorkflowService(
     PaymentGatewayService paymentGatewayService,
     IConfiguration configuration)
     : IWalletWorkflowService,
+      IWalletProviderWorkflowService,
       IWalletApprovalWorkflowService,
       IWalletCaseWorkflowService,
       IWalletReportingService
@@ -132,9 +133,17 @@ public sealed class WalletWorkflowService(
     public Task<Result<WalletWorkflowResponse>> RejectDepositAsync(WalletWorkflowActionRequest request, CancellationToken ct = default) =>
         TransitionDepositAsync(request, [WalletWorkflowStatus.PendingApproval, WalletWorkflowStatus.Approved], WalletWorkflowStatus.Rejected, ct, reject: true);
 
-    public async Task<Result<WalletWorkflowResponse>> SettleDepositAsync(WalletWorkflowActionRequest request, CancellationToken ct = default)
+    public Task<Result<WalletWorkflowResponse>> SettleDepositAsync(
+        WalletWorkflowActionRequest request,
+        CancellationToken ct = default) =>
+        SettleDepositAsync(request, providerContext: null, ct);
+
+    private async Task<Result<WalletWorkflowResponse>> SettleDepositAsync(
+        WalletWorkflowActionRequest request,
+        WalletRequestContext? providerContext,
+        CancellationToken ct)
     {
-        var load = await LoadDepositAsync(request, true, ct);
+        var load = await LoadDepositAsync(request, true, ct, providerContext);
         if (!load.IsSuccess) return Result<WalletWorkflowResponse>.Failure(load.Message!, load.StatusCode);
 
         var deposit = load.Data!.Entity;
@@ -508,9 +517,17 @@ public sealed class WalletWorkflowService(
             TransactionStatus.Rejected,
             ct);
 
-    public async Task<Result<WalletWorkflowResponse>> SettleWithdrawalAsync(WalletWorkflowActionRequest request, CancellationToken ct = default)
+    public Task<Result<WalletWorkflowResponse>> SettleWithdrawalAsync(
+        WalletWorkflowActionRequest request,
+        CancellationToken ct = default) =>
+        SettleWithdrawalAsync(request, providerContext: null, ct);
+
+    private async Task<Result<WalletWorkflowResponse>> SettleWithdrawalAsync(
+        WalletWorkflowActionRequest request,
+        WalletRequestContext? providerContext,
+        CancellationToken ct)
     {
-        var load = await LoadWithdrawalAsync(request, true, ct);
+        var load = await LoadWithdrawalAsync(request, true, ct, providerContext);
         if (!load.IsSuccess) return Result<WalletWorkflowResponse>.Failure(load.Message!, load.StatusCode);
 
         var withdrawal = load.Data!.Entity;
@@ -700,14 +717,85 @@ public sealed class WalletWorkflowService(
             TransactionStatus.Cancelled,
             ct);
 
+    Task<Result<WalletWorkflowResponse>> IWalletProviderWorkflowService.ApplyDepositStatusAsync(
+        Guid tenantId,
+        WalletWorkflowStatus status,
+        WalletWorkflowActionRequest request,
+        CancellationToken ct)
+    {
+        var context = CreateProviderContext(tenantId, request);
+        var providerRequest = WithProviderReason(request, status);
+        return status switch
+        {
+            WalletWorkflowStatus.Completed => SettleDepositAsync(providerRequest, context, ct),
+            WalletWorkflowStatus.Cancelled or WalletWorkflowStatus.Expired => TransitionDepositAsync(
+                providerRequest,
+                [WalletWorkflowStatus.PendingApproval, WalletWorkflowStatus.Approved],
+                WalletWorkflowStatus.Cancelled,
+                ct,
+                cancel: true,
+                providerContext: context),
+            WalletWorkflowStatus.Rejected => TransitionDepositAsync(
+                providerRequest,
+                [WalletWorkflowStatus.PendingApproval, WalletWorkflowStatus.Approved],
+                WalletWorkflowStatus.Rejected,
+                ct,
+                reject: true,
+                providerContext: context),
+            _ => TransitionDepositAsync(
+                providerRequest,
+                [WalletWorkflowStatus.PendingApproval, WalletWorkflowStatus.Approved, WalletWorkflowStatus.Settling],
+                WalletWorkflowStatus.Failed,
+                ct,
+                fail: true,
+                providerContext: context)
+        };
+    }
+
+    Task<Result<WalletWorkflowResponse>> IWalletProviderWorkflowService.ApplyWithdrawalStatusAsync(
+        Guid tenantId,
+        WalletWorkflowStatus status,
+        WalletWorkflowActionRequest request,
+        CancellationToken ct)
+    {
+        var context = CreateProviderContext(tenantId, request);
+        var providerRequest = WithProviderReason(request, status);
+        return status switch
+        {
+            WalletWorkflowStatus.Completed => SettleWithdrawalAsync(providerRequest, context, ct),
+            WalletWorkflowStatus.Cancelled or WalletWorkflowStatus.Expired => CompleteWithdrawalWithoutSettlementAsync(
+                providerRequest,
+                [WalletWorkflowStatus.PendingApproval, WalletWorkflowStatus.Approved],
+                WalletWorkflowStatus.Cancelled,
+                TransactionStatus.Cancelled,
+                ct,
+                context),
+            WalletWorkflowStatus.Rejected => CompleteWithdrawalWithoutSettlementAsync(
+                providerRequest,
+                [WalletWorkflowStatus.PendingApproval, WalletWorkflowStatus.Approved],
+                WalletWorkflowStatus.Rejected,
+                TransactionStatus.Rejected,
+                ct,
+                context),
+            _ => CompleteWithdrawalWithoutSettlementAsync(
+                providerRequest,
+                [WalletWorkflowStatus.PendingApproval, WalletWorkflowStatus.Approved, WalletWorkflowStatus.Settling],
+                WalletWorkflowStatus.Failed,
+                TransactionStatus.Failed,
+                ct,
+                context)
+        };
+    }
+
     private async Task<Result<WalletWorkflowResponse>> CompleteWithdrawalWithoutSettlementAsync(
         WalletWorkflowActionRequest request,
         IReadOnlyCollection<WalletWorkflowStatus> allowedStatuses,
         WalletWorkflowStatus workflowStatus,
         TransactionStatus transactionStatus,
-        CancellationToken ct)
+        CancellationToken ct,
+        WalletRequestContext? providerContext = null)
     {
-        var load = await LoadWithdrawalAsync(request, true, ct);
+        var load = await LoadWithdrawalAsync(request, true, ct, providerContext);
         if (!load.IsSuccess) return Result<WalletWorkflowResponse>.Failure(load.Message!, load.StatusCode);
 
         var withdrawal = load.Data!.Entity;
@@ -949,7 +1037,7 @@ public sealed class WalletWorkflowService(
             OperationType = request.OperationType,
             Status = WalletApprovalStatus.Pending,
             WalletId = request.WalletId,
-            RequesterCredentialId = contextResult.Data.ActorCredentialId ?? request.Metadata.CredentialId ?? Guid.Empty,
+            RequesterCredentialId = contextResult.Data.ActorCredentialId ?? Guid.Empty,
             Amount = request.Amount,
             Reason = request.Reason,
             AuditMetadataJson = request.AuditMetadataJson,
@@ -1769,9 +1857,10 @@ public sealed class WalletWorkflowService(
         bool approve = false,
         bool reject = false,
         bool fail = false,
-        bool cancel = false)
+        bool cancel = false,
+        WalletRequestContext? providerContext = null)
     {
-        var load = await LoadDepositAsync(request, true, ct);
+        var load = await LoadDepositAsync(request, true, ct, providerContext);
         if (!load.IsSuccess) return Result<WalletWorkflowResponse>.Failure(load.Message!, load.StatusCode);
 
         var deposit = load.Data!.Entity;
@@ -1921,11 +2010,36 @@ public sealed class WalletWorkflowService(
 
     private sealed record WalletReportScope(bool TenantWide, IReadOnlyList<Guid> WalletIds);
 
-    private async Task<Result<WorkflowLoad<DepositRequest>>> LoadDepositAsync(WalletWorkflowActionRequest request, bool tracking, CancellationToken ct)
+    private static WalletRequestContext CreateProviderContext(
+        Guid tenantId,
+        WalletWorkflowActionRequest request) =>
+        new(
+            tenantId,
+            ActorCredentialId: null,
+            request.Metadata.RequestId?.ToString(),
+            request.Metadata.IpAddress,
+            request.Metadata.UserAgent,
+            IsPrivilegedActor: true,
+            IsSystemActor: true);
+
+    private static WalletWorkflowActionRequest WithProviderReason(
+        WalletWorkflowActionRequest request,
+        WalletWorkflowStatus status) =>
+        request with
+        {
+            Reason = request.Reason ?? $"Provider status: {request.ProviderStatus ?? status.ToString()}"
+        };
+
+    private async Task<Result<WorkflowLoad<DepositRequest>>> LoadDepositAsync(
+        WalletWorkflowActionRequest request,
+        bool tracking,
+        CancellationToken ct,
+        WalletRequestContext? providerContext = null)
     {
-        var contextResult = contextResolver.Resolve(request);
-        if (!contextResult.IsSuccess) return Result<WorkflowLoad<DepositRequest>>.Failure(contextResult.Message!, contextResult.StatusCode);
-        var context = contextResult.Data!;
+        var contextResult = providerContext is null ? contextResolver.Resolve(request) : null;
+        if (contextResult is { IsSuccess: false })
+            return Result<WorkflowLoad<DepositRequest>>.Failure(contextResult.Message!, contextResult.StatusCode);
+        var context = providerContext ?? contextResult!.Data!;
         var feature = await EnsureFeatureAsync(context, TenantModuleFeatureKeys.WalletsDeposits, ct);
         if (!feature.IsSuccess) return Failure<WorkflowLoad<DepositRequest>>(feature);
 
@@ -1948,11 +2062,16 @@ public sealed class WalletWorkflowService(
             : Result<WorkflowLoad<DepositRequest>>.Failure(authorization.Message!, authorization.StatusCode);
     }
 
-    private async Task<Result<WorkflowLoad<WithdrawalRequest>>> LoadWithdrawalAsync(WalletWorkflowActionRequest request, bool tracking, CancellationToken ct)
+    private async Task<Result<WorkflowLoad<WithdrawalRequest>>> LoadWithdrawalAsync(
+        WalletWorkflowActionRequest request,
+        bool tracking,
+        CancellationToken ct,
+        WalletRequestContext? providerContext = null)
     {
-        var contextResult = contextResolver.Resolve(request);
-        if (!contextResult.IsSuccess) return Result<WorkflowLoad<WithdrawalRequest>>.Failure(contextResult.Message!, contextResult.StatusCode);
-        var context = contextResult.Data!;
+        var contextResult = providerContext is null ? contextResolver.Resolve(request) : null;
+        if (contextResult is { IsSuccess: false })
+            return Result<WorkflowLoad<WithdrawalRequest>>.Failure(contextResult.Message!, contextResult.StatusCode);
+        var context = providerContext ?? contextResult!.Data!;
         var feature = await EnsureFeatureAsync(context, TenantModuleFeatureKeys.WalletsWithdrawals, ct);
         if (!feature.IsSuccess) return Failure<WorkflowLoad<WithdrawalRequest>>(feature);
 

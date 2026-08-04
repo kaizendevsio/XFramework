@@ -128,6 +128,10 @@ public sealed class IdentityServerSigningAndPersistenceHardeningTests : Integrat
     {
         await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
         {
+            IntegrationTestFixture.EstablishTrustedActorContext(
+                scope.ServiceProvider,
+                IntegrationTestFixture.TestTenantId,
+                IntegrationTestFixture.TestCredentialId);
             var service = scope.ServiceProvider.GetRequiredService<IServiceIdentityService>();
             var configuration = scope.ServiceProvider.GetRequiredService<ServiceIdentityConfiguration>();
             var current = await service.GetSigningKeysAsync(new GetServiceSigningKeysRequest());
@@ -137,11 +141,7 @@ public sealed class IdentityServerSigningAndPersistenceHardeningTests : Integrat
             var rotation = await service.RotateSigningKeyAsync(new RotateServiceSigningKeyRequest
             {
                 Reason = "integration-test",
-                Metadata = new RequestMetadata
-                {
-                    HasTrustedActorContext = true,
-                    TrustedActorRoles = new HashSet<string>(["SuperAdmin"], StringComparer.OrdinalIgnoreCase)
-                }
+                Metadata = new RequestMetadata()
             });
             var completedAt = DateTime.UtcNow;
 
@@ -176,6 +176,9 @@ public sealed class IdentityServerSigningAndPersistenceHardeningTests : Integrat
             var results = await Task.WhenAll(Enumerable.Range(0, 12).Select(async _ =>
             {
                 await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+                IntegrationTestFixture.EstablishTrustedServiceTargetContext(
+                    scope.ServiceProvider,
+                    IntegrationTestFixture.TestTenantId);
                 var service = scope.ServiceProvider.GetRequiredService<IServiceIdentityService>();
                 return await service.GetSigningKeysAsync(new GetServiceSigningKeysRequest());
             }));
@@ -248,6 +251,9 @@ public sealed class IdentityServerSigningAndPersistenceHardeningTests : Integrat
         try
         {
             await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+            IntegrationTestFixture.EstablishTrustedServiceTargetContext(
+                scope.ServiceProvider,
+                IntegrationTestFixture.TestTenantId);
             var service = scope.ServiceProvider.GetRequiredService<IServiceIdentityService>();
             var result = await service.GetSigningKeysAsync(new GetServiceSigningKeysRequest());
 
@@ -296,6 +302,9 @@ public sealed class IdentityServerSigningAndPersistenceHardeningTests : Integrat
         try
         {
             await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+            IntegrationTestFixture.EstablishTrustedServiceTargetContext(
+                scope.ServiceProvider,
+                IntegrationTestFixture.TestTenantId);
             var service = scope.ServiceProvider.GetRequiredService<IServiceIdentityService>();
             var result = await service.GetSigningKeysAsync(new GetServiceSigningKeysRequest());
 

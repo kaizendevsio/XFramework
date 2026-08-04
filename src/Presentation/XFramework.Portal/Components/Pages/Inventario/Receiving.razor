@@ -417,7 +417,7 @@ else
     private string GetLotLabel(InventoryLot lot) => string.IsNullOrWhiteSpace(lot.LotNumber) ? lot.Id.ToString()[..8] : $"{lot.LotNumber} - {GetProductName(lot.ProductId)}";
     private string GetLotSearchText(InventoryLot lot) => $"{lot.LotNumber} {lot.Status} {GetProductName(lot.ProductId)} {lot.SupplierReference}";
 
-    private RequestMetadata BuildMetadata() => new() { TenantId = TenantFilter.SelectedTenantId };
+    private RequestMetadata BuildMetadata() => new() { RequestedTenantId = TenantFilter.SelectedTenantId };
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     public void Dispose()

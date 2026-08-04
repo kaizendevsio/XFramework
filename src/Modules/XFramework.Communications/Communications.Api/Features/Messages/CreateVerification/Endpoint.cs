@@ -1,12 +1,18 @@
 using Communications.Domain.Shared.Contracts.Requests.Create;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace Communications.Api.Features.Messages.CreateVerification;
 
 public static class CreateVerificationMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.None,
+        TenantAccessMode = TenantAccessMode.ServiceTargetTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.BoltService, XFrameworkServiceScopes.TenantTarget],
+        AllowedServiceCallers = [XFrameworkServiceNames.IdentityServer])]
     [MapPost("/api/communications/messages/verification", Tags = ["Messages"],
         Summary = "Create and send a verification message",
         Description = "Sends a verification token to the requested contact. Phone contacts are sent by SMS.")]

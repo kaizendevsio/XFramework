@@ -7,7 +7,10 @@ namespace IdentityServer.Api.Features.Auth.ChangePassword;
 
 public static class ChangePasswordEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result> Handle(
         ChangePasswordRequest request,
         IAuthService authService,
@@ -24,7 +27,7 @@ public static class ChangePasswordEndpoint
         IAuthService authService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authService.ChangePasswordAsync(request, ct);
     }
 }

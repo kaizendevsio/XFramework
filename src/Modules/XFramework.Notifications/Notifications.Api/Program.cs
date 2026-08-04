@@ -1,5 +1,6 @@
 using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Integration.Extensions;
 using Notifications.Api.Generated;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
@@ -10,6 +11,7 @@ using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
 builder.Logging.AddXFrameworkLogging(builder.Configuration);
+builder.Services.AddIdentityServerSessionValidation();
 
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Notifications.Api");
 builder.Services.AddXFrameworkHealthChecks<AppDbContext>(

@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Tenants.SetModuleFeatures;
 
 public static class SetTenantModuleFeaturesEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result> Handle(
         SetTenantModuleFeaturesRequest request,
         IIdentityAuthorizationService service,
@@ -25,7 +28,7 @@ public static class SetTenantModuleFeaturesEndpoint
         IIdentityAuthorizationService service,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return service.SetTenantModuleFeaturesAsync(request, ct);
     }
 }

@@ -2,12 +2,16 @@ using FluentValidation;
 using IdentityServer.Api.Features.Authorization.Shared;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.ServiceIdentity.RetireSigningKey;
 
 public static class RetireServiceSigningKeyEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.Optional,
+        TenantAccessMode = TenantAccessMode.Tenantless,
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
     public static Task<Result<ServiceSigningKeyResponse>> Handle(
         RetireServiceSigningKeyRequest request,
         IServiceIdentityService serviceIdentityService,
@@ -25,7 +29,7 @@ public static class RetireServiceSigningKeyEndpoint
         IServiceIdentityService serviceIdentityService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return serviceIdentityService.RetireSigningKeyAsync(request, ct);
     }
 }

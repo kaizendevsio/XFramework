@@ -50,6 +50,13 @@ public sealed class StorageTestAuthHandler(
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);
+        var actorToken = TestInvocationIdentityExtensions.CreateTestActorToken(
+            tenantId,
+            credentialId,
+            identityId,
+            Guid.Parse("00000000-0000-0000-0000-000000000693"),
+            ["Admin"]);
+        Request.Headers.Authorization = $"Bearer {actorToken}";
 
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }

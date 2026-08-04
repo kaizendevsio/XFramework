@@ -99,6 +99,6 @@ public sealed class TenantResolverTests
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
-        return new AppDbContext(options);
+        return TestTrustedPersistence.Create(options);
     }
 }

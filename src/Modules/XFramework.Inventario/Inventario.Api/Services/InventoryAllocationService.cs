@@ -7,12 +7,13 @@ using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock;
 using XFramework.Inventario.Domain.Shared.Enums;
+using XFramework.Integration.Security;
 
 namespace XFramework.Inventario.Api.Services;
 
 public sealed class InventoryAllocationService(
     IDataContext dataContext,
-    IHttpContextAccessor httpContextAccessor,
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     StockPostingService stockPostingService)
 {
     public async Task<Result<List<ReservationAllocation>>> GetAllocationsAsync(
@@ -345,50 +346,19 @@ public sealed class InventoryAllocationService(
 
     private bool HasExpiredLotOverrideAuthorization()
     {
-        var user = httpContextAccessor.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated != true)
-            return false;
-
-        return user.Claims.Any(IsOverrideClaim);
-    }
-
-    private static bool IsOverrideClaim(Claim claim)
-    {
-        if (claim.Type is ClaimTypes.Role or "role" or "roles" &&
-            (claim.Value.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
-             claim.Value.Equals("InventoryAdmin", StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        if (claim.Type is "permission" or "permissions" &&
-            claim.Value.Equals("inventario.override_expired_lot", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return claim.Type.Equals("isAdmin", StringComparison.OrdinalIgnoreCase) &&
-               bool.TryParse(claim.Value, out var isAdmin) &&
-               isAdmin;
+        var actor = trustedInvocationContextAccessor.Current?.Actor;
+        return actor is not null &&
+            (actor.Roles.Contains("Admin") ||
+             actor.Roles.Contains("InventoryAdmin") ||
+             actor.Capabilities.Contains("inventario.override_expired_lot"));
     }
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)
     {
-        if (request?.Metadata?.TenantId is { } metadataTenantId && metadataTenantId != Guid.Empty)
-            return Result<Guid>.Success(metadataTenantId);
-
-        var user = httpContextAccessor.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated != true)
+        var tenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId;
+        if (tenantId is null || tenantId == Guid.Empty)
             return Result<Guid>.Unauthorized("Authentication is required for allocation operations.");
-
-        var tenantIdClaim = user.FindFirst("tenantId")?.Value
-            ?? user.FindFirst("TenantId")?.Value
-            ?? user.FindFirst("tid")?.Value;
-
-        if (Guid.TryParse(tenantIdClaim, out var tenantId) && tenantId != Guid.Empty)
-            return Result<Guid>.Success(tenantId);
-
-        return Result<Guid>.Forbidden("Authenticated user does not have a valid tenant context.");
+        return Result<Guid>.Success(tenantId.Value);
     }
 
     private static bool IsExpired(InventoryLot lot, DateTime now) =>

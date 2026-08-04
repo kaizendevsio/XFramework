@@ -279,6 +279,7 @@ else
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private PortalActorContext ActorContext { get; set; } = default!;
     [Inject] private ILogger<SessionDetail> Logger { get; set; } = default!;
 
     private AttendanceSessionDetail? _detail;
@@ -298,7 +299,7 @@ else
     private string _adjustmentParticipantLabel = string.Empty;
     private readonly AdjustmentForm _adjustmentForm = new();
 
-    private bool ManualActionsDisabled => RequestMetadata.CredentialId is null || _savingEvent || _savingAdjustment;
+    private bool ManualActionsDisabled => ActorContext.CredentialId is null || _savingEvent || _savingAdjustment;
     private string ContextLabel => _detail?.Context is null
         ? "Unknown context"
         : string.IsNullOrWhiteSpace(_detail.Context.Code)
@@ -481,7 +482,7 @@ else
 
     private async Task RecordManualEvent(AttendanceSessionRosterRow row, AttendanceEventType eventType)
     {
-        if (TenantFilter.SelectedTenantId is not Guid tenantId || RequestMetadata.CredentialId is not Guid actorCredentialId)
+        if (TenantFilter.SelectedTenantId is not Guid tenantId || ActorContext.CredentialId is not Guid actorCredentialId)
         {
             ToastService.Warning("Manual attendance actions require an operator credential.", "Attendance");
             return;
@@ -544,7 +545,7 @@ else
             return;
         }
 
-        if (RequestMetadata.CredentialId is not Guid actorCredentialId)
+        if (ActorContext.CredentialId is not Guid actorCredentialId)
         {
             ToastService.Warning("Manual adjustments require an operator credential.", "Attendance");
             return;
@@ -608,13 +609,11 @@ else
 
     private RequestMetadata BuildMetadata(Guid tenantId) => new()
     {
-        TenantId = tenantId,
-        CredentialId = RequestMetadata.CredentialId,
-        SessionId = RequestMetadata.SessionId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
-        Name = RequestMetadata.Name ?? "Portal",
+        OperationName = RequestMetadata.OperationName ?? "Portal",
         DeviceName = RequestMetadata.DeviceName,
-        DeviceAgent = RequestMetadata.DeviceAgent,
+        UserAgent = RequestMetadata.UserAgent,
         IpAddress = RequestMetadata.IpAddress
     };
 

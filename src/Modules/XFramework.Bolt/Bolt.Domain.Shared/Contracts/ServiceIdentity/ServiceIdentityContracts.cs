@@ -47,6 +47,7 @@ public partial record ServiceTokenResponse
 public partial record ServiceSigningKeysResponse
 {
     [MemoryPackOrder(0)] public List<ServiceSigningKeyResponse> Keys { get; set; } = [];
+    [MemoryPackOrder(1)] public Dictionary<string, List<string>> CredentialGenerationsByClient { get; set; } = [];
 }
 
 [MemoryPackable]

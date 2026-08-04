@@ -99,7 +99,7 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
         results.Should().OnlyContain(result => result.IsSuccess && result.Response != null);
         results.Select(result => result.Response).Should().OnlyContain(response => response == first.Response);
         var ensuredMetadata = first.Response!;
-        var tenantId = metadata.TenantId!.Value;
+        var tenantId = metadata.RequestedTenantId!.Value;
 
         await using var db = CreateDbContext();
         var type = await db.Set<StorageFileType>()

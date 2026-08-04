@@ -396,23 +396,24 @@ public sealed class IdentityServerPortalContractTests
             source.Should().Contain(
                 "RequireAuthorization = true",
                 $"{Path.GetFileName(Path.GetDirectoryName(endpointFile))} must require HTTP authorization");
-            source.Should().Contain(
-                "[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]",
-                $"{Path.GetFileName(Path.GetDirectoryName(endpointFile))} must require the Identity admin service scope");
+            source.Should().Contain("RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin]");
+            source.Should().Contain("TenantAccessMode = TenantAccessMode.DelegatedTenant");
+            source.Should().Contain("RequiredActorCapabilities = [\"identity.tenants:manage\"]");
             source.Should().Contain("HandleHttp(");
             source.Should().Contain("HttpContext httpContext");
-            source.Should().Contain("IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);");
+            source.Should().Contain("IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);");
         }
 
         var endpointMetadata = File.ReadAllText(Path.Combine(
             authorizationRoot,
             "Shared",
             "IdentityAuthorizationEndpointMetadata.cs"));
-        endpointMetadata.Should().Contain("metadata.TenantId = ResolveGuidClaim(httpContext.User");
-        endpointMetadata.Should().Contain("metadata.CredentialId = ResolveGuidClaim(");
-        endpointMetadata.Should().Contain("metadata.ServiceAccessToken = null");
-        endpointMetadata.Should().Contain("metadata.HasTrustedActorContext = httpContext.User.Identity?.IsAuthenticated == true");
-        endpointMetadata.Should().Contain("metadata.TrustedActorRoles = httpContext.User.FindAll(ClaimTypes.Role)");
+        endpointMetadata.Should().Contain("metadata.IpAddress = httpContext.Connection.RemoteIpAddress?.ToString();");
+        endpointMetadata.Should().Contain("metadata.UserAgent = httpContext.Request.Headers.UserAgent.ToString();");
+        endpointMetadata.Should().NotContain("metadata.TenantId");
+        endpointMetadata.Should().NotContain("metadata.CredentialId");
+        endpointMetadata.Should().NotContain("AccessToken");
+        endpointMetadata.Should().NotContain("TrustedActorRoles");
 
         var serviceSource = File.ReadAllText(Path.Combine(
             repositoryRoot.FullName,
@@ -423,17 +424,25 @@ public sealed class IdentityServerPortalContractTests
             "Services",
             "IdentityAuthorizationService.cs"));
 
-        serviceSource.Should().Contain("ITrustedServiceInvocationResolver trustedServiceInvocationResolver");
+        serviceSource.Should().Contain("ITrustedInvocationContextAccessor trustedInvocationContextAccessor");
         serviceSource.Should().Contain("EnsureCallerCapabilityAsync(");
         serviceSource.Should().Contain("EnsureCanInspectCredentialCapabilitiesAsync(");
         serviceSource.Should().Contain("TryResolveAuthenticatedCredential(");
-        serviceSource.Should().Contain("metadata.HasTrustedActorContext");
-        serviceSource.Should().Contain("metadata.TrustedActorRoles.Contains(\"SuperAdmin\")");
+        serviceSource.Should().Contain("if (context?.Actor is { } actor)");
+        serviceSource.Should().Contain("return actor.Capabilities.Contains(\"identity.tenants:manage\")");
+        serviceSource.Should().Contain("context?.Service?.Scopes.Contains(XFrameworkServiceScopes.IdentityAdmin) == true");
+        serviceSource.IndexOf("if (context?.Actor is { } actor)", StringComparison.Ordinal)
+            .Should().BeLessThan(
+                serviceSource.IndexOf(
+                    "context?.Service?.Scopes.Contains(XFrameworkServiceScopes.IdentityAdmin) == true",
+                    StringComparison.Ordinal),
+                "an accompanying privileged service token must not elevate a limited actor");
         serviceSource.Should().NotContain("IHttpContextAccessor");
         serviceSource.Should().NotContain("HttpContext");
-        serviceSource.Should().Contain("XFrameworkServiceNames.IdentityServer");
         serviceSource.Should().Contain("XFrameworkServiceScopes.IdentityAdmin");
-        serviceSource.Should().Contain("metadata.TenantId.Value == targetTenantId");
+        serviceSource.Should().Contain("context.EffectiveTenantId == targetTenantId");
+        serviceSource.Should().NotContain("metadata.TenantId");
+        serviceSource.Should().NotContain("metadata.CredentialId");
         serviceSource.Should().Contain("new CapabilityDecision(false, \"NoActiveRole\")");
         serviceSource.Should().Contain("RequiresTenantFeature(moduleKey, subFeatureKey)");
         serviceSource.Should().NotContain("IsCoreIdentityFeature(");
@@ -869,10 +878,12 @@ public sealed class IdentityServerPortalContractTests
         foreach (var endpointFile in endpointFiles)
         {
             var source = File.ReadAllText(endpointFile);
-            source.Should().Contain("[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]");
+            source.Should().Contain("RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin]");
+            source.Should().Contain("TenantAccessMode = TenantAccessMode.DelegatedTenant");
+            source.Should().Contain("RequiredActorCapabilities = [\"identity.tenants:manage\"]");
             source.Should().Contain("RequireAuthorization = true");
             source.Should().Contain("Roles = [\"SuperAdmin\"]");
-            source.Should().Contain("IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);");
+            source.Should().Contain("IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);");
         }
     }
 
@@ -893,8 +904,9 @@ public sealed class IdentityServerPortalContractTests
                 operation,
                 "Endpoint.cs"));
 
-            source.Should().Contain(
-                "[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]");
+            source.Should().Contain("ActorRequirement = ActorRequirement.Optional");
+            source.Should().Contain("TenantAccessMode = TenantAccessMode.Tenantless");
+            source.Should().Contain("RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin]");
             source.Should().Contain("RequireAuthorization = true");
             source.Should().Contain("Roles = [\"SuperAdmin\"]");
         }
@@ -942,9 +954,12 @@ public sealed class IdentityServerPortalContractTests
             "Authorization");
         foreach (var endpoint in Directory.EnumerateFiles(authorizationRoot, "Endpoint.cs", SearchOption.AllDirectories))
         {
-            File.ReadAllText(endpoint).Should().Contain(
-                "[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]",
+            var source = File.ReadAllText(endpoint);
+            source.Should().Contain(
+                "RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin]",
                 $"{Path.GetRelativePath(authorizationRoot, endpoint)} is an Identity authorization surface");
+            source.Should().Contain("TenantAccessMode = TenantAccessMode.DelegatedTenant");
+            source.Should().Contain("RequiredActorCapabilities = [\"identity.tenants:manage\"]");
         }
 
         var serviceIdentityRoot = Path.Combine(
@@ -958,7 +973,7 @@ public sealed class IdentityServerPortalContractTests
         foreach (var operation in new[] { "GetSigningKeys", "RotateSigningKey", "RetireSigningKey" })
         {
             File.ReadAllText(Path.Combine(serviceIdentityRoot, operation, "Endpoint.cs")).Should().Contain(
-                "[BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]",
+                "RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin]",
                 $"{operation} is an Identity service-administration surface");
         }
 

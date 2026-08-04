@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using System.Net.Http.Headers;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.TestInfrastructure;
@@ -17,6 +18,9 @@ public abstract class InventarioTestBase
         {
             BaseAddress = new Uri(InventarioIntegrationTestFixture.InventarioUrl)
         };
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            InventarioIntegrationTestFixture.TestActorAccessToken);
     }
 
     [TearDown]
@@ -42,17 +46,22 @@ public abstract class InventarioTestBase
             })
             .Build();
 
-        return new AppDbContext(options, new HttpContextAccessor(), config);
+        return new AppDbContext(
+            options,
+            new HttpContextAccessor(),
+            config,
+            new TestEffectiveTenantContextAccessor(InventarioIntegrationTestFixture.TestTenantId),
+            new TestCrossTenantWriteAuthorizationAccessor());
     }
 
     protected static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = InventarioIntegrationTestFixture.TestTenantId,
+        RequestedTenantId = InventarioIntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "InventarioIntegrationTest",
+        OperationName = "InventarioIntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 
     protected static string UniqueCode(string prefix) => $"{prefix}-{Guid.NewGuid():N}"[..Math.Min(prefix.Length + 13, prefix.Length + 33)];

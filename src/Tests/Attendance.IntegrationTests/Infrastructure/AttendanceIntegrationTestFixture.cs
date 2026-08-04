@@ -4,12 +4,13 @@ using Attendance.Domain.Shared.Contracts;
 using Attendance.IntegrationTests.Infrastructure;
 using Attendance.Integration.Drivers;
 using Bolt.Client;
-using Bolt.Hub.Extensions;
+using Bolt.Server;
 using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using Testcontainers.PostgreSql;
 using XFramework.Core.DataContext;
@@ -19,8 +20,10 @@ using XFramework.Domain.Contexts;
 using XFramework.Domain.Interceptors;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Extensions;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Security;
 using XFramework.TestInfrastructure;
 
 namespace Attendance.IntegrationTests;
@@ -35,9 +38,13 @@ public sealed class AttendanceIntegrationTestFixture
     private static WebApplication boltApp = null!;
     private static WebApplication attendanceApp = null!;
     private static WebApplication testClientApp = null!;
+    private static IServiceScope testClientScope = null!;
     private static Task? boltTask;
     private static Task? attendanceTask;
     private static Task? testClientTask;
+    private static string? previousAspNetCoreEnvironment;
+    private static string? previousJwtPublicKeyPath;
+    private static string? previousBoltAnonymous;
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => TestConstants.Ports.AttendanceBolt;
@@ -48,13 +55,20 @@ public sealed class AttendanceIntegrationTestFixture
 
     public static IServiceProvider Services => attendanceApp.Services;
     public static IAttendanceServiceWrapper ServiceWrapper =>
-        testClientApp.Services.GetRequiredService<IAttendanceServiceWrapper>();
+        testClientScope.ServiceProvider.GetRequiredService<IAttendanceServiceWrapper>();
     public static IDataContext DataContext =>
         testClientApp.Services.CreateScope().ServiceProvider.GetRequiredService<IDataContext>();
 
     [OneTimeSetUp]
     public async Task GlobalSetup()
     {
+        previousAspNetCoreEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        previousJwtPublicKeyPath = Environment.GetEnvironmentVariable("JwtOptions__SigningPublicKeyPath");
+        previousBoltAnonymous = Environment.GetEnvironmentVariable("BoltConfiguration__Anonymous");
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", Environments.Development);
+        Environment.SetEnvironmentVariable("JwtOptions__SigningPublicKeyPath", TestJwtKeyMaterial.PublicKeyPath);
+        Environment.SetEnvironmentVariable("BoltConfiguration__Anonymous", "true");
+
         var externalConnectionString = Environment.GetEnvironmentVariable(ExternalConnectionStringEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(externalConnectionString))
         {
@@ -94,6 +108,7 @@ public sealed class AttendanceIntegrationTestFixture
 
         testClientApp = StartTestClient();
         await TestHostWaiter.WaitForHealth($"{TestClientUrl}/health/live", testClientTask);
+        testClientScope = testClientApp.Services.CreateScope();
 
         await WaitForBoltClients();
     }
@@ -101,12 +116,17 @@ public sealed class AttendanceIntegrationTestFixture
     [OneTimeTearDown]
     public async Task GlobalTeardown()
     {
+        try { testClientScope?.Dispose(); } catch { }
         try { if (testClientApp is not null) await testClientApp.StopAsync(); } catch { }
         try { if (attendanceApp is not null) await attendanceApp.StopAsync(); } catch { }
         try { if (boltApp is not null) await boltApp.StopAsync(); } catch { }
 
         if (ownsPostgresContainer && postgres is not null)
             await postgres.DisposeAsync();
+
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", previousAspNetCoreEnvironment);
+        Environment.SetEnvironmentVariable("JwtOptions__SigningPublicKeyPath", previousJwtPublicKeyPath);
+        Environment.SetEnvironmentVariable("BoltConfiguration__Anonymous", previousBoltAnonymous);
     }
 
     public static AppDbContext CreateDbContext()
@@ -126,7 +146,11 @@ public sealed class AttendanceIntegrationTestFixture
             })
             .Build();
 
-        return new AppDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor(), configuration);
+        return new AppDbContext(
+            options,
+            new Microsoft.AspNetCore.Http.HttpContextAccessor(),
+            configuration,
+            new XFramework.TestInfrastructure.TestEffectiveTenantContextAccessor(TestTenantId));
     }
 
     private static WebApplication StartBolt()
@@ -137,7 +161,9 @@ public sealed class AttendanceIntegrationTestFixture
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
-        app.UseAppServices();
+        app.UseRouting();
+        app.UseWebSockets();
+        app.MapBolt("/bolt/ws");
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
         boltTask = Task.Run(() => app.RunAsync());
@@ -148,7 +174,7 @@ public sealed class AttendanceIntegrationTestFixture
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls(AttendanceUrl);
-        OverrideConfig(builder, "Attendance", "1e6e94fb-c4ce-4f2b-98b7-88a40b1d57cf");
+        OverrideConfig(builder, "XFramework.Attendance", "1e6e94fb-c4ce-4f2b-98b7-88a40b1d57cf");
         builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
         builder.Services.AddHttpContextAccessor();
@@ -163,6 +189,7 @@ public sealed class AttendanceIntegrationTestFixture
             .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
         builder.Services.AddServerDataContext<AppDbContext>();
         builder.Services.InstallStandardServices<AttendanceService>(builder.Configuration);
+        builder.Services.AddSingleton(CreateTestJwtOptions());
         builder.Services.AddTenantResolver();
         builder.Services.AddTenantModuleFeatures();
         builder.Services.AddScoped<AttendanceService>();
@@ -170,7 +197,18 @@ public sealed class AttendanceIntegrationTestFixture
         builder.Services.AddAuthentication("AttendanceTest")
             .AddScheme<AuthenticationSchemeOptions, AttendanceTestAuthHandler>("AttendanceTest", _ => { });
         builder.Services.AddAuthorization();
-        builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddXFrameworkBoltClient(
+            builder.Configuration,
+            autoConnect: false,
+            hostEnvironment: builder.Environment);
+        builder.Services.AddSingleton<IOptions<ServiceIdentityOptions>>(
+            Options.Create(new ServiceIdentityOptions
+            {
+                ClientId = "XFramework.Attendance",
+                DefaultScopes = [XFrameworkServiceScopes.BoltService]
+            }));
+        builder.Services.AddScoped<IActorIdentityProvider, AttendanceTestActorIdentityProvider>();
+        builder.Services.AddSingleton<IServiceIdentityProvider, AttendanceTestServiceIdentityProvider>();
         builder.Services.AddDataContextHandler(typeof(AttendanceService).Assembly);
 
         var app = (WebApplication)builder.Build();
@@ -205,21 +243,28 @@ public sealed class AttendanceIntegrationTestFixture
         builder.WebHost.UseUrls(TestClientUrl);
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["BoltConfiguration:ClientName"] = "AttendanceTestClient",
+            ["BoltConfiguration:ClientName"] = XFrameworkServiceNames.Portal,
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
+            ["BoltConfiguration:Anonymous"] = "true",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Logging:LogLevel:Default"] = "Warning"
         });
 
         builder.Services.InstallStandardServices<AttendanceIntegrationTestFixture>(builder.Configuration);
+        builder.Services.AddSingleton(CreateTestJwtOptions());
         builder.Services.AddSingleton(new DeviceAgentProvider("AttendanceTest"));
-        builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddXFrameworkBoltClient(
+            builder.Configuration,
+            autoConnect: false,
+            hostEnvironment: builder.Environment);
+        builder.Services.AddSingleton<IActorAccessTokenProvider, AttendanceTestActorAccessTokenProvider>();
+        builder.Services.AddSingleton<IServiceTokenProvider, AttendanceTestServiceTokenProvider>();
         builder.Services.AddAttendanceWrapperServices();
         builder.Services.AddRemoteDataContext();
         builder.Services.AddScoped(_ => new RequestMetadata
         {
-            TenantId = TestTenantId,
+            RequestedTenantId = TestTenantId,
             RequestId = Guid.NewGuid()
         });
 
@@ -277,10 +322,21 @@ public sealed class AttendanceIntegrationTestFixture
             ["ConnectionStrings:DefaultDatabaseConnection"] = ConnectionString,
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
+            ["BoltConfiguration:Anonymous"] = "true",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Logging:LogLevel:Default"] = "Warning"
         });
     }
+
+    private static JwtOptions CreateTestJwtOptions() => new()
+    {
+        GenerationId = "attendance-integration-tests-g1",
+        SigningPublicKeyPath = TestJwtKeyMaterial.PublicKeyPath,
+        ValidAudience = "http://localhost",
+        ValidIssuer = "http://localhost",
+        AccessTokenLifespan = "00:30:00",
+        RefreshTokenLifespan = "00:30:00"
+    };
 
     private static async Task MigrateAndSeed()
     {
@@ -292,7 +348,11 @@ public sealed class AttendanceIntegrationTestFixture
                 Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
-        await using var db = new AppDbContext(options);
+        await using var db = new AppDbContext(
+            options,
+            new Microsoft.AspNetCore.Http.HttpContextAccessor(),
+            new ConfigurationBuilder().Build(),
+            new XFramework.TestInfrastructure.TestEffectiveTenantContextAccessor(TestTenantId));
         await db.Database.MigrateAsync();
         await TestSeedData.SeedAll(db);
         await SeedTenant(db, OtherTenantId, "Other Attendance Tenant");

@@ -7,7 +7,10 @@ namespace IdentityServer.Api.Features.Credentials.Avatar.Upload;
 
 public static class UploadCredentialAvatarEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<CredentialAvatarResponse>> Handle(
         UploadCredentialAvatarRequest request,
         IAuthService authService,
@@ -25,7 +28,7 @@ public static class UploadCredentialAvatarEndpoint
         IAuthService authService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authService.UploadCredentialAvatarAsync(request, ct);
     }
 }

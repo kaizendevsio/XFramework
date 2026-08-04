@@ -86,12 +86,31 @@ public sealed class DownstreamIdentitySessionValidationTests
         context.Result.Failure!.Message.Should().Be("Identity session is no longer valid");
         identityServer.Verify(wrapper => wrapper.ValidateIdentitySession(
             It.Is<ValidateIdentitySessionRequest>(request =>
-                request.TenantId == tenantId
-                && request.CredentialId == credentialId
-                && request.SessionId == sessionId
-                && request.RoleTypeIds.SequenceEqual(new[] { roleTypeId })
-                && request.Metadata.TenantId == tenantId),
+                request.Metadata.RequestedTenantId == null
+                && request.Metadata.OperationName == "Validate actor identity"),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Test]
+    public async Task IdentityServerTransportFailure_FailsClosedWithoutLeakingTheException()
+    {
+        var identityServer = new Mock<IIdentityServerServiceWrapper>(MockBehavior.Strict);
+        identityServer
+            .Setup(wrapper => wrapper.ValidateIdentitySession(
+                It.IsAny<ValidateIdentitySessionRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("transport details"));
+
+        var (options, context) = CreateValidationContext(
+            identityServer.Object,
+            new Claim("tenant_id", Guid.NewGuid().ToString("D")),
+            new Claim("credential_id", Guid.NewGuid().ToString("D")),
+            new Claim("session_id", Guid.NewGuid().ToString("D")),
+            new Claim(JwtCredentialSet.GenerationClaim, "g1"));
+
+        await options.Events.OnTokenValidated(context);
+
+        context.Result!.Failure!.Message.Should().Be("Actor identity validation is unavailable.");
     }
 
     [Test]
@@ -112,7 +131,10 @@ public sealed class DownstreamIdentitySessionValidationTests
                 {
                     TenantId = tenantId,
                     CredentialId = credentialId,
+                    IdentityId = Guid.NewGuid(),
                     SessionId = sessionId,
+                    GenerationId = "g1",
+                    ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
                     IsValid = true
                 }
             });
@@ -126,16 +148,22 @@ public sealed class DownstreamIdentitySessionValidationTests
 
         await options.Events.OnTokenValidated(context);
 
+        var secondValidation = await context.HttpContext.RequestServices
+            .GetRequiredService<IActorIdentityProvider>()
+            .ValidateAsync("test-actor-token");
+
         context.Result?.Failure.Should().BeNull();
+        secondValidation.IsValid.Should().BeTrue(secondValidation.Error);
         identityServer.Verify(
             wrapper => wrapper.ValidateIdentitySession(
                 It.IsAny<ValidateIdentitySessionRequest>(),
                 It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Once,
+            "authentication and trusted invocation authorization share one validation result per request");
     }
 
     [Test]
-    public async Task RequestAbort_CancelsUnderlyingSessionValidation()
+    public async Task RequestAbort_CancelsUnderlyingSessionValidationAndPropagatesCancellation()
     {
         using var requestCancellation = new CancellationTokenSource();
         CancellationToken wrapperToken = default;
@@ -160,15 +188,16 @@ public sealed class DownstreamIdentitySessionValidationTests
 
         var validation = options.Events.OnTokenValidated(context);
         requestCancellation.Cancel();
-        await validation.WaitAsync(TimeSpan.FromSeconds(1));
+        var act = async () => await validation;
 
+        await act.Should().ThrowAsync<OperationCanceledException>();
         wrapperToken.IsCancellationRequested.Should().BeTrue();
-        context.Result!.Failure!.Message.Should().Be("Identity session validation is unavailable");
     }
 
     [Test]
-    public async Task ValidationDeadline_CancelsUnderlyingSessionValidationWithinFiveSeconds()
+    public async Task CallerDeadline_CancelsUnderlyingSessionValidationPromptly()
     {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
         CancellationToken wrapperToken = default;
         var identityServer = new Mock<IIdentityServerServiceWrapper>(MockBehavior.Strict);
         identityServer
@@ -183,20 +212,19 @@ public sealed class DownstreamIdentitySessionValidationTests
 
         var (options, context) = CreateValidationContext(
             identityServer.Object,
-            CancellationToken.None,
+            deadline.Token,
             new Claim("tenant_id", Guid.NewGuid().ToString("D")),
             new Claim("credential_id", Guid.NewGuid().ToString("D")),
             new Claim("session_id", Guid.NewGuid().ToString("D")),
             new Claim(JwtCredentialSet.GenerationClaim, "g1"));
         var stopwatch = Stopwatch.StartNew();
+        var act = async () => await options.Events.OnTokenValidated(context);
 
-        await options.Events.OnTokenValidated(context).WaitAsync(TimeSpan.FromSeconds(8));
+        await act.Should().ThrowAsync<OperationCanceledException>();
 
         stopwatch.Stop();
         wrapperToken.IsCancellationRequested.Should().BeTrue();
-        stopwatch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(4.5));
-        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(7));
-        context.Result!.Failure!.Message.Should().Be("Identity session validation is unavailable");
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
     }
 
     [Test]
@@ -308,7 +336,10 @@ public sealed class DownstreamIdentitySessionValidationTests
         services.AddLogging();
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
         services.AddIdentityServerSessionValidation();
+        services.AddIdentityServerSessionValidation();
         services.AddSingleton(identityServer);
+        services.AddSingleton<IActorAccessTokenScope, TestActorAccessTokenScope>();
+        services.AddSingleton<ITrustedInvocationContextStore>(new TestTrustedInvocationContextAccessor());
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider
             .GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
@@ -318,6 +349,10 @@ public sealed class DownstreamIdentitySessionValidationTests
             RequestServices = serviceProvider,
             RequestAborted = requestAborted
         };
+        serviceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext = httpContext;
+        if (claims.Any(claim => claim.Type == JwtCredentialSet.GenerationClaim))
+            httpContext.Request.Headers.Authorization = "Bearer test-actor-token";
+
         var context = new TokenValidatedContext(
             httpContext,
             new AuthenticationScheme(
@@ -337,6 +372,20 @@ public sealed class DownstreamIdentitySessionValidationTests
     {
         await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         throw new InvalidOperationException("Session validation cancellation was not observed.");
+    }
+
+    private sealed class TestActorAccessTokenScope : IActorAccessTokenScope
+    {
+        public IDisposable Push(string actorAccessToken) => NoopDisposable.Instance;
+
+        private sealed class NoopDisposable : IDisposable
+        {
+            public static NoopDisposable Instance { get; } = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 
     private static string ExtractComposeService(string compose, string serviceName)

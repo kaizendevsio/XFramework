@@ -18,6 +18,11 @@ public interface IIdentityAuthorizationService
         GetEffectiveCredentialCapabilitiesRequest request,
         CancellationToken ct = default);
 
+    Task<Result<EffectiveCredentialCapabilitiesResponse>> GetTrustedEffectiveCredentialCapabilitiesAsync(
+        Guid tenantId,
+        Guid credentialId,
+        CancellationToken ct = default);
+
     Task<Result<TenantAuthorizationPolicyResponse>> GetTenantAuthorizationPolicyAsync(
         GetTenantAuthorizationPolicyRequest request,
         CancellationToken ct = default);

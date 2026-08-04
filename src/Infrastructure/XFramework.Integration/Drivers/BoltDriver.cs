@@ -23,13 +23,22 @@ namespace XFramework.Integration.Drivers;
 /// BoltConfiguration.Targets) or a direct client ID. The request type name is used
 /// as the Bolt command hash for routing on the hub.
 /// </summary>
-public sealed class BoltDriver : IMessageBusWrapper
+public sealed class BoltDriver : IMessageBusWrapper, IDisposable
 {
     private readonly BoltClient _client;
     private readonly BoltConfiguration _config;
     private readonly IServiceTokenProvider _serviceTokenProvider;
+    private readonly IActorAccessTokenProvider _actorAccessTokenProvider;
     private readonly ILogger<BoltDriver> _logger;
+    private readonly Action _disconnectedHandler;
+    private readonly Action _reconnectingHandler;
+    private readonly Action _reconnectedHandler;
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _legacySubscriptions = new();
+    private readonly object _subscriptionGate = new();
+    private readonly Dictionary<long, Task> _activeSubscriptions = [];
+    private readonly CancellationTokenSource _subscriptionLifetime = new();
+    private long _nextSubscriptionId;
+    private bool _disposed;
 
     public bool IsConnected => _client.IsConnected;
     public Action OnReconnected { get; set; } = () => { };
@@ -40,15 +49,49 @@ public sealed class BoltDriver : IMessageBusWrapper
         BoltClient client,
         IOptions<BoltConfiguration> config,
         IServiceTokenProvider serviceTokenProvider,
+        IActorAccessTokenProvider actorAccessTokenProvider,
         ILogger<BoltDriver> logger)
     {
         _client = client;
         _config = config.Value;
         _serviceTokenProvider = serviceTokenProvider;
+        _actorAccessTokenProvider = actorAccessTokenProvider;
         _logger = logger;
-        _client.Disconnected += () => OnDisconnected();
-        _client.Reconnecting += () => OnReconnecting();
-        _client.Reconnected += () => OnReconnected();
+        _disconnectedHandler = () => OnDisconnected();
+        _reconnectingHandler = () => OnReconnecting();
+        _reconnectedHandler = () => OnReconnected();
+        _client.Disconnected += _disconnectedHandler;
+        _client.Reconnecting += _reconnectingHandler;
+        _client.Reconnected += _reconnectedHandler;
+    }
+
+    public void Dispose()
+    {
+        Task[] activeSubscriptions;
+        lock (_subscriptionGate)
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            activeSubscriptions = _activeSubscriptions.Values.ToArray();
+        }
+
+        _client.Disconnected -= _disconnectedHandler;
+        _client.Reconnecting -= _reconnectingHandler;
+        _client.Reconnected -= _reconnectedHandler;
+
+        _subscriptionLifetime.Cancel();
+
+        foreach (var subscription in _legacySubscriptions.Values)
+        {
+            subscription.Cancel();
+            subscription.Dispose();
+        }
+
+        _legacySubscriptions.Clear();
+        Task.WhenAll(activeSubscriptions).GetAwaiter().GetResult();
+        _subscriptionLifetime.Dispose();
     }
 
     public async Task<bool> Connect()
@@ -71,8 +114,7 @@ public sealed class BoltDriver : IMessageBusWrapper
     public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        var recipientId = await EnrichMetadataAsync(request, recipient, ct);
-        var payload = MemoryPackSerializer.Serialize(request);
+        var (recipientId, payload) = await CreateInvocationAsync(request, recipient, ct);
         var (status, responsePayload) = await _client.InvokeAsync(recipientId, typeof(TRequest).Name, payload, ct);
         return DeserializeCmdResponse(status, responsePayload);
     }
@@ -80,8 +122,7 @@ public sealed class BoltDriver : IMessageBusWrapper
     public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        var recipientId = await EnrichMetadataAsync(request, recipient, ct);
-        var payload = MemoryPackSerializer.Serialize(request);
+        var (recipientId, payload) = await CreateInvocationAsync(request, recipient, ct);
         var (status, responsePayload) = await _client.InvokeAsync(recipientId, typeof(TRequest).Name, payload, ct);
         return DeserializeCmdResponse<TResponse>(status, responsePayload);
     }
@@ -89,8 +130,7 @@ public sealed class BoltDriver : IMessageBusWrapper
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient, CancellationToken ct = default)
         where TRequest : class, IHasRequestServer
     {
-        var recipientId = await EnrichMetadataAsync(request, recipient, ct);
-        var payload = MemoryPackSerializer.Serialize(request);
+        var (recipientId, payload) = await CreateInvocationAsync(request, recipient, ct);
         var (status, responsePayload) = await _client.InvokeAsync(recipientId, typeof(TRequest).Name, payload, ct);
         return DeserializeQueryResponse<TResponse>(status, responsePayload);
     }
@@ -101,7 +141,7 @@ public sealed class BoltDriver : IMessageBusWrapper
         if (data is not null)
         {
             data.Metadata ??= new RequestMetadata();
-            data.Metadata.Name = _config.ClientName ?? string.Empty;
+            data.Metadata.OperationName = eventName;
             data.Metadata.RequestId ??= Guid.NewGuid();
         }
         await _client.PublishAsync(topic, data, durable: false);
@@ -171,15 +211,22 @@ public sealed class BoltDriver : IMessageBusWrapper
         CancellationToken ct = default)
         where TResponse : class
     {
-        _ = Task.Run(async () =>
+        return StartTrackedSubscription(async subscriptionCt =>
         {
             try
             {
-                await foreach (var item in _client.SubscribeAsync<TResponse>(topic, ct, actorAccessTokenProvider))
+                await foreach (var item in _client.SubscribeAsync<TResponse>(
+                                   topic,
+                                   subscriptionCt,
+                                   actorAccessTokenProvider))
                 {
                     try
                     {
                         await handler(item);
+                    }
+                    catch (OperationCanceledException) when (subscriptionCt.IsCancellationRequested)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
@@ -187,13 +234,15 @@ public sealed class BoltDriver : IMessageBusWrapper
                     }
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) when (subscriptionCt.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Transient subscription error: topic={Topic}", topic);
             }
         }, ct);
-        return Task.CompletedTask;
     }
 
     public async Task Unsubscribe(BoltSubscriptionRequest request)
@@ -240,16 +289,24 @@ public sealed class BoltDriver : IMessageBusWrapper
         CancellationToken ct = default)
         where TResponse : class
     {
-        _ = Task.Run(async () =>
+        return StartTrackedSubscription(async subscriptionCt =>
         {
             try
             {
-                await foreach (var msg in _client.SubscribeDurableAsync<TResponse>(topic, subscriberId, ct, actorAccessTokenProvider))
+                await foreach (var msg in _client.SubscribeDurableAsync<TResponse>(
+                                   topic,
+                                   subscriberId,
+                                   subscriptionCt,
+                                   actorAccessTokenProvider))
                 {
                     try
                     {
                         await handler(msg.Payload);
-                        await msg.AckAsync(ct);
+                        await msg.AckAsync(subscriptionCt);
+                    }
+                    catch (OperationCanceledException) when (subscriptionCt.IsCancellationRequested)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
@@ -257,27 +314,79 @@ public sealed class BoltDriver : IMessageBusWrapper
                     }
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) when (subscriptionCt.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Durable subscription error: topic={Topic} subscriber={Subscriber}", topic, subscriberId);
             }
         }, ct);
+    }
+
+    private Task StartTrackedSubscription(
+        Func<CancellationToken, Task> subscribe,
+        CancellationToken callerToken)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        long subscriptionId;
+        lock (_subscriptionGate)
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(BoltDriver));
+
+            subscriptionId = ++_nextSubscriptionId;
+            _activeSubscriptions.Add(subscriptionId, completion.Task);
+        }
+
+        _ = Task.Run(async () =>
+        {
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+                callerToken,
+                _subscriptionLifetime.Token);
+            try
+            {
+                await subscribe(linkedCts.Token);
+            }
+            catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Tracked Bolt subscription failed.");
+            }
+            finally
+            {
+                lock (_subscriptionGate)
+                    _activeSubscriptions.Remove(subscriptionId);
+
+                completion.TrySetResult();
+            }
+        });
+
         return Task.CompletedTask;
     }
 
-    private async Task<string> EnrichMetadataAsync<TRequest>(TRequest request, string recipient, CancellationToken ct)
+    private async Task<(string RecipientId, byte[] Payload)> CreateInvocationAsync<TRequest>(
+        TRequest request,
+        string recipient,
+        CancellationToken ct)
         where TRequest : IHasRequestServer
     {
         request.Metadata ??= new RequestMetadata();
-        request.Metadata.Name = _config.ClientName ?? string.Empty;
-        if (request.Metadata.TenantId == null && _config.ClientGuid.HasValue)
-            request.Metadata.TenantId = _config.ClientGuid.Value;
+        request.Metadata.OperationName ??= typeof(TRequest).Name;
         request.Metadata.RequestId ??= Guid.NewGuid();
 
         var audience = ResolveAudience(recipient);
-        request.Metadata.ServiceAccessToken = await _serviceTokenProvider.GetTokenAsync(audience, null, ct);
-        return ResolveRecipientId(recipient);
+        var envelope = new BoltInvocationEnvelope
+        {
+            Payload = MemoryPackSerializer.Serialize(request),
+            ActorAccessToken = await _actorAccessTokenProvider.GetTokenAsync(ct),
+            ServiceAccessToken = await _serviceTokenProvider.GetTokenAsync(audience, null, ct)
+        };
+
+        return (ResolveRecipientId(recipient), MemoryPackSerializer.Serialize(envelope));
     }
 
     private static string ResolveAudience(string recipient)

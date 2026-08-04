@@ -1,20 +1,14 @@
 using System.Net;
 using System.Security.Claims;
-using IdentityServer.Domain.Shared;
-using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
 
 namespace XFramework.Portal.Services;
 
 public sealed class PortalAuthService(
-    IDataContext dataContext,
     IIdentityServerServiceWrapper identityServer,
-    IConfiguration configuration,
-    RequestMetadata requestMetadata,
     ILogger<PortalAuthService> logger)
 {
     public async Task<PortalLoginResult> AuthenticateAsync(
@@ -29,39 +23,15 @@ public sealed class PortalAuthService(
             return PortalLoginResult.Failed("Username and password are required.");
         }
 
-        var options = new PortalAuthOptions();
-        configuration.GetSection(PortalAuthOptions.BootstrapAdminSectionName).Bind(options);
-
-        var tenant = await FindBootstrapTenantAsync(options, ct);
-
-        if (tenant is null)
-        {
-            return PortalLoginResult.Failed("Portal admin tenant is not seeded yet.");
-        }
-
-        requestMetadata.TenantId = tenant.Id;
-
-        var roleType = await dataContext.Query<IdentityRoleType>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenant.Id)
-            .Where(x => x.SystemReferenceId == IdentityConstants.RoleType.Admin)
-            .FirstOrDefaultAsync(ct);
-
-        if (roleType is null)
-        {
-            return PortalLoginResult.Failed("Portal admin role is not seeded yet.");
-        }
-
         var request = new AuthenticateIdentityRequest
         {
             UserName = username.Trim(),
             Password = password,
-            RoleId = roleType.Id,
+            RoleId = PortalBootstrapConstants.AdminRoleTypeId,
             AuthorizationType = AuthorizationType.Username,
             GenerateToken = true,
             RememberMe = rememberMe,
-            Metadata = BuildMetadata(httpContext, tenant.Id)
+            Metadata = BuildMetadata(httpContext, PortalBootstrapConstants.AdminTenantId)
         };
 
         var response = await identityServer.AuthenticateIdentity(request);
@@ -81,17 +51,24 @@ public sealed class PortalAuthService(
             return PortalLoginResult.Failed(message);
         }
 
-        var principal = BuildPrincipal(response.Response, roleType.Id, tenant.Id, username.Trim());
+        if (string.IsNullOrWhiteSpace(response.Response.AccessToken))
+            return PortalLoginResult.Failed("IdentityServer did not issue an actor token.");
+
+        var principal = BuildPrincipal(
+            response.Response,
+            PortalBootstrapConstants.AdminRoleTypeId,
+            PortalBootstrapConstants.AdminTenantId,
+            username.Trim());
         return PortalLoginResult.Success(principal);
     }
 
     private static RequestMetadata BuildMetadata(HttpContext httpContext, Guid tenantId) => new()
     {
-        TenantId = tenantId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal",
+        OperationName = "Portal login",
         DeviceName = Environment.MachineName,
-        DeviceAgent = httpContext.Request.Headers.UserAgent.ToString(),
+        UserAgent = httpContext.Request.Headers.UserAgent.ToString(),
         IpAddress = httpContext.Connection.RemoteIpAddress?.ToString()
     };
 
@@ -118,7 +95,8 @@ public sealed class PortalAuthService(
             new(PortalAuthClaims.CredentialId, credentialId.ToString()),
             new(PortalAuthClaims.TenantId, tenantId.ToString()),
             new(PortalAuthClaims.RoleTypeId, roleTypeId.ToString()),
-            new(PortalAuthClaims.IsSuperUser, IsSuperUserRole(roleTypeId).ToString())
+            new(PortalAuthClaims.IsSuperUser, IsSuperUserRole(roleTypeId).ToString()),
+            new(PortalAuthClaims.ActorAccessToken, response.AccessToken!)
         };
 
         if (response.SessionId is { } sessionId)
@@ -133,29 +111,6 @@ public sealed class PortalAuthService(
     private static bool IsSuperUserRole(Guid roleTypeId) =>
         roleTypeId == PortalBootstrapConstants.AdminRoleTypeId;
 
-    private async Task<Tenant?> FindBootstrapTenantAsync(PortalAuthOptions options, CancellationToken ct)
-    {
-        var tenant = await dataContext.Query<Tenant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => !x.IsDeleted)
-            .Where(x => x.Id == PortalBootstrapConstants.AdminTenantId)
-            .FirstOrDefaultAsync(ct);
-
-        if (tenant is not null)
-        {
-            return tenant;
-        }
-
-        var lookupNames = PortalBootstrapConstants.BuildAdminTenantLookupNames(options.TenantName);
-        return await dataContext.Query<Tenant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => !x.IsDeleted)
-            .Where(x => lookupNames.Contains(x.Name))
-            .OrderBy(x => x.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-    }
 }
 
 public sealed record PortalLoginResult(bool IsSuccess, string? Error, ClaimsPrincipal? Principal)

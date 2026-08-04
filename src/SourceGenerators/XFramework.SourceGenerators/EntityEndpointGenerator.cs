@@ -321,14 +321,21 @@ public class EntityEndpointGenerator : IIncrementalGenerator
     private static string GenerateGetByIdEndpoint(EndpointInfo entity, string entityName)
     {
         var authConfig = GenerateAuthConfiguration(entity);
+        var trustedInvocationParameters = GenerateTrustedInvocationParameters(entity);
+        var trustedInvocationAuthorization = GenerateTrustedInvocationAuthorization(
+            entity,
+            "GET",
+            $"{entity.RoutePrefix}/{{id:guid}}",
+            "view");
 
         return $$"""
                     // GET by ID
                     group.MapGet("/{id:guid}", async (
                         Guid id,
-                        [FromServices] I{{entityName}}Service service,
+                        {{trustedInvocationParameters}}[FromServices] I{{entityName}}Service service,
                         CancellationToken ct) =>
                     {
+            {{trustedInvocationAuthorization}}
                         var result = await service.GetByIdAsync(id, includeNavigations: false, navigationDepth: 1, ct: ct);
                         
                         return result.IsSuccess
@@ -352,14 +359,21 @@ public class EntityEndpointGenerator : IIncrementalGenerator
     private static string GenerateGetListEndpoint(EndpointInfo entity, string entityName)
     {
         var authConfig = GenerateAuthConfiguration(entity);
+        var trustedInvocationParameters = GenerateTrustedInvocationParameters(entity);
+        var trustedInvocationAuthorization = GenerateTrustedInvocationAuthorization(
+            entity,
+            "GET",
+            $"{entity.RoutePrefix}/",
+            "view");
 
         return $$"""
                     // GET list
                     group.MapGet("/", async (
                         [AsParameters] Get{{entityName}}ListRequest request,
-                        [FromServices] I{{entityName}}Service service,
+                        {{trustedInvocationParameters}}[FromServices] I{{entityName}}Service service,
                         CancellationToken ct) =>
                     {
+            {{trustedInvocationAuthorization}}
                         var result = await service.GetListAsync(request, includeNavigations: false, navigationDepth: 1, ct: ct);
                         
                         return result.IsSuccess
@@ -383,6 +397,12 @@ public class EntityEndpointGenerator : IIncrementalGenerator
     private static string GenerateCreateEndpoint(EndpointInfo entity, string entityName)
     {
         var authConfig = GenerateAuthConfiguration(entity, "Create");
+        var trustedInvocationParameters = GenerateTrustedInvocationParameters(entity);
+        var trustedInvocationAuthorization = GenerateTrustedInvocationAuthorization(
+            entity,
+            "POST",
+            $"{entity.RoutePrefix}/",
+            "create");
         var validatorParameter = entity.HasCreateValidator
             ? $"global::FluentValidation.IValidator<global::{entity.Namespace}.Create{entityName}Request> validator,\n                        "
             : string.Empty;
@@ -394,9 +414,10 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                     // POST create
                     group.MapPost("/", async (
                         Create{{entityName}}Request request,
-                        {{validatorParameter}}[FromServices] I{{entityName}}Service service,
+                        {{validatorParameter}}{{trustedInvocationParameters}}[FromServices] I{{entityName}}Service service,
                         CancellationToken ct) =>
                     {
+            {{trustedInvocationAuthorization}}
             {{validation}}
                         var result = await service.CreateAsync(request, ct);
                         
@@ -426,6 +447,12 @@ public class EntityEndpointGenerator : IIncrementalGenerator
     private static string GenerateUpdateEndpoint(EndpointInfo entity, string entityName)
     {
         var authConfig = GenerateAuthConfiguration(entity, "Update");
+        var trustedInvocationParameters = GenerateTrustedInvocationParameters(entity);
+        var trustedInvocationAuthorization = GenerateTrustedInvocationAuthorization(
+            entity,
+            "PUT",
+            $"{entity.RoutePrefix}/{{id:guid}}",
+            "update");
         var validatorParameter = entity.HasUpdateValidator
             ? $"global::FluentValidation.IValidator<global::{entity.Namespace}.Update{entityName}Request> validator,\n                        "
             : string.Empty;
@@ -447,9 +474,10 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                     group.MapPut("/{id:guid}", async (
                         Guid id,
                         {{concurrencyParameter}}Update{{entityName}}Request request,
-                        {{validatorParameter}}[FromServices] I{{entityName}}Service service,
+                        {{validatorParameter}}{{trustedInvocationParameters}}[FromServices] I{{entityName}}Service service,
                         CancellationToken ct) =>
                     {
+            {{trustedInvocationAuthorization}}
             {{validation}}
                         var result = await service.UpdateAsync(id, {{concurrencyArgument}}request, ct);
                         
@@ -507,6 +535,12 @@ public class EntityEndpointGenerator : IIncrementalGenerator
     private static string GenerateDeleteEndpoint(EndpointInfo entity, string entityName)
     {
         var authConfig = GenerateAuthConfiguration(entity, "Delete");
+        var trustedInvocationParameters = GenerateTrustedInvocationParameters(entity);
+        var trustedInvocationAuthorization = GenerateTrustedInvocationAuthorization(
+            entity,
+            "DELETE",
+            $"{entity.RoutePrefix}/{{id:guid}}",
+            "delete");
         var concurrencyParameter = entity.IsBaseModel
             ? "Guid expectedConcurrencyStamp,\n                        "
             : string.Empty;
@@ -518,9 +552,10 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                     // DELETE
                     group.MapDelete("/{id:guid}", async (
                         Guid id,
-                        {{concurrencyParameter}}[FromServices] I{{entityName}}Service service,
+                        {{concurrencyParameter}}{{trustedInvocationParameters}}[FromServices] I{{entityName}}Service service,
                         CancellationToken ct) =>
                     {
+            {{trustedInvocationAuthorization}}
                         var result = await service.DeleteAsync(id, {{concurrencyArgument}}ct);
                         
                         return result.IsSuccess
@@ -543,6 +578,64 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                     .Produces(StatusCodes.Status409Conflict);
             """;
     }
+
+    private static string GenerateTrustedInvocationParameters(EndpointInfo entity) =>
+        entity.RequireAuthorization
+            ? """
+              HttpContext httpContext,
+                                      [FromServices] global::XFramework.Integration.Security.IHttpTrustedInvocationAuthorizer invocationAuthorizer,
+                                      [FromServices] global::XFramework.Integration.Security.IActorAccessTokenScope actorAccessTokenScope,
+                                      [FromServices] global::XFramework.Core.Services.FeatureGates.ITrustedInvocationFeatureGate trustedInvocationFeatureGate,
+
+              """
+            : string.Empty;
+
+    private static string GenerateTrustedInvocationAuthorization(
+        EndpointInfo entity,
+        string httpMethod,
+        string route,
+        string capability) =>
+        entity.RequireAuthorization
+            ? $$"""
+                        var authorizationHeader = httpContext.Request.Headers.Authorization.ToString();
+                        var actorAccessToken = authorizationHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                            ? authorizationHeader[7..].Trim()
+                            : null;
+                        using var actorTokenLease = string.IsNullOrWhiteSpace(actorAccessToken)
+                            ? null
+                            : actorAccessTokenScope.Push(actorAccessToken);
+                        var invocationAuthorization = await invocationAuthorizer.AuthorizeAsync(
+                            authorizationHeader,
+                            httpContext.Request.Headers["X-XFramework-Service-Authorization"].ToString(),
+                            new global::XFramework.Domain.Shared.BusinessObjects.RequestMetadata(),
+                            new global::XFramework.Integration.Security.InvocationAuthorizationPolicy
+                            {
+                                ActorRequirement = global::XFramework.Integration.Security.ActorRequirement.Required,
+                                TenantAccessMode = global::XFramework.Integration.Security.TenantAccessMode.ActorTenant,
+                                RequireServiceIdentity = false
+                            },
+                            ct);
+                        if (!invocationAuthorization.IsSuccess)
+                        {
+                            return Results.Problem(
+                                detail: invocationAuthorization.Error,
+                                statusCode: invocationAuthorization.StatusCode);
+                        }
+
+                        var featureGateResult = await trustedInvocationFeatureGate.EnsureAllowedAsync(
+                            "{{route}}",
+                            "{{httpMethod}}",
+                            "{{capability}}",
+                            ct);
+                        if (!featureGateResult.IsSuccess)
+                        {
+                            return Results.Problem(
+                                detail: featureGateResult.Message,
+                                statusCode: featureGateResult.StatusCode);
+                        }
+
+              """
+            : string.Empty;
 
     private static string GenerateAuthConfiguration(EndpointInfo entity, string? capability = null)
     {

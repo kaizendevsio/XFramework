@@ -30,23 +30,17 @@ public sealed class AuthServiceTrustedThrottlingTests
     public async Task BoltAuthenticationThrottles_UseValidatedCallerInsteadOfMetadataIp()
     {
         var limiter = new CapturingRateLimiter();
-        var resolver = new Mock<ITrustedServiceInvocationResolver>(MockBehavior.Strict);
-        resolver.Setup(service => service.ResolveAsync(
-                It.IsAny<RequestMetadata>(),
+        var tenantId = Guid.NewGuid();
+        var invocationContext = new TestTrustedInvocationContextAccessor(new TrustedInvocationContext(
+            Actor: null,
+            Service: new TrustedServiceIdentity(
+                "trusted-portal",
                 XFrameworkServiceNames.IdentityServer,
-                null,
-                null,
-                false,
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync((RequestMetadata metadata, string _, IReadOnlyCollection<string>? _,
-                IReadOnlyCollection<string>? _, bool _, CancellationToken _) =>
-                TrustedServiceInvocationResult.Success(new TrustedServiceInvocation(
-                    "trusted-portal",
-                    XFrameworkServiceNames.IdentityServer,
-                    metadata.TenantId,
-                    null,
-                    metadata,
-                    new HashSet<string>())));
+                new HashSet<string>(),
+                GenerationId: null),
+            EffectiveTenantId: tenantId,
+            RequestedTargetTenantId: tenantId,
+            CorrelationId: Guid.NewGuid()));
         using var dbContext = new DbContext(new DbContextOptionsBuilder<DbContext>().Options);
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
         var service = new AuthService(
@@ -58,13 +52,11 @@ public sealed class AuthServiceTrustedThrottlingTests
             Mock.Of<IJwtService>(),
             TimeProvider.System,
             limiter,
-            resolver.Object,
+            invocationContext,
             new CacheManager(memoryCache, NullLogger<CacheManager>.Instance),
             Mock.Of<IStorageServiceWrapper>(),
             Mock.Of<IIdentityAuthorizationService>(),
             NullLogger<AuthService>.Instance);
-        var tenantId = Guid.NewGuid();
-
         await service.AuthenticateAsync(CreateAuthenticateRequest(tenantId, "198.51.100.10"));
         await service.AuthenticateAsync(CreateAuthenticateRequest(tenantId, "203.0.113.10"));
         await service.ForgotPasswordAsync(CreateForgotPasswordRequest(tenantId, "198.51.100.11"));
@@ -80,7 +72,6 @@ public sealed class AuthServiceTrustedThrottlingTests
             StrictSecurityRateLimitPolicyMap.CreateAuthenticationClientKey(
                 null,
                 "service:trusted-portal:unknown-user"));
-        resolver.VerifyAll();
     }
 
     private static AuthenticateIdentityRequest CreateAuthenticateRequest(Guid tenantId, string ipAddress) => new()
@@ -107,9 +98,8 @@ public sealed class AuthServiceTrustedThrottlingTests
 
     private static RequestMetadata CreateMetadata(Guid tenantId, string ipAddress) => new()
     {
-        TenantId = tenantId,
-        IpAddress = ipAddress,
-        ServiceAccessToken = "validated-by-test-resolver"
+        RequestedTenantId = tenantId,
+        IpAddress = ipAddress
     };
 
     private sealed class CapturingRateLimiter : IDistributedSecurityRateLimiter

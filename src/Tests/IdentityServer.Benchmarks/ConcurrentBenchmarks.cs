@@ -44,6 +44,7 @@ public class ConcurrentBenchmarks
     private WebApplication _testClientApp = null!;
     private HttpClient _httpClient = null!;
     private IIdentityServerServiceWrapper _serviceWrapper = null!;
+    private IServiceScope _testClientScope = null!;
 
     // Thin protocol
     private BoltClient _thinServiceClient = null!;
@@ -164,7 +165,8 @@ public class ConcurrentBenchmarks
         }
 
         _httpClient = new HttpClient { BaseAddress = new Uri(IdentityServerUrl) };
-        _serviceWrapper = _testClientApp.Services.GetRequiredService<IIdentityServerServiceWrapper>();
+        _testClientScope = _testClientApp.Services.CreateScope();
+        _serviceWrapper = _testClientScope.ServiceProvider.GetRequiredService<IIdentityServerServiceWrapper>();
 
         // 9. Thin protocol
         await SetupThinProtocol();
@@ -248,9 +250,9 @@ public class ConcurrentBenchmarks
     {
         Metadata = new RequestMetadata
         {
-            TenantId = TestTenantId, RequestId = Guid.NewGuid(),
-            IpAddress = "127.0.0.1", Name = "Benchmark",
-            DeviceName = "BenchDevice", DeviceAgent = "BenchAgent"
+            RequestId = Guid.NewGuid(),
+            IpAddress = "127.0.0.1", OperationName = "Benchmark",
+            DeviceName = "BenchDevice", UserAgent = "BenchAgent"
         }
     };
 
@@ -330,6 +332,7 @@ public class ConcurrentBenchmarks
     [GlobalCleanup]
     public async Task Cleanup()
     {
+        _testClientScope?.Dispose();
         _httpClient?.Dispose();
         _grpcChannel?.Dispose();
         try { await _grpcHubApp.StopAsync(); } catch { }

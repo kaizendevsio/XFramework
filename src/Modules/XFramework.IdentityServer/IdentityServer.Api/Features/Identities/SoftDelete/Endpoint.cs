@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Identities.SoftDelete;
 
 public static class SoftDeleteIdentityEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result> Handle(
         SoftDeleteIdentityRequest request,
         IIdentityAdministrationService service,
@@ -26,7 +29,7 @@ public static class SoftDeleteIdentityEndpoint
         IIdentityAdministrationService service,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return service.SoftDeleteAsync(request, ct);
     }
 }

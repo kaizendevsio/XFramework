@@ -12,6 +12,7 @@ using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
 using XFramework.Inventario.Domain.Shared.Contracts.Responses.Products;
 using XFramework.Inventario.Domain.Shared.Enums;
+using XFramework.Integration.Security;
 
 namespace XFramework.Inventario.Api.Services;
 
@@ -24,19 +25,19 @@ public class ProductService
     private readonly AppDbContext? _db;
     private readonly ICacheService _cacheService;
     private readonly ILogger<ProductService> _logger;
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ITrustedInvocationContextAccessor _trustedInvocationContextAccessor;
 
     public ProductService(
         IDataContext dataContext,
         ICacheService cacheService,
         ILogger<ProductService> logger,
-        IHttpContextAccessor httpContextAccessor)
+        ITrustedInvocationContextAccessor trustedInvocationContextAccessor)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _db = null;
         _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+        _trustedInvocationContextAccessor = trustedInvocationContextAccessor ?? throw new ArgumentNullException(nameof(trustedInvocationContextAccessor));
     }
 
     public ProductService(
@@ -44,13 +45,13 @@ public class ProductService
         AppDbContext db,
         ICacheService cacheService,
         ILogger<ProductService> logger,
-        IHttpContextAccessor httpContextAccessor)
+        ITrustedInvocationContextAccessor trustedInvocationContextAccessor)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _db = db ?? throw new ArgumentNullException(nameof(db));
         _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+        _trustedInvocationContextAccessor = trustedInvocationContextAccessor ?? throw new ArgumentNullException(nameof(trustedInvocationContextAccessor));
     }
 
     /// <summary>
@@ -597,21 +598,10 @@ public class ProductService
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request = null)
     {
-        if (request?.Metadata?.TenantId is { } metadataTenantId && metadataTenantId != Guid.Empty)
-            return Result<Guid>.Success(metadataTenantId);
-
-        var user = _httpContextAccessor.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated != true)
+        var tenantId = _trustedInvocationContextAccessor.Current?.EffectiveTenantId;
+        if (tenantId is null || tenantId == Guid.Empty)
             return Result<Guid>.Unauthorized("Authentication is required for product catalog operations");
-
-        var tenantIdClaim = user.FindFirst("tenantId")?.Value
-            ?? user.FindFirst("TenantId")?.Value
-            ?? user.FindFirst("tid")?.Value;
-
-        if (Guid.TryParse(tenantIdClaim, out var tenantId) && tenantId != Guid.Empty)
-            return Result<Guid>.Success(tenantId);
-
-        return Result<Guid>.Forbidden("Authenticated user does not have a valid tenant context");
+        return Result<Guid>.Success(tenantId.Value);
     }
 
     private static string BuildProductCacheKey(Guid tenantId, Guid productId) =>

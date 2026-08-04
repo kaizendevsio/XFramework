@@ -19,6 +19,8 @@ using Storage.Integration.Drivers;
 using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Core.Health;
+using XFramework.Integration.Security;
+using IdentityServer.Integration.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,6 +66,13 @@ builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(
 
 // Bolt - thin binary RPC transport to microservices
 builder.Services.AddXFrameworkBoltClient(builder.Configuration, hostEnvironment: builder.Environment);
+builder.Services.AddScoped<PortalActorContext>();
+builder.Services.AddScoped<PortalActorAccessTokenProvider>();
+builder.Services.Replace(ServiceDescriptor.Scoped<IActorAccessTokenProvider>(services =>
+    services.GetRequiredService<PortalActorAccessTokenProvider>()));
+builder.Services.Replace(ServiceDescriptor.Scoped<IActorAccessTokenScope>(services =>
+    services.GetRequiredService<PortalActorAccessTokenProvider>()));
+builder.Services.Replace(ServiceDescriptor.Scoped<IActorIdentityProvider, IdentityServerActorIdentityProvider>());
 
 builder.Services.AddHealthChecks()
     .AddCheck(
@@ -96,20 +105,17 @@ builder.Services.AddScoped(sp =>
 
     var metadata = new RequestMetadata
     {
-        TenantId = tenantFilter.SelectedTenantId ?? loginTenantId,
-        ActorTenantId = loginTenantId,
-        CredentialId = TryGetGuidClaim(user, PortalAuthClaims.CredentialId),
-        SessionId = TryGetGuidClaim(user, PortalAuthClaims.SessionId),
+        RequestedTenantId = tenantFilter.SelectedTenantId ?? loginTenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal",
+        OperationName = "Portal",
         DeviceName = Environment.MachineName,
-        DeviceAgent = httpContext?.Request.Headers.UserAgent.ToString(),
+        UserAgent = httpContext?.Request.Headers.UserAgent.ToString(),
         IpAddress = httpContext?.Connection.RemoteIpAddress?.ToString()
     };
 
     tenantFilter.OnChanged += () =>
     {
-        metadata.TenantId = tenantFilter.SelectedTenantId ?? loginTenantId;
+        metadata.RequestedTenantId = tenantFilter.SelectedTenantId ?? loginTenantId;
         metadata.RequestId = Guid.NewGuid();
     };
 

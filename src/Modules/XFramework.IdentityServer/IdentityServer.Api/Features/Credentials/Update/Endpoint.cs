@@ -32,9 +32,50 @@ public static class UpdateCredentialEndpoint
         UpdateCredentialRequest command,
         HttpContext httpContext,
         [FromServices] IValidator<UpdateCredentialRequest> validator,
+        [FromServices] IHttpTrustedInvocationAuthorizer invocationAuthorizer,
+        [FromServices] ITrustedInvocationFeatureGate featureGate,
+        [FromServices] IActorAccessTokenScope actorAccessTokenScope,
         [FromServices] IAuthService authService,
         CancellationToken ct)
     {
+        command.Metadata ??= new RequestMetadata();
+        var authorizationHeader = httpContext.Request.Headers.Authorization.ToString();
+        var actorAccessToken = authorizationHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authorizationHeader[7..].Trim()
+            : null;
+        using var actorTokenLease = string.IsNullOrWhiteSpace(actorAccessToken)
+            ? null
+            : actorAccessTokenScope.Push(actorAccessToken);
+        var invocationAuthorization = await invocationAuthorizer.AuthorizeAsync(
+            authorizationHeader,
+            httpContext.Request.Headers["X-XFramework-Service-Authorization"].ToString(),
+            command.Metadata,
+            new InvocationAuthorizationPolicy
+            {
+                ActorRequirement = ActorRequirement.Required,
+                TenantAccessMode = TenantAccessMode.ActorTenant,
+                RequireServiceIdentity = false
+            },
+            ct);
+        if (!invocationAuthorization.IsSuccess)
+        {
+            return TypedResults.Problem(
+                detail: invocationAuthorization.Error,
+                statusCode: invocationAuthorization.StatusCode);
+        }
+
+        var featureResult = await featureGate.EnsureAllowedAsync(
+            "/api/credentials/{id:guid}",
+            HttpMethods.Patch,
+            IdentityAuthorizationConstants.Update,
+            ct);
+        if (!featureResult.IsSuccess)
+        {
+            return TypedResults.Problem(
+                detail: featureResult.Message,
+                statusCode: featureResult.StatusCode);
+        }
+
         var validationResult = await validator.ValidateAsync(command, ct);
         if (!validationResult.IsValid)
         {
@@ -54,7 +95,7 @@ public static class UpdateCredentialEndpoint
         }
 
         command.CredentialId = id;
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(command.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(command.Metadata, httpContext);
         var result = await authService.UpdateCredentialAsync(command, ct);
         if (!result.IsSuccess)
         {

@@ -1,14 +1,9 @@
-using System.Security.Claims;
-using System.Text.Json;
 using FluentAssertions;
 using IdentityServer.Api.Features.Auth.ValidateSession;
-using IdentityServer.Api.Services;
 using IdentityServer.Domain.Shared.Contracts.Requests;
-using IdentityServer.Domain.Shared.Contracts.Responses;
 using Microsoft.AspNetCore.Http;
-using Moq;
 using NUnit.Framework;
-using XFramework.Core.Patterns;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.UnitTests;
 
@@ -16,76 +11,59 @@ namespace IdentityServer.UnitTests;
 public sealed class SessionValidationHttpTests
 {
     [Test]
-    public async Task HandleHttp_OverwritesClientIdentifiersWithAuthenticatedClaims()
+    public async Task HandleHttp_ReturnsAuthenticatedActorSnapshotWithoutReadingIdentityFromBody()
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
         var roleTypeId = Guid.NewGuid();
-        var request = new ValidateIdentitySessionRequest
-        {
-            TenantId = Guid.NewGuid(),
-            CredentialId = Guid.NewGuid(),
-            SessionId = Guid.NewGuid(),
-            RoleTypeIds = [Guid.NewGuid()]
-        };
-        var context = CreateContext(tenantId, credentialId, sessionId, [roleTypeId]);
-        var service = new Mock<IAuthService>(MockBehavior.Strict);
-        service.Setup(candidate => candidate.ValidateIdentitySessionAsync(request, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<ValidateIdentitySessionResponse>.Success(new ValidateIdentitySessionResponse()));
+        var identityId = Guid.NewGuid();
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(5);
+        var request = new ValidateIdentitySessionRequest();
+        var context = new TestTrustedInvocationContextAccessor(new TrustedInvocationContext(
+            new TrustedActorIdentity(
+                credentialId,
+                identityId,
+                tenantId,
+                sessionId,
+                new HashSet<string> { roleTypeId.ToString("D") },
+                new HashSet<string> { "identity.users.view" },
+                "g1",
+                expiresAt),
+            Service: null,
+            EffectiveTenantId: tenantId,
+            RequestedTargetTenantId: null,
+            CorrelationId: Guid.NewGuid()));
 
         var result = await ValidateIdentitySessionEndpoint.HandleHttp(
             request,
             context,
-            service.Object,
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        request.TenantId.Should().Be(tenantId);
-        request.CredentialId.Should().Be(credentialId);
-        request.SessionId.Should().Be(sessionId);
-        request.RoleTypeIds.Should().Equal(roleTypeId);
-        service.VerifyAll();
+        result.Data!.TenantId.Should().Be(tenantId);
+        result.Data.CredentialId.Should().Be(credentialId);
+        result.Data.IdentityId.Should().Be(identityId);
+        result.Data.SessionId.Should().Be(sessionId);
+        result.Data.Roles.Should().Equal(roleTypeId.ToString("D"));
+        result.Data.Capabilities.Should().Equal("identity.users.view");
+        result.Data.GenerationId.Should().Be("g1");
+        result.Data.ExpiresAtUtc.Should().Be(expiresAt.UtcDateTime);
+        result.Data.IsValid.Should().BeTrue();
     }
 
     [Test]
-    public async Task HandleHttp_WithMissingSessionClaims_ReturnsForbiddenWithoutCallingService()
+    public async Task HandleHttp_WithoutTrustedActor_ReturnsUnauthorized()
     {
         var request = new ValidateIdentitySessionRequest();
-        var context = new DefaultHttpContext
-        {
-            User = new ClaimsPrincipal(new ClaimsIdentity([], "test"))
-        };
-        var service = new Mock<IAuthService>(MockBehavior.Strict);
+        var context = new TestTrustedInvocationContextAccessor();
 
         var result = await ValidateIdentitySessionEndpoint.HandleHttp(
             request,
             context,
-            service.Object,
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
-        service.VerifyNoOtherCalls();
-    }
-
-    private static DefaultHttpContext CreateContext(
-        Guid tenantId,
-        Guid credentialId,
-        Guid sessionId,
-        IReadOnlyCollection<Guid> roleTypeIds)
-    {
-        var claims = new[]
-        {
-            new Claim("tenant_id", tenantId.ToString("D")),
-            new Claim("credential_id", credentialId.ToString("D")),
-            new Claim("session_id", sessionId.ToString("D")),
-            new Claim(ClaimTypes.Role, JsonSerializer.Serialize(roleTypeIds))
-        };
-
-        return new DefaultHttpContext
-        {
-            User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))
-        };
+        result.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
     }
 }

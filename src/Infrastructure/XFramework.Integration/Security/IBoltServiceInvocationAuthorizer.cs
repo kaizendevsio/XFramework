@@ -5,10 +5,10 @@ namespace XFramework.Integration.Security;
 
 public interface IBoltServiceInvocationAuthorizer
 {
-    Task<TrustedServiceInvocationResult> AuthorizeAsync(
-        RequestMetadata? metadata,
+    Task<TrustedInvocationResult> AuthorizeAsync(
+        InvocationCredentials credentials,
+        RequestMetadata metadata,
         BoltInboundRequestContext requestContext,
-        IReadOnlyCollection<string>? requiredScopes = null,
-        IReadOnlyCollection<string>? allowedCallers = null,
+        InvocationAuthorizationPolicy policy,
         CancellationToken ct = default);
 }

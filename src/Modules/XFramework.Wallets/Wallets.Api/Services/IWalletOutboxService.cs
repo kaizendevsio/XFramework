@@ -13,6 +13,7 @@ public interface IWalletOutboxService
     Task<Result<WalletOutboxActionResponse>> RetryAsync(WalletOutboxActionRequest request, CancellationToken ct = default);
     Task<Result<WalletOutboxActionResponse>> ReplayAsync(WalletOutboxActionRequest request, CancellationToken ct = default);
     Task<Result<WalletOutboxActionResponse>> DeadLetterAsync(WalletOutboxActionRequest request, CancellationToken ct = default);
+    Task<IReadOnlyList<Guid>> GetDueTenantIdsAsync(CancellationToken ct = default);
     Task DispatchDueAsync(CancellationToken ct = default);
 }
 

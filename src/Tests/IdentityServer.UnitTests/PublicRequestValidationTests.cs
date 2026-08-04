@@ -113,29 +113,25 @@ public sealed class PublicRequestValidationTests
             nameof(CreateCredentialRequest.UserAlias));
 
         new ConfirmVerificationRequestValidator().Validate(
-            new ConfirmVerificationRequest(new string('t', 2_049)))
+            new ConfirmVerificationRequest(new string('t', 2_049), Guid.NewGuid()))
             .Errors.Should().Contain(error => error.PropertyName == nameof(ConfirmVerificationRequest.Token));
+        new ConfirmVerificationRequestValidator().Validate(
+            new ConfirmVerificationRequest("valid-token", Guid.Empty))
+            .Errors.Should().Contain(error => error.PropertyName == nameof(ConfirmVerificationRequest.TenantId));
     }
 
     [Test]
-    public void VerificationAndSessionValidators_RejectNullModelsAndOversizedRoleSets()
+    public void VerificationValidator_RejectsNullModel_AndSessionValidationRequestHasNoIdentityBody()
     {
         var createVerification = new XFramework.Domain.Shared.Contracts.Requests.Create<IdentityVerification>(null!);
-        var validateSession = new ValidateIdentitySessionRequest
-        {
-            TenantId = Guid.NewGuid(),
-            CredentialId = Guid.NewGuid(),
-            SessionId = Guid.NewGuid(),
-            RoleTypeIds = Enumerable.Repeat(Guid.NewGuid(), 65).ToList()
-        };
 
         var verificationResult = new CreateVerificationRequestValidator().Validate(createVerification);
-        var sessionResult = new ValidateIdentitySessionRequestValidator().Validate(validateSession);
 
         verificationResult.IsValid.Should().BeFalse();
         verificationResult.Errors.Should().Contain(error => error.PropertyName == "Model");
-        sessionResult.IsValid.Should().BeFalse();
-        sessionResult.Errors.Should().Contain(error => error.PropertyName == nameof(ValidateIdentitySessionRequest.RoleTypeIds));
+        typeof(ValidateIdentitySessionRequest).GetProperties()
+            .Select(property => property.Name)
+            .Should().NotContain(["TenantId", "CredentialId", "SessionId", "RoleTypeIds"]);
     }
 
     [Test]

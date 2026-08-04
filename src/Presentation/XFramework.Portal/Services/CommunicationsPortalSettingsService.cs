@@ -57,13 +57,11 @@ public sealed class CommunicationsPortalSettingsService(
 
     private RequestMetadata BuildMetadata(Guid tenantId) => new()
     {
-        TenantId = tenantId,
-        CredentialId = metadata.CredentialId,
-        SessionId = metadata.SessionId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal",
+        OperationName = "Portal",
         DeviceName = metadata.DeviceName,
-        DeviceAgent = metadata.DeviceAgent,
+        UserAgent = metadata.UserAgent,
         IpAddress = metadata.IpAddress
     };
 

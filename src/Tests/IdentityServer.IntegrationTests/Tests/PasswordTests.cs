@@ -313,12 +313,11 @@ public class PasswordTests : IntegrationTestBase
 
     private static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = IntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "IntegrationTest",
+        OperationName = "IntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 
     private async Task<IdentityCredential> SeedCredential(string password = "TestPassword123!")

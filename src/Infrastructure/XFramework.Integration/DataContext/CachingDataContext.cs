@@ -1,6 +1,7 @@
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext.Cache;
 using Microsoft.Extensions.Logging;
+using XFramework.Integration.Security;
 
 namespace XFramework.Integration.DataContext;
 
@@ -10,25 +11,28 @@ public class CachingDataContext : IDataContext, ICacheControl
     private readonly IClientCacheService _cache;
     private readonly DataContextOptions _options;
     private readonly ILogger<CachingDataContext> _logger;
+    private readonly ITrustedInvocationContextAccessor _invocationContextAccessor;
     private readonly List<string> _affectedEntityTypes = [];
 
     public CachingDataContext(
         IDataContext inner,
         IClientCacheService cache,
         DataContextOptions options,
-        ILogger<CachingDataContext> logger)
+        ILogger<CachingDataContext> logger,
+        ITrustedInvocationContextAccessor invocationContextAccessor)
     {
         _inner = inner;
         _cache = cache;
         _options = options;
         _logger = logger;
+        _invocationContextAccessor = invocationContextAccessor;
     }
 
     public IRemoteQuery<T> Query<T>() where T : class
     {
         var innerQuery = _inner.Query<T>();
         var policy = _options.GetCachePolicy<T>();
-        return new CachingQuery<T>(innerQuery, _cache, policy, _logger);
+        return new CachingQuery<T>(innerQuery, _cache, policy, _logger, _invocationContextAccessor);
     }
 
     public void Add<T>(T entity) where T : class

@@ -3,6 +3,7 @@ using Bolt.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using XFramework.Integration.Extensions;
 
 namespace XFramework.Core.DataContext;
 
@@ -10,7 +11,8 @@ public static class DataContextHandlerExtensions
 {
     public static IServiceCollection AddDataContextHandler(this IServiceCollection services, Assembly entityAssembly)
     {
-        services.AddSingleton<IQueryExecutionService>(sp =>
+        services.AddTrustedInvocationSecurity();
+        services.AddScoped<IQueryExecutionService>(sp =>
         {
             var queryService = ActivatorUtilities.CreateInstance<QueryExecutionService>(sp);
 

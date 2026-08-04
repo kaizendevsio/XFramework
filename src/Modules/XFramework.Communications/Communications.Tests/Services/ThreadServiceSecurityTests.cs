@@ -27,11 +27,14 @@ using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Security;
 
 namespace Communications.Tests.Services;
 
 public sealed class ThreadServiceSecurityTests
 {
+    private static readonly AsyncLocal<TrustedInvocationContext?> TrustedContext = new();
+
     [Test]
     public async Task DeleteMessageReactionAsync_MissingThreadOrMessageId_ReturnsBadRequest()
     {
@@ -612,7 +615,11 @@ public sealed class ThreadServiceSecurityTests
         InMemoryDataContext dataContext,
         ICommunicationsTemplateService? templateService = null)
     {
-        var resolver = new CommunicationsRequestContextResolver(new HttpContextAccessor(), TestConfiguration(), new TestJwtService());
+        TrustedContext.Value = null;
+        var resolver = new CommunicationsRequestContextResolver(
+            new HttpContextAccessor(),
+            TestConfiguration(),
+            serviceInvocationResolver: new TestTrustedInvocationContextAccessor());
         return new(
             dataContext,
             resolver,
@@ -627,13 +634,32 @@ public sealed class ThreadServiceSecurityTests
 
     private static RequestMetadata Metadata(Guid credentialId, Guid tenantId)
     {
+        TrustedContext.Value = new TrustedInvocationContext(
+            new TrustedActorIdentity(
+                credentialId,
+                Guid.NewGuid(),
+                tenantId,
+                Guid.NewGuid(),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                "test-generation",
+                DateTimeOffset.UtcNow.AddHours(1)),
+            null,
+            tenantId,
+            tenantId,
+            Guid.NewGuid());
+
         var metadata = new RequestMetadata
         {
-            CredentialId = credentialId,
-            TenantId = tenantId,
-            ActorAccessToken = $"{tenantId:D}:{credentialId:D}"
+            RequestedTenantId = tenantId,
+            OperationName = "ThreadServiceSecurityTest"
         };
         return metadata;
+    }
+
+    private sealed class TestTrustedInvocationContextAccessor : ITrustedInvocationContextAccessor
+    {
+        public TrustedInvocationContext? Current => TrustedContext.Value;
     }
 
     private sealed class TestStorageServiceWrapper : IStorageServiceWrapper
@@ -701,7 +727,7 @@ public sealed class ThreadServiceSecurityTests
                 Response = new StorageFileValidationResponse
                 {
                     StorageFileId = request.StorageFileId,
-                    TenantId = request.Metadata.TenantId ?? Guid.Empty,
+                    TenantId = request.Metadata.RequestedTenantId ?? Guid.Empty,
                     IsValid = true,
                     Status = StorageFileStatus.Available,
                     Visibility = StorageFileVisibility.Private,

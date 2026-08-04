@@ -269,11 +269,11 @@ public sealed class ServiceIdentityCredentialGenerationTests
 
         return new ServiceIdentityService(
             dataContext.Object,
-            configuration,
             parsed,
             Mock.Of<IBoltTransportTokenSigner>(),
             clock,
-            logger ?? NullLogger<ServiceIdentityService>.Instance);
+            logger ?? NullLogger<ServiceIdentityService>.Instance,
+            signingKeyStore: new FileSystemServiceSigningKeyStore(configuration, parsed));
     }
 
     private static IConfiguration CreateConfiguration(

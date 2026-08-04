@@ -1,51 +1,39 @@
-using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Security;
 
 namespace Communications.Tests.Infrastructure;
 
-internal sealed class FakeTrustedServiceInvocationResolver : ITrustedServiceInvocationResolver
+internal sealed class FakeTrustedServiceInvocationResolver(
+    Guid? tenantId = null,
+    Guid? credentialId = null,
+    string serviceName = XFrameworkServiceNames.Portal,
+    bool includeActor = false,
+    IReadOnlySet<string>? roles = null) : ITrustedInvocationContextAccessor
 {
     public const string ValidPortalToken = "valid-portal-token";
-    public const string OtherServiceToken = "valid-other-service-token";
     public const string WrongAudienceToken = "wrong-audience-token";
+    public const string OtherServiceToken = "other-service-token";
 
-    public Task<TrustedServiceInvocationResult> ResolveAsync(
-        RequestMetadata? metadata,
-        string expectedAudience,
-        IReadOnlyCollection<string>? requiredScopes = null,
-        IReadOnlyCollection<string>? allowedCallers = null,
-        bool requireTenant = true,
-        CancellationToken ct = default)
-    {
-        if (metadata is null || string.IsNullOrWhiteSpace(metadata.ServiceAccessToken))
-            return Task.FromResult(TrustedServiceInvocationResult.Failure("Service token is required."));
+    private readonly Guid resolvedTenantId = tenantId ?? Guid.NewGuid();
 
-        if (metadata.ServiceAccessToken == WrongAudienceToken)
-            return Task.FromResult(TrustedServiceInvocationResult.Failure("Wrong audience."));
-
-        var caller = metadata.ServiceAccessToken switch
-        {
-            ValidPortalToken => XFrameworkServiceNames.Portal,
-            OtherServiceToken => "XFramework.OtherService",
-            _ => null
-        };
-
-        if (string.IsNullOrWhiteSpace(caller))
-            return Task.FromResult(TrustedServiceInvocationResult.Failure("Unknown test service token."));
-
-        var scopes = new HashSet<string>(
-            requiredScopes ?? [XFrameworkServiceScopes.BoltService],
-            StringComparer.OrdinalIgnoreCase);
-
-        var invocation = new TrustedServiceInvocation(
-            caller,
-            expectedAudience,
-            metadata.TenantId,
-            metadata.CredentialId,
-            metadata,
-            scopes);
-
-        return Task.FromResult(TrustedServiceInvocationResult.Success(invocation));
-    }
+    public TrustedInvocationContext Current => new(
+        includeActor
+            ? new TrustedActorIdentity(
+                credentialId ?? Guid.NewGuid(),
+                Guid.NewGuid(),
+                resolvedTenantId,
+                Guid.NewGuid(),
+                roles ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                "test-generation",
+                DateTimeOffset.UtcNow.AddHours(1))
+            : null,
+        new TrustedServiceIdentity(
+            serviceName,
+            XFrameworkServiceNames.Communications,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { XFrameworkServiceScopes.BoltService },
+            "test-service-generation"),
+        resolvedTenantId,
+        resolvedTenantId,
+        Guid.NewGuid());
 }

@@ -108,7 +108,7 @@ XFramework Hub intentionally fixes the required service scope to `bolt.service` 
 
 ### Transport and Invocation Authorization
 
-Transport authentication and RPC authorization are separate checks. XFramework Bolt Hub authenticates the WebSocket and binds the registration identity. Each source-generated `[BoltHandler]` then validates `RequestMetadata.ServiceAccessToken` for the destination service before validation, dependency resolution, or business-handler execution. The token caller must produce the same deterministic Bolt sender route as the Hub-verified frame sender.
+Transport authentication and RPC authorization are separate checks. XFramework Bolt Hub authenticates the WebSocket and binds the registration identity. Per-invocation actor and service tokens travel in the Bolt invocation envelope, outside business request metadata. Each source-generated `[BoltHandler]` resolves an immutable `TrustedInvocationContext` through the configured identity providers before validation, dependency resolution, or business-handler execution. The validated service caller must produce the same deterministic Bolt sender route as the Hub-verified frame sender.
 
 Generated handlers return `401 Unauthorized` for a missing or invalid destination token, `403 Forbidden` for a sender mismatch, missing required scope, or disallowed caller, and `503 Service Unavailable` when IdentityServer signing-key validation infrastructure is unavailable. Successful base JWT validation is cached by token digest and destination audience, with a fixed entry bound and no lifetime beyond the token expiry. Failed validation is not cached. Signing-key refresh is single-flight and keeps one active key set, so attacker-controlled key IDs cannot create unbounded cache entries. An unknown key ID can force one globally throttled refresh, allowing normal key rotation without creating a per-key cache or refresh storm. Manual low-level handlers remain responsible for their own invocation policy; use the context-aware `RegisterHandler` overload when the verified request ID and sender hash are required.
 
@@ -203,7 +203,7 @@ public static class AuthenticateEndpoint
 
 Use manual `BoltServer.RegisterHandler` only for low-level protocol tests, direct-mode samples, or infrastructure that is not a VSA feature.
 
-Every generated Bolt request must expose the inherited `RequestMetadata` contract. The caller-side Bolt driver populates its destination service token, and generated destination handlers enforce the baseline token and sender binding automatically. Add `RequiredServiceScopes` or `AllowedServiceCallers` only when the handler requires a narrower service policy.
+Every generated Bolt request must expose the inherited diagnostics-only `RequestMetadata` contract. The caller-side Bolt driver places actor and destination service tokens in `BoltInvocationEnvelope`, and generated destination handlers resolve trusted identities and enforce sender binding automatically. Add `RequiredServiceScopes` or `AllowedServiceCallers` only when the handler requires a narrower service policy.
 
 ### RPC (Request-Response)
 

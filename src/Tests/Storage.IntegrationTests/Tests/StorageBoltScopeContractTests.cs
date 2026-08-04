@@ -24,6 +24,12 @@ public sealed class StorageBoltScopeContractTests
         "ListStorageUploadPartsEndpoint"
     ];
 
+    private static readonly HashSet<string> ServiceTargetWriteHandlers =
+    [
+        "ClaimStorageFileEndpoint",
+        "DeleteStorageFileEndpoint"
+    ];
+
     [Test]
     public void EveryStorageBoltHandler_RequiresItsOperationScope()
     {
@@ -40,7 +46,50 @@ public sealed class StorageBoltScopeContractTests
             var expectedScope = ReadHandlers.Contains(handler.Type.Name)
                 ? XFrameworkServiceScopes.StorageRead
                 : XFrameworkServiceScopes.StorageWrite;
-            handler.Attribute!.RequiredServiceScopes.Should().Equal(expectedScope);
+            var expectedScopes = ServiceTargetWriteHandlers.Contains(handler.Type.Name)
+                ? new[] { expectedScope, XFrameworkServiceScopes.TenantTarget }
+                : [expectedScope];
+            handler.Attribute!.RequiredServiceScopes.Should().Equal(expectedScopes);
         }
+    }
+
+    [Test]
+    public void UploadPart_AuthorizesBeforeBufferingRequestBody()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot().FullName,
+            "src",
+            "Modules",
+            "XFramework.Storage",
+            "Storage.Api",
+            "Features",
+            "Sessions",
+            "UploadPart",
+            "Endpoint.cs"));
+
+        var authorizationIndex = source.IndexOf("invocationAuthorizer.AuthorizeAsync(", StringComparison.Ordinal);
+        var boundedBodyReadIndex = source.IndexOf("ReadBoundedBodyAsync(httpRequest.Body", StringComparison.Ordinal);
+
+        authorizationIndex.Should().BeGreaterThanOrEqualTo(0);
+        boundedBodyReadIndex.Should().BeGreaterThan(authorizationIndex,
+            "unauthorized callers must be rejected before their upload body is buffered");
+        source.Should().Contain("if (totalBytes > MaxUploadPartBytes)",
+            "chunked request bodies must be bounded even when Content-Length is absent");
+        source.Should().NotContain("httpRequest.ContentLength",
+            "client-controlled Content-Length must not bypass the authoritative bounded body reader");
+    }
+
+    private static DirectoryInfo FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "XFramework.slnx")))
+                return directory;
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Repository root could not be found.");
     }
 }

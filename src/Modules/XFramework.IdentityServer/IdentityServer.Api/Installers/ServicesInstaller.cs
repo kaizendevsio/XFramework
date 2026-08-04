@@ -3,6 +3,7 @@ using IdentityServer.Api.Infrastructure;
 using Storage.Integration.Drivers;
 using XFramework.Core.Extensions;
 using XFramework.Integration.Security;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace IdentityServer.Api.Installers;
 
@@ -20,8 +21,16 @@ public class ServicesInstaller : IInstaller
             serviceProvider.GetRequiredService<TimeProvider>().GetUtcNow(),
             serviceProvider.GetRequiredService<IHostEnvironment>().EnvironmentName));
         services.AddSingleton<IBoltTransportTokenSigner, FileBackedBoltTransportTokenSigner>();
-        services.AddSingleton<IIdentitySigningKeyProvider, IdentityServerLocalSigningKeyProvider>();
+        services.AddSingleton<IServiceSigningKeyStore, FileSystemServiceSigningKeyStore>();
+        services.RemoveAll<IIdentitySigningKeyProvider>();
+        services.RemoveAll<IServiceCredentialGenerationProvider>();
+        services.AddSingleton<IdentityServerLocalSigningKeyProvider>();
+        services.AddSingleton<IIdentitySigningKeyProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<IdentityServerLocalSigningKeyProvider>());
+        services.AddSingleton<IServiceCredentialGenerationProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<IdentityServerLocalSigningKeyProvider>());
         services.AddIdentitySessionJwtValidation();
+        services.Replace(ServiceDescriptor.Scoped<IActorIdentityProvider, IdentityServerLocalActorIdentityProvider>());
         XFramework.GeneratedServices.GeneratedEntityServiceRegistrations
             .AddGeneratedEntityServices(services);
 

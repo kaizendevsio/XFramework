@@ -14,6 +14,7 @@ using NSubstitute;
 using NUnit.Framework;
 using Testcontainers.PostgreSql;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Security;
 
 namespace Bolt.Tests;
 
@@ -117,7 +118,7 @@ public sealed class CommunicationsBoltTopicAuthorizerPostgreSqlTests
                 new Claim("tenantId", topicTenantId.ToString("D"))
             ],
             "Test"));
-        await using var provider = CreateProvider(servicePrincipal);
+        await using var provider = CreateProvider(actorPrincipal);
 
         await using (var seedScope = provider.CreateAsyncScope())
         {
@@ -138,12 +139,8 @@ public sealed class CommunicationsBoltTopicAuthorizerPostgreSqlTests
                 """);
         }
 
-        var jwtService = Substitute.For<IJwtService>();
-        jwtService.DecodeJwtToken("actor-token")
-            .Returns(Task.FromResult((actorPrincipal, new System.IdentityModel.Tokens.Jwt.JwtSecurityToken())));
         var authorizer = new CommunicationsBoltTopicAuthorizer(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            jwtService,
             NullLogger<CommunicationsBoltTopicAuthorizer>.Instance);
         var context = new BoltTopicAuthorizationContext(
             BoltTopicOperation.Subscribe,
@@ -179,7 +176,23 @@ public sealed class CommunicationsBoltTopicAuthorizerPostgreSqlTests
             services,
             configuration,
             Substitute.For<IHostEnvironment>());
+        services.AddScoped<IActorIdentityProvider>(_ => new StubActorIdentityProvider(
+            ActorIdentityValidationResult.Success(new TrustedActorIdentity(
+                Guid.Parse(httpPrincipal.FindFirstValue(ClaimTypes.Name)!),
+                Guid.NewGuid(),
+                Guid.Parse(httpPrincipal.FindFirstValue("tenantId")!),
+                Guid.NewGuid(),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                "test-generation",
+                DateTimeOffset.UtcNow.AddMinutes(5)))));
         return services.BuildServiceProvider();
+    }
+
+    private sealed class StubActorIdentityProvider(ActorIdentityValidationResult result) : IActorIdentityProvider
+    {
+        public Task<ActorIdentityValidationResult> ValidateAsync(string token, CancellationToken ct = default) =>
+            Task.FromResult(result);
     }
 
     private static void EnsureDedicatedTestDatabase(string value)

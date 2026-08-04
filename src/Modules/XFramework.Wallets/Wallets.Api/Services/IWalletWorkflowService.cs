@@ -24,6 +24,21 @@ public interface IWalletWorkflowService
     Task<Result<int>> ExpireDueAsync(ExpireWalletWorkflowsRequest request, CancellationToken ct = default);
 }
 
+public interface IWalletProviderWorkflowService
+{
+    Task<Result<WalletWorkflowResponse>> ApplyDepositStatusAsync(
+        Guid tenantId,
+        WalletWorkflowStatus status,
+        WalletWorkflowActionRequest request,
+        CancellationToken ct = default);
+
+    Task<Result<WalletWorkflowResponse>> ApplyWithdrawalStatusAsync(
+        Guid tenantId,
+        WalletWorkflowStatus status,
+        WalletWorkflowActionRequest request,
+        CancellationToken ct = default);
+}
+
 public interface IWalletApprovalWorkflowService
 {
     Task<Result<WalletApprovalResponse>> CreateAsync(CreateWalletApprovalRequest request, CancellationToken ct = default);

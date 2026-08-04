@@ -49,11 +49,11 @@ public sealed class ServiceIdentitySigningKeyConcurrencyTests
         {
             var service = new ServiceIdentityService(
                 dataContext,
-                configuration,
                 serviceConfiguration,
                 Mock.Of<IBoltTransportTokenSigner>(),
                 TimeProvider.System,
-                NullLogger<ServiceIdentityService>.Instance);
+                NullLogger<ServiceIdentityService>.Instance,
+                signingKeyStore: new FileSystemServiceSigningKeyStore(configuration, serviceConfiguration));
             return service.GetSigningKeysAsync(new GetServiceSigningKeysRequest());
         }));
 
@@ -78,18 +78,18 @@ public sealed class ServiceIdentitySigningKeyConcurrencyTests
             "Test");
         var service = new ServiceIdentityService(
             dataContext,
-            configuration,
             serviceConfiguration,
             Mock.Of<IBoltTransportTokenSigner>(),
             TimeProvider.System,
-            NullLogger<ServiceIdentityService>.Instance);
+            NullLogger<ServiceIdentityService>.Instance,
+            SuperAdminContext(),
+            signingKeyStore: new FileSystemServiceSigningKeyStore(configuration, serviceConfiguration));
 
         var initial = await service.GetSigningKeysAsync(new GetServiceSigningKeysRequest());
         var initialKeyId = initial.Data!.Keys.Single(key => key.IsActive).KeyId;
         var rotated = await service.RotateSigningKeyAsync(new RotateServiceSigningKeyRequest
         {
-            Reason = "explicit-test-rotation",
-            Metadata = SuperAdminMetadata()
+            Reason = "explicit-test-rotation"
         });
 
         rotated.IsSuccess.Should().BeTrue(rotated.Message);
@@ -100,11 +100,24 @@ public sealed class ServiceIdentitySigningKeyConcurrencyTests
             !key.IsActive && key.KeyId == initialKeyId && key.RetiredAtUtc.HasValue);
     }
 
-    private static RequestMetadata SuperAdminMetadata() => new()
+    private static TestTrustedInvocationContextAccessor SuperAdminContext()
     {
-        HasTrustedActorContext = true,
-        TrustedActorRoles = new HashSet<string>(["SuperAdmin"], StringComparer.OrdinalIgnoreCase)
-    };
+        var tenantId = Guid.NewGuid();
+        return new TestTrustedInvocationContextAccessor(new TrustedInvocationContext(
+            new TrustedActorIdentity(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                tenantId,
+                Guid.NewGuid(),
+                new HashSet<string>(["SuperAdmin"], StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(),
+                "g1",
+                DateTimeOffset.UtcNow.AddMinutes(5)),
+            Service: null,
+            EffectiveTenantId: tenantId,
+            RequestedTargetTenantId: null,
+            CorrelationId: Guid.NewGuid()));
+    }
 
     private IConfiguration CreateConfiguration() =>
         new ConfigurationBuilder()

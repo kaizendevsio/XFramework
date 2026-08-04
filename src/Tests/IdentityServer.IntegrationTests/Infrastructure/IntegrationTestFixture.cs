@@ -36,11 +36,13 @@ using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Extensions;
+using XFramework.Domain.Shared.Enums;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Extensions;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Security;
+using XFramework.Integration.Abstractions;
 using XFramework.TestInfrastructure;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
@@ -53,6 +55,7 @@ public class IntegrationTestFixture
     private static WebApplication _streamFlowApp = null!;
     private static WebApplication _identityServerApp = null!;
     private static WebApplication _testClientApp = null!;
+    private static IServiceScope _testClientScope = null!;
     private static Task? _streamFlowTask;
     private static Task? _identityServerTask;
     private static Task? _testClientTask;
@@ -61,9 +64,11 @@ public class IntegrationTestFixture
     public static string BoltUrl { get; } = GetAvailableLoopbackUrl();
     public static string IdentityServerUrl { get; } = GetAvailableLoopbackUrl();
     public static string TestClientUrl { get; } = GetAvailableLoopbackUrl();
+    public static string TestActorAccessToken { get; private set; } = null!;
+    public static string TestServiceAccessToken { get; private set; } = null!;
 
     public static IServiceProvider Services => _identityServerApp.Services;
-    private const string TestServiceClientId = "TestClient";
+    private const string TestServiceClientId = XFrameworkServiceNames.Portal;
     private const string TestServiceGenerationId = "test-client-g1";
     private const string TestServiceClientSecret = "IdentityServerIntegrationTestSecret-2026";
     private const string LimitedScopeClientId = "LimitedIdentityClient";
@@ -89,32 +94,56 @@ public class IntegrationTestFixture
     /// Service wrapper that calls IdentityServer through the actual Bolt transport.
     /// </summary>
     public static IIdentityServerServiceWrapper ServiceWrapper =>
-        _testClientApp.Services.GetRequiredService<IIdentityServerServiceWrapper>();
+        _testClientScope.ServiceProvider.GetRequiredService<IIdentityServerServiceWrapper>();
 
     public static async Task<IIdentityServerServiceWrapper> CreateLimitedScopeServiceWrapper()
+        => await CreateServiceWrapper(
+            LimitedScopeClientId,
+            LimitedScopeClientSecret,
+            XFrameworkServiceScopes.DataContextQuery);
+
+    public static async Task<IIdentityServerServiceWrapper> CreatePortalWrapperWithoutTenantTargetScope()
+        => await CreateServiceWrapper(
+            TestServiceClientId,
+            TestServiceClientSecret,
+            XFrameworkServiceScopes.IdentityAdmin);
+
+    public static async Task<IIdentityServerServiceWrapper> CreateUnauthorizedCallerServiceWrapper()
+        => await CreateServiceWrapper(
+            LimitedScopeClientId,
+            LimitedScopeClientSecret,
+            XFrameworkServiceScopes.IdentityAdmin,
+            XFrameworkServiceScopes.TenantTarget);
+
+    private static async Task<IIdentityServerServiceWrapper> CreateServiceWrapper(
+        string clientId,
+        string clientSecret,
+        params string[] scopes)
     {
         using var client = new HttpClient { BaseAddress = new Uri(IdentityServerUrl) };
         using var response = await client.PostAsJsonAsync(
             "/api/service-identity/token",
             new IssueServiceTokenRequest
             {
-                ClientId = LimitedScopeClientId,
-                ClientSecret = LimitedScopeClientSecret,
+                ClientId = clientId,
+                ClientSecret = clientSecret,
                 Audience = XFrameworkServiceNames.IdentityServer,
-                Scopes = [XFrameworkServiceScopes.DataContextQuery]
+                Scopes = [.. scopes]
             });
         response.EnsureSuccessStatusCode();
         var token = await response.Content.ReadFromJsonAsync<ServiceTokenResponse>()
             ?? throw new InvalidOperationException("Limited-scope service token response was empty.");
         var tokenProvider = new FixedServiceTokenProvider(token.AccessToken);
+        var scopedServices = _testClientScope.ServiceProvider;
         var driver = new BoltDriver(
-            _testClientApp.Services.GetRequiredService<BoltClient>(),
-            _testClientApp.Services.GetRequiredService<IOptions<BoltConfiguration>>(),
+            scopedServices.GetRequiredService<BoltClient>(),
+            scopedServices.GetRequiredService<IOptions<BoltConfiguration>>(),
             tokenProvider,
-            _testClientApp.Services.GetRequiredService<ILogger<BoltDriver>>());
+            scopedServices.GetRequiredService<IActorAccessTokenProvider>(),
+            scopedServices.GetRequiredService<ILogger<BoltDriver>>());
 
         return ActivatorUtilities.CreateInstance<IdentityServerServiceWrapper>(
-            _testClientApp.Services,
+            scopedServices,
             driver,
             tokenProvider);
     }
@@ -125,6 +154,47 @@ public class IntegrationTestFixture
     /// </summary>
     public static IDataContext DataContext =>
         _testClientApp.Services.CreateScope().ServiceProvider.GetRequiredService<IDataContext>();
+
+    public static IDisposable UseActorAccessToken(string actorAccessToken) =>
+        IdentityServerTestActorAccessTokenProvider.Push(actorAccessToken);
+
+    public static IDisposable SuppressActorAccessToken() =>
+        IdentityServerTestActorAccessTokenProvider.Suppress();
+
+    public static void EstablishTrustedActorContext(
+        IServiceProvider scopedServices,
+        Guid tenantId,
+        Guid credentialId,
+        IReadOnlySet<string>? roles = null,
+        IReadOnlySet<string>? capabilities = null)
+    {
+        var actor = new TrustedActorIdentity(
+            credentialId,
+            null,
+            tenantId,
+            Guid.NewGuid(),
+            roles ?? new HashSet<string>(["SuperAdmin"], StringComparer.OrdinalIgnoreCase),
+            capabilities ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            "identityserver-integration-tests-g1",
+            DateTimeOffset.UtcNow.AddHours(1));
+
+        scopedServices.GetRequiredService<ITrustedInvocationContextStore>().Set(
+            new TrustedInvocationContext(actor, null, tenantId, null, Guid.NewGuid()));
+    }
+
+    public static void EstablishTrustedServiceTargetContext(
+        IServiceProvider scopedServices,
+        Guid tenantId)
+    {
+        var service = new TrustedServiceIdentity(
+            TestServiceClientId,
+            XFrameworkServiceNames.IdentityServer,
+            new HashSet<string>(XFrameworkServiceScopes.AdminDefaults, StringComparer.Ordinal),
+            TestServiceGenerationId);
+
+        scopedServices.GetRequiredService<ITrustedInvocationContextStore>().Set(
+            new TrustedInvocationContext(null, service, tenantId, tenantId, Guid.NewGuid()));
+    }
 
     public static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
     public static readonly Guid TestCredentialId = Guid.Parse("00000000-0000-0000-0000-000000000691");
@@ -153,6 +223,8 @@ public class IntegrationTestFixture
         _identityServerApp = StartIdentityServer();
         await WaitForHealth($"{IdentityServerUrl}/health/live", _identityServerTask);
         await VerifyCentralTransportIdentity();
+        TestActorAccessToken = await CreateTestActorAccessToken();
+        TestServiceAccessToken = await CreateTestServiceAccessToken();
 
         // 5. Seed the in-memory tenant cache
         var cache = _identityServerApp.Services.GetRequiredService<IMemoryCache>();
@@ -168,6 +240,7 @@ public class IntegrationTestFixture
         // 6. Start test client app (connects to Bolt, has IIdentityServerServiceWrapper)
         _testClientApp = StartTestClient();
         await WaitForHealth($"{TestClientUrl}/health/live", _testClientTask);
+        _testClientScope = _testClientApp.Services.CreateScope();
 
         // 7. Wait for both Bolt clients to connect and register
         await WaitForBoltClients();
@@ -176,6 +249,7 @@ public class IntegrationTestFixture
     [OneTimeTearDown]
     public async Task GlobalTeardown()
     {
+        try { _testClientScope?.Dispose(); } catch { }
         try { if (_testClientApp != null) await _testClientApp.StopAsync(); } catch { }
         try { if (_identityServerApp != null) await _identityServerApp.StopAsync(); } catch { }
         try { if (_streamFlowApp != null) await _streamFlowApp.StopAsync(); } catch { }
@@ -198,6 +272,8 @@ public class IntegrationTestFixture
         builder.Services.InstallJwt(builder.Configuration, builder.Environment);
         builder.Services.InstallStandardServices<Bolt.Hub.Installers.BoltInstaller>(builder.Configuration);
         builder.Services.InstallRuntimeServices(builder.Configuration);
+        builder.Services.AddSingleton<IServiceTokenProvider, DeferredIntegrationServiceTokenProvider>();
+        builder.Services.AddTestTrustedServiceTargetContext();
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
@@ -276,6 +352,7 @@ public class IntegrationTestFixture
             serviceProvider.GetRequiredService<TimeProvider>().GetUtcNow(),
             serviceProvider.GetRequiredService<IHostEnvironment>().EnvironmentName));
         builder.Services.AddSingleton<IBoltTransportTokenSigner, FileBackedBoltTransportTokenSigner>();
+        builder.Services.AddSingleton<IServiceSigningKeyStore, FileSystemServiceSigningKeyStore>();
         builder.Services.AddSingleton<IBoltTransportTokenProvider>(serviceProvider =>
             new IntegrationBoltTransportTokenProvider(
                 serviceProvider.GetRequiredService<IBoltTransportTokenSigner>(),
@@ -285,6 +362,7 @@ public class IntegrationTestFixture
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
         builder.Services.AddIdentityServerRemoteEntityValidation();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddScoped<IActorIdentityProvider, IdentityServerLocalActorIdentityProvider>();
 
         // Register DataContext handler so IdentityServer can serve __db_query__/__db_changes__ via Bolt
         builder.Services.AddDataContextHandler(typeof(AuthService).Assembly);
@@ -331,7 +409,7 @@ public class IntegrationTestFixture
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["BoltConfiguration:ClientName"] = "TestClient",
+            ["BoltConfiguration:ClientName"] = XFrameworkServiceNames.Portal,
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["BoltConfiguration:GenerateServiceAccessToken"] = "false",
@@ -345,6 +423,7 @@ public class IntegrationTestFixture
             ["ServiceIdentity:DefaultScopes:2"] = XFrameworkServiceScopes.DataContextQuery,
             ["ServiceIdentity:DefaultScopes:3"] = XFrameworkServiceScopes.DataContextMutate,
             ["ServiceIdentity:DefaultScopes:4"] = XFrameworkServiceScopes.IdentitySessionValidate,
+            ["ServiceIdentity:DefaultScopes:5"] = XFrameworkServiceScopes.TenantTarget,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Kestrel:Endpoints:Http:Url"] = TestClientUrl,
             ["urls"] = TestClientUrl,
@@ -371,6 +450,7 @@ public class IntegrationTestFixture
                 TestServiceClientId,
                 TestServiceGenerationId));
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddSingleton<IActorAccessTokenProvider, IdentityServerTestActorAccessTokenProvider>();
 
         // Register the IdentityServer service wrapper (generated — uses Bolt transport)
         builder.Services.AddIdentityServerWrapperServices();
@@ -378,10 +458,10 @@ public class IntegrationTestFixture
         // Register RemoteDataContext so IDataContext queries go through Bolt to IdentityServer
         builder.Services.AddRemoteDataContext();
 
-        // RequestMetadata provides tenant context for remote queries
+        // Remote DataContext calls explicitly target the test tenant.
         builder.Services.AddScoped(_ => new RequestMetadata
         {
-            TenantId = TestTenantId,
+            RequestedTenantId = TestTenantId,
             RequestId = Guid.NewGuid()
         });
 
@@ -447,7 +527,12 @@ public class IntegrationTestFixture
                 ClientId = XFrameworkServiceNames.IdentityServer,
                 ClientSecret = TestHostServiceClientSecret
             });
-        token.EnsureSuccessStatusCode();
+        if (!token.IsSuccessStatusCode)
+        {
+            var body = await token.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(
+                $"Bolt transport token endpoint returned {(int)token.StatusCode}: {body}");
+        }
     }
 
     private static async Task ConnectBoltClient(BoltClient client, string clientName)
@@ -516,7 +601,8 @@ public class IntegrationTestFixture
                 XFrameworkServiceScopes.IdentitySessionValidate,
                 XFrameworkServiceScopes.DataContextQuery,
                 XFrameworkServiceScopes.DataContextQueryAllTenants,
-                XFrameworkServiceScopes.DataContextMutate),
+                XFrameworkServiceScopes.DataContextMutate,
+                XFrameworkServiceScopes.TenantTarget),
             ["ServiceIdentity:Clients:1:ClientId"] = clientName,
             ["ServiceIdentity:Clients:1:GenerationId"] = TestHostServiceGenerationId,
             ["ServiceIdentity:Clients:1:ClientSecret"] = TestHostServiceClientSecret,
@@ -527,12 +613,16 @@ public class IntegrationTestFixture
             ["ServiceIdentity:Clients:1:AllowedScopes"] = string.Join(',',
                 XFrameworkServiceScopes.BoltService,
                 XFrameworkServiceScopes.StorageRead,
-                XFrameworkServiceScopes.StorageWrite),
+                XFrameworkServiceScopes.StorageWrite,
+                XFrameworkServiceScopes.TenantTarget),
             ["ServiceIdentity:Clients:2:ClientId"] = LimitedScopeClientId,
             ["ServiceIdentity:Clients:2:GenerationId"] = LimitedScopeGenerationId,
             ["ServiceIdentity:Clients:2:ClientSecret"] = LimitedScopeClientSecret,
             ["ServiceIdentity:Clients:2:AllowedAudiences"] = XFrameworkServiceNames.IdentityServer,
-            ["ServiceIdentity:Clients:2:AllowedScopes"] = XFrameworkServiceScopes.DataContextQuery,
+            ["ServiceIdentity:Clients:2:AllowedScopes"] = string.Join(',',
+                XFrameworkServiceScopes.DataContextQuery,
+                XFrameworkServiceScopes.IdentityAdmin,
+                XFrameworkServiceScopes.TenantTarget),
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Kestrel:Endpoints:Http:Url"] = serverUrl,
             ["urls"] = serverUrl,
@@ -560,7 +650,11 @@ public class IntegrationTestFixture
             .UseNpgsql(ConnectionString)
             .Options;
 
-        await using var db = new AppDbContext(options);
+        await using var db = new AppDbContext(
+            options,
+            new HttpContextAccessor(),
+            new ConfigurationBuilder().Build(),
+            new TestEffectiveTenantContextAccessor(TestTenantId));
         await db.Database.MigrateAsync();
         await XFramework.TestInfrastructure.TestSeedData.SeedAll(db);
         await SeedAuthenticatedTestCredential(db);
@@ -607,6 +701,63 @@ public class IntegrationTestFixture
             ConcurrencyStamp = Guid.NewGuid()
         });
         await db.SaveChangesAsync();
+    }
+
+    private static async Task<string> CreateTestActorAccessToken()
+    {
+        await using var scope = _identityServerApp.Services.CreateAsyncScope();
+        EstablishTrustedActorContext(scope.ServiceProvider, TestTenantId, TestCredentialId);
+        var token = await scope.ServiceProvider.GetRequiredService<IJwtService>().GenerateToken(
+            "identityserver-test-admin",
+            TestCredentialId,
+            [TestConstants.RoleTypeId],
+            TestTenantId);
+        var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+        var sessionTypeId = await db.Set<Contracts.SessionType>()
+            .IgnoreQueryFilters()
+            .Where(type => type.TenantId == TestTenantId)
+            .Where(type => type.SystemReferenceId == IdentityConstants.SessionType.User)
+            .Select(type => type.Id)
+            .SingleAsync();
+
+        db.Set<Contracts.Session>().Add(new Contracts.Session
+        {
+            Id = token.SessionId,
+            TenantId = TestTenantId,
+            CredentialId = TestCredentialId,
+            SessionTypeId = sessionTypeId,
+            Status = CurrentSessionState.Active,
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
+        });
+        await db.SaveChangesAsync();
+
+        return token.AccessToken;
+    }
+
+    private static async Task<string> CreateTestServiceAccessToken()
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(IdentityServerUrl) };
+        using var response = await client.PostAsJsonAsync(
+            "/api/service-identity/token",
+            new IssueServiceTokenRequest
+            {
+                ClientId = TestServiceClientId,
+                ClientSecret = TestServiceClientSecret,
+                Audience = XFrameworkServiceNames.IdentityServer,
+                Scopes =
+                [
+                    XFrameworkServiceScopes.IdentityAdmin,
+                    XFrameworkServiceScopes.IdentitySessionValidate,
+                    XFrameworkServiceScopes.TenantTarget
+                ]
+            });
+        response.EnsureSuccessStatusCode();
+        var token = await response.Content.ReadFromJsonAsync<ServiceTokenResponse>()
+            ?? throw new InvalidOperationException("Test service token response was empty.");
+        return token.AccessToken;
     }
 
     private static async Task WaitForHealth(string url, Task? appTask = null, int timeoutSeconds = 30)
@@ -656,6 +807,25 @@ public class IntegrationTestFixture
         {
             ct.ThrowIfCancellationRequested();
             return ValueTask.FromResult(accessToken);
+        }
+    }
+
+    private sealed class DeferredIntegrationServiceTokenProvider : IServiceTokenProvider
+    {
+        public ValueTask<string> GetTokenAsync(
+            string audience,
+            IReadOnlyCollection<string>? scopes = null,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrWhiteSpace(TestServiceAccessToken))
+            {
+                throw new InvalidOperationException(
+                    "The integration service token has not been issued yet.");
+            }
+
+            return ValueTask.FromResult(TestServiceAccessToken);
         }
     }
 }
@@ -713,6 +883,7 @@ internal static class IdentityServerWorkflowFailureInjection
     private static int _remainingCommunicationsRejections;
     private static int _remainingPasswordResetProcessorFailures;
     private static int _communicationsDeliveryAttemptCount;
+    private static TaskCompletionSource _cancelUploadPartReached = NewSignal();
 
     public static TestStorageFailurePoint StorageFailurePoint
     {
@@ -736,6 +907,7 @@ internal static class IdentityServerWorkflowFailureInjection
     public static int DeletedFileCount => Volatile.Read(ref _deletedFileCount);
     public static int StorageClaimAttemptCount => Volatile.Read(ref _storageClaimAttemptCount);
     public static int CommunicationsDeliveryAttemptCount => Volatile.Read(ref _communicationsDeliveryAttemptCount);
+    public static Task CancelUploadPartReached => Volatile.Read(ref _cancelUploadPartReached).Task;
 
     public static void RecordAbort() => Interlocked.Increment(ref _abortedUploadCount);
     public static void RecordDelete() => Interlocked.Increment(ref _deletedFileCount);
@@ -745,6 +917,12 @@ internal static class IdentityServerWorkflowFailureInjection
     public static bool ConsumeStorageClaimFailure() => ConsumeOne(ref _remainingStorageClaimFailures);
     public static void RecordCommunicationsDeliveryAttempt() =>
         Interlocked.Increment(ref _communicationsDeliveryAttemptCount);
+
+    public static async Task BlockUploadPartUntilCanceledAsync(CancellationToken ct)
+    {
+        Volatile.Read(ref _cancelUploadPartReached).TrySetResult();
+        await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+    }
 
     public static void RejectNextCommunicationsDeliveries(int count) =>
         Volatile.Write(ref _remainingCommunicationsRejections, count);
@@ -768,7 +946,11 @@ internal static class IdentityServerWorkflowFailureInjection
         Volatile.Write(ref _remainingCommunicationsRejections, 0);
         Volatile.Write(ref _remainingPasswordResetProcessorFailures, 0);
         Volatile.Write(ref _communicationsDeliveryAttemptCount, 0);
+        Interlocked.Exchange(ref _cancelUploadPartReached, NewSignal());
     }
+
+    private static TaskCompletionSource NewSignal() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private static bool ConsumeOne(ref int remaining)
     {
@@ -785,12 +967,15 @@ internal static class IdentityServerWorkflowFailureInjection
 
 internal sealed class FailureInjectingPasswordResetProcessor(AuthService inner) : IPasswordResetProcessor
 {
-    public Task<Result> ProcessForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken ct)
+    public Task<Result> ProcessForgotPasswordAsync(
+        Guid tenantId,
+        ForgotPasswordRequest request,
+        CancellationToken ct)
     {
         if (IdentityServerWorkflowFailureInjection.ConsumePasswordResetProcessorFailure())
             return Task.FromResult(Result.Failure("Injected pre-delivery password reset failure.", 503));
 
-        return inner.ProcessForgotPasswordAsync(request, ct);
+        return inner.ProcessForgotPasswordAsync(tenantId, request, ct);
     }
 }
 
@@ -821,7 +1006,7 @@ internal sealed class TestStorageServiceWrapper(
         EnsureStorageUploadMetadataRequest request,
         CancellationToken ct = default)
     {
-        var tenantId = request.Metadata.TenantId ?? IntegrationTestFixture.TestTenantId;
+        var tenantId = request.Metadata.RequestedTenantId ?? IntegrationTestFixture.TestTenantId;
         var type = await db.Set<StorageFileType>()
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Name == request.ContentType, ct);
@@ -878,7 +1063,7 @@ internal sealed class TestStorageServiceWrapper(
         CreateStorageUploadSessionRequest request,
         CancellationToken ct = default)
     {
-        var tenantId = request.Metadata.TenantId ?? IntegrationTestFixture.TestTenantId;
+        var tenantId = request.Metadata.RequestedTenantId ?? IntegrationTestFixture.TestTenantId;
         var storageFileId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
         var objectKey = $"{tenantId:N}/{storageFileId:N}/{request.FileName}";
@@ -948,7 +1133,7 @@ internal sealed class TestStorageServiceWrapper(
         CancellationToken ct = default)
     {
         if (IdentityServerWorkflowFailureInjection.StorageFailurePoint == TestStorageFailurePoint.CancelUploadPart)
-            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            await IdentityServerWorkflowFailureInjection.BlockUploadPartUntilCanceledAsync(ct);
 
         if (IdentityServerWorkflowFailureInjection.StorageFailurePoint == TestStorageFailurePoint.UploadPart)
         {
@@ -1054,7 +1239,7 @@ internal sealed class TestStorageServiceWrapper(
 
         await using var claimScope = scopeFactory.CreateAsyncScope();
         var claimDb = claimScope.ServiceProvider.GetRequiredService<DbContext>();
-        var tenantId = request.Metadata.TenantId ?? IntegrationTestFixture.TestTenantId;
+        var tenantId = request.Metadata.RequestedTenantId ?? IntegrationTestFixture.TestTenantId;
         var now = DateTime.UtcNow;
         var updated = await claimDb.Set<StorageFile>()
             .IgnoreQueryFilters()
@@ -1107,7 +1292,7 @@ internal sealed class TestStorageServiceWrapper(
         GetStorageFileRequest request,
         CancellationToken ct = default)
     {
-        var tenantId = request.Metadata.TenantId ?? IntegrationTestFixture.TestTenantId;
+        var tenantId = request.Metadata.RequestedTenantId ?? IntegrationTestFixture.TestTenantId;
         var file = await db.Set<StorageFile>()
             .IgnoreQueryFilters()
             .AsNoTracking()

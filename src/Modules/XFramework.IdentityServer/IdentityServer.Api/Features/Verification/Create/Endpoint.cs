@@ -18,7 +18,7 @@ public static class CreateVerificationEndpoint
         IAuthService authService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return VerificationResponseMapper.Map(
             await authService.CreateVerificationAsync(request, ct));
     }

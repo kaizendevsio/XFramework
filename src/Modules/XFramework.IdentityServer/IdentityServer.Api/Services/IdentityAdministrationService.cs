@@ -1,10 +1,12 @@
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Services;
 
 public sealed class IdentityAdministrationService(
     IDataContext dataContext,
-    DbContext dbContext) : IIdentityAdministrationService
+    DbContext dbContext,
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor) : IIdentityAdministrationService
 {
     public async Task<Result<IdentityAdministrationResponse>> CreateAsync(
         CreateIdentityRequest request,
@@ -200,8 +202,8 @@ public sealed class IdentityAdministrationService(
                 .SetProperty(session => session.ConcurrencyStamp, concurrencyStamp), ct);
     }
 
-    private static Result<Guid> ResolveTenantId(RequestMetadata metadata) =>
-        metadata.TenantId is { } tenantId && tenantId != Guid.Empty
+    private Result<Guid> ResolveTenantId(RequestMetadata metadata) =>
+        trustedInvocationContextAccessor.Current?.EffectiveTenantId is { } tenantId && tenantId != Guid.Empty
             ? Result<Guid>.Success(tenantId)
             : Result<Guid>.Forbidden("An authorized tenant context is required");
 

@@ -1,18 +1,13 @@
 using System.Security.Claims;
 using Bolt.Server;
-using IdentityServer.Domain.Shared.Contracts;
 using Communications.Domain.Shared.Contracts;
 using Microsoft.Extensions.DependencyInjection;
-using XFramework.Integration.Abstractions;
+using XFramework.Integration.Security;
 
 namespace Bolt.Hub.Services;
 
-// Approved architecture exception documented in
-// docs/solutions/architecture-patterns/bolt-hub-operational-constraints-and-exceptions.md:
-// the Hub performs read-only Identity/Communications checks to authorize Communications topic access.
 public sealed class CommunicationsBoltTopicAuthorizer(
     IServiceScopeFactory scopeFactory,
-    IJwtService jwtService,
     ILogger<CommunicationsBoltTopicAuthorizer> logger) : IBoltTopicAuthorizer
 {
     private const string Prefix = "communications.tenant.";
@@ -55,40 +50,35 @@ public sealed class CommunicationsBoltTopicAuthorizer(
         if (IsCommunicationsServiceIdentity(context))
             return AuthorizeCommunicationsServiceTopic(context, segments);
 
-        var credentialId = await ResolveCredentialIdAsync(context, ct);
-        if (credentialId is null)
+        if (string.IsNullOrWhiteSpace(context.ActorAccessToken) ||
+            context.ActorAccessToken.Length > MaxActorAccessTokenLength)
             return false;
 
         await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<DbContext>();
-
-        // This system read may run under a tenantless service HttpContext. Replace the
-        // ambient filters with the complete topic-tenant and credential-state boundary.
-        var credentialExists = await db.Set<IdentityCredential>()
-            .IgnoreQueryFilters()
-            .Where(c => c.Id == credentialId.Value)
-            .Where(c => c.TenantId == topicTenantId)
-            .Where(c => !c.IsDeleted && c.IsEnabled)
-            .AnyAsync(ct);
-
-        if (!credentialExists)
+        var actorValidation = await scope.ServiceProvider
+            .GetRequiredService<IActorIdentityProvider>()
+            .ValidateAsync(context.ActorAccessToken, ct);
+        if (!actorValidation.IsValid || actorValidation.Identity is not { } actor || actor.TenantId != topicTenantId)
             return false;
+
+        var credentialId = actor.CredentialId;
+        var db = scope.ServiceProvider.GetRequiredService<DbContext>();
 
         var allowed = context.Operation switch
         {
             BoltTopicOperation.Subscribe or BoltTopicOperation.Unsubscribe => segments[3] switch
             {
                 "user" => context.Durable &&
-                    AuthorizeUserTopic(segments, credentialId.Value) &&
-                    AuthorizeUserSubscriberId(context.SubscriberId, topicTenantId, credentialId.Value),
+                    AuthorizeUserTopic(segments, credentialId) &&
+                    AuthorizeUserSubscriberId(context.SubscriberId, topicTenantId, credentialId),
                 "presence" => !context.Durable,
-                "thread" => !context.Durable && await AuthorizeThreadTopicAsync(db, segments, topicTenantId, credentialId.Value, ct),
+                "thread" => !context.Durable && await AuthorizeThreadTopicAsync(db, segments, topicTenantId, credentialId, ct),
                 _ => false
             },
             BoltTopicOperation.Ack => segments[3] == "user" &&
                 context.Durable &&
-                AuthorizeUserTopic(segments, credentialId.Value) &&
-                AuthorizeUserSubscriberId(context.SubscriberId, topicTenantId, credentialId.Value),
+                AuthorizeUserTopic(segments, credentialId) &&
+                AuthorizeUserSubscriberId(context.SubscriberId, topicTenantId, credentialId),
             BoltTopicOperation.Publish => false,
             _ => false
         };
@@ -199,41 +189,6 @@ public sealed class CommunicationsBoltTopicAuthorizer(
             context.User?.FindFirstValue("azp");
 
         return string.Equals(serviceClaim, CommunicationsServiceClientId, StringComparison.Ordinal);
-    }
-
-    private async Task<Guid?> ResolveCredentialIdAsync(BoltTopicAuthorizationContext context, CancellationToken ct)
-    {
-        var credentialId = ResolveCredentialId(context.User);
-        if (credentialId is not null)
-            return credentialId;
-
-        if (string.IsNullOrWhiteSpace(context.ActorAccessToken) ||
-            context.ActorAccessToken.Length > MaxActorAccessTokenLength)
-            return null;
-
-        try
-        {
-            var (principal, _) = await jwtService.DecodeJwtToken(context.ActorAccessToken);
-            return ResolveCredentialId(principal);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Rejected Communications Bolt topic access because actor access token could not be validated");
-            return null;
-        }
-    }
-
-    private static Guid? ResolveCredentialId(ClaimsPrincipal? user)
-    {
-        var value =
-            user?.FindFirstValue(ClaimTypes.Name) ??
-            user?.FindFirstValue("credential_id") ??
-            user?.FindFirstValue("CredentialId") ??
-            user?.FindFirstValue("sub");
-
-        return Guid.TryParse(value, out var credentialId)
-            ? credentialId
-            : null;
     }
 
     private static bool TryValidateTopicGrammar(

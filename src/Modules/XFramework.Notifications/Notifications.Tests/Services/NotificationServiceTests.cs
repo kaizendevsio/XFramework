@@ -14,6 +14,7 @@ using SmsGateway.Integration.Drivers;
 using NUnit.Framework;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Security;
 
 namespace Notifications.Tests.Services;
 
@@ -24,7 +25,7 @@ public sealed class NotificationServiceTests
     {
         await using var database = await TestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var result = await service.GetPreferencesAsync(database.TenantId, credentialId, CancellationToken.None);
 
@@ -42,7 +43,7 @@ public sealed class NotificationServiceTests
         await using var database = await TestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         database.Context.Set<NotificationInboxItem>().AddRange(
             CreateInboxItem(database.TenantId, credentialId, "Current tenant"),
@@ -68,7 +69,7 @@ public sealed class NotificationServiceTests
         await using var database = await TestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         var correlationId = $"communications:{Guid.NewGuid():N}";
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var request = new CreateNotificationRequest
         {
@@ -101,7 +102,7 @@ public sealed class NotificationServiceTests
         await using var database = await TestDatabase.CreateAsync();
         var credentialId = Guid.NewGuid();
         EnableChannels(database.Context, database.TenantId, credentialId, NotificationDeliveryChannel.Email);
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         var result = await service.CreateNotificationAsync(new CreateNotificationRequest
         {
@@ -143,7 +144,7 @@ public sealed class NotificationServiceTests
             })
             .Build();
 
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
         var create = await service.CreateNotificationAsync(new CreateNotificationRequest
         {
             TenantId = database.TenantId,
@@ -171,7 +172,7 @@ public sealed class NotificationServiceTests
         smsGateway.CreatedRequests[0].AgentClusterId.Should().Be(agentClusterId);
         smsGateway.CreatedRequests[0].Recipient.Should().Be("+15555550123");
         smsGateway.CreatedRequests[0].CorrelationId.Should().Be("sms-test:Sms");
-        smsGateway.CreatedRequests[0].Metadata.TenantId.Should().Be(database.TenantId);
+        smsGateway.CreatedRequests[0].Metadata.RequestedTenantId.Should().Be(database.TenantId);
 
         var job = await database.Context.Set<NotificationDeliveryJob>().SingleAsync();
         job.Status.Should().Be(NotificationDeliveryStatus.Sent);
@@ -186,7 +187,7 @@ public sealed class NotificationServiceTests
         database.Context.Set<NotificationInboxItem>().Add(item);
         await database.Context.SaveChangesAsync();
 
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
         var result = await service.MarkReadAsync(new MarkNotificationReadRequest
         {
             TenantId = database.TenantId,
@@ -212,7 +213,7 @@ public sealed class NotificationServiceTests
         database.Context.Set<NotificationInboxItem>().Add(item);
         await database.Context.SaveChangesAsync();
 
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
 
         foreach (var status in new[]
                  {
@@ -262,7 +263,7 @@ public sealed class NotificationServiceTests
         });
         await database.Context.SaveChangesAsync();
 
-        var service = CreateService(database.Context);
+        var service = CreateService(database.Context, database.TenantId);
         var result = await service.RecordDeliveryStatusAsync(new RecordNotificationDeliveryStatusRequest
         {
             TenantId = database.TenantId,
@@ -276,8 +277,27 @@ public sealed class NotificationServiceTests
         result.Message.Should().Contain("Cannot transition");
     }
 
-    private static NotificationService CreateService(AppDbContext db) =>
-        new(db, NullLogger<NotificationService>.Instance, new ConfigurationBuilder().Build());
+    private static NotificationService CreateService(AppDbContext db, Guid tenantId) =>
+        new(db, NullLogger<NotificationService>.Instance, new TestInvocationContextAccessor(tenantId));
+
+    private sealed class TestInvocationContextAccessor(Guid tenantId) : ITrustedInvocationContextAccessor
+    {
+        public TrustedInvocationContext Current { get; } =
+            new(
+                new TrustedActorIdentity(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    tenantId,
+                    Guid.NewGuid(),
+                    new HashSet<string>(StringComparer.Ordinal) { "notifications-test" },
+                    new HashSet<string>(StringComparer.Ordinal),
+                    "notifications-tests-g1",
+                    DateTimeOffset.UtcNow.AddHours(1)),
+                null,
+                tenantId,
+                null,
+                Guid.NewGuid());
+    }
 
     private static void EnableChannels(
         AppDbContext db,
@@ -362,7 +382,12 @@ public sealed class NotificationServiceTests
                 })
                 .Build();
 
-            var context = new AppDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor(), configuration);
+            var context = new AppDbContext(
+                options,
+                new Microsoft.AspNetCore.Http.HttpContextAccessor(),
+                configuration,
+                new TestEffectiveTenantContextAccessor(tenantId),
+                new TestCrossTenantWriteAuthorizationAccessor());
 
             _ = typeof(NotificationInboxItem).Assembly;
             await context.Database.EnsureCreatedAsync();
@@ -374,6 +399,19 @@ public sealed class NotificationServiceTests
         {
             await Context.DisposeAsync();
             await connection.DisposeAsync();
+        }
+
+        private sealed class TestEffectiveTenantContextAccessor(Guid tenantId)
+            : XFramework.Domain.Shared.Security.IEffectiveTenantContextAccessor
+        {
+            public bool HasTrustedInvocation => true;
+            public Guid? EffectiveTenantId => tenantId;
+        }
+
+        private sealed class TestCrossTenantWriteAuthorizationAccessor
+            : XFramework.Domain.Shared.Security.ICrossTenantWriteAuthorizationAccessor
+        {
+            public bool IsAuthorized => true;
         }
     }
 }

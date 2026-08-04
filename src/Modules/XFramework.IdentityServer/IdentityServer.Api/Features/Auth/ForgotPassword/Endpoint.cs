@@ -1,11 +1,15 @@
 using FluentValidation;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.Auth.ForgotPassword;
 
 public static class ForgotPasswordEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.Optional,
+        TenantAccessMode = TenantAccessMode.PublicTenantLookup,
+        AllowAnonymous = true)]
     [MapPost("/api/auth/forgot-password", Tags = ["Auth"],
         Summary = "Request a password reset",
         Description = "Initiates a password reset flow by generating a reset token and sending it via email or SMS. Does not reveal if the account exists.",

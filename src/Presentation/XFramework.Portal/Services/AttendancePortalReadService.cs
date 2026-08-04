@@ -507,13 +507,11 @@ public sealed class AttendancePortalReadService(
 
     private RequestMetadata BuildMetadata(Guid tenantId) => new()
     {
-        TenantId = tenantId,
-        CredentialId = requestMetadata.CredentialId,
-        SessionId = requestMetadata.SessionId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
-        Name = requestMetadata.Name ?? "Portal",
+        OperationName = requestMetadata.OperationName ?? "Portal",
         DeviceName = requestMetadata.DeviceName,
-        DeviceAgent = requestMetadata.DeviceAgent,
+        UserAgent = requestMetadata.UserAgent,
         IpAddress = requestMetadata.IpAddress
     };
 

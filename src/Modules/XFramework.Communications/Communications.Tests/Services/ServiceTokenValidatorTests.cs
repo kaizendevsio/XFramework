@@ -66,7 +66,7 @@ public sealed class ServiceTokenValidatorTests
     }
 
     [Test]
-    public async Task ValidateAsync_CallerGenerationDifferentFromReceiver_ReturnsValid()
+    public async Task ValidateAsync_RetiredCallerGeneration_ReturnsInvalid()
     {
         var fixture = CreateTokenFixture(
             XFrameworkServiceNames.Communications,
@@ -77,7 +77,8 @@ public sealed class ServiceTokenValidatorTests
             fixture.Token,
             XFrameworkServiceNames.Communications);
 
-        Assert.That(result.IsValid, Is.True, result.Error);
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.Error, Does.Contain("generation is not accepted"));
     }
 
     [Test]
@@ -96,6 +97,25 @@ public sealed class ServiceTokenValidatorTests
     }
 
     [Test]
+    public async Task ValidateAsync_MissingGenerationProvider_FailsClosed()
+    {
+        var fixture = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+        var validator = new ServiceTokenValidator(
+            new SigningKeyOnlyProvider(fixture.PublicKeyPem, fixture.KeyId),
+            Options.Create(ValidationOptions()),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ServiceTokenValidator>.Instance);
+
+        var result = await validator.ValidateAsync(
+            fixture.Token,
+            XFrameworkServiceNames.Communications);
+
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.Error, Does.Contain("generation is not accepted"));
+    }
+
+    [Test]
     public async Task ValidateAsync_CallerGenerationMatchingReceiverFallback_ReturnsValid()
     {
         const string fallbackGeneration = "generation-0";
@@ -104,7 +124,10 @@ public sealed class ServiceTokenValidatorTests
             [XFrameworkServiceScopes.CommunicationsAdmin],
             generationId: fallbackGeneration);
         var validator = new ServiceTokenValidator(
-            new TestSigningKeyProvider(fixture.PublicKeyPem, fixture.KeyId),
+            new TestSigningKeyProvider(
+                fixture.PublicKeyPem,
+                fixture.KeyId,
+                [CurrentGeneration, fallbackGeneration]),
             Options.Create(new ServiceIdentityOptions
             {
                 Issuer = Issuer,
@@ -224,6 +247,32 @@ public sealed class ServiceTokenValidatorTests
         Assert.That(first.IsValid, Is.True, first.Error);
         Assert.That(second.IsValid, Is.True, second.Error);
         Assert.That(keyProvider.RequestCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ValidateAsync_CachedToken_IsRejectedWhenCallerGenerationIsRetired()
+    {
+        var fixture = CreateTokenFixture(
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.CommunicationsAdmin]);
+        var keyProvider = new TestSigningKeyProvider(fixture.PublicKeyPem, fixture.KeyId);
+        var validator = new ServiceTokenValidator(
+            keyProvider,
+            Options.Create(ValidationOptions()),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ServiceTokenValidator>.Instance);
+
+        var first = await validator.ValidateAsync(
+            fixture.Token,
+            XFrameworkServiceNames.Communications);
+        keyProvider.RetireGeneration(CurrentGeneration);
+        var second = await validator.ValidateAsync(
+            fixture.Token,
+            XFrameworkServiceNames.Communications);
+
+        Assert.That(first.IsValid, Is.True, first.Error);
+        Assert.That(second.IsValid, Is.False);
+        Assert.That(second.Error, Does.Contain("generation is not accepted"));
+        Assert.That(keyProvider.RequestCount, Is.EqualTo(1), "the JWT signature may remain cached while generation policy is rechecked");
     }
 
     [Test]
@@ -425,10 +474,20 @@ public sealed class ServiceTokenValidatorTests
         GenerationId = CurrentGeneration
     };
 
-    private sealed class TestSigningKeyProvider(string publicKeyPem, string keyId) : IIdentitySigningKeyProvider
+    private sealed class TestSigningKeyProvider(
+        string publicKeyPem,
+        string keyId,
+        IReadOnlyCollection<string>? acceptedGenerations = null)
+        : IIdentitySigningKeyProvider, IServiceCredentialGenerationProvider
     {
+        private readonly HashSet<string> _acceptedGenerations =
+            (acceptedGenerations ?? [CurrentGeneration]).ToHashSet(StringComparer.Ordinal);
+
         public int RequestCount { get; private set; }
         public bool FailRequests { get; set; }
+
+        public void RetireGeneration(string generationId) =>
+            _acceptedGenerations.Remove(generationId);
 
         public Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
             string? kid = null,
@@ -453,6 +512,12 @@ public sealed class ServiceTokenValidatorTests
 
             return Task.FromResult(keys);
         }
+
+        public Task<bool> IsAcceptedAsync(
+            string clientId,
+            string generationId,
+            CancellationToken ct = default) =>
+            Task.FromResult(_acceptedGenerations.Contains(generationId));
     }
 
     private sealed class CancelingSigningKeyProvider : IIdentitySigningKeyProvider
@@ -460,5 +525,24 @@ public sealed class ServiceTokenValidatorTests
         public Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
             string? keyId = null,
             CancellationToken ct = default) => Task.FromCanceled<IReadOnlyList<ServiceSigningKeyResponse>>(ct);
+    }
+
+    private sealed class SigningKeyOnlyProvider(string publicKeyPem, string keyId) : IIdentitySigningKeyProvider
+    {
+        public Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
+            string? requestedKeyId = null,
+            CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<ServiceSigningKeyResponse>>(
+            [
+                new ServiceSigningKeyResponse
+                {
+                    KeyId = keyId,
+                    Algorithm = "RS256",
+                    PublicKeyPem = publicKeyPem,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    ActivatedAtUtc = DateTime.UtcNow,
+                    IsActive = true
+                }
+            ]);
     }
 }

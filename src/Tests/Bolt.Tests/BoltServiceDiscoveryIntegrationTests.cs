@@ -14,8 +14,11 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.Security;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Bolt.Tests;
 
@@ -40,6 +43,9 @@ public sealed class BoltServiceDiscoveryIntegrationTests
         builder.WebHost.UseUrls($"http://localhost:{_port}");
         builder.Services.AddDbContext<DbContext, AppDbContext>(options =>
             options.UseInMemoryDatabase(_databaseName));
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton<IEffectiveTenantContextAccessor, TrustedTenantlessContextAccessor>();
+        builder.Services.AddScoped<ITrustedServiceTargetContextInitializer, TrustedTenantlessInitializer>();
         builder.Services.AddBoltServer(options =>
             options.RegistrationIdentityBindingMode = BoltRegistrationIdentityBindingMode.Enforce);
         builder.Services.AddMemoryCache();
@@ -74,6 +80,41 @@ public sealed class BoltServiceDiscoveryIntegrationTests
         _ = Task.Run(() => _hubApp.RunAsync());
         await WaitForHealth($"http://localhost:{_port}/health");
         _loggerFactory = _hubApp.Services.GetRequiredService<ILoggerFactory>();
+    }
+
+    private sealed class TrustedTenantlessContextAccessor : IEffectiveTenantContextAccessor
+    {
+        public bool HasTrustedInvocation => true;
+        public Guid? EffectiveTenantId => null;
+    }
+
+    private sealed class TrustedTenantlessInitializer : ITrustedServiceTargetContextInitializer
+    {
+        public Task<TrustedInvocationResult> EstablishAsync(
+            Guid targetTenantId,
+            string audience,
+            IReadOnlyCollection<string> requiredServiceScopes,
+            string allowedServiceCaller,
+            Guid? correlationId = null,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TrustedInvocationResult> EstablishTenantlessAsync(
+            string audience,
+            IReadOnlyCollection<string> requiredServiceScopes,
+            string allowedServiceCaller,
+            Guid? correlationId = null,
+            CancellationToken ct = default) =>
+            Task.FromResult(TrustedInvocationResult.Success(new TrustedInvocationContext(
+                null,
+                new TrustedServiceIdentity(
+                    XFrameworkServiceNames.BoltHub,
+                    XFrameworkServiceNames.BoltHub,
+                    new HashSet<string>(requiredServiceScopes, StringComparer.OrdinalIgnoreCase),
+                    "bolt-tests-g1"),
+                null,
+                null,
+                correlationId ?? Guid.NewGuid())));
     }
 
     [TearDown]

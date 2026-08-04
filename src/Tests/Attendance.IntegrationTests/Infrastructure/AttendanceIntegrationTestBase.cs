@@ -1,5 +1,6 @@
 using Attendance.Api.Services;
 using Attendance.Integration.Drivers;
+using Attendance.IntegrationTests.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using XFramework.Domain.Contexts;
@@ -31,16 +32,19 @@ public abstract class AttendanceIntegrationTestBase
         AttendanceIntegrationTestFixture.CreateDbContext();
 
     protected static AttendanceService CreateService(AppDbContext db) =>
-        new(db, NullLogger<AttendanceService>.Instance);
+        new(
+            db,
+            NullLogger<AttendanceService>.Instance,
+            new AttendanceTestInvocationContextAccessor(AttendanceIntegrationTestFixture.TestTenantId));
 
     protected static RequestMetadata CreateMetadata(Guid? tenantId = null) => new()
     {
-        TenantId = tenantId ?? AttendanceIntegrationTestFixture.TestTenantId,
+        RequestedTenantId = tenantId ?? AttendanceIntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "AttendanceIntegrationTest",
+        OperationName = "AttendanceIntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 
     protected static string UniqueCode(string prefix) =>

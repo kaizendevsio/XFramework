@@ -32,6 +32,7 @@ using XFramework.Domain.Shared.Extensions;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Extensions;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Security;
 using XFramework.TestInfrastructure;
 
 namespace Storage.IntegrationTests;
@@ -46,12 +47,21 @@ public sealed class StorageIntegrationTestFixture
     private const string TestClientSecret = "storage-integration-client-secret-2026";
     private static readonly Guid TestIdentityId = Guid.Parse("74c5c42e-8035-454f-a3ba-da3844759c6f");
     public static readonly Guid TestCredentialId = Guid.Parse("ef70fc0d-eed3-4b97-a111-808b31e0cd4c");
+    private static readonly TestInvocationIdentityOptions InvocationIdentity = new(
+        "storage-test-actor-token",
+        "storage-test-service-token",
+        XFrameworkServiceNames.Portal,
+        TestConstants.TenantId,
+        TestCredentialId,
+        TestIdentityId,
+        Guid.Parse("00000000-0000-0000-0000-000000000833"));
 
     private static PostgreSqlContainer postgres = null!;
     private static bool ownsPostgresContainer;
     private static WebApplication boltApp = null!;
     private static WebApplication storageApp = null!;
     private static WebApplication testClientApp = null!;
+    private static IServiceScope testClientScope = null!;
     private static Task? boltTask;
     private static Task? storageTask;
     private static Task? testClientTask;
@@ -68,7 +78,7 @@ public sealed class StorageIntegrationTestFixture
     public static IntegrationStorageObjectProvider Provider { get; } = new();
 
     public static IStorageServiceWrapper ServiceWrapper =>
-        testClientApp.Services.GetRequiredService<IStorageServiceWrapper>();
+        testClientScope.ServiceProvider.GetRequiredService<IStorageServiceWrapper>();
 
     public static IDataContext DataContext =>
         testClientApp.Services.CreateScope().ServiceProvider.GetRequiredService<IDataContext>();
@@ -125,6 +135,7 @@ public sealed class StorageIntegrationTestFixture
 
         testClientApp = StartTestClient();
         await TestHostWaiter.WaitForHealth($"{TestClientUrl}/health/live", testClientTask);
+        testClientScope = testClientApp.Services.CreateScope();
 
         await WaitForBoltClients();
     }
@@ -132,6 +143,7 @@ public sealed class StorageIntegrationTestFixture
     [OneTimeTearDown]
     public async Task GlobalTeardown()
     {
+        try { testClientScope?.Dispose(); } catch { }
         await StopApplicationAsync(testClientApp);
         await StopApplicationAsync(storageApp);
         await StopApplicationAsync(boltApp);
@@ -189,7 +201,11 @@ public sealed class StorageIntegrationTestFixture
             })
             .Build();
 
-        return new AppDbContext(options, new HttpContextAccessor(), configuration);
+        return new AppDbContext(
+            options,
+            new HttpContextAccessor(),
+            configuration,
+            new XFramework.TestInfrastructure.TestEffectiveTenantContextAccessor(TestTenantId));
     }
 
     private static WebApplication StartBolt()
@@ -199,7 +215,7 @@ public sealed class StorageIntegrationTestFixture
             EnvironmentName = Environments.Development
         });
         builder.WebHost.UseUrls(BoltUrl);
-        OverrideConfig(builder, "Bolt.StorageTest", "00000000-0000-0000-0000-000000000690", BoltUrl);
+        OverrideConfig(builder, "Bolt.StorageTest", BoltUrl);
         builder.Services.InstallServicesInAssembly<Bolt.Hub.Installers.BoltInstaller>(
             builder.Configuration,
             builder.Environment);
@@ -208,6 +224,7 @@ public sealed class StorageIntegrationTestFixture
         builder.Services.InstallJwt(builder.Configuration);
         builder.Services.InstallStandardServices<Bolt.Hub.Installers.BoltInstaller>(builder.Configuration);
         builder.Services.InstallRuntimeServices(builder.Configuration);
+        builder.Services.AddTestInvocationClient(InvocationIdentity);
 
         var app = (WebApplication)builder.Build();
         MapTestTokenAuthority(app, builder.Configuration);
@@ -227,7 +244,6 @@ public sealed class StorageIntegrationTestFixture
         OverrideConfig(
             builder,
             XFrameworkServiceNames.Storage,
-            "2cc8a10f-54f1-44da-99e4-d49e3f663d19",
             StorageUrl);
         builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
@@ -253,6 +269,7 @@ public sealed class StorageIntegrationTestFixture
             .AddScheme<AuthenticationSchemeOptions, StorageTestAuthHandler>("StorageTest", _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddTestInvocationServer(InvocationIdentity);
         builder.Services.AddDataContextHandler(typeof(StorageService).Assembly);
 
         var app = (WebApplication)builder.Build();
@@ -283,11 +300,11 @@ public sealed class StorageIntegrationTestFixture
         builder.WebHost.UseUrls(TestClientUrl);
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["BoltConfiguration:ClientName"] = "StorageTestClient",
+            ["BoltConfiguration:ClientName"] = XFrameworkServiceNames.Portal,
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["BoltConfiguration:GenerateServiceAccessToken"] = "false",
-            ["ServiceIdentity:ClientId"] = "StorageTestClient",
+            ["ServiceIdentity:ClientId"] = XFrameworkServiceNames.Portal,
             ["ServiceIdentity:Authority"] = BoltUrl,
             ["ServiceIdentity:AllowInsecureHttp"] = "true",
             ["ServiceIdentity:GenerationId"] = TestClientGenerationId,
@@ -306,11 +323,12 @@ public sealed class StorageIntegrationTestFixture
         builder.Services.InstallStandardServices<StorageIntegrationTestFixture>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("StorageTest"));
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddTestInvocationClient(InvocationIdentity);
         builder.Services.AddStorageWrapperServices();
         builder.Services.AddRemoteDataContext();
         builder.Services.AddScoped(_ => new RequestMetadata
         {
-            TenantId = TestTenantId,
+            RequestedTenantId = TestTenantId,
             RequestId = Guid.NewGuid()
         });
 
@@ -383,14 +401,13 @@ public sealed class StorageIntegrationTestFixture
     private static void OverrideConfig(
         WebApplicationBuilder builder,
         string clientName,
-        string clientGuid,
         string serverUrl)
     {
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = ConnectionString,
             ["DefaultDatabaseConnection"] = ConnectionString,
-            ["BoltConfiguration:ClientGuid"] = clientGuid,
+            ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ClientName"] = clientName,
             ["BoltConfiguration:GenerateServiceAccessToken"] = "false",
             ["ServiceIdentity:ClientId"] = clientName,
@@ -413,7 +430,7 @@ public sealed class StorageIntegrationTestFixture
                 XFrameworkServiceScopes.BoltService,
                 XFrameworkServiceScopes.StorageRead,
                 XFrameworkServiceScopes.StorageWrite),
-            ["ServiceIdentity:Clients:1:ClientId"] = "StorageTestClient",
+            ["ServiceIdentity:Clients:1:ClientId"] = XFrameworkServiceNames.Portal,
             ["ServiceIdentity:Clients:1:GenerationId"] = TestClientGenerationId,
             ["ServiceIdentity:Clients:1:ClientSecret"] = TestClientSecret,
             ["ServiceIdentity:Clients:1:AllowedAudiences"] = XFrameworkServiceNames.Storage,
@@ -501,7 +518,7 @@ public sealed class StorageIntegrationTestFixture
         var generationId = request.ClientId switch
         {
             XFrameworkServiceNames.Storage when SecretsMatch(request.ClientSecret, StorageServiceSecret) => StorageServiceGenerationId,
-            "StorageTestClient" when SecretsMatch(request.ClientSecret, TestClientSecret) => TestClientGenerationId,
+            XFrameworkServiceNames.Portal when SecretsMatch(request.ClientSecret, TestClientSecret) => TestClientGenerationId,
             _ => null
         };
         if (generationId is null)
@@ -562,7 +579,7 @@ public sealed class StorageIntegrationTestFixture
     private static string? ResolveCredentialGeneration(string clientId, string? clientSecret) => clientId switch
     {
         XFrameworkServiceNames.Storage when SecretsMatch(clientSecret, StorageServiceSecret) => StorageServiceGenerationId,
-        "StorageTestClient" when SecretsMatch(clientSecret, TestClientSecret) => TestClientGenerationId,
+        XFrameworkServiceNames.Portal when SecretsMatch(clientSecret, TestClientSecret) => TestClientGenerationId,
         _ => null
     };
 
@@ -595,7 +612,11 @@ public sealed class StorageIntegrationTestFixture
             .UseNpgsql(ConnectionString)
             .Options;
 
-        await using var db = new AppDbContext(options);
+        await using var db = new AppDbContext(
+            options,
+            new HttpContextAccessor(),
+            new ConfigurationBuilder().Build(),
+            new XFramework.TestInfrastructure.TestEffectiveTenantContextAccessor(TestTenantId));
         await db.Database.MigrateAsync();
         await TestSeedData.SeedAll(db);
         await SeedStorageReferenceData(db);

@@ -12,9 +12,8 @@ namespace Wallets.Api.Services;
 public sealed class WalletPaymentWebhookService(
     DbContext dbContext,
     IConfiguration configuration,
-    IHttpContextAccessor httpContextAccessor,
     IWalletFeatureGateService featureGateService,
-    IWalletWorkflowService workflowService) : IWalletPaymentWebhookService
+    IWalletProviderWorkflowService providerWorkflowService) : IWalletPaymentWebhookService
 {
     public async Task<Result<WalletWebhookIngestResponse>> IngestAsync(
         IngestWalletPaymentWebhookRequest request,
@@ -52,13 +51,6 @@ public sealed class WalletPaymentWebhookService(
             return Result<WalletWebhookIngestResponse>.Failure("Webhook tenant context is required", 400);
         }
 
-        if (request.Metadata.TenantId is { } metadataTenantId &&
-            metadataTenantId != Guid.Empty &&
-            metadataTenantId != tenantId.Value)
-        {
-            return Result<WalletWebhookIngestResponse>.Forbidden("Webhook tenant does not match trusted provider context");
-        }
-
         var feature = await featureGateService.EnsureEnabledAsync(
             tenantId.Value,
             TenantModuleFeatureKeys.WalletsWebhooks,
@@ -66,13 +58,6 @@ public sealed class WalletPaymentWebhookService(
         if (!feature.IsSuccess)
         {
             return Result<WalletWebhookIngestResponse>.Failure(feature.Message!, feature.StatusCode);
-        }
-
-        request.Metadata.TenantId = tenantId.Value;
-        if (httpContextAccessor.HttpContext is { } httpContext)
-        {
-            httpContext.Items["TenantId"] = tenantId.Value;
-            httpContext.Items["WalletsPrivilegedActor"] = true;
         }
 
         var webhookEvent = await dbContext.Set<WalletPaymentWebhookEvent>()
@@ -139,12 +124,20 @@ public sealed class WalletPaymentWebhookService(
             Result<WalletWorkflowResponse> workflowResult;
             if (deposit is not null)
             {
-                workflowResult = await DispatchDepositWebhookAsync(mappedStatus, action, ct);
+                workflowResult = await providerWorkflowService.ApplyDepositStatusAsync(
+                    tenantId.Value,
+                    mappedStatus,
+                    action,
+                    ct);
                 webhookEvent.DepositRequestId = deposit.Id;
             }
             else
             {
-                workflowResult = await DispatchWithdrawalWebhookAsync(mappedStatus, action, ct);
+                workflowResult = await providerWorkflowService.ApplyWithdrawalStatusAsync(
+                    tenantId.Value,
+                    mappedStatus,
+                    action,
+                    ct);
                 webhookEvent.WithdrawalRequestId = withdrawal!.Id;
             }
 
@@ -353,42 +346,6 @@ public sealed class WalletPaymentWebhookService(
             "expired" => WalletWorkflowStatus.Expired,
             "rejected" => WalletWorkflowStatus.Rejected,
             _ => WalletWorkflowStatus.Failed
-        };
-
-    private Task<Result<WalletWorkflowResponse>> DispatchDepositWebhookAsync(
-        WalletWorkflowStatus mappedStatus,
-        WalletWorkflowActionRequest request,
-        CancellationToken ct) =>
-        mappedStatus switch
-        {
-            WalletWorkflowStatus.Completed => workflowService.SettleDepositAsync(request, ct),
-            WalletWorkflowStatus.Cancelled or WalletWorkflowStatus.Expired => workflowService.CancelDepositAsync(
-                request with { Reason = request.Reason ?? $"Provider status: {request.ProviderStatus ?? mappedStatus.ToString()}" },
-                ct),
-            WalletWorkflowStatus.Rejected => workflowService.RejectDepositAsync(
-                request with { Reason = request.Reason ?? $"Provider status: {request.ProviderStatus ?? mappedStatus.ToString()}" },
-                ct),
-            _ => workflowService.FailDepositAsync(
-                request with { Reason = request.Reason ?? $"Provider status: {request.ProviderStatus ?? mappedStatus.ToString()}" },
-                ct)
-        };
-
-    private Task<Result<WalletWorkflowResponse>> DispatchWithdrawalWebhookAsync(
-        WalletWorkflowStatus mappedStatus,
-        WalletWorkflowActionRequest request,
-        CancellationToken ct) =>
-        mappedStatus switch
-        {
-            WalletWorkflowStatus.Completed => workflowService.SettleWithdrawalAsync(request, ct),
-            WalletWorkflowStatus.Cancelled or WalletWorkflowStatus.Expired => workflowService.CancelWithdrawalAsync(
-                request with { Reason = request.Reason ?? $"Provider status: {request.ProviderStatus ?? mappedStatus.ToString()}" },
-                ct),
-            WalletWorkflowStatus.Rejected => workflowService.RejectWithdrawalAsync(
-                request with { Reason = request.Reason ?? $"Provider status: {request.ProviderStatus ?? mappedStatus.ToString()}" },
-                ct),
-            _ => workflowService.FailWithdrawalAsync(
-                request with { Reason = request.Reason ?? $"Provider status: {request.ProviderStatus ?? mappedStatus.ToString()}" },
-                ct)
         };
 
     private async Task<DepositRequest?> FindDepositAsync(

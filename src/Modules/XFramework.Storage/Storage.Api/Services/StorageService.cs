@@ -15,9 +15,7 @@ public sealed partial class StorageService(
     AppDbContext db,
     IStorageProviderFactory providerFactory,
     IOptions<StorageOptions> options,
-    IHttpContextAccessor httpContextAccessor,
-    IConfiguration configuration,
-    ITrustedServiceInvocationResolver? serviceInvocationResolver,
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     ILogger<StorageService> logger)
 {
     private readonly StorageOptions storageOptions = options.Value;
@@ -1073,54 +1071,24 @@ public sealed partial class StorageService(
                 .AsNoTracking()
                 .FirstOrDefaultAsync(bucket => bucket.Id == tenantBucketId && bucket.TenantId == tenantId, ct);
 
-    private async Task<Result<Guid>> ResolveTenantIdAsync(
+    private Task<Result<Guid>> ResolveTenantIdAsync(
         RequestMetadata? metadata,
         CancellationToken ct)
     {
-        var httpContext = httpContextAccessor.HttpContext;
-        var trustedInvocation = httpContext is null
-            ? await ResolveTrustedServerMetadataAsync(metadata, ct)
-            : null;
-        var isSignedInternalRequest = trustedInvocation is not null;
-        var trustedTenantId = TryGetClaimGuid(httpContext?.User, "tenant_id", "tenantId", "TenantId", "tenant", "tid")
-            ?? TryGetItemGuid(httpContext, "TenantId")
-            ?? (isSignedInternalRequest ? metadata?.TenantId : null);
-
-        if (trustedTenantId is null && httpContext?.User?.Identity?.IsAuthenticated != true)
-        {
-            trustedTenantId = Guid.TryParse(configuration["Tenant:DefaultId"], out var defaultTenantId)
-                ? defaultTenantId
-                : null;
-        }
+        ct.ThrowIfCancellationRequested();
+        var trustedTenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId;
 
         if (trustedTenantId is null || trustedTenantId.Value == Guid.Empty)
-            return Result<Guid>.Failure("Tenant context is required", 400);
+            return Task.FromResult(Result<Guid>.Failure("Tenant context is required", 400));
 
-        if (metadata?.TenantId is { } metadataTenantId &&
+        if (metadata?.RequestedTenantId is { } metadataTenantId &&
             metadataTenantId != Guid.Empty &&
             metadataTenantId != trustedTenantId.Value)
         {
-            return Result<Guid>.Forbidden("Request tenant does not match trusted tenant context");
+            return Task.FromResult(Result<Guid>.Forbidden("Request tenant does not match trusted tenant context"));
         }
 
-        return Result<Guid>.Success(trustedTenantId.Value);
-    }
-
-    private async Task<TrustedServiceInvocation?> ResolveTrustedServerMetadataAsync(
-        RequestMetadata? metadata,
-        CancellationToken ct)
-    {
-        if (serviceInvocationResolver is null)
-            return null;
-
-        var result = await serviceInvocationResolver.ResolveAsync(
-            metadata,
-            configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.Storage,
-            [XFrameworkServiceScopes.BoltService],
-            requireTenant: true,
-            ct: ct);
-
-        return result.IsSuccess ? result.Invocation : null;
+        return Task.FromResult(Result<Guid>.Success(trustedTenantId.Value));
     }
 
     private static Result<T> TenantFailure<T>(Result<Guid> tenantResult) =>

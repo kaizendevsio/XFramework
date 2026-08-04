@@ -217,6 +217,9 @@ public sealed class IdentityServerPersistenceRemediationTests : IntegrationTestB
         accessor.HttpContext = new DefaultHttpContext();
         var commandCounter = IntegrationTestFixture.Services.GetRequiredService<DbCommandCounterInterceptor>();
         using var measurement = commandCounter.BeginMeasurement();
+        IntegrationTestFixture.EstablishTrustedServiceTargetContext(
+            scope.ServiceProvider,
+            IntegrationTestFixture.TestTenantId);
 
         var result = await scope.ServiceProvider.GetRequiredService<IAuthService>()
             .AuthenticateAsync(new AuthenticateIdentityRequest
@@ -381,11 +384,10 @@ public sealed class IdentityServerPersistenceRemediationTests : IntegrationTestB
 
     private static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = IntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = nameof(IdentityServerPersistenceRemediationTests),
+        OperationName = nameof(IdentityServerPersistenceRemediationTests),
         DeviceName = "IntegrationTest",
-        DeviceAgent = "IntegrationTest"
+        UserAgent = "IntegrationTest"
     };
 }

@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext.Cache;
 using Microsoft.Extensions.Logging;
+using XFramework.Integration.Security;
 
 namespace XFramework.Integration.DataContext;
 
@@ -11,18 +12,21 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
     private readonly IClientCacheService _cache;
     private readonly CachePolicy _policy;
     private readonly ILogger _logger;
+    private readonly ITrustedInvocationContextAccessor _invocationContextAccessor;
     private bool _noCache;
 
     public CachingQuery(
         IRemoteQuery<T> inner,
         IClientCacheService cache,
         CachePolicy policy,
-        ILogger logger)
+        ILogger logger,
+        ITrustedInvocationContextAccessor invocationContextAccessor)
     {
         _inner = inner;
         _cache = cache;
         _policy = policy;
         _logger = logger;
+        _invocationContextAccessor = invocationContextAccessor;
     }
 
     // All builder methods delegate to inner and return this wrapper
@@ -124,13 +128,17 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
     private bool ShouldUseCache =>
         _policy.Enabled &&
         !_noCache &&
-        _inner is RemoteQuery<T> { Metadata.TenantId: { } tenantId } &&
+        _inner is RemoteQuery<T> &&
+        _invocationContextAccessor.Current?.EffectiveTenantId is { } tenantId &&
         tenantId != Guid.Empty;
 
     private string GetCacheKey()
     {
         if (_inner is RemoteQuery<T> remoteQuery)
-            return CacheKeyBuilder.ForQuery<T>(remoteQuery.Descriptor, remoteQuery.Metadata!);
+            return CacheKeyBuilder.ForQuery<T>(
+                remoteQuery.Descriptor,
+                _invocationContextAccessor.Current
+                    ?? throw new InvalidOperationException("A trusted invocation context is required for caching."));
 
         // Fallback for non-remote queries
         return $"{typeof(T).Name}:query:{Guid.NewGuid()}";

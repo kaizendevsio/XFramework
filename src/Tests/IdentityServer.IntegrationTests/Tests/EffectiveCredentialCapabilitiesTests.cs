@@ -140,6 +140,10 @@ public sealed class EffectiveCredentialCapabilitiesTests : IntegrationTestBase
     {
         var scenario = await SeedScenario(MissingPermissionBehavior.Allow, roleCount: 101);
         await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+        IntegrationTestFixture.EstablishTrustedActorContext(
+            scope.ServiceProvider,
+            scenario.TenantId,
+            scenario.CredentialId);
         var service = scope.ServiceProvider.GetRequiredService<IIdentityAuthorizationService>();
 
         var result = await service.CheckCredentialCapabilityAsync(new CheckCredentialCapabilityRequest
@@ -150,10 +154,7 @@ public sealed class EffectiveCredentialCapabilitiesTests : IntegrationTestBase
             CapabilityKey = IdentityAuthorizationConstants.View,
             Metadata = new RequestMetadata
             {
-                TenantId = scenario.TenantId,
-                CredentialId = scenario.CredentialId,
-                RequestId = Guid.NewGuid(),
-                HasTrustedActorContext = true
+                RequestId = Guid.NewGuid()
             }
         });
 
@@ -215,6 +216,10 @@ public sealed class EffectiveCredentialCapabilitiesTests : IntegrationTestBase
         CapabilityScenario scenario)
     {
         await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+        IntegrationTestFixture.EstablishTrustedActorContext(
+            scope.ServiceProvider,
+            scenario.TenantId,
+            scenario.CredentialId);
         var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
         accessor.HttpContext = new DefaultHttpContext
         {
@@ -234,10 +239,7 @@ public sealed class EffectiveCredentialCapabilitiesTests : IntegrationTestBase
                     CredentialId = scenario.CredentialId,
                     Metadata = new RequestMetadata
                     {
-                        TenantId = scenario.TenantId,
-                        CredentialId = scenario.CredentialId,
-                        RequestId = Guid.NewGuid(),
-                        HasTrustedActorContext = true
+                        RequestId = Guid.NewGuid()
                     }
                 });
         }

@@ -1,5 +1,6 @@
 using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Integration.Extensions;
 using Storage.Api.Features.Sessions.UploadPart;
 using Storage.Api.Generated;
 using XFramework.Core.DataContext;
@@ -11,6 +12,7 @@ using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
 builder.Logging.AddXFrameworkLogging(builder.Configuration);
+builder.Services.AddIdentityServerSessionValidation();
 
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Storage.Api");
 builder.Services.AddXFrameworkHealthChecks<AppDbContext>(

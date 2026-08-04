@@ -72,6 +72,6 @@ public static class NotificationsServiceWrapperExtensions
 {
     public static void AddNotificationsWrapperServices(this IServiceCollection services)
     {
-        services.AddSingleton<INotificationsServiceWrapper, NotificationsServiceWrapper>();
+        services.AddScoped<INotificationsServiceWrapper, NotificationsServiceWrapper>();
     }
 }

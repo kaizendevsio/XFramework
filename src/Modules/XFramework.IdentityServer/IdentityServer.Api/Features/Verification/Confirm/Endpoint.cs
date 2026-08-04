@@ -1,5 +1,8 @@
 using FluentValidation;
 using IdentityServer.Api.Features.Verification;
+using XFramework.Core.Services.FeatureGates;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Security;
 using PatchVerificationRequest = XFramework.Domain.Shared.Contracts.Requests.Patch<IdentityServer.Domain.Shared.Contracts.IdentityVerification>;
 
 namespace IdentityServer.Api.Features.Verification.Confirm;
@@ -32,7 +35,10 @@ public static class ConfirmVerificationEndpoint
     private static async Task<IResult> ConfirmFromBody(
         Guid verificationId,
         ConfirmVerificationRequest body,
+        HttpContext httpContext,
         IValidator<ConfirmVerificationRequest> validator,
+        IHttpTrustedInvocationAuthorizer invocationAuthorizer,
+        ITrustedInvocationFeatureGate featureGate,
         IAuthService authService,
         CancellationToken ct)
     {
@@ -45,6 +51,37 @@ public static class ConfirmVerificationEndpoint
                     group => group.Key,
                     group => group.Select(error => error.ErrorMessage).ToArray()));
         }
+
+        var metadata = new RequestMetadata
+        {
+            RequestId = Guid.NewGuid(),
+            RequestedTenantId = body.TenantId,
+            OperationName = nameof(ConfirmVerificationRequest),
+            IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = httpContext.Request.Headers.UserAgent.ToString()
+        };
+        var invocationResult = await invocationAuthorizer.AuthorizeAsync(
+            httpContext.Request.Headers.Authorization.ToString(),
+            httpContext.Request.Headers["X-XFramework-Service-Authorization"].ToString(),
+            metadata,
+            new InvocationAuthorizationPolicy
+            {
+                ActorRequirement = ActorRequirement.Optional,
+                TenantAccessMode = TenantAccessMode.PublicTenantLookup,
+                RequireServiceIdentity = false,
+                AllowAnonymous = true
+            },
+            ct);
+        if (!invocationResult.IsSuccess)
+            return Results.Problem(detail: invocationResult.Error, statusCode: invocationResult.StatusCode);
+
+        var featureResult = await featureGate.EnsureAllowedAsync(
+            "/api/verifications/{verificationId:guid}/confirm",
+            HttpMethods.Patch,
+            null,
+            ct);
+        if (!featureResult.IsSuccess)
+            return Results.Problem(detail: featureResult.Message, statusCode: featureResult.StatusCode);
 
         var request = new PatchVerificationRequest(new IdentityVerification
         {
@@ -59,7 +96,7 @@ public static class ConfirmVerificationEndpoint
     }
 }
 
-public sealed record ConfirmVerificationRequest(string? Token);
+public sealed record ConfirmVerificationRequest(string? Token, Guid TenantId);
 
 public sealed class ConfirmVerificationRequestValidator : AbstractValidator<ConfirmVerificationRequest>
 {
@@ -68,5 +105,7 @@ public sealed class ConfirmVerificationRequestValidator : AbstractValidator<Conf
         RuleFor(request => request.Token)
             .NotEmpty().WithMessage("Verification token is required")
             .MaximumLength(2_048).WithMessage("Verification token is too long");
+        RuleFor(request => request.TenantId)
+            .NotEmpty().WithMessage("Tenant ID is required");
     }
 }

@@ -133,28 +133,56 @@ public class BoltHandlerGenerator : ISourceGenerator
         string? summary = null;
         string? description = null;
         bool excludeFromOpenApi = false;
-        bool requireAuthorization = false;
+        bool requireAuthorization = true;
         string? authorizationPolicy = null;
         string? rateLimitPolicy = null;
         string? capability = null;
         string[]? roles = null;
         string[]? requiredServiceScopes = null;
         string[]? allowedServiceCallers = null;
+        string[]? requiredActorCapabilities = null;
+        var actorRequirement = 0;
+        var tenantAccessMode = 0;
+        var allowAnonymous = false;
 
-        if (hasBolt)
+        var boltPolicyAttributeData = methodSymbol.GetAttributes()
+            .FirstOrDefault(static attribute =>
+                attribute.AttributeClass?.Name == "BoltHandlerAttribute");
+        if (boltPolicyAttributeData is null)
         {
-            var boltAttributeData = methodSymbol.GetAttributes()
+            boltPolicyAttributeData = containingClass.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Where(candidate => !SymbolEqualityComparer.Default.Equals(candidate, methodSymbol))
+                .Where(candidate => candidate.Parameters.Length > 0 &&
+                    SymbolEqualityComparer.Default.Equals(candidate.Parameters[0].Type, requestType))
+                .SelectMany(static candidate => candidate.GetAttributes())
                 .FirstOrDefault(static attribute =>
                     attribute.AttributeClass?.Name == "BoltHandlerAttribute");
-            if (boltAttributeData != null)
-            {
-                requiredServiceScopes = GetStringArrayNamedArgument(
-                    boltAttributeData,
-                    "RequiredServiceScopes");
-                allowedServiceCallers = GetStringArrayNamedArgument(
-                    boltAttributeData,
-                    "AllowedServiceCallers");
-            }
+        }
+
+        if (boltPolicyAttributeData != null)
+        {
+            requiredServiceScopes = GetStringArrayNamedArgument(
+                boltPolicyAttributeData,
+                "RequiredServiceScopes");
+            allowedServiceCallers = GetStringArrayNamedArgument(
+                boltPolicyAttributeData,
+                "AllowedServiceCallers");
+            requiredActorCapabilities = GetStringArrayNamedArgument(
+                boltPolicyAttributeData,
+                "RequiredActorCapabilities");
+            actorRequirement = GetIntNamedArgument(
+                boltPolicyAttributeData,
+                "ActorRequirement",
+                actorRequirement);
+            tenantAccessMode = GetIntNamedArgument(
+                boltPolicyAttributeData,
+                "TenantAccessMode",
+                tenantAccessMode);
+            allowAnonymous = GetBoolNamedArgument(
+                boltPolicyAttributeData,
+                "AllowAnonymous",
+                allowAnonymous);
         }
 
         if (httpAttr != null)
@@ -219,6 +247,27 @@ public class BoltHandlerGenerator : ISourceGenerator
                     httpAttributeData,
                     "RequireAuthorization",
                     requireAuthorization);
+                requiredServiceScopes = GetStringArrayNamedArgument(
+                    httpAttributeData,
+                    "RequiredServiceScopes") ?? requiredServiceScopes;
+                allowedServiceCallers = GetStringArrayNamedArgument(
+                    httpAttributeData,
+                    "AllowedServiceCallers") ?? allowedServiceCallers;
+                requiredActorCapabilities = GetStringArrayNamedArgument(
+                    httpAttributeData,
+                    "RequiredActorCapabilities") ?? requiredActorCapabilities;
+                actorRequirement = GetIntNamedArgument(
+                    httpAttributeData,
+                    "ActorRequirement",
+                    actorRequirement);
+                tenantAccessMode = GetIntNamedArgument(
+                    httpAttributeData,
+                    "TenantAccessMode",
+                    tenantAccessMode);
+                allowAnonymous = GetBoolNamedArgument(
+                    httpAttributeData,
+                    "AllowAnonymous",
+                    allowAnonymous);
                 authorizationPolicy = GetStringNamedArgument(
                     httpAttributeData,
                     "AuthorizationPolicy") ?? authorizationPolicy;
@@ -234,10 +283,50 @@ public class BoltHandlerGenerator : ISourceGenerator
             }
         }
 
+        var featureGateRoute = route;
+        var featureGateHttpMethod = httpMethod;
+        var featureGateCapability = capability;
+        if (featureGateRoute is null)
+        {
+            var siblingHttpAttribute = containingClass.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Where(candidate => !SymbolEqualityComparer.Default.Equals(candidate, methodSymbol))
+                .Where(candidate => candidate.Parameters.Length > 0 &&
+                    SymbolEqualityComparer.Default.Equals(candidate.Parameters[0].Type, requestType))
+                .SelectMany(static candidate => candidate.GetAttributes())
+                .FirstOrDefault(static attribute =>
+                    attribute.AttributeClass?.Name is "MapGetAttribute" or "MapPostAttribute" or
+                        "MapPutAttribute" or "MapPatchAttribute" or "MapDeleteAttribute");
+            if (siblingHttpAttribute != null)
+            {
+                featureGateRoute = siblingHttpAttribute.ConstructorArguments.FirstOrDefault().Value as string;
+                featureGateHttpMethod = siblingHttpAttribute.AttributeClass?.Name switch
+                {
+                    "MapGetAttribute" => "GET",
+                    "MapPostAttribute" => "POST",
+                    "MapPutAttribute" => "PUT",
+                    "MapPatchAttribute" => "PATCH",
+                    "MapDeleteAttribute" => "DELETE",
+                    _ => null
+                };
+                featureGateCapability = GetStringNamedArgument(siblingHttpAttribute, "Capability");
+            }
+        }
+
         // Collect DI parameters (skip request + CancellationToken)
         var diParams = new List<(string TypeFullName, string Name, bool IsValidator)>();
         var hasCancellationToken = false;
         var requestTypeFullName = ToGlobalQualified(requestType.ToDisplayString());
+        var requestSupportsMetadata = requestType.AllInterfaces.Any(static interfaceType =>
+            interfaceType.Name == "IHasRequestServer");
+        for (var requestBaseType = requestType as INamedTypeSymbol;
+             !requestSupportsMetadata && requestBaseType is not null;
+             requestBaseType = requestBaseType.BaseType)
+        {
+            requestSupportsMetadata = requestBaseType.GetMembers("Metadata")
+                .OfType<IPropertySymbol>()
+                .Any(static property => property.Type.Name == "RequestMetadata");
+        }
         var queryParameters = CollectQueryParameters(requestType);
         var routeParameters = CollectRouteParameters(route, queryParameters);
         var constructorBoundProperties = CollectConstructorBoundProperties(requestType, queryParameters);
@@ -286,6 +375,7 @@ public class BoltHandlerGenerator : ISourceGenerator
             MethodName = methodSymbol.Name,
             RequestTypeFullName = requestTypeFullName,
             RequestTypeName = requestType.Name,
+            RequestSupportsMetadata = requestSupportsMetadata,
             SfResponseTypeFullName = sfResponseType != null ? ToGlobalQualified(sfResponseType.ToDisplayString()) : null,
             ResultDataTypeFullName = resultDataType != null ? ToGlobalQualified(resultDataType.ToDisplayString()) : null,
             IsGenericResult = isGenericResult,
@@ -309,6 +399,13 @@ public class BoltHandlerGenerator : ISourceGenerator
             Roles = roles,
             RequiredServiceScopes = requiredServiceScopes,
             AllowedServiceCallers = allowedServiceCallers,
+            RequiredActorCapabilities = requiredActorCapabilities,
+            ActorRequirement = actorRequirement,
+            TenantAccessMode = tenantAccessMode,
+            AllowAnonymous = allowAnonymous,
+            FeatureGateRoute = featureGateRoute,
+            FeatureGateHttpMethod = featureGateHttpMethod,
+            FeatureGateCapability = featureGateCapability,
             ValidatorTypeFullName = hasValidator ? validatorInterface : null
         };
     }
@@ -504,6 +601,20 @@ public class BoltHandlerGenerator : ISourceGenerator
         return null;
     }
 
+    private static int GetIntNamedArgument(
+        AttributeData attributeData,
+        string propertyName,
+        int defaultValue)
+    {
+        foreach (var namedArg in attributeData.NamedArguments)
+        {
+            if (namedArg.Key == propertyName && namedArg.Value.Value is int value)
+                return value;
+        }
+
+        return defaultValue;
+    }
+
     private static string[]? GetStringArrayNamedArgument(AttributeData attributeData, string propertyName)
     {
         foreach (var namedArg in attributeData.NamedArguments)
@@ -593,6 +704,12 @@ public class BoltHandlerGenerator : ISourceGenerator
 
         var requiredServiceScopes = ToStringArrayExpression(h.RequiredServiceScopes);
         var allowedServiceCallers = ToStringArrayExpression(h.AllowedServiceCallers);
+        var requiredActorCapabilities = ToStringArrayExpression(h.RequiredActorCapabilities);
+        var featureGateRoute = ToCSharpStringLiteral(h.FeatureGateRoute ?? string.Empty);
+        var featureGateHttpMethod = ToCSharpStringLiteral(h.FeatureGateHttpMethod ?? "POST");
+        var featureGateCapability = h.FeatureGateCapability is null
+            ? "null"
+            : ToCSharpStringLiteral(h.FeatureGateCapability);
 
         var validationBlock = "";
         if (h.ValidatorTypeFullName != null)
@@ -663,20 +780,59 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
                 try
                 {{
                     using var scope = scopeFactory.CreateScope();
-                    var request = MemoryPackSerializer.Deserialize<{h.RequestTypeFullName}>(payload.Span);
+                    var envelope = MemoryPackSerializer.Deserialize<global::XFramework.Domain.Shared.BusinessObjects.BoltInvocationEnvelope>(payload.Span);
+                    if (envelope is null || envelope.Payload.Length == 0)
+                        return ((System.Net.HttpStatusCode)400, ReadOnlyMemory<byte>.Empty);
+
+                    var request = MemoryPackSerializer.Deserialize<{h.RequestTypeFullName}>(envelope.Payload);
                     if (request is null)
                         return ((System.Net.HttpStatusCode)400, ReadOnlyMemory<byte>.Empty);
+
+                    request.Metadata ??= new global::XFramework.Domain.Shared.BusinessObjects.RequestMetadata();
+
+                    using var actorTokenLease = string.IsNullOrWhiteSpace(envelope.ActorAccessToken)
+                        ? null
+                        : scope.ServiceProvider
+                            .GetRequiredService<IActorAccessTokenScope>()
+                            .Push(envelope.ActorAccessToken);
+
+                    var policy = new InvocationAuthorizationPolicy
+                    {{
+                        ActorRequirement = (ActorRequirement){h.ActorRequirement},
+                        TenantAccessMode = (TenantAccessMode){h.TenantAccessMode},
+                        RequireServiceIdentity = {(!h.AllowAnonymous).ToString().ToLowerInvariant()},
+                        RequiredServiceScopes = {requiredServiceScopes} ?? System.Array.Empty<string>(),
+                        AllowedServiceCallers = {allowedServiceCallers} ?? System.Array.Empty<string>(),
+                        RequiredActorCapabilities = {requiredActorCapabilities} ?? System.Array.Empty<string>(),
+                        AllowAnonymous = {h.AllowAnonymous.ToString().ToLowerInvariant()}
+                    }};
 
                     var authorization = await scope.ServiceProvider
                         .GetRequiredService<IBoltServiceInvocationAuthorizer>()
                         .AuthorizeAsync(
+                            new global::XFramework.Domain.Shared.BusinessObjects.InvocationCredentials(
+                                envelope.ActorAccessToken,
+                                envelope.ServiceAccessToken),
                             request.Metadata,
                             context,
-                            requiredScopes: {requiredServiceScopes},
-                            allowedCallers: {allowedServiceCallers},
+                            policy,
                             ct: ct);
                     if (!authorization.IsSuccess)
+                    {{
                         return ((System.Net.HttpStatusCode)authorization.StatusCode, ReadOnlyMemory<byte>.Empty);
+                    }}
+
+                    var featureGateResult = await scope.ServiceProvider
+                        .GetRequiredService<global::XFramework.Core.Services.FeatureGates.ITrustedInvocationFeatureGate>()
+                        .EnsureAllowedAsync(
+                            {featureGateRoute},
+                            {featureGateHttpMethod},
+                            {featureGateCapability},
+                            ct);
+                    if (!featureGateResult.IsSuccess)
+                    {{
+                        return ((System.Net.HttpStatusCode)featureGateResult.StatusCode, ReadOnlyMemory<byte>.Empty);
+                    }}
 
 {validationBlock}
 {diResolves}
@@ -873,6 +1029,76 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
         if (h.HasCancellationToken)
             callArgs.Append(", ct");
 
+        var trustedAuthorizationBlock = "";
+        if (h.HasBoltHandler || h.RequireAuthorization)
+        {
+            AppendRestParameter("global::XFramework.Integration.Security.IHttpTrustedInvocationAuthorizer invocationAuthorizer");
+            AppendRestParameter("global::XFramework.Integration.Security.IActorAccessTokenScope actorAccessTokenScope");
+            AppendRestParameter("global::XFramework.Core.Services.FeatureGates.ITrustedInvocationFeatureGate trustedInvocationFeatureGate");
+            var existingHttpContextParameter = h.DiParameters
+                .FirstOrDefault(static parameter =>
+                    parameter.TypeFullName == "global::Microsoft.AspNetCore.Http.HttpContext" ||
+                    parameter.TypeFullName == "Microsoft.AspNetCore.Http.HttpContext");
+            var httpContextParameterName = existingHttpContextParameter == default
+                ? "invocationHttpContext"
+                : $"@{existingHttpContextParameter.Name}";
+            if (existingHttpContextParameter == default)
+                AppendRestParameter("Microsoft.AspNetCore.Http.HttpContext invocationHttpContext");
+            var actorCapabilities = ToStringArrayExpression(h.RequiredActorCapabilities);
+            var serviceScopes = ToStringArrayExpression(h.RequiredServiceScopes);
+            var allowedServiceCallers = ToStringArrayExpression(h.AllowedServiceCallers);
+            var requireServiceIdentity = !h.AllowAnonymous &&
+                                         (h.ActorRequirement == 2 ||
+                                          h.RequiredServiceScopes is { Length: > 0 } ||
+                                          h.AllowedServiceCallers is { Length: > 0 })
+                ? "true"
+                : "false";
+            var metadataInitialization = h.RequestSupportsMetadata
+                ? @"request.Metadata ??= new global::XFramework.Domain.Shared.BusinessObjects.RequestMetadata();
+            var invocationMetadata = request.Metadata;"
+                : @"var invocationMetadata = new global::XFramework.Domain.Shared.BusinessObjects.RequestMetadata();";
+            trustedAuthorizationBlock = $@"
+            {metadataInitialization}
+            invocationMetadata.IpAddress = {httpContextParameterName}.Connection.RemoteIpAddress?.ToString();
+            invocationMetadata.UserAgent = {httpContextParameterName}.Request.Headers.UserAgent.ToString();
+            var actorAuthorizationHeader = {httpContextParameterName}.Request.Headers.Authorization.ToString();
+            var actorAccessToken = actorAuthorizationHeader.StartsWith(""Bearer "", System.StringComparison.OrdinalIgnoreCase)
+                ? actorAuthorizationHeader[7..].Trim()
+                : null;
+            using var actorTokenLease = string.IsNullOrWhiteSpace(actorAccessToken)
+                ? null
+                : actorAccessTokenScope.Push(actorAccessToken);
+            var invocationAuthorization = await invocationAuthorizer.AuthorizeAsync(
+                actorAuthorizationHeader,
+                {httpContextParameterName}.Request.Headers[""X-XFramework-Service-Authorization""].ToString(),
+                invocationMetadata,
+                new global::XFramework.Integration.Security.InvocationAuthorizationPolicy
+                {{
+                    ActorRequirement = (global::XFramework.Integration.Security.ActorRequirement){h.ActorRequirement},
+                    TenantAccessMode = (global::XFramework.Integration.Security.TenantAccessMode){h.TenantAccessMode},
+                    RequireServiceIdentity = {requireServiceIdentity},
+                    RequiredServiceScopes = {serviceScopes} ?? System.Array.Empty<string>(),
+                    AllowedServiceCallers = {allowedServiceCallers} ?? System.Array.Empty<string>(),
+                    RequiredActorCapabilities = {actorCapabilities} ?? System.Array.Empty<string>(),
+                    AllowAnonymous = {h.AllowAnonymous.ToString().ToLowerInvariant()}
+                }},
+                ct);
+            if (!invocationAuthorization.IsSuccess)
+                return TypedResults.Problem(
+                    detail: invocationAuthorization.Error,
+                    statusCode: invocationAuthorization.StatusCode);
+            var featureGateResult = await trustedInvocationFeatureGate.EnsureAllowedAsync(
+                {ToCSharpStringLiteral(h.FeatureGateRoute ?? h.Route ?? string.Empty)},
+                {ToCSharpStringLiteral(h.FeatureGateHttpMethod ?? h.HttpMethod ?? "POST")},
+                {(h.FeatureGateCapability is null ? "null" : ToCSharpStringLiteral(h.FeatureGateCapability))},
+                ct);
+            if (!featureGateResult.IsSuccess)
+                return TypedResults.Problem(
+                    detail: featureGateResult.Message,
+                    statusCode: featureGateResult.StatusCode);
+";
+        }
+
         // Build validation block
         var validationBlock = "";
         if (hasValidator)
@@ -949,7 +1175,7 @@ public static class {h.ClassName}_RestEndpoint
 
     private static async Task<{resultTypes}> RestHandle({restParams})
     {{
-{requestInitialization}{validationBlock}
+{requestInitialization}{trustedAuthorizationBlock}{validationBlock}
         var result = await {h.ClassFullName}.{h.MethodName}({callArgs});
 
         if (!result.IsSuccess)
@@ -1050,6 +1276,9 @@ public static class GeneratedEndpointRoutes
             .ToArray();
         var hasRoles = roles is { Length: > 0 };
 
+        if (h.AllowAnonymous && policy == null && !hasRoles)
+            return string.Empty;
+
         if (!h.RequireAuthorization && policy == null && !hasRoles)
             return string.Empty;
 
@@ -1116,6 +1345,7 @@ public static class GeneratedEndpointRoutes
         public string MethodName { get; set; } = "";
         public string RequestTypeFullName { get; set; } = "";
         public string RequestTypeName { get; set; } = "";
+        public bool RequestSupportsMetadata { get; set; }
         public string? SfResponseTypeFullName { get; set; }
         public string? ResultDataTypeFullName { get; set; }
         public bool IsGenericResult { get; set; }
@@ -1145,6 +1375,13 @@ public static class GeneratedEndpointRoutes
         // Bolt service authorization
         public string[]? RequiredServiceScopes { get; set; }
         public string[]? AllowedServiceCallers { get; set; }
+        public string[]? RequiredActorCapabilities { get; set; }
+        public int ActorRequirement { get; set; }
+        public int TenantAccessMode { get; set; }
+        public bool AllowAnonymous { get; set; }
+        public string? FeatureGateRoute { get; set; }
+        public string? FeatureGateHttpMethod { get; set; }
+        public string? FeatureGateCapability { get; set; }
 
         // Validation
         public string? ValidatorTypeFullName { get; set; }

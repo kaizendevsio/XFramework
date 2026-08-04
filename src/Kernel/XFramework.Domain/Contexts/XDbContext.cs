@@ -3,13 +3,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Shared.Contracts.Base;
+using XFramework.Domain.Shared.Security;
 
 namespace XFramework.Domain.Contexts;
 
 public class XDbContext : DbContext
 {
-    private readonly IHttpContextAccessor? _httpContextAccessor;
-    private readonly IConfiguration? _configuration;
+    private readonly IEffectiveTenantContextAccessor? _effectiveTenantContextAccessor;
+    private readonly ICrossTenantWriteAuthorizationAccessor? _crossTenantWriteAuthorizationAccessor;
 
     /// <summary>
     /// Parameterless constructor for EF Core design-time tooling only.
@@ -27,14 +28,33 @@ public class XDbContext : DbContext
     public XDbContext(DbContextOptions options, IHttpContextAccessor httpContextAccessor)
         : base(options)
     {
-        _httpContextAccessor = httpContextAccessor;
     }
 
     public XDbContext(DbContextOptions options, IHttpContextAccessor httpContextAccessor, IConfiguration configuration)
         : base(options)
     {
-        _httpContextAccessor = httpContextAccessor;
-        _configuration = configuration;
+    }
+
+    public XDbContext(
+        DbContextOptions options,
+        IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration,
+        IEffectiveTenantContextAccessor effectiveTenantContextAccessor)
+        : base(options)
+    {
+        _effectiveTenantContextAccessor = effectiveTenantContextAccessor;
+    }
+
+    public XDbContext(
+        DbContextOptions options,
+        IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration,
+        IEffectiveTenantContextAccessor effectiveTenantContextAccessor,
+        ICrossTenantWriteAuthorizationAccessor crossTenantWriteAuthorizationAccessor)
+        : base(options)
+    {
+        _effectiveTenantContextAccessor = effectiveTenantContextAccessor;
+        _crossTenantWriteAuthorizationAccessor = crossTenantWriteAuthorizationAccessor;
     }
 
     /// <summary>
@@ -109,40 +129,22 @@ public class XDbContext : DbContext
     }
 
     /// <summary>
-    /// Retrieves the current tenant ID from (in priority order):
-    ///   1. HttpContext claims (tenant_id / tenantId / TenantId / tid / tenant)
-    ///   2. Configuration fallback (Tenant:DefaultId) — for unauthenticated endpoints like auth/verify
-    ///   3. Guid.Empty — design-time / migration-only (global filter excludes everything)
+    /// Uses only trusted invocation context. Constructors without the trusted accessor exist for
+    /// EF design-time tooling; tenant-scoped queries and tracked writes fail closed.
     /// </summary>
     private Guid GetCurrentTenantId()
     {
-        var httpContext = _httpContextAccessor?.HttpContext;
-        if (httpContext?.User?.Identity?.IsAuthenticated == true)
+        if (_effectiveTenantContextAccessor is null ||
+            !_effectiveTenantContextAccessor.HasTrustedInvocation)
         {
-            var tenantIdClaim = httpContext.User.FindFirst("tenant_id")?.Value
-                ?? httpContext.User.FindFirst("tenantId")?.Value
-                ?? httpContext.User.FindFirst("TenantId")?.Value
-                ?? httpContext.User.FindFirst("tid")?.Value
-                ?? httpContext.User.FindFirst("tenant")?.Value;
-
-            if (!string.IsNullOrEmpty(tenantIdClaim) && Guid.TryParse(tenantIdClaim, out var tenantId))
-            {
-                return tenantId;
-            }
-
             throw new InvalidOperationException(
-                "Authenticated user does not have a tenant ID claim. " +
-                "Ensure the authentication provider includes a supported tenant claim.");
+                "A trusted tenant context is required to query tenant-owned entities.");
         }
 
-        // Unauthenticated requests (auth, verify, register) — use configured default tenant
-        var defaultTenantId = _configuration?["Tenant:DefaultId"];
-        if (!string.IsNullOrEmpty(defaultTenantId) && Guid.TryParse(defaultTenantId, out var defaultId))
-        {
-            return defaultId;
-        }
+        return _effectiveTenantContextAccessor.EffectiveTenantId is { } tenantId && tenantId != Guid.Empty
+            ? tenantId
+            : Guid.Empty;
 
-        return Guid.Empty;
     }
 
     public override int SaveChanges()
@@ -164,11 +166,19 @@ public class XDbContext : DbContext
     private void OnBeforeSaveChanges()
     {
         ChangeTracker.DetectChanges();
-        foreach (var entry in ChangeTracker.Entries())
+        var changedEntries = ChangeTracker.Entries()
+            .Where(entry => entry.State is not EntityState.Detached and not EntityState.Unchanged)
+            .ToArray();
+        var hasTrustedInvocation = _effectiveTenantContextAccessor?.HasTrustedInvocation == true;
+        var effectiveTenantId = _effectiveTenantContextAccessor?.EffectiveTenantId;
+        if (changedEntries.Length > 0 && !hasTrustedInvocation)
         {
-            if (entry.State is EntityState.Detached or EntityState.Unchanged)
-                continue;
+            throw new InvalidOperationException(
+                "A trusted tenant context is required to save changes.");
+        }
 
+        foreach (var entry in changedEntries)
+        {
             foreach (var property in entry.Properties)
             {
                 switch (property.Metadata.Name)
@@ -203,6 +213,13 @@ public class XDbContext : DbContext
                             throw new InvalidOperationException(
                                 $"Cannot save entity of type '{entry.Entity.GetType().Name}' without a valid TenantId. " +
                                 "Ensure TenantId is set before saving.");
+                        }
+                        if (_crossTenantWriteAuthorizationAccessor?.IsAuthorized != true &&
+                            (effectiveTenantId is null || effectiveTenantId == Guid.Empty ||
+                             (Guid)property.CurrentValue != effectiveTenantId))
+                        {
+                            throw new InvalidOperationException(
+                                $"Cannot save entity of type '{entry.Entity.GetType().Name}' outside the trusted effective tenant.");
                         }
                         break;
                 }

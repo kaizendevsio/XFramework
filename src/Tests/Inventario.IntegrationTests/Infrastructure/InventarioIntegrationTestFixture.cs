@@ -17,8 +17,11 @@ using XFramework.Domain.Contexts;
 using XFramework.Domain.Interceptors;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.Extensions;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Extensions;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Security;
 using XFramework.Inventario.Api.Services;
 using XFramework.TestInfrastructure;
 
@@ -31,19 +34,30 @@ public sealed class InventarioIntegrationTestFixture
     private static WebApplication _boltApp = null!;
     private static WebApplication _inventarioApp = null!;
     private static WebApplication _testClientApp = null!;
+    private static IServiceScope _testClientScope = null!;
     private static Task? _boltTask;
     private static Task? _inventarioTask;
     private static Task? _testClientTask;
+    private static readonly TestBoltTransportAuthority TransportAuthority = new(BoltUrl);
+    private static readonly TestInvocationIdentityOptions InvocationIdentity = new(
+        "inventario-test-actor-token",
+        "inventario-test-service-token",
+        XFrameworkServiceNames.Portal,
+        TestConstants.TenantId,
+        Guid.Parse("00000000-0000-0000-0000-000000000821"),
+        Guid.Parse("00000000-0000-0000-0000-000000000822"),
+        Guid.Parse("00000000-0000-0000-0000-000000000823"));
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => TestConstants.Ports.InventarioBolt;
     public static string InventarioUrl => TestConstants.Ports.InventarioServer;
     public static string TestClientUrl => TestConstants.Ports.InventarioTestClient;
     public static Guid TestTenantId => TestConstants.TenantId;
+    public static string TestActorAccessToken => InvocationIdentity.ActorToken;
 
     public static IServiceProvider Services => _inventarioApp.Services;
     public static IInventarioServiceWrapper ServiceWrapper =>
-        _testClientApp.Services.GetRequiredService<IInventarioServiceWrapper>();
+        _testClientScope.ServiceProvider.GetRequiredService<IInventarioServiceWrapper>();
     public static IDataContext DataContext =>
         _testClientApp.Services.CreateScope().ServiceProvider.GetRequiredService<IDataContext>();
 
@@ -69,6 +83,7 @@ public sealed class InventarioIntegrationTestFixture
 
         _testClientApp = StartTestClient();
         await TestHostWaiter.WaitForHealth($"{TestClientUrl}/health/live", _testClientTask);
+        _testClientScope = _testClientApp.Services.CreateScope();
 
         await WaitForBoltClients();
     }
@@ -76,24 +91,41 @@ public sealed class InventarioIntegrationTestFixture
     [OneTimeTearDown]
     public async Task GlobalTeardown()
     {
+        try { _testClientScope?.Dispose(); } catch { }
         try { if (_testClientApp != null) await _testClientApp.StopAsync(); } catch { }
         try { if (_inventarioApp != null) await _inventarioApp.StopAsync(); } catch { }
         try { if (_boltApp != null) await _boltApp.StopAsync(); } catch { }
         if (_postgres != null) await _postgres.DisposeAsync();
+        TransportAuthority.Dispose();
     }
 
     private static WebApplication StartBolt()
     {
-        var builder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Development
+        });
         builder.WebHost.UseUrls(BoltUrl);
-        OverrideConfig(builder, "Bolt.InventarioTest", "00000000-0000-0000-0000-000000000020");
+        OverrideConfig(builder, "Bolt.InventarioTest", BoltUrl);
+        TransportAuthority.Configure(builder);
+        builder.Services.InstallServicesInAssembly<Bolt.Hub.Installers.BoltInstaller>(
+            builder.Configuration,
+            builder.Environment);
+        builder.Services.InstallSwagger(builder.Configuration);
+        builder.Services.InstallOData(builder.Configuration);
+        builder.Services.InstallJwt(builder.Configuration);
+        builder.Services.InstallStandardServices<Bolt.Hub.Installers.BoltInstaller>(builder.Configuration);
+        builder.Services.InstallRuntimeServices(builder.Configuration);
+        builder.Services.AddTestInvocationClient(InvocationIdentity);
 
         var app = (WebApplication)builder.Build();
+        TransportAuthority.MapEndpoints(app);
         app.UseCorrelationId();
         app.UseAppServices();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        _boltTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        _boltTask = app.WaitForShutdownAsync();
         return app;
     }
 
@@ -101,7 +133,7 @@ public sealed class InventarioIntegrationTestFixture
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls(InventarioUrl);
-        OverrideConfig(builder, "Inventario", "f9f79c2d-79f3-4a8e-85f6-90aef15bf184");
+        OverrideConfig(builder, XFrameworkServiceNames.Inventario, InventarioUrl);
         builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
         builder.Services.AddHttpContextAccessor();
@@ -137,6 +169,9 @@ public sealed class InventarioIntegrationTestFixture
             .AddScheme<AuthenticationSchemeOptions, InventarioTestAuthHandler>("InventarioTest", _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddSingleton(
+            TransportAuthority.CreateTokenProvider(XFrameworkServiceNames.Inventario));
+        builder.Services.AddTestInvocationServer(InvocationIdentity);
         builder.Services.AddDataContextHandler(typeof(ProductService).Assembly);
 
         var app = (WebApplication)builder.Build();
@@ -151,7 +186,8 @@ public sealed class InventarioIntegrationTestFixture
         UpdateProductEndpoint.Map(authorizedRoutes);
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        _inventarioTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        _inventarioTask = app.WaitForShutdownAsync();
         return app;
     }
 
@@ -171,29 +207,49 @@ public sealed class InventarioIntegrationTestFixture
         builder.WebHost.UseUrls(TestClientUrl);
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["BoltConfiguration:ClientName"] = "InventarioTestClient",
+            ["BoltConfiguration:ClientName"] = XFrameworkServiceNames.Portal,
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
+            ["ServiceIdentity:ClientId"] = XFrameworkServiceNames.Portal,
+            ["ServiceIdentity:Authority"] = BoltUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
+            ["ServiceIdentity:GenerationId"] = "inventario-test-client-g1",
+            ["ServiceIdentity:ClientSecret"] = "inventario-test-client-secret-2026-secure",
+            ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.BoltService,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
+            ["Kestrel:Endpoints:Http:Url"] = TestClientUrl,
+            ["urls"] = TestClientUrl,
             ["Logging:LogLevel:Default"] = "Warning"
         });
 
         builder.Services.InstallStandardServices<InventarioIntegrationTestFixture>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("InventarioTest"));
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddSingleton(
+            TransportAuthority.CreateTokenProvider(XFrameworkServiceNames.Portal));
+        builder.Services.AddTestInvocationClient(InvocationIdentity);
         builder.Services.AddInventarioWrapperServices();
         builder.Services.AddRemoteDataContext();
         builder.Services.AddScoped(_ => new RequestMetadata
         {
-            TenantId = TestTenantId,
+            RequestedTenantId = TestTenantId,
             RequestId = Guid.NewGuid()
         });
 
         var app = builder.Build();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        _testClientTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        _testClientTask = app.WaitForShutdownAsync();
         return app;
+    }
+
+    private static void StartApplication(WebApplication app)
+    {
+        app.StartAsync()
+            .WaitAsync(TimeSpan.FromSeconds(30))
+            .GetAwaiter()
+            .GetResult();
     }
 
     private static async Task WaitForBoltClients()
@@ -236,14 +292,25 @@ public sealed class InventarioIntegrationTestFixture
         }
     }
 
-    private static void OverrideConfig(WebApplicationBuilder builder, string clientName, string clientGuid)
+    private static void OverrideConfig(
+        WebApplicationBuilder builder,
+        string clientName,
+        string serverUrl)
     {
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = ConnectionString,
-            ["BoltConfiguration:ClientGuid"] = clientGuid,
+            ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ClientName"] = clientName,
+            ["ServiceIdentity:ClientId"] = clientName,
+            ["ServiceIdentity:Authority"] = BoltUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
+            ["ServiceIdentity:GenerationId"] = "inventario-test-service-g1",
+            ["ServiceIdentity:ClientSecret"] = "inventario-test-service-secret-2026-secure",
+            ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.BoltService,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
+            ["Kestrel:Endpoints:Http:Url"] = serverUrl,
+            ["urls"] = serverUrl,
             ["Logging:LogLevel:Default"] = "Warning"
         });
     }
@@ -263,7 +330,11 @@ public sealed class InventarioIntegrationTestFixture
                 Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
-        await using var db = new AppDbContext(options);
+        await using var db = new AppDbContext(
+            options,
+            new HttpContextAccessor(),
+            new ConfigurationBuilder().Build(),
+            new TestEffectiveTenantContextAccessor(TestTenantId));
         await db.Database.MigrateAsync();
         await TestSeedData.SeedAll(db);
         await EnableInventarioFeatures(db);

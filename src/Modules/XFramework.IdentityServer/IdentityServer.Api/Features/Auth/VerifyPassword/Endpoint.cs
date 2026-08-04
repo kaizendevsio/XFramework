@@ -7,7 +7,10 @@ namespace IdentityServer.Api.Features.Auth.VerifyPassword;
 
 public static class VerifyPasswordEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<bool>> Handle(
         VerifyPasswordRequest request,
         IAuthService authService,
@@ -24,7 +27,7 @@ public static class VerifyPasswordEndpoint
         IAuthService authService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authService.VerifyPasswordAsync(request, ct);
     }
 }

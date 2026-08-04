@@ -25,11 +25,22 @@ public sealed class ServiceIdentityScopeIsolationTests
                 XFrameworkServiceScopes.BoltService,
                 XFrameworkServiceScopes.DataContextQuery,
                 XFrameworkServiceScopes.DataContextMutate,
+                XFrameworkServiceScopes.TenantTarget,
                 XFrameworkServiceScopes.IdentityAdmin
             ],
             [XFrameworkServiceNames.BoltHub] = [XFrameworkServiceScopes.BoltService],
-            [XFrameworkServiceNames.Communications] = [XFrameworkServiceScopes.BoltService],
-            [XFrameworkServiceNames.Notifications] = [XFrameworkServiceScopes.BoltService],
+            [XFrameworkServiceNames.Communications] =
+            [
+                XFrameworkServiceScopes.BoltService,
+                XFrameworkServiceScopes.NotificationsSend,
+                XFrameworkServiceScopes.StorageRead,
+                XFrameworkServiceScopes.StorageWrite
+            ],
+            [XFrameworkServiceNames.Notifications] =
+            [
+                XFrameworkServiceScopes.BoltService,
+                XFrameworkServiceScopes.SmsGatewaySend
+            ],
             [XFrameworkServiceNames.Storage] = [XFrameworkServiceScopes.BoltService],
             [XFrameworkServiceNames.Attendance] = [XFrameworkServiceScopes.BoltService],
             [XFrameworkServiceNames.SmsGateway] = [XFrameworkServiceScopes.BoltService],
@@ -42,6 +53,7 @@ public sealed class ServiceIdentityScopeIsolationTests
     private static readonly string[] PrivilegedScopes =
     [
         XFrameworkServiceScopes.DataContextMutate,
+        XFrameworkServiceScopes.TenantTarget,
         XFrameworkServiceScopes.AttendanceAdmin,
         XFrameworkServiceScopes.CommunicationsAdmin,
         XFrameworkServiceScopes.CommunityAdmin,
@@ -104,10 +116,10 @@ public sealed class ServiceIdentityScopeIsolationTests
 
         return new ServiceIdentityService(
             new Mock<IDataContext>(MockBehavior.Strict).Object,
-            configuration,
             serviceIdentityConfiguration,
             Mock.Of<IBoltTransportTokenSigner>(),
             TimeProvider.System,
-            NullLogger<ServiceIdentityService>.Instance);
+            NullLogger<ServiceIdentityService>.Instance,
+            signingKeyStore: new FileSystemServiceSigningKeyStore(configuration, serviceIdentityConfiguration));
     }
 }

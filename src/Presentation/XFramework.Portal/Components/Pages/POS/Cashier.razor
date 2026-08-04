@@ -379,6 +379,7 @@ else
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private PortalActorContext ActorContext { get; set; } = default!;
     [Inject] private DialogService DialogService { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
@@ -1022,7 +1023,7 @@ else
 
     private bool TryResolveCashier(out Guid cashierCredentialId)
     {
-        cashierCredentialId = RequestMetadata.CredentialId ?? Guid.Empty;
+        cashierCredentialId = ActorContext.CredentialId ?? Guid.Empty;
         if (cashierCredentialId != Guid.Empty)
             return true;
 
@@ -1057,11 +1058,9 @@ else
 
     private RequestMetadata BuildMetadata() => new()
     {
-        TenantId = TenantFilter.SelectedTenantId,
-        CredentialId = RequestMetadata.CredentialId,
-        SessionId = RequestMetadata.SessionId,
+        RequestedTenantId = TenantFilter.SelectedTenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal"
+        OperationName = "Portal"
     };
 
     private static string GetRegisterValue(PosRegister register) => register.Id.ToString();

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.ServiceIdentity.GetBoltTransportMetadata;
 
@@ -8,7 +9,10 @@ public static class GetBoltTransportMetadataEndpoint
     [MapGet("/.well-known/openid-configuration", Tags = ["Service Identity"],
         Summary = "Get Bolt transport token metadata",
         Description = "Returns public issuer and signing-key discovery metadata for Bolt transport JWT validation.",
-        ExcludeFromOpenApi = true)]
+        ExcludeFromOpenApi = true,
+        ActorRequirement = ActorRequirement.None,
+        TenantAccessMode = TenantAccessMode.Tenantless,
+        AllowAnonymous = true)]
     public static Task<Result<BoltTransportMetadataResponse>> Handle(
         GetBoltTransportMetadataRequest request,
         ServiceIdentityConfiguration configuration,

@@ -413,29 +413,20 @@ public sealed class ReservationServiceTests
         Guid tenantId,
         bool includeAdminClaim = false)
     {
-        var claims = new List<Claim> { new("tenantId", tenantId.ToString()) };
-        if (includeAdminClaim)
-            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
-
-        var httpContextAccessor = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                    claims,
-                    authenticationType: "Test"))
-            }
-        };
+        var roles = includeAdminClaim
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Admin" }
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var invocationContext = new TestTrustedInvocationContextAccessor(tenantId, roles);
 
         var featureService = new FakeTenantModuleFeatureService();
-        var productVariationService = new ProductVariationService(dataContext, httpContextAccessor, featureService);
+        var productVariationService = new ProductVariationService(dataContext, invocationContext, featureService);
         var stockPostingService = new StockPostingService(
             dataContext,
-            httpContextAccessor,
+            invocationContext,
             featureService,
             productVariationService);
-        var allocationService = new InventoryAllocationService(dataContext, httpContextAccessor, stockPostingService);
-        return new ReservationService(dataContext, httpContextAccessor, allocationService);
+        var allocationService = new InventoryAllocationService(dataContext, invocationContext, stockPostingService);
+        return new ReservationService(dataContext, invocationContext, allocationService);
     }
 
     private sealed class FakeTenantModuleFeatureService : ITenantModuleFeatureService

@@ -14,6 +14,8 @@ using XFramework.Core.RateLimiting;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Enums;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 using Session = IdentityServer.Domain.Shared.Contracts.Session;
 
 namespace IdentityServer.IntegrationTests.Tests;
@@ -22,9 +24,19 @@ namespace IdentityServer.IntegrationTests.Tests;
 [NonParallelizable]
 public sealed class AuthenticationSecurityTests : IntegrationTestBase
 {
+    private IDisposable? _actorAccessTokenSuppression;
+
+    [SetUp]
+    public void SuppressAmbientActorAccessToken() =>
+        _actorAccessTokenSuppression = IntegrationTestFixture.SuppressActorAccessToken();
+
     [TearDown]
-    public void ResetRateLimiter() =>
+    public void ResetTestState()
+    {
+        _actorAccessTokenSuppression?.Dispose();
+        _actorAccessTokenSuppression = null;
         IntegrationTestFixture.Services.GetRequiredService<TestDistributedSecurityRateLimiter>().Reset();
+    }
 
     [Test]
     public async Task Authenticate_BusinessPath_UsesCompositeDistributedLimitAndFailsClosed()
@@ -71,7 +83,7 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
             Email = $"unknown-{Guid.NewGuid():N}@example.test",
             Metadata = new RequestMetadata
             {
-                TenantId = IntegrationTestFixture.TestTenantId,
+                RequestedTenantId = IntegrationTestFixture.TestTenantId,
                 IpAddress = "198.51.100.20"
             }
         };
@@ -103,7 +115,7 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
             NewPassword = "ValidPassword123!",
             Metadata = new RequestMetadata
             {
-                TenantId = IntegrationTestFixture.TestTenantId,
+                RequestedTenantId = IntegrationTestFixture.TestTenantId,
                 IpAddress = "198.51.100.21"
             }
         });
@@ -131,7 +143,6 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
             {
                 Metadata = new RequestMetadata
                 {
-                    TenantId = IntegrationTestFixture.TestTenantId,
                     IpAddress = "198.51.100.22"
                 }
             });
@@ -440,29 +451,30 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
         {
             await start.Task;
             await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+            IntegrationTestFixture.EstablishTrustedServiceTargetContext(scope.ServiceProvider, seeded.TenantId);
             return await scope.ServiceProvider.GetRequiredService<IAuthService>()
                 .RefreshTokenAsync(new RefreshTokenRequest
                 {
                     AccessToken = auth.Data.AccessToken,
                     RefreshToken = auth.Data.RefreshToken,
                     SessionId = sessionId,
-                    Metadata = new RequestMetadata { TenantId = seeded.TenantId }
+                    Metadata = new RequestMetadata()
                 });
         });
         var logoutTask = Task.Run(async () =>
         {
             await start.Task;
             await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+            IntegrationTestFixture.EstablishTrustedActorContext(
+                scope.ServiceProvider,
+                seeded.TenantId,
+                seeded.CredentialId);
             return await scope.ServiceProvider.GetRequiredService<IAuthService>()
                 .LogoutAsync(new LogoutRequest
                 {
                     SessionId = sessionId,
                     CredentialId = seeded.CredentialId,
-                    Metadata = new RequestMetadata
-                    {
-                        TenantId = seeded.TenantId,
-                        CredentialId = seeded.CredentialId
-                    }
+                    Metadata = new RequestMetadata()
                 });
         });
 
@@ -478,11 +490,62 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task Logout_ActorPlusServiceCannotTerminateAnotherCredentialsSession()
+    {
+        var seeded = await SeedAuthenticationGraph();
+        var auth = await AuthenticateDirect(CreateAuthRequest(
+            seeded.TenantId,
+            seeded.RoleTypeId,
+            seeded.Username,
+            seeded.Password));
+        auth.IsSuccess.Should().BeTrue(auth.Message);
+        var sessionId = auth.Data!.SessionId!.Value;
+
+        await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
+        var actor = new TrustedActorIdentity(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            seeded.TenantId,
+            Guid.NewGuid(),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            "identityserver-integration-tests-g1",
+            DateTimeOffset.UtcNow.AddHours(1));
+        var service = new TrustedServiceIdentity(
+            "TestClient",
+            XFrameworkServiceNames.IdentityServer,
+            new HashSet<string>(XFrameworkServiceScopes.AdminDefaults, StringComparer.Ordinal),
+            "test-client-g1");
+        scope.ServiceProvider.GetRequiredService<ITrustedInvocationContextStore>().Set(
+            new TrustedInvocationContext(actor, service, seeded.TenantId, null, Guid.NewGuid()));
+
+        var result = await scope.ServiceProvider.GetRequiredService<IAuthService>()
+            .LogoutAsync(new LogoutRequest
+            {
+                SessionId = sessionId,
+                CredentialId = seeded.CredentialId,
+                Metadata = new RequestMetadata()
+            });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(403);
+        await using var db = CreateDbContext();
+        var persisted = await db.Set<Session>()
+            .IgnoreQueryFilters()
+            .SingleAsync(session => session.Id == sessionId);
+        persisted.Status.Should().Be(CurrentSessionState.Active);
+    }
+
+    [Test]
     public async Task Bolt_ValidateIdentitySession_AfterRoleTypeDisabled_ReturnsUnauthorized()
     {
         var seeded = await SeedAuthenticationGraph();
-        var auth = await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(
-            CreateAuthRequest(seeded.TenantId, seeded.RoleTypeId, seeded.Username, seeded.Password));
+        QueryResponse<AuthenticateIdentityResponse> auth;
+        using (IntegrationTestFixture.SuppressActorAccessToken())
+        {
+            auth = await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(
+                CreateAuthRequest(seeded.TenantId, seeded.RoleTypeId, seeded.Username, seeded.Password));
+        }
         auth.HttpStatusCode.Should().Be(HttpStatusCode.OK, auth.Message);
 
         await using (var db = CreateDbContext())
@@ -495,18 +558,14 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
             await db.SaveChangesAsync();
         }
 
+        using var actorAccessToken = IntegrationTestFixture.UseActorAccessToken(auth.Response!.AccessToken!);
         var result = await IntegrationTestFixture.ServiceWrapper.ValidateIdentitySession(
             new ValidateIdentitySessionRequest
             {
-                TenantId = seeded.TenantId,
-                CredentialId = seeded.CredentialId,
-                SessionId = auth.Response!.SessionId!.Value,
-                RoleTypeIds = [seeded.RoleTypeId],
                 Metadata = new RequestMetadata
                 {
-                    TenantId = seeded.TenantId,
                     RequestId = Guid.NewGuid(),
-                    Name = nameof(Bolt_ValidateIdentitySession_AfterRoleTypeDisabled_ReturnsUnauthorized)
+                    OperationName = nameof(Bolt_ValidateIdentitySession_AfterRoleTypeDisabled_ReturnsUnauthorized)
                 }
             });
 
@@ -743,12 +802,12 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
         GenerateToken = true,
         Metadata = new RequestMetadata
         {
-            TenantId = tenantId,
+            RequestedTenantId = tenantId,
             RequestId = Guid.NewGuid(),
             IpAddress = "127.0.0.1",
-            Name = "AuthenticationSecurityTests",
+            OperationName = "AuthenticationSecurityTests",
             DeviceName = "IntegrationTest",
-            DeviceAgent = "IntegrationTest"
+            UserAgent = "IntegrationTest"
         }
     };
 
@@ -760,6 +819,9 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
         var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
         accessor.HttpContext = new DefaultHttpContext();
         accessor.HttpContext.Connection.RemoteIpAddress = remoteIpAddress;
+        IntegrationTestFixture.EstablishTrustedServiceTargetContext(
+            scope.ServiceProvider,
+            request.Metadata.RequestedTenantId!.Value);
         return await scope.ServiceProvider.GetRequiredService<IAuthService>()
             .AuthenticateAsync(request);
     }

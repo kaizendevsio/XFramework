@@ -3,6 +3,7 @@ using XFramework.Domain.Contexts;
 using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Enums;
+using XFramework.TestInfrastructure;
 
 namespace Wallets.IntegrationTests;
 
@@ -32,7 +33,11 @@ public abstract class WalletsTestBase
             })
             .Build();
 
-        return new AppDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor(), config);
+        return new AppDbContext(
+            options,
+            new Microsoft.AspNetCore.Http.HttpContextAccessor(),
+            config,
+            new TestEffectiveTenantContextAccessor(WalletsTestFixture.TestTenantId));
     }
 
     protected async Task<IdentityCredential> SeedCredential()
@@ -114,11 +119,11 @@ public abstract class WalletsTestBase
 
     protected static XFramework.Domain.Shared.BusinessObjects.RequestMetadata CreateMetadata() => new()
     {
-        TenantId = WalletsTestFixture.TestTenantId,
+        RequestedTenantId = WalletsTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "WalletTest",
+        OperationName = "WalletTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 }

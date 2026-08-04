@@ -1,5 +1,6 @@
 using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts;
+using IdentityServer.Integration.Extensions;
 using Wallets.Api.Features.Batch.DecrementBatch;
 using Wallets.Api.Features.Batch.IncrementBatch;
 using Wallets.Api.Features.Batch.TransferBatch;
@@ -15,6 +16,7 @@ using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
 builder.Logging.AddXFrameworkLogging(builder.Configuration);
+builder.Services.AddIdentityServerSessionValidation();
 
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Wallets.Api");
 builder.Services.AddXFrameworkHealthChecks<AppDbContext>(

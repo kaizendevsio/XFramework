@@ -12,7 +12,8 @@ namespace XFramework.Integration.Security;
 public sealed class ServiceTokenValidator(
     IIdentitySigningKeyProvider signingKeyProvider,
     IOptions<ServiceIdentityOptions> options,
-    ILogger<ServiceTokenValidator> logger)
+    ILogger<ServiceTokenValidator> logger,
+    IServiceCredentialGenerationProvider? credentialGenerationProvider = null)
     : IServiceTokenValidator
 {
     private const int MaxSuccessfulValidationCacheEntries = 1024;
@@ -20,6 +21,10 @@ public sealed class ServiceTokenValidator(
     private readonly object _cacheLock = new();
     private readonly Dictionary<ValidationCacheKey, LinkedListNode<CachedValidation>> _successfulValidations = [];
     private readonly LinkedList<CachedValidation> _validationLru = [];
+    private readonly IServiceCredentialGenerationProvider _credentialGenerationProvider =
+        credentialGenerationProvider ??
+        signingKeyProvider as IServiceCredentialGenerationProvider ??
+        RejectingServiceCredentialGenerationProvider.Instance;
 
     public async Task<ServiceTokenValidationResult> ValidateAsync(
         string? token,
@@ -35,7 +40,7 @@ public sealed class ServiceTokenValidator(
 
         var cacheKey = CreateCacheKey(token, expectedAudience);
         if (TryGetCachedValidation(cacheKey, out var cachedValidation))
-            return ApplyCurrentPolicy(cachedValidation, requiredScopes);
+            return await ApplyCurrentPolicyAsync(cachedValidation, requiredScopes, ct);
 
         JwtSecurityToken unvalidated;
         try
@@ -101,7 +106,7 @@ public sealed class ServiceTokenValidator(
                 ExtractScopes(principal),
                 principal,
                 null);
-            var policyResult = ApplyCredentialGenerationPolicy(validation);
+            var policyResult = await ApplyCredentialGenerationPolicyAsync(validation, ct);
             if (!policyResult.IsValid)
                 return policyResult;
 
@@ -119,18 +124,20 @@ public sealed class ServiceTokenValidator(
         }
     }
 
-    private ServiceTokenValidationResult ApplyCurrentPolicy(
+    private async Task<ServiceTokenValidationResult> ApplyCurrentPolicyAsync(
         ServiceTokenValidationResult validation,
-        IReadOnlyCollection<string>? requiredScopes)
+        IReadOnlyCollection<string>? requiredScopes,
+        CancellationToken ct)
     {
-        var generationResult = ApplyCredentialGenerationPolicy(validation);
+        var generationResult = await ApplyCredentialGenerationPolicyAsync(validation, ct);
         return generationResult.IsValid
             ? ApplyRequiredScopes(validation, requiredScopes)
             : generationResult;
     }
 
-    private ServiceTokenValidationResult ApplyCredentialGenerationPolicy(
-        ServiceTokenValidationResult validation)
+    private async Task<ServiceTokenValidationResult> ApplyCredentialGenerationPolicyAsync(
+        ServiceTokenValidationResult validation,
+        CancellationToken ct)
     {
         var generationClaims = validation.Principal?
             .FindAll("client_credential_generation")
@@ -142,7 +149,27 @@ public sealed class ServiceTokenValidator(
                 "Service token credential generation is not accepted.");
         }
 
-        return validation;
+        try
+        {
+            var isAccepted = await _credentialGenerationProvider.IsAcceptedAsync(
+                validation.CallerClientId!,
+                generationClaims[0],
+                ct);
+            return isAccepted
+                ? validation
+                : ServiceTokenValidationResult.Failure(
+                    "Service token credential generation is not accepted.");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Service credential generation policy is unavailable.");
+            return ServiceTokenValidationResult.Unavailable(
+                "Service credential generation policy is unavailable.");
+        }
     }
 
     private static ServiceTokenValidationResult ApplyRequiredScopes(
@@ -293,4 +320,18 @@ public sealed class ServiceTokenValidator(
         DateTimeOffset ExpiresAtUtc);
 
     private sealed record ImportedSecurityKey(SecurityKey SecurityKey, RSA Owner);
+
+    private sealed class RejectingServiceCredentialGenerationProvider : IServiceCredentialGenerationProvider
+    {
+        public static RejectingServiceCredentialGenerationProvider Instance { get; } = new();
+
+        public Task<bool> IsAcceptedAsync(
+            string clientId,
+            string generationId,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(false);
+        }
+    }
 }

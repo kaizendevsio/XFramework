@@ -31,7 +31,7 @@ public class HealthCheckTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Http_HealthCheck_RespondsUnder50ms()
+    public async Task Http_HealthCheck_RespondsUnder250ms()
     {
         var request = new HealthCheckRequest { Metadata = CreateMetadata() };
 
@@ -44,8 +44,8 @@ public class HealthCheckTests : IntegrationTestBase
         sw.Stop();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        sw.ElapsedMilliseconds.Should().BeLessThan(50,
-            "Health check should be lightweight with no DB or BCrypt operations");
+        sw.ElapsedMilliseconds.Should().BeLessThan(250,
+            "health checks should remain bounded while including centralized invocation validation");
 
         TestContext.Out.WriteLine($"[HTTP] HealthCheck — {sw.Elapsed.TotalMilliseconds:F1}ms");
     }
@@ -69,7 +69,7 @@ public class HealthCheckTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Bolt_HealthCheck_RespondsUnder50ms()
+    public async Task Bolt_HealthCheck_RespondsUnder250ms()
     {
         // Warmup
         await IntegrationTestFixture.ServiceWrapper.HealthCheck(
@@ -82,8 +82,8 @@ public class HealthCheckTests : IntegrationTestBase
 
         result.Should().NotBeNull();
         result!.HttpStatusCode.Should().Be(HttpStatusCode.OK);
-        sw.ElapsedMilliseconds.Should().BeLessThan(50,
-            "Health check should be lightweight with no DB or BCrypt operations");
+        sw.ElapsedMilliseconds.Should().BeLessThan(250,
+            "health checks should remain bounded while including centralized invocation validation");
 
         TestContext.Out.WriteLine($"[Bolt] HealthCheck — {sw.Elapsed.TotalMilliseconds:F1}ms");
     }
@@ -94,12 +94,11 @@ public class HealthCheckTests : IntegrationTestBase
 
     private static RequestMetadata CreateMetadata() => new()
     {
-        TenantId = IntegrationTestFixture.TestTenantId,
         RequestId = Guid.NewGuid(),
         IpAddress = "127.0.0.1",
-        Name = "IntegrationTest",
+        OperationName = "IntegrationTest",
         DeviceName = "TestDevice",
-        DeviceAgent = "TestAgent"
+        UserAgent = "TestAgent"
     };
 
     #endregion

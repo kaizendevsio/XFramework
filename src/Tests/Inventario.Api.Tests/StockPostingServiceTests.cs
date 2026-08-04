@@ -361,22 +361,14 @@ public sealed class StockPostingServiceTests
         Guid tenantId,
         bool negativeStockEnabled = false)
     {
-        var httpContextAccessor = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("tenantId", tenantId.ToString())],
-                    authenticationType: "Test"))
-            }
-        };
+        var invocationContext = new TestTrustedInvocationContextAccessor(tenantId);
 
         var featureService = new FakeTenantModuleFeatureService(negativeStockEnabled);
-        var productVariationService = new ProductVariationService(dataContext, httpContextAccessor, featureService);
+        var productVariationService = new ProductVariationService(dataContext, invocationContext, featureService);
 
         return new StockPostingService(
             dataContext,
-            httpContextAccessor,
+            invocationContext,
             featureService,
             productVariationService);
     }

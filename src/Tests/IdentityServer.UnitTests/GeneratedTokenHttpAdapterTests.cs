@@ -13,6 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using NUnit.Framework;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
+using XFramework.Integration.Security;
 using XFramework.Domain.Shared.Enums;
 using XFramework.Domain.Shared.ServiceIdentity;
 
@@ -42,6 +44,27 @@ public sealed class GeneratedTokenHttpAdapterTests
         var authService = new Mock<IAuthService>(MockBehavior.Strict);
         authService.Setup(service => service.AuthenticateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<AuthenticateIdentityResponse>.Success(expected));
+        var invocationAuthorizer = new Mock<IHttpTrustedInvocationAuthorizer>(MockBehavior.Strict);
+        invocationAuthorizer.Setup(authorizer => authorizer.AuthorizeAsync(
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                request.Metadata,
+                It.IsAny<InvocationAuthorizationPolicy>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TrustedInvocationResult.Success(new TrustedInvocationContext(
+                Actor: null,
+                Service: null,
+                EffectiveTenantId: Guid.NewGuid(),
+                RequestedTargetTenantId: null,
+                CorrelationId: Guid.NewGuid())));
+        var actorAccessTokenScope = new Mock<IActorAccessTokenScope>(MockBehavior.Strict);
+        var featureGate = new Mock<ITrustedInvocationFeatureGate>(MockBehavior.Strict);
+        featureGate.Setup(gate => gate.EnsureAllowedAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
 
         var response = await InvokeGeneratedAdapter(
             typeof(AuthenticateEndpoint).Assembly.GetType(
@@ -50,11 +73,17 @@ public sealed class GeneratedTokenHttpAdapterTests
             request,
             authService.Object,
             new AuthenticateIdentityRequestValidator(),
-            CancellationToken.None);
+            CancellationToken.None,
+            invocationAuthorizer.Object,
+            actorAccessTokenScope.Object,
+            featureGate.Object,
+            new DefaultHttpContext());
 
         response.Should().BeOfType<Ok<AuthenticateIdentityResponse>>()
             .Which.Value.Should().BeSameAs(expected);
         authService.VerifyAll();
+        invocationAuthorizer.VerifyAll();
+        featureGate.VerifyAll();
     }
 
     [Test]
@@ -79,6 +108,30 @@ public sealed class GeneratedTokenHttpAdapterTests
             .ReturnsAsync(Result<ServiceTokenResponse>.Success(expected));
         var context = new DefaultHttpContext();
         context.Request.Scheme = "https";
+        var invocationAuthorizer = new Mock<IHttpTrustedInvocationAuthorizer>(MockBehavior.Strict);
+        invocationAuthorizer.Setup(authorizer => authorizer.AuthorizeAsync(
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<XFramework.Domain.Shared.BusinessObjects.RequestMetadata>(),
+                It.Is<InvocationAuthorizationPolicy>(policy =>
+                    policy.AllowAnonymous &&
+                    policy.ActorRequirement == ActorRequirement.None &&
+                    policy.TenantAccessMode == TenantAccessMode.Tenantless),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TrustedInvocationResult.Success(new TrustedInvocationContext(
+                Actor: null,
+                Service: null,
+                EffectiveTenantId: null,
+                RequestedTargetTenantId: null,
+                CorrelationId: Guid.NewGuid())));
+        var actorAccessTokenScope = new Mock<IActorAccessTokenScope>(MockBehavior.Strict);
+        var featureGate = new Mock<ITrustedInvocationFeatureGate>(MockBehavior.Strict);
+        featureGate.Setup(gate => gate.EnsureAllowedAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
 
         var response = await InvokeGeneratedAdapter(
             typeof(IssueBoltTransportTokenEndpoint).Assembly.GetType(
@@ -89,7 +142,11 @@ public sealed class GeneratedTokenHttpAdapterTests
             CreateServiceIdentityConfiguration(),
             service.Object,
             new IssueBoltTransportTokenRequestValidator(),
-            CancellationToken.None);
+            CancellationToken.None,
+            invocationAuthorizer.Object,
+            actorAccessTokenScope.Object,
+            featureGate.Object,
+            context);
 
         response.Should().BeOfType<Ok<ServiceTokenResponse>>()
             .Which.Value.Should().BeSameAs(expected);
@@ -117,6 +174,8 @@ public sealed class GeneratedTokenHttpAdapterTests
         root.GetProperty("tokenType").GetString().Should().Be(expected.TokenType);
         root.GetProperty("expiresAtUtc").GetDateTime().Should().Be(expected.ExpiresAtUtc);
         service.VerifyAll();
+        invocationAuthorizer.VerifyAll();
+        featureGate.VerifyAll();
     }
 
     private static async Task<IResult> InvokeGeneratedAdapter(Type adapterType, params object[] arguments)

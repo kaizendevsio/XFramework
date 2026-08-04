@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Identities.UpdateProfile;
 
 public static class UpdateIdentityProfileEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<IdentityAdministrationResponse>> Handle(
         UpdateIdentityProfileRequest request,
         IIdentityAdministrationService service,
@@ -25,7 +28,7 @@ public static class UpdateIdentityProfileEndpoint
         IIdentityAdministrationService service,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return service.UpdateProfileAsync(request, ct);
     }
 }

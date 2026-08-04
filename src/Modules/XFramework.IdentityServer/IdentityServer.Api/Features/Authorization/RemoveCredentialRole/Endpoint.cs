@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Authorization.RemoveCredentialRole;
 
 public static class RemoveCredentialRoleEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result> Handle(
         RemoveCredentialRoleRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -24,7 +27,7 @@ public static class RemoveCredentialRoleEndpoint
         IIdentityAuthorizationService authorizationService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authorizationService.RemoveCredentialRoleAsync(request, ct);
     }
 }

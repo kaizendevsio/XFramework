@@ -80,7 +80,7 @@ The mental model is:
 - Check-in after the grace period becomes `Late`.
 - Missing checkout can become `Incomplete` when the policy requires checkout.
 - Manual adjustments must include `ActorCredentialId` and a non-empty reason.
-- Manual check-in/check-out from operators should use `AttendanceEventSource.Manual` and the scoped operator credential from `RequestMetadata.CredentialId`.
+- Manual check-in/check-out from operators should use `AttendanceEventSource.Manual` and the validated operator credential from `ITrustedInvocationContextAccessor`.
 
 ## Portal Integration Rules
 

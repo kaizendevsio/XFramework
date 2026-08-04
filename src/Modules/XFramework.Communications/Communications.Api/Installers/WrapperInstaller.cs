@@ -13,7 +13,7 @@ public sealed class WrapperInstaller : IInstaller
     {
         services.AddXFrameworkBoltClient(configuration, hostEnvironment: hostEnvironment);
         services.AddIdentityServerSessionValidation();
-        services.AddSingleton<INotificationsServiceWrapper, NotificationsServiceWrapper>();
+        services.AddScoped<INotificationsServiceWrapper, NotificationsServiceWrapper>();
         services.AddStorageWrapperServices();
     }
 }

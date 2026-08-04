@@ -332,7 +332,7 @@ else
             _ => "info"
         };
 
-    private RequestMetadata BuildMetadata() => new() { TenantId = TenantFilter.SelectedTenantId };
+    private RequestMetadata BuildMetadata() => new() { RequestedTenantId = TenantFilter.SelectedTenantId };
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     public void Dispose()
     {

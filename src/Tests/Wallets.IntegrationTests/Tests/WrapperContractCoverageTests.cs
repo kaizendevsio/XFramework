@@ -166,31 +166,35 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
 
         var approveDeposit = await CreateDepositViaWrapper(credential.Id, gatewayId, Unique("dep-approve"));
         var checker = await SeedCredential();
-        var approve = await WalletsTestFixture.ServiceWrapper.ApproveDepositWorkflow(new ApproveDepositWorkflowRequest
+        var approve = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.ApproveDepositWorkflow(new ApproveDepositWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = approveDeposit.Id,
             Reason = "wrapper approve deposit"
-        });
+        }));
         approve.IsSuccess.Should().BeTrue(approve.Message);
 
         var rejectDeposit = await CreateDepositViaWrapper(credential.Id, gatewayId, Unique("dep-reject"));
-        var reject = await WalletsTestFixture.ServiceWrapper.RejectDepositWorkflow(new RejectDepositWorkflowRequest
+        var reject = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.RejectDepositWorkflow(new RejectDepositWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = rejectDeposit.Id,
             Reason = "wrapper reject deposit"
-        });
+        }));
         reject.IsSuccess.Should().BeTrue(reject.Message);
 
         var settleDeposit = await CreateDepositViaWrapper(credential.Id, gatewayId, Unique("dep-settle"));
-        await WalletsTestFixture.ServiceWrapper.ApproveDepositWorkflow(new ApproveDepositWorkflowRequest
+        await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.ApproveDepositWorkflow(new ApproveDepositWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = settleDeposit.Id,
             Reason = "wrapper approve before settle"
-        });
-        var settle = await WalletsTestFixture.ServiceWrapper.SettleDepositWorkflow(new SettleDepositWorkflowRequest
+        }));
+        var settle = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.SettleDepositWorkflow(new SettleDepositWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = settleDeposit.Id,
@@ -198,25 +202,27 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
             ProviderTransactionId = Unique("provider-tx"),
             ProviderStatus = "completed",
             IdempotencyKey = Unique("deposit-settle")
-        });
+        }));
         settle.IsSuccess.Should().BeTrue(settle.Message);
 
         var failDeposit = await CreateDepositViaWrapper(credential.Id, gatewayId, Unique("dep-fail"));
-        var fail = await WalletsTestFixture.ServiceWrapper.FailDepositWorkflow(new FailDepositWorkflowRequest
+        var fail = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.FailDepositWorkflow(new FailDepositWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = failDeposit.Id,
             Reason = "wrapper fail deposit"
-        });
+        }));
         fail.IsSuccess.Should().BeTrue(fail.Message);
 
         var cancelDeposit = await CreateDepositViaWrapper(credential.Id, gatewayId, Unique("dep-cancel"));
-        var cancel = await WalletsTestFixture.ServiceWrapper.CancelDepositWorkflow(new CancelDepositWorkflowRequest
+        var cancel = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.CancelDepositWorkflow(new CancelDepositWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = cancelDeposit.Id,
             Reason = "wrapper cancel deposit"
-        });
+        }));
         cancel.IsSuccess.Should().BeTrue(cancel.Message);
     }
 
@@ -238,31 +244,35 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
         validate.IsSuccess.Should().BeTrue(validate.Message);
 
         var approveWithdrawal = await CreateWithdrawalViaWrapper(credential.Id, wallet.Id, gatewayId, Unique("wd-approve"));
-        var approve = await WalletsTestFixture.ServiceWrapper.ApproveWithdrawalWorkflow(new ApproveWithdrawalWorkflowRequest
+        var approve = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.ApproveWithdrawalWorkflow(new ApproveWithdrawalWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = approveWithdrawal.Id,
             Reason = "wrapper approve withdrawal"
-        });
+        }));
         approve.IsSuccess.Should().BeTrue(approve.Message);
 
         var rejectWithdrawal = await CreateWithdrawalViaWrapper(credential.Id, wallet.Id, gatewayId, Unique("wd-reject"));
-        var reject = await WalletsTestFixture.ServiceWrapper.RejectWithdrawalWorkflow(new RejectWithdrawalWorkflowRequest
+        var reject = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.RejectWithdrawalWorkflow(new RejectWithdrawalWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = rejectWithdrawal.Id,
             Reason = "wrapper reject withdrawal"
-        });
+        }));
         reject.IsSuccess.Should().BeTrue(reject.Message);
 
         var settleWithdrawal = await CreateWithdrawalViaWrapper(credential.Id, wallet.Id, gatewayId, Unique("wd-settle"));
-        await WalletsTestFixture.ServiceWrapper.ApproveWithdrawalWorkflow(new ApproveWithdrawalWorkflowRequest
+        await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.ApproveWithdrawalWorkflow(new ApproveWithdrawalWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = settleWithdrawal.Id,
             Reason = "wrapper approve before settle"
-        });
-        var settle = await WalletsTestFixture.ServiceWrapper.SettleWithdrawalWorkflow(new SettleWithdrawalWorkflowRequest
+        }));
+        var settle = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.SettleWithdrawalWorkflow(new SettleWithdrawalWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = settleWithdrawal.Id,
@@ -270,25 +280,27 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
             ProviderTransactionId = Unique("provider-tx"),
             ProviderStatus = "completed",
             IdempotencyKey = Unique("withdrawal-settle")
-        });
+        }));
         settle.IsSuccess.Should().BeTrue(settle.Message);
 
         var failWithdrawal = await CreateWithdrawalViaWrapper(credential.Id, wallet.Id, gatewayId, Unique("wd-fail"));
-        var fail = await WalletsTestFixture.ServiceWrapper.FailWithdrawalWorkflow(new FailWithdrawalWorkflowRequest
+        var fail = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.FailWithdrawalWorkflow(new FailWithdrawalWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = failWithdrawal.Id,
             Reason = "wrapper fail withdrawal"
-        });
+        }));
         fail.IsSuccess.Should().BeTrue(fail.Message);
 
         var cancelWithdrawal = await CreateWithdrawalViaWrapper(credential.Id, wallet.Id, gatewayId, Unique("wd-cancel"));
-        var cancel = await WalletsTestFixture.ServiceWrapper.CancelWithdrawalWorkflow(new CancelWithdrawalWorkflowRequest
+        var cancel = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.CancelWithdrawalWorkflow(new CancelWithdrawalWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = cancelWithdrawal.Id,
             Reason = "wrapper cancel withdrawal"
-        });
+        }));
         cancel.IsSuccess.Should().BeTrue(cancel.Message);
 
         var expireDeposit = await CreateDepositViaWrapper(credential.Id, gatewayId, Unique("dep-expire"), DateTime.UtcNow.AddMinutes(-5));
@@ -314,12 +326,13 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
         var checker = await SeedCredential();
         var gatewayId = await SeedPaymentGateway();
         var deposit = await CreateDepositViaWrapper(credential.Id, gatewayId, Unique("webhook-dep"));
-        await WalletsTestFixture.ServiceWrapper.ApproveDepositWorkflow(new ApproveDepositWorkflowRequest
+        await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.ApproveDepositWorkflow(new ApproveDepositWorkflowRequest
         {
             Metadata = Metadata(checker.Id),
             RequestId = deposit.Id,
             Reason = "approve before webhook"
-        });
+        }));
 
         var payload = $$"""{"tenantId":"{{WalletsTestFixture.TestTenantId}}","reference":"{{deposit.ExternalReference}}","amount":{{deposit.Amount}}}""";
         var webhook = await WalletsTestFixture.ServiceWrapper.IngestWalletPaymentWebhook(new IngestWalletPaymentWebhookRequest
@@ -426,12 +439,13 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
         createApproval.IsSuccess.Should().BeTrue(createApproval.Message);
 
         var approvalId = await LoadApprovalIdByReason(createApprovalReason);
-        var approve = await WalletsTestFixture.ServiceWrapper.ApproveWalletApproval(new ApproveWalletApprovalRequest
+        var approve = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.ApproveWalletApproval(new ApproveWalletApprovalRequest
         {
             Metadata = Metadata(checker.Id),
             ApprovalId = approvalId,
             Reason = "wrapper approve maker-checker"
-        });
+        }));
         approve.IsSuccess.Should().BeTrue(approve.Message);
 
         var rejectApprovalReason = Unique("approval-reject");
@@ -444,12 +458,13 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
             Reason = rejectApprovalReason
         });
         var rejectApprovalId = await LoadApprovalIdByReason(rejectApprovalReason);
-        var reject = await WalletsTestFixture.ServiceWrapper.RejectWalletApproval(new RejectWalletApprovalRequest
+        var reject = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.RejectWalletApproval(new RejectWalletApprovalRequest
         {
             Metadata = Metadata(checker.Id),
             ApprovalId = rejectApprovalId,
             Reason = "wrapper reject maker-checker"
-        });
+        }));
         reject.IsSuccess.Should().BeTrue(reject.Message);
 
         var createCaseReference = Unique("case");
@@ -738,9 +753,13 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
 
     private static XFramework.Domain.Shared.BusinessObjects.RequestMetadata Metadata(Guid? credentialId = null)
     {
-        var metadata = CreateMetadata();
-        metadata.CredentialId = credentialId;
-        return metadata;
+        return CreateMetadata();
+    }
+
+    private static async Task<T> AsActor<T>(Guid credentialId, Func<Task<T>> action)
+    {
+        using var actorScope = WalletsTestFixture.PushActor(credentialId);
+        return await action();
     }
 
     private static string Unique(string prefix) => $"{prefix}-{Guid.NewGuid():N}";

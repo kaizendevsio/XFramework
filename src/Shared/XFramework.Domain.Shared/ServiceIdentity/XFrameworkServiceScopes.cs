@@ -6,6 +6,7 @@ public static class XFrameworkServiceScopes
     public const string DataContextQuery = "datacontext.query";
     public const string DataContextQueryAllTenants = "datacontext.query.all-tenants";
     public const string DataContextMutate = "datacontext.mutate";
+    public const string TenantTarget = "tenant.target";
 
     public const string AttendanceAdmin = "attendance.admin";
     public const string CommunicationsAdmin = "communications.admin";
@@ -15,6 +16,7 @@ public static class XFrameworkServiceScopes
     public const string IdentitySessionValidate = "identity.session.validate";
     public const string InventarioAdmin = "inventario.admin";
     public const string NotificationsSend = "notifications.send";
+    public const string SmsGatewayAgent = "smsgateway.agent";
     public const string SmsGatewaySend = "smsgateway.send";
     public const string StorageRead = "storage.read";
     public const string StorageWrite = "storage.write";
@@ -26,6 +28,7 @@ public static class XFrameworkServiceScopes
         DataContextQuery,
         DataContextQueryAllTenants,
         DataContextMutate,
+        TenantTarget,
         AttendanceAdmin,
         CommunicationsAdmin,
         CommunicationsChat,
@@ -34,6 +37,7 @@ public static class XFrameworkServiceScopes
         IdentitySessionValidate,
         InventarioAdmin,
         NotificationsSend,
+        SmsGatewayAgent,
         SmsGatewaySend,
         StorageRead,
         StorageWrite,

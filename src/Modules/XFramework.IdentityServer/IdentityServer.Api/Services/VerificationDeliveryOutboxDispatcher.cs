@@ -41,9 +41,7 @@ public sealed class VerificationDeliveryOutboxDispatcher(
         var db = scope.ServiceProvider.GetRequiredService<DbContext>();
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        await AbandonExpiredClaimsAsync(db, now, ct);
-
-        var id = await db.Set<VerificationDeliveryOutboxMessage>()
+        var candidate = await db.Set<VerificationDeliveryOutboxMessage>()
             .IgnoreQueryFilters()
             .Where(message => !message.IsDeleted && message.IsEnabled)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
@@ -51,15 +49,36 @@ public sealed class VerificationDeliveryOutboxDispatcher(
             .Where(message => message.NextAttemptAt == null || message.NextAttemptAt <= now)
             .Where(message => message.LeaseExpiresAt == null || message.LeaseExpiresAt <= now)
             .OrderBy(message => message.CreatedAt)
-            .Select(message => (Guid?)message.Id)
+            .Select(message => new OutboxCandidate(message.Id, message.TenantId, message.RequestId))
             .FirstOrDefaultAsync(ct);
-        if (id is null)
+        if (candidate is null)
             return;
+
+        var contextInitializer = scope.ServiceProvider
+            .GetRequiredService<ITrustedServiceTargetContextInitializer>();
+        var authorization = await contextInitializer.EstablishAsync(
+            candidate.TenantId,
+            XFrameworkServiceNames.Communications,
+            [XFrameworkServiceScopes.BoltService],
+            XFrameworkServiceNames.IdentityServer,
+            candidate.RequestId,
+            ct);
+        if (!authorization.IsSuccess)
+        {
+            logger.LogWarning(
+                "Verification delivery outbox candidate {OutboxMessageId} could not establish trusted tenant context: {Error}",
+                candidate.Id,
+                authorization.Error);
+            return;
+        }
+
+        await AbandonExpiredClaimAsync(db, candidate.Id, candidate.TenantId, now, ct);
 
         var leaseOwner = $"{Environment.MachineName}:{Guid.NewGuid():N}";
         var claimed = await db.Set<VerificationDeliveryOutboxMessage>()
             .IgnoreQueryFilters()
-            .Where(message => message.Id == id && message.Attempts < MaxAttempts)
+            .Where(message => message.Id == candidate.Id && message.TenantId == candidate.TenantId)
+            .Where(message => message.Attempts < MaxAttempts)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .Where(message => message.NextAttemptAt == null || message.NextAttemptAt <= now)
             .Where(message => message.LeaseExpiresAt == null || message.LeaseExpiresAt <= now)
@@ -75,7 +94,10 @@ public sealed class VerificationDeliveryOutboxDispatcher(
         var message = await db.Set<VerificationDeliveryOutboxMessage>()
             .IgnoreQueryFilters()
             .AsTracking()
-            .SingleAsync(item => item.Id == id && item.LeaseOwner == leaseOwner, ct);
+            .SingleAsync(item =>
+                item.Id == candidate.Id &&
+                item.TenantId == candidate.TenantId &&
+                item.LeaseOwner == leaseOwner, ct);
         ICommunicationsServiceWrapper wrapper;
         try
         {
@@ -108,7 +130,7 @@ public sealed class VerificationDeliveryOutboxDispatcher(
                 IsScheduled = false,
                 Metadata = new RequestMetadata
                 {
-                    TenantId = message.TenantId,
+                    RequestedTenantId = authorization.Context!.EffectiveTenantId,
                     RequestId = message.RequestId
                 }
             }, ct);
@@ -152,10 +174,16 @@ public sealed class VerificationDeliveryOutboxDispatcher(
         await db.SaveChangesAsync(ct);
     }
 
-    private static async Task AbandonExpiredClaimsAsync(DbContext db, DateTime now, CancellationToken ct)
+    private static async Task AbandonExpiredClaimAsync(
+        DbContext db,
+        Guid messageId,
+        Guid tenantId,
+        DateTime now,
+        CancellationToken ct)
     {
         await db.Set<VerificationDeliveryOutboxMessage>()
             .IgnoreQueryFilters()
+            .Where(message => message.Id == messageId && message.TenantId == tenantId)
             .Where(message => !message.IsDeleted && message.IsEnabled)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .Where(message => message.Attempts < MaxAttempts)
@@ -169,6 +197,7 @@ public sealed class VerificationDeliveryOutboxDispatcher(
 
         var abandonedVerificationIds = await db.Set<VerificationDeliveryOutboxMessage>()
             .IgnoreQueryFilters()
+            .Where(message => message.Id == messageId && message.TenantId == tenantId)
             .Where(message => !message.IsDeleted && message.IsEnabled)
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .Where(message => message.LeaseExpiresAt <= now)
@@ -180,6 +209,7 @@ public sealed class VerificationDeliveryOutboxDispatcher(
 
         await db.Set<IdentityVerification>()
             .IgnoreQueryFilters()
+            .Where(item => item.TenantId == tenantId)
             .Where(item => abandonedVerificationIds.Contains(item.Id) && item.ConsumedAt == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(item => item.Status, (short?)GenericStatusType.Canceled)
@@ -190,6 +220,7 @@ public sealed class VerificationDeliveryOutboxDispatcher(
 
         await db.Set<VerificationDeliveryOutboxMessage>()
             .IgnoreQueryFilters()
+            .Where(message => message.Id == messageId && message.TenantId == tenantId)
             .Where(message => abandonedVerificationIds.Contains(message.VerificationId))
             .Where(message => message.ProcessedAt == null && message.DeadLetteredAt == null)
             .ExecuteUpdateAsync(setters => setters
@@ -263,4 +294,6 @@ public sealed class VerificationDeliveryOutboxDispatcher(
         message.Intent = null;
         message.Message = null;
     }
+
+    private sealed record OutboxCandidate(Guid Id, Guid TenantId, Guid RequestId);
 }

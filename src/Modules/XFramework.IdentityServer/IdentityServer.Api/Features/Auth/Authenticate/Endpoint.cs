@@ -2,12 +2,16 @@ using FluentValidation;
 using IdentityServer.Api.Infrastructure;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.Auth.Authenticate;
 
 public static class AuthenticateEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.Optional,
+        TenantAccessMode = TenantAccessMode.PublicTenantLookup,
+        AllowAnonymous = true)]
     [MapPost("/api/auth/authenticate", Tags = ["Auth"],
         Summary = "Authenticate a user",
         Description = "Authenticates a user with multi-type support (Username, Email, Phone, Token). Generates JWT tokens and creates session.",

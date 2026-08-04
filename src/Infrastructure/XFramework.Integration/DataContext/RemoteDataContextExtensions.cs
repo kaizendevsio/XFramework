@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.DataContext.Cache;
+using XFramework.Integration.Security;
 
 namespace XFramework.Integration.DataContext;
 
@@ -25,7 +26,8 @@ public static class RemoteDataContextExtensions
             var cache = sp.GetRequiredService<IClientCacheService>();
             var opts = sp.GetRequiredService<DataContextOptions>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachingDataContext>>();
-            return new CachingDataContext(remote, cache, opts, logger);
+            var invocationContext = sp.GetRequiredService<ITrustedInvocationContextAccessor>();
+            return new CachingDataContext(remote, cache, opts, logger, invocationContext);
         });
         services.AddScoped<ICacheControl>(sp => (CachingDataContext)sp.GetRequiredService<IDataContext>());
 

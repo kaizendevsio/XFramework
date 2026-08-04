@@ -466,9 +466,7 @@ internal sealed class CommunicationsChatSession(
         where TRequest : RequestBase
     {
         request.Metadata ??= new RequestMetadata();
-        request.Metadata.TenantId = TenantId;
-        request.Metadata.CredentialId = CredentialId;
-        request.Metadata.ActorAccessToken ??= accessToken;
+        request.Metadata.RequestedTenantId = TenantId;
 
         StampCredentialFields(request);
         return request;

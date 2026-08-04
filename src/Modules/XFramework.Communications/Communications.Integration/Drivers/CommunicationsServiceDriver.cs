@@ -978,7 +978,7 @@ public static class CommunicationsServiceWrapperExtensions
     public static void AddCommunicationsWrapperServices(this IServiceCollection services)
     {
         services.TryAddSingleton<ICommunicationsChatActorProvider, EmptyCommunicationsChatActorProvider>();
-        services.AddSingleton<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
+        services.AddScoped<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
         services.AddSingleton<ICommunicationsChatClient, CommunicationsChatClient>();
     }
 }

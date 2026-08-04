@@ -15,7 +15,7 @@ public sealed class SmsService(
     AppDbContext db,
     ILogger<SmsService> logger,
     IConfiguration configuration,
-    ITrustedServiceInvocationResolver? serviceInvocationResolver = null) : ISmsService
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor) : ISmsService
 {
     private readonly TimeSpan _leaseDuration = TimeSpan.FromSeconds(
         Math.Max(30, configuration.GetValue("SmsGateway:LeaseSeconds", 120)));
@@ -302,21 +302,5 @@ public sealed class SmsService(
     };
 
     private Guid ResolveTrustedTenantId(RequestMetadata metadata)
-    {
-        if (serviceInvocationResolver is not null)
-        {
-            var trusted = serviceInvocationResolver.ResolveAsync(
-                    metadata,
-                    configuration["BoltConfiguration:ClientName"] ?? XFrameworkServiceNames.SmsGateway,
-                    [XFrameworkServiceScopes.BoltService],
-                    requireTenant: true)
-                .GetAwaiter()
-                .GetResult();
-
-            if (!trusted.IsSuccess)
-                return Guid.Empty;
-        }
-
-        return metadata.TenantId ?? Guid.Empty;
-    }
+        => trustedInvocationContextAccessor.Current?.EffectiveTenantId ?? Guid.Empty;
 }

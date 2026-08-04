@@ -458,9 +458,9 @@ else
 
     private RequestMetadata BuildMetadata() => new()
     {
-        TenantId = TenantFilter.SelectedTenantId,
+        RequestedTenantId = TenantFilter.SelectedTenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal"
+        OperationName = "Portal"
     };
 
     private string GetProductLabel(Product product) =>

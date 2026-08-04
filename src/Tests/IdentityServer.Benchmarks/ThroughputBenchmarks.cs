@@ -214,8 +214,8 @@ public class ThroughputBenchmarks
     {
         Metadata = new RequestMetadata
         {
-            TenantId = TestTenantId, RequestId = Guid.NewGuid(),
-            IpAddress = "127.0.0.1", Name = "Benchmark"
+            RequestId = Guid.NewGuid(),
+            IpAddress = "127.0.0.1", OperationName = "Benchmark"
         }
     };
 

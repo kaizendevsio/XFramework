@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Identities.Create;
 
 public static class CreateIdentityEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<IdentityAdministrationResponse>> Handle(
         CreateIdentityRequest request,
         IIdentityAdministrationService service,
@@ -25,7 +28,7 @@ public static class CreateIdentityEndpoint
         IIdentityAdministrationService service,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return service.CreateAsync(request, ct);
     }
 }

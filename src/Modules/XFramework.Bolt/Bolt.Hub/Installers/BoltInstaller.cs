@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.ResponseCompression;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Domain.Shared.ServiceIdentity;
+using IdentityServer.Integration.Extensions;
+using XFramework.Integration.Extensions;
 
 namespace Bolt.Hub.Installers;
 
@@ -67,6 +69,8 @@ public sealed class BoltInstaller : IInstaller
                 .Bind(options.RegistrationMigrationAllowances);
         });
         services.AddSingleton<IBoltTopicAuthorizer, CommunicationsBoltTopicAuthorizer>();
+        services.AddIdentityServerHttpActorValidation(configuration);
+        services.AddIdentityServerServiceTokenClient(configuration, XFrameworkServiceNames.BoltHub);
         services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
         services.AddMemoryCache();
         services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();

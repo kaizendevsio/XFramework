@@ -139,7 +139,7 @@ public sealed class CommunicationsTemplateServiceTests
         var otherCredentialId = Guid.NewGuid();
         var dataContext = new InMemoryDataContext();
         dataContext.Seed(Credential(ownerCredentialId, tenantId), Credential(otherCredentialId, tenantId));
-        var service = CreateService(dataContext, tenantId);
+        var service = CreateService(dataContext, tenantId, ownerCredentialId);
         var created = await service.CreateTemplateAsync(new CreateMessageTemplateRequest
         {
             TemplateType = MessageTemplateTypes.User,
@@ -151,7 +151,8 @@ public sealed class CommunicationsTemplateServiceTests
             Metadata = Metadata(tenantId, ownerCredentialId)
         });
 
-        var result = await service.RenderTemplateAsync(new RenderMessageTemplateRequest
+        var otherService = CreateService(dataContext, tenantId, otherCredentialId);
+        var result = await otherService.RenderTemplateAsync(new RenderMessageTemplateRequest
         {
             TemplateId = created.Data!.Id,
             TemplateVariables = new Dictionary<string, string> { ["Name"] = "Ava" },
@@ -207,14 +208,21 @@ public sealed class CommunicationsTemplateServiceTests
 
     private static CommunicationsTemplateService CreateService(
         InMemoryDataContext dataContext,
-        params Guid[] tenantIds) =>
+        Guid tenantId,
+        Guid? credentialId = null) =>
         new(
             dataContext,
-            new FakeTenantResolver(tenantIds),
+            new FakeTenantResolver([tenantId]),
             new CommunicationsRequestContextResolver(
                 new HttpContextAccessor(),
                 TestConfiguration(),
-                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver()),
+                serviceInvocationResolver: new FakeTrustedServiceInvocationResolver(
+                    tenantId,
+                    credentialId,
+                    includeActor: true,
+                    roles: credentialId is null
+                        ? new HashSet<string>(["Admin"], StringComparer.OrdinalIgnoreCase)
+                        : new HashSet<string>(StringComparer.OrdinalIgnoreCase))),
             NullLogger<CommunicationsTemplateService>.Instance);
 
     private static GetMessageTemplatesRequest ListRequest(Guid tenantId) => new()
@@ -238,10 +246,8 @@ public sealed class CommunicationsTemplateServiceTests
     {
         var metadata = new RequestMetadata
         {
-            TenantId = tenantId,
-            CredentialId = credentialId,
-            Name = "XFramework.Portal",
-            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidPortalToken
+            RequestedTenantId = tenantId,
+            OperationName = "CommunicationsTemplates"
         };
         return metadata;
     }

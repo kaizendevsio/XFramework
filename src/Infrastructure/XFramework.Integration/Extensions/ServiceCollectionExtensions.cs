@@ -16,12 +16,45 @@ using XFramework.Integration.DataContext;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Health;
 using XFramework.Integration.Security;
+using XFramework.Domain.Shared.Security;
 using XFramework.Integration.ServiceDiscovery;
 
 namespace XFramework.Integration.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    public static IServiceCollection AddIdentityServerServiceTokenClient(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string defaultClientId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(defaultClientId);
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddOptions<ServiceIdentityOptions>()
+            .Configure(options =>
+            {
+                configuration.GetSection(ServiceIdentityOptions.SectionName).Bind(options);
+                options.ClientId = string.IsNullOrWhiteSpace(options.ClientId)
+                    ? defaultClientId
+                    : options.ClientId;
+            })
+            .ValidateOnStart();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<ServiceIdentityOptions>, ServiceIdentityOptionsValidator>());
+        services.AddHttpClient(ServiceIdentityHttpClient.Name, (serviceProvider, client) =>
+        {
+            client.BaseAddress = serviceProvider
+                .GetRequiredService<IOptions<ServiceIdentityOptions>>()
+                .Value
+                .ResolveAuthority();
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
+        services.TryAddSingleton<IServiceTokenProvider, IdentityServerServiceTokenProvider>();
+        services.AddTrustedInvocationSecurity();
+        return services;
+    }
+
     /// <summary>
     /// Register BoltClient (thin protocol) and BoltDriver (IMessageBusWrapper) for service-to-service communication.
     /// Reads BoltConfiguration from appsettings.json (section "BoltConfiguration").
@@ -150,12 +183,45 @@ public static class ServiceCollectionExtensions
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IBoltServiceManifestProvider, ConfigurationBoltServiceManifestProvider>());
         services.AddHostedService<BoltServiceManifestAdvertisementHostedService>();
-        services.TryAddSingleton<IIdentitySigningKeyProvider, IdentityServerSigningKeyProvider>();
-        services.TryAddSingleton<IServiceTokenValidator, ServiceTokenValidator>();
-        services.TryAddSingleton<ITrustedServiceInvocationResolver, TrustedServiceInvocationResolver>();
-        services.TryAddSingleton<IBoltServiceInvocationAuthorizer, BoltServiceInvocationAuthorizer>();
-        services.AddSingleton<IMessageBusWrapper, BoltDriver>();
+        services.AddTrustedInvocationSecurity();
+        services.AddScoped<IMessageBusWrapper, BoltDriver>();
 
+        return services;
+    }
+
+    public static IServiceCollection AddTrustedInvocationSecurity(this IServiceCollection services)
+    {
+        services.TryAddSingleton<IdentityServerSigningKeyProvider>();
+        services.TryAddSingleton<IIdentitySigningKeyProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<IdentityServerSigningKeyProvider>());
+        services.TryAddSingleton<IServiceCredentialGenerationProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<IIdentitySigningKeyProvider>() as IServiceCredentialGenerationProvider
+            ?? throw new InvalidOperationException(
+                "The configured identity signing-key provider must also validate service credential generations."));
+        services.TryAddSingleton<IServiceTokenValidator, ServiceTokenValidator>();
+        services.TryAddSingleton<IServiceIdentityProvider, ServiceIdentityProvider>();
+        services.TryAddSingleton<AmbientActorAccessTokenProvider>();
+        services.TryAddSingleton<IActorAccessTokenProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<AmbientActorAccessTokenProvider>());
+        services.TryAddSingleton<IActorAccessTokenScope>(serviceProvider =>
+            serviceProvider.GetRequiredService<AmbientActorAccessTokenProvider>());
+        services.TryAddScoped<IActorIdentityProvider, RejectingActorIdentityProvider>();
+        services.TryAddScoped<TrustedInvocationContextAccessor>();
+        services.TryAddScoped<ITrustedInvocationContextAccessor>(serviceProvider =>
+            serviceProvider.GetRequiredService<TrustedInvocationContextAccessor>());
+        services.TryAddScoped<IEffectiveTenantContextAccessor>(serviceProvider =>
+            serviceProvider.GetRequiredService<TrustedInvocationContextAccessor>());
+        services.TryAddScoped<CrossTenantWriteAuthorization>();
+        services.TryAddScoped<ICrossTenantWriteAuthorizationAccessor>(serviceProvider =>
+            serviceProvider.GetRequiredService<CrossTenantWriteAuthorization>());
+        services.TryAddScoped<ICrossTenantWriteAuthorizationScopeFactory>(serviceProvider =>
+            serviceProvider.GetRequiredService<CrossTenantWriteAuthorization>());
+        services.TryAddScoped<ITrustedInvocationContextStore>(serviceProvider =>
+            serviceProvider.GetRequiredService<TrustedInvocationContextAccessor>());
+        services.TryAddScoped<ITrustedInvocationResolver, TrustedInvocationResolver>();
+        services.TryAddScoped<ITrustedServiceTargetContextInitializer, TrustedServiceTargetContextInitializer>();
+        services.TryAddScoped<IBoltServiceInvocationAuthorizer, BoltServiceInvocationAuthorizer>();
+        services.TryAddScoped<IHttpTrustedInvocationAuthorizer, HttpTrustedInvocationAuthorizer>();
         return services;
     }
 

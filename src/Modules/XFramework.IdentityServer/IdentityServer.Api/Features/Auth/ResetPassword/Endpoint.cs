@@ -1,12 +1,16 @@
 using FluentValidation;
 using IdentityServer.Api.Infrastructure;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.Auth.ResetPassword;
 
 public static class ResetPasswordEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        ActorRequirement = ActorRequirement.Optional,
+        TenantAccessMode = TenantAccessMode.PublicTenantLookup,
+        AllowAnonymous = true)]
     [MapPost("/api/auth/reset-password", Tags = ["Auth"],
         Summary = "Reset password with token",
         Description = "Resets a user's password using a valid reset token. Validates the token, hashes the new password, and invalidates the token.",

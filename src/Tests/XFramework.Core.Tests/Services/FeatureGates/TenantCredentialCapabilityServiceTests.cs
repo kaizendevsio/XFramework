@@ -183,7 +183,7 @@ public sealed class TenantCredentialCapabilityServiceTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
 
-        return new AppDbContext(options);
+        return TestTrustedPersistence.Create(options);
     }
 
     private static TenantCredentialCapabilityService CreateService(AppDbContext db) =>

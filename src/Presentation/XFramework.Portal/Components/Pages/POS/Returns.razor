@@ -142,6 +142,7 @@ else
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private PortalActorContext ActorContext { get; set; } = default!;
 
     private List<PosReturnSummaryResponse> _returns = [];
     private List<PosSaleSummaryResponse> _completedSales = [];
@@ -297,7 +298,7 @@ else
             return;
         }
 
-        var cashierCredentialId = RequestMetadata.CredentialId ?? Guid.Empty;
+        var cashierCredentialId = ActorContext.CredentialId ?? Guid.Empty;
         if (cashierCredentialId == Guid.Empty)
         {
             ToastService.Show("Cashier credential is missing from the current session.");
@@ -345,11 +346,9 @@ else
 
     private RequestMetadata BuildMetadata() => new()
     {
-        TenantId = TenantFilter.SelectedTenantId,
-        CredentialId = RequestMetadata.CredentialId,
-        SessionId = RequestMetadata.SessionId,
+        RequestedTenantId = TenantFilter.SelectedTenantId,
         RequestId = Guid.NewGuid(),
-        Name = "Portal"
+        OperationName = "Portal"
     };
 
     private string GetSaleNumber(Guid saleId) => _completedSales.FirstOrDefault(item => item.Id == saleId)?.SaleNumber ?? saleId.ToString()[..8];

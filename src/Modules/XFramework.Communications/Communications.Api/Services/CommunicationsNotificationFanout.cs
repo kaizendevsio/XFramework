@@ -217,7 +217,7 @@ public sealed class CommunicationsNotificationFanout(
         var response = await notificationsWrapper.CreateNotification(new CreateNotificationRequest
         {
             TenantId = outboxEvent.TenantId,
-            Metadata = new RequestMetadata { TenantId = outboxEvent.TenantId },
+            Metadata = new RequestMetadata { RequestedTenantId = outboxEvent.TenantId },
             RecipientCredentialId = recipientCredentialId,
             SourceCredentialId = outboxEvent.ActorCredentialId,
             TemplateKey = templateKey,

@@ -20,9 +20,12 @@ using XFramework.Domain.Contexts;
 using XFramework.Domain.Interceptors;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.Extensions;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Extensions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Security;
 using XFramework.TestInfrastructure;
 using BatchDecrementEndpoint = Wallets.Api.Features.Batch.DecrementBatch.Endpoint;
 using BatchIncrementEndpoint = Wallets.Api.Features.Batch.IncrementBatch.Endpoint;
@@ -38,9 +41,23 @@ public class WalletsTestFixture
     private static WebApplication _streamFlowApp = null!;
     private static WebApplication _walletsApp = null!;
     private static WebApplication _testClientApp = null!;
+    private static IServiceScope _testClientScope = null!;
     private static Task? _streamFlowTask;
     private static Task? _walletsTask;
     private static Task? _testClientTask;
+    private static readonly Guid DefaultActorCredentialId =
+        Guid.Parse("00000000-0000-0000-0000-000000000831");
+    private static readonly Guid DefaultActorSessionId =
+        Guid.Parse("00000000-0000-0000-0000-000000000833");
+    private static readonly TestBoltTransportAuthority TransportAuthority = new(BoltUrl);
+    private static readonly TestInvocationIdentityOptions InvocationIdentity = new(
+        "wallets-test-actor-token",
+        "wallets-test-service-token",
+        XFrameworkServiceNames.Portal,
+        Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac"),
+        DefaultActorCredentialId,
+        Guid.Parse("00000000-0000-0000-0000-000000000832"),
+        DefaultActorSessionId);
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => "http://localhost:17100";
@@ -49,9 +66,20 @@ public class WalletsTestFixture
 
     public static IServiceProvider Services => _walletsApp.Services;
     public static IWalletsServiceWrapper ServiceWrapper =>
-        _testClientApp.Services.GetRequiredService<IWalletsServiceWrapper>();
+        _testClientScope.ServiceProvider.GetRequiredService<IWalletsServiceWrapper>();
     public static IDataContext DataContext =>
         _testClientApp.Services.CreateScope().ServiceProvider.GetRequiredService<IDataContext>();
+
+    public static IDisposable PushActor(Guid credentialId, bool privileged = true)
+    {
+        var token = TestInvocationIdentityExtensions.CreateTestActorToken(
+            TestTenantId,
+            credentialId,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            privileged ? ["Admin"] : []);
+        return TestInvocationActorTokenScope.Push(token);
+    }
 
     public static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
     public static readonly Guid TestWalletTypeId = Guid.Parse("e1e2e3e4-e5f6-7890-abcd-ef1234567890");
@@ -85,6 +113,7 @@ public class WalletsTestFixture
 
         _testClientApp = StartTestClient();
         await WaitForHealth($"{TestClientUrl}/health/live", _testClientTask);
+        _testClientScope = _testClientApp.Services.CreateScope();
 
         await WaitForBoltClients();
     }
@@ -92,24 +121,41 @@ public class WalletsTestFixture
     [OneTimeTearDown]
     public async Task GlobalTeardown()
     {
+        try { _testClientScope?.Dispose(); } catch { }
         try { if (_testClientApp != null) await _testClientApp.StopAsync(); } catch { }
         try { if (_walletsApp != null) await _walletsApp.StopAsync(); } catch { }
         try { if (_streamFlowApp != null) await _streamFlowApp.StopAsync(); } catch { }
         if (_postgres != null) await _postgres.DisposeAsync();
+        TransportAuthority.Dispose();
     }
 
     private static WebApplication StartBolt()
     {
-        var builder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Development
+        });
         builder.WebHost.UseUrls(BoltUrl);
-        OverrideConfig(builder, "Bolt.WalletTest", "00000000-0000-0000-0000-000000000010");
+        OverrideConfig(builder, "Bolt.WalletTest", BoltUrl);
+        TransportAuthority.Configure(builder);
+        builder.Services.InstallServicesInAssembly<Bolt.Hub.Installers.BoltInstaller>(
+            builder.Configuration,
+            builder.Environment);
+        builder.Services.InstallSwagger(builder.Configuration);
+        builder.Services.InstallOData(builder.Configuration);
+        builder.Services.InstallJwt(builder.Configuration);
+        builder.Services.InstallStandardServices<Bolt.Hub.Installers.BoltInstaller>(builder.Configuration);
+        builder.Services.InstallRuntimeServices(builder.Configuration);
+        builder.Services.AddTestInvocationClient(InvocationIdentity);
 
         var app = (WebApplication)builder.Build();
+        TransportAuthority.MapEndpoints(app);
         app.UseCorrelationId();
         app.UseAppServices();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        _streamFlowTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        _streamFlowTask = app.WaitForShutdownAsync();
         return app;
     }
 
@@ -118,7 +164,7 @@ public class WalletsTestFixture
         // Build manually so test configuration is in place before installers/Bolt client registration read it.
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls(WalletsUrl);
-        OverrideConfig(builder, "Wallets", "4902761a-822d-4c6b-8e2d-323fd501bcd6");
+        OverrideConfig(builder, XFrameworkServiceNames.Wallets, WalletsUrl);
         builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
         builder.Services.AddHttpContextAccessor();
@@ -152,6 +198,7 @@ public class WalletsTestFixture
         builder.Services.AddScoped<Wallets.Api.Services.IWalletWorkflowService, Wallets.Api.Services.WalletWorkflowService>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletApprovalWorkflowService, Wallets.Api.Services.WalletWorkflowService>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletCaseWorkflowService, Wallets.Api.Services.WalletWorkflowService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletProviderWorkflowService, Wallets.Api.Services.WalletWorkflowService>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletReportingService, Wallets.Api.Services.WalletWorkflowService>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletPolicyAdminService, Wallets.Api.Services.WalletPolicyAdminService>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletPaymentWebhookService, Wallets.Api.Services.WalletPaymentWebhookService>();
@@ -160,6 +207,11 @@ public class WalletsTestFixture
         builder.Services.AddScoped<Wallets.Api.Services.IWalletReconciliationService, Wallets.Api.Services.WalletReconciliationService>();
         builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletOperationsService>();
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddSingleton(
+            TransportAuthority.CreateTokenProvider(XFrameworkServiceNames.Wallets));
+        builder.Services.AddTestInvocationServer(
+            InvocationIdentity,
+            XFrameworkServiceNames.Wallets);
         builder.Services.AddDataContextHandler(typeof(Wallets.Api.Services.WalletOperationsService).Assembly);
 
         var app = (WebApplication)builder.Build();
@@ -180,7 +232,8 @@ public class WalletsTestFixture
 
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        _walletsTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        _walletsTask = app.WaitForShutdownAsync();
         return app;
     }
 
@@ -201,11 +254,19 @@ public class WalletsTestFixture
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["BoltConfiguration:ClientName"] = "WalletTestClient",
+            ["BoltConfiguration:ClientName"] = XFrameworkServiceNames.Portal,
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["BoltConfiguration:Signature"] = "wallets-bolt-test-secret",
+            ["ServiceIdentity:ClientId"] = XFrameworkServiceNames.Portal,
+            ["ServiceIdentity:Authority"] = BoltUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
+            ["ServiceIdentity:GenerationId"] = "wallet-test-client-g1",
+            ["ServiceIdentity:ClientSecret"] = "wallet-test-client-secret-2026-secure-value",
+            ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.BoltService,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
+            ["Kestrel:Endpoints:Http:Url"] = TestClientUrl,
+            ["urls"] = TestClientUrl,
             ["Logging:LogLevel:Default"] = "Warning",
         });
 
@@ -215,19 +276,31 @@ public class WalletsTestFixture
         builder.Services.InstallStandardServices<WalletsTestFixture>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("WalletTest"));
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddSingleton(
+            TransportAuthority.CreateTokenProvider(XFrameworkServiceNames.Portal));
+        builder.Services.AddTestInvocationClient(InvocationIdentity);
         builder.Services.AddWalletsWrapperServices();
         builder.Services.AddRemoteDataContext();
         builder.Services.AddScoped(_ => new RequestMetadata
         {
-            TenantId = TestTenantId,
+            RequestedTenantId = TestTenantId,
             RequestId = Guid.NewGuid()
         });
 
         var app = builder.Build();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
-        _testClientTask = Task.Run(() => app.RunAsync());
+        StartApplication(app);
+        _testClientTask = app.WaitForShutdownAsync();
         return app;
+    }
+
+    private static void StartApplication(WebApplication app)
+    {
+        app.StartAsync()
+            .WaitAsync(TimeSpan.FromSeconds(30))
+            .GetAwaiter()
+            .GetResult();
     }
 
     private static async Task WaitForBoltClients()
@@ -271,15 +344,26 @@ public class WalletsTestFixture
         }
     }
 
-    private static void OverrideConfig(WebApplicationBuilder builder, string clientName, string clientGuid)
+    private static void OverrideConfig(
+        WebApplicationBuilder builder,
+        string clientName,
+        string serverUrl)
     {
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = ConnectionString,
-            ["BoltConfiguration:ClientGuid"] = clientGuid,
+            ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ClientName"] = clientName,
             ["BoltConfiguration:Signature"] = "wallets-bolt-test-secret",
+            ["ServiceIdentity:ClientId"] = clientName,
+            ["ServiceIdentity:Authority"] = BoltUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
+            ["ServiceIdentity:GenerationId"] = "wallet-test-service-g1",
+            ["ServiceIdentity:ClientSecret"] = "wallet-test-service-secret-2026-secure-value",
+            ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.BoltService,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
+            ["Kestrel:Endpoints:Http:Url"] = serverUrl,
+            ["urls"] = serverUrl,
             ["Wallets:Webhooks:SharedSecret"] = "wallets-webhook-test-secret",
             ["Logging:LogLevel:Default"] = "Warning"
         });
@@ -302,7 +386,11 @@ public class WalletsTestFixture
                 Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
-        await using var db = new AppDbContext(options);
+        await using var db = new AppDbContext(
+            options,
+            new HttpContextAccessor(),
+            new ConfigurationBuilder().Build(),
+            new TestEffectiveTenantContextAccessor(TestTenantId));
         await db.Database.MigrateAsync();
         await XFramework.TestInfrastructure.TestSeedData.SeedAll(db);
         await SeedWalletFeeSchedules(db);
@@ -457,6 +545,17 @@ public class WalletsTestFixture
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
+            var roles = claims
+                .Where(static claim => claim.Type == ClaimTypes.Role)
+                .Select(static claim => claim.Value)
+                .ToArray();
+            var actorToken = TestInvocationIdentityExtensions.CreateTestActorToken(
+                tenantId,
+                credentialId ?? DefaultActorCredentialId,
+                identityId,
+                DefaultActorSessionId,
+                roles);
+            Request.Headers.Authorization = $"Bearer {actorToken}";
 
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }

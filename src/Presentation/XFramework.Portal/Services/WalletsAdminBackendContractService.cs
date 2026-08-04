@@ -383,13 +383,11 @@ public sealed class WalletsAdminBackendContractService(
 
     private RequestMetadata Metadata() => new()
     {
-        TenantId = tenantFilter.SelectedTenantId ?? requestMetadata.TenantId,
-        CredentialId = requestMetadata.CredentialId,
-        SessionId = requestMetadata.SessionId,
+        RequestedTenantId = tenantFilter.SelectedTenantId ?? requestMetadata.RequestedTenantId,
         RequestId = Guid.NewGuid(),
-        Name = requestMetadata.Name ?? "Portal",
+        OperationName = requestMetadata.OperationName ?? "Portal",
         DeviceName = requestMetadata.DeviceName,
-        DeviceAgent = requestMetadata.DeviceAgent,
+        UserAgent = requestMetadata.UserAgent,
         IpAddress = requestMetadata.IpAddress
     };
 

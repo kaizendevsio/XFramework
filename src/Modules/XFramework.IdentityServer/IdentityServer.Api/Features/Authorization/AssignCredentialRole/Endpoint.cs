@@ -6,7 +6,10 @@ namespace IdentityServer.Api.Features.Authorization.AssignCredentialRole;
 
 public static class AssignCredentialRoleEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin],
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result<AssignedCredentialRoleResponse>> Handle(
         AssignCredentialRoleRequest request,
         IIdentityAuthorizationService authorizationService,
@@ -23,7 +26,7 @@ public static class AssignCredentialRoleEndpoint
         IIdentityAuthorizationService authorizationService,
         CancellationToken ct)
     {
-        IdentityAuthorizationEndpointMetadata.ApplyHttpContextActor(request.Metadata, httpContext);
+        IdentityAuthorizationEndpointMetadata.ApplyHttpDiagnostics(request.Metadata, httpContext);
         return authorizationService.AssignCredentialRoleAsync(request, ct);
     }
 }

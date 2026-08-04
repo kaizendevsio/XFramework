@@ -16,6 +16,7 @@ public sealed class ServiceIdentityOptions
     public int TokenRefreshSkewSeconds { get; set; } = 60;
     public int TokenAcquisitionTimeoutSeconds { get; set; } = 30;
     public int SigningKeyCacheMinutes { get; set; } = 15;
+    public int CredentialGenerationCacheSeconds { get; set; } = 5;
     public List<string> DefaultScopes { get; set; } = [];
 
     public bool HasValidationFallback => ValidationFallback is { } fallback

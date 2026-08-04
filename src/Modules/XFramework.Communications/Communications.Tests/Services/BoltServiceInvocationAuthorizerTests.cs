@@ -19,53 +19,123 @@ public sealed class BoltServiceInvocationAuthorizerTests
             Guid.NewGuid(),
             BoltCodec.Fnv1aHash(XFrameworkServiceNames.Portal.ToSha256()));
 
+        var policy = new InvocationAuthorizationPolicy
+        {
+            ActorRequirement = ActorRequirement.None,
+            TenantAccessMode = TenantAccessMode.Tenantless,
+            RequiredServiceScopes = ["scope.required"],
+            AllowedServiceCallers = [XFrameworkServiceNames.Portal]
+        };
         var result = await authorizer.AuthorizeAsync(
-            new RequestMetadata { ServiceAccessToken = "token" },
+            new InvocationCredentials(null, "token"),
+            new RequestMetadata(),
             context,
-            ["scope.required"],
-            [XFrameworkServiceNames.Portal]);
+            policy);
 
         Assert.That(result.IsSuccess, Is.True, result.Error);
         Assert.That(resolver.ExpectedAudience, Is.EqualTo(XFrameworkServiceNames.Communications));
-        Assert.That(resolver.RequiredScopes, Is.EquivalentTo(new[] { "scope.required" }));
-        Assert.That(resolver.AllowedCallers, Is.EquivalentTo(new[] { XFrameworkServiceNames.Portal }));
-        Assert.That(resolver.RequireTenant, Is.False);
+        Assert.That(resolver.Policy, Is.EqualTo(policy));
     }
 
     [Test]
     public async Task AuthorizeAsync_TokenCallerDoesNotMatchTransportSender_ReturnsForbidden()
     {
-        var resolver = new StubResolver(SuccessfulInvocation(XFrameworkServiceNames.Portal));
-        var authorizer = CreateAuthorizer(resolver);
+        var contextStore = new TestContextStore();
+        var authorizer = CreateAuthorizer(
+            new StubResolver(SuccessfulInvocation(XFrameworkServiceNames.Portal)),
+            contextStore);
         var context = new BoltInboundRequestContext(
             Guid.NewGuid(),
             BoltCodec.Fnv1aHash(XFrameworkServiceNames.Wallets.ToSha256()));
 
         var result = await authorizer.AuthorizeAsync(
-            new RequestMetadata { ServiceAccessToken = "token" },
-            context);
+            new InvocationCredentials(null, "token"),
+            new RequestMetadata(),
+            context,
+            TenantlessServicePolicy());
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(403));
+        Assert.That(contextStore.Current, Is.Null);
+    }
+
+    [Test]
+    public async Task AuthorizeAsync_SenderMismatch_DoesNotValidateActorToken()
+    {
+        var actorProvider = new CountingActorProvider();
+        var serviceProvider = new StubServiceIdentityProvider(ServiceIdentityValidationResult.Success(
+            new TrustedServiceIdentity(
+                XFrameworkServiceNames.Portal,
+                XFrameworkServiceNames.Communications,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                "generation")));
+        var authorizer = new BoltServiceInvocationAuthorizer(
+            new TrustedInvocationResolver(actorProvider, serviceProvider),
+            serviceProvider,
+            new TestContextStore(),
+            Options.Create(new ServiceIdentityOptions
+            {
+                ClientId = XFrameworkServiceNames.Communications
+            }));
+
+        var result = await authorizer.AuthorizeAsync(
+            new InvocationCredentials("actor-token", "service-token"),
+            new RequestMetadata(),
+            new BoltInboundRequestContext(
+                Guid.NewGuid(),
+                BoltCodec.Fnv1aHash(XFrameworkServiceNames.Wallets.ToSha256())),
+            new InvocationAuthorizationPolicy
+            {
+                ActorRequirement = ActorRequirement.Required,
+                TenantAccessMode = TenantAccessMode.ActorTenant
+            });
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(403));
+        Assert.That(actorProvider.CallCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task AuthorizeAsync_ExplicitAnonymousPolicy_PublishesTenantlessContext()
+    {
+        var anonymousContext = new TrustedInvocationContext(null, null, null, null, Guid.NewGuid());
+        var contextStore = new TestContextStore();
+        var authorizer = CreateAuthorizer(
+            new StubResolver(TrustedInvocationResult.Success(anonymousContext)),
+            contextStore);
+
+        var result = await authorizer.AuthorizeAsync(
+            new InvocationCredentials(null, null),
+            new RequestMetadata(),
+            new BoltInboundRequestContext(Guid.NewGuid(), 0),
+            new InvocationAuthorizationPolicy
+            {
+                ActorRequirement = ActorRequirement.None,
+                TenantAccessMode = TenantAccessMode.Tenantless,
+                RequireServiceIdentity = false,
+                AllowAnonymous = true
+            });
+
+        Assert.That(result.IsSuccess, Is.True, result.Error);
+        Assert.That(contextStore.Current, Is.SameAs(anonymousContext));
     }
 
     [Test]
     public async Task Resolver_MissingRequiredScope_ReturnsForbidden()
     {
-        var validator = new StubTokenValidator(new ServiceTokenValidationResult(
+        var resolver = CreateResolver(new ServiceTokenValidationResult(
             true,
             XFrameworkServiceNames.Portal,
             XFrameworkServiceNames.Communications,
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "scope.other" },
             null,
             null));
-        var resolver = new TrustedServiceInvocationResolver(validator);
 
         var result = await resolver.ResolveAsync(
-            new RequestMetadata { ServiceAccessToken = "token" },
-            XFrameworkServiceNames.Communications,
-            ["scope.required"],
-            requireTenant: false);
+            new InvocationCredentials(null, "token"),
+            new RequestMetadata(),
+            TenantlessServicePolicy(requiredScopes: ["scope.required"]),
+            XFrameworkServiceNames.Communications);
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(403));
@@ -74,92 +144,101 @@ public sealed class BoltServiceInvocationAuthorizerTests
     [Test]
     public async Task Resolver_DisallowedCaller_ReturnsForbidden()
     {
-        var validator = new StubTokenValidator(new ServiceTokenValidationResult(
+        var resolver = CreateResolver(new ServiceTokenValidationResult(
             true,
             XFrameworkServiceNames.Portal,
             XFrameworkServiceNames.Communications,
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             null,
             null));
-        var resolver = new TrustedServiceInvocationResolver(validator);
 
         var result = await resolver.ResolveAsync(
-            new RequestMetadata { ServiceAccessToken = "token" },
-            XFrameworkServiceNames.Communications,
-            allowedCallers: [XFrameworkServiceNames.Wallets],
-            requireTenant: false);
+            new InvocationCredentials(null, "token"),
+            new RequestMetadata(),
+            TenantlessServicePolicy(allowedCallers: [XFrameworkServiceNames.Wallets]),
+            XFrameworkServiceNames.Communications);
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.StatusCode, Is.EqualTo(403));
     }
 
-    [Test]
-    public async Task Resolver_InvalidToken_ReturnsUnauthorized()
+    [TestCase(401)]
+    [TestCase(503)]
+    public async Task Resolver_ServiceIdentityFailure_PreservesStatusCode(int statusCode)
     {
-        var resolver = new TrustedServiceInvocationResolver(
-            new StubTokenValidator(ServiceTokenValidationResult.Failure("invalid")));
+        var resolver = new TrustedInvocationResolver(
+            new RejectingActorProvider(),
+            new StubServiceIdentityProvider(ServiceIdentityValidationResult.Failure("validation failed", statusCode)));
 
         var result = await resolver.ResolveAsync(
-            new RequestMetadata { ServiceAccessToken = "invalid" },
-            XFrameworkServiceNames.Communications,
-            requireTenant: false);
+            new InvocationCredentials(null, "invalid"),
+            new RequestMetadata(),
+            TenantlessServicePolicy(),
+            XFrameworkServiceNames.Communications);
 
         Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.StatusCode, Is.EqualTo(401));
+        Assert.That(result.StatusCode, Is.EqualTo(statusCode));
     }
 
-    [Test]
-    public async Task Resolver_SigningKeyInfrastructureUnavailable_ReturnsServiceUnavailable()
-    {
-        var resolver = new TrustedServiceInvocationResolver(
-            new StubTokenValidator(ServiceTokenValidationResult.Unavailable("keys unavailable")));
-
-        var result = await resolver.ResolveAsync(
-            new RequestMetadata { ServiceAccessToken = "unverified" },
-            XFrameworkServiceNames.Communications,
-            requireTenant: false);
-
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.StatusCode, Is.EqualTo(503));
-    }
-
-    private static BoltServiceInvocationAuthorizer CreateAuthorizer(ITrustedServiceInvocationResolver resolver) =>
+    private static BoltServiceInvocationAuthorizer CreateAuthorizer(
+        ITrustedInvocationResolver resolver,
+        ITrustedInvocationContextStore? contextStore = null) =>
         new(
             resolver,
+            new StubServiceIdentityProvider(ServiceIdentityValidationResult.Success(
+                new TrustedServiceIdentity(
+                    XFrameworkServiceNames.Portal,
+                    XFrameworkServiceNames.Communications,
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "scope.required" },
+                    "generation"))),
+            contextStore ?? new TestContextStore(),
             Options.Create(new ServiceIdentityOptions
             {
                 ClientId = XFrameworkServiceNames.Communications
             }));
 
-    private static TrustedServiceInvocationResult SuccessfulInvocation(string caller) =>
-        TrustedServiceInvocationResult.Success(new TrustedServiceInvocation(
-            caller,
-            XFrameworkServiceNames.Communications,
-            null,
-            null,
-            new RequestMetadata { ServiceAccessToken = "token" },
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "scope.required" }));
+    private static TrustedInvocationResolver CreateResolver(ServiceTokenValidationResult validation) =>
+        new(
+            new RejectingActorProvider(),
+            new ServiceIdentityProvider(new StubTokenValidator(validation)));
 
-    private sealed class StubResolver(TrustedServiceInvocationResult result)
-        : ITrustedServiceInvocationResolver
+    private static InvocationAuthorizationPolicy TenantlessServicePolicy(
+        IReadOnlyCollection<string>? requiredScopes = null,
+        IReadOnlyCollection<string>? allowedCallers = null) =>
+        new()
+        {
+            ActorRequirement = ActorRequirement.None,
+            TenantAccessMode = TenantAccessMode.Tenantless,
+            RequiredServiceScopes = requiredScopes ?? [],
+            AllowedServiceCallers = allowedCallers ?? []
+        };
+
+    private static TrustedInvocationResult SuccessfulInvocation(string caller) =>
+        TrustedInvocationResult.Success(new TrustedInvocationContext(
+            Actor: null,
+            Service: new TrustedServiceIdentity(
+                caller,
+                XFrameworkServiceNames.Communications,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "scope.required" },
+                "generation"),
+            EffectiveTenantId: null,
+            RequestedTargetTenantId: null,
+            CorrelationId: Guid.NewGuid()));
+
+    private sealed class StubResolver(TrustedInvocationResult result) : ITrustedInvocationResolver
     {
         public string? ExpectedAudience { get; private set; }
-        public IReadOnlyCollection<string>? RequiredScopes { get; private set; }
-        public IReadOnlyCollection<string>? AllowedCallers { get; private set; }
-        public bool RequireTenant { get; private set; }
+        public InvocationAuthorizationPolicy? Policy { get; private set; }
 
-        public Task<TrustedServiceInvocationResult> ResolveAsync(
-            RequestMetadata? metadata,
+        public Task<TrustedInvocationResult> ResolveAsync(
+            InvocationCredentials credentials,
+            RequestMetadata metadata,
+            InvocationAuthorizationPolicy policy,
             string expectedAudience,
-            IReadOnlyCollection<string>? requiredScopes = null,
-            IReadOnlyCollection<string>? allowedCallers = null,
-            bool requireTenant = true,
             CancellationToken ct = default)
         {
             ExpectedAudience = expectedAudience;
-            RequiredScopes = requiredScopes;
-            AllowedCallers = allowedCallers;
-            RequireTenant = requireTenant;
+            Policy = policy;
             return Task.FromResult(result);
         }
     }
@@ -172,5 +251,36 @@ public sealed class BoltServiceInvocationAuthorizerTests
             IReadOnlyCollection<string>? requiredScopes = null,
             CancellationToken ct = default) =>
             Task.FromResult(result);
+    }
+
+    private sealed class StubServiceIdentityProvider(ServiceIdentityValidationResult result) : IServiceIdentityProvider
+    {
+        public Task<ServiceIdentityValidationResult> ValidateAsync(
+            string token,
+            string expectedAudience,
+            CancellationToken ct = default) => Task.FromResult(result);
+    }
+
+    private sealed class RejectingActorProvider : IActorIdentityProvider
+    {
+        public Task<ActorIdentityValidationResult> ValidateAsync(string token, CancellationToken ct = default) =>
+            Task.FromResult(ActorIdentityValidationResult.Failure("unexpected actor"));
+    }
+
+    private sealed class CountingActorProvider : IActorIdentityProvider
+    {
+        public int CallCount { get; private set; }
+
+        public Task<ActorIdentityValidationResult> ValidateAsync(string token, CancellationToken ct = default)
+        {
+            CallCount++;
+            return Task.FromResult(ActorIdentityValidationResult.Failure("unexpected actor validation"));
+        }
+    }
+
+    private sealed class TestContextStore : ITrustedInvocationContextStore
+    {
+        public TrustedInvocationContext? Current { get; private set; }
+        public void Set(TrustedInvocationContext context) => Current = context;
     }
 }

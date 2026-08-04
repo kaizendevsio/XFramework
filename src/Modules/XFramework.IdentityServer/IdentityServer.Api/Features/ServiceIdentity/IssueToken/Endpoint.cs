@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.ServiceIdentity.IssueToken;
 
@@ -11,7 +12,10 @@ public static class IssueServiceTokenEndpoint
         Summary = "Issue service token",
         Description = "Issues a short-lived internal service token for a target XFramework service.",
         RateLimitPolicy = "auth",
-        ExcludeFromOpenApi = false)]
+        ExcludeFromOpenApi = false,
+        ActorRequirement = ActorRequirement.None,
+        TenantAccessMode = TenantAccessMode.Tenantless,
+        AllowAnonymous = true)]
     public static async Task<Result<ServiceTokenResponse>> Handle(
         IssueServiceTokenRequest request,
         HttpRequest httpRequest,

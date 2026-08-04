@@ -807,13 +807,11 @@ else
 
     private RequestMetadata BuildCommandMetadata(Guid tenantId) => new()
     {
-        TenantId = tenantId,
-        CredentialId = RequestMetadata.CredentialId,
-        SessionId = RequestMetadata.SessionId,
+        RequestedTenantId = tenantId,
         RequestId = Guid.NewGuid(),
-        Name = RequestMetadata.Name ?? "Portal",
+        OperationName = RequestMetadata.OperationName ?? "Portal",
         DeviceName = RequestMetadata.DeviceName,
-        DeviceAgent = RequestMetadata.DeviceAgent,
+        UserAgent = RequestMetadata.UserAgent,
         IpAddress = RequestMetadata.IpAddress
     };
 

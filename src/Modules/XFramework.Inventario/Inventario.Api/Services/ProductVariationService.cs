@@ -9,9 +9,11 @@ using XFramework.Inventario.Domain.Shared.Contracts.Requests.Variations;
 
 namespace XFramework.Inventario.Api.Services;
 
+using XFramework.Integration.Security;
+
 public sealed class ProductVariationService(
     IDataContext dataContext,
-    IHttpContextAccessor httpContextAccessor,
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     ITenantModuleFeatureService featureService)
 {
     public async Task<Result<List<ProductVariationType>>> GetTypesAsync(
@@ -297,21 +299,10 @@ public sealed class ProductVariationService(
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)
     {
-        if (request?.Metadata?.TenantId is { } metadataTenantId && metadataTenantId != Guid.Empty)
-            return Result<Guid>.Success(metadataTenantId);
-
-        var user = httpContextAccessor.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated != true)
+        var tenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId;
+        if (tenantId is null || tenantId == Guid.Empty)
             return Result<Guid>.Unauthorized("Authentication is required for variant operations.");
-
-        var tenantIdClaim = user.FindFirst("tenantId")?.Value
-            ?? user.FindFirst("TenantId")?.Value
-            ?? user.FindFirst("tid")?.Value;
-
-        if (Guid.TryParse(tenantIdClaim, out var tenantId) && tenantId != Guid.Empty)
-            return Result<Guid>.Success(tenantId);
-
-        return Result<Guid>.Forbidden("Authenticated user does not have a valid tenant context.");
+        return Result<Guid>.Success(tenantId.Value);
     }
 
     private async Task<Result> EnsureVariationsEnabledAsync(Guid tenantId, CancellationToken ct) =>

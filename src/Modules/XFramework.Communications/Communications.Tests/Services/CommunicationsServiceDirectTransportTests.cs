@@ -35,7 +35,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             new TestNotificationsServiceWrapper(),
             new TestCommunicationsTemplateService(),
-            ContextResolver(),
+            ContextResolver(tenantId),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -69,7 +69,7 @@ public sealed class CommunicationsServiceDirectTransportTests
                 Message = "Gateway unavailable"
             }),
             new TestCommunicationsTemplateService(),
-            ContextResolver(),
+            ContextResolver(tenantId),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -107,7 +107,7 @@ public sealed class CommunicationsServiceDirectTransportTests
 
         var result = await service.CreateDirectMessageAsync(new CreateDirectMessageRequest
         {
-            Metadata = new RequestMetadata { TenantId = tenantId },
+            Metadata = new RequestMetadata { RequestedTenantId = tenantId },
             MessageTransportType = MessageTransportType.Sms,
             AgentClusterId = Guid.NewGuid(),
             Recipient = "+15555550123",
@@ -130,7 +130,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             new TestNotificationsServiceWrapper(throwOnCreate: true),
             new TestCommunicationsTemplateService(),
-            ContextResolver(),
+            ContextResolver(tenantId),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -161,7 +161,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             new TestNotificationsServiceWrapper(throwOnCreate: true, exceptionMessage: recipient),
             new TestCommunicationsTemplateService(),
-            ContextResolver(),
+            ContextResolver(tenantId),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             logger);
@@ -198,7 +198,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             notifications,
             new TestCommunicationsTemplateService(),
-            ContextResolver(),
+            ContextResolver(tenantId),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -238,7 +238,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             SuccessfulNotifications(),
             new TestCommunicationsTemplateService(),
-            ContextResolver(),
+            ContextResolver(tenantId),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -275,7 +275,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             notifications,
             new TestCommunicationsTemplateService(),
-            ContextResolver(),
+            ContextResolver(tenantId),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -309,7 +309,7 @@ public sealed class CommunicationsServiceDirectTransportTests
             new TestTenantResolver(tenantId),
             new TestNotificationsServiceWrapper(throwOnCreate: true, exceptionMessage: sensitiveDetail),
             new TestCommunicationsTemplateService(),
-            ContextResolver(),
+            ContextResolver(tenantId),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             NullLogger<CommunicationsService>.Instance);
@@ -345,18 +345,19 @@ public sealed class CommunicationsServiceDirectTransportTests
     {
         return new RequestMetadata
         {
-            TenantId = tenantId,
+            RequestedTenantId = tenantId,
             RequestId = requestId ?? Guid.NewGuid(),
-            Name = "XFramework.Portal",
-            ServiceAccessToken = FakeTrustedServiceInvocationResolver.ValidPortalToken
+            OperationName = "CreateDirectMessage"
         };
     }
 
-    private static CommunicationsRequestContextResolver ContextResolver() =>
+    private static CommunicationsRequestContextResolver ContextResolver(Guid? tenantId = null) =>
         new(
             new HttpContextAccessor(),
             TestConfiguration(),
-            serviceInvocationResolver: new FakeTrustedServiceInvocationResolver());
+            serviceInvocationResolver: tenantId.HasValue
+                ? new FakeTrustedServiceInvocationResolver(tenantId.Value)
+                : null);
 
     private static IConfiguration TestConfiguration() =>
         new ConfigurationBuilder()

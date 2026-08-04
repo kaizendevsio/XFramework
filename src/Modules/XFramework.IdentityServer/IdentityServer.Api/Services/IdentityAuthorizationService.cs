@@ -7,7 +7,7 @@ namespace IdentityServer.Api.Services;
 
 public sealed class IdentityAuthorizationService(
     IDataContext dataContext,
-    ITrustedServiceInvocationResolver trustedServiceInvocationResolver,
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService tenantModuleFeatureService,
     ILogger<IdentityAuthorizationService> logger) : IIdentityAuthorizationService
 {
@@ -138,18 +138,17 @@ public sealed class IdentityAuthorizationService(
 
     private async Task<Result> EnsureTenantAdministratorAsync(RequestMetadata metadata, CancellationToken ct)
     {
-        if (metadata.HasTrustedActorContext && metadata.TrustedActorRoles.Contains("SuperAdmin"))
-            return Result.Success();
+        var context = trustedInvocationContextAccessor.Current;
+        if (context?.Actor is { } actor)
+        {
+            return actor.Capabilities.Contains("identity.tenants:manage")
+                ? Result.Success()
+                : Result.Forbidden("Tenant administration requires the identity.tenants:manage capability");
+        }
 
-        var trusted = await trustedServiceInvocationResolver.ResolveAsync(
-            metadata,
-            XFrameworkServiceNames.IdentityServer,
-            [XFrameworkServiceScopes.IdentityAdmin],
-            requireTenant: false,
-            ct: ct);
-        return trusted.IsSuccess
+        return context?.Service?.Scopes.Contains(XFrameworkServiceScopes.IdentityAdmin) == true
             ? Result.Success()
-            : Result.Failure(trusted.Error ?? "Tenant administration is not authorized", trusted.StatusCode);
+            : Result.Forbidden("Tenant administration is not authorized");
     }
 
     public async Task<Result<CredentialCapabilityCheckResponse>> CheckCredentialCapabilityAsync(
@@ -170,7 +169,7 @@ public sealed class IdentityAuthorizationService(
         if (credential is null)
             return Result<CredentialCapabilityCheckResponse>.NotFound("Credential not found");
 
-        if (request.Metadata.TenantId is { } metadataTenantId && metadataTenantId != credential.TenantId)
+        if (request.Metadata.RequestedTenantId is { } metadataTenantId && metadataTenantId != credential.TenantId)
             return Result<CredentialCapabilityCheckResponse>.Failure("Credential does not belong to the active tenant", 403);
 
         var inspectAuthorization = await EnsureCanInspectCredentialCapabilitiesAsync(
@@ -218,7 +217,7 @@ public sealed class IdentityAuthorizationService(
         if (credential is null)
             return Result<EffectiveCredentialCapabilitiesResponse>.NotFound("Credential not found");
 
-        if (request.Metadata.TenantId is { } metadataTenantId && metadataTenantId != credential.TenantId)
+        if (trustedInvocationContextAccessor.Current?.EffectiveTenantId is { } metadataTenantId && metadataTenantId != credential.TenantId)
             return Result<EffectiveCredentialCapabilitiesResponse>.Failure(
                 "Credential does not belong to the active tenant",
                 403);
@@ -233,6 +232,30 @@ public sealed class IdentityAuthorizationService(
                 inspectAuthorization.Message!,
                 inspectAuthorization.StatusCode);
 
+        return await BuildEffectiveCredentialCapabilitiesAsync(credential, ct);
+    }
+
+    public async Task<Result<EffectiveCredentialCapabilitiesResponse>> GetTrustedEffectiveCredentialCapabilitiesAsync(
+        Guid tenantId,
+        Guid credentialId,
+        CancellationToken ct = default)
+    {
+        var credential = await dataContext.Query<IdentityCredential>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.Id == credentialId && x.TenantId == tenantId)
+            .Where(x => !x.IsDeleted && x.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+        if (credential is null)
+            return Result<EffectiveCredentialCapabilitiesResponse>.NotFound("Credential not found");
+
+        return await BuildEffectiveCredentialCapabilitiesAsync(credential, ct);
+    }
+
+    private async Task<Result<EffectiveCredentialCapabilitiesResponse>> BuildEffectiveCredentialCapabilitiesAsync(
+        IdentityCredential credential,
+        CancellationToken ct)
+    {
         var response = new EffectiveCredentialCapabilitiesResponse
         {
             TenantId = credential.TenantId,
@@ -243,7 +266,6 @@ public sealed class IdentityAuthorizationService(
         var activeRoles = await dataContext.Query<IdentityRole>()
             .IgnoreQueryFilters()
             .NoCache()
-            .Include(x => x.Type)
             .Where(x => x.TenantId == credential.TenantId)
             .Where(x => x.CredentialId == credential.Id)
             .Where(x => !x.IsDeleted && x.IsEnabled)
@@ -402,7 +424,7 @@ public sealed class IdentityAuthorizationService(
         GetTenantAuthorizationPolicyRequest request,
         CancellationToken ct = default)
     {
-        var tenantId = ResolveRequestedTenantId(request.TenantId, request.Metadata.TenantId);
+        var tenantId = ResolveRequestedTenantId(request.TenantId, trustedInvocationContextAccessor.Current?.EffectiveTenantId);
         if (!tenantId.IsSuccess)
             return Result<TenantAuthorizationPolicyResponse>.Failure(tenantId.Message!, tenantId.StatusCode);
         var resolvedTenantId = tenantId.Data;
@@ -440,7 +462,7 @@ public sealed class IdentityAuthorizationService(
         UpdateTenantAuthorizationPolicyRequest request,
         CancellationToken ct = default)
     {
-        var tenantId = ResolveRequestedTenantId(request.TenantId, request.Metadata.TenantId);
+        var tenantId = ResolveRequestedTenantId(request.TenantId, trustedInvocationContextAccessor.Current?.EffectiveTenantId);
         if (!tenantId.IsSuccess)
             return Result<TenantAuthorizationPolicyResponse>.Failure(tenantId.Message!, tenantId.StatusCode);
         var resolvedTenantId = tenantId.Data;
@@ -514,7 +536,7 @@ public sealed class IdentityAuthorizationService(
         GetRoleTypePermissionsRequest request,
         CancellationToken ct = default)
     {
-        var roleType = await GetRoleTypeAsync(request.RoleTypeId, request.Metadata.TenantId, ct);
+        var roleType = await GetRoleTypeAsync(request.RoleTypeId, trustedInvocationContextAccessor.Current?.EffectiveTenantId, ct);
         if (!roleType.IsSuccess)
             return Result<RoleTypePermissionsResponse>.Failure(roleType.Message!, roleType.StatusCode);
 
@@ -552,7 +574,7 @@ public sealed class IdentityAuthorizationService(
         SetRoleTypePermissionsRequest request,
         CancellationToken ct = default)
     {
-        var roleType = await GetRoleTypeAsync(request.RoleTypeId, request.Metadata.TenantId, ct);
+        var roleType = await GetRoleTypeAsync(request.RoleTypeId, trustedInvocationContextAccessor.Current?.EffectiveTenantId, ct);
         if (!roleType.IsSuccess)
             return Result<RoleTypePermissionsResponse>.Failure(roleType.Message!, roleType.StatusCode);
 
@@ -641,7 +663,7 @@ public sealed class IdentityAuthorizationService(
         GetCredentialRolePermissionOverridesRequest request,
         CancellationToken ct = default)
     {
-        var role = await GetIdentityRoleAsync(request.IdentityRoleId, request.Metadata.TenantId, ct);
+        var role = await GetIdentityRoleAsync(request.IdentityRoleId, trustedInvocationContextAccessor.Current?.EffectiveTenantId, ct);
         if (!role.IsSuccess)
             return Result<CredentialRolePermissionOverridesResponse>.Failure(role.Message!, role.StatusCode);
 
@@ -681,7 +703,7 @@ public sealed class IdentityAuthorizationService(
         SetCredentialRolePermissionOverridesRequest request,
         CancellationToken ct = default)
     {
-        var role = await GetIdentityRoleAsync(request.IdentityRoleId, request.Metadata.TenantId, ct);
+        var role = await GetIdentityRoleAsync(request.IdentityRoleId, trustedInvocationContextAccessor.Current?.EffectiveTenantId, ct);
         if (!role.IsSuccess)
             return Result<CredentialRolePermissionOverridesResponse>.Failure(role.Message!, role.StatusCode);
 
@@ -782,7 +804,7 @@ public sealed class IdentityAuthorizationService(
         if (credential is null)
             return Result<AssignedCredentialRoleResponse>.NotFound("Credential not found");
 
-        if (request.Metadata.TenantId is { } metadataTenantId && metadataTenantId != credential.TenantId)
+        if (trustedInvocationContextAccessor.Current?.EffectiveTenantId is { } metadataTenantId && metadataTenantId != credential.TenantId)
             return Result<AssignedCredentialRoleResponse>.Failure(
                 "Credential does not belong to the active tenant",
                 403);
@@ -867,7 +889,7 @@ public sealed class IdentityAuthorizationService(
         RemoveCredentialRoleRequest request,
         CancellationToken ct = default)
     {
-        var role = await GetIdentityRoleAsync(request.IdentityRoleId, request.Metadata.TenantId, ct);
+        var role = await GetIdentityRoleAsync(request.IdentityRoleId, trustedInvocationContextAccessor.Current?.EffectiveTenantId, ct);
         if (!role.IsSuccess)
             return Result.Failure(role.Message!, role.StatusCode);
 
@@ -1218,7 +1240,7 @@ public sealed class IdentityAuthorizationService(
             ct);
     }
 
-    private async Task<Result> EnsureCallerCapabilityAsync(
+    private Task<Result> EnsureCallerCapabilityAsync(
         RequestMetadata metadata,
         Guid targetTenantId,
         string moduleKey,
@@ -1228,41 +1250,25 @@ public sealed class IdentityAuthorizationService(
     {
         var tenantCheck = EnsureMetadataTenantMatchesTarget(metadata, targetTenantId);
         if (!tenantCheck.IsSuccess)
-            return tenantCheck;
+            return Task.FromResult(tenantCheck);
 
-        if (metadata.HasTrustedActorContext &&
-            metadata.TrustedActorRoles.Contains("SuperAdmin") &&
-            metadata.TenantId == targetTenantId)
+        var context = trustedInvocationContextAccessor.Current;
+        if (context?.Actor is { } actor)
         {
-            return Result.Success();
+            var trustedCapability =
+                $"{TenantModuleFeatureKeys.Combine(moduleKey, subFeatureKey)}:{capabilityKey}";
+            if (context.EffectiveTenantId == targetTenantId &&
+                actor.Capabilities.Contains(trustedCapability))
+                return Task.FromResult(Result.Success());
+
+            return Task.FromResult(Result.Forbidden("Caller is not allowed to manage IdentityServer authorization"));
         }
 
-        if (TryResolveAuthenticatedCredential(metadata, targetTenantId, out var credentialId))
+        if (context?.Service?.Scopes.Contains(XFrameworkServiceScopes.IdentityAdmin) == true)
         {
-            var decision = await ResolveCapabilityAsync(
-                targetTenantId,
-                credentialId,
-                moduleKey,
-                subFeatureKey,
-                capabilityKey,
-                ct);
-
-            if (decision.IsAllowed)
-                return Result.Success();
-        }
-
-        var trustedInvocation = await trustedServiceInvocationResolver.ResolveAsync(
-            metadata,
-            XFrameworkServiceNames.IdentityServer,
-            [XFrameworkServiceScopes.IdentityAdmin],
-            requireTenant: true,
-            ct: ct);
-
-        if (trustedInvocation.IsSuccess)
-        {
-            return trustedInvocation.Invocation?.TenantId == targetTenantId
+            return Task.FromResult(context.EffectiveTenantId == targetTenantId
                 ? Result.Success()
-                : Result.Forbidden("Trusted service tenant does not match the active tenant");
+                : Result.Forbidden("Trusted service tenant does not match the active tenant"));
         }
 
         logger.LogWarning(
@@ -1271,37 +1277,38 @@ public sealed class IdentityAuthorizationService(
             moduleKey,
             subFeatureKey,
             capabilityKey,
-            trustedInvocation.Error ?? "Caller capability was not allowed");
+            "Caller capability was not allowed");
 
-        return Result.Forbidden("Caller is not allowed to manage IdentityServer authorization");
+        return Task.FromResult(Result.Forbidden("Caller is not allowed to manage IdentityServer authorization"));
     }
 
-    private static Result EnsureMetadataTenantMatchesTarget(RequestMetadata metadata, Guid targetTenantId)
+    private Result EnsureMetadataTenantMatchesTarget(RequestMetadata metadata, Guid targetTenantId)
     {
-        if (metadata.TenantId is null || metadata.TenantId == Guid.Empty)
-            return Result.Forbidden("Tenant metadata is required");
+        var effectiveTenantId = trustedInvocationContextAccessor.Current?.EffectiveTenantId;
+        if (effectiveTenantId is null || effectiveTenantId == Guid.Empty)
+            return Result.Forbidden("Trusted tenant context is required");
 
-        return metadata.TenantId.Value == targetTenantId
+        return effectiveTenantId.Value == targetTenantId
             ? Result.Success()
             : Result.Forbidden("Requested tenant does not match the active tenant");
     }
 
-    private static bool TryResolveAuthenticatedCredential(
+    private bool TryResolveAuthenticatedCredential(
         RequestMetadata metadata,
         Guid targetTenantId,
         out Guid credentialId)
     {
         credentialId = default;
+        var context = trustedInvocationContextAccessor.Current;
 
-        if (!metadata.HasTrustedActorContext ||
-            metadata.TenantId != targetTenantId ||
-            metadata.CredentialId is not { } actorCredentialId ||
-            actorCredentialId == Guid.Empty)
+        if (context?.Actor is not { } actor ||
+            context.EffectiveTenantId != targetTenantId ||
+            actor.CredentialId == Guid.Empty)
         {
             return false;
         }
 
-        credentialId = actorCredentialId;
+        credentialId = actor.CredentialId;
         return true;
     }
 
