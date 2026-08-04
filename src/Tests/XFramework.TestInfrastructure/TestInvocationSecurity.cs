@@ -218,6 +218,7 @@ public static class TestInvocationIdentityExtensions
         services.AddSingleton(options);
         services.AddSingleton<IActorAccessTokenProvider, TestActorAccessTokenProvider>();
         services.AddSingleton<IServiceTokenProvider, TestServiceTokenProvider>();
+        services.AddScoped<ITrustedServiceTargetContextInitializer, TestTrustedServiceTargetContextInitializer>();
         return services;
     }
 
@@ -278,6 +279,55 @@ internal sealed class TestServiceTokenProvider(TestInvocationIdentityOptions opt
     {
         ct.ThrowIfCancellationRequested();
         return ValueTask.FromResult(options.ServiceToken);
+    }
+}
+
+internal sealed class TestTrustedServiceTargetContextInitializer(
+    ITrustedInvocationContextStore contextStore)
+    : ITrustedServiceTargetContextInitializer
+{
+    public Task<TrustedInvocationResult> EstablishAsync(
+        Guid targetTenantId,
+        string audience,
+        IReadOnlyCollection<string> requiredServiceScopes,
+        string allowedServiceCaller,
+        Guid? correlationId = null,
+        CancellationToken ct = default) =>
+        EstablishAsync(targetTenantId, audience, requiredServiceScopes, allowedServiceCaller, correlationId, ct, false);
+
+    public Task<TrustedInvocationResult> EstablishTenantlessAsync(
+        string audience,
+        IReadOnlyCollection<string> requiredServiceScopes,
+        string allowedServiceCaller,
+        Guid? correlationId = null,
+        CancellationToken ct = default) =>
+        EstablishAsync(null, audience, requiredServiceScopes, allowedServiceCaller, correlationId, ct, true);
+
+    private Task<TrustedInvocationResult> EstablishAsync(
+        Guid? targetTenantId,
+        string audience,
+        IReadOnlyCollection<string> requiredServiceScopes,
+        string allowedServiceCaller,
+        Guid? correlationId,
+        CancellationToken ct,
+        bool tenantless)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!tenantless && (!targetTenantId.HasValue || targetTenantId.Value == Guid.Empty))
+            return Task.FromResult(TrustedInvocationResult.Failure("A target tenant is required.", 400));
+
+        var context = new TrustedInvocationContext(
+            null,
+            new TrustedServiceIdentity(
+                allowedServiceCaller,
+                audience,
+                new HashSet<string>(requiredServiceScopes, StringComparer.OrdinalIgnoreCase),
+                "integration-tests-g1"),
+            targetTenantId,
+            targetTenantId,
+            correlationId is { } requestId && requestId != Guid.Empty ? requestId : Guid.NewGuid());
+        contextStore.Set(context);
+        return Task.FromResult(TrustedInvocationResult.Success(context));
     }
 }
 

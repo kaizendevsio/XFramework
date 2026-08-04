@@ -49,9 +49,6 @@ public static class UploadStorageFilePartEndpoint
         if (!IsOctetStream(httpRequest.ContentType))
             return TypedResults.Problem(detail: "Upload part REST endpoint requires application/octet-stream", statusCode: StatusCodes.Status415UnsupportedMediaType);
 
-        if (httpRequest.ContentLength > MaxUploadPartBytes)
-            return TypedResults.Problem(detail: "Upload part exceeds the 100 MB limit", statusCode: StatusCodes.Status413PayloadTooLarge);
-
         var metadata = new RequestMetadata
         {
             RequestId = Guid.NewGuid(),

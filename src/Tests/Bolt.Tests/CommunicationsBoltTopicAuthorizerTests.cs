@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NUnit.Framework;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Shared.Security;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Security;
 
@@ -291,7 +292,9 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
             HttpContext = new DefaultHttpContext { User = httpPrincipal }
         });
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddDbContext<DbContext, AppDbContext>((_, options) =>
+        services.AddSingleton<IEffectiveTenantContextAccessor>(
+            new TrustedTenantContextAccessor(credential.TenantId));
+        services.AddDbContext<DbContext, TestIdentityDbContext>((_, options) =>
             options.UseInMemoryDatabase(databaseName));
         services.AddScoped<IActorIdentityProvider>(_ =>
         {
@@ -309,6 +312,36 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         db.Set<IdentityCredential>().Add(credential);
         await db.SaveChangesAsync();
         return provider;
+    }
+
+    private sealed class TrustedTenantContextAccessor(Guid tenantId) : IEffectiveTenantContextAccessor
+    {
+        public bool HasTrustedInvocation => true;
+        public Guid? EffectiveTenantId => tenantId;
+    }
+
+    private sealed class TestIdentityDbContext(
+        DbContextOptions<TestIdentityDbContext> options,
+        IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration,
+        IEffectiveTenantContextAccessor effectiveTenantContextAccessor)
+        : XDbContext(options, httpContextAccessor, configuration, effectiveTenantContextAccessor)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            var credential = modelBuilder.Entity<IdentityCredential>();
+            credential.HasKey(item => item.Id);
+            credential.Ignore(item => item.Tenant);
+            credential.Ignore(item => item.AuthorizationLogs);
+            credential.Ignore(item => item.IdentityContacts);
+            credential.Ignore(item => item.IdentityFavorites);
+            credential.Ignore(item => item.IdentityInfo);
+            credential.Ignore(item => item.IdentityRoles);
+            credential.Ignore(item => item.IdentityVerifications);
+            credential.Ignore(item => item.SessionData);
+            credential.Ignore(item => item.Subscriptions);
+            base.OnModelCreating(modelBuilder);
+        }
     }
 
     private static CommunicationsBoltTopicAuthorizer CreateAuthorizer(

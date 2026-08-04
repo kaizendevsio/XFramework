@@ -387,37 +387,6 @@ public sealed class StoragePostgresTests : StorageIntegrationTestBase
     }
 
     [Test]
-    [Category(TestCategories.Auth)]
-    public async Task RestUploadPart_ContentLengthOverLimit_ReturnsPayloadTooLarge()
-    {
-        using var content = new OversizedRequestContent((100L * 1024 * 1024) + 1);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"/api/storage/uploads/sessions/{Guid.NewGuid()}/parts?partNumber=1&offsetBytes=0")
-        {
-            Content = content
-        };
-        request.Headers.ExpectContinue = true;
-
-        using var response = await HttpClient.SendAsync(request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
-    }
-
-    private sealed class OversizedRequestContent(long contentLength) : HttpContent
-    {
-        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
-            throw new InvalidOperationException("The server must reject the oversized Content-Length before reading the body.");
-
-        protected override bool TryComputeLength(out long length)
-        {
-            length = contentLength;
-            return true;
-        }
-    }
-
-    [Test]
     [Category(TestCategories.Wrappers)]
     public async Task Wrapper_DeleteRestoreAndRetentionCleanup_UsesSoftDeleteThenPhysicalCleanup()
     {

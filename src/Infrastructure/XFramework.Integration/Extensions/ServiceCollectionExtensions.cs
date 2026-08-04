@@ -23,6 +23,38 @@ namespace XFramework.Integration.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    public static IServiceCollection AddIdentityServerServiceTokenClient(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string defaultClientId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(defaultClientId);
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddOptions<ServiceIdentityOptions>()
+            .Configure(options =>
+            {
+                configuration.GetSection(ServiceIdentityOptions.SectionName).Bind(options);
+                options.ClientId = string.IsNullOrWhiteSpace(options.ClientId)
+                    ? defaultClientId
+                    : options.ClientId;
+            })
+            .ValidateOnStart();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<ServiceIdentityOptions>, ServiceIdentityOptionsValidator>());
+        services.AddHttpClient(ServiceIdentityHttpClient.Name, (serviceProvider, client) =>
+        {
+            client.BaseAddress = serviceProvider
+                .GetRequiredService<IOptions<ServiceIdentityOptions>>()
+                .Value
+                .ResolveAuthority();
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
+        services.TryAddSingleton<IServiceTokenProvider, IdentityServerServiceTokenProvider>();
+        services.AddTrustedInvocationSecurity();
+        return services;
+    }
+
     /// <summary>
     /// Register BoltClient (thin protocol) and BoltDriver (IMessageBusWrapper) for service-to-service communication.
     /// Reads BoltConfiguration from appsettings.json (section "BoltConfiguration").

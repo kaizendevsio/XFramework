@@ -75,6 +75,8 @@ public sealed class StorageBoltScopeContractTests
             "unauthorized callers must be rejected before their upload body is buffered");
         source.Should().Contain("if (totalBytes > MaxUploadPartBytes)",
             "chunked request bodies must be bounded even when Content-Length is absent");
+        source.Should().NotContain("httpRequest.ContentLength",
+            "client-controlled Content-Length must not bypass the authoritative bounded body reader");
     }
 
     private static DirectoryInfo FindRepositoryRoot()

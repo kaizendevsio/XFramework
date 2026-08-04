@@ -3,6 +3,8 @@ using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
 using Bolt.Hub.Security;
 using Bolt.Server;
 using MemoryPack;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Bolt.Hub.Services;
 
@@ -18,6 +20,9 @@ public sealed class BoltServiceDiscoveryHostedService(
 
         using (var scope = scopeFactory.CreateScope())
         {
+            if (!await AuthorizeRegistryScopeAsync(scope.ServiceProvider, Guid.NewGuid(), cancellationToken))
+                throw new InvalidOperationException("Bolt service discovery could not establish its trusted service context.");
+
             var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
             await registry.ResetPresenceAsync(cancellationToken);
         }
@@ -47,6 +52,9 @@ public sealed class BoltServiceDiscoveryHostedService(
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
                 using var scope = scopeFactory.CreateScope();
+                if (!await AuthorizeRegistryScopeAsync(scope.ServiceProvider, Guid.NewGuid(), stoppingToken))
+                    continue;
+
                 var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
                 await registry.RetireStaleAsync(stoppingToken);
             }
@@ -80,6 +88,9 @@ public sealed class BoltServiceDiscoveryHostedService(
         }
 
         using var scope = scopeFactory.CreateScope();
+        if (!await AuthorizeRegistryScopeAsync(scope.ServiceProvider, requestId, ct))
+            return (HttpStatusCode.ServiceUnavailable, ReadOnlyMemory<byte>.Empty);
+
         var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
         var response = await registry.AdvertiseAsync(context, manifest, ct);
 
@@ -106,6 +117,9 @@ public sealed class BoltServiceDiscoveryHostedService(
             : MemoryPackSerializer.Deserialize<BoltServiceRegistryRequest>(payload.Span) ?? new BoltServiceRegistryRequest();
 
         using var scope = scopeFactory.CreateScope();
+        if (!await AuthorizeRegistryScopeAsync(scope.ServiceProvider, requestId, ct))
+            return (HttpStatusCode.ServiceUnavailable, ReadOnlyMemory<byte>.Empty);
+
         var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
         var response = await registry.GetServicesAsync(request, ct);
 
@@ -132,6 +146,9 @@ public sealed class BoltServiceDiscoveryHostedService(
             : MemoryPackSerializer.Deserialize<BoltModuleRegistryRequest>(payload.Span) ?? new BoltModuleRegistryRequest();
 
         using var scope = scopeFactory.CreateScope();
+        if (!await AuthorizeRegistryScopeAsync(scope.ServiceProvider, requestId, ct))
+            return (HttpStatusCode.ServiceUnavailable, ReadOnlyMemory<byte>.Empty);
+
         var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
         var response = await registry.GetModulesAsync(request, ct);
 
@@ -141,6 +158,9 @@ public sealed class BoltServiceDiscoveryHostedService(
     private async Task HandleClientRegisteredAsync(BoltClientConnectionEvent connectionEvent, CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
+        if (!await AuthorizeRegistryScopeAsync(scope.ServiceProvider, Guid.NewGuid(), ct))
+            return;
+
         var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
         await registry.MarkConnectedAsync(connectionEvent, ct);
     }
@@ -148,8 +168,33 @@ public sealed class BoltServiceDiscoveryHostedService(
     private async Task HandleClientDisconnectedAsync(BoltClientConnectionEvent connectionEvent, CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
+        if (!await AuthorizeRegistryScopeAsync(scope.ServiceProvider, Guid.NewGuid(), ct))
+            return;
+
         var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
         await registry.MarkDisconnectedAsync(connectionEvent, ct);
+    }
+
+    private async Task<bool> AuthorizeRegistryScopeAsync(
+        IServiceProvider serviceProvider,
+        Guid correlationId,
+        CancellationToken ct)
+    {
+        var authorization = await serviceProvider
+            .GetRequiredService<ITrustedServiceTargetContextInitializer>()
+            .EstablishTenantlessAsync(
+                XFrameworkServiceNames.BoltHub,
+                [XFrameworkServiceScopes.BoltService],
+                XFrameworkServiceNames.BoltHub,
+                correlationId,
+                ct);
+        if (authorization.IsSuccess)
+            return true;
+
+        logger.LogError(
+            "Bolt service discovery trusted-context authorization failed: {Error}",
+            authorization.Error);
+        return false;
     }
 
     private static (HttpStatusCode, ReadOnlyMemory<byte>) Serialize<T>(HttpStatusCode statusCode, T response) =>
