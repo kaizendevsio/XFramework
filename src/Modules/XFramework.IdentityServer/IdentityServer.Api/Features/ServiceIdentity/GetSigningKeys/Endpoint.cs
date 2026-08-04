@@ -22,7 +22,10 @@ public static class GetServiceSigningKeysEndpoint
     [MapPost("/api/service-identity/signing-keys/query", Tags = ["Service Identity"],
         Summary = "Get service signing public keys",
         Description = "Returns public service signing keys for internal JWT validation.",
-        ExcludeFromOpenApi = false)]
+        ExcludeFromOpenApi = false,
+        ActorRequirement = ActorRequirement.None,
+        TenantAccessMode = TenantAccessMode.Tenantless,
+        AllowAnonymous = true)]
     public static async Task<Result<ServiceSigningKeysResponse>> HandleHttp(
         GetServiceSigningKeysRequest request,
         IServiceIdentityService serviceIdentityService,
