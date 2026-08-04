@@ -948,11 +948,10 @@ def execute(
         "generateToken": True,
         "rememberMe": False,
         "metadata": {
-            "tenantId": config.tenant_id,
-            "credentialId": config.credential_id,
-            "name": PRINCIPAL_REFERENCE,
+            "requestedTenantId": config.tenant_id,
+            "operationName": "Authenticate Bolt Phase 0 synthetic user",
             "deviceName": PRINCIPAL_REFERENCE,
-            "deviceAgent": PRINCIPAL_REFERENCE,
+            "userAgent": PRINCIPAL_REFERENCE,
             "requestId": str(uuid.uuid4()),
         },
     }
