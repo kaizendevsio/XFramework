@@ -15,10 +15,13 @@
         <PackageReference Include="NUnit3TestAdapter" />
         <PackageReference Include="coverlet.collector" />
         <PackageReference Include="FluentAssertions" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="Moq" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\Modules\XFramework.POS\POS.Domain.Shared\POS.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.POS\POS.Api\POS.Api.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.POS\POS.Integration\POS.Integration.csproj" />
         <ProjectReference Include="..\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     </ItemGroup>

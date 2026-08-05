@@ -91,16 +91,32 @@ public sealed class PosSalesService(
 
         sale.Lines = lineBuildResult.Data!;
         sale.SubtotalAmount = sale.Lines.Sum(line => line.Quantity * line.UnitPrice);
-        sale.TotalAmount = sale.SubtotalAmount - sale.DiscountAmount + sale.TaxAmount;
+        var allocations = PosServiceHelpers.BuildSaleRefundAllocations(sale);
+        sale.TotalAmount = allocations.Values.Sum(allocation => allocation.RefundAmount);
 
-        if (sale.TotalAmount < 0)
-            return Result<PosSaleReceiptResponse>.Failure("Sale total cannot be negative", 400);
+        if (allocations.Values.Any(allocation => allocation.RefundAmount < 0))
+            return Result<PosSaleReceiptResponse>.Failure("Sale discounts cannot make a line total negative", 400);
 
         if (request.Payment.Amount != sale.TotalAmount)
             return Result<PosSaleReceiptResponse>.Conflict("Payment amount does not match sale total");
 
         db.Set<PosSale>().Add(sale);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            var concurrentReplay = await LoadSaleByIdempotencyAsync(tenantId, idempotencyKey, tracking: true, ct);
+            if (concurrentReplay is null)
+                throw;
+
+            if (!string.Equals(concurrentReplay.RequestHash, requestHash, StringComparison.Ordinal))
+                return Result<PosSaleReceiptResponse>.Conflict("Checkout idempotency key was reused with a different payload");
+
+            return await ContinueCheckoutAsync(concurrentReplay, register, request, context.Metadata, ct, replayed: true);
+        }
 
         return await ContinueCheckoutAsync(sale, register, request, context.Metadata, ct, replayed: false);
     }
@@ -143,7 +159,19 @@ public sealed class PosSalesService(
                 payment = CreatePayment(sale, register, request);
                 db.Set<PosPayment>().Add(payment);
                 sale.Payments.Add(payment);
-                await db.SaveChangesAsync(ct);
+                try
+                {
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateException)
+                {
+                    db.ChangeTracker.Clear();
+                    var concurrentSale = await LoadSaleAsync(sale.TenantId, sale.Id, true, ct);
+                    if (concurrentSale?.Payments.Count != 1)
+                        throw;
+
+                    return await ContinueCheckoutAsync(concurrentSale, register, request, metadata, ct, replayed: true);
+                }
             }
 
             if (payment.Status == PosPaymentStatus.Failed)
@@ -478,7 +506,7 @@ public sealed class PosSalesService(
             IsEnabled = true
         };
 
-        payment.ReferenceNumber = PosServiceHelpers.SalePaymentReference(sale, payment);
+        payment.ReferenceNumber = PosServiceHelpers.SalePaymentReference(sale);
         payment.IdempotencyKey = payment.ReferenceNumber;
         return payment;
     }

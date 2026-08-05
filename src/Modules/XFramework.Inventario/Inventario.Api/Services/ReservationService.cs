@@ -122,11 +122,17 @@ public sealed class ReservationService(
         ReleaseReservationRequest request,
         CancellationToken ct = default)
     {
-        var reservationResult = await GetActiveReservation(request, request.ReservationId, ct);
+        var reservationResult = await GetReservation(request, request.ReservationId, ct);
         if (!reservationResult.IsSuccess)
             return reservationResult;
 
         var reservation = reservationResult.Data!;
+        if (reservation.Status == ReservationStatus.Released)
+            return Result<Reservation>.Success(reservation, "Reservation release replayed.");
+
+        if (reservation.Status != ReservationStatus.Active)
+            return Result<Reservation>.Conflict($"A {reservation.Status} reservation cannot be released.");
+
         var releaseResult = await allocationService.ReleaseAsync(
             reservation,
             request,
@@ -150,11 +156,17 @@ public sealed class ReservationService(
         FulfillReservationRequest request,
         CancellationToken ct = default)
     {
-        var reservationResult = await GetActiveReservation(request, request.ReservationId, ct);
+        var reservationResult = await GetReservation(request, request.ReservationId, ct);
         if (!reservationResult.IsSuccess)
             return reservationResult;
 
         var reservation = reservationResult.Data!;
+        if (reservation.Status == ReservationStatus.Fulfilled)
+            return Result<Reservation>.Success(reservation, "Reservation fulfillment replayed.");
+
+        if (reservation.Status != ReservationStatus.Active)
+            return Result<Reservation>.Conflict($"A {reservation.Status} reservation cannot be fulfilled.");
+
         var fulfillmentResult = await allocationService.FulfillAsync(
             reservation,
             request,
@@ -178,11 +190,14 @@ public sealed class ReservationService(
         CancelReservationRequest request,
         CancellationToken ct = default)
     {
-        var reservationResult = await GetActiveReservation(request, request.ReservationId, ct);
+        var reservationResult = await GetReservation(request, request.ReservationId, ct);
         if (!reservationResult.IsSuccess)
             return reservationResult;
 
         var reservation = reservationResult.Data!;
+        if (reservation.Status != ReservationStatus.Active)
+            return Result<Reservation>.Conflict($"A {reservation.Status} reservation cannot be cancelled.");
+
         var releaseResult = await allocationService.ReleaseAsync(
             reservation,
             request,
@@ -248,7 +263,7 @@ public sealed class ReservationService(
         return Result<int>.Success(reservations.Count, $"{reservations.Count} reservation(s) expired.");
     }
 
-    private async Task<Result<Reservation>> GetActiveReservation(
+    private async Task<Result<Reservation>> GetReservation(
         RequestBase request,
         Guid reservationId,
         CancellationToken ct)
@@ -261,12 +276,11 @@ public sealed class ReservationService(
             .Where(x =>
                 x.TenantId == tenantResult.Data &&
                 x.Id == reservationId &&
-                x.Status == ReservationStatus.Active &&
                 !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         return reservation is null
-            ? Result<Reservation>.NotFound("Active reservation not found.")
+            ? Result<Reservation>.NotFound("Reservation not found.")
             : Result<Reservation>.Success(reservation);
     }
 

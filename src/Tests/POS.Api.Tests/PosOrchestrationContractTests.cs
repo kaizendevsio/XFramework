@@ -77,6 +77,32 @@ public sealed class PosOrchestrationContractTests
         source.Should().Contain("MapGeneratedEndpoints");
     }
 
+    [Test]
+    public void PosEndpoints_RequireOperationCapabilitiesForHttpAndBolt()
+    {
+        var source = ReadSource("src", "Modules", "XFramework.POS", "POS.Api", "Features", "PosEndpoints.cs");
+
+        source.Should().Contain("RequiredActorCapabilities");
+        source.Should().Contain("PosAuthorizationCapabilities.SalesCreate");
+        source.Should().Contain("PosAuthorizationCapabilities.RegistersUpdate");
+        source.Should().Contain("PosAuthorizationCapabilities.CartsDelete");
+        source.Should().Contain("PosAuthorizationCapabilities.ReturnsCreate");
+    }
+
+    [Test]
+    public void RegisterService_ValidatesReferencesThroughRemoteWrappersAndWalletOwnership()
+    {
+        var source = ReadSource("src", "Modules", "XFramework.POS", "POS.Api", "Services", "PosRegisterService.cs");
+
+        source.Should().Contain("identityServer.IdentityCredential.Get");
+        source.Should().Contain("wallets.Wallet.Get");
+        source.Should().Contain("inventario.Warehouse.Get");
+        source.Should().Contain("cashDrawerWallet.CredentialId != merchantCredentialId");
+        source.Should().NotContain("db.Set<Wallet>");
+        source.Should().NotContain("db.Set<Warehouse>");
+        source.Should().NotContain("db.Set<IdentityCredential>");
+    }
+
     private static string ReadSource(params string[] segments)
     {
         var repositoryRoot = FindRepositoryRoot();

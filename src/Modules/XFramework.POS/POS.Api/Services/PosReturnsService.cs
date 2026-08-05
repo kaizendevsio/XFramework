@@ -48,11 +48,18 @@ public sealed class PosReturnsService(
         if (request.Lines.Count == 0)
             return Result<PosReturnResponse>.Failure("At least one return line is required", 400);
 
+        if (request.Lines.Select(line => line.SaleLineId).Distinct().Count() != request.Lines.Count)
+            return Result<PosReturnResponse>.Failure("A sale line can appear only once in a POS return", 400);
+
+        if (request.Lines.Any(line => line.TaxAmount != 0))
+            return Result<PosReturnResponse>.Failure("Return tax is calculated from the original sale", 400);
+
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var sale = await db.Set<PosSale>()
             .AsTracking()
             .Include(item => item.Register)
             .Include(item => item.Lines)
+            .Include(item => item.Payments)
             .FirstOrDefaultAsync(item =>
                 item.TenantId == context.TenantId &&
                 item.Id == request.SaleId &&
@@ -89,18 +96,53 @@ public sealed class PosReturnsService(
             Register = sale.Register
         };
         posReturn.ReturnNumber = PosServiceHelpers.NewReturnNumber(now, posReturn.Id);
-        posReturn.Lines = await BuildReturnLinesAsync(posReturn, sale, request, context.TenantId, ct);
+        var lineResult = await BuildReturnLinesAsync(posReturn, sale, request, context.TenantId, ct);
+        if (!lineResult.IsSuccess)
+            return Result<PosReturnResponse>.Failure(lineResult.Message!, lineResult.StatusCode);
 
-        if (posReturn.Lines.Count != request.Lines.Count)
-            return Result<PosReturnResponse>.Failure("One or more return lines are invalid", 400);
-
-        posReturn.SubtotalAmount = posReturn.Lines.Sum(line => line.Quantity * line.UnitPrice);
+        posReturn.Lines = lineResult.Data!;
         posReturn.TaxAmount = posReturn.Lines.Sum(line => line.TaxAmount);
-        posReturn.TotalRefundAmount = posReturn.SubtotalAmount + posReturn.TaxAmount;
+        posReturn.TotalRefundAmount = posReturn.Lines.Sum(line => line.RefundAmount);
+        posReturn.SubtotalAmount = posReturn.TotalRefundAmount - posReturn.TaxAmount;
+
+        var capturedAmount = sale.Payments
+            .Where(payment => payment.Status == PosPaymentStatus.Captured)
+            .Sum(payment => payment.Amount);
+        var saleLineIds = sale.Lines.Select(line => line.Id).ToList();
+        var previouslyAllocatedRefund = await db.Set<PosReturnLine>()
+            .AsNoTracking()
+            .Where(line =>
+                line.TenantId == context.TenantId &&
+                saleLineIds.Contains(line.SaleLineId) &&
+                !line.IsDeleted)
+            .SumAsync(line => line.RefundAmount, ct);
+
+        if (previouslyAllocatedRefund + posReturn.TotalRefundAmount > capturedAmount)
+            return Result<PosReturnResponse>.Conflict("Return total exceeds the captured payment amount");
 
         db.Set<PosReturn>().Add(posReturn);
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            var concurrentReplay = await LoadReturnByIdempotencyAsync(
+                context.TenantId,
+                idempotencyKey,
+                tracking: true,
+                ct);
+            if (concurrentReplay is null)
+                throw;
+
+            if (!string.Equals(concurrentReplay.RequestHash, requestHash, StringComparison.Ordinal))
+                return Result<PosReturnResponse>.Conflict("Return idempotency key was reused with a different payload");
+
+            return await ExecuteReturnWorkflowAsync(concurrentReplay, context.Metadata, ct, replayed: true);
+        }
 
         return await ExecuteReturnWorkflowAsync(posReturn, context.Metadata, ct, replayed: false);
     }
@@ -238,7 +280,7 @@ public sealed class PosReturnsService(
             : Result<PosReturnResponse>.Success(response, 201, "POS return completed");
     }
 
-    private async Task<List<PosReturnLine>> BuildReturnLinesAsync(
+    private async Task<Result<List<PosReturnLine>>> BuildReturnLinesAsync(
         PosReturn posReturn,
         PosSale sale,
         CreatePosReturnRequest request,
@@ -246,25 +288,55 @@ public sealed class PosReturnsService(
         CancellationToken ct)
     {
         var lines = new List<PosReturnLine>();
+        var saleLineIds = sale.Lines.Select(line => line.Id).ToList();
+        var previousReturns = await db.Set<PosReturnLine>()
+            .AsNoTracking()
+            .Where(line =>
+                line.TenantId == tenantId &&
+                saleLineIds.Contains(line.SaleLineId) &&
+                !line.IsDeleted)
+            .GroupBy(line => line.SaleLineId)
+            .Select(group => new
+            {
+                SaleLineId = group.Key,
+                Quantity = group.Sum(line => line.Quantity),
+                TaxAmount = group.Sum(line => line.TaxAmount),
+                RefundAmount = group.Sum(line => line.RefundAmount)
+            })
+            .ToDictionaryAsync(item => item.SaleLineId, ct);
+        var allocations = PosServiceHelpers.BuildSaleRefundAllocations(sale);
 
         foreach (var requestLine in request.Lines)
         {
             var saleLine = sale.Lines.FirstOrDefault(item => item.Id == requestLine.SaleLineId);
-            if (saleLine is null || requestLine.Quantity <= 0)
-                continue;
+            if (saleLine is null)
+                return Result<List<PosReturnLine>>.NotFound("POS sale line was not found");
 
-            var returnedQuantity = await db.Set<PosReturnLine>()
-                .AsNoTracking()
-                .Where(item =>
-                    item.TenantId == tenantId &&
-                    item.SaleLineId == saleLine.Id &&
-                    !item.IsDeleted)
-                .SumAsync(item => item.Quantity, ct);
+            if (requestLine.Quantity <= 0)
+                return Result<List<PosReturnLine>>.Failure("Return quantity must be greater than zero", 400);
 
-            if (returnedQuantity + requestLine.Quantity > saleLine.Quantity)
-                continue;
+            previousReturns.TryGetValue(saleLine.Id, out var previous);
+            var returnedQuantity = previous?.Quantity ?? 0;
+            var remainingQuantity = saleLine.Quantity - returnedQuantity;
+            if (requestLine.Quantity > remainingQuantity)
+                return Result<List<PosReturnLine>>.Conflict("Return quantity exceeds the remaining sale line quantity");
 
-            var refundAmount = requestLine.Quantity * saleLine.UnitPrice + requestLine.TaxAmount;
+            var allocation = allocations[saleLine.Id];
+            var remainingRefund = allocation.RefundAmount - (previous?.RefundAmount ?? 0);
+            var remainingTax = allocation.TaxAmount - (previous?.TaxAmount ?? 0);
+            var partialAllocation = PosServiceHelpers.BuildPartialReturnAllocation(
+                allocation,
+                saleLine.Quantity,
+                returnedQuantity,
+                previous?.TaxAmount ?? 0,
+                previous?.RefundAmount ?? 0,
+                requestLine.Quantity);
+            var refundAmount = partialAllocation.RefundAmount;
+            var taxAmount = partialAllocation.TaxAmount;
+
+            if (refundAmount < 0 || refundAmount > remainingRefund || taxAmount > remainingTax)
+                return Result<List<PosReturnLine>>.Conflict("Return amount exceeds the remaining refundable amount");
+
             lines.Add(new PosReturnLine
             {
                 Id = Guid.NewGuid(),
@@ -277,7 +349,7 @@ public sealed class PosReturnsService(
                 VariantName = saleLine.VariantName,
                 Quantity = requestLine.Quantity,
                 UnitPrice = saleLine.UnitPrice,
-                TaxAmount = requestLine.TaxAmount,
+                TaxAmount = taxAmount,
                 RefundAmount = refundAmount,
                 WarehouseId = saleLine.WarehouseId,
                 LocationId = saleLine.LocationId,
@@ -288,7 +360,7 @@ public sealed class PosReturnsService(
             });
         }
 
-        return lines;
+        return Result<List<PosReturnLine>>.Success(lines);
     }
 
     private async Task<Result> PostReturnInventoryAsync(

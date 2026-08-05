@@ -125,6 +125,9 @@ public partial class PosCart : BaseModel
     [MemoryPackOrder(21)]
     public string? CancelReason { get; set; }
 
+    [MemoryPackOrder(22)]
+    public string? RequestHash { get; set; }
+
     [MemoryPackIgnore]
     public virtual PosRegister Register { get; set; } = null!;
 

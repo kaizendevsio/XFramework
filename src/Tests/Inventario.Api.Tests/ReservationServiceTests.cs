@@ -264,6 +264,46 @@ public sealed class ReservationServiceTests
     }
 
     [Test]
+    public async Task FulfillAsync_AlreadyFulfilledReservation_ReplaysWithoutPostingStockAgain()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var reservationId = Guid.NewGuid();
+        var dataContext = SeedReservationData(tenantId, ids, onHand: 10, reserved: 4, reservationId);
+        var service = CreateService(dataContext, tenantId);
+        var request = new FulfillReservationRequest { ReservationId = reservationId };
+
+        var first = await service.FulfillAsync(request);
+        var second = await service.FulfillAsync(request);
+
+        first.IsSuccess.Should().BeTrue(first.Message);
+        second.IsSuccess.Should().BeTrue(second.Message);
+        second.Data!.Status.Should().Be(ReservationStatus.Fulfilled);
+        dataContext.Added.OfType<InventoryMovement>().Should().HaveCount(2);
+        dataContext.SaveCount.Should().Be(1);
+    }
+
+    [Test]
+    public async Task ReleaseAsync_AlreadyReleasedReservation_ReplaysWithoutPostingStockAgain()
+    {
+        var tenantId = Guid.NewGuid();
+        var ids = TestIds.Create();
+        var reservationId = Guid.NewGuid();
+        var dataContext = SeedReservationData(tenantId, ids, onHand: 10, reserved: 4, reservationId);
+        var service = CreateService(dataContext, tenantId);
+        var request = new ReleaseReservationRequest { ReservationId = reservationId };
+
+        var first = await service.ReleaseAsync(request);
+        var second = await service.ReleaseAsync(request);
+
+        first.IsSuccess.Should().BeTrue(first.Message);
+        second.IsSuccess.Should().BeTrue(second.Message);
+        second.Data!.Status.Should().Be(ReservationStatus.Released);
+        dataContext.Added.OfType<InventoryMovement>().Should().ContainSingle();
+        dataContext.SaveCount.Should().Be(1);
+    }
+
+    [Test]
     public async Task ExpireAsync_DueReservation_ReleasesReservedQuantity()
     {
         var tenantId = Guid.NewGuid();
