@@ -31,8 +31,8 @@ internal static class PosServiceHelpers
     public static string NewCartNumber(DateTime now, Guid cartId) =>
         $"CART-{now:yyyyMMddHHmmss}-{cartId:N}"[..32];
 
-    public static string SalePaymentReference(PosSale sale, PosPayment payment) =>
-        $"POS-SALE-{sale.Id:N}-{payment.Id:N}"[..80];
+    public static string SalePaymentReference(PosSale sale) =>
+        $"POS-SALE-{sale.Id:N}-PAYMENT";
 
     public static string SaleLineReservationReference(PosSaleLine line) =>
         $"POS-LINE-{line.Id:N}"[..80];
@@ -89,6 +89,92 @@ internal static class PosServiceHelpers
                 line.TaxAmount
             }).ToArray()
         });
+
+    public static string BuildCartRequestHash(CreatePosCartRequest request) =>
+        Hash(new
+        {
+            request.RegisterId,
+            request.CashierCredentialId,
+            request.CustomerCredentialId,
+            request.CustomerLabel,
+            request.Notes,
+            request.WarehouseId,
+            request.LocationId,
+            request.CurrencyId,
+            request.WalletTypeId,
+            request.DiscountAmount,
+            request.TaxAmount,
+            request.Suspend,
+            Lines = request.Lines.Select((line, index) => new
+            {
+                index,
+                line.ProductId,
+                line.ProductVariationId,
+                line.Quantity,
+                line.ExpectedUnitPrice,
+                line.DiscountAmount,
+                line.TaxAmount,
+                line.WarehouseId,
+                line.LocationId,
+                line.LotId
+            }).ToArray()
+        });
+
+    public static IReadOnlyDictionary<Guid, PosSaleLineRefundAllocation> BuildSaleRefundAllocations(PosSale sale)
+    {
+        var orderedLines = sale.Lines.OrderBy(line => line.LineNumber).ToList();
+        var grossSubtotal = orderedLines.Sum(line => line.Quantity * line.UnitPrice);
+        var remainingHeaderDiscount = sale.DiscountAmount;
+        var remainingHeaderTax = sale.TaxAmount;
+        var allocations = new Dictionary<Guid, PosSaleLineRefundAllocation>(orderedLines.Count);
+
+        for (var index = 0; index < orderedLines.Count; index++)
+        {
+            var line = orderedLines[index];
+            var isLast = index == orderedLines.Count - 1;
+            var grossLineAmount = line.Quantity * line.UnitPrice;
+            var headerDiscount = isLast
+                ? remainingHeaderDiscount
+                : AllocateProportion(sale.DiscountAmount, grossLineAmount, grossSubtotal);
+            var headerTax = isLast
+                ? remainingHeaderTax
+                : AllocateProportion(sale.TaxAmount, grossLineAmount, grossSubtotal);
+
+            remainingHeaderDiscount -= headerDiscount;
+            remainingHeaderTax -= headerTax;
+            allocations[line.Id] = new PosSaleLineRefundAllocation(
+                line.TaxAmount + headerTax,
+                line.LineTotal - headerDiscount + headerTax);
+        }
+
+        return allocations;
+    }
+
+    public static PosSaleLineRefundAllocation BuildPartialReturnAllocation(
+        PosSaleLineRefundAllocation original,
+        decimal originalQuantity,
+        decimal previouslyReturnedQuantity,
+        decimal previouslyReturnedTax,
+        decimal previouslyReturnedRefund,
+        decimal requestedQuantity)
+    {
+        var remainingQuantity = originalQuantity - previouslyReturnedQuantity;
+        if (requestedQuantity == remainingQuantity)
+        {
+            return new PosSaleLineRefundAllocation(
+                original.TaxAmount - previouslyReturnedTax,
+                original.RefundAmount - previouslyReturnedRefund);
+        }
+
+        return new PosSaleLineRefundAllocation(
+            decimal.Round(original.TaxAmount * requestedQuantity / originalQuantity, 2, MidpointRounding.AwayFromZero),
+            decimal.Round(original.RefundAmount * requestedQuantity / originalQuantity, 2, MidpointRounding.AwayFromZero));
+    }
+
+    private static decimal AllocateProportion(decimal amount, decimal lineAmount, decimal totalAmount) =>
+        amount == 0 || totalAmount == 0
+            ? 0
+            : decimal.Round(amount * lineAmount / totalAmount, 2, MidpointRounding.AwayFromZero);
 
     private static string Hash<T>(T value)
     {
@@ -327,3 +413,5 @@ internal static class PosServiceHelpers
         FailureReason = line.FailureReason
     };
 }
+
+internal readonly record struct PosSaleLineRefundAllocation(decimal TaxAmount, decimal RefundAmount);

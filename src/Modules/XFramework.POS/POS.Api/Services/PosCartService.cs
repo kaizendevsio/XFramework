@@ -31,11 +31,17 @@ public sealed class PosCartService(
         var tenantId = contextResult.Data!.TenantId;
 
         var idempotencyKey = PosServiceHelpers.NormalizeOptional(request.IdempotencyKey) ?? string.Empty;
+        var requestHash = PosServiceHelpers.BuildCartRequestHash(request);
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
             var replay = await LoadCartByIdempotencyAsync(tenantId, idempotencyKey, ct);
             if (replay is not null)
+            {
+                if (!string.Equals(replay.RequestHash, requestHash, StringComparison.Ordinal))
+                    return Result<PosCartResponse>.Conflict("Cart idempotency key was reused with a different payload");
+
                 return Result<PosCartResponse>.Success(PosServiceHelpers.ToCartResponse(replay), "POS cart replayed");
+            }
         }
 
         var register = await LoadRegisterAsync(tenantId, request.RegisterId, ct);
@@ -61,6 +67,7 @@ public sealed class PosCartService(
             DiscountAmount = request.DiscountAmount,
             TaxAmount = request.TaxAmount,
             IdempotencyKey = idempotencyKey,
+            RequestHash = requestHash,
             SuspendedAt = request.Suspend ? now : null,
             ExpiresAt = now.Add(CartTtl),
             CreatedAt = now,
@@ -88,7 +95,22 @@ public sealed class PosCartService(
             return Result<PosCartResponse>.Failure(totalsResult.Message!, totalsResult.StatusCode);
 
         db.Set<PosCart>().Add(cart);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            db.ChangeTracker.Clear();
+            var concurrentReplay = await LoadCartByIdempotencyAsync(tenantId, idempotencyKey, ct);
+            if (concurrentReplay is null)
+                throw;
+
+            if (!string.Equals(concurrentReplay.RequestHash, requestHash, StringComparison.Ordinal))
+                return Result<PosCartResponse>.Conflict("Cart idempotency key was reused with a different payload");
+
+            return Result<PosCartResponse>.Success(PosServiceHelpers.ToCartResponse(concurrentReplay), "POS cart replayed");
+        }
 
         return Result<PosCartResponse>.Success(
             PosServiceHelpers.ToCartResponse(cart),
@@ -632,7 +654,7 @@ public sealed class PosCartService(
     private static Result ApplyTotals(PosCart cart)
     {
         cart.SubtotalAmount = cart.Lines.Sum(line => line.Quantity * line.UnitPrice);
-        cart.TotalAmount = cart.SubtotalAmount - cart.DiscountAmount + cart.TaxAmount;
+        cart.TotalAmount = cart.Lines.Sum(line => line.LineTotal) - cart.DiscountAmount + cart.TaxAmount;
 
         return cart.TotalAmount < 0
             ? Result.Failure("Cart total cannot be negative", 400)

@@ -207,6 +207,48 @@ public sealed class PosValidatorTests
         result.Errors.Should().Contain(error => error.PropertyName == nameof(RetryPosReturnRequest.ReturnId));
     }
 
+    [Test]
+    public void CreatePosReturnValidator_DuplicateLinesOrClientTax_ReturnsValidationErrors()
+    {
+        var saleLineId = Guid.NewGuid();
+        var request = new CreatePosReturnRequest
+        {
+            SaleId = Guid.NewGuid(),
+            CashierCredentialId = Guid.NewGuid(),
+            IdempotencyKey = "return-key",
+            Lines =
+            [
+                new CreatePosReturnLineRequest { SaleLineId = saleLineId, Quantity = 1, TaxAmount = 1 },
+                new CreatePosReturnLineRequest { SaleLineId = saleLineId, Quantity = 1 }
+            ]
+        };
+
+        var result = new CreatePosReturnValidator().Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error => error.PropertyName == nameof(CreatePosReturnRequest.Lines));
+        result.Errors.Should().Contain(error => error.PropertyName == "Lines[0].TaxAmount");
+    }
+
+    [Test]
+    public void TransactionValidators_MoreThanMaximumLines_ReturnValidationErrors()
+    {
+        var sale = ValidCheckout();
+        sale.Lines = Enumerable.Range(0, 101)
+            .Select(_ => new CheckoutPosSaleLineRequest
+            {
+                ProductId = Guid.NewGuid(),
+                Quantity = 1,
+                ExpectedUnitPrice = 1
+            })
+            .ToList();
+
+        var result = new CheckoutPosSaleValidator().Validate(sale);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error => error.PropertyName == nameof(CheckoutPosSaleRequest.Lines));
+    }
+
     private static CheckoutPosSaleRequest ValidCheckout() => new()
     {
         RegisterId = Guid.NewGuid(),

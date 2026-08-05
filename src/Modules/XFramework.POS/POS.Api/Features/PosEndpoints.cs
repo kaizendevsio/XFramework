@@ -1,4 +1,6 @@
 using POS.Api.Services;
+using IdentityServer.Domain.Shared.Contracts;
+using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
 using POS.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -8,10 +10,12 @@ namespace POS.Api.Features;
 
 public static class SearchPosCatalogEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     [MapGet("/api/pos/catalog", Tags = ["POS Catalog"],
         Summary = "Search POS catalog",
-        Description = "Delegates to Inventario sellable product search for POS line selection.")]
+        Description = "Delegates to Inventario sellable product search for POS line selection.",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     public static Task<Result<List<PosCatalogItemResponse>>> Handle(
         SearchPosCatalogRequest request,
         PosCatalogService service,
@@ -21,9 +25,11 @@ public static class SearchPosCatalogEndpoint
 
 public static class GetPosRegisterEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersView])]
     [MapGet("/api/pos/registers/{id:guid}", Tags = ["POS Registers"],
-        Summary = "Get POS register")]
+        Summary = "Get POS register",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersView])]
     public static Task<Result<PosRegisterResponse>> Handle(
         GetPosRegisterRequest request,
         PosRegisterService service,
@@ -33,9 +39,11 @@ public static class GetPosRegisterEndpoint
 
 public static class CreatePosRegisterEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersCreate])]
     [MapPost("/api/pos/registers", Tags = ["POS Registers"],
-        Summary = "Create POS register")]
+        Summary = "Create POS register",
+        Capability = IdentityAuthorizationConstants.Create,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersCreate])]
     public static Task<Result<PosRegisterResponse>> Handle(
         CreatePosRegisterRequest request,
         PosRegisterService service,
@@ -45,9 +53,11 @@ public static class CreatePosRegisterEndpoint
 
 public static class UpdatePosRegisterEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersUpdate])]
     [MapPut("/api/pos/registers/{id:guid}", Tags = ["POS Registers"],
-        Summary = "Update POS register")]
+        Summary = "Update POS register",
+        Capability = IdentityAuthorizationConstants.Update,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersUpdate])]
     public static Task<Result<PosRegisterResponse>> Handle(
         UpdatePosRegisterRequest request,
         PosRegisterService service,
@@ -57,9 +67,11 @@ public static class UpdatePosRegisterEndpoint
 
 public static class CreatePosCartEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsCreate])]
     [MapPost("/api/pos/carts", Tags = ["POS Carts"],
-        Summary = "Create POS cart")]
+        Summary = "Create POS cart",
+        Capability = IdentityAuthorizationConstants.Create,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsCreate])]
     public static Task<Result<PosCartResponse>> Handle(
         CreatePosCartRequest request,
         PosCartService service,
@@ -69,9 +81,11 @@ public static class CreatePosCartEndpoint
 
 public static class UpdatePosCartEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     [MapPut("/api/pos/carts/{id:guid}", Tags = ["POS Carts"],
-        Summary = "Update POS cart")]
+        Summary = "Update POS cart",
+        Capability = IdentityAuthorizationConstants.Update,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     public static Task<Result<PosCartResponse>> Handle(
         UpdatePosCartRequest request,
         PosCartService service,
@@ -81,9 +95,11 @@ public static class UpdatePosCartEndpoint
 
 public static class GetPosCartEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsView])]
     [MapGet("/api/pos/carts/{id:guid}", Tags = ["POS Carts"],
-        Summary = "Get POS cart")]
+        Summary = "Get POS cart",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsView])]
     public static Task<Result<PosCartResponse>> Handle(
         GetPosCartRequest request,
         PosCartService service,
@@ -93,9 +109,11 @@ public static class GetPosCartEndpoint
 
 public static class SearchPosCartsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsView])]
     [MapGet("/api/pos/carts", Tags = ["POS Carts"],
-        Summary = "Search POS carts")]
+        Summary = "Search POS carts",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsView])]
     public static Task<Result<List<PosCartSummaryResponse>>> Handle(
         SearchPosCartsRequest request,
         PosCartService service,
@@ -105,9 +123,11 @@ public static class SearchPosCartsEndpoint
 
 public static class SuspendPosCartEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     [MapPost("/api/pos/carts/{cartId:guid}/suspend", Tags = ["POS Carts"],
-        Summary = "Suspend POS cart")]
+        Summary = "Suspend POS cart",
+        Capability = IdentityAuthorizationConstants.Update,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     public static Task<Result<PosCartResponse>> Handle(
         SuspendPosCartRequest request,
         PosCartService service,
@@ -117,9 +137,11 @@ public static class SuspendPosCartEndpoint
 
 public static class ResumePosCartEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     [MapPost("/api/pos/carts/{cartId:guid}/resume", Tags = ["POS Carts"],
-        Summary = "Resume POS cart")]
+        Summary = "Resume POS cart",
+        Capability = IdentityAuthorizationConstants.Update,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     public static Task<Result<PosCartResponse>> Handle(
         ResumePosCartRequest request,
         PosCartService service,
@@ -129,9 +151,11 @@ public static class ResumePosCartEndpoint
 
 public static class CancelPosCartEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsDelete])]
     [MapPost("/api/pos/carts/{cartId:guid}/cancel", Tags = ["POS Carts"],
-        Summary = "Cancel POS cart")]
+        Summary = "Cancel POS cart",
+        Capability = IdentityAuthorizationConstants.Delete,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsDelete])]
     public static Task<Result<PosCartResponse>> Handle(
         CancelPosCartRequest request,
         PosCartService service,
@@ -141,10 +165,12 @@ public static class CancelPosCartEndpoint
 
 public static class CheckoutPosCartEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate, PosAuthorizationCapabilities.SalesCreate])]
     [MapPost("/api/pos/carts/{cartId:guid}/checkout", Tags = ["POS Carts"],
         Summary = "Checkout POS cart",
-        Description = "Converts a persisted POS cart into a sale through the existing checkout orchestration.")]
+        Description = "Converts a persisted POS cart into a sale through the existing checkout orchestration.",
+        Capability = IdentityAuthorizationConstants.Update,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate, PosAuthorizationCapabilities.SalesCreate])]
     public static Task<Result<PosSaleReceiptResponse>> Handle(
         CheckoutPosCartRequest request,
         PosCartService service,
@@ -154,10 +180,12 @@ public static class CheckoutPosCartEndpoint
 
 public static class CheckoutPosSaleEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesCreate])]
     [MapPost("/api/pos/sales/checkout", Tags = ["POS Sales"],
         Summary = "Checkout POS sale",
-        Description = "Creates a sale, reserves Inventario stock, captures Wallets payment, and fulfills reservations.")]
+        Description = "Creates a sale, reserves Inventario stock, captures Wallets payment, and fulfills reservations.",
+        Capability = IdentityAuthorizationConstants.Create,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesCreate])]
     public static Task<Result<PosSaleReceiptResponse>> Handle(
         CheckoutPosSaleRequest request,
         PosSalesService service,
@@ -167,9 +195,11 @@ public static class CheckoutPosSaleEndpoint
 
 public static class GetPosSaleEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     [MapGet("/api/pos/sales/{id:guid}", Tags = ["POS Sales"],
-        Summary = "Get POS sale")]
+        Summary = "Get POS sale",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     public static Task<Result<PosSaleReceiptResponse>> Handle(
         GetPosSaleRequest request,
         PosSalesService service,
@@ -179,9 +209,11 @@ public static class GetPosSaleEndpoint
 
 public static class SearchPosSalesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     [MapGet("/api/pos/sales", Tags = ["POS Sales"],
-        Summary = "Search POS sales")]
+        Summary = "Search POS sales",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     public static Task<Result<List<PosSaleSummaryResponse>>> Handle(
         SearchPosSalesRequest request,
         PosSalesService service,
@@ -191,9 +223,11 @@ public static class SearchPosSalesEndpoint
 
 public static class CancelPosSaleEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesDelete])]
     [MapPost("/api/pos/sales/{saleId:guid}/cancel", Tags = ["POS Sales"],
-        Summary = "Cancel POS sale")]
+        Summary = "Cancel POS sale",
+        Capability = IdentityAuthorizationConstants.Delete,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesDelete])]
     public static Task<Result<PosSaleReceiptResponse>> Handle(
         CancelPosSaleRequest request,
         PosSalesService service,
@@ -203,9 +237,11 @@ public static class CancelPosSaleEndpoint
 
 public static class RetryPosSaleFulfillmentEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesUpdate])]
     [MapPost("/api/pos/sales/{saleId:guid}/retry-fulfillment", Tags = ["POS Sales"],
-        Summary = "Retry POS sale fulfillment")]
+        Summary = "Retry POS sale fulfillment",
+        Capability = IdentityAuthorizationConstants.Update,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesUpdate])]
     public static Task<Result<PosSaleReceiptResponse>> Handle(
         RetryPosSaleFulfillmentRequest request,
         PosSalesService service,
@@ -215,10 +251,12 @@ public static class RetryPosSaleFulfillmentEndpoint
 
 public static class CreatePosReturnEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsCreate])]
     [MapPost("/api/pos/returns", Tags = ["POS Returns"],
         Summary = "Create POS return",
-        Description = "Posts returned stock through Inventario and refunds through Wallets.")]
+        Description = "Posts returned stock through Inventario and refunds through Wallets.",
+        Capability = IdentityAuthorizationConstants.Create,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsCreate])]
     public static Task<Result<PosReturnResponse>> Handle(
         CreatePosReturnRequest request,
         PosReturnsService service,
@@ -228,9 +266,11 @@ public static class CreatePosReturnEndpoint
 
 public static class GetPosReturnEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsView])]
     [MapGet("/api/pos/returns/{id:guid}", Tags = ["POS Returns"],
-        Summary = "Get POS return")]
+        Summary = "Get POS return",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsView])]
     public static Task<Result<PosReturnResponse>> Handle(
         GetPosReturnRequest request,
         PosReturnsService service,
@@ -240,9 +280,11 @@ public static class GetPosReturnEndpoint
 
 public static class SearchPosReturnsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsView])]
     [MapGet("/api/pos/returns", Tags = ["POS Returns"],
-        Summary = "Search POS returns")]
+        Summary = "Search POS returns",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsView])]
     public static Task<Result<List<PosReturnSummaryResponse>>> Handle(
         SearchPosReturnsRequest request,
         PosReturnsService service,
@@ -252,10 +294,12 @@ public static class SearchPosReturnsEndpoint
 
 public static class RetryPosReturnEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsUpdate])]
     [MapPost("/api/pos/returns/{returnId:guid}/retry", Tags = ["POS Returns"],
         Summary = "Retry POS return",
-        Description = "Retries recoverable inventory posting or refund failures for a POS return.")]
+        Description = "Retries recoverable inventory posting or refund failures for a POS return.",
+        Capability = IdentityAuthorizationConstants.Update,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsUpdate])]
     public static Task<Result<PosReturnResponse>> Handle(
         RetryPosReturnRequest request,
         PosReturnsService service,

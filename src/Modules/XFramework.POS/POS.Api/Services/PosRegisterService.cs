@@ -2,15 +2,20 @@ using Microsoft.EntityFrameworkCore;
 using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
 using POS.Domain.Shared.Contracts.Responses;
-using IdentityServer.Domain.Shared.Contracts;
-using Wallets.Domain.Shared.Contracts;
+using IdentityServer.Integration.Drivers;
+using Inventario.Integration.Drivers;
+using Wallets.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Contexts;
-using XFramework.Inventario.Domain.Shared.Contracts;
 
 namespace POS.Api.Services;
 
-public sealed class PosRegisterService(AppDbContext db, IPosRequestContextResolver contextResolver)
+public sealed class PosRegisterService(
+    AppDbContext db,
+    IPosRequestContextResolver contextResolver,
+    IIdentityServerServiceWrapper identityServer,
+    IWalletsServiceWrapper wallets,
+    IInventarioServiceWrapper inventario)
 {
     public async Task<Result<PosRegisterResponse>> GetAsync(
         GetPosRegisterRequest request,
@@ -176,52 +181,50 @@ public sealed class PosRegisterService(AppDbContext db, IPosRequestContextResolv
         Guid locationId,
         CancellationToken ct)
     {
-        var merchantExists = await db.Set<IdentityCredential>()
-            .AsNoTracking()
-            .AnyAsync(item => item.TenantId == tenantId && item.Id == merchantCredentialId && !item.IsDeleted, ct);
-        if (!merchantExists)
+        var merchantResponse = await identityServer.IdentityCredential.Get(merchantCredentialId, tenantId);
+        var merchant = merchantResponse.Response;
+        if (!merchantResponse.IsSuccess || merchant is null || merchant.IsDeleted || merchant.TenantId != tenantId)
             return Result.NotFound("Merchant credential was not found for this tenant");
 
-        var walletType = await db.Set<WalletType>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == walletTypeId && !item.IsDeleted, ct);
-        if (walletType is null)
+        var walletTypeResponse = await wallets.WalletType.Get(walletTypeId, tenantId);
+        var walletType = walletTypeResponse.Response;
+        if (!walletTypeResponse.IsSuccess || walletType is null || walletType.IsDeleted || walletType.TenantId != tenantId)
             return Result.NotFound("Wallet type was not found for this tenant");
 
         if (walletType.CurrencyTypeId.HasValue && walletType.CurrencyTypeId.Value != currencyId)
             return Result.Conflict("Wallet type currency does not match the POS register currency");
 
-        var currencyExists = await db.Set<CurrencyType>()
-            .AsNoTracking()
-            .AnyAsync(item => item.TenantId == tenantId && item.Id == currencyId && !item.IsDeleted, ct);
-        if (!currencyExists)
+        var currencyResponse = await wallets.CurrencyType.Get(currencyId, tenantId);
+        var currency = currencyResponse.Response;
+        if (!currencyResponse.IsSuccess || currency is null || currency.IsDeleted || currency.TenantId != tenantId)
             return Result.NotFound("Currency was not found for this tenant");
 
-        var cashDrawerWallet = await db.Set<Wallet>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == cashDrawerWalletId && !item.IsDeleted, ct);
-        if (cashDrawerWallet is null)
+        var cashDrawerWalletResponse = await wallets.Wallet.Get(cashDrawerWalletId, tenantId);
+        var cashDrawerWallet = cashDrawerWalletResponse.Response;
+        if (!cashDrawerWalletResponse.IsSuccess || cashDrawerWallet is null || cashDrawerWallet.IsDeleted || cashDrawerWallet.TenantId != tenantId)
             return Result.NotFound("Cash drawer wallet was not found for this tenant");
+
+        if (cashDrawerWallet.CredentialId != merchantCredentialId)
+            return Result.Conflict("Cash drawer wallet does not belong to the merchant credential");
 
         if (cashDrawerWallet.WalletTypeId.HasValue && cashDrawerWallet.WalletTypeId.Value != walletTypeId)
             return Result.Conflict("Cash drawer wallet type does not match the POS register wallet type");
 
-        var warehouseExists = await db.Set<Warehouse>()
-            .AsNoTracking()
-            .AnyAsync(item => item.TenantId == tenantId && item.Id == warehouseId && !item.IsDeleted, ct);
-        if (!warehouseExists)
+        var warehouseResponse = await inventario.Warehouse.Get(warehouseId, tenantId);
+        var warehouse = warehouseResponse.Response;
+        if (!warehouseResponse.IsSuccess || warehouse is null || warehouse.IsDeleted || warehouse.TenantId != tenantId)
             return Result.NotFound("Warehouse was not found for this tenant");
 
-        var locationExists = await db.Set<InventoryLocation>()
-            .AsNoTracking()
-            .AnyAsync(item =>
-                item.TenantId == tenantId &&
-                item.Id == locationId &&
-                item.WarehouseId == warehouseId &&
-                !item.IsDeleted,
-                ct);
-        if (!locationExists)
+        var locationResponse = await inventario.InventoryLocation.Get(locationId, tenantId);
+        var location = locationResponse.Response;
+        if (!locationResponse.IsSuccess ||
+            location is null ||
+            location.IsDeleted ||
+            location.TenantId != tenantId ||
+            location.WarehouseId != warehouseId)
+        {
             return Result.NotFound("Location was not found in the selected warehouse for this tenant");
+        }
 
         return Result.Success();
     }

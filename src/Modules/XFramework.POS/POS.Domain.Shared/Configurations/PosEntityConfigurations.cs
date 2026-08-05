@@ -77,6 +77,7 @@ public sealed class PosCartConfiguration : IEntityTypeConfiguration<PosCart>
         entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
         entity.Property(e => e.IdempotencyKey).HasMaxLength(160);
         entity.Property(e => e.CancelReason).HasMaxLength(500);
+        entity.Property(e => e.RequestHash).HasMaxLength(64);
 
         entity.HasIndex(e => new { e.TenantId, e.CartNumber })
             .IsUnique()
@@ -188,7 +189,9 @@ public sealed class PosPaymentConfiguration : IEntityTypeConfiguration<PosPaymen
         entity.Property(e => e.RefundedAmount).HasPrecision(18, 2);
 
         entity.HasIndex(e => new { e.TenantId, e.SaleId })
-            .HasDatabaseName("IX_POS_Payment_Tenant_Sale");
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("UX_POS_Payment_Tenant_Sale_Active");
         entity.HasIndex(e => new { e.TenantId, e.IdempotencyKey })
             .IsUnique()
             .HasFilter("\"IsDeleted\" = false")

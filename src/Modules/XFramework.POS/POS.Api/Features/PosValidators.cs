@@ -3,6 +3,11 @@ using POS.Domain.Shared.Contracts.Requests;
 
 namespace POS.Api.Features;
 
+internal static class PosValidationLimits
+{
+    public const int MaxTransactionLines = 100;
+}
+
 public sealed class SearchPosCatalogValidator : AbstractValidator<SearchPosCatalogRequest>
 {
     public SearchPosCatalogValidator()
@@ -66,6 +71,8 @@ public sealed class CreatePosCartValidator : AbstractValidator<CreatePosCartRequ
         RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.IdempotencyKey).MaximumLength(160).When(x => !string.IsNullOrWhiteSpace(x.IdempotencyKey));
         RuleFor(x => x.Lines).NotEmpty();
+        RuleFor(x => x.Lines).Must(lines => lines is not null && lines.Count <= PosValidationLimits.MaxTransactionLines)
+            .WithMessage($"A POS cart cannot contain more than {PosValidationLimits.MaxTransactionLines} lines");
         RuleForEach(x => x.Lines).SetValidator(new PosCartLineValidator());
     }
 }
@@ -80,6 +87,8 @@ public sealed class UpdatePosCartValidator : AbstractValidator<UpdatePosCartRequ
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Lines).NotEmpty();
+        RuleFor(x => x.Lines).Must(lines => lines is not null && lines.Count <= PosValidationLimits.MaxTransactionLines)
+            .WithMessage($"A POS cart cannot contain more than {PosValidationLimits.MaxTransactionLines} lines");
         RuleForEach(x => x.Lines).SetValidator(new PosCartLineValidator());
     }
 }
@@ -158,6 +167,8 @@ public sealed class CheckoutPosSaleValidator : AbstractValidator<CheckoutPosSale
         RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(160);
         RuleFor(x => x.Lines).NotEmpty();
+        RuleFor(x => x.Lines).Must(lines => lines is not null && lines.Count <= PosValidationLimits.MaxTransactionLines)
+            .WithMessage($"A POS sale cannot contain more than {PosValidationLimits.MaxTransactionLines} lines");
         RuleFor(x => x.Payment).NotNull();
         RuleFor(x => x.Payment.Amount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Payment.Method).IsInEnum();
@@ -217,11 +228,17 @@ public sealed class CreatePosReturnValidator : AbstractValidator<CreatePosReturn
         RuleFor(x => x.Reason).MaximumLength(500).When(x => !string.IsNullOrWhiteSpace(x.Reason));
         RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(160);
         RuleFor(x => x.Lines).NotEmpty();
+        RuleFor(x => x.Lines).Must(lines => lines is not null && lines.Count <= PosValidationLimits.MaxTransactionLines)
+            .WithMessage($"A POS return cannot contain more than {PosValidationLimits.MaxTransactionLines} lines");
+        RuleFor(x => x.Lines).Must(lines =>
+                lines is not null && lines.Select(line => line.SaleLineId).Distinct().Count() == lines.Count)
+            .WithMessage("A sale line can appear only once in a POS return");
         RuleForEach(x => x.Lines).ChildRules(line =>
         {
             line.RuleFor(x => x.SaleLineId).NotEmpty();
             line.RuleFor(x => x.Quantity).GreaterThan(0);
-            line.RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0);
+            line.RuleFor(x => x.TaxAmount).Equal(0)
+                .WithMessage("Return tax is calculated from the original sale and must not be supplied by the client");
         });
     }
 }
