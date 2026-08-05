@@ -13,12 +13,14 @@ public interface IWalletEventPublisher
     /// <summary>
     /// Retrieves recent events from the bounded in-memory buffer.
     /// </summary>
+    /// <param name="tenantId">Required tenant boundary</param>
     /// <param name="walletId">Optional filter by wallet ID</param>
     /// <param name="credentialId">Optional filter by credential ID</param>
     /// <param name="eventType">Optional filter by event type name</param>
     /// <param name="pageIndex">Zero-based page index</param>
     /// <param name="pageSize">Number of events per page</param>
     IReadOnlyList<WalletEvent> GetRecentEvents(
+        Guid tenantId,
         Guid? walletId = null,
         Guid? credentialId = null,
         string? eventType = null,

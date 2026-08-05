@@ -6,6 +6,8 @@ using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Enums;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Wallets.Api.Services;
 
@@ -13,8 +15,12 @@ public sealed class WalletPaymentWebhookService(
     DbContext dbContext,
     IConfiguration configuration,
     IWalletFeatureGateService featureGateService,
-    IWalletProviderWorkflowService providerWorkflowService) : IWalletPaymentWebhookService
+    IWalletProviderWorkflowService providerWorkflowService,
+    ITrustedInvocationContextAccessor invocationContextAccessor,
+    ITrustedServiceTargetContextInitializer serviceTargetContextInitializer) : IWalletPaymentWebhookService
 {
+    private const int MaxRawPayloadLength = 256 * 1024;
+
     public async Task<Result<WalletWebhookIngestResponse>> IngestAsync(
         IngestWalletPaymentWebhookRequest request,
         CancellationToken ct = default)
@@ -25,13 +31,19 @@ public sealed class WalletPaymentWebhookService(
             return Result<WalletWebhookIngestResponse>.Failure("Provider key and external event id are required", 400);
         }
 
+        if (request.RawPayloadJson.Length > MaxRawPayloadLength)
+        {
+            return Result<WalletWebhookIngestResponse>.Failure("Webhook payload is too large", 413);
+        }
+
         var signatureValid = ValidateSignature(request);
         var configuredTenantId = ResolveConfiguredTenantId(request.ProviderKey);
         var payloadTenantId = ResolveTenantIdFromSignedPayload(request.RawPayloadJson);
         var mappedStatus = MapStatus(request.ProviderStatus);
         if (!signatureValid)
         {
-            var auditTenantId = configuredTenantId ?? payloadTenantId;
+            // An unsigned payload cannot select the tenant whose audit partition is written.
+            var auditTenantId = configuredTenantId;
             if (auditTenantId.HasValue)
             {
                 await UpsertRejectedSignatureEventAsync(
@@ -49,6 +61,28 @@ public sealed class WalletPaymentWebhookService(
         if (tenantId is null || tenantId.Value == Guid.Empty)
         {
             return Result<WalletWebhookIngestResponse>.Failure("Webhook tenant context is required", 400);
+        }
+
+        var currentInvocation = invocationContextAccessor.Current;
+        if (currentInvocation is not null && currentInvocation.EffectiveTenantId != tenantId.Value)
+        {
+            return Result<WalletWebhookIngestResponse>.Forbidden("Webhook tenant does not match trusted invocation context");
+        }
+
+        if (currentInvocation is null)
+        {
+            var authorization = await serviceTargetContextInitializer.EstablishAsync(
+                tenantId.Value,
+                XFrameworkServiceNames.Wallets,
+                [XFrameworkServiceScopes.WalletsAdmin],
+                XFrameworkServiceNames.Wallets,
+                ct: ct);
+            if (!authorization.IsSuccess)
+            {
+                return Result<WalletWebhookIngestResponse>.Failure(
+                    "Webhook processing authorization failed",
+                    authorization.StatusCode);
+            }
         }
 
         var feature = await featureGateService.EnsureEnabledAsync(

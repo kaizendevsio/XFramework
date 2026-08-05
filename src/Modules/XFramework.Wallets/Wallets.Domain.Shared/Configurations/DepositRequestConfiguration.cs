@@ -45,6 +45,8 @@ public class DepositRequestConfiguration : IEntityTypeConfiguration<DepositReque
         entity.Property(e => e.RequestedFee).HasPrecision(24, 8);
         entity.Property(e => e.CalculatedFee).HasPrecision(24, 8);
         entity.Property(e => e.FailureReason).HasMaxLength(4000);
+        entity.Property(e => e.IdempotencyKey).HasMaxLength(200);
+        entity.Property(e => e.RequestHash).HasMaxLength(64);
 
         entity.HasOne(d => d.PaymentGateway).WithMany()
             .HasForeignKey(d => d.GatewayId)
@@ -86,5 +88,8 @@ public class DepositRequestConfiguration : IEntityTypeConfiguration<DepositReque
         entity.HasIndex(e => new { e.TenantId, e.ProviderEventId })
             .IsUnique()
             .HasFilter("\"ProviderEventId\" IS NOT NULL");
+        entity.HasIndex(e => new { e.TenantId, e.IdempotencyKey })
+            .IsUnique()
+            .HasFilter("\"IdempotencyKey\" IS NOT NULL");
     }
 }

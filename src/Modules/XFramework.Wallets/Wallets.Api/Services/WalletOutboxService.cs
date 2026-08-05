@@ -1,5 +1,6 @@
 using System.Data;
 using IdentityServer.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -188,6 +189,10 @@ public sealed class WalletOutboxService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletOutboxActionResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.Webhooks))
+        {
+            return Result<WalletOutboxActionResponse>.Forbidden("Wallet webhook capability is required");
         }
 
         var feature = await featureGateService.EnsureEnabledAsync(

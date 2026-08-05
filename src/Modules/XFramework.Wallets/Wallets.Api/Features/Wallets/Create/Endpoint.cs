@@ -1,4 +1,5 @@
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Responses;
 using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Core.Patterns;
@@ -15,8 +16,9 @@ public static class CreateWalletEndpoint
         Summary = "Create a new wallet",
         Description = "Creates a new wallet for a credential with the specified wallet type. Automatically generates a unique account number.",
         RequireAuthorization = true,
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact],
         ExcludeFromOpenApi = true)]
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact])]
     public static async Task<Result<WalletResponse>> Handle(
         CreateWalletRequest request,
         IWalletOperationsService walletService,

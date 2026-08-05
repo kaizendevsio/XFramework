@@ -1,4 +1,5 @@
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts;
 using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Security;
@@ -40,7 +41,8 @@ public static class Endpoint
             {
                 ActorRequirement = ActorRequirement.Required,
                 TenantAccessMode = TenantAccessMode.ActorTenant,
-                RequireServiceIdentity = false
+                RequireServiceIdentity = false,
+                RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact]
             },
             cancellationToken);
         if (!invocationResult.IsSuccess)
@@ -67,6 +69,7 @@ public static class Endpoint
             request.Requests,
             contextResult.Data!,
             request.AllowPartialSuccess,
+            request.IdempotencyKey,
             cancellationToken);
 
         if (!result.IsSuccess)
@@ -127,4 +130,6 @@ public record BatchDecrementRequestWrapper : RequestBase
     /// If true, continues processing after failures; if false, rolls back entire batch on any failure
     /// </summary>
     public bool AllowPartialSuccess { get; set; }
+
+    public string? IdempotencyKey { get; set; }
 }

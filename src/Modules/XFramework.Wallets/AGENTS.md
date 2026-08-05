@@ -57,6 +57,10 @@ not ordinary CRUD.
 - Use `Result<T>` consistently for service and endpoint outcomes.
 - Keep tenant, actor, credential, correlation id, IP, and user-agent resolution
   server-side through `IWalletRequestContextResolver` and trusted metadata.
+- Use IdentityServer's canonical capability format:
+  `{module}[.{subfeature}]:{view|create|update|delete|manage}`. Reuse
+  `WalletAuthorizationCapabilities`; do not invent capability suffixes that
+  IdentityServer cannot issue.
 - Do not trust `TenantId`, actor, credential, fee, status, or provider result
   values from request bodies when the server can resolve or verify them.
 - Use the tenant feature taxonomy already wired in `Wallets.Api/Program.cs`:
@@ -71,6 +75,10 @@ not ordinary CRUD.
   directly to bypass validation or ledger posting.
 - Payment webhooks must be signature-validated, idempotent by provider event or
   external reference, raw-payload audited, and retry-safe.
+- Public provider webhooks are tenantless until the signature identifies a
+  configured gateway. Never use an unsigned payload tenant to select the audit
+  partition. Internal Bolt webhook calls must use service-target tenant context
+  and the Wallets admin service scope.
 - Outbox publishing must be durable: poll pending messages, retry with backoff,
   capture errors, and move exhausted messages to failed/dead-letter states.
 - Reconciliation must compare balances, snapshots, running ledger, transaction
@@ -86,6 +94,11 @@ not ordinary CRUD.
 - Lock affected wallets in deterministic order before mutating balances.
 - Preserve idempotency protections: same tenant + idempotency key should replay
   the same request, and the same key with a changed request hash should fail.
+- Deposit and withdrawal request creation requires the same durable
+  tenant-scoped idempotency and request-hash protection as ledger operations.
+- Persist rejected ledger operations with their policy/risk decision so failed
+  attempts remain auditable; never publish a financial outbox event for a
+  rejected operation.
 - Maintain constraints and indexes for account numbers, active wallet uniqueness,
   provider event/reference uniqueness, outbox polling, statements, operation
   history, and reconciliation.

@@ -1,8 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using IdentityServer.Domain.Shared.Contracts;
 using Payments.Core.Services;
 using Payments.Domain.Shared.Contracts;
 using Payments.Domain.Shared.Contracts.Requests.Create;
+using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -32,6 +35,14 @@ public sealed class WalletWorkflowService(
         if (!contextResult.IsSuccess) return Result<WalletWorkflowResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsDeposits, ct);
         if (!feature.IsSuccess) return Failure<WalletWorkflowResponse>(feature);
+
+        var requestHash = ComputeWorkflowRequestHash(request);
+        var replay = await FindDepositReplayAsync(
+            contextResult.Data!.TenantId,
+            request.IdempotencyKey,
+            requestHash,
+            ct);
+        if (replay is not null) return replay;
 
         if (request.Amount <= 0)
         {
@@ -99,7 +110,9 @@ public sealed class WalletWorkflowService(
             DepositStatus = (short)DepositStatus.PendingPayment,
             WorkflowStatus = WalletWorkflowStatus.PendingApproval,
             RequestedByCredentialId = contextResult.Data.ActorCredentialId ?? request.CredentialId,
-            RawRequestData = JsonSerializer.Serialize(request)
+            RawRequestData = JsonSerializer.Serialize(request),
+            IdempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey),
+            RequestHash = requestHash
         };
 
         var approval = CreateApproval(
@@ -113,7 +126,21 @@ public sealed class WalletWorkflowService(
         deposit.ApprovalId = approval.Id;
 
         dbContext.Set<DepositRequest>().Add(deposit);
-        await dbContext.SaveChangesAsync(ct);
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+        {
+            dbContext.ChangeTracker.Clear();
+            var concurrentReplay = await FindDepositReplayAsync(
+                contextResult.Data.TenantId,
+                request.IdempotencyKey,
+                requestHash,
+                ct);
+            if (concurrentReplay is not null) return concurrentReplay;
+            throw;
+        }
 
         var providerResult = await TryInitiateDepositProviderAsync(deposit, ct);
         if (!providerResult.IsSuccess)
@@ -294,6 +321,14 @@ public sealed class WalletWorkflowService(
         var feature = await EnsureFeatureAsync(contextResult.Data!, TenantModuleFeatureKeys.WalletsWithdrawals, ct);
         if (!feature.IsSuccess) return Failure<WalletWorkflowResponse>(feature);
 
+        var requestHash = ComputeWorkflowRequestHash(request);
+        var replay = await FindWithdrawalReplayAsync(
+            contextResult.Data!.TenantId,
+            request.IdempotencyKey,
+            requestHash,
+            ct);
+        if (replay is not null) return replay;
+
         if (request.Amount <= 0)
         {
             return Result<WalletWorkflowResponse>.Failure("Amount must be greater than zero", 400);
@@ -357,7 +392,9 @@ public sealed class WalletWorkflowService(
             WithdrawalStatus = TransactionStatus.Pending,
             WorkflowStatus = WalletWorkflowStatus.PendingApproval,
             RequestedByCredentialId = contextResult.Data.ActorCredentialId ?? request.CredentialId,
-            RawRequestData = JsonSerializer.Serialize(request)
+            RawRequestData = JsonSerializer.Serialize(request),
+            IdempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey),
+            RequestHash = requestHash
         };
 
         var approval = CreateApproval(
@@ -370,7 +407,21 @@ public sealed class WalletWorkflowService(
         dbContext.Set<WalletApprovalRequest>().Add(approval);
         withdrawal.ApprovalId = approval.Id;
         dbContext.Set<WithdrawalRequest>().Add(withdrawal);
-        await dbContext.SaveChangesAsync(ct);
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+        {
+            dbContext.ChangeTracker.Clear();
+            var concurrentReplay = await FindWithdrawalReplayAsync(
+                contextResult.Data.TenantId,
+                request.IdempotencyKey,
+                requestHash,
+                ct);
+            if (concurrentReplay is not null) return concurrentReplay;
+            throw;
+        }
 
         return Result<WalletWorkflowResponse>.Success(ToWithdrawalResponse(withdrawal, "Withdrawal request created"));
     }
@@ -386,7 +437,9 @@ public sealed class WalletWorkflowService(
         var withdrawal = load.Data!.Entity;
         if (withdrawal.HoldOperationId.HasValue)
         {
-            return Result<WalletWorkflowResponse>.Success(ToWithdrawalResponse(withdrawal, "Withdrawal already approved and held"));
+            var existingProviderResult = await TryInitiateWithdrawalProviderAsync(withdrawal, request, ct);
+            return existingProviderResult ??
+                Result<WalletWorkflowResponse>.Success(ToWithdrawalResponse(withdrawal, "Withdrawal already approved and held"));
         }
 
         if (withdrawal.WorkflowStatus is not WalletWorkflowStatus.PendingApproval)
@@ -498,6 +551,11 @@ public sealed class WalletWorkflowService(
         if (!holdResult.IsSuccess)
         {
             return Result<WalletWorkflowResponse>.Failure(holdResult.Message!, holdResult.StatusCode);
+        }
+
+        if (holdResult.Data!.AlreadyProcessed)
+        {
+            await dbContext.Entry(withdrawal).ReloadAsync(ct);
         }
 
         var providerResult = await TryInitiateWithdrawalProviderAsync(withdrawal, request, ct);
@@ -1141,13 +1199,39 @@ public sealed class WalletWorkflowService(
             return Result<WalletCaseResponse>.Failure(authorization.Message!, authorization.StatusCode);
         }
 
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.Policy))
+        {
+            return Result<WalletCaseResponse>.Forbidden("Wallet policy capability is required to resolve cases");
+        }
+
+        if (contextResult.Data.ActorCredentialId is not { } deciderCredentialId || deciderCredentialId == Guid.Empty)
+        {
+            return Result<WalletCaseResponse>.Failure("Case decider credential is required", 400);
+        }
+
+        if (deciderCredentialId == walletCase.RequesterCredentialId)
+        {
+            return Result<WalletCaseResponse>.Forbidden("Requester cannot resolve their own wallet case");
+        }
+
+        if (walletCase.Status is WalletCaseStatus.Resolved or WalletCaseStatus.Rejected)
+        {
+            return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, "Wallet case already decided"));
+        }
+
         if (!request.Approve)
         {
             walletCase.Status = WalletCaseStatus.Rejected;
-            walletCase.DeciderCredentialId = contextResult.Data!.ActorCredentialId;
+            walletCase.DeciderCredentialId = deciderCredentialId;
             walletCase.ResolvedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(ct);
             return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, "Wallet case rejected"));
+        }
+
+        var originalValidation = await ValidateOriginalCaseReferenceAsync(walletCase, ct);
+        if (!originalValidation.IsSuccess)
+        {
+            return Result<WalletCaseResponse>.Failure(originalValidation.Message!, originalValidation.StatusCode);
         }
 
         var credit = walletCase.CaseType is WalletCaseType.Refund;
@@ -1161,7 +1245,7 @@ public sealed class WalletWorkflowService(
                 WalletCaseType.Chargeback => WalletOperationType.Chargeback,
                 _ => WalletOperationType.Reversal
             },
-            ActorCredentialId = contextResult.Data!.ActorCredentialId ?? wallet.CredentialId,
+            ActorCredentialId = deciderCredentialId,
             IdempotencyKey = request.IdempotencyKey ?? $"wallet-case:resolve:{walletCase.Id}",
             ReferenceNumber = walletCase.ExternalReference ?? walletCase.Id.ToString("N"),
             ExternalReference = walletCase.ExternalReference,
@@ -1203,7 +1287,7 @@ public sealed class WalletWorkflowService(
             {
                 walletCase.Status = WalletCaseStatus.Resolved;
                 walletCase.SettlementOperationId = operation.Id;
-                walletCase.DeciderCredentialId = contextResult.Data.ActorCredentialId;
+                walletCase.DeciderCredentialId = deciderCredentialId;
                 walletCase.ResolvedAt = DateTime.UtcNow;
                 return Task.CompletedTask;
             }
@@ -1215,6 +1299,79 @@ public sealed class WalletWorkflowService(
         }
 
         return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, "Wallet case resolved"));
+    }
+
+    private async Task<Result> ValidateOriginalCaseReferenceAsync(WalletCase walletCase, CancellationToken ct)
+    {
+        if (!walletCase.OriginalOperationId.HasValue)
+        {
+            return Result.Failure("Original wallet operation is required", 400);
+        }
+
+        var originalOperationExists = await dbContext.Set<WalletOperation>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.Id == walletCase.OriginalOperationId.Value &&
+                x.TenantId == walletCase.TenantId &&
+                !x.IsDeleted &&
+                x.Status == WalletOperationStatus.Completed,
+                ct);
+        if (!originalOperationExists)
+        {
+            return Result.Failure("Original completed wallet operation was not found", 400);
+        }
+
+        if (walletCase.OriginalTransactionId.HasValue)
+        {
+            var transactionLinked = await dbContext.Set<WalletLedgerEntry>()
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.TenantId == walletCase.TenantId &&
+                    !x.IsDeleted &&
+                    x.OperationId == walletCase.OriginalOperationId.Value &&
+                    x.WalletId == walletCase.WalletId &&
+                    x.WalletTransactionId == walletCase.OriginalTransactionId.Value,
+                    ct);
+            if (!transactionLinked)
+            {
+                return Result.Failure("Original transaction is not linked to the selected wallet operation", 400);
+            }
+        }
+
+        if (walletCase.CaseType is not WalletCaseType.Refund)
+        {
+            return Result.Success();
+        }
+
+        var refundableAmount = await dbContext.Set<WalletLedgerEntry>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == walletCase.TenantId &&
+                !x.IsDeleted &&
+                x.OperationId == walletCase.OriginalOperationId.Value &&
+                x.WalletId == walletCase.WalletId &&
+                x.BalanceBucket == WalletBalanceBucket.Available &&
+                x.Direction == WalletLedgerDirection.Debit)
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+
+        var alreadyRefunded = await dbContext.Set<WalletCase>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == walletCase.TenantId &&
+                !x.IsDeleted &&
+                x.Id != walletCase.Id &&
+                x.CaseType == WalletCaseType.Refund &&
+                x.Status == WalletCaseStatus.Resolved &&
+                x.OriginalOperationId == walletCase.OriginalOperationId)
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+
+        return walletCase.Amount > 0 && walletCase.Amount <= refundableAmount - alreadyRefunded
+            ? Result.Success()
+            : Result.Failure("Refund amount exceeds the remaining refundable debit", 400);
     }
 
     public async Task<Result<List<WalletStatementLineResponse>>> GetStatementAsync(WalletStatementRequest request, CancellationToken ct = default)
@@ -1751,6 +1908,34 @@ public sealed class WalletWorkflowService(
                 null,
                 ct);
         }
+
+        var claimed = await dbContext.Set<WithdrawalRequest>()
+            .IgnoreQueryFilters()
+            .Where(x =>
+                x.Id == withdrawal.Id &&
+                x.TenantId == withdrawal.TenantId &&
+                !x.IsDeleted &&
+                x.WorkflowStatus == WalletWorkflowStatus.Approved)
+            .ExecuteUpdateAsync(
+                updates => updates
+                    .SetProperty(x => x.WorkflowStatus, WalletWorkflowStatus.Settling)
+                    .SetProperty(x => x.ModifiedAt, DateTime.UtcNow),
+                ct);
+
+        if (claimed == 0)
+        {
+            await dbContext.Entry(withdrawal).ReloadAsync(ct);
+            if (withdrawal.WorkflowStatus is WalletWorkflowStatus.Settling or WalletWorkflowStatus.Completed)
+            {
+                return Result<WalletWorkflowResponse>.Success(
+                    ToWithdrawalResponse(withdrawal, "Withdrawal payout is already processing"));
+            }
+
+            return Result<WalletWorkflowResponse>.Conflict("Withdrawal payout could not be claimed for processing");
+        }
+
+        withdrawal.WorkflowStatus = WalletWorkflowStatus.Settling;
+        withdrawal.ModifiedAt = DateTime.UtcNow;
 
         var response = await paymentGatewayService.ProcessCashOutAsync(new CreateCashoutRequest
         {
@@ -2371,6 +2556,88 @@ public sealed class WalletWorkflowService(
         webhook.ProcessingError = processingError;
         webhook.ProcessedAt = DateTime.UtcNow;
     }
+
+    private async Task<Result<WalletWorkflowResponse>?> FindDepositReplayAsync(
+        Guid tenantId,
+        string? idempotencyKey,
+        string requestHash,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey)) return null;
+
+        var existing = await dbContext.Set<DepositRequest>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.TenantId == tenantId &&
+                !x.IsDeleted &&
+                x.IdempotencyKey == idempotencyKey.Trim(),
+                ct);
+        if (existing is null) return null;
+
+        return string.Equals(existing.RequestHash, requestHash, StringComparison.Ordinal)
+            ? Result<WalletWorkflowResponse>.Success(ToDepositResponse(existing, "Deposit request already created"))
+            : Result<WalletWorkflowResponse>.Conflict("Idempotency key was already used with a different deposit request");
+    }
+
+    private async Task<Result<WalletWorkflowResponse>?> FindWithdrawalReplayAsync(
+        Guid tenantId,
+        string? idempotencyKey,
+        string requestHash,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey)) return null;
+
+        var existing = await dbContext.Set<WithdrawalRequest>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.TenantId == tenantId &&
+                !x.IsDeleted &&
+                x.IdempotencyKey == idempotencyKey.Trim(),
+                ct);
+        if (existing is null) return null;
+
+        return string.Equals(existing.RequestHash, requestHash, StringComparison.Ordinal)
+            ? Result<WalletWorkflowResponse>.Success(ToWithdrawalResponse(existing, "Withdrawal request already created"))
+            : Result<WalletWorkflowResponse>.Conflict("Idempotency key was already used with a different withdrawal request");
+    }
+
+    private static string ComputeWorkflowRequestHash(CreateDepositWorkflowRequest request) =>
+        ComputeSha256(JsonSerializer.Serialize(new
+        {
+            request.CredentialId,
+            request.WalletId,
+            request.WalletTypeId,
+            request.CurrencyId,
+            request.GatewayId,
+            request.Amount,
+            request.RequestedFee,
+            request.Address,
+            request.Remarks,
+            request.ExternalReference,
+            request.ExpiryDate
+        }));
+
+    private static string ComputeWorkflowRequestHash(CreateWithdrawalWorkflowRequest request) =>
+        ComputeSha256(JsonSerializer.Serialize(new
+        {
+            request.CredentialId,
+            request.WalletId,
+            request.CurrencyId,
+            request.GatewayId,
+            request.Amount,
+            request.RequestedFee,
+            request.Address,
+            request.Remarks,
+            request.ExternalReference
+        }));
+
+    private static string ComputeSha256(string value) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    private static string? NormalizeIdempotencyKey(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static void ApplyApprovalDecision(
         WalletApprovalRequest? approval,

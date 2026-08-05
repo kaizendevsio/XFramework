@@ -57,13 +57,14 @@ public sealed class WalletEventPublisher : IWalletEventPublisher
 
     /// <inheritdoc />
     public IReadOnlyList<WalletEvent> GetRecentEvents(
+        Guid tenantId,
         Guid? walletId = null,
         Guid? credentialId = null,
         string? eventType = null,
         int pageIndex = 0,
         int pageSize = 50)
     {
-        var query = _recentEvents.AsEnumerable();
+        var query = _recentEvents.Where(e => e.TenantId == tenantId);
 
         if (walletId.HasValue && walletId.Value != Guid.Empty)
             query = query.Where(e => e.WalletId == walletId.Value);

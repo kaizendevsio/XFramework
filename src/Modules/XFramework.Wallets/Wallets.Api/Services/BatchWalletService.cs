@@ -22,6 +22,7 @@ public sealed class BatchWalletService(
         List<BatchIncrementRequest> requests,
         WalletRequestContext context,
         bool allowPartialSuccess = false,
+        string? idempotencyKey = null,
         CancellationToken cancellationToken = default)
     {
         var validation = ValidateBatch(requests);
@@ -39,8 +40,8 @@ public sealed class BatchWalletService(
         logger.BatchWalletOperationStarted("Increment", requests.Count);
         var stopwatch = Stopwatch.StartNew();
         var result = allowPartialSuccess
-            ? await ExecutePartialAsync(requests, context, ExecuteIncrementLedgerAsync, cancellationToken)
-            : await ExecuteIncrementLedgerAsync(requests, context, cancellationToken);
+            ? await ExecutePartialAsync(requests, context, idempotencyKey, ExecuteIncrementLedgerAsync, cancellationToken)
+            : await ExecuteIncrementLedgerAsync(requests, context, idempotencyKey, cancellationToken);
 
         return Complete("BatchIncrement", "Increment", result, stopwatch);
     }
@@ -49,6 +50,7 @@ public sealed class BatchWalletService(
         List<BatchDecrementRequest> requests,
         WalletRequestContext context,
         bool allowPartialSuccess = false,
+        string? idempotencyKey = null,
         CancellationToken cancellationToken = default)
     {
         var validation = ValidateBatch(requests);
@@ -66,8 +68,8 @@ public sealed class BatchWalletService(
         logger.BatchWalletOperationStarted("Decrement", requests.Count);
         var stopwatch = Stopwatch.StartNew();
         var result = allowPartialSuccess
-            ? await ExecutePartialAsync(requests, context, ExecuteDecrementLedgerAsync, cancellationToken)
-            : await ExecuteDecrementLedgerAsync(requests, context, cancellationToken);
+            ? await ExecutePartialAsync(requests, context, idempotencyKey, ExecuteDecrementLedgerAsync, cancellationToken)
+            : await ExecuteDecrementLedgerAsync(requests, context, idempotencyKey, cancellationToken);
 
         return Complete("BatchDecrement", "Decrement", result, stopwatch);
     }
@@ -76,6 +78,7 @@ public sealed class BatchWalletService(
         List<BatchTransferRequest> requests,
         WalletRequestContext context,
         bool allowPartialSuccess = false,
+        string? idempotencyKey = null,
         CancellationToken cancellationToken = default)
     {
         var validation = ValidateBatch(requests);
@@ -93,8 +96,8 @@ public sealed class BatchWalletService(
         logger.BatchWalletOperationStarted("Transfer", requests.Count);
         var stopwatch = Stopwatch.StartNew();
         var result = allowPartialSuccess
-            ? await ExecutePartialAsync(requests, context, ExecuteTransferLedgerAsync, cancellationToken)
-            : await ExecuteTransferLedgerAsync(requests, context, cancellationToken);
+            ? await ExecutePartialAsync(requests, context, idempotencyKey, ExecuteTransferLedgerAsync, cancellationToken)
+            : await ExecuteTransferLedgerAsync(requests, context, idempotencyKey, cancellationToken);
 
         return Complete("BatchTransfer", "Transfer", result, stopwatch);
     }
@@ -113,6 +116,7 @@ public sealed class BatchWalletService(
     private async Task<Result<BatchOperationResult>> ExecuteIncrementLedgerAsync(
         List<BatchIncrementRequest> requests,
         WalletRequestContext context,
+        string? idempotencyKey,
         CancellationToken ct)
     {
         var tenantId = context.TenantId;
@@ -287,12 +291,15 @@ public sealed class BatchWalletService(
             newWallets.Values.ToList(),
             requests.Count,
             "batch-increment",
+            idempotencyKey,
+            context.ActorCredentialId,
             ct);
     }
 
     private async Task<Result<BatchOperationResult>> ExecuteDecrementLedgerAsync(
         List<BatchDecrementRequest> requests,
         WalletRequestContext context,
+        string? idempotencyKey,
         CancellationToken ct)
     {
         var tenantId = context.TenantId;
@@ -416,12 +423,15 @@ public sealed class BatchWalletService(
             [],
             requests.Count,
             "batch-decrement",
+            idempotencyKey,
+            context.ActorCredentialId,
             ct);
     }
 
     private async Task<Result<BatchOperationResult>> ExecuteTransferLedgerAsync(
         List<BatchTransferRequest> requests,
         WalletRequestContext context,
+        string? idempotencyKey,
         CancellationToken ct)
     {
         var tenantId = context.TenantId;
@@ -585,6 +595,8 @@ public sealed class BatchWalletService(
             [],
             requests.Count,
             "batch-transfer",
+            idempotencyKey,
+            context.ActorCredentialId,
             ct);
     }
 
@@ -596,6 +608,8 @@ public sealed class BatchWalletService(
         IReadOnlyList<Wallet> newWallets,
         int totalProcessed,
         string referencePrefix,
+        string? idempotencyKey,
+        Guid? actorCredentialId,
         CancellationToken ct)
     {
         var ledgerResult = await ledgerService.ExecuteAsync(
@@ -603,7 +617,11 @@ public sealed class BatchWalletService(
             {
                 TenantId = tenantId,
                 OperationType = operationType,
-                ReferenceNumber = $"{referencePrefix}:{Guid.NewGuid():N}",
+                ActorCredentialId = actorCredentialId,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim(),
+                ReferenceNumber = string.IsNullOrWhiteSpace(idempotencyKey)
+                    ? $"{referencePrefix}:{Guid.NewGuid():N}"
+                    : $"{referencePrefix}:{idempotencyKey.Trim()}",
                 Postings = postings,
                 NewWallets = newWallets,
                 ReadModels = readModels
@@ -628,7 +646,8 @@ public sealed class BatchWalletService(
     private async Task<Result<BatchOperationResult>> ExecutePartialAsync<TRequest>(
         List<TRequest> requests,
         WalletRequestContext context,
-        Func<List<TRequest>, WalletRequestContext, CancellationToken, Task<Result<BatchOperationResult>>> executeSingle,
+        string? idempotencyKey,
+        Func<List<TRequest>, WalletRequestContext, string?, CancellationToken, Task<Result<BatchOperationResult>>> executeSingle,
         CancellationToken ct)
         where TRequest : class
     {
@@ -636,7 +655,10 @@ public sealed class BatchWalletService(
 
         for (var i = 0; i < requests.Count; i++)
         {
-            var singleResult = await executeSingle([requests[i]], context, ct);
+            var itemIdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey)
+                ? null
+                : $"{idempotencyKey.Trim()}:{i}";
+            var singleResult = await executeSingle([requests[i]], context, itemIdempotencyKey, ct);
             if (singleResult.IsSuccess)
             {
                 result.SuccessCount++;

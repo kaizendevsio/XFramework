@@ -20,8 +20,9 @@ public abstract class WalletsTestBase
     [TearDown]
     public void BaseTearDown() => HttpClient?.Dispose();
 
-    protected AppDbContext CreateDbContext()
+    protected AppDbContext CreateDbContext(Guid? tenantId = null)
     {
+        var effectiveTenantId = tenantId ?? WalletsTestFixture.TestTenantId;
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(WalletsTestFixture.ConnectionString)
             .Options;
@@ -29,7 +30,7 @@ public abstract class WalletsTestBase
         var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Tenant:DefaultId"] = WalletsTestFixture.TestTenantId.ToString()
+                ["Tenant:DefaultId"] = effectiveTenantId.ToString()
             })
             .Build();
 
@@ -37,7 +38,7 @@ public abstract class WalletsTestBase
             options,
             new Microsoft.AspNetCore.Http.HttpContextAccessor(),
             config,
-            new TestEffectiveTenantContextAccessor(WalletsTestFixture.TestTenantId));
+            new TestEffectiveTenantContextAccessor(effectiveTenantId));
     }
 
     protected async Task<IdentityCredential> SeedCredential()

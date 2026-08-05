@@ -2,6 +2,7 @@ using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore.Storage;
 using XFramework.Core.Patterns;
 
 namespace Wallets.Api.Services;
@@ -126,26 +127,38 @@ public sealed class WalletLedgerService(
 
             if (!policyResult.IsSuccess)
             {
-                await transaction.RollbackAsync(ct);
-                return Result<WalletLedgerExecutionResult>.Failure(
+                return await RejectAndCommitAsync(
+                    transaction,
+                    request,
+                    requestHash,
                     policyResult.Message ?? "Wallet policy rejected the operation",
-                    policyResult.StatusCode);
+                    policyResult.StatusCode,
+                    policyResult.Data,
+                    ct);
             }
 
             if (policyResult.Data?.IsApproved == false)
             {
-                await transaction.RollbackAsync(ct);
-                return Result<WalletLedgerExecutionResult>.Failure(
+                return await RejectAndCommitAsync(
+                    transaction,
+                    request,
+                    requestHash,
                     policyResult.Data.Message ?? "Wallet policy rejected the operation",
-                    403);
+                    403,
+                    policyResult.Data,
+                    ct);
             }
 
             if (policyResult.Data?.RequiresApproval == true && !request.ApprovalId.HasValue)
             {
-                await transaction.RollbackAsync(ct);
-                return Result<WalletLedgerExecutionResult>.Failure(
+                return await RejectAndCommitAsync(
+                    transaction,
+                    request,
+                    requestHash,
                     policyResult.Data.Message ?? "Wallet policy requires maker-checker approval before settlement",
-                    409);
+                    409,
+                    policyResult.Data,
+                    ct);
             }
 
             if (request.ApprovalId.HasValue)
@@ -153,10 +166,14 @@ public sealed class WalletLedgerService(
                 var approvalValidation = await ValidateApprovalAsync(request, walletIds, ct);
                 if (!approvalValidation.IsSuccess)
                 {
-                    await transaction.RollbackAsync(ct);
-                    return Result<WalletLedgerExecutionResult>.Failure(
+                    return await RejectAndCommitAsync(
+                        transaction,
+                        request,
+                        requestHash,
                         approvalValidation.Message ?? "Wallet approval is invalid",
-                        approvalValidation.StatusCode);
+                        approvalValidation.StatusCode,
+                        policyResult.Data,
+                        ct);
                 }
             }
 
@@ -336,9 +353,56 @@ public sealed class WalletLedgerService(
                 "Idempotency key was already used with a different request");
         }
 
+        if (existing.Status is WalletOperationStatus.Rejected or WalletOperationStatus.Failed)
+        {
+            return Result<WalletLedgerExecutionResult>.Failure(
+                existing.FailureMessage ?? "Wallet operation was rejected",
+                existing.Status == WalletOperationStatus.Rejected ? 403 : 409);
+        }
+
         return Result<WalletLedgerExecutionResult>.Success(
             new WalletLedgerExecutionResult(existing.Id, true, new Dictionary<Guid, WalletBalanceExecutionResult>()),
             "Transaction already processed");
+    }
+
+    private async Task<Result<WalletLedgerExecutionResult>> RejectAndCommitAsync(
+        IDbContextTransaction transaction,
+        WalletLedgerExecutionRequest request,
+        string requestHash,
+        string message,
+        int statusCode,
+        WalletPolicyEvaluationResult? policyDecision,
+        CancellationToken ct)
+    {
+        dbContext.Set<WalletOperation>().Add(new WalletOperation
+        {
+            Id = Guid.NewGuid(),
+            TenantId = request.TenantId,
+            OperationType = request.OperationType,
+            Status = WalletOperationStatus.Rejected,
+            IdempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey) ? null : request.IdempotencyKey,
+            RequestHash = requestHash,
+            ReferenceNumber = request.ReferenceNumber,
+            CorrelationId = request.CorrelationId,
+            ActorCredentialId = request.ActorCredentialId,
+            ExternalReference = request.ExternalReference,
+            Reason = request.Reason,
+            FailureMessage = message,
+            RiskDecision = policyDecision?.Decision,
+            PolicyDecision = policyDecision?.Decision,
+            PolicyDecisionJson = policyDecision?.DecisionJson,
+            RequiresApproval = policyDecision?.RequiresApproval == true,
+            RiskTier = policyDecision?.RiskTier,
+            RiskScore = policyDecision?.RiskScore,
+            RequestedFee = request.RequestedFee,
+            CalculatedFee = request.CalculatedFee,
+            ApprovalId = request.ApprovalId,
+            OriginalOperationId = request.OriginalOperationId
+        });
+
+        await dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return Result<WalletLedgerExecutionResult>.Failure(message, statusCode);
     }
 
     private static string? ValidateRequest(WalletLedgerExecutionRequest request)
