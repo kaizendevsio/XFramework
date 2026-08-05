@@ -18,8 +18,11 @@ public static class StrictSecurityRateLimitPolicyMap
     public static readonly StrictSecurityRateLimitPolicy Refresh =
         new("refresh", 10, TimeSpan.FromMinutes(1));
 
-    private static readonly StrictSecurityRateLimitPolicy ServiceIdentity =
-        new("service-identity", 5, TimeSpan.FromMinutes(1));
+    private static readonly StrictSecurityRateLimitPolicy ServiceToken =
+        new("service-token", 60, TimeSpan.FromMinutes(1));
+
+    private static readonly StrictSecurityRateLimitPolicy BoltTransportToken =
+        new("bolt-transport-token", 30, TimeSpan.FromMinutes(1));
 
     public static readonly StrictSecurityRateLimitPolicy PasswordReset =
         new("password-reset", 3, TimeSpan.FromMinutes(15));
@@ -30,10 +33,16 @@ public static class StrictSecurityRateLimitPolicyMap
     public static bool TryResolve(HttpRequest request, out StrictSecurityRateLimitPolicy policy)
     {
         if (HttpMethods.IsPost(request.Method)
-            && (request.Path.Equals("/api/service-identity/token", StringComparison.OrdinalIgnoreCase)
-                || request.Path.Equals("/api/service-identity/bolt-transport-token", StringComparison.OrdinalIgnoreCase)))
+            && request.Path.Equals("/api/service-identity/token", StringComparison.OrdinalIgnoreCase))
         {
-            policy = ServiceIdentity;
+            policy = ServiceToken;
+            return true;
+        }
+
+        if (HttpMethods.IsPost(request.Method)
+            && request.Path.Equals("/api/service-identity/bolt-transport-token", StringComparison.OrdinalIgnoreCase))
+        {
+            policy = BoltTransportToken;
             return true;
         }
 

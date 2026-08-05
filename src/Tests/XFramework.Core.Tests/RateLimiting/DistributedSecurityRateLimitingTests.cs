@@ -22,8 +22,8 @@ namespace XFramework.Core.Tests.RateLimiting;
 [TestFixture]
 public sealed class DistributedSecurityRateLimitingTests
 {
-    [TestCase("POST", "/api/service-identity/token", "service-identity", 5, 60)]
-    [TestCase("POST", "/api/service-identity/bolt-transport-token", "service-identity", 5, 60)]
+    [TestCase("POST", "/api/service-identity/token", "service-token", 60, 60)]
+    [TestCase("POST", "/api/service-identity/bolt-transport-token", "bolt-transport-token", 30, 60)]
     [TestCase("PATCH", "/api/verifications/34ed62ad-e830-4cf9-a428-29a03e7ef917/token", "verification", 5, 900)]
     public void PolicyMap_MapsStrictIdentityServerRoutes(
         string method,
@@ -40,6 +40,20 @@ public sealed class DistributedSecurityRateLimitingTests
         policy.Name.Should().Be(expectedName);
         policy.PermitLimit.Should().Be(expectedLimit);
         policy.Window.Should().Be(TimeSpan.FromSeconds(expectedWindowSeconds));
+    }
+
+    [Test]
+    public void PolicyMap_UsesIndependentQuotasForServiceAndBoltTransportTokens()
+    {
+        var serviceContext = CreateContext("POST", "/api/service-identity/token");
+        var transportContext = CreateContext("POST", "/api/service-identity/bolt-transport-token");
+
+        StrictSecurityRateLimitPolicyMap.TryResolve(serviceContext.Request, out var servicePolicy)
+            .Should().BeTrue();
+        StrictSecurityRateLimitPolicyMap.TryResolve(transportContext.Request, out var transportPolicy)
+            .Should().BeTrue();
+
+        servicePolicy.Name.Should().NotBe(transportPolicy.Name);
     }
 
     [TestCase("GET", "/api/auth/authenticate")]
