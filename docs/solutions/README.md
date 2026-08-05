@@ -52,6 +52,7 @@ status: current
 - [Decentralized remote data context](architecture-patterns/decentralized-remote-data-context.md) - remote `IDataContext` architecture over generated service wrappers.
 - [IdentityServer schema ownership exceptions](architecture-patterns/identityserver-schema-ownership-exceptions.md) - documents the legacy `Application`, `Audit`, and `GeoLocation` tables that remain owned by IdentityServer.
 - [IdentityServer backend audit and remediation](workflow-issues/identityserver-backend-audit-2026-07-31.md) - records the post-Bolt BackendGuidelines audit, implemented fixes, independent re-audit, and verification evidence.
+- [Inventario backend audit after trusted invocation remediation](workflow-issues/inventario-backend-audit-2026-08-04.md) - records the current post-IdentityServer findings, resolved tenant/Bolt issues, and verification evidence.
 - [Portal service wrapper and integration test contract](developer-experience/portal-service-wrapper-and-integration-test-contract.md) - wrapper-first Portal business operations, direct `IDataContext` mutation rules, and standard/extended integration-test tiers.
 - [UI guidelines](../../rules/UiGuidelines.md) - primary Portal and Blazor UI rules, with links to BlazorBlueprint component details.
 - [Bolt protocol, Hub, and Media audit](workflow-issues/bolt-protocol-hub-media-audit-2026-07-12.md) - active correctness, security, performance, scalability, and Media finding inventory.

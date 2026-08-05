@@ -14,7 +14,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
         entity.Property(e => e.Description).HasMaxLength(1000);
         entity.Property(e => e.Price).HasPrecision(18, 2);
-        entity.Property(e => e.StockQuantity).HasDefaultValue(0);
+        entity.Property(e => e.StockQuantity).HasPrecision(18, 4).HasDefaultValue(0m);
         entity.Property(e => e.SKU).HasMaxLength(50);
         entity.Property(e => e.Brand).HasMaxLength(100);
         entity.Property(e => e.Weight).HasPrecision(18, 3);

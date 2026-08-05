@@ -31,7 +31,6 @@ public sealed class WarehouseService(
             return Result<List<Warehouse>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var warehouses = await dataContext.Query<Warehouse>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted)
             .OrderBy(x => x.Code)
             .Take(200)
@@ -57,7 +56,6 @@ public sealed class WarehouseService(
             return Result<Warehouse>.Failure("Warehouse code and name are required.", 400);
 
         var duplicate = await dataContext.Query<Warehouse>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Code == code && !x.IsDeleted, ct);
         if (duplicate)
             return Result<Warehouse>.Failure("A warehouse with the same code already exists.", 409);
@@ -101,7 +99,6 @@ public sealed class WarehouseService(
             return Result<List<InventoryLocation>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var query = dataContext.Query<InventoryLocation>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
 
         if (request.WarehouseId is { } id)
@@ -132,13 +129,11 @@ public sealed class WarehouseService(
             return Result<InventoryLocation>.Failure("Location code and name are required.", 400);
 
         var warehouseExists = await dataContext.Query<Warehouse>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == request.WarehouseId && !x.IsDeleted, ct);
         if (!warehouseExists)
             return Result<InventoryLocation>.NotFound("Warehouse not found.");
 
         var duplicate = await dataContext.Query<InventoryLocation>()
-            .IgnoreQueryFilters()
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
                 x.WarehouseId == request.WarehouseId &&

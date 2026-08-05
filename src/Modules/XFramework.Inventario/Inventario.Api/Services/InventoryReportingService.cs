@@ -60,8 +60,14 @@ public sealed class InventoryReportingService(
 
         var now = DateTime.UtcNow;
         var cutoff = now.AddDays(Math.Clamp(request.DaysAhead, 1, 365));
-        var rows = await BuildExpiryRows(tenantResult.Data, request.ProductId, request.ProductVariationId, lot =>
-            lot.ExpiresAt is not null && lot.ExpiresAt > now && lot.ExpiresAt <= cutoff, ct);
+        var rows = await BuildExpiryRows(
+            tenantResult.Data,
+            request.ProductId,
+            request.ProductVariationId,
+            expiresAfter: now,
+            expiresOnOrBefore: cutoff,
+            includeExpiredStatus: false,
+            ct);
 
         return Result<List<NearExpiryStockReportRow>>.Success(rows);
     }
@@ -83,8 +89,14 @@ public sealed class InventoryReportingService(
             return Result<List<NearExpiryStockReportRow>>.Failure(traceabilityResult.Message!, traceabilityResult.StatusCode);
 
         var now = DateTime.UtcNow;
-        var rows = await BuildExpiryRows(tenantResult.Data, request.ProductId, request.ProductVariationId, lot =>
-            lot.Status == InventoryLotStatus.Expired || lot.ExpiresAt is not null && lot.ExpiresAt <= now, ct);
+        var rows = await BuildExpiryRows(
+            tenantResult.Data,
+            request.ProductId,
+            request.ProductVariationId,
+            expiresAfter: null,
+            expiresOnOrBefore: now,
+            includeExpiredStatus: true,
+            ct);
 
         return Result<List<NearExpiryStockReportRow>>.Success(rows);
     }
@@ -102,23 +114,28 @@ public sealed class InventoryReportingService(
             return Result<List<StockPositionReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
-        var balances = await dataContext.Query<StockBalance>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .ToListAsync(ct);
+        var balancesQuery = dataContext.Query<StockBalance>()
+            .Where(x => x.TenantId == tenantId);
 
         if (request.ProductId is { } productId)
-            balances = balances.Where(x => x.ProductId == productId).ToList();
+            balancesQuery = balancesQuery.Where(x => x.ProductId == productId);
         if (request.ProductVariationId is { } productVariationId)
-            balances = balances.Where(x => x.ProductVariationId == productVariationId).ToList();
+            balancesQuery = balancesQuery.Where(x => x.ProductVariationId == productVariationId);
         if (request.WarehouseId is { } warehouseId)
-            balances = balances.Where(x => x.WarehouseId == warehouseId).ToList();
+            balancesQuery = balancesQuery.Where(x => x.WarehouseId == warehouseId);
         if (request.LocationId is { } locationId)
-            balances = balances.Where(x => x.LocationId == locationId).ToList();
+            balancesQuery = balancesQuery.Where(x => x.LocationId == locationId);
         if (request.LotId is { } lotId)
-            balances = balances.Where(x => x.LotId == lotId).ToList();
+            balancesQuery = balancesQuery.Where(x => x.LotId == lotId);
 
-        var lookups = await LoadLookups(tenantId, ct);
+        var balances = await balancesQuery
+            .OrderBy(x => x.ProductId)
+            .ThenBy(x => x.WarehouseId)
+            .ThenBy(x => x.LocationId)
+            .Take(1000)
+            .ToListAsync(ct);
+
+        var lookups = await LoadLookups(tenantId, balances, ct);
         var rows = balances.Select(balance => new StockPositionReportRow(
                 balance.Id,
                 balance.ProductId,
@@ -160,34 +177,35 @@ public sealed class InventoryReportingService(
             return Result<List<MovementLedgerReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
-        var movements = await dataContext.Query<InventoryMovement>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .ToListAsync(ct);
+        var movementsQuery = dataContext.Query<InventoryMovement>()
+            .Where(x => x.TenantId == tenantId);
 
         if (request.ProductId is { } productId)
-            movements = movements.Where(x => x.ProductId == productId).ToList();
+            movementsQuery = movementsQuery.Where(x => x.ProductId == productId);
         if (request.ProductVariationId is { } productVariationId)
-            movements = movements.Where(x => x.ProductVariationId == productVariationId).ToList();
+            movementsQuery = movementsQuery.Where(x => x.ProductVariationId == productVariationId);
         if (request.WarehouseId is { } warehouseId)
-            movements = movements.Where(x => x.WarehouseId == warehouseId).ToList();
+            movementsQuery = movementsQuery.Where(x => x.WarehouseId == warehouseId);
         if (request.LocationId is { } locationId)
-            movements = movements.Where(x => x.LocationId == locationId).ToList();
+            movementsQuery = movementsQuery.Where(x => x.LocationId == locationId);
         if (request.LotId is { } lotId)
-            movements = movements.Where(x => x.LotId == lotId).ToList();
+            movementsQuery = movementsQuery.Where(x => x.LotId == lotId);
         if (!string.IsNullOrWhiteSpace(request.ReferenceType))
-            movements = movements.Where(x => x.ReferenceType == request.ReferenceType).ToList();
+            movementsQuery = movementsQuery.Where(x => x.ReferenceType == request.ReferenceType);
         if (request.ReferenceId is { } referenceId)
-            movements = movements.Where(x => x.ReferenceId == referenceId).ToList();
+            movementsQuery = movementsQuery.Where(x => x.ReferenceId == referenceId);
         if (request.From is { } from)
-            movements = movements.Where(x => x.MovementDate >= from).ToList();
+            movementsQuery = movementsQuery.Where(x => x.MovementDate >= from);
         if (request.To is { } to)
-            movements = movements.Where(x => x.MovementDate <= to).ToList();
+            movementsQuery = movementsQuery.Where(x => x.MovementDate <= to);
 
-        var lookups = await LoadLookups(tenantId, ct);
-        var rows = movements
+        var movements = await movementsQuery
             .OrderByDescending(x => x.MovementDate)
             .Take(1000)
+            .ToListAsync(ct);
+
+        var lookups = await LoadLookups(tenantId, movements, ct);
+        var rows = movements
             .Select(movement => new MovementLedgerReportRow(
                 movement.Id,
                 movement.ProductId,
@@ -232,24 +250,25 @@ public sealed class InventoryReportingService(
             return Result<List<ReservationAllocationStatusReportRow>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
-        var allocations = await dataContext.Query<ReservationAllocation>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .ToListAsync(ct);
+        var allocationsQuery = dataContext.Query<ReservationAllocation>()
+            .Where(x => x.TenantId == tenantId);
 
         if (request.ProductId is { } productId)
-            allocations = allocations.Where(x => x.ProductId == productId).ToList();
+            allocationsQuery = allocationsQuery.Where(x => x.ProductId == productId);
         if (request.ProductVariationId is { } productVariationId)
-            allocations = allocations.Where(x => x.ProductVariationId == productVariationId).ToList();
+            allocationsQuery = allocationsQuery.Where(x => x.ProductVariationId == productVariationId);
         if (request.LotId is { } lotId)
-            allocations = allocations.Where(x => x.LotId == lotId).ToList();
+            allocationsQuery = allocationsQuery.Where(x => x.LotId == lotId);
         if (request.Status is { } status)
-            allocations = allocations.Where(x => x.Status == status).ToList();
+            allocationsQuery = allocationsQuery.Where(x => x.Status == status);
 
-        var lookups = await LoadLookups(tenantId, ct);
-        var rows = allocations
+        var allocations = await allocationsQuery
             .OrderByDescending(x => x.ReservedAt)
             .Take(1000)
+            .ToListAsync(ct);
+
+        var lookups = await LoadLookups(tenantId, allocations, ct);
+        var rows = allocations
             .Select(allocation => new ReservationAllocationStatusReportRow(
                 allocation.Id,
                 allocation.ReservationId,
@@ -278,31 +297,41 @@ public sealed class InventoryReportingService(
         Guid tenantId,
         Guid? productId,
         Guid? productVariationId,
-        Func<InventoryLot, bool> lotFilter,
+        DateTime? expiresAfter,
+        DateTime expiresOnOrBefore,
+        bool includeExpiredStatus,
         CancellationToken ct)
     {
-        var lots = await dataContext.Query<InventoryLot>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .ToListAsync(ct);
+        var lotsQuery = dataContext.Query<InventoryLot>()
+            .Where(x => x.TenantId == tenantId);
         if (productId is { } id)
-            lots = lots.Where(x => x.ProductId == id).ToList();
+            lotsQuery = lotsQuery.Where(x => x.ProductId == id);
         if (productVariationId is { } variantId)
-            lots = lots.Where(x => x.ProductVariationId == variantId).ToList();
+            lotsQuery = lotsQuery.Where(x => x.ProductVariationId == variantId);
 
-        lots = lots.Where(lotFilter).ToList();
+        lotsQuery = includeExpiredStatus
+            ? lotsQuery.Where(x => x.Status == InventoryLotStatus.Expired || x.ExpiresAt != null && x.ExpiresAt <= expiresOnOrBefore)
+            : lotsQuery.Where(x => x.ExpiresAt != null && x.ExpiresAt > expiresAfter && x.ExpiresAt <= expiresOnOrBefore);
+
+        var lots = await lotsQuery
+            .OrderBy(x => x.ExpiresAt)
+            .Take(1000)
+            .ToListAsync(ct);
         if (lots.Count == 0)
             return [];
 
-        var lotIds = lots.Select(x => x.Id).ToHashSet();
+        var lotIds = lots.Select(x => x.Id).ToList();
         var balances = await dataContext.Query<StockBalance>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && x.LotId != null && !x.IsDeleted)
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.LotId != null &&
+                lotIds.Contains(x.LotId.Value) &&
+                x.OnHandQuantity > 0)
+            .Take(1000)
             .ToListAsync(ct);
-        balances = balances.Where(x => x.LotId is { } lotId && lotIds.Contains(lotId) && x.OnHandQuantity > 0).ToList();
 
         var lotMap = lots.ToDictionary(x => x.Id);
-        var lookups = await LoadLookups(tenantId, ct);
+        var lookups = await LoadLookups(tenantId, balances, ct);
 
         return balances.Select(balance =>
             {
@@ -333,27 +362,65 @@ public sealed class InventoryReportingService(
             .ToList();
     }
 
-    private async Task<LookupMaps> LoadLookups(Guid tenantId, CancellationToken ct)
+    private Task<LookupMaps> LoadLookups(Guid tenantId, IReadOnlyCollection<StockBalance> rows, CancellationToken ct) =>
+        LoadLookups(
+            tenantId,
+            rows.Select(x => x.ProductId),
+            rows.Select(x => x.ProductVariationId),
+            rows.Select(x => (Guid?)x.WarehouseId),
+            rows.Select(x => (Guid?)x.LocationId),
+            rows.Select(x => x.LotId),
+            ct);
+
+    private Task<LookupMaps> LoadLookups(Guid tenantId, IReadOnlyCollection<InventoryMovement> rows, CancellationToken ct) =>
+        LoadLookups(
+            tenantId,
+            rows.Select(x => x.ProductId),
+            rows.Select(x => x.ProductVariationId),
+            rows.Select(x => x.WarehouseId),
+            rows.Select(x => x.LocationId),
+            rows.Select(x => x.LotId),
+            ct);
+
+    private Task<LookupMaps> LoadLookups(Guid tenantId, IReadOnlyCollection<ReservationAllocation> rows, CancellationToken ct) =>
+        LoadLookups(
+            tenantId,
+            rows.Select(x => x.ProductId),
+            rows.Select(x => x.ProductVariationId),
+            [],
+            [],
+            rows.Select(x => x.LotId),
+            ct);
+
+    private async Task<LookupMaps> LoadLookups(
+        Guid tenantId,
+        IEnumerable<Guid> productIds,
+        IEnumerable<Guid?> variationIds,
+        IEnumerable<Guid?> warehouseIds,
+        IEnumerable<Guid?> locationIds,
+        IEnumerable<Guid?> lotIds,
+        CancellationToken ct)
     {
+        var productIdList = productIds.Distinct().ToList();
+        var variationIdList = variationIds.OfType<Guid>().Distinct().ToList();
+        var warehouseIdList = warehouseIds.OfType<Guid>().Distinct().ToList();
+        var locationIdList = locationIds.OfType<Guid>().Distinct().ToList();
+        var lotIdList = lotIds.OfType<Guid>().Distinct().ToList();
+
         var products = await dataContext.Query<Product>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .Where(x => x.TenantId == tenantId && productIdList.Contains(x.Id))
             .ToListAsync(ct);
         var warehouses = await dataContext.Query<Warehouse>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .Where(x => x.TenantId == tenantId && warehouseIdList.Contains(x.Id))
             .ToListAsync(ct);
         var locations = await dataContext.Query<InventoryLocation>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .Where(x => x.TenantId == tenantId && locationIdList.Contains(x.Id))
             .ToListAsync(ct);
         var lots = await dataContext.Query<InventoryLot>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .Where(x => x.TenantId == tenantId && lotIdList.Contains(x.Id))
             .ToListAsync(ct);
         var variations = await dataContext.Query<ProductVariation>()
-            .IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .Where(x => x.TenantId == tenantId && variationIdList.Contains(x.Id))
             .ToListAsync(ct);
         var typeIds = variations
             .Where(x => x.ProductVariationTypeId is not null)
@@ -363,8 +430,7 @@ public sealed class InventoryReportingService(
         var variationTypes = typeIds.Count == 0
             ? []
             : await dataContext.Query<ProductVariationType>()
-                .IgnoreQueryFilters()
-                .Where(x => x.TenantId == tenantId && typeIds.Contains(x.Id) && !x.IsDeleted)
+                .Where(x => x.TenantId == tenantId && typeIds.Contains(x.Id))
                 .ToListAsync(ct);
         var variationTypeNames = variationTypes.ToDictionary<ProductVariationType, Guid, string?>(
             x => x.Id,

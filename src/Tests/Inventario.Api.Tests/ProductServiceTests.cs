@@ -14,7 +14,6 @@ using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Api.Services;
 using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Products;
-using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace Inventario.Api.Tests;
 
@@ -22,7 +21,7 @@ namespace Inventario.Api.Tests;
 public sealed class ProductServiceTests
 {
     [Test]
-    public async Task CreateAsync_AuthenticatedTenant_AssignsTenantAndCreatesOpeningMovement()
+    public async Task CreateAsync_AuthenticatedTenant_AssignsTenantWithoutCreatingStock()
     {
         var tenantId = Guid.NewGuid();
         var categoryId = Guid.NewGuid();
@@ -42,7 +41,7 @@ public sealed class ProductServiceTests
             Name = "Widget",
             Description = "Tenant-owned product",
             Price = 12.50m,
-            StockQuantity = 7,
+            StockQuantity = 0,
             CategoryId = categoryId,
             SKU = "W-001"
         });
@@ -50,17 +49,31 @@ public sealed class ProductServiceTests
         result.IsSuccess.Should().BeTrue(result.Message);
         result.StatusCode.Should().Be(201);
         result.Data!.TenantId.Should().Be(tenantId);
-        result.Data.StockQuantity.Should().Be(7);
+        result.Data.StockQuantity.Should().Be(0);
+        dataContext.Added.OfType<InventoryMovement>().Should().BeEmpty();
 
-        var movement = dataContext.Added.OfType<InventoryMovement>().Single();
-        movement.TenantId.Should().Be(tenantId);
-        movement.ProductId.Should().Be(result.Data.Id);
-        movement.MovementType.Should().Be(InventoryMovementType.OpeningBalance);
-        movement.QuantityDelta.Should().Be(7);
-        movement.QuantityBefore.Should().Be(0);
-        movement.QuantityAfter.Should().Be(7);
+        cache.SetKeys.Should().Contain($"inventario:tenant:{tenantId}:product:{result.Data.Id}");
+    }
 
-        cache.SetKeys.Should().Contain($"products:{tenantId}:{result.Data.Id}");
+    [Test]
+    public async Task CreateAsync_WithInitialStock_RequiresDimensionedStockMovement()
+    {
+        var tenantId = Guid.NewGuid();
+        var dataContext = new FakeDataContext();
+        var service = CreateService(dataContext, new FakeCacheService(), tenantId);
+
+        var result = await service.CreateAsync(new CreateProductRequest
+        {
+            Name = "Widget",
+            Price = 12.50m,
+            StockQuantity = 7,
+            CategoryId = Guid.NewGuid()
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(400);
+        dataContext.Added.Should().BeEmpty();
+        dataContext.SaveCount.Should().Be(0);
     }
 
     [Test]
@@ -164,6 +177,87 @@ public sealed class ProductServiceTests
         result.IsSuccess.Should().BeFalse();
         result.StatusCode.Should().Be(409);
         dataContext.Added.OfType<Product>().Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task CreateAsync_CacheWriteThrows_ReturnsCommittedProduct()
+    {
+        var tenantId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var dataContext = new FakeDataContext();
+        dataContext.Set<ProductCategory>().Add(new ProductCategory
+        {
+            Id = categoryId,
+            TenantId = tenantId,
+            Name = "Parts"
+        });
+        var cache = new FakeCacheService { ThrowOnSet = true };
+        var service = CreateService(dataContext, cache, tenantId);
+
+        var result = await service.CreateAsync(new CreateProductRequest
+        {
+            Name = "Widget",
+            Price = 12.50m,
+            CategoryId = categoryId
+        });
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        dataContext.SaveCount.Should().Be(1);
+        dataContext.Added.OfType<Product>().Should().ContainSingle();
+    }
+
+    [Test]
+    public async Task DeleteAsync_ProductWithStock_ReturnsConflictWithoutDeleting()
+    {
+        var tenantId = Guid.NewGuid();
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Stocked product"
+        };
+        var dataContext = new FakeDataContext();
+        dataContext.Set<Product>().Add(product);
+        dataContext.Set<StockBalance>().Add(new StockBalance
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ProductId = product.Id,
+            WarehouseId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
+            OnHandQuantity = 1,
+            AvailableQuantity = 1
+        });
+        var service = CreateService(dataContext, new FakeCacheService(), tenantId);
+
+        var result = await service.DeleteAsync(product.Id);
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(409);
+        dataContext.Removed.Should().BeEmpty();
+        dataContext.SaveCount.Should().Be(0);
+    }
+
+    [Test]
+    public async Task DeleteAsync_CacheInvalidationThrows_ReturnsCommittedSuccess()
+    {
+        var tenantId = Guid.NewGuid();
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Disposable product"
+        };
+        var dataContext = new FakeDataContext();
+        dataContext.Set<Product>().Add(product);
+        var cache = new FakeCacheService { ThrowOnRemove = true };
+        var service = CreateService(dataContext, cache, tenantId);
+
+        var result = await service.DeleteAsync(product.Id);
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        dataContext.Removed.Should().ContainSingle(x => ReferenceEquals(x, product));
+        dataContext.SaveCount.Should().Be(1);
     }
 
     [Test]
@@ -472,6 +566,8 @@ public sealed class ProductServiceTests
     private sealed class FakeCacheService : ICacheService
     {
         public List<string> SetKeys { get; } = [];
+        public bool ThrowOnSet { get; init; }
+        public bool ThrowOnRemove { get; init; }
 
         public Task<Result<T?>> GetAsync<T>(string key, CancellationToken cancellationToken = default) =>
             Task.FromResult(Result<T?>.Success(default));
@@ -483,12 +579,20 @@ public sealed class ProductServiceTests
             TimeSpan? slidingExpiration = null,
             CancellationToken cancellationToken = default)
         {
+            if (ThrowOnSet)
+                throw new InvalidOperationException("Cache unavailable");
+
             SetKeys.Add(key);
             return Task.FromResult(Result.Success());
         }
 
-        public Task<Result> RemoveAsync(string key, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Result.Success());
+        public Task<Result> RemoveAsync(string key, CancellationToken cancellationToken = default)
+        {
+            if (ThrowOnRemove)
+                throw new InvalidOperationException("Cache unavailable");
+
+            return Task.FromResult(Result.Success());
+        }
 
         public Task<Result<bool>> ExistsAsync(string key, CancellationToken cancellationToken = default) =>
             Task.FromResult(Result<bool>.Success(false));
@@ -501,8 +605,13 @@ public sealed class ProductServiceTests
             CancellationToken cancellationToken = default) =>
             factory(cancellationToken).ContinueWith(t => Result<T>.Success(t.Result), cancellationToken);
 
-        public Task<Result<int>> RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Result<int>.Success(0));
+        public Task<Result<int>> RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+        {
+            if (ThrowOnRemove)
+                throw new InvalidOperationException("Cache unavailable");
+
+            return Task.FromResult(Result<int>.Success(0));
+        }
 
         public Result<CacheStatistics> GetStatistics() =>
             Result<CacheStatistics>.Success(new CacheStatistics());

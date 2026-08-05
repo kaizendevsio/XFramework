@@ -85,7 +85,7 @@ public sealed class CatalogTests : InventarioTestBase
     }
 
     [Test]
-    public async Task SaveChangesAsync_RemoteProductCreate_PersistsWithCategory()
+    public async Task SaveChangesAsync_RemoteProductCreate_IsRejected()
     {
         await using var db = CreateDbContext();
         var category = await TestInventarioSeed.SeedCategory(db);
@@ -106,17 +106,16 @@ public sealed class CatalogTests : InventarioTestBase
         ctx.Add(product);
         var save = await ctx.SaveChangesAsync();
 
-        save.IsSuccess.Should().BeTrue(save.Message);
+        save.IsSuccess.Should().BeFalse();
         var persisted = await db.Set<Product>()
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.Id == product.Id);
-        persisted.Should().NotBeNull();
-        persisted!.CategoryId.Should().Be(category.Id);
+        persisted.Should().BeNull();
     }
 
     [Test]
     [Category(TestCategories.ExtendedIntegration)]
-    public async Task SaveChangesAsync_RemoteProductUpdate_PersistsThroughInventarioDataContext()
+    public async Task SaveChangesAsync_RemoteProductUpdate_IsRejected()
     {
         await using var db = CreateDbContext();
         var product = await TestInventarioSeed.SeedProduct(db);
@@ -131,19 +130,19 @@ public sealed class CatalogTests : InventarioTestBase
         ctx.Update(remoteProduct);
         var save = await ctx.SaveChangesAsync();
 
-        save.IsSuccess.Should().BeTrue(save.Message);
+        save.IsSuccess.Should().BeFalse();
         await using var verifyDb = CreateDbContext();
         var persisted = await verifyDb.Set<Product>()
             .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstAsync(x => x.Id == product.Id);
-        persisted.Name.Should().Be(remoteProduct.Name);
-        persisted.Price.Should().Be(42m);
+        persisted.Name.Should().Be(product.Name);
+        persisted.Price.Should().Be(product.Price);
     }
 
     [Test]
     [Category(TestCategories.ExtendedIntegration)]
-    public async Task SaveChangesAsync_RemoteProductRemove_SoftDeletesThroughInventarioDataContext()
+    public async Task SaveChangesAsync_RemoteProductRemove_IsRejected()
     {
         await using var db = CreateDbContext();
         var product = await TestInventarioSeed.SeedProduct(db);
@@ -152,14 +151,14 @@ public sealed class CatalogTests : InventarioTestBase
         ctx.Remove(product);
         var save = await ctx.SaveChangesAsync();
 
-        save.IsSuccess.Should().BeTrue(save.Message);
+        save.IsSuccess.Should().BeFalse();
         await using var verifyDb = CreateDbContext();
         var persisted = await verifyDb.Set<Product>()
             .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstAsync(x => x.Id == product.Id);
-        persisted.IsDeleted.Should().BeTrue();
-        persisted.DeletedAt.Should().NotBeNull();
+        persisted.IsDeleted.Should().BeFalse();
+        persisted.DeletedAt.Should().BeNull();
     }
 
     [Test]

@@ -38,7 +38,6 @@ public sealed class PurchasingService(
             return Result<List<Supplier>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var query = dataContext.Query<Supplier>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
 
         if (!request.IncludeInactive)
@@ -71,7 +70,6 @@ public sealed class PurchasingService(
             return Result<Supplier>.Failure("Supplier code and name are required.", 400);
 
         var duplicate = await dataContext.Query<Supplier>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Code == code && !x.IsDeleted, ct);
         if (duplicate)
             return Result<Supplier>.Conflict("A supplier with the same code already exists.");
@@ -112,7 +110,6 @@ public sealed class PurchasingService(
             return Result<List<PurchaseOrder>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var query = dataContext.Query<PurchaseOrder>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
 
         if (request.Status is { } status)
@@ -168,7 +165,6 @@ public sealed class PurchasingService(
         if (request.SupplierId is { } supplierId)
         {
             var supplierExists = await dataContext.Query<Supplier>()
-                .IgnoreQueryFilters()
                 .AnyAsync(x => x.TenantId == tenantId && x.Id == supplierId && !x.IsDeleted && x.IsActive, ct);
             if (!supplierExists)
                 return Result<PurchaseOrder>.NotFound("Supplier not found.");
@@ -180,7 +176,6 @@ public sealed class PurchasingService(
                 return Result<PurchaseOrder>.Failure("Purchase order line quantities must be greater than zero.", 400);
 
             var productExists = await dataContext.Query<Product>()
-                .IgnoreQueryFilters()
                 .AnyAsync(x => x.TenantId == tenantId && x.Id == line.ProductId && !x.IsDeleted, ct);
             if (!productExists)
                 return Result<PurchaseOrder>.NotFound("Product not found.");
@@ -196,7 +191,6 @@ public sealed class PurchasingService(
 
         var orderNumber = NormalizeOptional(request.OrderNumber) ?? GenerateDocumentNumber("PO");
         var duplicate = await dataContext.Query<PurchaseOrder>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.OrderNumber == orderNumber && !x.IsDeleted, ct);
         if (duplicate)
             return Result<PurchaseOrder>.Conflict("A purchase order with the same number already exists.");
@@ -269,9 +263,10 @@ public sealed class PurchasingService(
         if (request.Status is PurchaseOrderStatus.PartiallyReceived or PurchaseOrderStatus.Received)
             return Result<PurchaseOrder>.Failure("Receiving controls received purchase order statuses.", 400);
 
+        dataContext.Update(order);
         order.Status = request.Status;
         order.ModifiedAt = DateTime.UtcNow;
-        dataContext.Update(order);
+        order.ConcurrencyStamp = Guid.NewGuid();
 
         var saveResult = await dataContext.SaveChangesAsync(ct);
         if (!saveResult.IsSuccess)
@@ -293,7 +288,6 @@ public sealed class PurchasingService(
             return Result<List<ReceivingDocument>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var query = dataContext.Query<ReceivingDocument>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
 
         if (request.PurchaseOrderId is { } purchaseOrderId)
@@ -332,13 +326,11 @@ public sealed class PurchasingService(
             return replay;
 
         var warehouseExists = await dataContext.Query<Warehouse>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == request.WarehouseId && !x.IsDeleted, ct);
         if (!warehouseExists)
             return Result<ReceivingDocument>.NotFound("Warehouse not found.");
 
         var locationExists = await dataContext.Query<InventoryLocation>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == request.LocationId && x.WarehouseId == request.WarehouseId && !x.IsDeleted, ct);
         if (!locationExists)
             return Result<ReceivingDocument>.NotFound("Location not found.");
@@ -359,7 +351,6 @@ public sealed class PurchasingService(
         if (request.SupplierId is { } supplierId)
         {
             var supplierExists = await dataContext.Query<Supplier>()
-                .IgnoreQueryFilters()
                 .AnyAsync(x => x.TenantId == tenantId && x.Id == supplierId && !x.IsDeleted && x.IsActive, ct);
             if (!supplierExists)
                 return Result<ReceivingDocument>.NotFound("Supplier not found.");
@@ -367,7 +358,6 @@ public sealed class PurchasingService(
 
         var receiptNumber = NormalizeOptional(request.ReceiptNumber) ?? GenerateDocumentNumber("RCV");
         var duplicateReceipt = await dataContext.Query<ReceivingDocument>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.ReceiptNumber == receiptNumber && !x.IsDeleted, ct);
         if (duplicateReceipt)
             return Result<ReceivingDocument>.Conflict("A receiving document with the same receipt number already exists.");
@@ -413,9 +403,10 @@ public sealed class PurchasingService(
 
         if (purchaseOrder is not null)
         {
+            dataContext.Update(purchaseOrder);
             ApplyPurchaseOrderStatus(purchaseOrder, purchaseOrderLines);
             purchaseOrder.ModifiedAt = now;
-            dataContext.Update(purchaseOrder);
+            purchaseOrder.ConcurrencyStamp = Guid.NewGuid();
         }
 
         var saveResult = await dataContext.SaveChangesAsync(ct);
@@ -438,7 +429,6 @@ public sealed class PurchasingService(
             return Result<ReceivingLine>.Failure("Receiving quantity must be greater than zero.", 400);
 
         var product = await dataContext.Query<Product>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.Id == lineRequest.ProductId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
         if (product is null)
@@ -500,9 +490,10 @@ public sealed class PurchasingService(
 
         if (purchaseOrderLine is not null)
         {
+            dataContext.Update(purchaseOrderLine);
             purchaseOrderLine.ReceivedQuantity += lineRequest.Quantity;
             purchaseOrderLine.ModifiedAt = DateTime.UtcNow;
-            dataContext.Update(purchaseOrderLine);
+            purchaseOrderLine.ConcurrencyStamp = Guid.NewGuid();
         }
 
         var line = new ReceivingLine
@@ -536,7 +527,6 @@ public sealed class PurchasingService(
         if (lineRequest.LotId is { } lotId)
         {
             var existing = await dataContext.Query<InventoryLot>()
-                .IgnoreQueryFilters()
                 .Where(x => x.TenantId == tenantId && x.Id == lotId && !x.IsDeleted)
                 .FirstOrDefaultAsync(ct);
             if (existing is null)
@@ -554,7 +544,6 @@ public sealed class PurchasingService(
             return Result<InventoryLot?>.Success(null);
 
         var existingLot = await dataContext.Query<InventoryLot>()
-            .IgnoreQueryFilters()
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == lineRequest.ProductId &&
@@ -605,7 +594,6 @@ public sealed class PurchasingService(
             return null;
 
         var existing = await dataContext.Query<ReceivingDocument>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.IdempotencyKey == idempotencyKey && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
         if (existing is null)
@@ -615,7 +603,6 @@ public sealed class PurchasingService(
             return Result<ReceivingDocument>.Conflict("Idempotency key was already used with a different receiving request.");
 
         existing.Lines = await dataContext.Query<ReceivingLine>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.ReceivingDocumentId == existing.Id && !x.IsDeleted)
             .ToListAsync(ct);
         return Result<ReceivingDocument>.Success(existing, "Receiving document already processed.");
@@ -624,14 +611,12 @@ public sealed class PurchasingService(
     private async Task<PurchaseOrder?> LoadPurchaseOrder(Guid tenantId, Guid purchaseOrderId, CancellationToken ct)
     {
         var order = await dataContext.Query<PurchaseOrder>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.Id == purchaseOrderId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
         if (order is null)
             return null;
 
         order.Lines = await dataContext.Query<PurchaseOrderLine>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.PurchaseOrderId == purchaseOrderId && !x.IsDeleted)
             .OrderBy(x => x.CreatedAt)
             .ToListAsync(ct);

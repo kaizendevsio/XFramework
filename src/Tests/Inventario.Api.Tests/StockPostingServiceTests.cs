@@ -56,6 +56,66 @@ public sealed class StockPostingServiceTests
     }
 
     [Test]
+    public async Task PostAsync_FractionalOpeningBalance_PreservesProductSnapshotPrecision()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        var service = CreateService(dataContext, tenantId);
+
+        var result = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            MovementType = InventoryMovementType.OpeningBalance,
+            Quantity = 1.25m
+        });
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        dataContext.Set<Product>().Single().StockQuantity.Should().Be(1.25m);
+    }
+
+    [Test]
+    public async Task PostAsync_TransferToSameDimensions_ReturnsBadRequestWithoutSaving()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var dataContext = SeedStockData(tenantId, productId, warehouseId, locationId);
+        dataContext.Set<StockBalance>().Add(new StockBalance
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            OnHandQuantity = 10,
+            AvailableQuantity = 10
+        });
+        var service = CreateService(dataContext, tenantId);
+
+        var result = await service.PostAsync(new PostStockMovementRequest
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            DestinationWarehouseId = warehouseId,
+            DestinationLocationId = locationId,
+            MovementType = InventoryMovementType.Transfer,
+            Quantity = 2
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(400);
+        dataContext.SaveCount.Should().Be(0);
+        dataContext.Added.OfType<InventoryMovement>().Should().BeEmpty();
+    }
+
+    [Test]
     public async Task PostAsync_ShipmentBeyondAvailableStock_ReturnsConflictWithoutSaving()
     {
         var tenantId = Guid.NewGuid();

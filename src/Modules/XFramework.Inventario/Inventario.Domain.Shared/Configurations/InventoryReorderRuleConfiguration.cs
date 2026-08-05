@@ -18,7 +18,10 @@ public class InventoryReorderRuleConfiguration : IEntityTypeConfiguration<Invent
         entity.Property(e => e.PreferredSupplier).HasMaxLength(200);
         entity.Property(e => e.IsActive).HasDefaultValue(true);
 
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.WarehouseId, e.LocationId });
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.ProductVariationId, e.WarehouseId, e.LocationId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasAnnotation("Npgsql:NullsDistinct", false);
         entity.HasIndex(e => new { e.TenantId, e.IsActive });
 
         entity.HasOne(e => e.Product)
