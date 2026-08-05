@@ -19,7 +19,7 @@ else
     @if (_error is not null)
     {
         <BbAlert Variant="AlertVariant.Danger">
-            <BbAlertTitle>Database Error</BbAlertTitle>
+            <BbAlertTitle>Dashboard unavailable</BbAlertTitle>
             <BbAlertDescription>@_error</BbAlertDescription>
         </BbAlert>
     }
@@ -138,7 +138,7 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load dashboard stats");
-            _error = $"Failed to load stats: {ex.Message}";
+            _error = "Dashboard statistics are temporarily unavailable. Please try again.";
         }
         finally
         {

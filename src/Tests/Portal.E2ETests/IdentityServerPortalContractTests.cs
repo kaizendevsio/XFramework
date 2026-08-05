@@ -9,6 +9,24 @@ namespace Portal.E2ETests;
 public sealed class IdentityServerPortalContractTests
 {
     [Test]
+    public void Dashboard_DoesNotExposeIdentityServerTokenFailures()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal",
+            "Components",
+            "Pages",
+            "Dashboard.razor"));
+
+        source.Should().Contain("Dashboard statistics are temporarily unavailable. Please try again.");
+        source.Should().NotContain("ex.Message");
+        source.Should().NotContain("IdentityServer token request failed");
+    }
+
+    [Test]
     public void IdentityServerEntityRelationshipDialogs_UseSharedEntityPickerAdvancedSearch()
     {
         var repositoryRoot = FindRepositoryRoot();
