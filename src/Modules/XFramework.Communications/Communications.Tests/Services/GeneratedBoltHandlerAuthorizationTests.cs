@@ -77,6 +77,16 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
 
         Assert.That(result.Item1, Is.EqualTo(HttpStatusCode.OK));
         Assert.That(settingsService.CallCount, Is.EqualTo(1));
+        Assert.That(authorizer.LastPolicy, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(authorizer.LastPolicy!.TenantAccessMode, Is.EqualTo(TenantAccessMode.DelegatedTenant));
+            Assert.That(authorizer.LastPolicy.RequiredServiceScopes, Does.Contain(XFrameworkServiceScopes.CommunicationsAdmin));
+            Assert.That(authorizer.LastPolicy.AllowedServiceCallers, Does.Contain(XFrameworkServiceNames.Portal));
+            Assert.That(
+                authorizer.LastPolicy.RequiredCrossTenantActorCapabilities,
+                Does.Contain(XFrameworkActorCapabilities.IdentityTenantsManage));
+        });
     }
 
     [Test]
@@ -109,6 +119,10 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
         Assert.That(response, Is.Not.Null);
         Assert.That(response!.Message, Is.EqualTo("Validation failed"));
         Assert.That(response.ValidationErrors, Does.ContainKey(nameof(UpdateThreadRequest.ThreadId)));
+        Assert.That(authorizer.LastPolicy, Is.Not.Null);
+        Assert.That(
+            authorizer.LastPolicy!.RequiredServiceScopes,
+            Does.Contain(XFrameworkServiceScopes.CommunicationsChat));
     }
 
     [TestCase(401)]
@@ -231,7 +245,9 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
             [
                 new Claim("client_id", XFrameworkServiceNames.Portal),
                 new Claim(JwtRegisteredClaimNames.Sub, XFrameworkServiceNames.Portal),
-                new Claim("scope", XFrameworkServiceScopes.BoltService),
+                new Claim(
+                    "scope",
+                    $"{XFrameworkServiceScopes.BoltService} {XFrameworkServiceScopes.CommunicationsAdmin}"),
                 new Claim("client_credential_generation", "generation-1")
             ],
             notBefore: now.AddMinutes(-1),
@@ -345,6 +361,7 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
     {
         public int CallCount { get; private set; }
         public BoltInboundRequestContext LastContext { get; private set; }
+        public InvocationAuthorizationPolicy? LastPolicy { get; private set; }
 
         public Task<TrustedInvocationResult> AuthorizeAsync(
             InvocationCredentials credentials,
@@ -355,6 +372,7 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
         {
             CallCount++;
             LastContext = requestContext;
+            LastPolicy = policy;
             return Task.FromResult(result);
         }
     }

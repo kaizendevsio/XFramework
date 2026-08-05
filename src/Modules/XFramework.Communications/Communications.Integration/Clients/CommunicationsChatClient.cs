@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Contracts.Responses;
+using XFramework.Integration.Security;
 
 namespace Communications.Integration.Clients;
 
@@ -145,7 +146,8 @@ public interface ICommunicationsChatSession
 public sealed class CommunicationsChatClient(
     ICommunicationsServiceWrapper wrapper,
     IConfiguration configuration,
-    ICommunicationsChatActorProvider actorProvider) : ICommunicationsChatClient
+    ICommunicationsChatActorProvider actorProvider,
+    IActorAccessTokenScope actorAccessTokenScope) : ICommunicationsChatClient
 {
     public ICommunicationsChatSession For(Guid tenantId, Guid credentialId, string? deviceId = null)
     {
@@ -161,7 +163,12 @@ public sealed class CommunicationsChatClient(
         if (credentialId == Guid.Empty)
             throw new ArgumentException("Credential ID is required.", nameof(credentialId));
 
-        return new CommunicationsChatSession(wrapper, tenantId, credentialId, NormalizeDeviceId(deviceId));
+        return new CommunicationsChatSession(
+            wrapper,
+            actorAccessTokenScope,
+            tenantId,
+            credentialId,
+            NormalizeDeviceId(deviceId));
     }
 
     public async ValueTask<ICommunicationsChatSession> ForCurrentActorAsync(string? deviceId = null, CancellationToken ct = default)
@@ -175,6 +182,7 @@ public sealed class CommunicationsChatClient(
 
         return new CommunicationsChatSession(
             wrapper,
+            actorAccessTokenScope,
             actor.TenantId,
             actor.CredentialId,
             NormalizeDeviceId(deviceId ?? actor.DeviceId),
@@ -205,6 +213,7 @@ public sealed class CommunicationsChatClient(
 
 internal sealed class CommunicationsChatSession(
     ICommunicationsServiceWrapper wrapper,
+    IActorAccessTokenScope actorAccessTokenScope,
     Guid tenantId,
     Guid credentialId,
     string deviceId,
@@ -218,79 +227,79 @@ internal sealed class CommunicationsChatSession(
     public Task<QueryResponse<CreateThreadResponse>> CreateThreadAsync(
         CreateThreadRequest request,
         CancellationToken ct = default) =>
-        wrapper.CreateThreadAsync(Prepare(request), ct);
+        InvokeAsync(callCt => wrapper.CreateThreadAsync(Prepare(request), callCt), ct);
 
     public Task<QueryResponse<CreateThreadResponse>> CreateDirectThreadAsync(
         Guid otherCredentialId,
         Guid? typeId = null,
         string? name = null,
         CancellationToken ct = default) =>
-        wrapper.CreateDirectThreadAsync(Prepare(new CreateDirectThreadRequest
+        InvokeAsync(callCt => wrapper.CreateDirectThreadAsync(Prepare(new CreateDirectThreadRequest
         {
             OtherCredentialId = otherCredentialId,
             TypeId = typeId,
             Name = name
-        }), ct);
+        }), callCt), ct);
 
     public Task<QueryResponse<GetThreadListResponse>> GetThreadsAsync(
         int pageIndex = 0,
         int pageSize = 20,
         CancellationToken ct = default) =>
-        wrapper.GetThreadListAsync(Prepare(new GetThreadListRequest
+        InvokeAsync(callCt => wrapper.GetThreadListAsync(Prepare(new GetThreadListRequest
         {
             PageIndex = pageIndex,
             PageSize = pageSize
-        }), ct);
+        }), callCt), ct);
 
     public Task<QueryResponse<GetThreadResponse>> GetThreadAsync(
         Guid threadId,
         CancellationToken ct = default) =>
-        wrapper.GetThreadAsync(Prepare(new GetThreadRequest { Id = threadId }), ct);
+        InvokeAsync(callCt => wrapper.GetThreadAsync(Prepare(new GetThreadRequest { Id = threadId }), callCt), ct);
 
     public Task<QueryResponse<GetUnreadCountsResponse>> GetUnreadCountsAsync(CancellationToken ct = default) =>
-        wrapper.GetUnreadCountsAsync(Prepare(new GetUnreadCountsRequest()), ct);
+        InvokeAsync(callCt => wrapper.GetUnreadCountsAsync(Prepare(new GetUnreadCountsRequest()), callCt), ct);
 
     public Task<CmdResponse> UpdateThreadAsync(UpdateThreadRequest request, CancellationToken ct = default) =>
-        wrapper.UpdateThreadAsync(Prepare(request), ct);
+        InvokeAsync(callCt => wrapper.UpdateThreadAsync(Prepare(request), callCt), ct);
 
     public Task<CmdResponse> LeaveThreadAsync(Guid threadId, CancellationToken ct = default) =>
-        wrapper.LeaveThreadAsync(Prepare(new LeaveThreadRequest { ThreadId = threadId }), ct);
+        InvokeAsync(callCt => wrapper.LeaveThreadAsync(Prepare(new LeaveThreadRequest { ThreadId = threadId }), callCt), ct);
 
     public Task<CmdResponse> MuteThreadAsync(Guid threadId, bool isMuted, CancellationToken ct = default) =>
-        wrapper.MuteThreadAsync(Prepare(new MuteThreadRequest { ThreadId = threadId, IsMuted = isMuted }), ct);
+        InvokeAsync(callCt => wrapper.MuteThreadAsync(Prepare(new MuteThreadRequest { ThreadId = threadId, IsMuted = isMuted }), callCt), ct);
 
     public Task<CmdResponse> ArchiveThreadAsync(Guid threadId, bool isArchived, CancellationToken ct = default) =>
-        wrapper.ArchiveThreadAsync(Prepare(new ArchiveThreadRequest { ThreadId = threadId, IsArchived = isArchived }), ct);
+        InvokeAsync(callCt => wrapper.ArchiveThreadAsync(Prepare(new ArchiveThreadRequest { ThreadId = threadId, IsArchived = isArchived }), callCt), ct);
 
     public Task<CmdResponse> AddThreadMemberAsync(Guid threadId, Guid credentialId, CancellationToken ct = default) =>
-        wrapper.AddThreadMemberAsync(Prepare(new AddThreadMemberRequest { ThreadId = threadId, CredentialId = credentialId }), ct);
+        InvokeAsync(callCt => wrapper.AddThreadMemberAsync(Prepare(new AddThreadMemberRequest { ThreadId = threadId, CredentialId = credentialId }), callCt), ct);
 
     public Task<CmdResponse> RemoveThreadMemberAsync(Guid threadId, Guid credentialId, CancellationToken ct = default) =>
-        wrapper.RemoveThreadMemberAsync(Prepare(new RemoveThreadMemberRequest { ThreadId = threadId, CredentialId = credentialId }), ct);
+        InvokeAsync(callCt => wrapper.RemoveThreadMemberAsync(Prepare(new RemoveThreadMemberRequest { ThreadId = threadId, CredentialId = credentialId }), callCt), ct);
 
     public Task<CmdResponse> InviteMemberAsync(Guid threadId, Guid credentialId, CancellationToken ct = default) =>
-        wrapper.CreateThreadInviteAsync(Prepare(new CreateThreadInviteRequest { ThreadId = threadId, CredentialId = credentialId }), ct);
+        InvokeAsync(callCt => wrapper.CreateThreadInviteAsync(Prepare(new CreateThreadInviteRequest { ThreadId = threadId, CredentialId = credentialId }), callCt), ct);
 
     public Task<CmdResponse> RespondInviteAsync(Guid threadId, Guid inviteId, bool accept, CancellationToken ct = default) =>
-        wrapper.RespondThreadInviteAsync(Prepare(new RespondThreadInviteRequest
+        InvokeAsync(callCt => wrapper.RespondThreadInviteAsync(Prepare(new RespondThreadInviteRequest
         {
             ThreadId = threadId,
             InviteId = inviteId,
             Accept = accept
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> UpdateMemberRoleAsync(Guid threadId, Guid memberId, string role, CancellationToken ct = default) =>
-        wrapper.UpdateThreadMemberRoleAsync(Prepare(new UpdateThreadMemberRoleRequest
+        InvokeAsync(callCt => wrapper.UpdateThreadMemberRoleAsync(Prepare(new UpdateThreadMemberRoleRequest
         {
             ThreadId = threadId,
             MemberId = memberId,
             Role = role
-        }), ct);
+        }), callCt), ct);
 
     public Task<QueryResponse<CreateThreadMessageResponse>> SendMessageAsync(
         CreateThreadMessageRequest request,
         CancellationToken ct = default) =>
-        wrapper.CreateThreadMessageAsync(Prepare(request), ct);
+        InvokeAsync(callCt => wrapper.CreateThreadMessageAsync(Prepare(request), callCt), ct);
 
     public Task<QueryResponse<CreateThreadMessageResponse>> SendMessageAsync(
         Guid threadId,
@@ -298,25 +307,25 @@ internal sealed class CommunicationsChatSession(
         Guid? parentMessageId = null,
         IReadOnlyCollection<Guid>? mentionedCredentialIds = null,
         CancellationToken ct = default) =>
-        wrapper.CreateThreadMessageAsync(Prepare(new CreateThreadMessageRequest
+        InvokeAsync(callCt => wrapper.CreateThreadMessageAsync(Prepare(new CreateThreadMessageRequest
         {
             ThreadId = threadId,
             Text = text,
             ParentMessageId = parentMessageId,
             MentionedCredentialIds = mentionedCredentialIds?.ToList() ?? []
-        }), ct);
+        }), callCt), ct);
 
     public Task<QueryResponse<GetThreadMessagesResponse>> GetMessagesAsync(
         Guid threadId,
         int pageIndex = 0,
         int pageSize = 20,
         CancellationToken ct = default) =>
-        wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
+        InvokeAsync(callCt => wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
         {
             ThreadId = threadId,
             PageIndex = pageIndex,
             PageSize = pageSize
-        }), ct);
+        }), callCt), ct);
 
     public Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
         string query,
@@ -324,59 +333,59 @@ internal sealed class CommunicationsChatSession(
         int pageIndex = 0,
         int pageSize = 20,
         CancellationToken ct = default) =>
-        wrapper.SearchMessagesAsync(Prepare(new SearchMessagesRequest
+        InvokeAsync(callCt => wrapper.SearchMessagesAsync(Prepare(new SearchMessagesRequest
         {
             Query = query,
             ThreadId = threadId,
             PageIndex = pageIndex,
             PageSize = pageSize
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> EditMessageAsync(Guid threadId, Guid messageId, string text, CancellationToken ct = default) =>
-        wrapper.EditThreadMessageAsync(Prepare(new EditThreadMessageRequest
+        InvokeAsync(callCt => wrapper.EditThreadMessageAsync(Prepare(new EditThreadMessageRequest
         {
             ThreadId = threadId,
             MessageId = messageId,
             Text = text
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> DeleteMessageAsync(Guid threadId, Guid messageId, CancellationToken ct = default) =>
-        wrapper.DeleteThreadMessageAsync(Prepare(new DeleteThreadMessageRequest
+        InvokeAsync(callCt => wrapper.DeleteThreadMessageAsync(Prepare(new DeleteThreadMessageRequest
         {
             ThreadId = threadId,
             MessageId = messageId
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> MarkReadAsync(Guid threadId, IReadOnlyCollection<Guid> messageIds, CancellationToken ct = default) =>
-        wrapper.MarkMessagesReadAsync(Prepare(new MarkMessagesReadRequest
+        InvokeAsync(callCt => wrapper.MarkMessagesReadAsync(Prepare(new MarkMessagesReadRequest
         {
             ThreadId = threadId,
             MessageIds = messageIds.ToList()
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> ReactAsync(Guid threadId, Guid messageId, Guid reactionTypeId, CancellationToken ct = default) =>
-        wrapper.CreateMessageReactionAsync(Prepare(new CreateMessageReactionRequest
+        InvokeAsync(callCt => wrapper.CreateMessageReactionAsync(Prepare(new CreateMessageReactionRequest
         {
             ThreadId = threadId,
             MessageId = messageId,
             TypeId = reactionTypeId
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> DeleteReactionAsync(Guid threadId, Guid messageId, Guid reactionId, CancellationToken ct = default) =>
-        wrapper.DeleteMessageReactionAsync(Prepare(new DeleteMessageReactionRequest
+        InvokeAsync(callCt => wrapper.DeleteMessageReactionAsync(Prepare(new DeleteMessageReactionRequest
         {
             ThreadId = threadId,
             MessageId = messageId,
             ReactionId = reactionId
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> AttachFileAsync(Guid threadId, Guid messageId, Guid storageFileId, CancellationToken ct = default) =>
-        wrapper.CreateMessageFileAsync(Prepare(new CreateMessageFileRequest
+        InvokeAsync(callCt => wrapper.CreateMessageFileAsync(Prepare(new CreateMessageFileRequest
         {
             ThreadId = threadId,
             MessageId = messageId,
             StorageFileId = storageFileId
-        }), ct);
+        }), callCt), ct);
 
     public Task<QueryResponse<PaginatedResult<MessageFileResponse>>> GetFilesAsync(
         Guid threadId,
@@ -384,83 +393,83 @@ internal sealed class CommunicationsChatSession(
         int pageIndex = 0,
         int pageSize = 20,
         CancellationToken ct = default) =>
-        wrapper.GetMessageFilesAsync(Prepare(new GetMessageFilesRequest
+        InvokeAsync(callCt => wrapper.GetMessageFilesAsync(Prepare(new GetMessageFilesRequest
         {
             ThreadId = threadId,
             MessageId = messageId,
             PageIndex = pageIndex,
             PageSize = pageSize
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> DetachFileAsync(Guid threadId, Guid messageId, Guid fileId, CancellationToken ct = default) =>
-        wrapper.DeleteMessageFileAsync(Prepare(new DeleteMessageFileRequest
+        InvokeAsync(callCt => wrapper.DeleteMessageFileAsync(Prepare(new DeleteMessageFileRequest
         {
             ThreadId = threadId,
             MessageId = messageId,
             FileId = fileId
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> PinMessageAsync(Guid threadId, Guid messageId, CancellationToken ct = default) =>
-        wrapper.PinMessageAsync(Prepare(new PinMessageRequest { ThreadId = threadId, MessageId = messageId }), ct);
+        InvokeAsync(callCt => wrapper.PinMessageAsync(Prepare(new PinMessageRequest { ThreadId = threadId, MessageId = messageId }), callCt), ct);
 
     public Task<CmdResponse> UnpinMessageAsync(Guid threadId, Guid messageId, CancellationToken ct = default) =>
-        wrapper.UnpinMessageAsync(Prepare(new UnpinMessageRequest { ThreadId = threadId, MessageId = messageId }), ct);
+        InvokeAsync(callCt => wrapper.UnpinMessageAsync(Prepare(new UnpinMessageRequest { ThreadId = threadId, MessageId = messageId }), callCt), ct);
 
     public Task<CmdResponse> SaveMessageAsync(Guid threadId, Guid messageId, CancellationToken ct = default) =>
-        wrapper.SaveMessageAsync(Prepare(new SaveMessageRequest { ThreadId = threadId, MessageId = messageId }), ct);
+        InvokeAsync(callCt => wrapper.SaveMessageAsync(Prepare(new SaveMessageRequest { ThreadId = threadId, MessageId = messageId }), callCt), ct);
 
     public Task<CmdResponse> UnsaveMessageAsync(Guid threadId, Guid messageId, CancellationToken ct = default) =>
-        wrapper.UnsaveMessageAsync(Prepare(new UnsaveMessageRequest { ThreadId = threadId, MessageId = messageId }), ct);
+        InvokeAsync(callCt => wrapper.UnsaveMessageAsync(Prepare(new UnsaveMessageRequest { ThreadId = threadId, MessageId = messageId }), callCt), ct);
 
     public Task<CmdResponse> ReportMessageAsync(Guid threadId, Guid messageId, string reason, string? details = null, CancellationToken ct = default) =>
-        wrapper.ReportMessageAsync(Prepare(new ReportMessageRequest
+        InvokeAsync(callCt => wrapper.ReportMessageAsync(Prepare(new ReportMessageRequest
         {
             ThreadId = threadId,
             MessageId = messageId,
             Reason = reason,
             Details = details
-        }), ct);
+        }), callCt), ct);
 
     public Task<CmdResponse> BlockCredentialAsync(Guid credentialId, CancellationToken ct = default) =>
-        wrapper.BlockCredentialAsync(Prepare(new BlockCredentialRequest { CredentialId = credentialId }), ct);
+        InvokeAsync(callCt => wrapper.BlockCredentialAsync(Prepare(new BlockCredentialRequest { CredentialId = credentialId }), callCt), ct);
 
     public Task<CmdResponse> UnblockCredentialAsync(Guid credentialId, CancellationToken ct = default) =>
-        wrapper.DeleteCredentialBlockAsync(Prepare(new DeleteCredentialBlockRequest { CredentialId = credentialId }), ct);
+        InvokeAsync(callCt => wrapper.DeleteCredentialBlockAsync(Prepare(new DeleteCredentialBlockRequest { CredentialId = credentialId }), callCt), ct);
 
     public Task SubscribeThreadEventsAsync(
         Guid threadId,
         Func<CommunicationsRealtimeEvent, Task> handler,
         CancellationToken ct = default) =>
-        wrapper.SubscribeThreadEventsForDeviceAsync(TenantId, CredentialId, threadId, DeviceId, handler, GetAccessTokenAsync, ct);
+        InvokeAsync(callCt => wrapper.SubscribeThreadEventsForDeviceAsync(TenantId, CredentialId, threadId, DeviceId, handler, GetAccessTokenAsync, callCt), ct);
 
     public Task SubscribeUserEventsAsync(
         Func<CommunicationsRealtimeEvent, Task> handler,
         CancellationToken ct = default) =>
-        wrapper.SubscribeUserCommunicationsEventsForDeviceAsync(TenantId, CredentialId, DeviceId, handler, GetAccessTokenAsync, ct);
+        InvokeAsync(callCt => wrapper.SubscribeUserCommunicationsEventsForDeviceAsync(TenantId, CredentialId, DeviceId, handler, GetAccessTokenAsync, callCt), ct);
 
     public Task SubscribeTypingAsync(
         Guid threadId,
         Func<CommunicationsTypingState, Task> handler,
         CancellationToken ct = default) =>
-        wrapper.SubscribeTypingAsync(TenantId, threadId, handler, GetAccessTokenAsync, ct);
+        InvokeAsync(callCt => wrapper.SubscribeTypingAsync(TenantId, threadId, handler, GetAccessTokenAsync, callCt), ct);
 
     public Task SubscribePresenceAsync(
         Func<CommunicationsPresenceState, Task> handler,
         CancellationToken ct = default) =>
-        wrapper.SubscribePresenceAsync(TenantId, handler, GetAccessTokenAsync, ct);
+        InvokeAsync(callCt => wrapper.SubscribePresenceAsync(TenantId, handler, GetAccessTokenAsync, callCt), ct);
 
     public Task PublishTypingAsync(Guid threadId, bool isTyping, CancellationToken ct = default) =>
-        wrapper.PublishCommunicationsTypingAsync(Prepare(new PublishCommunicationsTypingRequest
+        InvokeAsync(callCt => wrapper.PublishCommunicationsTypingAsync(Prepare(new PublishCommunicationsTypingRequest
         {
             ThreadId = threadId,
             IsTyping = isTyping
-        }), ct);
+        }), callCt), ct);
 
     public Task PublishPresenceAsync(bool isOnline, CancellationToken ct = default) =>
-        wrapper.PublishCommunicationsPresenceAsync(Prepare(new PublishCommunicationsPresenceRequest
+        InvokeAsync(callCt => wrapper.PublishCommunicationsPresenceAsync(Prepare(new PublishCommunicationsPresenceRequest
         {
             IsOnline = isOnline
-        }), ct);
+        }), callCt), ct);
 
     private TRequest Prepare<TRequest>(TRequest request)
         where TRequest : RequestBase
@@ -476,6 +485,28 @@ internal sealed class CommunicationsChatSession(
         accessTokenProvider is not null
             ? accessTokenProvider(ct)
             : ValueTask.FromResult(accessToken);
+
+    private async Task<T> InvokeAsync<T>(
+        Func<CancellationToken, Task<T>> invocation,
+        CancellationToken ct)
+    {
+        var token = await GetAccessTokenAsync(ct);
+        using var actorScope = string.IsNullOrWhiteSpace(token)
+            ? null
+            : actorAccessTokenScope.Push(token);
+        return await invocation(ct);
+    }
+
+    private async Task InvokeAsync(
+        Func<CancellationToken, Task> invocation,
+        CancellationToken ct)
+    {
+        var token = await GetAccessTokenAsync(ct);
+        using var actorScope = string.IsNullOrWhiteSpace(token)
+            ? null
+            : actorAccessTokenScope.Push(token);
+        await invocation(ct);
+    }
 
     private void StampCredentialFields(RequestBase request)
     {

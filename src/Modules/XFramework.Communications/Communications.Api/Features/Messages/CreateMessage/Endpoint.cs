@@ -7,7 +7,7 @@ namespace Communications.Api.Features.Messages.CreateMessage;
 
 public static class CreateThreadMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/messages", Tags = ["Messages"],
         Summary = "Create a message in a thread",
         Description = "Creates a new message in the specified thread. Validates that the sender is a member of the thread.")]

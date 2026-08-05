@@ -7,7 +7,11 @@ namespace Communications.Api.Features.Admin;
 
 public static class QueryCommunicationsAdminUsersEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/communications/admin/users/query", Tags = ["Communications Admin"],
         Summary = "Query Communications admin users",
         Description = "Returns tenant-scoped Communications user diagnostics with privacy-safe message metadata.")]
@@ -20,7 +24,11 @@ public static class QueryCommunicationsAdminUsersEndpoint
 
 public static class GetCommunicationsAdminUserDetailEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/communications/admin/users/{credentialId:guid}", Tags = ["Communications Admin"],
         Summary = "Get Communications admin user detail",
         Description = "Returns tenant-scoped Communications activity grouped around one credential.")]
@@ -33,7 +41,11 @@ public static class GetCommunicationsAdminUserDetailEndpoint
 
 public static class QueryCommunicationsAdminThreadsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/communications/admin/threads/query", Tags = ["Communications Admin"],
         Summary = "Query Communications admin threads",
         Description = "Returns tenant-scoped Communications thread diagnostics with short previews only.")]
@@ -46,7 +58,11 @@ public static class QueryCommunicationsAdminThreadsEndpoint
 
 public static class GetCommunicationsAdminThreadDetailEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/communications/admin/threads/{threadId:guid}", Tags = ["Communications Admin"],
         Summary = "Get Communications admin thread detail",
         Description = "Returns tenant-scoped thread members and short message previews.")]
@@ -59,7 +75,11 @@ public static class GetCommunicationsAdminThreadDetailEndpoint
 
 public static class GetCommunicationsAdminOperationsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/communications/admin/operations", Tags = ["Communications Admin"],
         Summary = "Get Communications admin operations state",
         Description = "Returns tenant-scoped outbox, invite, pin, and saved-message diagnostics.")]
@@ -72,7 +92,11 @@ public static class GetCommunicationsAdminOperationsEndpoint
 
 public static class GetCommunicationsAdminModerationEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/communications/admin/moderation", Tags = ["Communications Admin"],
         Summary = "Get Communications admin moderation state",
         Description = "Returns tenant-scoped moderation reports, blocks, and enforced policy state.")]

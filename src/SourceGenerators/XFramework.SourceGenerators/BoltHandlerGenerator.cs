@@ -141,6 +141,7 @@ public class BoltHandlerGenerator : ISourceGenerator
         string[]? requiredServiceScopes = null;
         string[]? allowedServiceCallers = null;
         string[]? requiredActorCapabilities = null;
+        string[]? requiredCrossTenantActorCapabilities = null;
         var actorRequirement = 0;
         var tenantAccessMode = 0;
         var allowAnonymous = false;
@@ -171,6 +172,9 @@ public class BoltHandlerGenerator : ISourceGenerator
             requiredActorCapabilities = GetStringArrayNamedArgument(
                 boltPolicyAttributeData,
                 "RequiredActorCapabilities");
+            requiredCrossTenantActorCapabilities = GetStringArrayNamedArgument(
+                boltPolicyAttributeData,
+                "RequiredCrossTenantActorCapabilities");
             actorRequirement = GetIntNamedArgument(
                 boltPolicyAttributeData,
                 "ActorRequirement",
@@ -256,6 +260,9 @@ public class BoltHandlerGenerator : ISourceGenerator
                 requiredActorCapabilities = GetStringArrayNamedArgument(
                     httpAttributeData,
                     "RequiredActorCapabilities") ?? requiredActorCapabilities;
+                requiredCrossTenantActorCapabilities = GetStringArrayNamedArgument(
+                    httpAttributeData,
+                    "RequiredCrossTenantActorCapabilities") ?? requiredCrossTenantActorCapabilities;
                 actorRequirement = GetIntNamedArgument(
                     httpAttributeData,
                     "ActorRequirement",
@@ -400,6 +407,7 @@ public class BoltHandlerGenerator : ISourceGenerator
             RequiredServiceScopes = requiredServiceScopes,
             AllowedServiceCallers = allowedServiceCallers,
             RequiredActorCapabilities = requiredActorCapabilities,
+            RequiredCrossTenantActorCapabilities = requiredCrossTenantActorCapabilities,
             ActorRequirement = actorRequirement,
             TenantAccessMode = tenantAccessMode,
             AllowAnonymous = allowAnonymous,
@@ -705,6 +713,7 @@ public class BoltHandlerGenerator : ISourceGenerator
         var requiredServiceScopes = ToStringArrayExpression(h.RequiredServiceScopes);
         var allowedServiceCallers = ToStringArrayExpression(h.AllowedServiceCallers);
         var requiredActorCapabilities = ToStringArrayExpression(h.RequiredActorCapabilities);
+        var requiredCrossTenantActorCapabilities = ToStringArrayExpression(h.RequiredCrossTenantActorCapabilities);
         var featureGateRoute = ToCSharpStringLiteral(h.FeatureGateRoute ?? string.Empty);
         var featureGateHttpMethod = ToCSharpStringLiteral(h.FeatureGateHttpMethod ?? "POST");
         var featureGateCapability = h.FeatureGateCapability is null
@@ -804,6 +813,7 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
                         RequiredServiceScopes = {requiredServiceScopes} ?? System.Array.Empty<string>(),
                         AllowedServiceCallers = {allowedServiceCallers} ?? System.Array.Empty<string>(),
                         RequiredActorCapabilities = {requiredActorCapabilities} ?? System.Array.Empty<string>(),
+                        RequiredCrossTenantActorCapabilities = {requiredCrossTenantActorCapabilities} ?? System.Array.Empty<string>(),
                         AllowAnonymous = {h.AllowAnonymous.ToString().ToLowerInvariant()}
                     }};
 
@@ -1045,6 +1055,7 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
             if (existingHttpContextParameter == default)
                 AppendRestParameter("Microsoft.AspNetCore.Http.HttpContext invocationHttpContext");
             var actorCapabilities = ToStringArrayExpression(h.RequiredActorCapabilities);
+            var crossTenantActorCapabilities = ToStringArrayExpression(h.RequiredCrossTenantActorCapabilities);
             var serviceScopes = ToStringArrayExpression(h.RequiredServiceScopes);
             var allowedServiceCallers = ToStringArrayExpression(h.AllowedServiceCallers);
             var requireServiceIdentity = !h.AllowAnonymous &&
@@ -1080,6 +1091,7 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
                     RequiredServiceScopes = {serviceScopes} ?? System.Array.Empty<string>(),
                     AllowedServiceCallers = {allowedServiceCallers} ?? System.Array.Empty<string>(),
                     RequiredActorCapabilities = {actorCapabilities} ?? System.Array.Empty<string>(),
+                    RequiredCrossTenantActorCapabilities = {crossTenantActorCapabilities} ?? System.Array.Empty<string>(),
                     AllowAnonymous = {h.AllowAnonymous.ToString().ToLowerInvariant()}
                 }},
                 ct);
@@ -1376,6 +1388,7 @@ public static class GeneratedEndpointRoutes
         public string[]? RequiredServiceScopes { get; set; }
         public string[]? AllowedServiceCallers { get; set; }
         public string[]? RequiredActorCapabilities { get; set; }
+        public string[]? RequiredCrossTenantActorCapabilities { get; set; }
         public int ActorRequirement { get; set; }
         public int TenantAccessMode { get; set; }
         public bool AllowAnonymous { get; set; }

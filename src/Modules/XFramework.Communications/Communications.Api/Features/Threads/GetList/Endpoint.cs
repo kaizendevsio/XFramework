@@ -7,7 +7,7 @@ namespace Communications.Api.Features.Threads.GetList;
 
 public static class GetThreadListEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapGet("/api/communications/threads", Tags = ["Threads"],
         Summary = "Get a list of threads for a credential",
         Description = "Returns a paginated list of threads where the credential is a member, including member count and last message preview.")]

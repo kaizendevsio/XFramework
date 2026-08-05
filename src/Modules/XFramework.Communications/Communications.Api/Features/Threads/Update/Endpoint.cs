@@ -6,7 +6,7 @@ namespace Communications.Api.Features.Threads.Update;
 
 public static class UpdateThreadEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPatch("/api/communications/threads/{threadId:guid}", Tags = ["Threads"],
         Summary = "Update a thread",
         Description = "Updates thread name and/or description. Validates the requester is a member.")]

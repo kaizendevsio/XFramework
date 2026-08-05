@@ -7,7 +7,10 @@ namespace Communications.Api.Features.Templates;
 
 public static class GetMessageTemplatesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/communications/templates", Tags = ["Communications Templates"],
         Summary = "List Communications templates",
         Description = "Returns system, tenant, and user Communications templates for the authenticated tenant.")]
@@ -20,7 +23,10 @@ public static class GetMessageTemplatesEndpoint
 
 public static class GetMessageTemplateEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/communications/templates/{templateId:guid}", Tags = ["Communications Templates"],
         Summary = "Get Communications template",
         Description = "Returns a single Communications template for the authenticated tenant.")]
@@ -33,7 +39,10 @@ public static class GetMessageTemplateEndpoint
 
 public static class CreateMessageTemplateEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/communications/templates", Tags = ["Communications Templates"],
         Summary = "Create Communications template",
         Description = "Creates a tenant or user Communications template.")]
@@ -46,7 +55,10 @@ public static class CreateMessageTemplateEndpoint
 
 public static class UpdateMessageTemplateEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPut("/api/communications/templates/{templateId:guid}", Tags = ["Communications Templates"],
         Summary = "Update Communications template",
         Description = "Updates a configurable tenant or user Communications template.")]
@@ -59,7 +71,10 @@ public static class UpdateMessageTemplateEndpoint
 
 public static class DeleteMessageTemplateEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapDelete("/api/communications/templates/{templateId:guid}", Tags = ["Communications Templates"],
         Summary = "Delete Communications template",
         Description = "Soft-deletes a configurable Communications template.")]
@@ -72,7 +87,10 @@ public static class DeleteMessageTemplateEndpoint
 
 public static class CloneMessageTemplateEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/communications/templates/{templateId:guid}/clone", Tags = ["Communications Templates"],
         Summary = "Clone Communications template",
         Description = "Clones a system, tenant, or user template into a configurable tenant or user template.")]
@@ -85,7 +103,10 @@ public static class CloneMessageTemplateEndpoint
 
 public static class RenderMessageTemplateEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/communications/templates/render", Tags = ["Communications Templates"],
         Summary = "Render Communications template",
         Description = "Renders a Communications template with supplied variables using server-side validation.")]

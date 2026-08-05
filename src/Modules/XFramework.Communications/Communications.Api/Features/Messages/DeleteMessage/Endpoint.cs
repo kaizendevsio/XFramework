@@ -6,7 +6,7 @@ namespace Communications.Api.Features.Messages.DeleteMessage;
 
 public static class DeleteThreadMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapDelete("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}", Tags = ["Messages"],
         Summary = "Delete a message in a thread",
         Description = "Soft-deletes a message after verifying the requester is a thread member and message owner.")]

@@ -6,7 +6,7 @@ namespace Communications.Api.Features.Threads.Members.Add;
 
 public static class AddThreadMemberEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/members", Tags = ["Thread Members"],
         Summary = "Add a member to a thread",
         Description = "Adds a credential as a member of the specified thread. Validates that the thread and credential exist, and that the credential is not already a member.")]

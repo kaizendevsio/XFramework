@@ -26,6 +26,7 @@ using Storage.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
+using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Security;
 
@@ -94,6 +95,37 @@ public sealed class ThreadServiceSecurityTests
         Assert.That(index.MessageThreadId, Is.EqualTo(result.Data!.ThreadId));
         Assert.That(new[] { index.FirstCredentialId, index.SecondCredentialId }, Is.Ordered);
         Assert.That(new[] { index.FirstCredentialId, index.SecondCredentialId }, Is.EquivalentTo(new[] { callerCredentialId, otherCredentialId }));
+    }
+
+    [Test]
+    public async Task CreateThreadAsync_WhenPersistenceFails_ReturnsFailureWithoutLeakingProviderMessage()
+    {
+        var tenantId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+        var typeId = Guid.NewGuid();
+        var dataContext = new InMemoryDataContext
+        {
+            SaveChangesResult = DataContextResult.Failure("provider detail must remain internal", 503)
+        };
+        dataContext.Seed(
+            ThreadType(typeId, tenantId),
+            Credential(callerCredentialId, tenantId));
+        var service = CreateService(dataContext);
+
+        var result = await service.CreateThreadAsync(new CreateThreadRequest
+        {
+            TypeId = typeId,
+            Name = "Persistence failure",
+            Metadata = Metadata(callerCredentialId, tenantId)
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.StatusCode, Is.EqualTo(503));
+            Assert.That(result.Message, Is.EqualTo("Error creating thread"));
+            Assert.That(result.Message, Does.Not.Contain("provider detail"));
+        });
     }
 
     [Test]

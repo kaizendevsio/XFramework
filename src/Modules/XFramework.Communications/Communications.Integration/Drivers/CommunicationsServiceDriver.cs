@@ -308,7 +308,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public async Task<CmdResponse> CreateVerificationMessage(CreateVerificationMessageRequest request)
@@ -321,7 +321,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> UpdateMessageDirectAsync(
@@ -329,7 +329,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<QueryResponse<CreateThreadResponse>> CreateThreadAsync(
@@ -337,7 +337,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<CreateThreadRequest, CreateThreadResponse>(request);
+        return SendAsync<CreateThreadRequest, CreateThreadResponse>(request, ct);
     }
 
     public Task<QueryResponse<CreateThreadResponse>> CreateDirectThreadAsync(
@@ -345,7 +345,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<CreateDirectThreadRequest, CreateThreadResponse>(request);
+        return SendAsync<CreateDirectThreadRequest, CreateThreadResponse>(request, ct);
     }
 
     public Task<QueryResponse<GetThreadListResponse>> GetThreadListAsync(
@@ -353,7 +353,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetThreadListRequest, GetThreadListResponse>(request);
+        return SendAsync<GetThreadListRequest, GetThreadListResponse>(request, ct);
     }
 
     public Task<QueryResponse<GetThreadResponse>> GetThreadAsync(
@@ -361,7 +361,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetThreadRequest, GetThreadResponse>(request);
+        return SendAsync<GetThreadRequest, GetThreadResponse>(request, ct);
     }
 
     public Task<QueryResponse<GetUnreadCountsResponse>> GetUnreadCountsAsync(
@@ -369,7 +369,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetUnreadCountsRequest, GetUnreadCountsResponse>(request);
+        return SendAsync<GetUnreadCountsRequest, GetUnreadCountsResponse>(request, ct);
     }
 
     public Task<CmdResponse> UpdateThreadAsync(
@@ -377,7 +377,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> LeaveThreadAsync(
@@ -385,7 +385,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> MuteThreadAsync(
@@ -393,7 +393,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> ArchiveThreadAsync(
@@ -401,7 +401,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> AddThreadMemberAsync(
@@ -409,7 +409,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> RemoveThreadMemberAsync(
@@ -417,7 +417,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> CreateThreadInviteAsync(
@@ -425,7 +425,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> RespondThreadInviteAsync(
@@ -433,7 +433,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> UpdateThreadMemberRoleAsync(
@@ -441,7 +441,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<QueryResponse<CreateThreadMessageResponse>> CreateThreadMessageAsync(
@@ -449,7 +449,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<CreateThreadMessageRequest, CreateThreadMessageResponse>(request);
+        return SendAsync<CreateThreadMessageRequest, CreateThreadMessageResponse>(request, ct);
     }
 
     public Task<QueryResponse<GetThreadMessagesResponse>> GetThreadMessagesAsync(
@@ -457,7 +457,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetThreadMessagesRequest, GetThreadMessagesResponse>(request);
+        return SendAsync<GetThreadMessagesRequest, GetThreadMessagesResponse>(request, ct);
     }
 
     public Task<QueryResponse<SearchMessagesResponse>> SearchMessagesAsync(
@@ -465,7 +465,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<SearchMessagesRequest, SearchMessagesResponse>(request);
+        return SendAsync<SearchMessagesRequest, SearchMessagesResponse>(request, ct);
     }
 
     public Task<CmdResponse> DeleteThreadMessageAsync(
@@ -473,7 +473,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> EditThreadMessageAsync(
@@ -481,7 +481,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> PinMessageAsync(
@@ -489,7 +489,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> UnpinMessageAsync(
@@ -497,7 +497,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> SaveMessageAsync(
@@ -505,7 +505,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> UnsaveMessageAsync(
@@ -513,7 +513,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> MarkMessagesReadAsync(
@@ -521,7 +521,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> CreateMessageReactionAsync(
@@ -529,7 +529,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> DeleteMessageReactionAsync(
@@ -537,7 +537,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> CreateMessageFileAsync(
@@ -545,7 +545,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<QueryResponse<PaginatedResult<MessageFileResponse>>> GetMessageFilesAsync(
@@ -553,7 +553,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetMessageFilesRequest, PaginatedResult<MessageFileResponse>>(request);
+        return SendAsync<GetMessageFilesRequest, PaginatedResult<MessageFileResponse>>(request, ct);
     }
 
     public Task<CmdResponse> DeleteMessageFileAsync(
@@ -561,7 +561,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> ReportMessageAsync(
@@ -569,7 +569,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> BlockCredentialAsync(
@@ -577,7 +577,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> DeleteCredentialBlockAsync(
@@ -585,7 +585,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<QueryResponse<CommunicationsSettingsResponse>> GetCommunicationsSettingsAsync(
@@ -593,7 +593,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetCommunicationsSettingsRequest, CommunicationsSettingsResponse>(request);
+        return SendAsync<GetCommunicationsSettingsRequest, CommunicationsSettingsResponse>(request, ct);
     }
 
     public Task<CmdResponse<CommunicationsSettingsResponse>> UpdateCommunicationsSettingsAsync(
@@ -601,7 +601,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync<UpdateCommunicationsSettingsRequest, CommunicationsSettingsResponse>(request);
+        return SendVoidAsync<UpdateCommunicationsSettingsRequest, CommunicationsSettingsResponse>(request, ct);
     }
 
     public Task<QueryResponse<GetMessageTemplatesResponse>> GetMessageTemplatesAsync(
@@ -609,7 +609,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetMessageTemplatesRequest, GetMessageTemplatesResponse>(request);
+        return SendAsync<GetMessageTemplatesRequest, GetMessageTemplatesResponse>(request, ct);
     }
 
     public Task<QueryResponse<MessageTemplateResponse>> GetMessageTemplateAsync(
@@ -617,7 +617,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetMessageTemplateRequest, MessageTemplateResponse>(request);
+        return SendAsync<GetMessageTemplateRequest, MessageTemplateResponse>(request, ct);
     }
 
     public Task<CmdResponse<MessageTemplateResponse>> CreateMessageTemplateAsync(
@@ -625,7 +625,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync<CreateMessageTemplateRequest, MessageTemplateResponse>(request);
+        return SendVoidAsync<CreateMessageTemplateRequest, MessageTemplateResponse>(request, ct);
     }
 
     public Task<CmdResponse<MessageTemplateResponse>> UpdateMessageTemplateAsync(
@@ -633,7 +633,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync<UpdateMessageTemplateRequest, MessageTemplateResponse>(request);
+        return SendVoidAsync<UpdateMessageTemplateRequest, MessageTemplateResponse>(request, ct);
     }
 
     public Task<CmdResponse> DeleteMessageTemplateAsync(
@@ -641,7 +641,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse<MessageTemplateResponse>> CloneMessageTemplateAsync(
@@ -649,7 +649,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync<CloneMessageTemplateRequest, MessageTemplateResponse>(request);
+        return SendVoidAsync<CloneMessageTemplateRequest, MessageTemplateResponse>(request, ct);
     }
 
     public Task<QueryResponse<RenderMessageTemplateResponse>> RenderMessageTemplateAsync(
@@ -657,7 +657,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<RenderMessageTemplateRequest, RenderMessageTemplateResponse>(request);
+        return SendAsync<RenderMessageTemplateRequest, RenderMessageTemplateResponse>(request, ct);
     }
 
     public Task<QueryResponse<CommunicationsAdminUsersResponse>> QueryCommunicationsAdminUsersAsync(
@@ -665,7 +665,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<QueryCommunicationsAdminUsersRequest, CommunicationsAdminUsersResponse>(request);
+        return SendAsync<QueryCommunicationsAdminUsersRequest, CommunicationsAdminUsersResponse>(request, ct);
     }
 
     public Task<QueryResponse<CommunicationsAdminUserDetailResponse>> GetCommunicationsAdminUserDetailAsync(
@@ -673,7 +673,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetCommunicationsAdminUserDetailRequest, CommunicationsAdminUserDetailResponse>(request);
+        return SendAsync<GetCommunicationsAdminUserDetailRequest, CommunicationsAdminUserDetailResponse>(request, ct);
     }
 
     public Task<QueryResponse<CommunicationsAdminThreadsResponse>> QueryCommunicationsAdminThreadsAsync(
@@ -681,7 +681,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<QueryCommunicationsAdminThreadsRequest, CommunicationsAdminThreadsResponse>(request);
+        return SendAsync<QueryCommunicationsAdminThreadsRequest, CommunicationsAdminThreadsResponse>(request, ct);
     }
 
     public Task<QueryResponse<CommunicationsAdminThreadDetailResponse>> GetCommunicationsAdminThreadDetailAsync(
@@ -689,7 +689,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetCommunicationsAdminThreadDetailRequest, CommunicationsAdminThreadDetailResponse>(request);
+        return SendAsync<GetCommunicationsAdminThreadDetailRequest, CommunicationsAdminThreadDetailResponse>(request, ct);
     }
 
     public Task<QueryResponse<CommunicationsAdminOperationsResponse>> GetCommunicationsAdminOperationsAsync(
@@ -697,7 +697,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetCommunicationsAdminOperationsRequest, CommunicationsAdminOperationsResponse>(request);
+        return SendAsync<GetCommunicationsAdminOperationsRequest, CommunicationsAdminOperationsResponse>(request, ct);
     }
 
     public Task<QueryResponse<CommunicationsAdminModerationResponse>> GetCommunicationsAdminModerationAsync(
@@ -705,7 +705,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetCommunicationsAdminModerationRequest, CommunicationsAdminModerationResponse>(request);
+        return SendAsync<GetCommunicationsAdminModerationRequest, CommunicationsAdminModerationResponse>(request, ct);
     }
 
     public Task<QueryResponse<GetCommunicationsModerationRulesResponse>> GetCommunicationsModerationRulesAsync(
@@ -713,7 +713,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendAsync<GetCommunicationsModerationRulesRequest, GetCommunicationsModerationRulesResponse>(request);
+        return SendAsync<GetCommunicationsModerationRulesRequest, GetCommunicationsModerationRulesResponse>(request, ct);
     }
 
     public Task<CmdResponse<CommunicationsModerationRuleResponse>> CreateCommunicationsModerationRuleAsync(
@@ -721,7 +721,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync<CreateCommunicationsModerationRuleRequest, CommunicationsModerationRuleResponse>(request);
+        return SendVoidAsync<CreateCommunicationsModerationRuleRequest, CommunicationsModerationRuleResponse>(request, ct);
     }
 
     public Task<CmdResponse<CommunicationsModerationRuleResponse>> UpdateCommunicationsModerationRuleAsync(
@@ -729,7 +729,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync<UpdateCommunicationsModerationRuleRequest, CommunicationsModerationRuleResponse>(request);
+        return SendVoidAsync<UpdateCommunicationsModerationRuleRequest, CommunicationsModerationRuleResponse>(request, ct);
     }
 
     public Task<CmdResponse> DeleteCommunicationsModerationRuleAsync(
@@ -737,7 +737,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse<CommunicationsReportWorkflowResponse>> ReviewMessageReportAsync(
@@ -745,7 +745,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync<ReviewMessageReportRequest, CommunicationsReportWorkflowResponse>(request);
+        return SendVoidAsync<ReviewMessageReportRequest, CommunicationsReportWorkflowResponse>(request, ct);
     }
 
     public Task<CmdResponse> PublishCommunicationsTypingAsync(
@@ -753,7 +753,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task<CmdResponse> PublishCommunicationsPresenceAsync(
@@ -761,7 +761,7 @@ public sealed record CommunicationsServiceWrapper(
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return SendVoidAsync(request);
+        return SendVoidAsync(request, ct);
     }
 
     public Task SubscribeThreadEventsAsync(
@@ -979,6 +979,6 @@ public static class CommunicationsServiceWrapperExtensions
     {
         services.TryAddSingleton<ICommunicationsChatActorProvider, EmptyCommunicationsChatActorProvider>();
         services.AddScoped<ICommunicationsServiceWrapper, CommunicationsServiceWrapper>();
-        services.AddSingleton<ICommunicationsChatClient, CommunicationsChatClient>();
+        services.AddScoped<ICommunicationsChatClient, CommunicationsChatClient>();
     }
 }
