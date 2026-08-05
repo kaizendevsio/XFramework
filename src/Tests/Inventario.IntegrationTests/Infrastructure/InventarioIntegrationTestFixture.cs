@@ -337,7 +337,55 @@ public sealed class InventarioIntegrationTestFixture
             new TestEffectiveTenantContextAccessor(TestTenantId));
         await db.Database.MigrateAsync();
         await TestSeedData.SeedAll(db);
+        await SeedInvocationActor(db);
         await EnableInventarioFeatures(db);
+    }
+
+    private static async Task SeedInvocationActor(AppDbContext db)
+    {
+        if (await db.Set<IdentityServer.Domain.Shared.Contracts.IdentityCredential>()
+                .IgnoreQueryFilters()
+                .AnyAsync(x => x.Id == InvocationIdentity.CredentialId))
+        {
+            return;
+        }
+
+        db.Set<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().Add(new()
+        {
+            Id = InvocationIdentity.IdentityId,
+            TenantId = InvocationIdentity.TenantId,
+            FirstName = "Inventario",
+            LastName = "Integration Actor",
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
+        });
+
+        db.Set<IdentityServer.Domain.Shared.Contracts.IdentityCredential>().Add(new()
+        {
+            Id = InvocationIdentity.CredentialId,
+            TenantId = InvocationIdentity.TenantId,
+            IdentityInfoId = InvocationIdentity.IdentityId,
+            UserName = "inventario-integration-actor",
+            PasswordByte = [0],
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
+        });
+
+        db.Set<IdentityServer.Domain.Shared.Contracts.IdentityRole>().Add(new()
+        {
+            Id = Guid.NewGuid(),
+            TenantId = InvocationIdentity.TenantId,
+            CredentialId = InvocationIdentity.CredentialId,
+            TypeId = TestConstants.RoleTypeId,
+            RoleExpiration = DateTime.UtcNow.AddYears(1),
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
+        });
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task EnableInventarioFeatures(AppDbContext db)

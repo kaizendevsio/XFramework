@@ -65,6 +65,13 @@ public class ProductService
 
         var tenantId = tenantResult.Data;
 
+        if (request.StockQuantity != 0)
+        {
+            return Result<Product>.Failure(
+                "Initial stock must be posted through a stock movement with warehouse and location dimensions.",
+                400);
+        }
+
         using var activity = ActivitySources.Product.StartActivity("Product.Create");
         activity?.SetTag("product.name", request.Name);
         activity?.SetTag("product.price", request.Price);
@@ -107,7 +114,7 @@ public class ProductService
                 Name = request.Name,
                 Description = request.Description,
                 Price = request.Price,
-                StockQuantity = request.StockQuantity,
+                StockQuantity = 0,
                 CategoryId = request.CategoryId,
                 SKU = normalizedSku,
                 Brand = request.Brand,
@@ -118,34 +125,11 @@ public class ProductService
 
             _dataContext.Add(product);
 
-            if (request.StockQuantity > 0)
-            {
-                _dataContext.Add(new InventoryMovement
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = tenantId,
-                    IsEnabled = true,
-                    ProductId = productId,
-                    MovementType = InventoryMovementType.OpeningBalance,
-                    QuantityDelta = request.StockQuantity,
-                    QuantityBefore = 0,
-                    QuantityAfter = request.StockQuantity,
-                    MovementDate = DateTime.UtcNow,
-                    ReferenceType = nameof(Product),
-                    ReferenceId = productId,
-                    Reason = "Initial product stock"
-                });
-            }
-
             var saveResult = await _dataContext.SaveChangesAsync(ct);
             if (!saveResult.IsSuccess)
                 return Result<Product>.Failure(saveResult.Message ?? "Product save failed", saveResult.StatusCode);
 
-            // Cache the newly created product
-            var cacheKey = BuildProductCacheKey(tenantId, product.Id);
-            await _cacheService.SetAsync(cacheKey, product,
-                absoluteExpiration: TimeSpan.FromMinutes(10),
-                cancellationToken: ct);
+            await TrySetProductCacheAsync(tenantId, product, ct);
 
             stopwatch.Stop();
 
@@ -192,13 +176,11 @@ public class ProductService
         try
         {
             var cacheKey = BuildProductCacheKey(tenantId, id);
-
-            // Try cache first
-            var cached = await _cacheService.GetAsync<Product>(cacheKey, ct);
-            if (cached.IsSuccess && cached.Data != null)
+            var cached = await TryGetProductCacheAsync(cacheKey, ct);
+            if (cached is not null)
             {
                 _logger.CacheHit(cacheKey);
-                return Result<Product>.Success(cached.Data);
+                return Result<Product>.Success(cached);
             }
 
             _logger.CacheMiss(cacheKey);
@@ -214,11 +196,7 @@ public class ProductService
                 return Result<Product>.NotFound($"Product with ID {id} not found");
             }
 
-            // Cache the result
-            await _cacheService.SetAsync(cacheKey, product,
-                absoluteExpiration: TimeSpan.FromMinutes(10),
-                cancellationToken: ct);
-            _logger.CacheSetting(cacheKey, 10);
+            await TrySetProductCacheAsync(tenantId, product, ct);
 
             _logger.EntityRetrieved("Product", id);
             return Result<Product>.Success(product);
@@ -321,32 +299,22 @@ public class ProductService
             var page = request.Page <= 0 ? 1 : request.Page;
             var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
             var productQuery = BuildSellableProductQuery(tenantId, request.CategoryId, request.IsAvailable);
-            IQueryable<SellableProductCatalogItem>? rows = null;
+            var search = NormalizeSearch(request.Search);
+            IQueryable<SellableProductCatalogRow>? rows = null;
 
             if (request.IncludeBaseProducts)
-                rows = BuildBaseCatalogRows(productQuery);
+                rows = BuildBaseCatalogRows(productQuery, search);
 
             if (request.IncludeVariants)
             {
-                var variantRows = BuildVariantCatalogRows(productQuery, tenantId);
+                var variantRows = BuildVariantCatalogRows(productQuery, tenantId, search);
                 rows = rows is null ? variantRows : rows.Concat(variantRows);
             }
 
             if (rows is null)
                 return Result<List<SellableProductCatalogItem>>.Success([]);
 
-            var search = NormalizeSearch(request.Search);
-            if (search is not null)
-            {
-                rows = rows.Where(x =>
-                    x.ProductName.ToLower().Contains(search) ||
-                    (x.SKU != null && x.SKU.ToLower().Contains(search)) ||
-                    (x.Brand != null && x.Brand.ToLower().Contains(search)) ||
-                    (x.VariantName != null && x.VariantName.ToLower().Contains(search)) ||
-                    (x.VariantTypeName != null && x.VariantTypeName.ToLower().Contains(search)));
-            }
-
-            var items = await rows
+            var pageRows = await rows
                 .OrderBy(x => x.ProductName)
                 .ThenBy(x => x.ProductVariationId.HasValue)
                 .ThenBy(x => x.VariantTypeName)
@@ -354,6 +322,7 @@ public class ProductService
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(ct);
+            var items = pageRows.Select(ToCatalogItem).ToList();
 
             _logger.EntityQueryCompleted(items.Count, "SellableProductCatalog");
             return Result<List<SellableProductCatalogItem>>.Success(items);
@@ -402,10 +371,11 @@ public class ProductService
                 return Result<SellableProductDetail>.NotFound("Product not found");
             }
 
-            var variations = await BuildSellableVariationItemsQuery(tenantId, request.ProductId)
+            var variationRows = await BuildSellableVariationRowsQuery(tenantId, request.ProductId)
                 .OrderBy(x => x.VariantTypeName)
                 .ThenBy(x => x.VariantName)
                 .ToListAsync(ct);
+            var variations = variationRows.Select(ToVariationItem).ToList();
 
             return Result<SellableProductDetail>.Success(new SellableProductDetail(
                 product.Id,
@@ -449,10 +419,11 @@ public class ProductService
                 return Result<List<SellableProductVariationItem>>.NotFound("Product not found");
             }
 
-            var variations = await BuildSellableVariationItemsQuery(tenantId, request.ProductId)
+            var variationRows = await BuildSellableVariationRowsQuery(tenantId, request.ProductId)
                 .OrderBy(x => x.VariantTypeName)
                 .ThenBy(x => x.VariantName)
                 .ToListAsync(ct);
+            var variations = variationRows.Select(ToVariationItem).ToList();
 
             return Result<List<SellableProductVariationItem>>.Success(variations);
         }
@@ -531,12 +502,7 @@ public class ProductService
             if (!saveResult.IsSuccess)
                 return Result<Product>.Failure(saveResult.Message ?? "Product update failed", saveResult.StatusCode);
 
-            // Invalidate cache
-            var cacheKey = BuildProductCacheKey(tenantId, id);
-            await _cacheService.RemoveAsync(cacheKey, ct);
-            _logger.CacheInvalidated(cacheKey);
-            await _cacheService.RemoveByPrefixAsync(BuildProductListCachePrefix(tenantId), ct);
-            _logger.CacheCleared($"products:list:{tenantId}:*");
+            await TryInvalidateProductCacheAsync(tenantId, id, ct);
 
             _logger.EntityUpdated("Product", id);
             return Result<Product>.Success(product, "Product updated successfully");
@@ -573,18 +539,17 @@ public class ProductService
                 return Result.NotFound($"Product with ID {id} not found");
             }
 
+            var dependency = await FindDeleteDependencyAsync(tenantId, id, ct);
+            if (dependency is not null)
+                return Result.Conflict($"Product cannot be deleted while {dependency} exists.");
+
             // Soft delete (XDbContext handles IsDeleted flag and DeletedAt timestamp)
             _dataContext.Remove(product);
             var saveResult = await _dataContext.SaveChangesAsync(ct);
             if (!saveResult.IsSuccess)
                 return Result.Failure(saveResult.Message ?? "Product delete failed", saveResult.StatusCode);
 
-            // Invalidate cache
-            var cacheKey = BuildProductCacheKey(tenantId, id);
-            await _cacheService.RemoveAsync(cacheKey, ct);
-            _logger.CacheInvalidated(cacheKey);
-            await _cacheService.RemoveByPrefixAsync(BuildProductListCachePrefix(tenantId), ct);
-            _logger.CacheCleared($"products:list:{tenantId}:*");
+            await TryInvalidateProductCacheAsync(tenantId, id, ct);
 
             _logger.EntityDeleted("Product", id);
             return Result.Success("Product deleted successfully");
@@ -605,10 +570,124 @@ public class ProductService
     }
 
     private static string BuildProductCacheKey(Guid tenantId, Guid productId) =>
-        $"products:{tenantId}:{productId}";
+        $"inventario:tenant:{tenantId}:product:{productId}";
 
     private static string BuildProductListCachePrefix(Guid tenantId) =>
-        $"products:list:{tenantId}:";
+        $"inventario:tenant:{tenantId}:products:";
+
+    private async Task<Product?> TryGetProductCacheAsync(string cacheKey, CancellationToken ct)
+    {
+        try
+        {
+            var cached = await _cacheService.GetAsync<Product>(cacheKey, ct);
+            if (!cached.IsSuccess)
+                _logger.LogWarning("Product cache read failed for {CacheKey}: {Message}", cacheKey, cached.Message);
+            return cached.IsSuccess ? cached.Data : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Product cache read failed for {CacheKey}", cacheKey);
+            return null;
+        }
+    }
+
+    private async Task TrySetProductCacheAsync(Guid tenantId, Product product, CancellationToken ct)
+    {
+        var cacheKey = BuildProductCacheKey(tenantId, product.Id);
+        try
+        {
+            var cached = await _cacheService.SetAsync(
+                cacheKey,
+                product,
+                absoluteExpiration: TimeSpan.FromMinutes(10),
+                cancellationToken: ct);
+            if (!cached.IsSuccess)
+            {
+                _logger.LogWarning("Product cache write failed for {CacheKey}: {Message}", cacheKey, cached.Message);
+                return;
+            }
+
+            _logger.CacheSetting(cacheKey, 10);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Product cache write failed for {CacheKey}", cacheKey);
+        }
+    }
+
+    private async Task TryInvalidateProductCacheAsync(Guid tenantId, Guid productId, CancellationToken ct)
+    {
+        var cacheKey = BuildProductCacheKey(tenantId, productId);
+        var listPrefix = BuildProductListCachePrefix(tenantId);
+        try
+        {
+            var removed = await _cacheService.RemoveAsync(cacheKey, ct);
+            if (!removed.IsSuccess)
+                _logger.LogWarning("Product cache removal failed for {CacheKey}: {Message}", cacheKey, removed.Message);
+            else
+                _logger.CacheInvalidated(cacheKey);
+
+            var prefixRemoved = await _cacheService.RemoveByPrefixAsync(listPrefix, ct);
+            if (!prefixRemoved.IsSuccess)
+                _logger.LogWarning("Product cache prefix removal failed for {CachePrefix}: {Message}", listPrefix, prefixRemoved.Message);
+            else
+                _logger.CacheCleared($"{listPrefix}*");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Product cache invalidation failed for product {ProductId}", productId);
+        }
+    }
+
+    private async Task<string?> FindDeleteDependencyAsync(Guid tenantId, Guid productId, CancellationToken ct)
+    {
+        if (await _dataContext.Query<StockBalance>().AnyAsync(x =>
+                x.TenantId == tenantId &&
+                x.ProductId == productId &&
+                (x.OnHandQuantity != 0 || x.ReservedQuantity != 0), ct))
+        {
+            return "stock remains on hand or reserved";
+        }
+
+        if (await _dataContext.Query<ReservationAllocation>().AnyAsync(x =>
+                x.TenantId == tenantId &&
+                x.ProductId == productId &&
+                x.Status == ReservationAllocationStatus.Reserved, ct))
+        {
+            return "active reservation allocations";
+        }
+
+        if (await _dataContext.Query<InventoryLot>().AnyAsync(x =>
+                x.TenantId == tenantId && x.ProductId == productId, ct))
+        {
+            return "inventory lots";
+        }
+
+        if (await _dataContext.Query<ProductVariation>().AnyAsync(x =>
+                x.TenantId == tenantId && x.ProductId == productId, ct))
+        {
+            return "product variants";
+        }
+
+        if (await _dataContext.Query<InventoryReorderRule>().AnyAsync(x =>
+                x.TenantId == tenantId && x.ProductId == productId && x.IsActive, ct))
+        {
+            return "active reorder rules";
+        }
+
+        if (await _dataContext.Query<PurchaseOrderLine>().AnyAsync(x =>
+                x.TenantId == tenantId &&
+                x.ProductId == productId &&
+                x.ReceivedQuantity < x.OrderedQuantity &&
+                x.PurchaseOrder != null &&
+                x.PurchaseOrder.Status != PurchaseOrderStatus.Cancelled &&
+                x.PurchaseOrder.Status != PurchaseOrderStatus.Received, ct))
+        {
+            return "open purchase-order lines";
+        }
+
+        return null;
+    }
 
     private IQueryable<Product> BuildSellableProductQuery(
         Guid tenantId,
@@ -617,7 +696,6 @@ public class ProductService
     {
         var query = CatalogDb.Set<Product>()
             .AsNoTracking()
-            .IgnoreQueryFilters()
             .Where(p => p.TenantId == tenantId && !p.IsDeleted && p.IsEnabled);
 
         if (categoryId.HasValue)
@@ -629,61 +707,122 @@ public class ProductService
         return query;
     }
 
-    private static IQueryable<SellableProductCatalogItem> BuildBaseCatalogRows(
-        IQueryable<Product> products) =>
-        products.Select(product => new SellableProductCatalogItem(
-            product.Id,
-            null,
-            product.Name ?? string.Empty,
-            product.Name ?? string.Empty,
-            null,
-            null,
-            null,
-            product.SKU,
-            product.Brand,
-            product.Image,
-            product.CategoryId,
-            product.Category != null ? product.Category.Name : null,
-            product.IsAvailable,
-            product.Price));
-
-    private IQueryable<SellableProductCatalogItem> BuildVariantCatalogRows(
+    private static IQueryable<SellableProductCatalogRow> BuildBaseCatalogRows(
         IQueryable<Product> products,
-        Guid tenantId)
+        string? search)
+    {
+        if (search is not null)
+        {
+            products = products.Where(product =>
+                (product.Name != null && product.Name.ToLower().Contains(search)) ||
+                (product.SKU != null && product.SKU.ToLower().Contains(search)) ||
+                (product.Brand != null && product.Brand.ToLower().Contains(search)));
+        }
+
+        return products.Select(product => new SellableProductCatalogRow
+        {
+            ProductId = product.Id,
+            ProductVariationId = null,
+            DisplayName = product.Name ?? string.Empty,
+            ProductName = product.Name ?? string.Empty,
+            VariantName = null,
+            ProductVariationTypeId = null,
+            VariantTypeName = null,
+            SKU = product.SKU,
+            Brand = product.Brand,
+            Image = product.Image,
+            CategoryId = product.CategoryId,
+            CategoryName = product.Category != null ? product.Category.Name : null,
+            IsAvailable = product.IsAvailable,
+            Price = product.Price
+        });
+    }
+
+    private IQueryable<SellableProductCatalogRow> BuildVariantCatalogRows(
+        IQueryable<Product> products,
+        Guid tenantId,
+        string? search)
     {
         var variations = CatalogDb.Set<ProductVariation>()
             .AsNoTracking()
-            .IgnoreQueryFilters()
             .Where(v => v.TenantId == tenantId && !v.IsDeleted && v.IsEnabled);
         var variationTypes = CatalogDb.Set<ProductVariationType>()
             .AsNoTracking()
-            .IgnoreQueryFilters()
             .Where(t => t.TenantId == tenantId && !t.IsDeleted);
 
-        return
+        var rows =
             from product in products
             join variation in variations on product.Id equals variation.ProductId
             join variationType in variationTypes
                 on variation.ProductVariationTypeId equals (Guid?)variationType.Id into variationTypeJoin
             from variationType in variationTypeJoin.DefaultIfEmpty()
-            select new SellableProductCatalogItem(
-                product.Id,
-                variation.Id,
-                (product.Name ?? string.Empty) + " - " + (variation.Name ?? string.Empty),
-                product.Name ?? string.Empty,
-                variation.Name,
-                variation.ProductVariationTypeId,
-                variationType != null ? variationType.Name : variation.VariationType,
-                product.SKU,
-                product.Brand,
-                product.Image,
-                product.CategoryId,
-                product.Category != null ? product.Category.Name : null,
-                product.IsAvailable,
-                variation.Price);
+            select new { product, variation, variationType };
+
+        if (search is not null)
+        {
+            rows = rows.Where(row =>
+                (row.product.Name != null && row.product.Name.ToLower().Contains(search)) ||
+                (row.product.SKU != null && row.product.SKU.ToLower().Contains(search)) ||
+                (row.product.Brand != null && row.product.Brand.ToLower().Contains(search)) ||
+                (row.variation.Name != null && row.variation.Name.ToLower().Contains(search)) ||
+                (row.variationType != null && row.variationType.Name != null && row.variationType.Name.ToLower().Contains(search)) ||
+                (row.variation.VariationType != null && row.variation.VariationType.ToLower().Contains(search)));
+        }
+
+        return rows.Select(row => new SellableProductCatalogRow
+        {
+            ProductId = row.product.Id,
+            ProductVariationId = row.variation.Id,
+            DisplayName = (row.product.Name ?? string.Empty) + " - " + (row.variation.Name ?? string.Empty),
+            ProductName = row.product.Name ?? string.Empty,
+            VariantName = row.variation.Name,
+            ProductVariationTypeId = row.variation.ProductVariationTypeId,
+            VariantTypeName = row.variationType != null ? row.variationType.Name : row.variation.VariationType,
+            SKU = row.product.SKU,
+            Brand = row.product.Brand,
+            Image = row.product.Image,
+            CategoryId = row.product.CategoryId,
+            CategoryName = row.product.Category != null ? row.product.Category.Name : null,
+            IsAvailable = row.product.IsAvailable,
+            Price = row.variation.Price
+        });
     }
 
-    private IQueryable<SellableProductVariationItem> BuildSellableVariationItemsQuery(
+    private static SellableProductCatalogItem ToCatalogItem(SellableProductCatalogRow row) => new(
+        row.ProductId,
+        row.ProductVariationId,
+        row.DisplayName,
+        row.ProductName,
+        row.VariantName,
+        row.ProductVariationTypeId,
+        row.VariantTypeName,
+        row.SKU,
+        row.Brand,
+        row.Image,
+        row.CategoryId,
+        row.CategoryName,
+        row.IsAvailable,
+        row.Price);
+
+    private sealed class SellableProductCatalogRow
+    {
+        public Guid ProductId { get; init; }
+        public Guid? ProductVariationId { get; init; }
+        public string DisplayName { get; init; } = string.Empty;
+        public string ProductName { get; init; } = string.Empty;
+        public string? VariantName { get; init; }
+        public Guid? ProductVariationTypeId { get; init; }
+        public string? VariantTypeName { get; init; }
+        public string? SKU { get; init; }
+        public string? Brand { get; init; }
+        public string? Image { get; init; }
+        public Guid CategoryId { get; init; }
+        public string? CategoryName { get; init; }
+        public bool IsAvailable { get; init; }
+        public decimal Price { get; init; }
+    }
+
+    private IQueryable<SellableProductVariationRow> BuildSellableVariationRowsQuery(
         Guid tenantId,
         Guid productId)
     {
@@ -691,11 +830,9 @@ public class ProductService
             .Where(p => p.Id == productId);
         var variations = CatalogDb.Set<ProductVariation>()
             .AsNoTracking()
-            .IgnoreQueryFilters()
             .Where(v => v.TenantId == tenantId && !v.IsDeleted && v.IsEnabled);
         var variationTypes = CatalogDb.Set<ProductVariationType>()
             .AsNoTracking()
-            .IgnoreQueryFilters()
             .Where(t => t.TenantId == tenantId && !t.IsDeleted);
 
         return
@@ -704,15 +841,39 @@ public class ProductService
             join variationType in variationTypes
                 on variation.ProductVariationTypeId equals (Guid?)variationType.Id into variationTypeJoin
             from variationType in variationTypeJoin.DefaultIfEmpty()
-            select new SellableProductVariationItem(
-                variation.Id,
-                product.Id,
-                variation.ProductVariationTypeId,
-                variationType != null ? variationType.Name : variation.VariationType,
-                variation.Name ?? string.Empty,
-                variation.Price,
-                product.Price,
-                variation.Price - product.Price);
+            select new SellableProductVariationRow
+            {
+                ProductVariationId = variation.Id,
+                ProductId = product.Id,
+                ProductVariationTypeId = variation.ProductVariationTypeId,
+                VariantTypeName = variationType != null ? variationType.Name : variation.VariationType,
+                VariantName = variation.Name ?? string.Empty,
+                Price = variation.Price,
+                BaseProductPrice = product.Price,
+                PriceDelta = variation.Price - product.Price
+            };
+    }
+
+    private static SellableProductVariationItem ToVariationItem(SellableProductVariationRow row) => new(
+        row.ProductVariationId,
+        row.ProductId,
+        row.ProductVariationTypeId,
+        row.VariantTypeName,
+        row.VariantName,
+        row.Price,
+        row.BaseProductPrice,
+        row.PriceDelta);
+
+    private sealed class SellableProductVariationRow
+    {
+        public Guid ProductVariationId { get; init; }
+        public Guid ProductId { get; init; }
+        public Guid? ProductVariationTypeId { get; init; }
+        public string? VariantTypeName { get; init; }
+        public string VariantName { get; init; } = string.Empty;
+        public decimal Price { get; init; }
+        public decimal BaseProductPrice { get; init; }
+        public decimal PriceDelta { get; init; }
     }
 
     private static string? NormalizeSku(string? sku) =>

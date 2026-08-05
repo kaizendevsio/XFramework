@@ -26,7 +26,6 @@ public sealed class InventoryAllocationService(
 
         var tenantId = tenantResult.Data;
         var query = dataContext.Query<ReservationAllocation>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (request.ReservationId is { } reservationId)
@@ -218,7 +217,6 @@ public sealed class InventoryAllocationService(
         CancellationToken ct)
     {
         var balances = await dataContext.Query<StockBalance>()
-            .IgnoreQueryFilters()
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == request.ProductId &&
@@ -244,7 +242,6 @@ public sealed class InventoryAllocationService(
         var lots = lotIds.Count == 0
             ? []
             : await dataContext.Query<InventoryLot>()
-                .IgnoreQueryFilters()
                 .Where(x => x.TenantId == tenantId && lotIds.Contains(x.Id) && !x.IsDeleted)
                 .ToListAsync(ct);
 
@@ -284,7 +281,6 @@ public sealed class InventoryAllocationService(
         CancellationToken ct)
     {
         var allocations = await dataContext.Query<ReservationAllocation>()
-            .IgnoreQueryFilters()
             .Where(x =>
                 x.TenantId == reservation.TenantId &&
                 x.ReservationId == reservation.Id &&
@@ -300,7 +296,6 @@ public sealed class InventoryAllocationService(
             return Result<List<ReservationAllocation>>.Failure("Reservation does not have stock allocation details.", 409);
 
         var balance = await dataContext.Query<StockBalance>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == reservation.TenantId && x.Id == stockBalanceId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
 

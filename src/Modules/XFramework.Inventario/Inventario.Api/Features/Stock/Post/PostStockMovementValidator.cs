@@ -27,6 +27,12 @@ public sealed class PostStockMovementValidator : AbstractValidator<PostStockMove
             .NotEmpty()
             .When(x => x.MovementType == InventoryMovementType.Transfer)
             .WithMessage("Transfer destination location is required.");
+        RuleFor(x => x)
+            .Must(x =>
+                x.MovementType != InventoryMovementType.Transfer ||
+                x.DestinationWarehouseId != x.WarehouseId ||
+                x.DestinationLocationId != x.LocationId)
+            .WithMessage("Transfer destination must differ from the source warehouse and location.");
         RuleFor(x => x.UnitOfMeasure).MaximumLength(25).When(x => !string.IsNullOrWhiteSpace(x.UnitOfMeasure));
         RuleFor(x => x.ReferenceType).MaximumLength(100).When(x => !string.IsNullOrWhiteSpace(x.ReferenceType));
         RuleFor(x => x.Reason).MaximumLength(1000).When(x => !string.IsNullOrWhiteSpace(x.Reason));

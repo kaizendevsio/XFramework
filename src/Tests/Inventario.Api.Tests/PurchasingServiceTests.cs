@@ -24,6 +24,8 @@ public sealed class PurchasingServiceTests
         var tenantId = Guid.NewGuid();
         var ids = TestIds.Create();
         var dataContext = SeedPurchasingData(tenantId, ids, orderedQuantity: 10);
+        var originalOrderStamp = dataContext.Set<PurchaseOrder>().Single().ConcurrencyStamp;
+        var originalLineStamp = dataContext.Set<PurchaseOrderLine>().Single().ConcurrencyStamp;
         var service = CreateService(dataContext, tenantId);
 
         var result = await service.ReceiveAsync(new ReceiveInventoryRequest
@@ -51,6 +53,10 @@ public sealed class PurchasingServiceTests
 
         dataContext.Set<PurchaseOrder>().Single().Status.Should().Be(PurchaseOrderStatus.PartiallyReceived);
         dataContext.Set<PurchaseOrderLine>().Single().ReceivedQuantity.Should().Be(4);
+        dataContext.Set<PurchaseOrder>().Single().ConcurrencyStamp.Should().NotBe(originalOrderStamp);
+        dataContext.Set<PurchaseOrderLine>().Single().ConcurrencyStamp.Should().NotBe(originalLineStamp);
+        dataContext.Updated.Should().Contain(x => x is PurchaseOrder);
+        dataContext.Updated.Should().Contain(x => x is PurchaseOrderLine);
         dataContext.Set<InventoryLot>().Should().ContainSingle(x => x.LotNumber == "LOT-RCV-1");
         dataContext.Set<StockBalance>().Should().ContainSingle(x => x.LotId != null && x.OnHandQuantity == 4 && x.AvailableQuantity == 4);
         dataContext.Added.OfType<InventoryMovement>().Should().ContainSingle(x =>

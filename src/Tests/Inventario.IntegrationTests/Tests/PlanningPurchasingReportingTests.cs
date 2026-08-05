@@ -57,6 +57,21 @@ public sealed class PlanningPurchasingReportingTests : InventarioTestBase
 
     [Test]
     [Category(TestCategories.Planning)]
+    public async Task InventoryReorderRule_DuplicateActiveDimensions_IsRejectedByDatabase()
+    {
+        var seed = await SeedInventoryScope();
+        await using var db = CreateDbContext();
+        db.Set<InventoryReorderRule>().AddRange(
+            CreateReorderRule(seed),
+            CreateReorderRule(seed));
+
+        var act = async () => await db.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    [Test]
+    [Category(TestCategories.Planning)]
     [Category(TestCategories.Reporting)]
     public async Task GetReorderSuggestions_LowStockProduct_ReturnsSuggestedQuantity()
     {
@@ -365,6 +380,53 @@ public sealed class PlanningPurchasingReportingTests : InventarioTestBase
         documentCount.Should().Be(1);
     }
 
+    [Test]
+    [Category(TestCategories.Purchasing)]
+    public async Task PurchaseOrderLine_StaleConcurrentReceiptUpdate_ThrowsConcurrencyException()
+    {
+        var seed = await SeedInventoryScope();
+        var orderId = Guid.NewGuid();
+        var lineId = Guid.NewGuid();
+        await using (var setupDb = CreateDbContext())
+        {
+            setupDb.Set<PurchaseOrder>().Add(new PurchaseOrder
+            {
+                Id = orderId,
+                TenantId = InventarioIntegrationTestFixture.TestTenantId,
+                OrderNumber = UniqueCode("PO-CONC"),
+                Status = PurchaseOrderStatus.Open,
+                OrderDate = DateTime.UtcNow,
+                IsEnabled = true
+            });
+            setupDb.Set<PurchaseOrderLine>().Add(new PurchaseOrderLine
+            {
+                Id = lineId,
+                TenantId = InventarioIntegrationTestFixture.TestTenantId,
+                PurchaseOrderId = orderId,
+                ProductId = seed.Product.Id,
+                OrderedQuantity = 10,
+                ReceivedQuantity = 0,
+                IsEnabled = true
+            });
+            await setupDb.SaveChangesAsync();
+        }
+
+        await using var firstDb = CreateDbContext();
+        await using var secondDb = CreateDbContext();
+        var firstLine = await firstDb.Set<PurchaseOrderLine>().SingleAsync(x => x.Id == lineId);
+        var staleLine = await secondDb.Set<PurchaseOrderLine>().SingleAsync(x => x.Id == lineId);
+
+        firstLine.ReceivedQuantity = 6;
+        firstLine.ConcurrencyStamp = Guid.NewGuid();
+        await firstDb.SaveChangesAsync();
+
+        staleLine.ReceivedQuantity = 6;
+        staleLine.ConcurrencyStamp = Guid.NewGuid();
+        var act = async () => await secondDb.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateConcurrencyException>();
+    }
+
     private async Task<InventoryScope> SeedInventoryScope(
         bool withLot = false,
         DateTime? expiresAt = null)
@@ -379,6 +441,21 @@ public sealed class PlanningPurchasingReportingTests : InventarioTestBase
             : null;
         return new InventoryScope(product, warehouse, location, lot);
     }
+
+    private static InventoryReorderRule CreateReorderRule(InventoryScope seed) => new()
+    {
+        Id = Guid.NewGuid(),
+        TenantId = InventarioIntegrationTestFixture.TestTenantId,
+        ProductId = seed.Product.Id,
+        WarehouseId = seed.Warehouse.Id,
+        LocationId = seed.Location.Id,
+        MinimumQuantity = 1,
+        MaximumQuantity = 10,
+        ReorderPoint = 2,
+        ReorderQuantity = 5,
+        IsActive = true,
+        IsEnabled = true
+    };
 
     private static async Task PostOpeningBalance(
         Guid productId,

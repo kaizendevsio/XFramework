@@ -30,7 +30,6 @@ public sealed class InventoryLotService(
             return Result<List<InventoryLot>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var query = dataContext.Query<InventoryLot>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
 
         if (request.ProductId is { } productId)
@@ -68,7 +67,6 @@ public sealed class InventoryLotService(
             return Result<InventoryLot>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var lot = await dataContext.Query<InventoryLot>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && x.Id == request.Id && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
@@ -95,7 +93,6 @@ public sealed class InventoryLotService(
             return Result<InventoryLot>.Failure("Lot number is required.", 400);
 
         var productExists = await dataContext.Query<Product>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == request.ProductId && !x.IsDeleted, ct);
         if (!productExists)
             return Result<InventoryLot>.NotFound("Product not found.");
@@ -109,7 +106,6 @@ public sealed class InventoryLotService(
             return Result<InventoryLot>.Failure(variationResult.Message!, variationResult.StatusCode);
 
         var duplicate = await dataContext.Query<InventoryLot>()
-            .IgnoreQueryFilters()
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == request.ProductId &&

@@ -30,7 +30,6 @@ public sealed class ProductVariationService(
 
         var tenantId = tenantResult.Data;
         var query = dataContext.Query<ProductVariationType>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (request.ProductId is { } productId)
@@ -81,7 +80,6 @@ public sealed class ProductVariationService(
 
         var normalizedName = NormalizeKey(name);
         var duplicate = await dataContext.Query<ProductVariationType>()
-            .IgnoreQueryFilters()
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == request.ProductId &&
@@ -138,7 +136,6 @@ public sealed class ProductVariationService(
             return Result<ProductVariation>.Failure("Variant name is required.", 400);
 
         var duplicate = await dataContext.Query<ProductVariation>()
-            .IgnoreQueryFilters()
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == request.ProductId &&
@@ -186,7 +183,6 @@ public sealed class ProductVariationService(
 
         var tenantId = tenantResult.Data;
         var variation = await dataContext.Query<ProductVariation>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.Id == request.ProductVariationId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
         if (variation is null)
@@ -205,7 +201,6 @@ public sealed class ProductVariationService(
             return Result<ProductVariation>.Failure("Variant name is required.", 400);
 
         var duplicate = await dataContext.Query<ProductVariation>()
-            .IgnoreQueryFilters()
             .AnyAsync(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == variation.ProductId &&
@@ -243,7 +238,6 @@ public sealed class ProductVariationService(
             return Result<ProductVariation?>.Success(null);
 
         var variation = await dataContext.Query<ProductVariation>()
-            .IgnoreQueryFilters()
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.Id == productVariationId.Value &&
@@ -270,7 +264,6 @@ public sealed class ProductVariationService(
         CancellationToken ct)
     {
         var type = await dataContext.Query<ProductVariationType>()
-            .IgnoreQueryFilters()
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.Id == productVariationTypeId &&
@@ -288,13 +281,11 @@ public sealed class ProductVariationService(
 
     private async Task<Product?> LoadProductAsync(Guid tenantId, Guid productId, CancellationToken ct) =>
         await dataContext.Query<Product>()
-            .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.Id == productId && !x.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
     private async Task<bool> ProductExistsAsync(Guid tenantId, Guid productId, CancellationToken ct) =>
         await dataContext.Query<Product>()
-            .IgnoreQueryFilters()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == productId && !x.IsDeleted, ct);
 
     private Result<Guid> GetCurrentTenantId(RequestBase? request)

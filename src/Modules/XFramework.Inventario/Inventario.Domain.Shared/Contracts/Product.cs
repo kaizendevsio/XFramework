@@ -3,7 +3,6 @@ using XFramework.Domain.Shared.Attributes;
 namespace XFramework.Inventario.Domain.Shared.Contracts;
 
 [MemoryPackable(GenerateType.CircularReference)]
-[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Rest,
     Actions = EndpointActions.None,
@@ -21,7 +20,7 @@ public partial class Product : BaseModel, IProduct
     [MemoryPackOrder(2)]
     public decimal Price { get; set; }
     [MemoryPackOrder(3)]
-    public int StockQuantity { get; set; }
+    public decimal StockQuantity { get; set; }
     [MemoryPackOrder(4)]
     public Guid CategoryId { get; set; }
     [MemoryPackOrder(5)]
