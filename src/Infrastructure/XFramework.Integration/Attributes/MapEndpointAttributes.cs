@@ -49,6 +49,9 @@ public abstract class MapEndpointAttribute : Attribute
     /// <summary>Actor capabilities required by this REST endpoint.</summary>
     public string[]? RequiredActorCapabilities { get; set; }
 
+    /// <summary>Actor capabilities required only when targeting a tenant other than the actor tenant.</summary>
+    public string[]? RequiredCrossTenantActorCapabilities { get; set; }
+
     /// <summary>Whether this endpoint intentionally accepts requests without actor or service identity.</summary>
     public bool AllowAnonymous { get; set; }
 

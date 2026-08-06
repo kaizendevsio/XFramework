@@ -137,7 +137,7 @@ public sealed class ThreadService(
                     MemberCredentialIds = allMemberIds
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CreateThreadResponse>.Success(new CreateThreadResponse
             {
@@ -147,7 +147,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating thread: {Name}", request.Name);
-            return Result<CreateThreadResponse>.Failure($"Error creating thread: {ex.Message}");
+            return OperationFailure<CreateThreadResponse>(ex, "Error creating thread");
         }
     }
 
@@ -281,7 +281,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating direct thread for credential {CredentialId}", request.OtherCredentialId);
-            return Result<CreateThreadResponse>.Failure($"Error creating direct thread: {ex.Message}");
+            return OperationFailure<CreateThreadResponse>(ex, "Error creating direct thread");
         }
     }
 
@@ -404,7 +404,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting thread list");
-            return Result<GetThreadListResponse>.Failure($"Error getting thread list: {ex.Message}");
+            return OperationFailure<GetThreadListResponse>(ex, "Error getting thread list");
         }
     }
 
@@ -465,7 +465,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting thread: {ThreadId}", request.Id);
-            return Result<GetThreadResponse>.Failure($"Error getting thread: {ex.Message}");
+            return OperationFailure<GetThreadResponse>(ex, "Error getting thread");
         }
     }
 
@@ -507,7 +507,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting unread counts");
-            return Result<GetUnreadCountsResponse>.Failure($"Error getting unread counts: {ex.Message}");
+            return OperationFailure<GetUnreadCountsResponse>(ex, "Error getting unread counts");
         }
     }
 
@@ -565,7 +565,7 @@ public sealed class ThreadService(
                 });
 
             dataContext.Update(thread);
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -576,7 +576,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating thread {ThreadId}", request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error updating thread: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error updating thread");
         }
     }
 
@@ -632,7 +632,7 @@ public sealed class ThreadService(
                     member.CredentialId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -642,7 +642,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error leaving thread {ThreadId}", request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error leaving thread: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error leaving thread");
         }
     }
 
@@ -678,7 +678,7 @@ public sealed class ThreadService(
                     request.IsMuted
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -688,7 +688,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating mute state for thread {ThreadId}", request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error updating mute state: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error updating mute state");
         }
     }
 
@@ -724,7 +724,7 @@ public sealed class ThreadService(
                     request.IsArchived
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -734,7 +734,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating archive state for thread {ThreadId}", request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error updating archive state: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error updating archive state");
         }
     }
 
@@ -863,7 +863,7 @@ public sealed class ThreadService(
                     member.CredentialId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -874,7 +874,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error adding member {CredentialId} to thread {ThreadId}", request.CredentialId, request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error adding member: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error adding member");
         }
     }
 
@@ -938,7 +938,7 @@ public sealed class ThreadService(
                     member.CredentialId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -949,7 +949,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error removing member {CredentialId} from thread {ThreadId}", request.CredentialId, request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error removing member: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error removing member");
         }
     }
 
@@ -1051,7 +1051,7 @@ public sealed class ThreadService(
                     invite.InvitedByCredentialId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.Created,
@@ -1061,7 +1061,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating invite for thread {ThreadId}", request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error creating thread invite: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error creating thread invite");
         }
     }
 
@@ -1167,7 +1167,7 @@ public sealed class ThreadService(
                     MemberId = member?.Id
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -1177,7 +1177,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error responding to invite {InviteId} for thread {ThreadId}", request.InviteId, request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error responding to thread invite: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error responding to thread invite");
         }
     }
 
@@ -1251,7 +1251,7 @@ public sealed class ThreadService(
                     Role = normalizedRole
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -1261,7 +1261,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating member {MemberId} role in thread {ThreadId}", request.MemberId, request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error updating thread member role: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error updating thread member role");
         }
     }
 
@@ -1464,7 +1464,7 @@ public sealed class ThreadService(
                     });
             }
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CreateThreadMessageResponse>.Success(new CreateThreadMessageResponse
             {
@@ -1474,7 +1474,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating message in thread {ThreadId}", request.ThreadId);
-            return Result<CreateThreadMessageResponse>.Failure($"Error creating message: {ex.Message}");
+            return OperationFailure<CreateThreadMessageResponse>(ex, "Error creating message");
         }
     }
 
@@ -1557,7 +1557,7 @@ public sealed class ThreadService(
                         ConcurrencyStamp = Guid.NewGuid()
                     });
                 }
-                await dataContext.SaveChangesAsync(ct);
+                await dataContext.SaveChangesOrThrowAsync(ct);
             }
 
             // Get the member info for senders
@@ -1614,7 +1614,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting messages for thread {ThreadId}", request.ThreadId);
-            return Result<GetThreadMessagesResponse>.Failure($"Error getting messages: {ex.Message}");
+            return OperationFailure<GetThreadMessagesResponse>(ex, "Error getting messages");
         }
     }
 
@@ -1706,7 +1706,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error searching messages");
-            return Result<SearchMessagesResponse>.Failure($"Error searching messages: {ex.Message}");
+            return OperationFailure<SearchMessagesResponse>(ex, "Error searching messages");
         }
     }
 
@@ -1767,7 +1767,7 @@ public sealed class ThreadService(
                         ConcurrencyStamp = Guid.NewGuid()
                     });
 
-                    await dataContext.SaveChangesAsync(ct);
+                    await dataContext.SaveChangesOrThrowAsync(ct);
                 }
 
                 return Result<CmdResponse>.Success(new CmdResponse
@@ -1799,7 +1799,7 @@ public sealed class ThreadService(
                     request.MessageId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -1810,7 +1810,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error deleting message {MessageId} in thread {ThreadId}", request.MessageId, request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error deleting message: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error deleting message");
         }
     }
 
@@ -1875,7 +1875,7 @@ public sealed class ThreadService(
                     request.MessageId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -1886,7 +1886,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error editing message {MessageId} in thread {ThreadId}", request.MessageId, request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error editing message: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error editing message");
         }
     }
 
@@ -1969,7 +1969,7 @@ public sealed class ThreadService(
                     MemberId = member.Id
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -1979,7 +1979,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating pin for message {MessageId}", request.MessageId);
-            return Result<CmdResponse>.Failure($"Error updating message pin: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error updating message pin");
         }
     }
 
@@ -2058,7 +2058,7 @@ public sealed class ThreadService(
                     MemberId = member.Id
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -2068,7 +2068,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating saved state for message {MessageId}", request.MessageId);
-            return Result<CmdResponse>.Failure($"Error updating saved message: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error updating saved message");
         }
     }
 
@@ -2134,7 +2134,7 @@ public sealed class ThreadService(
                     report.Reason
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.Created,
@@ -2144,7 +2144,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error reporting message {MessageId}", request.MessageId);
-            return Result<CmdResponse>.Failure($"Error reporting message: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error reporting message");
         }
     }
 
@@ -2210,7 +2210,7 @@ public sealed class ThreadService(
                     existingBlock.BlockedCredentialId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.Created,
@@ -2220,7 +2220,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error blocking credential {CredentialId}", request.CredentialId);
-            return Result<CmdResponse>.Failure($"Error blocking credential: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error blocking credential");
         }
     }
 
@@ -2262,7 +2262,7 @@ public sealed class ThreadService(
                     block.BlockedCredentialId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
             return Result<CmdResponse>.Success(new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -2272,7 +2272,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error removing credential block for {CredentialId}", request.CredentialId);
-            return Result<CmdResponse>.Failure($"Error removing credential block: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error removing credential block");
         }
     }
 
@@ -2377,7 +2377,7 @@ public sealed class ThreadService(
                     StorageFileId = file.StorageId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2388,7 +2388,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating file attachment for message {MessageId}", request.MessageId);
-            return Result<CmdResponse>.Failure($"Error creating file attachment: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error creating file attachment");
         }
     }
 
@@ -2473,7 +2473,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error retrieving files for message {MessageId}", request.MessageId);
-            return Result<PaginatedResult<MessageFileResponse>>.Failure($"Error retrieving message files: {ex.Message}");
+            return OperationFailure<PaginatedResult<MessageFileResponse>>(ex, "Error retrieving message files");
         }
     }
 
@@ -2550,7 +2550,7 @@ public sealed class ThreadService(
                     StorageFileId = file.StorageId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2561,7 +2561,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error detaching file {FileId} from message {MessageId}", request.FileId, request.MessageId);
-            return Result<CmdResponse>.Failure($"Error detaching message file: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error detaching message file");
         }
     }
 
@@ -2646,7 +2646,7 @@ public sealed class ThreadService(
                     MemberId = member.Id
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2657,7 +2657,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating reaction on message {MessageId}", request.MessageId);
-            return Result<CmdResponse>.Failure($"Error creating reaction: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error creating reaction");
         }
     }
 
@@ -2734,7 +2734,7 @@ public sealed class ThreadService(
                     reaction.TypeId
                 });
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2745,7 +2745,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error deleting reaction {ReactionId}", request.ReactionId);
-            return Result<CmdResponse>.Failure($"Error deleting reaction: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error deleting reaction");
         }
     }
 
@@ -2852,7 +2852,7 @@ public sealed class ThreadService(
                     });
             }
 
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -2863,7 +2863,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error marking messages as read in thread {ThreadId}", request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error marking messages as read: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error marking messages as read");
         }
     }
 
@@ -2902,7 +2902,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error publishing typing state for thread {ThreadId}", request.ThreadId);
-            return Result<CmdResponse>.Failure($"Error publishing typing state: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error publishing typing state");
         }
     }
 
@@ -2945,7 +2945,7 @@ public sealed class ThreadService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error publishing presence state");
-            return Result<CmdResponse>.Failure($"Error publishing presence state: {ex.Message}");
+            return OperationFailure<CmdResponse>(ex, "Error publishing presence state");
         }
     }
 
@@ -3326,6 +3326,13 @@ public sealed class ThreadService(
             ConcurrencyStamp = Guid.NewGuid()
         });
     }
+
+    private static Result<T> OperationFailure<T>(Exception exception, string publicMessage) =>
+        exception is CommunicationsPersistenceException persistenceException
+            ? Result<T>.Failure(
+                publicMessage,
+                persistenceException.StatusCode > 0 ? persistenceException.StatusCode : 500)
+            : Result<T>.Failure(publicMessage, 500);
 
     private static MessageThreadMemberGroup CreateDefaultThreadMemberGroup(Guid threadId, Guid tenantId) => new()
     {

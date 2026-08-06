@@ -7,7 +7,11 @@ namespace Communications.Api.Features.Admin;
 
 public static class GetCommunicationsModerationRulesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/communications/admin/moderation/rules", Tags = ["Communications Admin"],
         Summary = "Get Communications moderation rules",
         Description = "Returns tenant-scoped Communications moderation rules.")]
@@ -20,7 +24,11 @@ public static class GetCommunicationsModerationRulesEndpoint
 
 public static class CreateCommunicationsModerationRuleEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/communications/admin/moderation/rules", Tags = ["Communications Admin"],
         Summary = "Create Communications moderation rule",
         Description = "Creates a tenant-scoped keyword or regex moderation rule.")]
@@ -33,7 +41,11 @@ public static class CreateCommunicationsModerationRuleEndpoint
 
 public static class UpdateCommunicationsModerationRuleEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPut("/api/communications/admin/moderation/rules/{ruleId:guid}", Tags = ["Communications Admin"],
         Summary = "Update Communications moderation rule",
         Description = "Updates a tenant-scoped moderation rule.")]
@@ -46,7 +58,11 @@ public static class UpdateCommunicationsModerationRuleEndpoint
 
 public static class DeleteCommunicationsModerationRuleEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapDelete("/api/communications/admin/moderation/rules/{ruleId:guid}", Tags = ["Communications Admin"],
         Summary = "Delete Communications moderation rule",
         Description = "Soft-deletes a tenant-scoped moderation rule.")]
@@ -59,7 +75,11 @@ public static class DeleteCommunicationsModerationRuleEndpoint
 
 public static class ReviewMessageReportEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/communications/admin/moderation/reports/{reportId:guid}/actions", Tags = ["Communications Admin"],
         Summary = "Action Communications report",
         Description = "Reviews, assigns, dismisses, resolves, escalates, or annotates a moderation report.")]

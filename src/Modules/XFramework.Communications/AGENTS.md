@@ -21,7 +21,9 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 - Use `ICommunicationsServiceWrapper` or `ICommunicationsChatClient` for tenant/chat app integration.
 - Portal must use Communications wrapper-backed admin/settings/template APIs for Communications business behavior. Do not use direct `IDataContext` mutation from Portal for Communications settings, moderation, templates, messages, threads, or delivery actions.
 - Communications API services must resolve trusted tenant/credential context through `ICommunicationsRequestContextResolver`; do not trust client-supplied tenant IDs on protected paths.
-- Communications trusted internal/admin calls use the shared trusted metadata infrastructure. Bolt signs service-to-service metadata with a shared secret and target audience; Communications validates the expected Communications Bolt audience and allowed trusted service name. Do not add page-level/manual metadata signatures.
+- Service identity and user identity are separate. Bolt wrapper calls carry an IdentityServer-issued service token for the `XFramework.Communications` audience; user operations also carry the current actor access token through `IActorAccessTokenScope`. `RequestMetadata` is request/audit context and is never proof of trust.
+- Chat handlers require `communications.chat`. Portal admin, settings, and moderation handlers require `communications.admin`, the `XFramework.Portal` caller, delegated tenant access, and `identity.tenants:manage` when the selected tenant differs from the actor tenant.
+- Use `RequiredCrossTenantActorCapabilities` for capabilities that are needed only when an authorized caller targets another tenant. Do not make cross-tenant capabilities unconditional for normal same-tenant chat calls.
 - Chat APIs must enforce Communications feature gates, membership checks, block policy, tenant isolation, policy settings, and rate limits in service logic.
 - External direct-message transports must be queued through Notifications. Do not inject or call `ISmsGatewayServiceWrapper` from Communications business services.
 - Notifications owns provider dispatch and delivery state for SMS/email/webhook/push. Communications may store audit/correlation fields but must not duplicate provider send logic.
@@ -35,6 +37,7 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 - Durable topics must be tenant/user/thread scoped and authorized. Avoid public thread-only topics.
 - Typing and presence are transient Bolt events. Do not persist every typing event.
 - Acknowledge durable events only after handlers succeed in client/helper code.
+- `ICommunicationsChatClient` is scoped. Actor-backed sessions must propagate their actor token for every RPC, transient publish, and subscription; do not capture the scoped wrapper in a singleton.
 
 ## Settings And Templates
 
@@ -49,6 +52,7 @@ Communications is not the owner of external delivery infrastructure. Email, SMS,
 - Add EF configurations in `Communications.Domain.Shared`; include indexes for tenant-scoped query shapes.
 - Use projections and pagination for admin/read APIs. Do not add unbounded list queries.
 - Prefer explicit service methods and request contracts over generic CRUD for business behavior.
+- `IDataContext.SaveChangesAsync` returns `DataContextResult`; every write must inspect it or use the Communications persistence helper. Never return success after a failed commit, and never return provider exception details to clients.
 - Migrations are generated through the shared migration runner path. Do not run migrations at service startup.
 
 ## Testing Expectations

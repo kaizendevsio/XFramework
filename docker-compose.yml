@@ -210,7 +210,7 @@ services:
       ServiceIdentity__Clients__1__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__1__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__1__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__1__AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,tenant.target,identity.admin,identity.session.validate
+      ServiceIdentity__Clients__1__AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,tenant.target,communications.admin,communications.chat,identity.admin,identity.session.validate
       ServiceIdentity__Clients__2__ClientId: XFramework.Bolt.Hub
       ServiceIdentity__Clients__2__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET:?Set BOLT_HUB_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__2__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -335,6 +335,7 @@ services:
       ServiceIdentity__DefaultScopes__1: identity.session.validate
       ServiceIdentity__DefaultScopes__2: notifications.send
       ServiceIdentity__DefaultScopes__3: tenant.target
+      ServiceIdentity__DefaultScopes__4: storage.read
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
@@ -615,6 +616,8 @@ services:
       ServiceIdentity__DefaultScopes__1: identity.admin
       ServiceIdentity__DefaultScopes__2: identity.session.validate
       ServiceIdentity__DefaultScopes__3: tenant.target
+      ServiceIdentity__DefaultScopes__4: communications.admin
+      ServiceIdentity__DefaultScopes__5: communications.chat
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}

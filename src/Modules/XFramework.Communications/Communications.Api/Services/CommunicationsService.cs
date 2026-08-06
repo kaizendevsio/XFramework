@@ -183,7 +183,7 @@ public sealed class CommunicationsService(
                 record.ModifiedAt = DateTime.UtcNow;
                 record.ConcurrencyStamp = Guid.NewGuid();
                 dataContext.Update(record);
-                await dataContext.SaveChangesAsync(ct);
+                await dataContext.SaveChangesOrThrowAsync(ct);
                 logger.CommunicationsCreateDirectError(ex.GetType().Name);
                 return Result<CmdResponse>.Failure("Direct message could not be queued with the SMS gateway", 502);
             }
@@ -194,7 +194,7 @@ public sealed class CommunicationsService(
                 record.ModifiedAt = DateTime.UtcNow;
                 record.ConcurrencyStamp = Guid.NewGuid();
                 dataContext.Update(record);
-                await dataContext.SaveChangesAsync(ct);
+                await dataContext.SaveChangesOrThrowAsync(ct);
 
                 var statusCode = result.HttpStatusCode == 0
                     ? 502
@@ -222,7 +222,7 @@ public sealed class CommunicationsService(
         catch (Exception ex)
         {
             logger.CommunicationsCreateDirectError(ex.GetType().Name);
-            return Result<CmdResponse>.Failure("Direct message could not be queued", 500);
+            return OperationFailure(ex, "Direct message could not be queued");
         }
     }
 
@@ -262,7 +262,7 @@ public sealed class CommunicationsService(
         catch (Exception ex)
         {
             logger.CommunicationsCreateDirectError(ex.GetType().Name);
-            return Result<CmdResponse>.Failure("Verification message could not be queued", 500);
+            return OperationFailure(ex, "Verification message could not be queued");
         }
     }
 
@@ -310,7 +310,7 @@ public sealed class CommunicationsService(
             record.ReceivedAt = request.ReceivedAt;
 
             dataContext.Update(record);
-            await dataContext.SaveChangesAsync(ct);
+            await dataContext.SaveChangesOrThrowAsync(ct);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -321,7 +321,7 @@ public sealed class CommunicationsService(
         catch (Exception ex)
         {
             logger.CommunicationsUpdateError(request.Id ?? Guid.Empty, ex);
-            return Result<CmdResponse>.Failure("Message could not be updated", 500);
+            return OperationFailure(ex, "Message could not be updated");
         }
     }
 
@@ -341,6 +341,13 @@ public sealed class CommunicationsService(
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Direct message delivery queued"
         });
+
+    private static Result<CmdResponse> OperationFailure(Exception exception, string publicMessage) =>
+        Result<CmdResponse>.Failure(
+            publicMessage,
+            exception is CommunicationsPersistenceException persistenceException && persistenceException.StatusCode > 0
+                ? persistenceException.StatusCode
+                : 500);
 
     private static bool TryMapDeliveryChannel(
         MessageTransportType transportType,

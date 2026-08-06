@@ -38,6 +38,9 @@ public class BoltHandlerAttribute : Attribute
     /// <summary>Actor capabilities required when delegated tenant access is requested.</summary>
     public string[]? RequiredActorCapabilities { get; set; }
 
+    /// <summary>Actor capabilities required only when targeting a tenant other than the actor tenant.</summary>
+    public string[]? RequiredCrossTenantActorCapabilities { get; set; }
+
     /// <summary>Whether this operation intentionally accepts requests without an actor or service identity.</summary>
     public bool AllowAnonymous { get; set; }
 }

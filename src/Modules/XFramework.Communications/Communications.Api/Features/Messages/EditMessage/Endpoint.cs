@@ -6,7 +6,7 @@ namespace Communications.Api.Features.Messages.EditMessage;
 
 public static class EditThreadMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPatch("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}", Tags = ["Messages"],
         Summary = "Edit a message in a thread",
         Description = "Updates the text of a message after verifying the requester is a thread member and message owner.")]

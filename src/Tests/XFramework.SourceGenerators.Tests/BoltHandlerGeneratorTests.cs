@@ -382,7 +382,8 @@ public static class RestrictedEndpoint
 {
     [BoltHandler(
         RequiredServiceScopes = ["wallets.write", "wallets.approve"],
-        AllowedServiceCallers = ["XFramework.Portal"])]
+        AllowedServiceCallers = ["XFramework.Portal"],
+        RequiredCrossTenantActorCapabilities = ["identity.tenants:manage"])]
     public static Task<Result> Handle(RestrictedRequest request, CancellationToken ct) =>
         Task.FromResult(new Result());
 }
@@ -397,6 +398,8 @@ public sealed record RestrictedRequest : RequestBase,
             "RequiredServiceScopes = new string[] { \"wallets.write\", \"wallets.approve\" }");
         generatedSource.Should().Contain(
             "AllowedServiceCallers = new string[] { \"XFramework.Portal\" }");
+        generatedSource.Should().Contain(
+            "RequiredCrossTenantActorCapabilities = new string[] { \"identity.tenants:manage\" }");
     }
 
     [Test]
@@ -761,6 +764,7 @@ namespace XFramework.Integration.Attributes
         public XFramework.Integration.Security.ActorRequirement ActorRequirement { get; set; }
         public XFramework.Integration.Security.TenantAccessMode TenantAccessMode { get; set; }
         public string[]? RequiredActorCapabilities { get; set; }
+        public string[]? RequiredCrossTenantActorCapabilities { get; set; }
         public bool AllowAnonymous { get; set; }
     }
 
@@ -778,6 +782,7 @@ namespace XFramework.Integration.Attributes
         public XFramework.Integration.Security.ActorRequirement ActorRequirement { get; set; }
         public XFramework.Integration.Security.TenantAccessMode TenantAccessMode { get; set; }
         public string[]? RequiredActorCapabilities { get; set; }
+        public string[]? RequiredCrossTenantActorCapabilities { get; set; }
         public bool AllowAnonymous { get; set; }
         public string? RateLimitPolicy { get; set; }
         public string? Capability { get; set; }
@@ -797,6 +802,7 @@ namespace XFramework.Integration.Attributes
         public XFramework.Integration.Security.ActorRequirement ActorRequirement { get; set; }
         public XFramework.Integration.Security.TenantAccessMode TenantAccessMode { get; set; }
         public string[]? RequiredActorCapabilities { get; set; }
+        public string[]? RequiredCrossTenantActorCapabilities { get; set; }
         public bool AllowAnonymous { get; set; }
     }
 
@@ -814,6 +820,7 @@ namespace XFramework.Integration.Attributes
         public XFramework.Integration.Security.ActorRequirement ActorRequirement { get; set; }
         public XFramework.Integration.Security.TenantAccessMode TenantAccessMode { get; set; }
         public string[]? RequiredActorCapabilities { get; set; }
+        public string[]? RequiredCrossTenantActorCapabilities { get; set; }
         public bool AllowAnonymous { get; set; }
     }
 }
@@ -875,6 +882,7 @@ namespace XFramework.Integration.Security
         public IReadOnlyCollection<string> RequiredServiceScopes { get; set; } = [];
         public IReadOnlyCollection<string> AllowedServiceCallers { get; set; } = [];
         public IReadOnlyCollection<string> RequiredActorCapabilities { get; set; } = [];
+        public IReadOnlyCollection<string> RequiredCrossTenantActorCapabilities { get; set; } = [];
         public bool AllowAnonymous { get; set; }
     }
 

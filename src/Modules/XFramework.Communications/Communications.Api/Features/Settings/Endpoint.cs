@@ -7,7 +7,11 @@ namespace Communications.Api.Features.Settings;
 
 public static class GetCommunicationsSettingsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/communications/settings", Tags = ["Communications Settings"],
         Summary = "Get Communications tenant settings",
         Description = "Returns grouped Communications settings for the authenticated tenant, including stored values and defaults.")]
@@ -20,7 +24,11 @@ public static class GetCommunicationsSettingsEndpoint
 
 public static class UpdateCommunicationsSettingsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsAdmin],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal],
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPut("/api/communications/settings", Tags = ["Communications Settings"],
         Summary = "Update Communications tenant settings",
         Description = "Validates and persists tenant-scoped Communications settings as RegistryConfiguration rows.")]

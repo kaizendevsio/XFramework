@@ -139,6 +139,8 @@ public sealed class ServiceIdentityComposeContractTests
             XFrameworkServiceScopes.DataContextQueryAllTenants,
             XFrameworkServiceScopes.DataContextMutate,
             XFrameworkServiceScopes.TenantTarget,
+            XFrameworkServiceScopes.CommunicationsAdmin,
+            XFrameworkServiceScopes.CommunicationsChat,
             XFrameworkServiceScopes.IdentityAdmin,
             XFrameworkServiceScopes.IdentitySessionValidate
         ]);

@@ -7,7 +7,7 @@ namespace Communications.Api.Features.Platform;
 
 public static class CreateDirectThreadEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/direct", Tags = ["Threads"],
         Summary = "Get or create a direct message thread",
         Description = "Creates a 1:1 direct message thread idempotently for the authenticated requester and another credential.")]
@@ -20,7 +20,7 @@ public static class CreateDirectThreadEndpoint
 
 public static class GetUnreadCountsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapGet("/api/communications/threads/unread-counts", Tags = ["Threads"],
         Summary = "Get unread message counts",
         Description = "Returns unread message counts per thread and the total unread count for the requester.")]
@@ -33,7 +33,7 @@ public static class GetUnreadCountsEndpoint
 
 public static class LeaveThreadEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/leave", Tags = ["Threads"],
         Summary = "Leave a thread",
         Description = "Removes the requester from a thread while preserving at least one member.")]
@@ -46,7 +46,7 @@ public static class LeaveThreadEndpoint
 
 public static class MuteThreadEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPatch("/api/communications/threads/{threadId:guid}/mute", Tags = ["Threads"],
         Summary = "Mute or unmute a thread",
         Description = "Updates the requester's per-thread mute state.")]
@@ -59,7 +59,7 @@ public static class MuteThreadEndpoint
 
 public static class ArchiveThreadEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPatch("/api/communications/threads/{threadId:guid}/archive", Tags = ["Threads"],
         Summary = "Archive or unarchive a thread",
         Description = "Updates the requester's per-thread archive state.")]
@@ -72,7 +72,7 @@ public static class ArchiveThreadEndpoint
 
 public static class CreateThreadInviteEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/invites", Tags = ["Thread Invites"],
         Summary = "Invite a credential to a thread",
         Description = "Creates a pending invitation for a credential to join a thread.")]
@@ -85,7 +85,7 @@ public static class CreateThreadInviteEndpoint
 
 public static class AcceptThreadInviteEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/invites/{inviteId:guid}/accept", Tags = ["Thread Invites"],
         Summary = "Accept a thread invite",
         Description = "Accepts a pending thread invitation for the requester.")]
@@ -101,7 +101,7 @@ public static class AcceptThreadInviteEndpoint
 
 public static class DeclineThreadInviteEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/invites/{inviteId:guid}/decline", Tags = ["Thread Invites"],
         Summary = "Decline a thread invite",
         Description = "Declines a pending thread invitation for the requester.")]
@@ -117,7 +117,7 @@ public static class DeclineThreadInviteEndpoint
 
 public static class UpdateThreadMemberRoleEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPatch("/api/communications/threads/{threadId:guid}/members/{memberId:guid}/role", Tags = ["Thread Members"],
         Summary = "Update a thread member role",
         Description = "Updates a thread member role to Owner, Admin, or Member.")]
@@ -130,7 +130,7 @@ public static class UpdateThreadMemberRoleEndpoint
 
 public static class PinMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/pin", Tags = ["Messages"],
         Summary = "Pin a message",
         Description = "Pins a message in a thread.")]
@@ -143,7 +143,7 @@ public static class PinMessageEndpoint
 
 public static class UnpinMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapDelete("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/pin", Tags = ["Messages"],
         Summary = "Unpin a message",
         Description = "Removes a pinned message from a thread.")]
@@ -162,7 +162,7 @@ public static class UnpinMessageEndpoint
 
 public static class SaveMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/save", Tags = ["Messages"],
         Summary = "Save a message",
         Description = "Saves a message for the requester.")]
@@ -175,7 +175,7 @@ public static class SaveMessageEndpoint
 
 public static class UnsaveMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapDelete("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/save", Tags = ["Messages"],
         Summary = "Unsave a message",
         Description = "Removes a saved message for the requester.")]
@@ -194,7 +194,7 @@ public static class UnsaveMessageEndpoint
 
 public static class SearchMessagesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapGet("/api/communications/messages/search", Tags = ["Messages"],
         Summary = "Search messages",
         Description = "Searches messages scoped to the requester's tenant and thread memberships.")]
@@ -207,7 +207,7 @@ public static class SearchMessagesEndpoint
 
 public static class ReportMessageEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/report", Tags = ["Moderation"],
         Summary = "Report a message",
         Description = "Creates a moderation report for a message.")]
@@ -220,7 +220,7 @@ public static class ReportMessageEndpoint
 
 public static class BlockCredentialEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/blocks", Tags = ["Moderation"],
         Summary = "Block a credential",
         Description = "Blocks another credential from 1:1 direct communications with the requester.")]
@@ -233,7 +233,7 @@ public static class BlockCredentialEndpoint
 
 public static class DeleteCredentialBlockEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapDelete("/api/communications/blocks/{credentialId:guid}", Tags = ["Moderation"],
         Summary = "Remove a credential block",
         Description = "Removes a 1:1 direct communications block created by the requester.")]

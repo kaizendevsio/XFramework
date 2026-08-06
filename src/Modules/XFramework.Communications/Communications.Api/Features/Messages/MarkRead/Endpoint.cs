@@ -6,7 +6,7 @@ namespace Communications.Api.Features.Messages.MarkRead;
 
 public static class MarkMessagesReadEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/messages/read", Tags = ["Messages"],
         Summary = "Mark messages as read",
         Description = "Marks the specified messages as read for the requesting member. Creates delivery records if they don't exist.")]

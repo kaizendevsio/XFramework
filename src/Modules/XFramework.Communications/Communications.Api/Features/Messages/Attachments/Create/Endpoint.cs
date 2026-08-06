@@ -6,7 +6,7 @@ namespace Communications.Api.Features.Messages.Attachments.Create;
 
 public static class CreateMessageFileEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapPost("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/files", Tags = ["Messages"],
         Summary = "Attach a file to a message",
         Description = "Creates a file attachment linking a message to a storage file.")]

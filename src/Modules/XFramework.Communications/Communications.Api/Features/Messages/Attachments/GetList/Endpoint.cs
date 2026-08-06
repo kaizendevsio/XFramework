@@ -8,7 +8,7 @@ namespace Communications.Api.Features.Messages.Attachments.GetList;
 
 public static class GetMessageFilesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat])]
     [MapGet("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/files", Tags = ["Messages"],
         Summary = "List files attached to a message",
         Description = "Returns all file attachments for a given message in a thread.")]

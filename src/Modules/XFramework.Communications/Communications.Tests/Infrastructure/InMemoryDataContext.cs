@@ -7,6 +7,7 @@ namespace Communications.Tests.Infrastructure;
 internal sealed class InMemoryDataContext : IDataContext
 {
     private readonly Dictionary<Type, IList<object>> _sets = [];
+    public DataContextResult SaveChangesResult { get; set; } = DataContextResult.Success();
 
     public List<T> Set<T>() where T : class
     {
@@ -66,7 +67,7 @@ internal sealed class InMemoryDataContext : IDataContext
     }
 
     public Task<DataContextResult> SaveChangesAsync(CancellationToken ct = default) =>
-        Task.FromResult(DataContextResult.Success());
+        Task.FromResult(SaveChangesResult);
 }
 
 internal sealed class InMemoryRemoteQuery<T>(IQueryable<T> queryable) : IRemoteQuery<T>
