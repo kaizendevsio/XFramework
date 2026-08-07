@@ -45,10 +45,11 @@ public sealed class EntityEndpointGeneratorTests
     {
         var generatedSource = RunGenerator(includeValidators: false);
 
-        generatedSource.Should().Contain("TenantCapabilityRequirement(\"create\")", Exactly.Once());
-        generatedSource.Should().Contain("TenantCapabilityRequirement(\"update\")", Exactly.Once());
-        generatedSource.Should().Contain("TenantCapabilityRequirement(\"delete\")", Exactly.Once());
+        generatedSource.Should().Contain("TenantCapabilityRequirement(\"add\")", Exactly.Once());
+        generatedSource.Should().Contain("TenantCapabilityRequirement(\"edit\")", Exactly.Once());
+        generatedSource.Should().Contain("TenantCapabilityRequirement(\"remove\")", Exactly.Once());
         generatedSource.Should().Contain(".RequireAuthorization()", Exactly.Times(5));
+        generatedSource.Should().NotContain("policy.RequireRole(");
         generatedSource.Should().NotContain("TenantCapabilityRequirement(\"view\")");
     }
 
@@ -71,6 +72,49 @@ public sealed class EntityEndpointGeneratorTests
             Exactly.Times(5));
         generatedSource.IndexOf("invocationAuthorizer.AuthorizeAsync(", StringComparison.Ordinal)
             .Should().BeLessThan(generatedSource.IndexOf("service.GetByIdAsync(", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public void GenerateEndpoints_UsesCentralPolicyWithOperationMetadataAndExplicitFeatureGate()
+    {
+        var generatedSource = RunGenerator(includeValidators: false);
+
+        generatedSource.Should().Contain(
+            "RequiredActorRoles = [\"Admin\", \"Auditor\"]",
+            Exactly.Times(5),
+            "roles are declared as an any-of set on every generated operation");
+        generatedSource.Should().Contain(
+            "RequiredActorCapabilities = [\"inventory.products:inspect\"]",
+            Exactly.Times(2));
+        generatedSource.Should().Contain(
+            "RequiredActorCapabilities = [\"inventory.products:add\"]",
+            Exactly.Once());
+        generatedSource.Should().Contain(
+            "RequiredActorCapabilities = [\"inventory.products:edit\"]",
+            Exactly.Once());
+        generatedSource.Should().Contain(
+            "RequiredActorCapabilities = [\"inventory.products:remove\"]",
+            Exactly.Once());
+        generatedSource.Should().Contain("EnsureGeneratedEntityAllowedAsync(", Exactly.Times(5));
+        generatedSource.Should().Contain("\"inventory.products\",", Exactly.Times(5));
+        generatedSource.Should().Contain("\"inspect\",", Exactly.Times(2));
+        generatedSource.Should().Contain("\"add\",", Exactly.Once());
+        generatedSource.Should().Contain("\"edit\",", Exactly.Once());
+        generatedSource.Should().Contain("\"remove\",", Exactly.Once());
+
+        generatedSource.Should().Contain("[\"region\"] = \"apac\"", Exactly.Times(2));
+        generatedSource.Should().Contain("[\"clearance\"] = \"elevated\"", Exactly.Once());
+
+        var authorizationIndex = generatedSource.IndexOf("invocationAuthorizer.AuthorizeAsync(", StringComparison.Ordinal);
+        var featureGateIndex = generatedSource.IndexOf(
+            "trustedInvocationFeatureGate.EnsureGeneratedEntityAllowedAsync(",
+            authorizationIndex,
+            StringComparison.Ordinal);
+        var serviceIndex = generatedSource.IndexOf("service.GetByIdAsync(", featureGateIndex, StringComparison.Ordinal);
+        authorizationIndex.Should().BeLessThan(featureGateIndex);
+        featureGateIndex.Should().BeLessThan(serviceIndex);
+        generatedSource.Should().Contain(".RequireAuthorization()", Exactly.Times(5));
+        generatedSource.Should().NotContain("policy.RequireRole(");
     }
 
     [Test]
@@ -211,6 +255,28 @@ namespace XFramework.Core.Attributes
         public bool RequireAuthorization { get; set; } = true;
         public int CacheDurationSeconds { get; set; } = 300;
         public string[]? Roles { get; set; }
+        public GeneratedActorRequirement ActorRequirement { get; set; } = GeneratedActorRequirement.Required;
+        public GeneratedTenantAccessMode TenantAccessMode { get; set; } = GeneratedTenantAccessMode.ActorTenant;
+        public string CrossTenantCapability { get; set; } = "identity.tenants:manage";
+        public string? AuthorizationFeature { get; set; }
+        public string ReadCapability { get; set; } = "view";
+        public string CreateCapability { get; set; } = "create";
+        public string UpdateCapability { get; set; } = "update";
+        public string DeleteCapability { get; set; } = "delete";
+    }
+
+    public enum GeneratedActorRequirement { Required, Optional, None }
+    public enum GeneratedTenantAccessMode { ActorTenant, DelegatedTenant, Tenantless }
+}
+
+namespace XFramework.Domain.Shared.Attributes
+{
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+    public sealed class RequireGeneratedActorAttributeAttribute(string name, string value) : Attribute
+    {
+        public string Name { get; } = name;
+        public string Value { get; } = value;
+        public XFramework.Core.Attributes.EndpointActions Actions { get; set; } = XFramework.Core.Attributes.EndpointActions.All;
     }
 }
 
@@ -227,7 +293,23 @@ namespace FluentValidation
 
 namespace Sample
 {
-    [GenerateEndpoints(Type = EndpointType.Both, Actions = EndpointActions.All)]
+    [XFramework.Domain.Shared.Attributes.RequireGeneratedActorAttribute(
+        "region",
+        "apac",
+        Actions = EndpointActions.Get | EndpointActions.GetList)]
+    [XFramework.Domain.Shared.Attributes.RequireGeneratedActorAttribute(
+        "clearance",
+        "elevated",
+        Actions = EndpointActions.Update)]
+    [GenerateEndpoints(
+        Type = EndpointType.Both,
+        Actions = EndpointActions.All,
+        AuthorizationFeature = "inventory.products",
+        ReadCapability = "inspect",
+        CreateCapability = "add",
+        UpdateCapability = "edit",
+        DeleteCapability = "remove",
+        Roles = ["Admin", "Auditor"])]
     public sealed class Widget : XFramework.Domain.Shared.Contracts.Base.BaseModel;
 
     public sealed class CreateWidgetRequest;

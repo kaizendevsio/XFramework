@@ -19,6 +19,8 @@ public static class IdentityAuthorizationConstants
     public const string IdentityAddresses = "identity.addresses";
     public const string IdentityAuthLogs = "identity.auth_logs";
 
+    public const string ActorAttributeIdentityVerified = "identity.is_verified";
+
     public static IReadOnlyList<string> CapabilityKeys { get; } =
         [View, Create, Update, Delete, Manage];
 }

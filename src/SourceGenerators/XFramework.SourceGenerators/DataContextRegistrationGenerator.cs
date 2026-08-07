@@ -15,6 +15,22 @@ namespace XFramework.SourceGenerators;
 [Generator]
 public class DataContextRegistrationGenerator : IIncrementalGenerator
 {
+    private static readonly DiagnosticDescriptor MissingAuthorizationFeature = new(
+        "XFWGEN001",
+        "Generated authorization feature is required",
+        "Secured generated entity '{0}' does not declare AuthorizationFeature; remote access will fail closed",
+        "XFramework.Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor InvalidGeneratedAuthorizationPolicy = new(
+        "XFWGEN002",
+        "Generated authorization policy is incomplete",
+        "Generated entity '{0}' has an invalid authorization policy: {1}",
+        "XFramework.Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
     private const int MutatingEndpointActions = 1 | 8 | 16; // Create | Update | Delete
     private const string CoreGenerateEndpointsAttribute = "XFramework.Core.Attributes.GenerateEndpointsAttribute";
     private const string SharedGenerateEndpointsAttribute = "XFramework.Domain.Shared.Attributes.GenerateEndpointsAttribute";
@@ -57,8 +73,11 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
                 ClassName = classSymbol.Name,
                 FullyQualifiedName = classSymbol.ToDisplayString(),
                 AssemblyName = classSymbol.ContainingAssembly?.Name ?? "",
+                Location = classSymbol.Locations.FirstOrDefault(),
+                EndpointTypeValue = GetEnumValue(attributeData, "Type", 3),
                 EndpointActionsValue = GetEndpointActionsValue(attributeData),
-                AllowRemoteMutation = HasAllowRemoteMutationAttribute(classSymbol)
+                AllowRemoteMutation = HasAllowRemoteMutationAttribute(classSymbol),
+                Authorization = GetAuthorizationInfo(classSymbol, attributeData)
             };
         }
 
@@ -103,8 +122,11 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
                         ClassName = type.Name,
                         FullyQualifiedName = type.ToDisplayString(),
                         AssemblyName = assembly.Name,
+                        Location = type.Locations.FirstOrDefault(),
+                        EndpointTypeValue = GetEnumValue(generateEndpointsAttribute, "Type", 3),
                         EndpointActionsValue = GetEndpointActionsValue(generateEndpointsAttribute),
-                        AllowRemoteMutation = HasAllowRemoteMutationAttribute(type)
+                        AllowRemoteMutation = HasAllowRemoteMutationAttribute(type),
+                        Authorization = GetAuthorizationInfo(type, generateEndpointsAttribute)
                     });
                 }
             }
@@ -120,6 +142,57 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
 
         if (validEntities.Count == 0)
             return;
+
+        foreach (var entity in validEntities)
+        {
+            if (entity.Authorization.RequireAuthorization &&
+                string.IsNullOrWhiteSpace(entity.Authorization.AuthorizationFeature))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    MissingAuthorizationFeature,
+                    entity.Location,
+                    entity.ClassName));
+            }
+
+            if (entity.Authorization.RequireAuthorization &&
+                entity.Authorization.ActorRequirement == 2 &&
+                (entity.Authorization.Roles.Length > 0 ||
+                 entity.Authorization.ActorAttributes.Count > 0 ||
+                 !string.IsNullOrWhiteSpace(entity.Authorization.AuthorizationFeature)))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    InvalidGeneratedAuthorizationPolicy,
+                    entity.Location,
+                    entity.ClassName,
+                    "ActorRequirement.None cannot be combined with actor role, capability, or attribute requirements"));
+            }
+
+            if (!IsCanonicalFeature(entity.Authorization.AuthorizationFeature) ||
+                !IsCanonicalCapabilityKey(entity.Authorization.ReadCapability) ||
+                !IsCanonicalCapabilityKey(entity.Authorization.CreateCapability) ||
+                !IsCanonicalCapabilityKey(entity.Authorization.UpdateCapability) ||
+                !IsCanonicalCapabilityKey(entity.Authorization.DeleteCapability) ||
+                !IsCanonicalFullCapability(entity.Authorization.CrossTenantCapability))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    InvalidGeneratedAuthorizationPolicy,
+                    entity.Location,
+                    entity.ClassName,
+                    "authorization feature and capability keys must use the canonical lowercase taxonomy"));
+            }
+
+            foreach (var serviceAccess in entity.Authorization.ServiceAccess)
+            {
+                if (serviceAccess.AllowedCallers.Length > 0 && serviceAccess.RequiredScopes.Length > 0)
+                    continue;
+
+                context.ReportDiagnostic(Diagnostic.Create(
+                    InvalidGeneratedAuthorizationPolicy,
+                    entity.Location,
+                    entity.ClassName,
+                    "service-only access requires at least one allowed caller and one entity-operation scope"));
+            }
+        }
 
         var sb = new StringBuilder();
         sb.AppendLine("// <auto-generated />");
@@ -144,6 +217,22 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
 
         sb.AppendLine("    };");
         sb.AppendLine();
+
+        if (compilation.GetTypeByMetadataName(
+                "XFramework.Core.DataContext.GeneratedEntityAuthorizationPolicy") is not null)
+        {
+            sb.AppendLine("    public static IReadOnlyCollection<GeneratedEntityAuthorizationPolicy> GetDataContextAuthorizationPolicies() =>");
+            sb.AppendLine("    [");
+            foreach (var entity in validEntities)
+            {
+                AppendAuthorizationPolicy(sb, entity, 2 | 4, "Read", entity.Authorization.ReadCapability);
+                AppendAuthorizationPolicy(sb, entity, 1, "Create", entity.Authorization.CreateCapability);
+                AppendAuthorizationPolicy(sb, entity, 8, "Update", entity.Authorization.UpdateCapability);
+                AppendAuthorizationPolicy(sb, entity, 16, "Delete", entity.Authorization.DeleteCapability);
+            }
+            sb.AppendLine("    ];");
+            sb.AppendLine();
+        }
 
         sb.AppendLine("    public static HashSet<string> GetDataContextMutableEntityTypes() => new(StringComparer.OrdinalIgnoreCase)");
         sb.AppendLine("    {");
@@ -219,6 +308,190 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         type.GetAttributes().Any(static a =>
             a.AttributeClass?.ToDisplayString() == SharedAllowRemoteMutationAttribute);
 
+    private static AuthorizationInfo GetAuthorizationInfo(
+        INamedTypeSymbol type,
+        AttributeData generateEndpointsAttribute)
+    {
+        var info = new AuthorizationInfo
+        {
+            RequireAuthorization = GetBoolValue(generateEndpointsAttribute, "RequireAuthorization", true),
+            ActorRequirement = GetEnumValue(generateEndpointsAttribute, "ActorRequirement", 0),
+            TenantAccessMode = GetEnumValue(generateEndpointsAttribute, "TenantAccessMode", 0),
+            CrossTenantCapability = GetStringValue(generateEndpointsAttribute, "CrossTenantCapability")
+                ?? "identity.tenants:manage",
+            AuthorizationFeature = GetStringValue(generateEndpointsAttribute, "AuthorizationFeature"),
+            ReadCapability = GetStringValue(generateEndpointsAttribute, "ReadCapability") ?? "view",
+            CreateCapability = GetStringValue(generateEndpointsAttribute, "CreateCapability") ?? "create",
+            UpdateCapability = GetStringValue(generateEndpointsAttribute, "UpdateCapability") ?? "update",
+            DeleteCapability = GetStringValue(generateEndpointsAttribute, "DeleteCapability") ?? "delete",
+            Roles = GetStringArrayValue(generateEndpointsAttribute, "Roles")
+        };
+
+        foreach (var attribute in type.GetAttributes())
+        {
+            var attributeName = attribute.AttributeClass?.ToDisplayString();
+            if (attributeName == "XFramework.Domain.Shared.Attributes.RequireGeneratedActorAttributeAttribute" &&
+                attribute.ConstructorArguments.Length == 2 &&
+                attribute.ConstructorArguments[0].Value is string name &&
+                attribute.ConstructorArguments[1].Value is string value)
+            {
+                info.ActorAttributes.Add(new ActorAttributeInfo(
+                    name,
+                    value,
+                    GetEnumValue(attribute, "Actions", 31)));
+            }
+            else if (attributeName == "XFramework.Domain.Shared.Attributes.AllowGeneratedServiceAccessAttribute")
+            {
+                info.ServiceAccess.Add(new ServiceAccessInfo(
+                    GetConstructorStringArray(attribute),
+                    GetStringArrayValue(attribute, "RequiredScopes"),
+                    GetEnumValue(attribute, "Actions", 6)));
+            }
+        }
+
+        return info;
+    }
+
+    private static void AppendAuthorizationPolicy(
+        StringBuilder sb,
+        EntityRegistrationInfo entity,
+        int actionMask,
+        string operation,
+        string capability)
+    {
+        var isMutation = operation is "Create" or "Update" or "Delete";
+        if ((entity.EndpointActionsValue & actionMask) == 0 &&
+            !(isMutation && entity.AllowRemoteMutation))
+            return;
+
+        var authorization = entity.Authorization;
+        var feature = authorization.AuthorizationFeature;
+        var requiredCapability = string.IsNullOrWhiteSpace(feature)
+            ? null
+            : $"{feature}:{capability}";
+        var actorRequirement = authorization.RequireAuthorization
+            ? authorization.ActorRequirement switch
+            {
+                1 => "Optional",
+                2 => "None",
+                _ => "Required"
+            }
+            : "Optional";
+        var actorAttributes = authorization.ActorAttributes
+            .Where(attribute => (attribute.Actions & actionMask) != 0)
+            .ToArray();
+        var serviceAccess = authorization.ServiceAccess
+            .Where(access => (access.Actions & actionMask) != 0)
+            .ToArray();
+        var allowedCallers = serviceAccess.SelectMany(static access => access.AllowedCallers).Distinct().ToArray();
+        var serviceScopes = serviceAccess.SelectMany(static access => access.RequiredScopes).Distinct().ToArray();
+
+        sb.AppendLine("        new GeneratedEntityAuthorizationPolicy");
+        sb.AppendLine("        {");
+        sb.AppendLine($"            EntityTypeName = \"{Escape(entity.ClassName)}\",");
+        sb.AppendLine($"            Operation = GeneratedEntityOperation.{operation},");
+        sb.AppendLine($"            RequireAuthorization = {authorization.RequireAuthorization.ToString().ToLowerInvariant()},");
+        sb.AppendLine($"            ActorRequirement = global::XFramework.Integration.Security.ActorRequirement.{actorRequirement},");
+        sb.AppendLine($"            TenantAccessMode = global::XFramework.Integration.Security.TenantAccessMode.{ResolveTenantAccessMode(authorization.TenantAccessMode)},");
+        sb.AppendLine($"            AuthorizationFeature = {StringLiteral(feature)},");
+        sb.AppendLine($"            RequiredCapability = {StringLiteral(requiredCapability)},");
+        sb.AppendLine($"            RequiredCrossTenantActorCapabilities = {StringArrayLiteral(string.IsNullOrWhiteSpace(authorization.CrossTenantCapability) ? [] : [authorization.CrossTenantCapability])},");
+        sb.AppendLine($"            RequiredRoles = {StringArrayLiteral(authorization.Roles)},");
+        sb.AppendLine($"            RequiredActorAttributes = {DictionaryLiteral(actorAttributes)},");
+        sb.AppendLine($"            AllowRemoteQuery = {(entity.EndpointTypeValue != 2).ToString().ToLowerInvariant()},");
+        sb.AppendLine($"            AllowRemoteMutation = {(isMutation && entity.AllowRemoteMutation).ToString().ToLowerInvariant()},");
+        sb.AppendLine($"            AllowServiceOnly = {serviceAccess.Any().ToString().ToLowerInvariant()},");
+        sb.AppendLine($"            AllowedServiceCallers = {StringArrayLiteral(allowedCallers)},");
+        sb.AppendLine($"            RequiredServiceScopes = {StringArrayLiteral(serviceScopes)}");
+        sb.AppendLine("        },");
+    }
+
+    private static bool GetBoolValue(AttributeData attribute, string name, bool defaultValue) =>
+        attribute.NamedArguments.FirstOrDefault(argument => argument.Key == name).Value.Value is bool value
+            ? value
+            : defaultValue;
+
+    private static int GetEnumValue(AttributeData attribute, string name, int defaultValue) =>
+        attribute.NamedArguments.FirstOrDefault(argument => argument.Key == name).Value.Value is int value
+            ? value
+            : defaultValue;
+
+    private static string? GetStringValue(AttributeData attribute, string name) =>
+        attribute.NamedArguments.FirstOrDefault(argument => argument.Key == name).Value.Value as string;
+
+    private static string[] GetStringArrayValue(AttributeData attribute, string name)
+    {
+        foreach (var argument in attribute.NamedArguments)
+        {
+            if (argument.Key != name || argument.Value.Kind != TypedConstantKind.Array)
+                continue;
+
+            return argument.Value.Values
+                .Select(static value => value.Value as string)
+                .Where(static value => value is not null)
+                .Cast<string>()
+                .ToArray();
+        }
+
+        return [];
+    }
+
+    private static string[] GetConstructorStringArray(AttributeData attribute)
+    {
+        if (attribute.ConstructorArguments.Length == 0 ||
+            attribute.ConstructorArguments[0].Kind != TypedConstantKind.Array)
+        {
+            return [];
+        }
+
+        return attribute.ConstructorArguments[0].Values
+            .Select(static value => value.Value as string)
+            .Where(static value => value is not null)
+            .Cast<string>()
+            .ToArray();
+    }
+
+    private static string StringLiteral(string? value) =>
+        value is null ? "null" : $"\"{Escape(value)}\"";
+
+    private static string StringArrayLiteral(IEnumerable<string> values) =>
+        $"[{string.Join(", ", values.Select(value => StringLiteral(value)))}]";
+
+    private static string DictionaryLiteral(IEnumerable<ActorAttributeInfo> attributes) =>
+        $"new global::System.Collections.Generic.Dictionary<string, string>(global::System.StringComparer.OrdinalIgnoreCase) {{ {string.Join(", ", attributes.Select(attribute => $"[\"{Escape(attribute.Name)}\"] = \"{Escape(attribute.Value)}\""))} }}";
+
+    private static string Escape(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+    private static string ResolveTenantAccessMode(int tenantAccessMode) => tenantAccessMode switch
+    {
+        1 => "DelegatedTenant",
+        2 => "Tenantless",
+        _ => "ActorTenant"
+    };
+
+    private static bool IsCanonicalFeature(string? feature) =>
+        string.IsNullOrWhiteSpace(feature) ||
+        global::System.Text.RegularExpressions.Regex.IsMatch(
+            feature,
+            "^[a-z][a-z0-9]*(?:[.][a-z][a-z0-9_]*)*$");
+
+    private static bool IsCanonicalCapabilityKey(string capability) =>
+        capability is "view" or "create" or "update" or "delete" or "manage";
+
+    private static bool IsCanonicalFullCapability(string? capability)
+    {
+        if (string.IsNullOrWhiteSpace(capability))
+            return true;
+
+        var value = capability!;
+        var separator = value.LastIndexOf(':');
+        return separator > 0 &&
+               separator < value.Length - 1 &&
+               IsCanonicalFeature(value.Substring(0, separator)) &&
+               IsCanonicalCapabilityKey(value.Substring(separator + 1));
+    }
+
     private static bool ShouldIncludeEntity(string assemblyName, string currentModuleName)
     {
         if (string.IsNullOrWhiteSpace(assemblyName) || string.IsNullOrWhiteSpace(currentModuleName))
@@ -259,7 +532,43 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         public string ClassName { get; set; } = "";
         public string FullyQualifiedName { get; set; } = "";
         public string AssemblyName { get; set; } = "";
+        public Location? Location { get; set; }
+        public int EndpointTypeValue { get; set; } = 3;
         public int EndpointActionsValue { get; set; } = 31;
         public bool AllowRemoteMutation { get; set; }
+        public AuthorizationInfo Authorization { get; set; } = new();
+    }
+
+    private sealed class AuthorizationInfo
+    {
+        public bool RequireAuthorization { get; set; } = true;
+        public int ActorRequirement { get; set; }
+        public int TenantAccessMode { get; set; }
+        public string CrossTenantCapability { get; set; } = "identity.tenants:manage";
+        public string? AuthorizationFeature { get; set; }
+        public string ReadCapability { get; set; } = "view";
+        public string CreateCapability { get; set; } = "create";
+        public string UpdateCapability { get; set; } = "update";
+        public string DeleteCapability { get; set; } = "delete";
+        public string[] Roles { get; set; } = [];
+        public List<ActorAttributeInfo> ActorAttributes { get; } = [];
+        public List<ServiceAccessInfo> ServiceAccess { get; } = [];
+    }
+
+    private sealed class ActorAttributeInfo(string name, string value, int actions)
+    {
+        public string Name { get; } = name;
+        public string Value { get; } = value;
+        public int Actions { get; } = actions;
+    }
+
+    private sealed class ServiceAccessInfo(
+        string[] allowedCallers,
+        string[] requiredScopes,
+        int actions)
+    {
+        public string[] AllowedCallers { get; } = allowedCallers;
+        public string[] RequiredScopes { get; } = requiredScopes;
+        public int Actions { get; } = actions;
     }
 }

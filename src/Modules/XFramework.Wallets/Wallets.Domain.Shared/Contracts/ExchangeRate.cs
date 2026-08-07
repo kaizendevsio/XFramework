@@ -9,6 +9,7 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/exchange-rates",
     RequireAuthorization = true,
+    AuthorizationFeature = "wallets",
     CacheDurationSeconds = 1800,
     CacheKeyPrefix = "exchange-rates"
 )]

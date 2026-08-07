@@ -428,6 +428,17 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               _serviceTokenProvider,
                               _actorAccessTokenProvider);
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", payload);
+                          if ((int)status < 200 || (int)status >= 300)
+                          {
+                              var failure = data.IsEmpty
+                                  ? null
+                                  : MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span);
+                              return new QueryResponse<PaginatedResult<{{model}}>>
+                              {
+                                  HttpStatusCode = status,
+                                  Message = failure?.Message
+                              };
+                          }
                           var items = data.IsEmpty ? new List<{{model}}>() : MemoryPack.MemoryPackSerializer.Deserialize<List<{{model}}>>(data.Span) ?? new List<{{model}}>();
 
                           _logger.LogDebug("GetList<{{model}}> | {StatusCode} in {Elapsed}ms | Request={Request} Response={Response}",
@@ -460,6 +471,17 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               _serviceTokenProvider,
                               _actorAccessTokenProvider);
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", payload);
+                          if ((int)status < 200 || (int)status >= 300)
+                          {
+                              var failure = data.IsEmpty
+                                  ? null
+                                  : MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span);
+                              return new QueryResponse<{{model}}>
+                              {
+                                  HttpStatusCode = status,
+                                  Message = failure?.Message
+                              };
+                          }
                           var entity = data.IsEmpty ? default : MemoryPack.MemoryPackSerializer.Deserialize<{{model}}>(data.Span);
 
                           _logger.LogDebug("Get<{{model}}> | {StatusCode} | Request={Request} Response={Response}",
@@ -567,6 +589,14 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                 {
                     var attrName = attr.AttributeClass?.ToDisplayString();
                     if (attrName != coreAttr && attrName != sharedAttr)
+                        continue;
+
+                    var endpointTypeArgument = attr.NamedArguments
+                        .FirstOrDefault(argument => argument.Key == "Type");
+                    var endpointType = endpointTypeArgument.Value.Value is int configuredEndpointType
+                        ? configuredEndpointType
+                        : 3;
+                    if (endpointType == 2)
                         continue;
 
                     models.Add(type.Name);

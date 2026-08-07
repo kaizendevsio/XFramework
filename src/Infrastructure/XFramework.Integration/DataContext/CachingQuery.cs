@@ -129,8 +129,7 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
         _policy.Enabled &&
         !_noCache &&
         _inner is RemoteQuery<T> &&
-        _invocationContextAccessor.Current?.EffectiveTenantId is { } tenantId &&
-        tenantId != Guid.Empty;
+        _invocationContextAccessor.Current is not null;
 
     private string GetCacheKey()
     {

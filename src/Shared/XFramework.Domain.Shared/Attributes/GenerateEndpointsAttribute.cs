@@ -35,7 +35,7 @@ namespace XFramework.Domain.Shared.Attributes;
 /// </code>
 /// </example>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-public sealed class GenerateEndpointsAttribute : Attribute
+public class GenerateEndpointsAttribute : Attribute
 {
     /// <summary>
     /// Gets or sets what type of code should be generated (service, endpoints, or both).
@@ -198,6 +198,35 @@ public sealed class GenerateEndpointsAttribute : Attribute
     /// </code>
     /// </example>
     public string[]? Roles { get; set; }
+
+    /// <summary>
+    /// Canonical module or subfeature key used to compose actor capabilities for generated operations.
+    /// </summary>
+    /// <example><c>wallets.reporting</c></example>
+    public string? AuthorizationFeature { get; set; }
+
+    /// <summary>Capability key required for generated Get and GetList operations.</summary>
+    public string ReadCapability { get; set; } = "view";
+
+    /// <summary>Capability key required for generated Create operations.</summary>
+    public string CreateCapability { get; set; } = "create";
+
+    /// <summary>Capability key required for generated Update operations.</summary>
+    public string UpdateCapability { get; set; } = "update";
+
+    /// <summary>Capability key required for generated Delete operations.</summary>
+    public string DeleteCapability { get; set; } = "delete";
+
+    /// <summary>
+    /// Actor requirement applied consistently to generated REST, service, Bolt, and remote data-context paths.
+    /// </summary>
+    public GeneratedActorRequirement ActorRequirement { get; set; } = GeneratedActorRequirement.Required;
+
+    /// <summary>Tenant rule applied to every generated access path.</summary>
+    public GeneratedTenantAccessMode TenantAccessMode { get; set; } = GeneratedTenantAccessMode.ActorTenant;
+
+    /// <summary>Capability required when delegated access targets a tenant other than the actor tenant.</summary>
+    public string CrossTenantCapability { get; set; } = "identity.tenants:manage";
 
     /// <summary>Explicit scalar properties exposed by generated response DTOs.</summary>
     public string[]? ResponseProperties { get; set; }

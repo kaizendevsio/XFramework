@@ -30,6 +30,51 @@ public sealed class TrustedInvocationFeatureGate(
         if (rule is null)
             return Result.Success();
 
+        var capability = ResolveCapability(httpMethod, normalizedRoute, declaredCapability);
+        return await EnsureFeatureAllowedAsync(
+            rule.ModuleKey,
+            rule.SubFeatureKey,
+            capability,
+            normalizedRoute,
+            ct);
+    }
+
+    public async Task<Result> EnsureGeneratedEntityAllowedAsync(
+        string authorizationFeature,
+        string capability,
+        bool requiresTenant,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(authorizationFeature))
+            return Result.Success();
+
+        if (!requiresTenant)
+            return Result.Success();
+
+        var feature = TenantModuleFeatureKeys.Normalize(authorizationFeature);
+        if (string.IsNullOrWhiteSpace(feature.ModuleKey))
+            return Result.Forbidden("Generated entity authorization feature is invalid.");
+
+        return await EnsureFeatureAllowedAsync(
+            feature.ModuleKey,
+            feature.SubFeatureKey,
+            capability,
+            authorizationFeature,
+            ct);
+    }
+
+    private async Task<Result> EnsureFeatureAllowedAsync(
+        string moduleKey,
+        string subFeatureKey,
+        string capability,
+        string diagnosticTarget,
+        CancellationToken ct)
+    {
+        var rule = new TenantModuleFeatureGateRule(
+            diagnosticTarget,
+            moduleKey,
+            subFeatureKey);
+
         var context = trustedInvocationContextAccessor.Current;
         if (context?.EffectiveTenantId is not { } tenantId || tenantId == Guid.Empty)
             return Result.Forbidden("Feature gate requires a trusted tenant context.");
@@ -41,7 +86,7 @@ public sealed class TrustedInvocationFeatureGate(
             ct);
         if (!featureResult.IsSuccess)
         {
-            LogDenial(normalizedRoute, tenantId, rule, null, featureResult.Message);
+            LogDenial(diagnosticTarget, tenantId, rule, null, featureResult.Message);
             return featureResult;
         }
 
@@ -54,7 +99,6 @@ public sealed class TrustedInvocationFeatureGate(
         if (actor.TenantId != tenantId)
             return Result.Success();
 
-        var capability = ResolveCapability(httpMethod, normalizedRoute, declaredCapability);
         var capabilityResult = await capabilityService.EnsureAllowedAsync(
             tenantId,
             actor.CredentialId,
@@ -63,7 +107,7 @@ public sealed class TrustedInvocationFeatureGate(
             capability,
             ct);
         if (!capabilityResult.IsSuccess)
-            LogDenial(normalizedRoute, tenantId, rule, actor.CredentialId, capabilityResult.Message);
+            LogDenial(diagnosticTarget, tenantId, rule, actor.CredentialId, capabilityResult.Message);
 
         return capabilityResult;
     }

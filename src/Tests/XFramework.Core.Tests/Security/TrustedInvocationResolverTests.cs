@@ -539,6 +539,94 @@ public sealed class TrustedInvocationResolverTests
     }
 
     [Test]
+    public async Task ProtectedRequest_WithAnyRequiredRole_IsAuthorized()
+    {
+        var resolver = CreateResolver(actor: Actor(roles: new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Auditor"
+        }));
+
+        var result = await resolver.ResolveAsync(
+            new InvocationCredentials("actor-token", "service-token"),
+            Metadata(ActorTenantId),
+            new InvocationAuthorizationPolicy
+            {
+                RequiredActorRoles = ["Admin", "Auditor"]
+            },
+            "target");
+
+        result.IsSuccess.Should().BeTrue(result.Error);
+    }
+
+    [Test]
+    public async Task ProtectedRequest_WithoutAnyRequiredRole_IsForbidden()
+    {
+        var resolver = CreateResolver(actor: Actor(roles: new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Reader"
+        }));
+
+        var result = await resolver.ResolveAsync(
+            new InvocationCredentials("actor-token", "service-token"),
+            Metadata(ActorTenantId),
+            new InvocationAuthorizationPolicy
+            {
+                RequiredActorRoles = ["Admin", "Auditor"]
+            },
+            "target");
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(403);
+    }
+
+    [Test]
+    public async Task ProtectedRequest_WithValidatedActorAttribute_IsAuthorized()
+    {
+        var resolver = CreateResolver(actor: Actor(attributes: new Dictionary<string, string>
+        {
+            ["department"] = "finance"
+        }));
+
+        var result = await resolver.ResolveAsync(
+            new InvocationCredentials("actor-token", "service-token"),
+            Metadata(ActorTenantId),
+            new InvocationAuthorizationPolicy
+            {
+                RequiredActorAttributes = new Dictionary<string, string>
+                {
+                    ["department"] = "finance"
+                }
+            },
+            "target");
+
+        result.IsSuccess.Should().BeTrue(result.Error);
+    }
+
+    [Test]
+    public async Task ProtectedRequest_WithMismatchedActorAttribute_IsForbidden()
+    {
+        var resolver = CreateResolver(actor: Actor(attributes: new Dictionary<string, string>
+        {
+            ["department"] = "operations"
+        }));
+
+        var result = await resolver.ResolveAsync(
+            new InvocationCredentials("actor-token", "service-token"),
+            Metadata(ActorTenantId),
+            new InvocationAuthorizationPolicy
+            {
+                RequiredActorAttributes = new Dictionary<string, string>
+                {
+                    ["department"] = "finance"
+                }
+            },
+            "target");
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(403);
+    }
+
+    [Test]
     public async Task TenantlessOperation_WithRequestedTenant_IsRejected()
     {
         var resolver = CreateResolver();
@@ -630,17 +718,20 @@ public sealed class TrustedInvocationResolverTests
     {
         var roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "admin" };
         var capabilities = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "identity.read" };
+        var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["department"] = "finance" };
         var scopes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "scope.read" };
 
-        var actor = Actor(capabilities, roles);
+        var actor = Actor(capabilities, roles, attributes);
         var service = new TrustedServiceIdentity("caller", "target", scopes, "generation");
 
         roles.Add("super-admin");
         capabilities.Add("identity.write");
+        attributes["department"] = "operations";
         scopes.Add("scope.write");
 
         actor.Roles.Should().BeEquivalentTo(["admin"]);
         actor.Capabilities.Should().BeEquivalentTo(["identity.read"]);
+        actor.Attributes.Should().ContainKey("department").WhoseValue.Should().Be("finance");
         service.Scopes.Should().BeEquivalentTo(["scope.read"]);
     }
 
@@ -676,7 +767,8 @@ public sealed class TrustedInvocationResolverTests
 
     private static TrustedActorIdentity Actor(
         IReadOnlySet<string>? capabilities = null,
-        IReadOnlySet<string>? roles = null) => new(
+        IReadOnlySet<string>? roles = null,
+        IReadOnlyDictionary<string, string>? attributes = null) => new(
         Guid.Parse("ae49ff82-cc8e-4cca-a42f-0e2b3d32bb37"),
         Guid.Parse("d340548b-ed0a-497b-a63a-31c28e1307c4"),
         ActorTenantId,
@@ -684,7 +776,8 @@ public sealed class TrustedInvocationResolverTests
         roles ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
         capabilities ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
         "actor-generation",
-        DateTimeOffset.UtcNow.AddMinutes(10));
+        DateTimeOffset.UtcNow.AddMinutes(10),
+        attributes);
 
     private sealed class StubActorProvider(TrustedActorIdentity? actor) : IActorIdentityProvider
     {

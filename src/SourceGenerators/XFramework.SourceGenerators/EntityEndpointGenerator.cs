@@ -79,6 +79,16 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                 Actions = actions,
                 RequireAuthorization = requireAuth,
                 Roles = roles,
+                ActorRequirement = GetEnumValue(attributeData, "ActorRequirement", 0),
+                TenantAccessMode = GetEnumValue(attributeData, "TenantAccessMode", 0),
+                CrossTenantCapability = GetStringValue(attributeData, "CrossTenantCapability")
+                    ?? "identity.tenants:manage",
+                AuthorizationFeature = GetStringValue(attributeData, "AuthorizationFeature"),
+                ReadCapability = GetStringValue(attributeData, "ReadCapability") ?? "view",
+                CreateCapability = GetStringValue(attributeData, "CreateCapability") ?? "create",
+                UpdateCapability = GetStringValue(attributeData, "UpdateCapability") ?? "update",
+                DeleteCapability = GetStringValue(attributeData, "DeleteCapability") ?? "delete",
+                ActorAttributes = GetActorAttributes(classSymbol),
                 IsBaseModel = InheritsBaseModel(classSymbol)
             };
         }
@@ -218,6 +228,16 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                         Actions = actions,
                         RequireAuthorization = requireAuth,
                         Roles = roles,
+                        ActorRequirement = GetEnumValue(attr, "ActorRequirement", 0),
+                        TenantAccessMode = GetEnumValue(attr, "TenantAccessMode", 0),
+                        CrossTenantCapability = GetStringValue(attr, "CrossTenantCapability")
+                            ?? "identity.tenants:manage",
+                        AuthorizationFeature = GetStringValue(attr, "AuthorizationFeature"),
+                        ReadCapability = GetStringValue(attr, "ReadCapability") ?? "view",
+                        CreateCapability = GetStringValue(attr, "CreateCapability") ?? "create",
+                        UpdateCapability = GetStringValue(attr, "UpdateCapability") ?? "update",
+                        DeleteCapability = GetStringValue(attr, "DeleteCapability") ?? "delete",
+                        ActorAttributes = GetActorAttributes(type),
                         IsBaseModel = InheritsBaseModel(type)
                     });
 
@@ -610,9 +630,13 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                             new global::XFramework.Domain.Shared.BusinessObjects.RequestMetadata(),
                             new global::XFramework.Integration.Security.InvocationAuthorizationPolicy
                             {
-                                ActorRequirement = global::XFramework.Integration.Security.ActorRequirement.Required,
-                                TenantAccessMode = global::XFramework.Integration.Security.TenantAccessMode.ActorTenant,
-                                RequireServiceIdentity = false
+                                ActorRequirement = global::XFramework.Integration.Security.ActorRequirement.{{ResolveActorRequirement(entity.ActorRequirement)}},
+                                TenantAccessMode = global::XFramework.Integration.Security.TenantAccessMode.{{ResolveTenantAccessMode(entity.TenantAccessMode)}},
+                                RequireServiceIdentity = false,
+                                RequiredActorRoles = {{StringArrayLiteral(entity.Roles ?? [])}},
+                                RequiredActorCapabilities = {{StringArrayLiteral(ResolveRequiredCapabilities(entity, capability))}},
+                                RequiredActorAttributes = {{DictionaryLiteral(entity.ActorAttributes, CapabilityActionMask(capability))}},
+                                RequiredCrossTenantActorCapabilities = {{StringArrayLiteral(string.IsNullOrWhiteSpace(entity.CrossTenantCapability) ? [] : [entity.CrossTenantCapability])}}
                             },
                             ct);
                         if (!invocationAuthorization.IsSuccess)
@@ -622,10 +646,10 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                                 statusCode: invocationAuthorization.StatusCode);
                         }
 
-                        var featureGateResult = await trustedInvocationFeatureGate.EnsureAllowedAsync(
-                            "{{route}}",
-                            "{{httpMethod}}",
-                            "{{capability}}",
+                        var featureGateResult = await trustedInvocationFeatureGate.EnsureGeneratedEntityAllowedAsync(
+                            "{{Escape(entity.AuthorizationFeature ?? string.Empty)}}",
+                            "{{ResolveCapability(entity, capability)}}",
+                            {{(ResolveTenantAccessMode(entity.TenantAccessMode) != "Tenantless").ToString().ToLowerInvariant()}},
                             ct);
                         if (!featureGateResult.IsSuccess)
                         {
@@ -644,16 +668,82 @@ public class EntityEndpointGenerator : IIncrementalGenerator
 
         var capabilityMetadata = capability is null
             ? string.Empty
-            : $"\n            .WithMetadata(new global::XFramework.Core.Services.FeatureGates.TenantCapabilityRequirement(\"{capability.ToLowerInvariant()}\"))";
-
-        if (entity.Roles != null && entity.Roles.Length > 0)
-        {
-            var rolesString = string.Join("\", \"", entity.Roles);
-            return $"\n            .RequireAuthorization(policy => policy.RequireRole(\"{rolesString}\")){capabilityMetadata}";
-        }
+            : $"\n            .WithMetadata(new global::XFramework.Core.Services.FeatureGates.TenantCapabilityRequirement(\"{ResolveCapability(entity, capability)}\"))";
 
         return $"\n            .RequireAuthorization(){capabilityMetadata}";
     }
+
+    private static List<ActorAttributeInfo> GetActorAttributes(INamedTypeSymbol type)
+    {
+        var result = new List<ActorAttributeInfo>();
+        foreach (var attribute in type.GetAttributes().Where(attribute =>
+                     attribute.AttributeClass?.ToDisplayString() ==
+                     "XFramework.Domain.Shared.Attributes.RequireGeneratedActorAttributeAttribute"))
+        {
+            if (attribute.ConstructorArguments.Length != 2 ||
+                attribute.ConstructorArguments[0].Value is not string name ||
+                attribute.ConstructorArguments[1].Value is not string value)
+            {
+                continue;
+            }
+
+            result.Add(new ActorAttributeInfo(
+                name,
+                value,
+                GetEnumValue(attribute, "Actions", 31)));
+        }
+
+        return result;
+    }
+
+    private static string ResolveCapability(EndpointInfo entity, string capability) =>
+        capability.ToLowerInvariant() switch
+        {
+            "view" => entity.ReadCapability,
+            "create" => entity.CreateCapability,
+            "update" => entity.UpdateCapability,
+            "delete" => entity.DeleteCapability,
+            _ => capability.ToLowerInvariant()
+        };
+
+    private static string[] ResolveRequiredCapabilities(EndpointInfo entity, string capability) =>
+        string.IsNullOrWhiteSpace(entity.AuthorizationFeature)
+            ? []
+            : [$"{entity.AuthorizationFeature}:{ResolveCapability(entity, capability)}"];
+
+    private static int CapabilityActionMask(string capability) => capability.ToLowerInvariant() switch
+    {
+        "view" => 2 | 4,
+        "create" => 1,
+        "update" => 8,
+        "delete" => 16,
+        _ => 0
+    };
+
+    private static string ResolveActorRequirement(int actorRequirement) => actorRequirement switch
+    {
+        1 => "Optional",
+        2 => "None",
+        _ => "Required"
+    };
+
+    private static string ResolveTenantAccessMode(int tenantAccessMode) => tenantAccessMode switch
+    {
+        1 => "DelegatedTenant",
+        2 => "Tenantless",
+        _ => "ActorTenant"
+    };
+
+    private static string StringArrayLiteral(IEnumerable<string> values) =>
+        $"[{string.Join(", ", values.Select(value => $"\"{Escape(value)}\""))}]";
+
+    private static string DictionaryLiteral(
+        IEnumerable<ActorAttributeInfo> attributes,
+        int actionMask) =>
+        $"new global::System.Collections.Generic.Dictionary<string, string>(global::System.StringComparer.OrdinalIgnoreCase) {{ {string.Join(", ", attributes.Where(attribute => (attribute.Actions & actionMask) != 0).Select(attribute => $"[\"{Escape(attribute.Name)}\"] = \"{Escape(attribute.Value)}\""))} }}";
+
+    private static string Escape(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     private static string ToPlural(string word)
     {
@@ -729,7 +819,23 @@ internal class EndpointInfo
     public int Actions { get; set; }
     public bool RequireAuthorization { get; set; }
     public string[]? Roles { get; set; }
+    public int ActorRequirement { get; set; }
+    public int TenantAccessMode { get; set; }
+    public string CrossTenantCapability { get; set; } = "identity.tenants:manage";
+    public string? AuthorizationFeature { get; set; }
+    public string ReadCapability { get; set; } = "view";
+    public string CreateCapability { get; set; } = "create";
+    public string UpdateCapability { get; set; } = "update";
+    public string DeleteCapability { get; set; } = "delete";
+    public List<ActorAttributeInfo> ActorAttributes { get; set; } = [];
     public bool IsBaseModel { get; set; }
     public bool HasCreateValidator { get; set; }
     public bool HasUpdateValidator { get; set; }
+}
+
+internal sealed class ActorAttributeInfo(string name, string value, int actions)
+{
+    public string Name { get; } = name;
+    public string Value { get; } = value;
+    public int Actions { get; } = actions;
 }

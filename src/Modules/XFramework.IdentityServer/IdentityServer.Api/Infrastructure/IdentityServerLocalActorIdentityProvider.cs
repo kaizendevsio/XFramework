@@ -74,13 +74,13 @@ public sealed class IdentityServerLocalActorIdentityProvider(
             if (credential is null)
                 return Cache(token, ActorIdentityValidationResult.Failure("Identity session is no longer valid."));
 
-            var identityIsActive = await dataContext.Query<IdentityInformation>()
+            var identity = await dataContext.Query<IdentityInformation>()
                 .IgnoreQueryFilters()
                 .NoCache()
                 .Where(identity => identity.Id == credential.IdentityInfoId && identity.TenantId == tenantId)
                 .Where(identity => !identity.IsDeleted && identity.IsEnabled)
-                .AnyAsync(ct);
-            if (!identityIsActive)
+                .FirstOrDefaultAsync(ct);
+            if (identity is null)
                 return Cache(token, ActorIdentityValidationResult.Failure("Identity session is no longer valid."));
 
             var activeRoles = await dataContext.Query<IdentityRole>()
@@ -122,6 +122,11 @@ public sealed class IdentityServerLocalActorIdentityProvider(
                 .Select(capability =>
                     $"{TenantModuleFeatureKeys.Combine(capability.ModuleKey, capability.SubFeatureKey)}:{capability.CapabilityKey}")
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [IdentityAuthorizationConstants.ActorAttributeIdentityVerified] =
+                    identity.IsVerified ? bool.TrueString : bool.FalseString
+            };
 
             return Cache(token, ActorIdentityValidationResult.Success(new TrustedActorIdentity(
                 credentialId,
@@ -131,7 +136,8 @@ public sealed class IdentityServerLocalActorIdentityProvider(
                 roles,
                 capabilities,
                 generationId,
-                new DateTimeOffset(DateTime.SpecifyKind(jwt.ValidTo, DateTimeKind.Utc)))));
+                new DateTimeOffset(DateTime.SpecifyKind(jwt.ValidTo, DateTimeKind.Utc)),
+                attributes)));
         }
         catch (SecurityTokenException)
         {

@@ -9,7 +9,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.All,
     RoutePrefix = "api/identity-contacts",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity.contacts"
 )]
 public partial class IdentityContact : BaseModel
 {

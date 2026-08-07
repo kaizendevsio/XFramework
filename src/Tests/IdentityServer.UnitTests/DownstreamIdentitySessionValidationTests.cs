@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Api.Features.Auth.ValidateSession;
@@ -135,6 +136,10 @@ public sealed class DownstreamIdentitySessionValidationTests
                     SessionId = sessionId,
                     GenerationId = "g1",
                     ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
+                    Attributes = new Dictionary<string, string>
+                    {
+                        [IdentityAuthorizationConstants.ActorAttributeIdentityVerified] = bool.TrueString
+                    },
                     IsValid = true
                 }
             });
@@ -154,6 +159,9 @@ public sealed class DownstreamIdentitySessionValidationTests
 
         context.Result?.Failure.Should().BeNull();
         secondValidation.IsValid.Should().BeTrue(secondValidation.Error);
+        secondValidation.Identity!.Attributes.Should().Contain(
+            IdentityAuthorizationConstants.ActorAttributeIdentityVerified,
+            bool.TrueString);
         identityServer.Verify(
             wrapper => wrapper.ValidateIdentitySession(
                 It.IsAny<ValidateIdentitySessionRequest>(),

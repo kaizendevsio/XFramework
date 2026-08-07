@@ -12,12 +12,20 @@ public static class DataContextHandlerExtensions
     public static IServiceCollection AddDataContextHandler(this IServiceCollection services, Assembly entityAssembly)
     {
         services.AddTrustedInvocationSecurity();
+        var registrationType = entityAssembly.GetTypes()
+            .FirstOrDefault(t => t.Name == "DataContextEntityRegistrations");
+        var generatedPolicies = registrationType?.GetMethod(
+                "GetDataContextAuthorizationPolicies",
+                BindingFlags.Public | BindingFlags.Static)
+            ?.Invoke(null, null) is IReadOnlyCollection<GeneratedEntityAuthorizationPolicy> policies
+            ? policies
+            : [];
+        var authorizationPolicies = new GeneratedEntityAuthorizationPolicyRegistry(generatedPolicies);
+        services.AddSingleton(authorizationPolicies);
+
         services.AddScoped<IQueryExecutionService>(sp =>
         {
             var queryService = ActivatorUtilities.CreateInstance<QueryExecutionService>(sp);
-
-            var registrationType = entityAssembly.GetTypes()
-                .FirstOrDefault(t => t.Name == "DataContextEntityRegistrations");
 
             if (registrationType is not null)
             {

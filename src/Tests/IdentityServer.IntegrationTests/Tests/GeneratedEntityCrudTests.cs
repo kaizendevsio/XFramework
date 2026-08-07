@@ -14,6 +14,27 @@ namespace IdentityServer.IntegrationTests.Tests;
 public sealed class GeneratedEntityCrudTests : IntegrationTestBase
 {
     [Test]
+    public async Task GeneratedEntityRead_WithoutActor_IsUnauthorized()
+    {
+        HttpClient.DefaultRequestHeaders.Authorization = null;
+
+        var response = await HttpClient.GetAsync($"/api/identity-addresses/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task GeneratedEntityReadThroughBoltWrapper_WithoutActor_IsUnauthorized()
+    {
+        using var actorSuppression = IntegrationTestFixture.SuppressActorAccessToken();
+
+        var response = await IntegrationTestFixture.ServiceWrapper.IdentityAddress.Get(Guid.NewGuid());
+
+        response.HttpStatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Message.Should().Contain("Actor identity is required");
+    }
+
+    [Test]
     public async Task GeneratedIdentityAddressCreateAndUpdate_AssignServerTenantAndPersist()
     {
         var identity = new IdentityInformation

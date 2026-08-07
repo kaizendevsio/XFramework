@@ -9,6 +9,7 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/withdrawal-requests",
     RequireAuthorization = true,
+    AuthorizationFeature = "wallets.reporting",
     CacheDurationSeconds = 300,
     CacheKeyPrefix = "withdrawal-requests"
 )]

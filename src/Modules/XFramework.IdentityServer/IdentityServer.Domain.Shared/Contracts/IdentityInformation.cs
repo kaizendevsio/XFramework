@@ -10,7 +10,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-info",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity.users"
 )]
 public partial class IdentityInformation : BaseModel
 {

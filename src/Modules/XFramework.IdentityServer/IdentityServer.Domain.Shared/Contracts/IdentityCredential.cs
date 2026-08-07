@@ -10,7 +10,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-credentials",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity.credentials"
 )]
 public partial class IdentityCredential : BaseModel, IHasOnlineStatus
 {

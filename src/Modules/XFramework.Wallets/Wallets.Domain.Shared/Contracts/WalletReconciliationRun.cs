@@ -8,6 +8,8 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/wallet-reconciliation-runs",
     RequireAuthorization = true,
+    AuthorizationFeature = "wallets.reconciliation",
+    ReadCapability = "manage",
     CacheDurationSeconds = 30,
     CacheKeyPrefix = "wallet-reconciliation-runs"
 )]

@@ -47,6 +47,8 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // Register DataContext handler for entity query/mutation via Bolt
 builder.Services.AddDataContextHandler(typeof(Program).Assembly);
+XFramework.GeneratedServices.GeneratedEntityServiceRegistrations
+    .AddGeneratedEntityServices(builder.Services);
 
 // Rate limiting — global 100/min per IP
 builder.Services.AddXFrameworkRateLimiting();
@@ -99,6 +101,7 @@ app.MapXFrameworkHealthChecks("Wallets");
 
 // Map feature endpoints (source-generated from [MapPost/Get/...] attributes)
 app.MapGeneratedEndpoints();
+XFramework.GeneratedEndpoints.GeneratedEntityEndpointRoutes.MapGeneratedEntityEndpoints(app);
 
 // Manual endpoints with custom param binding (route params, headers)
 GetWalletEndpoint.Map(app);

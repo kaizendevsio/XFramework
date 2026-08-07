@@ -214,6 +214,37 @@ public sealed class IdentityServerTokenProviderTests
     }
 
     [Test]
+    public async Task ServiceTokenProvider_ConcurrentEquivalentRequests_CoalesceToOneAcquisition()
+    {
+        var requestCount = 0;
+        var acquisitionStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseAcquisition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var factory = CreateFactory(async (_, ct) =>
+        {
+            Interlocked.Increment(ref requestCount);
+            acquisitionStarted.TrySetResult();
+            await releaseAcquisition.Task.WaitAsync(ct);
+            return CreateTokenResponse("coalesced-token", DateTimeOffset.UtcNow.AddMinutes(5));
+        });
+        var provider = CreateServiceProvider(factory, CreateOptions());
+
+        var requests = Enumerable.Range(0, 20)
+            .Select(_ => provider.GetTokenAsync(
+                    XFrameworkServiceNames.IdentityServer,
+                    [XFrameworkServiceScopes.IdentityAdmin, "custom.scope"])
+                .AsTask())
+            .ToArray();
+        await acquisitionStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        requestCount.Should().Be(1);
+        releaseAcquisition.TrySetResult();
+        var tokens = await Task.WhenAll(requests);
+
+        tokens.Should().OnlyContain(token => token == "coalesced-token");
+        requestCount.Should().Be(1);
+    }
+
+    [Test]
     public async Task TokenProvider_ServerErrorContainingSensitiveValues_DoesNotLogThem()
     {
         const string issuedToken = "sensitive-issued-token";

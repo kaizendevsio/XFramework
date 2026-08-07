@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Security;
 using Microsoft.Extensions.Logging;
@@ -30,7 +31,11 @@ public sealed class IdentityServerHttpActorIdentityProviderTests
             GenerationId = "actor-generation",
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
             Roles = ["Admin"],
-            Capabilities = ["identity.tenants:manage"]
+            Capabilities = ["identity.tenants:manage"],
+            Attributes = new Dictionary<string, string>
+            {
+                [IdentityAuthorizationConstants.ActorAttributeIdentityVerified] = bool.TrueString
+            }
         };
         HttpRequestMessage? observedRequest = null;
         var provider = CreateProvider(async (request, ct) =>
@@ -49,6 +54,9 @@ public sealed class IdentityServerHttpActorIdentityProviderTests
         result.Identity!.TenantId.Should().Be(snapshot.TenantId);
         result.Identity.CredentialId.Should().Be(snapshot.CredentialId);
         result.Identity.Capabilities.Should().Contain("identity.tenants:manage");
+        result.Identity.Attributes.Should().Contain(
+            IdentityAuthorizationConstants.ActorAttributeIdentityVerified,
+            bool.TrueString);
         observedRequest!.RequestUri!.AbsolutePath.Should().Be("/api/auth/validate-session");
         observedRequest.Headers.Authorization!.Scheme.Should().Be("Bearer");
         observedRequest.Headers.Authorization.Parameter.Should().Be("actor-token");

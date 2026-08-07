@@ -259,6 +259,36 @@ public sealed class EntityServiceGeneratorTests
     }
 
     [Test]
+    public void GenerateService_AuthorizesEachOperationBeforeDatabaseAccess()
+    {
+        var generatedSource = RunGenerator();
+
+        generatedSource.Should().Contain("GeneratedEntityAuthorizationPolicyRegistry authorizationPolicies");
+        generatedSource.Should().Contain("_authorizationPolicies.TryGet(nameof(Widget), operation, out var policy)");
+        generatedSource.Should().Contain("GeneratedEntityAuthorizationEvaluator.Evaluate(");
+        generatedSource.Should().Contain("policy.AuthorizationFeature ?? string.Empty");
+        generatedSource.Should().NotContain("new InvocationAuthorizationPolicy");
+
+        AssertAuthorizationPrecedes(
+            generatedSource,
+            "EnsureAuthorizedAsync(GeneratedEntityOperation.Create, ct)",
+            "request.Adapt<Widget>()");
+        AssertAuthorizationPrecedes(
+            generatedSource,
+            "EnsureAuthorizedAsync(GeneratedEntityOperation.Read, ct)",
+            "_context.Set<Widget>().AsNoTracking()");
+        AssertAuthorizationPrecedes(
+            generatedSource,
+            "EnsureAuthorizedAsync(GeneratedEntityOperation.Update, ct)",
+            "_context.Set<Widget>().AsTracking()");
+        AssertAuthorizationPrecedes(
+            generatedSource,
+            "EnsureAuthorizedAsync(GeneratedEntityOperation.Delete, ct)",
+            "_context.Set<Widget>().AsTracking()",
+            useLastAuthorization: true);
+    }
+
+    [Test]
     public void GenerateService_EmitsAggregateDependencyRegistrations()
     {
         var generatedSource = RunGeneratorTree("GeneratedEntityServiceRegistrations.g.cs");
@@ -271,6 +301,21 @@ public sealed class EntityServiceGeneratorTests
 
     private static string RunGenerator()
         => RunGeneratorTree("WidgetService.g.cs");
+
+    private static void AssertAuthorizationPrecedes(
+        string generatedSource,
+        string authorizationMarker,
+        string databaseMarker,
+        bool useLastAuthorization = false)
+    {
+        var authorizationIndex = useLastAuthorization
+            ? generatedSource.LastIndexOf(authorizationMarker, StringComparison.Ordinal)
+            : generatedSource.IndexOf(authorizationMarker, StringComparison.Ordinal);
+        authorizationIndex.Should().BeGreaterThanOrEqualTo(0);
+
+        var databaseIndex = generatedSource.IndexOf(databaseMarker, authorizationIndex, StringComparison.Ordinal);
+        databaseIndex.Should().BeGreaterThan(authorizationIndex);
+    }
 
     private static string RunGeneratorTree(string generatedFileName)
     {
@@ -380,6 +425,30 @@ namespace XFramework.Core.Attributes
     {
         public EndpointType Type { get; set; } = EndpointType.Both;
         public EndpointActions Actions { get; set; } = EndpointActions.All;
+        public bool RequireAuthorization { get; set; } = true;
+        public string[]? Roles { get; set; }
+        public GeneratedActorRequirement ActorRequirement { get; set; } = GeneratedActorRequirement.Required;
+        public GeneratedTenantAccessMode TenantAccessMode { get; set; } = GeneratedTenantAccessMode.ActorTenant;
+        public string CrossTenantCapability { get; set; } = "identity.tenants:manage";
+        public string? AuthorizationFeature { get; set; }
+        public string ReadCapability { get; set; } = "view";
+        public string CreateCapability { get; set; } = "create";
+        public string UpdateCapability { get; set; } = "update";
+        public string DeleteCapability { get; set; } = "delete";
+    }
+
+    public enum GeneratedActorRequirement { Required, Optional, None }
+    public enum GeneratedTenantAccessMode { ActorTenant, DelegatedTenant, Tenantless }
+}
+
+namespace XFramework.Domain.Shared.Attributes
+{
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+    public sealed class RequireGeneratedActorAttributeAttribute(string name, string value) : Attribute
+    {
+        public string Name { get; } = name;
+        public string Value { get; } = value;
+        public XFramework.Core.Attributes.EndpointActions Actions { get; set; } = XFramework.Core.Attributes.EndpointActions.All;
     }
 }
 
@@ -405,7 +474,23 @@ namespace XFramework.Domain.Shared.Contracts.Base
 
 namespace Sample
 {
-    [GenerateEndpoints(Type = EndpointType.Both, Actions = EndpointActions.All)]
+    [XFramework.Domain.Shared.Attributes.RequireGeneratedActorAttribute(
+        "region",
+        "apac",
+        Actions = EndpointActions.Get | EndpointActions.GetList)]
+    [XFramework.Domain.Shared.Attributes.RequireGeneratedActorAttribute(
+        "clearance",
+        "elevated",
+        Actions = EndpointActions.Update)]
+    [GenerateEndpoints(
+        Type = EndpointType.Both,
+        Actions = EndpointActions.All,
+        AuthorizationFeature = "inventory.products",
+        ReadCapability = "inspect",
+        CreateCapability = "add",
+        UpdateCapability = "edit",
+        DeleteCapability = "remove",
+        Roles = ["Admin", "Auditor"])]
     public sealed class Widget : XFramework.Domain.Shared.Contracts.Base.BaseModel,
         XFramework.Domain.Shared.Contracts.Base.IAllowsGlobalTenantRows
     {
