@@ -8,7 +8,7 @@ namespace Wallets.Api.Features.Batch;
 
 public static class BatchIncrementWalletBoltEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     public static async Task<Result<BatchOperationResult>> Handle(
         BatchIncrementWalletRequest request,
         IBatchWalletService batchService,
@@ -24,7 +24,7 @@ public static class BatchIncrementWalletBoltEndpoint
 
 public static class BatchDecrementWalletBoltEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     public static async Task<Result<BatchOperationResult>> Handle(
         BatchDecrementWalletRequest request,
         IBatchWalletService batchService,
@@ -40,7 +40,7 @@ public static class BatchDecrementWalletBoltEndpoint
 
 public static class BatchTransferWalletBoltEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     public static async Task<Result<BatchOperationResult>> Handle(
         BatchTransferWalletRequest request,
         IBatchWalletService batchService,

@@ -21,6 +21,7 @@ public sealed record WalletLedgerExecutionRequest
     public IReadOnlyList<Wallet> NewWallets { get; init; } = [];
     public IReadOnlyList<object> ReadModels { get; init; } = [];
     public IReadOnlyList<WalletTransactionStateUpdateRequest> TransactionUpdates { get; init; } = [];
+    public Func<CancellationToken, Task<Result>>? TransactionalValidationAsync { get; init; }
     public Func<WalletOperation, CancellationToken, Task>? BeforeCommitAsync { get; init; }
 }
 

@@ -121,6 +121,22 @@ public sealed class WalletLedgerService(
                 return Result<WalletLedgerExecutionResult>.NotFound("One or more wallets were not found");
             }
 
+            if (request.TransactionalValidationAsync is not null)
+            {
+                var transactionValidation = await request.TransactionalValidationAsync(ct);
+                if (!transactionValidation.IsSuccess)
+                {
+                    return await RejectAndCommitAsync(
+                        transaction,
+                        request,
+                        requestHash,
+                        transactionValidation.Message ?? "Wallet operation validation failed",
+                        transactionValidation.StatusCode,
+                        null,
+                        ct);
+                }
+            }
+
             var policyResult = await policyEvaluator.EvaluateAsync(
                 new WalletPolicyEvaluationContext(request, wallets),
                 ct);
@@ -357,7 +373,8 @@ public sealed class WalletLedgerService(
         {
             return Result<WalletLedgerExecutionResult>.Failure(
                 existing.FailureMessage ?? "Wallet operation was rejected",
-                existing.Status == WalletOperationStatus.Rejected ? 403 : 409);
+                existing.FailureStatusCode ??
+                (existing.Status == WalletOperationStatus.Rejected ? 403 : 409));
         }
 
         return Result<WalletLedgerExecutionResult>.Success(
@@ -388,6 +405,7 @@ public sealed class WalletLedgerService(
             ExternalReference = request.ExternalReference,
             Reason = request.Reason,
             FailureMessage = message,
+            FailureStatusCode = statusCode,
             RiskDecision = policyDecision?.Decision,
             PolicyDecision = policyDecision?.Decision,
             PolicyDecisionJson = policyDecision?.DecisionJson,

@@ -8,12 +8,12 @@ namespace Wallets.Api.Features.Wallets.ReverseTransaction;
 
 public static class ReverseTransactionEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage])]
     [MapPost("/api/wallets/reverse-transaction", Tags = ["Wallets"],
         Summary = "Reverse a transaction",
         Description = "Reverses a single transaction or a full transfer (paired). Creates inverse transactions and updates balances.",
         RequireAuthorization = true,
-        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ReverseTransactionRequest request,

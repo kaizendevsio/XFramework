@@ -31,7 +31,7 @@ public sealed class WalletPolicyAdminService(
         {
             return Result<WalletPolicyRuleResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         }
-        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.Policy))
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.PolicyManage))
         {
             return Result<WalletPolicyRuleResponse>.Forbidden("Wallet policy capability is required");
         }
@@ -106,7 +106,7 @@ public sealed class WalletPolicyAdminService(
         {
             return Result<WalletFeeScheduleResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         }
-        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.Policy))
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.PolicyManage))
         {
             return Result<WalletFeeScheduleResponse>.Forbidden("Wallet policy capability is required");
         }

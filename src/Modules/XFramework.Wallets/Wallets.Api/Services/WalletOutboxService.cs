@@ -190,7 +190,7 @@ public sealed class WalletOutboxService(
         {
             return Result<WalletOutboxActionResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         }
-        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.Webhooks))
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.WebhooksManage))
         {
             return Result<WalletOutboxActionResponse>.Forbidden("Wallet webhook capability is required");
         }

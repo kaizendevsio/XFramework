@@ -42,7 +42,7 @@ public static class Endpoint
                 ActorRequirement = ActorRequirement.Required,
                 TenantAccessMode = TenantAccessMode.ActorTenant,
                 RequireServiceIdentity = false,
-                RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact]
+                RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update]
             },
             cancellationToken);
         if (!invocationResult.IsSuccess)

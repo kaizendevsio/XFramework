@@ -88,6 +88,9 @@ public partial class WalletOperation : BaseModel
 
     [MemoryPackOrder(24)]
     public virtual WalletOperation? OriginalOperation { get; set; }
+
+    [MemoryPackOrder(25)]
+    public int? FailureStatusCode { get; set; }
 }
 
 public class GetWalletOperationListRequest

@@ -8,12 +8,12 @@ namespace Wallets.Api.Features.Wallets.Close;
 
 public static class CloseWalletEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage])]
     [MapPost("/api/wallets/close", Tags = ["Wallets"],
         Summary = "Close a wallet",
         Description = "Closes an empty wallet, preventing future financial operations.",
         RequireAuthorization = true,
-        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         CloseWalletRequest request,

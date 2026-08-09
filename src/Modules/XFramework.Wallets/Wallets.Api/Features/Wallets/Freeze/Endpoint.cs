@@ -8,12 +8,12 @@ namespace Wallets.Api.Features.Wallets.Freeze;
 
 public static class FreezeWalletEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage])]
     [MapPost("/api/wallets/freeze", Tags = ["Wallets"],
         Summary = "Freeze a wallet",
         Description = "Freezes a wallet, preventing all financial operations (transfer, increment, decrement, convert).",
         RequireAuthorization = true,
-        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         FreezeWalletRequest request,

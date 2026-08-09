@@ -11,12 +11,12 @@ namespace Wallets.Api.Features.Wallets.ReleaseTransaction;
 /// </summary>
 public static class ReleaseTransactionEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage])]
     [MapPost("/api/wallets/release-transaction", Tags = ["Wallets"],
         Summary = "Release a held transaction",
         Description = "Releases a transaction that was previously placed on hold. Moves the amount from on-hold balances to available balances.",
         RequireAuthorization = true,
-        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ReleaseTransactionRequest request,

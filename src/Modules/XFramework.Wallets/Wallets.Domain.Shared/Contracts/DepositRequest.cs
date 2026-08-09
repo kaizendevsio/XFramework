@@ -141,6 +141,12 @@ public partial class DepositRequest : BaseModel
 
     [MemoryPackOrder(41)]
     public virtual WalletTransaction? SettlementTransaction { get; set; }
+
+    [MemoryPackOrder(42)]
+    public string? IdempotencyKey { get; set; }
+
+    [MemoryPackOrder(43)]
+    public string? RequestHash { get; set; }
 }
 
 public class CreateDepositRequestRequest

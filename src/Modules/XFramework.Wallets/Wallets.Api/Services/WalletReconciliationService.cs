@@ -21,7 +21,7 @@ public sealed class WalletReconciliationService(
         {
             return Result<WalletReconciliationRunResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         }
-        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.Reconciliation))
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.ReconciliationManage))
         {
             return Result<WalletReconciliationRunResponse>.Forbidden("Wallet reconciliation capability is required");
         }
@@ -193,7 +193,7 @@ public sealed class WalletReconciliationService(
         {
             return Result<WalletReconciliationItemResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
         }
-        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.Reconciliation))
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.ReconciliationManage))
         {
             return Result<WalletReconciliationItemResponse>.Forbidden("Wallet reconciliation capability is required");
         }

@@ -1,11 +1,11 @@
 ---
 title: "Wallets Backend Audit Revalidation"
-date: 2026-08-06
+date: 2026-08-09
 category: workflow-issues
 module: Wallets
 problem_type: security_and_backend_compliance
 component: wallets
-severity: high
+severity: medium
 status: open
 tags: [wallets, security, bolt, identityserver, ledger, ef-core, caching, testing]
 ---
@@ -14,19 +14,19 @@ tags: [wallets, security, bolt, identityserver, ledger, ef-core, caching, testin
 
 ## Audit Scope
 
-- Baseline: `origin/develop` at `08a13824b452f8f9645af69abd7bb4e6877378a9`.
+- Baseline: `origin/develop` at `eef4105429522174fd3a72af4beee5448ec6256d`, including generated authorization parity from PR #403.
 - Authority: `CLAUDE.md`, `rules/BackendGuidelines.md`, and the canonical VSA, EF Core, caching, trusted-invocation, remote `IDataContext`, and wrapper-test documents they require.
 - Method: a fresh post-IdentityServer/post-Bolt review using the `xframework-audit-module` workflow, followed by remediation and regression testing on `codex/wallets-backend-post-bolt-audit`.
 - Areas: financial authorization, actor/service/tenant propagation, Bolt and REST handlers, background/admin work, service and transport token reuse, VSA, services, EF/schema ownership, migrations, caching, validation, packages, generated reads, remote `IDataContext`, wrappers, and tests.
 
 ## Current Result
 
-**Overall grade: C-.** This remediation removes the previously confirmed Critical defects and most High defects. Two High findings remain and should be handled before Wallets is treated as a complete least-privilege financial boundary.
+**Overall grade: C+.** No Critical or High finding remains after the Wallets remediation and the shared generated-authorization rollout. The remaining Medium findings still require scale, deployment, ownership, caching, and contract work before the module should be graded production-complete.
 
 | Severity | Count |
 |---|---:|
 | Critical | 0 |
-| High | 2 |
+| High | 0 |
 | Medium | 8 |
 | Low | 3 |
 
@@ -36,27 +36,13 @@ No current Critical finding remains after this remediation pass.
 
 ## High Findings
 
-### H1. Generated Bolt and remote read paths do not enforce Wallets-specific actor capabilities
-
-Sensitive Wallets entities now restrict generated REST routes to Admin/SuperAdmin roles, for example `Wallet` and webhook audit rows (`src/Modules/XFramework.Wallets/Wallets.Domain.Shared/Contracts/Wallet.cs:7-15`; `WalletPaymentWebhookEvent.cs:7-14`). The generated REST authorization policy, however, still establishes only an actor-tenant context (`src/SourceGenerators/XFramework.SourceGenerators/EntityEndpointGenerator.cs:603-619`), and the generated entity/Bolt and remote `IDataContext` paths do not consume those REST role declarations. The manual wallet reads are owner/admin scoped, but generic tenant-scoped generated reads remain available through service wrappers and remote queries.
-
-**Impact:** an authenticated non-admin tenant actor that can invoke the generated query boundary may still read tenant-wide balances, operations, ledger entries, outbox payloads, webhook payloads, and provider diagnostics despite the REST role restriction.
-
-**Missing coverage:** add a generated-handler and remote-`IDataContext` denial matrix for an ordinary actor, plus a capability-aware generated-endpoint contract shared by REST and Bolt.
-
-### H2. Cumulative refund validation is not serialized with refund settlement
-
-Case resolution now requires the policy-management capability, an independent decider, a completed original operation, a linked transaction when supplied, and a refund amount within the remaining debited amount (`src/Modules/XFramework.Wallets/Wallets.Api/Services/WalletWorkflowService.cs:1198-1236,1304-1374`). The `alreadyRefunded` sum is still read before `WalletLedgerService.ExecuteAsync` starts its serializable transaction and locks the wallet (`WalletWorkflowService.cs:1360-1372`; `WalletLedgerService.cs:44-119`).
-
-**Impact:** two independently approved refund cases can both validate against the same remaining amount before either settlement is visible. Depending on transaction timing, both may settle and over-refund the original debit.
-
-**Missing coverage:** add a concurrent partial-refund test and move original-operation/refundable-balance validation behind a lock inside the same transaction that writes the refund operation and postings.
+No current High finding remains after this revalidation.
 
 ## Medium Findings
 
 ### M1. Wallets applies migrations during application startup
 
-`src/Modules/XFramework.Wallets/Wallets.Api/Program.cs:94` calls `EnsureDatabase<AppDbContext>()`, which can run migrations from each service replica.
+`src/Modules/XFramework.Wallets/Wallets.Api/Program.cs:96` calls `EnsureDatabase<AppDbContext>()`, which can run migrations from each service replica.
 
 **Impact:** replicas can race schema changes and bypass the migration-runner deployment authority.
 
@@ -64,7 +50,7 @@ Case resolution now requires the policy-management capability, an independent de
 
 ### M2. Reporting and reconciliation retain unbounded and N+1 query paths
 
-Statements materialize all matching ledger entries (`WalletWorkflowService.cs:1377-1412`), settlement reporting loads deposit and withdrawal sets before combining/paging (`:1728-1821`), and reconciliation queries snapshot/ledger state per wallet (`WalletReconciliationService.cs:42-79`).
+Statements materialize all matching ledger entries (`WalletWorkflowService.cs:1404-1440`), settlement reporting loads deposit and withdrawal sets before combining/paging (`:1755-1845`), and reconciliation queries snapshot/ledger state per wallet (`WalletReconciliationService.cs:42-79`).
 
 **Impact:** large tenants can cause high memory use, excessive commands, and slow financial reports.
 
@@ -88,7 +74,7 @@ Wallets directly references `Payments.Core` (`src/Modules/XFramework.Wallets/Wal
 
 ### M5. Advanced features remain concentrated outside VSA slices
 
-`Features/AdvancedWallets/Endpoint.cs` contains 274 lines of unrelated workflows, while `WalletWorkflowService.cs` is 2,779 lines. Boundary validators now cover the principal advanced mutation requests (`Features/AdvancedWallets/Validators.cs`), but ownership remains broad.
+`Features/AdvancedWallets/Endpoint.cs` contains 274 lines of unrelated workflows, while `WalletWorkflowService.cs` is 2,806 lines. Boundary validators now cover the principal advanced mutation requests (`Features/AdvancedWallets/Validators.cs`), but ownership remains broad.
 
 **Impact:** authorization, validation, and transaction changes have a large review and regression surface.
 
@@ -104,7 +90,7 @@ Wallet entities declare `CacheDurationSeconds` and `CacheKeyPrefix`, for example
 
 ### M7. OpenAPI remains partial and coupled to persistence contracts
 
-Wallets filters the OpenAPI document to selected DTO-backed routes (`src/Modules/XFramework.Wallets/Wallets.Api/Program.cs:29-43`) because generated EF entity schemas contain navigation cycles.
+Wallets filters the OpenAPI document to selected DTO-backed routes (`src/Modules/XFramework.Wallets/Wallets.Api/Program.cs:26-43`) because generated EF entity schemas contain navigation cycles.
 
 **Impact:** consumers cannot rely on a complete Wallets API contract.
 
@@ -112,7 +98,7 @@ Wallets filters the OpenAPI document to selected DTO-backed routes (`src/Modules
 
 ### M8. Integration tests do not run production IdentityServer validation
 
-The fixture exercises Bolt transport, trusted actor/service envelopes, wrapper calls, PostgreSQL, and migrations, but replaces IdentityServer validation with test providers (`src/Tests/Wallets.IntegrationTests/Infrastructure/WalletsTestFixture.cs:37-120,250-288`). Static contract filters also start Testcontainers because the assembly-wide fixture is unconditional (`:37,97-104`).
+The fixture exercises Bolt transport, trusted actor/service envelopes, wrapper calls, PostgreSQL, and migrations, but replaces IdentityServer validation with test providers (`src/Tests/Wallets.IntegrationTests/Infrastructure/WalletsTestFixture.cs:37-130,260-298`). Static contract filters also start Testcontainers because the assembly-wide fixture is unconditional (`:37,101-110`).
 
 **Impact:** wrapper tests do not prove revoked-session, production audience/scope, or live capability-resolution behavior, and static-only tests still require Docker.
 
@@ -136,27 +122,31 @@ Wallets financial entities remain read-only at the generated contract, but `src/
 
 ## Resolved Or No Longer Applicable Findings
 
-1. **Wallet event leakage is fixed.** The publisher requires tenant scope, and event retrieval resolves trusted tenant/actor context and limits ordinary actors to their own credential. Two-tenant regression coverage is included.
-2. **Owner-created arbitrary refunds are blocked.** Resolution requires policy management, an independent decider, a completed original operation, optional transaction linkage, and remaining-refundable-amount validation. H2 records the remaining concurrency edge.
-3. **Concurrent withdrawal approval no longer duplicates provider payout.** Approval atomically claims `Approved -> Settling`; only the winner invokes the provider, while hold replay reloads current workflow state.
-4. **The public webhook route is HMAC-only again.** The HTTP endpoint is explicitly anonymous and tenantless; the internal Bolt path is separate and requires Portal, `wallets.admin`, `tenant.target`, and service-target tenant context.
-5. **Invalid signatures cannot select an audit tenant.** Rejected events are written only when the provider is configured to a tenant, and raw payloads are capped at 256 KiB.
-6. **Wallet administrative handlers now require canonical IdentityServer capabilities.** Values follow `{module}[.{subfeature}]:{view|create|update|delete|manage}`. Policy, outbox, reconciliation, approvals, workflow administration, reports, and core money handlers declare explicit capabilities; sensitive services also enforce them internally.
-7. **Deposit and withdrawal creation is durably idempotent.** Tenant-scoped unique keys and request hashes replay identical requests and reject changed payloads. Migration `20260805170822_WalletWorkflowCreateIdempotency` contains only the four intended columns and two indexes.
-8. **Batch requests are externally idempotent.** A top-level key is required; all-or-nothing mode replays the batch operation and partial mode derives stable per-item keys.
-9. **Rejected financial attempts are persisted.** Ledger policy/approval rejection creates a rejected operation with request hash and decision metadata, without postings or outbox publication.
-10. **Manual wallet reads are owner/admin scoped.** Wallet-by-ID and credential queries use trusted actor context instead of client authority.
-11. **Advanced mutation validators now cover workflows, webhooks, cases, and batch requests.** Validation remains at the generated endpoint boundary and is backed by integration tests.
-12. **Service and Bolt transport token acquisition remains cached and burst-controlled.** Independent singleton providers use per-key caches, refresh skew, single-flight acquisition, timeout, and failure backoff.
-13. **Generated financial mutations remain sealed.** Wallet financial entities expose read actions only and are not allowlisted for remote mutation.
-14. **Ledger and outbox safety remains intact.** Financial execution uses serializable transactions, deterministic wallet locks, balanced postings, snapshots, tenant-scoped request-hash replay, and atomic outbox creation.
+1. **Generated authorization is now consistent across REST, generated services/Bolt wrappers, and remote `IDataContext`.** PR #403 introduced a server-owned generated policy registry and centralized enforcement. Wallets declares exact capability, feature, endpoint-type, and route metadata for every remotely exposed entity and verifies the map with a completeness guard (`GeneratedEntityAuthorizationCompletenessTests.cs:16`). Tenant-wide generated `Wallet` and `WalletAddress` reads require `wallets.reporting:view` (`Wallet.cs:12`; `WalletAddress.cs:12`), while owner-facing custom reads retain their ownership checks. Runtime coverage proves `wallets:view` cannot access generated tenant-wide wallet reads through the wrapper or remote query (`DataContextTests.cs:77`).
+2. **Cumulative refund settlement and case decisions are transactionally guarded.** `WalletLedgerExecutionRequest` exposes a transaction-scoped validation callback (`IWalletLedgerService.cs:24`), which executes after deterministic wallet locking and before policy evaluation or postings (`WalletLedgerService.cs:124-140`). Approval locks and reloads the case and original operation, then computes completed refunds from ledger entries inside the serializable ledger transaction; rejection uses an atomic conditional transition so it cannot overwrite a completed settlement (`WalletWorkflowService.cs:1222-1415`). PostgreSQL-backed tests cover competing cumulative refunds, approve-versus-reject consistency, and rejected-operation replay without postings or outbox messages (`WalletAdvancedSystemTests.cs:1264-1530`).
+3. **Wallet event leakage is fixed.** The publisher requires tenant scope, and event retrieval resolves trusted tenant/actor context and limits ordinary actors to their own credential. Two-tenant regression coverage is included.
+4. **Owner-created arbitrary refunds are blocked.** Resolution requires policy management, an independent decider, a completed original operation, optional transaction linkage, and remaining-refundable-amount validation.
+5. **Concurrent withdrawal approval no longer duplicates provider payout.** Approval atomically claims `Approved -> Settling`; only the winner invokes the provider, while hold replay reloads current workflow state.
+6. **The public webhook route is HMAC-only again.** The HTTP endpoint is explicitly anonymous and tenantless; the internal Bolt path is separate and requires Portal, `wallets.admin`, `tenant.target`, and service-target tenant context.
+7. **Invalid signatures cannot select an audit tenant.** Rejected events are written only when the provider is configured to a tenant, and raw payloads are capped at 256 KiB.
+8. **Wallet administrative handlers now require canonical IdentityServer capabilities.** Values follow `{module}[.{subfeature}]:{view|create|update|delete|manage}`. Policy, outbox, reconciliation, approvals, workflow administration, reports, and core money handlers declare explicit capabilities; sensitive services also enforce them internally.
+9. **Deposit and withdrawal creation is durably idempotent.** Tenant-scoped unique keys and request hashes replay identical requests and reject changed payloads. Migration `20260805170822_WalletWorkflowCreateIdempotency` contains only the four intended columns and two indexes.
+10. **Batch requests are externally idempotent.** A top-level key is required; all-or-nothing mode replays the batch operation and partial mode derives stable per-item keys.
+11. **Rejected financial attempts are persisted and replay faithfully.** Ledger policy/approval/transactional validation rejection creates a rejected operation with request hash, decision metadata, and original HTTP failure status, without postings or outbox publication. Migration `20260809092233_AddWalletOperationFailureStatusCode` adds only the nullable replay-status column.
+12. **Manual wallet reads are owner/admin scoped.** Wallet-by-ID and credential queries use trusted actor context instead of client authority.
+13. **Advanced mutation validators now cover workflows, webhooks, cases, and batch requests.** Validation remains at the generated endpoint boundary and is backed by integration tests.
+14. **Service and Bolt transport token acquisition remains cached and burst-controlled.** Independent singleton providers use per-key caches, refresh skew, single-flight acquisition, timeout, and failure backoff.
+15. **Generated financial mutations remain sealed.** Wallet financial entities expose read actions only and are not allowlisted for remote mutation.
+16. **Ledger and outbox safety remains intact.** Financial execution uses serializable transactions, deterministic wallet locks, balanced postings, snapshots, tenant-scoped request-hash replay, and atomic outbox creation.
 
 ## Verification Evidence
 
-- `dotnet test src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj -m:1 /nr:false`: passed 103/103 against PostgreSQL through the `xeon-dev` Docker context.
-- Focused webhook/outbox/reconciliation wrapper test: passed 1/1.
+- `dotnet build src/Modules/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj -m:1 /nr:false -v:minimal`: passed with 0 warnings and 0 errors.
+- `dotnet build src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj -m:1 /nr:false -v:minimal`: passed with 0 warnings and 0 errors.
+- `dotnet test src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj -m:1 /nr:false`: passed 111/111 against PostgreSQL through a loopback-only SSH/socat tunnel to the `xeon-dev` Docker context.
+- Focused generated-authorization, cumulative-refund, case-decision, and rejected-replay tests: passed 5/5.
 - `git diff --check`: passed.
-- The EF migration was generated with EF Core tooling and applied successfully by the integration fixture. It contains only deposit/withdrawal idempotency columns and tenant-scoped unique indexes.
+- EF migrations were generated with EF Core tooling and applied successfully by the integration fixture. The latest migration adds only `WalletOperation.FailureStatusCode` for durable response replay.
 - `dotnet ef migrations has-pending-model-changes` through `XFramework.MigrationRunner`: passed with no pending model changes.
 - No service was deployed or restarted.
 

@@ -16,9 +16,9 @@ public static class CreateWalletEndpoint
         Summary = "Create a new wallet",
         Description = "Creates a new wallet for a credential with the specified wallet type. Automatically generates a unique account number.",
         RequireAuthorization = true,
-        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update],
         ExcludeFromOpenApi = true)]
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     public static async Task<Result<WalletResponse>> Handle(
         CreateWalletRequest request,
         IWalletOperationsService walletService,

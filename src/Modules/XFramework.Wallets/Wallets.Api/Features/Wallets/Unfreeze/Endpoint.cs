@@ -8,12 +8,12 @@ namespace Wallets.Api.Features.Wallets.Unfreeze;
 
 public static class UnfreezeWalletEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage])]
     [MapPost("/api/wallets/unfreeze", Tags = ["Wallets"],
         Summary = "Unfreeze a wallet",
         Description = "Unfreezes a wallet, restoring it to Active status and allowing financial operations.",
         RequireAuthorization = true,
-        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Admin],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         UnfreezeWalletRequest request,

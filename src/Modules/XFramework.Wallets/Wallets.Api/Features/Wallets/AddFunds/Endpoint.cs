@@ -10,12 +10,12 @@ namespace Wallets.Api.Features.Wallets.AddFunds;
 /// </summary>
 public static class AddFundsEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact])]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     [MapPost("/api/wallets/add-funds", Tags = ["Wallets"],
         Summary = "Add funds to a wallet",
         Description = "Increments (adds to) a wallet's balance. Supports both immediate and on-hold increments. Automatically creates wallet if WalletTypeId is provided and wallet doesn't exist.",
         RequireAuthorization = true,
-        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Transact],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         IncrementWalletRequest request,

@@ -1199,7 +1199,7 @@ public sealed class WalletWorkflowService(
             return Result<WalletCaseResponse>.Failure(authorization.Message!, authorization.StatusCode);
         }
 
-        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.Policy))
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.PolicyManage))
         {
             return Result<WalletCaseResponse>.Forbidden("Wallet policy capability is required to resolve cases");
         }
@@ -1221,17 +1221,24 @@ public sealed class WalletWorkflowService(
 
         if (!request.Approve)
         {
-            walletCase.Status = WalletCaseStatus.Rejected;
-            walletCase.DeciderCredentialId = deciderCredentialId;
-            walletCase.ResolvedAt = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync(ct);
-            return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, "Wallet case rejected"));
-        }
+            var resolvedAt = DateTime.UtcNow;
+            var rejected = await dbContext.Set<WalletCase>()
+                .IgnoreQueryFilters()
+                .Where(x =>
+                    x.Id == walletCase.Id &&
+                    x.TenantId == walletCase.TenantId &&
+                    !x.IsDeleted &&
+                    x.Status != WalletCaseStatus.Resolved &&
+                    x.Status != WalletCaseStatus.Rejected)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, WalletCaseStatus.Rejected)
+                    .SetProperty(x => x.DeciderCredentialId, deciderCredentialId)
+                    .SetProperty(x => x.ResolvedAt, resolvedAt)
+                    .SetProperty(x => x.ModifiedAt, resolvedAt), ct);
 
-        var originalValidation = await ValidateOriginalCaseReferenceAsync(walletCase, ct);
-        if (!originalValidation.IsSuccess)
-        {
-            return Result<WalletCaseResponse>.Failure(originalValidation.Message!, originalValidation.StatusCode);
+            await dbContext.Entry(walletCase).ReloadAsync(ct);
+            var message = rejected == 1 ? "Wallet case rejected" : "Wallet case already decided";
+            return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, message));
         }
 
         var credit = walletCase.CaseType is WalletCaseType.Refund;
@@ -1283,6 +1290,8 @@ public sealed class WalletWorkflowService(
                     Description = $"{walletCase.CaseType} settlement"
                 }
             ],
+            TransactionalValidationAsync = validationCt =>
+                ValidateOriginalCaseReferenceInTransactionAsync(walletCase, validationCt),
             BeforeCommitAsync = (operation, _) =>
             {
                 walletCase.Status = WalletCaseStatus.Resolved;
@@ -1301,12 +1310,38 @@ public sealed class WalletWorkflowService(
         return Result<WalletCaseResponse>.Success(ToCaseResponse(walletCase, "Wallet case resolved"));
     }
 
-    private async Task<Result> ValidateOriginalCaseReferenceAsync(WalletCase walletCase, CancellationToken ct)
+    private async Task<Result> ValidateOriginalCaseReferenceInTransactionAsync(
+        WalletCase walletCase,
+        CancellationToken ct)
     {
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT "ID"
+            FROM "Wallet"."WalletCase"
+            WHERE "TenantId" = {walletCase.TenantId}
+              AND "IsDeleted" = false
+              AND "ID" = {walletCase.Id}
+            FOR UPDATE
+            """, ct);
+        await dbContext.Entry(walletCase).ReloadAsync(ct);
+
+        if (walletCase.Status is WalletCaseStatus.Resolved or WalletCaseStatus.Rejected)
+        {
+            return Result.Conflict("Wallet case has already been decided");
+        }
+
         if (!walletCase.OriginalOperationId.HasValue)
         {
             return Result.Failure("Original wallet operation is required", 400);
         }
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT "ID"
+            FROM "Wallet"."WalletOperation"
+            WHERE "TenantId" = {walletCase.TenantId}
+              AND "IsDeleted" = false
+              AND "ID" = {walletCase.OriginalOperationId.Value}
+            FOR UPDATE
+            """, ct);
 
         var originalOperationExists = await dbContext.Set<WalletOperation>()
             .IgnoreQueryFilters()
@@ -1357,16 +1392,21 @@ public sealed class WalletWorkflowService(
                 x.Direction == WalletLedgerDirection.Debit)
             .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
 
-        var alreadyRefunded = await dbContext.Set<WalletCase>()
+        var alreadyRefunded = await dbContext.Set<WalletLedgerEntry>()
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(x =>
                 x.TenantId == walletCase.TenantId &&
                 !x.IsDeleted &&
-                x.Id != walletCase.Id &&
-                x.CaseType == WalletCaseType.Refund &&
-                x.Status == WalletCaseStatus.Resolved &&
-                x.OriginalOperationId == walletCase.OriginalOperationId)
+                x.WalletId == walletCase.WalletId &&
+                x.BalanceBucket == WalletBalanceBucket.Available &&
+                x.Direction == WalletLedgerDirection.Credit &&
+                x.EntryKind == WalletLedgerEntryKind.Refund &&
+                x.Operation.TenantId == walletCase.TenantId &&
+                !x.Operation.IsDeleted &&
+                x.Operation.Status == WalletOperationStatus.Completed &&
+                x.Operation.OperationType == WalletOperationType.Refund &&
+                x.Operation.OriginalOperationId == walletCase.OriginalOperationId)
             .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
 
         return walletCase.Amount > 0 && walletCase.Amount <= refundableAmount - alreadyRefunded
