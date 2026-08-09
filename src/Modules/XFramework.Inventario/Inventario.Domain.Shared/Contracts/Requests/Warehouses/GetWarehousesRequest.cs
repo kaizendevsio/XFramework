@@ -11,4 +11,7 @@ using TResponse = QueryResponse<List<Warehouse>>;
 [MemoryPackable]
 public partial record GetWarehousesRequest : RequestBase,
     IQuery<TResponse>,
-    IBoltRequest<TRequest, TResponse>;
+    IBoltRequest<TRequest, TResponse>
+{
+    public Guid? Id { get; init; }
+}

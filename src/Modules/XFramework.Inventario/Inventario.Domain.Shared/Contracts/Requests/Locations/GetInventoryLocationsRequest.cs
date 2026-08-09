@@ -14,4 +14,5 @@ public partial record GetInventoryLocationsRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid? WarehouseId { get; init; }
+    public Guid? Id { get; init; }
 }
