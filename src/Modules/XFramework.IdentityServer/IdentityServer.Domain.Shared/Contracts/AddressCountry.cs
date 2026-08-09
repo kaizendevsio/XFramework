@@ -8,7 +8,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/address-countries",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity.addresses"
 )]
 public partial class AddressCountry : BaseModel
 {

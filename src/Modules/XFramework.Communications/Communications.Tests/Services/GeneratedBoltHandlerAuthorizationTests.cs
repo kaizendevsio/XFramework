@@ -278,6 +278,13 @@ public sealed class GeneratedBoltHandlerAuthorizationTests
             string? declaredCapability,
             CancellationToken ct = default) =>
             Task.FromResult(Result.Success());
+
+        public Task<Result> EnsureGeneratedEntityAllowedAsync(
+            string authorizationFeature,
+            string capability,
+            bool requiresTenant,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result.Success());
     }
 
     private static BoltClient CreateClient() =>

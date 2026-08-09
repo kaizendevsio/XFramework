@@ -57,7 +57,8 @@ public class WalletsTestFixture
         Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac"),
         DefaultActorCredentialId,
         Guid.Parse("00000000-0000-0000-0000-000000000832"),
-        DefaultActorSessionId);
+        DefaultActorSessionId,
+        WalletAuthorizationCapabilities.All);
 
     public static string ConnectionString { get; private set; } = null!;
     public static string BoltUrl => "http://localhost:17100";
@@ -77,7 +78,8 @@ public class WalletsTestFixture
             credentialId,
             Guid.NewGuid(),
             Guid.NewGuid(),
-            privileged ? ["Admin"] : []);
+            privileged ? ["Admin"] : [],
+            privileged ? WalletAuthorizationCapabilities.All : []);
         return TestInvocationActorTokenScope.Push(token);
     }
 
@@ -213,6 +215,8 @@ public class WalletsTestFixture
             InvocationIdentity,
             XFrameworkServiceNames.Wallets);
         builder.Services.AddDataContextHandler(typeof(Wallets.Api.Services.WalletOperationsService).Assembly);
+        XFramework.GeneratedServices.GeneratedEntityServiceRegistrations
+            .AddGeneratedEntityServices(builder.Services);
 
         var app = (WebApplication)builder.Build();
         RegisterWalletsBoltHandlers(app);
@@ -222,6 +226,7 @@ public class WalletsTestFixture
 
         // Map source-generated endpoints
         Wallets.Api.Generated.GeneratedEndpointRoutes.MapGeneratedEndpoints(app);
+        XFramework.GeneratedEndpoints.GeneratedEntityEndpointRoutes.MapGeneratedEntityEndpoints(app);
 
         // Manual endpoints
         Wallets.Api.Features.Wallets.Get.GetWalletEndpoint.Map(app);
@@ -554,7 +559,12 @@ public class WalletsTestFixture
                 credentialId ?? DefaultActorCredentialId,
                 identityId,
                 DefaultActorSessionId,
-                roles);
+                roles,
+                roles.Any(role =>
+                    string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+                    ? WalletAuthorizationCapabilities.All
+                    : []);
             Request.Headers.Authorization = $"Bearer {actorToken}";
 
             return Task.FromResult(AuthenticateResult.Success(ticket));

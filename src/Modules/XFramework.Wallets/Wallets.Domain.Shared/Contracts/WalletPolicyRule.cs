@@ -8,6 +8,8 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/wallet-policy-rules",
     RequireAuthorization = true,
+    AuthorizationFeature = "wallets.policy",
+    ReadCapability = "manage",
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "wallet-policy-rules"
 )]

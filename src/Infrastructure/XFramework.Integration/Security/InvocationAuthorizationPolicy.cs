@@ -23,7 +23,10 @@ public sealed record InvocationAuthorizationPolicy
     public bool RequireServiceIdentity { get; init; } = true;
     public IReadOnlyCollection<string> RequiredServiceScopes { get; init; } = [];
     public IReadOnlyCollection<string> AllowedServiceCallers { get; init; } = [];
+    public IReadOnlyCollection<string> RequiredActorRoles { get; init; } = [];
     public IReadOnlyCollection<string> RequiredActorCapabilities { get; init; } = [];
     public IReadOnlyCollection<string> RequiredCrossTenantActorCapabilities { get; init; } = [];
+    public IReadOnlyDictionary<string, string> RequiredActorAttributes { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public bool AllowAnonymous { get; init; }
 }

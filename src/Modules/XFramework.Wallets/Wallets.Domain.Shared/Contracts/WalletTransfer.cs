@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
 using XFramework.Domain.Shared.Attributes;
 
 namespace Wallets.Domain.Shared.Contracts;
@@ -9,6 +9,7 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/wallet-transfers",
     RequireAuthorization = true,
+    AuthorizationFeature = "wallets.reporting",
     CacheDurationSeconds = 300,
     CacheKeyPrefix = "wallet-transfers"
 )]

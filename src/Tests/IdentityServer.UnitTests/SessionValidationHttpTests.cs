@@ -1,5 +1,6 @@
 using FluentAssertions;
 using IdentityServer.Api.Features.Auth.ValidateSession;
+using IdentityServer.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using Microsoft.AspNetCore.Http;
 using NUnit.Framework;
@@ -29,7 +30,11 @@ public sealed class SessionValidationHttpTests
                 new HashSet<string> { roleTypeId.ToString("D") },
                 new HashSet<string> { "identity.users.view" },
                 "g1",
-                expiresAt),
+                expiresAt,
+                new Dictionary<string, string>
+                {
+                    [IdentityAuthorizationConstants.ActorAttributeIdentityVerified] = bool.TrueString
+                }),
             Service: null,
             EffectiveTenantId: tenantId,
             RequestedTargetTenantId: null,
@@ -47,6 +52,9 @@ public sealed class SessionValidationHttpTests
         result.Data.SessionId.Should().Be(sessionId);
         result.Data.Roles.Should().Equal(roleTypeId.ToString("D"));
         result.Data.Capabilities.Should().Equal("identity.users.view");
+        result.Data.Attributes.Should().Contain(
+            IdentityAuthorizationConstants.ActorAttributeIdentityVerified,
+            bool.TrueString);
         result.Data.GenerationId.Should().Be("g1");
         result.Data.ExpiresAtUtc.Should().Be(expiresAt.UtcDateTime);
         result.Data.IsValid.Should().BeTrue();

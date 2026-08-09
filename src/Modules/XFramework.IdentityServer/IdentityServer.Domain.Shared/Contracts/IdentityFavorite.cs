@@ -9,7 +9,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.All,
     RoutePrefix = "api/identity-favorites",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity"
 )]
 public partial class IdentityFavorite : BaseModel
 {

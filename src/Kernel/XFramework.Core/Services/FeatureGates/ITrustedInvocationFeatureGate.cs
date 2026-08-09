@@ -9,4 +9,10 @@ public interface ITrustedInvocationFeatureGate
         string httpMethod,
         string? declaredCapability,
         CancellationToken ct = default);
+
+    Task<Result> EnsureGeneratedEntityAllowedAsync(
+        string authorizationFeature,
+        string capability,
+        bool requiresTenant,
+        CancellationToken ct = default);
 }

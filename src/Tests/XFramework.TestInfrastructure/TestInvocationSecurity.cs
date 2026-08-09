@@ -131,7 +131,8 @@ public sealed record TestInvocationIdentityOptions(
     Guid TenantId,
     Guid CredentialId,
     Guid IdentityId,
-    Guid SessionId);
+    Guid SessionId,
+    IReadOnlyCollection<string>? ActorCapabilities = null);
 
 public static class TestInvocationIdentityExtensions
 {
@@ -390,7 +391,11 @@ internal sealed class TestActorIdentityProvider(TestInvocationIdentityOptions op
             options.SessionId,
             new HashSet<string>(["IntegrationAdministrator", "Admin"], StringComparer.OrdinalIgnoreCase),
             new HashSet<string>(
-                ["identity.tenants:manage", "inventario.override_expired_lot"],
+                [
+                    "identity.tenants:manage",
+                    "inventario.override_expired_lot",
+                    .. (options.ActorCapabilities ?? [])
+                ],
                 StringComparer.OrdinalIgnoreCase),
             "integration-tests-g1",
             DateTimeOffset.UtcNow.AddHours(8))));

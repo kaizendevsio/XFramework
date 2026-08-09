@@ -8,7 +8,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-verification-types",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity.verifications"
 )]
 public partial class IdentityVerificationType : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows
 {

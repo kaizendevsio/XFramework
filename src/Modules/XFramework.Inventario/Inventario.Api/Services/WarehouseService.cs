@@ -30,8 +30,13 @@ public sealed class WarehouseService(
         if (!featureResult.IsSuccess)
             return Result<List<Warehouse>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
-        var warehouses = await dataContext.Query<Warehouse>()
-            .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted)
+        var query = dataContext.Query<Warehouse>()
+            .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
+
+        if (request.Id is { } id)
+            query = query.Where(x => x.Id == id);
+
+        var warehouses = await query
             .OrderBy(x => x.Code)
             .Take(200)
             .ToListAsync(ct);
@@ -103,6 +108,9 @@ public sealed class WarehouseService(
 
         if (request.WarehouseId is { } id)
             query = query.Where(x => x.WarehouseId == id);
+
+        if (request.Id is { } locationId)
+            query = query.Where(x => x.Id == locationId);
 
         var locations = await query
             .OrderBy(x => x.Code)

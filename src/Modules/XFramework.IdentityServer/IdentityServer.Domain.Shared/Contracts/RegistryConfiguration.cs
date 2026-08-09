@@ -10,6 +10,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Actions = EndpointActions.All,
     RoutePrefix = "api/registry-configurations",
     RequireAuthorization = true,
+    AuthorizationFeature = "identity",
     ResponseProperties = ["Id", "Key", "GroupId", "Unit", "IsEnabled", "CreatedAt", "ModifiedAt", "TenantId", "ConcurrencyStamp"]
 )]
 public partial class RegistryConfiguration : BaseModel

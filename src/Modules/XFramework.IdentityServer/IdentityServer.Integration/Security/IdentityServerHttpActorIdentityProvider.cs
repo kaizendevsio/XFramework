@@ -91,7 +91,8 @@ public sealed class IdentityServerHttpActorIdentityProvider(
                 snapshot.Roles.ToHashSet(StringComparer.OrdinalIgnoreCase),
                 snapshot.Capabilities.ToHashSet(StringComparer.OrdinalIgnoreCase),
                 snapshot.GenerationId,
-                new DateTimeOffset(DateTime.SpecifyKind(snapshot.ExpiresAtUtc, DateTimeKind.Utc))));
+                new DateTimeOffset(DateTime.SpecifyKind(snapshot.ExpiresAtUtc, DateTimeKind.Utc)),
+                snapshot.Attributes));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

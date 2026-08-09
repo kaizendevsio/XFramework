@@ -8,7 +8,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-role-type-groups",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity.roles"
 )]
 public partial class IdentityRoleTypeGroup : BaseModel, IHasSystemReferenceId
 {

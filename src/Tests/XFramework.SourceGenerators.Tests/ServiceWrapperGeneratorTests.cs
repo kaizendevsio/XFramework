@@ -117,6 +117,80 @@ public sealed class ServiceWrapperGeneratorTests
     }
 
     [Test]
+    public void GenerateWrapper_PropagatesActorTokenWithoutClientOwnedEntityPolicyOrScopes()
+    {
+        var domainReference = CreateReference(
+            "Inventario.Domain.Shared",
+            """
+            namespace XFramework.Inventario.Domain.Shared.Contracts
+            {
+                using XFramework.Domain.Shared.Attributes;
+                using XFramework.Domain.Shared.Contracts.Base;
+
+                [GenerateEndpoints(
+                    Actions = EndpointActions.All,
+                    AuthorizationFeature = "inventario.products",
+                    ReadCapability = "inspect",
+                    CreateCapability = "add")]
+                public sealed class Product : BaseModel;
+            }
+            """);
+
+        var generatedSource = RunGenerator(
+            "Inventario.Integration",
+            domainReference,
+            new Dictionary<string, string>());
+
+        generatedSource.Should().Contain("IActorAccessTokenProvider actorAccessTokenProvider");
+        generatedSource.Should().Contain("_actorAccessTokenProvider = actorAccessTokenProvider;");
+        generatedSource.Should().Contain(
+            "BoltInvocationEnvelopeFactory.CreateAsync(",
+            Exactly.Times(6));
+        generatedSource.Should().Contain("XFrameworkServiceScopes.DataContextQuery");
+        generatedSource.Should().Contain("XFrameworkServiceScopes.DataContextMutate");
+        generatedSource.Should().Contain("XFrameworkServiceScopes.TenantTarget");
+        generatedSource.Should().Contain("MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span)");
+        generatedSource.Should().Contain("HttpStatusCode = status");
+        generatedSource.Should().Contain("Message = failure?.Message");
+
+        generatedSource.Should().NotContain("inventario.products");
+        generatedSource.Should().NotContain("RequiredActorRoles");
+        generatedSource.Should().NotContain("RequiredActorCapabilities");
+        generatedSource.Should().NotContain("RequiredActorAttributes");
+        generatedSource.Should().NotContain("AuthorizationFeature");
+        generatedSource.Should().NotContain("inventario.products:inspect");
+        generatedSource.Should().NotContain("inventario.products:add");
+    }
+
+    [Test]
+    public void GenerateWrapper_RestOnlyEntityDoesNotGetBoltCrudWrapper()
+    {
+        var domainReference = CreateReference(
+            "Inventario.Domain.Shared",
+            """
+            namespace XFramework.Inventario.Domain.Shared.Contracts
+            {
+                using XFramework.Domain.Shared.Attributes;
+                using XFramework.Domain.Shared.Contracts.Base;
+
+                [GenerateEndpoints(Type = EndpointType.Rest)]
+                public sealed class RestOnlyProduct : BaseModel;
+
+                [GenerateEndpoints(Type = EndpointType.Both)]
+                public sealed class BoltProduct : BaseModel;
+            }
+            """);
+
+        var generatedSource = RunGenerator(
+            "Inventario.Integration",
+            domainReference,
+            new Dictionary<string, string>());
+
+        generatedSource.Should().Contain("public IBoltProductCrudService BoltProduct { get; init; }");
+        generatedSource.Should().NotContain("RestOnlyProductCrudService");
+    }
+
+    [Test]
     public void GenerateWrapper_TypedCommandResponse_PreservesTypedPayload()
     {
         var domainReference = CreateReference(
@@ -339,10 +413,7 @@ public sealed class ServiceWrapperGeneratorTests
 
     namespace XFramework.Domain.Shared.Attributes
     {
-        public enum EndpointType
-        {
-            Rest = 1
-        }
+        public enum EndpointType { Service = 1, Rest = 2, Both = 3 }
 
         [Flags]
         public enum EndpointActions
@@ -359,9 +430,14 @@ public sealed class ServiceWrapperGeneratorTests
         [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
         public sealed class GenerateEndpointsAttribute : Attribute
         {
-            public EndpointType Type { get; set; } = EndpointType.Rest;
+            public EndpointType Type { get; set; } = EndpointType.Both;
             public EndpointActions Actions { get; set; } = EndpointActions.All;
             public bool RequireAuthorization { get; set; }
+            public string? AuthorizationFeature { get; set; }
+            public string ReadCapability { get; set; } = "view";
+            public string CreateCapability { get; set; } = "create";
+            public string UpdateCapability { get; set; } = "update";
+            public string DeleteCapability { get; set; } = "delete";
         }
     }
 

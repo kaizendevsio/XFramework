@@ -8,6 +8,8 @@ namespace Wallets.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/wallet-payment-webhook-events",
     RequireAuthorization = true,
+    AuthorizationFeature = "wallets.webhooks",
+    ReadCapability = "manage",
     CacheDurationSeconds = 30,
     CacheKeyPrefix = "wallet-payment-webhook-events"
 )]

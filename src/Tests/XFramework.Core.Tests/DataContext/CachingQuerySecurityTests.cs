@@ -132,7 +132,36 @@ public sealed partial class CachingQuerySecurityTests
     }
 
     [Test]
-    public async Task CachedQuery_WithoutTrustedTenant_BypassesCache()
+    public async Task CachedQueries_PartitionKeysByValidatedActorAttributes()
+    {
+        var tenantId = Guid.NewGuid();
+        var credentialId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var cache = new RecordingClientCacheService();
+        using var services = CreateServices();
+
+        await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(
+                tenantId,
+                credentialId,
+                sessionId,
+                attributes: new Dictionary<string, string> { ["identity.is_verified"] = bool.TrueString }));
+        await ExecuteCachedQueryAsync(
+            services,
+            cache,
+            CreateTrustedContext(
+                tenantId,
+                credentialId,
+                sessionId,
+                attributes: new Dictionary<string, string> { ["identity.is_verified"] = bool.FalseString }));
+
+        cache.SetKeys.Should().OnlyHaveUniqueItems().And.HaveCount(2);
+    }
+
+    [Test]
+    public async Task CachedQuery_WithoutTrustedTenant_UsesTenantlessAuthorizationPartition()
     {
         var cache = new RecordingClientCacheService();
         var wrapper = new CachePartitionWrapper();
@@ -153,8 +182,10 @@ public sealed partial class CachingQuerySecurityTests
         await query.ToListAsync();
 
         wrapper.QueryCount.Should().Be(1);
-        cache.GetKeys.Should().BeEmpty();
-        cache.SetKeys.Should().BeEmpty();
+        cache.GetKeys.Should().ContainSingle()
+            .Which.Should().Contain("tenant:tenantless");
+        cache.SetKeys.Should().ContainSingle()
+            .Which.Should().Contain("tenant:tenantless");
     }
 
     [Test]
@@ -256,7 +287,8 @@ public sealed partial class CachingQuerySecurityTests
         Guid? credentialId = null,
         Guid? sessionId = null,
         string generationId = "test-actor-generation",
-        IReadOnlySet<string>? capabilities = null)
+        IReadOnlySet<string>? capabilities = null,
+        IReadOnlyDictionary<string, string>? attributes = null)
     {
         var actor = credentialId is { } trustedCredentialId
             ? new TrustedActorIdentity(
@@ -267,7 +299,8 @@ public sealed partial class CachingQuerySecurityTests
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 capabilities ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 generationId,
-                DateTimeOffset.UtcNow.AddMinutes(5))
+                DateTimeOffset.UtcNow.AddMinutes(5),
+                attributes)
             : null;
 
         return new TestTrustedInvocationContextAccessor(new TrustedInvocationContext(

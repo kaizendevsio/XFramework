@@ -17,7 +17,7 @@ namespace XFramework.Core.Tests.DataContext;
 public sealed partial class DataContextHandlerRegistrationTests
 {
     [Test]
-    public async Task AddDataContextHandler_MissingMutationRegistry_RegistersEntitiesAsQueryOnly()
+    public async Task AddDataContextHandler_LegacyRegistryWithoutAuthorizationPolicies_FailsClosed()
     {
         var registrationAssembly = CreateLegacyRegistrationAssembly();
         var services = new ServiceCollection()
@@ -50,6 +50,7 @@ public sealed partial class DataContextHandlerRegistrationTests
         response.Should().NotBeNull();
         response!.IsSuccess.Should().BeFalse();
         response.Message.Should().Contain("not registered for remote mutation");
+        response.StatusCode.Should().Be(403);
     }
 
     private static Assembly CreateLegacyRegistrationAssembly()

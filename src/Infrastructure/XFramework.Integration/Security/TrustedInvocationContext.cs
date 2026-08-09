@@ -12,7 +12,8 @@ public sealed record TrustedActorIdentity
         IReadOnlySet<string> Roles,
         IReadOnlySet<string> Capabilities,
         string GenerationId,
-        DateTimeOffset ExpiresAtUtc)
+        DateTimeOffset ExpiresAtUtc,
+        IReadOnlyDictionary<string, string>? Attributes = null)
     {
         this.CredentialId = CredentialId;
         this.IdentityId = IdentityId;
@@ -20,6 +21,8 @@ public sealed record TrustedActorIdentity
         this.SessionId = SessionId;
         this.Roles = Roles.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
         this.Capabilities = Capabilities.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+        this.Attributes = (Attributes ?? new Dictionary<string, string>())
+            .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
         this.GenerationId = GenerationId;
         this.ExpiresAtUtc = ExpiresAtUtc;
     }
@@ -30,6 +33,7 @@ public sealed record TrustedActorIdentity
     public Guid SessionId { get; }
     public FrozenSet<string> Roles { get; }
     public FrozenSet<string> Capabilities { get; }
+    public FrozenDictionary<string, string> Attributes { get; }
     public string GenerationId { get; }
     public DateTimeOffset ExpiresAtUtc { get; }
 }

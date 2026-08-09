@@ -16,7 +16,8 @@ namespace XFramework.Core.DataContext;
 public sealed class QueryExecutionService(
     IServiceProvider serviceProvider,
     ILogger<QueryExecutionService> logger,
-    ITrustedInvocationContextAccessor invocationContextAccessor)
+    ITrustedInvocationContextAccessor invocationContextAccessor,
+    GeneratedEntityAuthorizationPolicyRegistry? authorizationPolicyRegistry = null)
     : IQueryExecutionService
 {
     public const int MaximumMutationBatchSize = 100;
@@ -37,6 +38,8 @@ public sealed class QueryExecutionService(
 
     private readonly ConcurrentDictionary<string, Type> _entityTypes = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, bool> _mutableEntityTypes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly GeneratedEntityAuthorizationPolicyRegistry _authorizationPolicyRegistry =
+        authorizationPolicyRegistry ?? new GeneratedEntityAuthorizationPolicyRegistry();
 
     public void RegisterEntity<T>(string name) where T : class
         => RegisterEntity(typeof(T), name);
@@ -48,7 +51,7 @@ public sealed class QueryExecutionService(
     {
         _entityTypes[name] = entityType;
         _mutableEntityTypes[name] = allowRemoteMutation;
-        logger.LogDebug("Registered entity type '{Name}' → {Type}", name, entityType.FullName);
+        logger.LogDebug("Registered entity type '{Name}' -> {Type}", name, entityType.FullName);
     }
 
     public async Task<byte[]> ExecuteAsync(byte[] queryDescriptorBytes, CancellationToken ct = default)
@@ -72,52 +75,47 @@ public sealed class QueryExecutionService(
         if (!_entityTypes.TryGetValue(descriptor.EntityTypeName, out var entityType))
             return SerializeError($"Entity type '{descriptor.EntityTypeName}' is not registered. Query rejected.");
 
+        var authorization = ValidateGeneratedAuthorization(
+            descriptor.EntityTypeName,
+            GeneratedEntityOperation.Read,
+            requireRemoteQuery: true);
+        if (!authorization.IsSuccess)
+            return SerializeError(authorization.Error!, authorization.StatusCode);
+
         var descriptorError = QueryDescriptorExecutor.ValidateDescriptor(descriptor);
         if (descriptorError is not null)
             return SerializeError(descriptorError);
 
-        var trustError = await ValidateTrustedDataContextAsync(
+        var trust = ValidateTrustedDataContext(
             RequiredScopes(
                 descriptor.IgnoreQueryFilters
                     ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
                     : [XFrameworkServiceScopes.DataContextQuery]),
-            requireTenant: RequiresTenantMetadata(entityType),
-            ct);
-        if (trustError is not null)
-            return SerializeError(trustError);
+            requireTenant: RequiresTenantMetadata(entityType));
+        if (!trust.IsSuccess)
+            return SerializeError(trust.Error!, trust.StatusCode);
 
         if (!HasRequiredQueryTenant(entityType))
             return SerializeError($"Entity type '{descriptor.EntityTypeName}' requires a trusted tenant for remote DataContext query.");
+
+        var featureError = await ValidateTargetFeatureAsync(
+            serviceProvider,
+            descriptor.EntityTypeName,
+            GeneratedEntityOperation.Read,
+            ct);
+        if (featureError is not null)
+            return SerializeError(featureError, 403);
 
         try
         {
             var dbContext = serviceProvider.GetRequiredService<DbContext>();
 
-            var capabilityError = await ValidateCredentialCapabilityAsync(
-                serviceProvider,
-                entityType,
-                IdentityAuthorizationConstants.View,
-                ct);
-            if (capabilityError is not null)
-                return SerializeError(capabilityError);
-
             if (descriptor.IgnoreQueryFilters)
             {
-                var bypassCapabilityError = await ValidateCredentialCapabilityAsync(
-                    serviceProvider,
-                    entityType,
-                    IdentityAuthorizationConstants.Manage,
-                    ct);
-                if (bypassCapabilityError is not null)
-                    return SerializeError("Query-filter bypass requires manage capability.");
+                if (invocationContextAccessor.Current?.Actor is not { } actor ||
+                    !actor.Capabilities.Contains("identity.tenants:manage"))
+                    return SerializeError("Query-filter bypass requires manage capability.", 403);
             }
-
-            var featureError = await ValidateTargetFeatureAsync(
-                serviceProvider,
-                entityType,
-                ct);
-            if (featureError is not null)
-                return SerializeError(featureError);
 
             var result = await QueryDescriptorExecutor.ExecuteAsync(
                 dbContext,
@@ -178,49 +176,42 @@ public sealed class QueryExecutionService(
         if (!_entityTypes.TryGetValue(descriptor.EntityTypeName, out var entityType))
             yield break;
 
+        if (!ValidateGeneratedAuthorization(
+                descriptor.EntityTypeName,
+                GeneratedEntityOperation.Read,
+                requireRemoteQuery: true).IsSuccess)
+            yield break;
+
         if (QueryDescriptorExecutor.ValidateDescriptor(descriptor) is not null)
             yield break;
 
-        var trustError = await ValidateTrustedDataContextAsync(
+        var trust = ValidateTrustedDataContext(
             RequiredScopes(
                 descriptor.IgnoreQueryFilters
                     ? [XFrameworkServiceScopes.DataContextQuery, XFrameworkServiceScopes.DataContextQueryAllTenants]
                     : [XFrameworkServiceScopes.DataContextQuery]),
-            requireTenant: RequiresTenantMetadata(entityType),
-            ct);
-        if (trustError is not null)
+            requireTenant: RequiresTenantMetadata(entityType));
+        if (!trust.IsSuccess)
             yield break;
 
         if (!HasRequiredQueryTenant(entityType))
             yield break;
 
-        var dbContext = serviceProvider.GetRequiredService<DbContext>();
-
-        var capabilityError = await ValidateCredentialCapabilityAsync(
-            serviceProvider,
-            entityType,
-            IdentityAuthorizationConstants.View,
-            ct);
-        if (capabilityError is not null)
+        if (await ValidateTargetFeatureAsync(
+                serviceProvider,
+                descriptor.EntityTypeName,
+                GeneratedEntityOperation.Read,
+                ct) is not null)
             yield break;
+
+        var dbContext = serviceProvider.GetRequiredService<DbContext>();
 
         if (descriptor.IgnoreQueryFilters)
         {
-            var bypassCapabilityError = await ValidateCredentialCapabilityAsync(
-                serviceProvider,
-                entityType,
-                IdentityAuthorizationConstants.Manage,
-                ct);
-            if (bypassCapabilityError is not null)
+            if (invocationContextAccessor.Current?.Actor is not { } actor ||
+                !actor.Capabilities.Contains("identity.tenants:manage"))
                 yield break;
         }
-
-        var featureError = await ValidateTargetFeatureAsync(
-            serviceProvider,
-            entityType,
-            ct);
-        if (featureError is not null)
-            yield break;
 
         await foreach (var item in QueryDescriptorExecutor.ExecuteStreamAsync(
                            dbContext,
@@ -265,42 +256,53 @@ public sealed class QueryExecutionService(
             return SerializeError($"Remote mutation entities must not exceed {MaximumSerializedEntitySizeBytes} bytes.");
         }
 
+        var preflight = new List<(ChangeEntry Change, Type EntityType, GeneratedEntityOperation Operation)>();
+        foreach (var change in request.Changes)
+        {
+            if (!_entityTypes.TryGetValue(change.EntityTypeName, out var entityType))
+                return SerializeError($"Entity type '{change.EntityTypeName}' is not registered.", 403);
+
+            if (!_mutableEntityTypes.TryGetValue(change.EntityTypeName, out var canMutate) || !canMutate)
+                return SerializeError($"Entity type '{change.EntityTypeName}' is not registered for remote mutation.", 403);
+
+            var operation = ResolveGeneratedOperation(change.Operation);
+            var authorization = ValidateGeneratedAuthorization(
+                change.EntityTypeName,
+                operation,
+                requireRemoteMutation: true);
+            if (!authorization.IsSuccess)
+                return SerializeError(authorization.Error!, authorization.StatusCode);
+
+            var trust = ValidateTrustedDataContext(
+                RequiredScopes([XFrameworkServiceScopes.DataContextMutate]),
+                requireTenant: RequiresTenantMetadata(entityType));
+            if (!trust.IsSuccess)
+                return SerializeError(trust.Error!, trust.StatusCode);
+
+            preflight.Add((change, entityType, operation));
+        }
+
+        foreach (var featureCheck in preflight
+                     .Select(static item => (item.Change.EntityTypeName, item.Operation))
+                     .Distinct())
+        {
+            var featureError = await ValidateTargetFeatureAsync(
+                serviceProvider,
+                featureCheck.EntityTypeName,
+                featureCheck.Operation,
+                ct);
+            if (featureError is not null)
+                return SerializeError(featureError, 403);
+        }
+
         try
         {
             var dbContext = serviceProvider.GetRequiredService<DbContext>();
             var changedTenantModuleFeatures = new List<(Guid TenantId, string ModuleKey, string SubFeatureKey)>();
             var persistedEntities = new List<(string EntityTypeName, object Entity)>();
 
-            foreach (var change in request.Changes)
+            foreach (var (change, entityType, _) in preflight)
             {
-                if (!_entityTypes.TryGetValue(change.EntityTypeName, out var entityType))
-                    return SerializeError($"Entity type '{change.EntityTypeName}' is not registered.");
-
-                if (!_mutableEntityTypes.TryGetValue(change.EntityTypeName, out var canMutate) || !canMutate)
-                    return SerializeError($"Entity type '{change.EntityTypeName}' is not registered for remote mutation.");
-
-                var trustError = await ValidateTrustedDataContextAsync(
-                    RequiredScopes([XFrameworkServiceScopes.DataContextMutate]),
-                    requireTenant: RequiresTenantMetadata(entityType),
-                    ct);
-                if (trustError is not null)
-                    return SerializeError(trustError);
-
-                var capabilityError = await ValidateCredentialCapabilityAsync(
-                    serviceProvider,
-                    entityType,
-                    ResolveMutationCapability(change.Operation),
-                    ct);
-                if (capabilityError is not null)
-                    return SerializeError(capabilityError);
-
-                var featureError = await ValidateTargetFeatureAsync(
-                    serviceProvider,
-                    entityType,
-                    ct);
-                if (featureError is not null)
-                    return SerializeError(featureError);
-
                 // For Update operations, try FieldPatch first before deserializing as entity
                 if (change.Operation == ChangeOperation.Update)
                 {
@@ -604,61 +606,65 @@ public sealed class QueryExecutionService(
             .ToArray();
     }
 
-    private async Task<string?> ValidateTrustedDataContextAsync(
+    private InvocationPolicyCheckResult ValidateTrustedDataContext(
         IReadOnlyCollection<string> scopes,
-        bool requireTenant,
-        CancellationToken ct)
+        bool requireTenant)
     {
         var context = invocationContextAccessor.Current;
         if (context?.Service is null)
-            return "A trusted service identity is required for remote DataContext access.";
+            return InvocationPolicyCheckResult.Failure(
+                "A trusted service identity is required for remote DataContext access.",
+                401);
         if (!XFrameworkServiceNames.All.Contains(context.Service.ClientId, StringComparer.OrdinalIgnoreCase))
-            return "The trusted service identity is not an allowed remote DataContext caller.";
+            return InvocationPolicyCheckResult.Failure(
+                "The trusted service identity is not an allowed remote DataContext caller.",
+                403);
         if (requireTenant &&
             (context.EffectiveTenantId is not { } tenantId || tenantId == Guid.Empty))
-            return "A trusted tenant is required for remote DataContext access.";
+            return InvocationPolicyCheckResult.Failure(
+                "A trusted tenant is required for remote DataContext access.",
+                403);
 
         if (scopes.Contains(XFrameworkServiceScopes.DataContextQueryAllTenants, StringComparer.OrdinalIgnoreCase) &&
-            (context.Actor is null || !context.Actor.Capabilities.Contains("identity.tenants:manage")))
+            context.Actor is null)
         {
-            return "Query-filter bypass requires an authorized actor.";
+            return InvocationPolicyCheckResult.Failure(
+                "Query-filter bypass requires an authorized actor.",
+                401);
+        }
+
+        if (scopes.Contains(XFrameworkServiceScopes.DataContextQueryAllTenants, StringComparer.OrdinalIgnoreCase) &&
+            !context.Actor!.Capabilities.Contains("identity.tenants:manage"))
+        {
+            return InvocationPolicyCheckResult.Failure(
+                "Query-filter bypass requires an authorized actor.",
+                403);
         }
 
         var missingScopes = scopes.Where(scope => !context.Service.Scopes.Contains(scope)).ToArray();
         return missingScopes.Length == 0
-            ? null
-            : $"Trusted service identity is missing required scope(s): {string.Join(", ", missingScopes)}.";
-    }
-
-    private Task<string?> ValidateCredentialCapabilityAsync(
-        IServiceProvider scopedServices,
-        Type entityType,
-        string capabilityKey,
-        CancellationToken ct)
-    {
-        var actor = invocationContextAccessor.Current?.Actor;
-        if (actor is null)
-            return Task.FromResult<string?>(null);
-
-        var feature = ResolveIdentityFeature(entityType);
-        if (feature is null)
-            return Task.FromResult<string?>(null);
-
-        var trustedCapability =
-            $"{TenantModuleFeatureKeys.Combine(feature.Value.ModuleKey, feature.Value.SubFeatureKey)}:{capabilityKey}";
-        return Task.FromResult<string?>(actor.Capabilities.Contains(trustedCapability)
-            ? null
-            : "Credential capability is not allowed for this operation.");
+            ? InvocationPolicyCheckResult.Success()
+            : InvocationPolicyCheckResult.Failure(
+                $"Trusted service identity is missing required scope(s): {string.Join(", ", missingScopes)}.",
+                403);
     }
 
     private async Task<string?> ValidateTargetFeatureAsync(
         IServiceProvider scopedServices,
-        Type entityType,
+        string entityTypeName,
+        GeneratedEntityOperation operation,
         CancellationToken ct)
     {
-        var feature = ResolveIdentityFeature(entityType);
-        if (feature is null || invocationContextAccessor.Current?.EffectiveTenantId is not { } targetTenantId || targetTenantId == Guid.Empty)
+        if (!_authorizationPolicyRegistry.TryGet(
+                entityTypeName,
+                operation,
+                out var policy) ||
+            string.IsNullOrWhiteSpace(policy.AuthorizationFeature) ||
+            invocationContextAccessor.Current?.EffectiveTenantId is not { } targetTenantId ||
+            targetTenantId == Guid.Empty)
             return null;
+
+        var feature = TenantModuleFeatureKeys.Normalize(policy.AuthorizationFeature);
 
         var featureService = scopedServices.GetService<ITenantModuleFeatureService>();
         if (featureService is null)
@@ -666,8 +672,8 @@ public sealed class QueryExecutionService(
 
         var result = await featureService.EnsureEnabledAsync(
             targetTenantId,
-            feature.Value.ModuleKey,
-            feature.Value.SubFeatureKey,
+            feature.ModuleKey,
+            feature.SubFeatureKey,
             ct);
         return result.IsSuccess ? null : "The requested tenant feature is not enabled.";
     }
@@ -678,14 +684,11 @@ public sealed class QueryExecutionService(
         object entity,
         CancellationToken ct)
     {
-        if (ResolveIdentityFeature(entityType) is null)
-            return null;
-
         var validator = scopedServices
             .GetServices<IRemoteDataContextEntityValidator>()
             .SingleOrDefault(candidate => candidate.EntityType == entityType);
         if (validator is null)
-            return $"Entity '{entityType.Name}' is not configured for validated remote mutation.";
+            return null;
 
         var errors = await validator.ValidateAsync(entity, ct);
         return errors.Count == 0
@@ -693,62 +696,33 @@ public sealed class QueryExecutionService(
             : $"Entity validation failed: {string.Join("; ", errors)}";
     }
 
-    private static (string ModuleKey, string SubFeatureKey)? ResolveIdentityFeature(Type entityType)
+    private static GeneratedEntityOperation ResolveGeneratedOperation(ChangeOperation operation) => operation switch
     {
-        var featureKey = entityType == typeof(IdentityInformation)
-            ? TenantModuleFeatureKeys.IdentityUsers
-            : entityType == typeof(IdentityCredential)
-                ? TenantModuleFeatureKeys.IdentityCredentials
-                : entityType == typeof(IdentityRole)
-                    || entityType == typeof(IdentityRoleType)
-                    || entityType == typeof(IdentityRoleTypeGroup)
-                    || entityType == typeof(IdentityRoleTypeFeaturePermission)
-                    || entityType == typeof(IdentityRoleFeaturePermissionOverride)
-                        ? TenantModuleFeatureKeys.IdentityRoles
-                : entityType == typeof(Tenant)
-                    || entityType == typeof(TenantModuleFeature)
-                    || entityType == typeof(TenantAuthorizationPolicy)
-                        ? TenantModuleFeatureKeys.IdentityTenants
-                : entityType == typeof(Session) || entityType == typeof(SessionType)
-                    ? TenantModuleFeatureKeys.IdentitySessions
-                : entityType == typeof(IdentityVerification)
-                    || entityType == typeof(IdentityVerificationType)
-                        ? TenantModuleFeatureKeys.IdentityVerifications
-                : entityType == typeof(IdentityContact)
-                    || entityType == typeof(IdentityContactType)
-                    || entityType == typeof(IdentityContactGroup)
-                        ? TenantModuleFeatureKeys.IdentityContacts
-                : entityType == typeof(IdentityAddress)
-                    || entityType == typeof(IdentityAddressType)
-                    || entityType == typeof(AddressCountry)
-                    || entityType == typeof(AddressRegion)
-                    || entityType == typeof(AddressProvince)
-                    || entityType == typeof(AddressCity)
-                    || entityType == typeof(AddressBarangay)
-                        ? TenantModuleFeatureKeys.IdentityAddresses
-                : entityType == typeof(AuthorizationLog)
-                    ? TenantModuleFeatureKeys.IdentityAuthLogs
-                : entityType == typeof(IdentityFavorite)
-                    || entityType == typeof(RegistryConfiguration)
-                    || entityType == typeof(RegistryConfigurationGroup)
-                    || entityType == typeof(RegistryFavoriteType)
-                        ? TenantModuleFeatureKeys.Identity
-                : null;
-
-        if (featureKey is null)
-            return null;
-
-        var normalized = TenantModuleFeatureKeys.Normalize(featureKey);
-        return normalized;
-    }
-
-    private static string ResolveMutationCapability(ChangeOperation operation) => operation switch
-    {
-        ChangeOperation.Add => IdentityAuthorizationConstants.Create,
-        ChangeOperation.Update => IdentityAuthorizationConstants.Update,
-        ChangeOperation.Remove => IdentityAuthorizationConstants.Delete,
-        _ => IdentityAuthorizationConstants.Manage
+        ChangeOperation.Add => GeneratedEntityOperation.Create,
+        ChangeOperation.Update => GeneratedEntityOperation.Update,
+        ChangeOperation.Remove => GeneratedEntityOperation.Delete,
+        _ => throw new InvalidOperationException("Unsupported remote DataContext operation.")
     };
+
+    private InvocationPolicyCheckResult ValidateGeneratedAuthorization(
+        string entityTypeName,
+        GeneratedEntityOperation operation,
+        bool requireRemoteQuery = false,
+        bool requireRemoteMutation = false)
+    {
+        if (!_authorizationPolicyRegistry.TryGet(entityTypeName, operation, out var policy))
+            return InvocationPolicyCheckResult.Failure("Remote DataContext access is not authorized.", 403);
+
+        if ((requireRemoteQuery && !policy.AllowRemoteQuery) ||
+            (requireRemoteMutation && !policy.AllowRemoteMutation))
+        {
+            return InvocationPolicyCheckResult.Failure("Remote DataContext access is not authorized.", 403);
+        }
+
+        return GeneratedEntityAuthorizationEvaluator.Evaluate(
+            invocationContextAccessor.Current,
+            policy);
+    }
 
     private static void InvalidateTenantModuleFeatureCache(
         IServiceProvider scopedServices,
@@ -764,9 +738,9 @@ public sealed class QueryExecutionService(
         }
     }
 
-    private static byte[] SerializeError(string message)
+    private static byte[] SerializeError(string message, int statusCode = 400)
     {
-        var result = DataContextResult.Failure(message);
+        var result = DataContextResult.Failure(message, statusCode);
         return MemoryPack.MemoryPackSerializer.Serialize(result);
     }
 }

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.Security;
 using XFramework.Integration.Security;
 
 namespace XFramework.Integration.DataContext.Cache;
@@ -10,10 +11,11 @@ internal static class CacheKeyBuilder
     public static string ForQuery<T>(QueryDescriptor descriptor, TrustedInvocationContext context)
     {
         var hash = ComputeDescriptorHash(descriptor);
-        var tenantId = context.EffectiveTenantId
-            ?? throw new InvalidOperationException("A trusted tenant is required for cached remote queries.");
+        var tenantSegment = context.EffectiveTenantId is { } tenantId
+            ? tenantId.ToString("N")
+            : "tenantless";
         var authorityHash = ComputeAuthorityHash(context);
-        return $"{typeof(T).Name}:tenant:{tenantId:N}:authority:{authorityHash}:query:{hash}";
+        return $"{typeof(T).Name}:tenant:{tenantSegment}:authority:{authorityHash}:query:{hash}";
     }
 
     public static string PrefixForEntity<T>()
@@ -39,9 +41,11 @@ internal static class CacheKeyBuilder
             actor?.GenerationId ?? string.Empty,
             JoinSorted(actor?.Roles),
             JoinSorted(actor?.Capabilities),
+            JoinSorted(actor?.Attributes),
             service?.ClientId ?? string.Empty,
             service?.GenerationId ?? string.Empty,
-            JoinSorted(service?.Scopes));
+            JoinSorted(service?.Scopes),
+            GeneratedAuthorizationPolicyVersion.Current.ToString());
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(authority));
         return Convert.ToHexStringLower(hash)[..16];
     }
@@ -49,4 +53,10 @@ internal static class CacheKeyBuilder
     private static string JoinSorted(IReadOnlySet<string>? values) => values is null
         ? string.Empty
         : string.Join(',', values.Order(StringComparer.OrdinalIgnoreCase));
+
+    private static string JoinSorted(IReadOnlyDictionary<string, string>? values) => values is null
+        ? string.Empty
+        : string.Join(',', values
+            .OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(static pair => $"{pair.Key}={pair.Value}"));
 }

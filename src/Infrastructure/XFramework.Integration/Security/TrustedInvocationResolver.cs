@@ -65,15 +65,12 @@ public sealed class TrustedInvocationResolver(
             return TrustedInvocationResult.Failure("Actor identity is required.");
         }
 
-        if (policy.ActorRequirement == ActorRequirement.None && actor is not null)
-            return TrustedInvocationResult.Failure("This operation does not accept actor delegation.", 403);
-
-        if (actor is not null &&
-            policy.RequiredActorCapabilities.Any(capability => !actor.Capabilities.Contains(capability)))
+        var actorPolicyResult = TrustedActorPolicyEvaluator.Evaluate(actor, policy);
+        if (!actorPolicyResult.IsSuccess)
         {
             return TrustedInvocationResult.Failure(
-                "Actor is not authorized for this operation.",
-                403);
+                actorPolicyResult.Error!,
+                actorPolicyResult.StatusCode);
         }
 
         if (policy.AllowAnonymous)
@@ -207,8 +204,10 @@ public sealed class TrustedInvocationResolver(
         if (policy.RequireServiceIdentity ||
             policy.RequiredServiceScopes.Count > 0 ||
             policy.AllowedServiceCallers.Count > 0 ||
+            policy.RequiredActorRoles.Count > 0 ||
             policy.RequiredActorCapabilities.Count > 0 ||
-            policy.RequiredCrossTenantActorCapabilities.Count > 0)
+            policy.RequiredCrossTenantActorCapabilities.Count > 0 ||
+            policy.RequiredActorAttributes.Count > 0)
         {
             return TrustedInvocationResult.Failure(
                 "Anonymous access cannot be combined with service or actor authorization requirements.",

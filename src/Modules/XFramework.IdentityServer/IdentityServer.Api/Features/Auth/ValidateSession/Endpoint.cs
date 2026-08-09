@@ -37,6 +37,7 @@ public static class ValidateIdentitySessionEndpoint
             SessionId = actor.SessionId,
             Roles = actor.Roles.ToList(),
             Capabilities = actor.Capabilities.ToList(),
+            Attributes = actor.Attributes.ToDictionary(),
             GenerationId = actor.GenerationId,
             ExpiresAtUtc = actor.ExpiresAtUtc.UtcDateTime,
             IsValid = true

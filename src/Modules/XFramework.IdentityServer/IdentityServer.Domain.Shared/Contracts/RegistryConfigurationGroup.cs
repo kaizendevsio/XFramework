@@ -9,7 +9,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/registry-configuration-groups",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity"
 )]
 public partial class RegistryConfigurationGroup : BaseModel, IHasSystemReferenceId
 {

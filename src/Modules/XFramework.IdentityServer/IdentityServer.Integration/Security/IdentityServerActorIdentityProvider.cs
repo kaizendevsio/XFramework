@@ -72,7 +72,8 @@ public sealed class IdentityServerActorIdentityProvider(
                 snapshot.Roles.ToHashSet(StringComparer.OrdinalIgnoreCase),
                 snapshot.Capabilities.ToHashSet(StringComparer.OrdinalIgnoreCase),
                 snapshot.GenerationId,
-                new DateTimeOffset(DateTime.SpecifyKind(snapshot.ExpiresAtUtc, DateTimeKind.Utc))));
+                new DateTimeOffset(DateTime.SpecifyKind(snapshot.ExpiresAtUtc, DateTimeKind.Utc)),
+                snapshot.Attributes));
             if (httpContext is not null)
                 httpContext.Items[RequestCacheKey] = new CachedValidation(tokenDigest, result);
             return result;

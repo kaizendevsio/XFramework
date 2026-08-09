@@ -63,7 +63,7 @@ public partial class QueryExecutionServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             invocationScope.ServiceProvider,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -80,6 +80,279 @@ public partial class QueryExecutionServiceTests
         rows.Should().ContainSingle().Which.Name.Should().Be("Invocation scope");
         dbContextCreations.Should().Be(1,
             "remote execution must reuse the already-authorized invocation scope");
+    }
+
+    [Test]
+    public async Task ExecuteAsync_MissingGeneratedPolicy_FailsBeforeDbContextResolution()
+    {
+        var dbContextResolutions = 0;
+        var services = new ServiceCollection()
+            .AddScoped<DbContext>(_ =>
+            {
+                Interlocked.Increment(ref dbContextResolutions);
+                throw new InvalidOperationException("The database must not be resolved.");
+            })
+            .BuildServiceProvider();
+        var service = CreateService(
+            services,
+            NullLogger<QueryExecutionService>.Instance,
+            CreateTrustedContext(DefaultTenantId),
+            new GeneratedEntityAuthorizationPolicyRegistry());
+        service.RegisterEntity<TestTenantEntity>(nameof(TestTenantEntity));
+
+        var result = MemoryPackSerializer.Deserialize<DataContextResult>(await service.ExecuteAsync(
+            MemoryPackSerializer.Serialize(new QueryDescriptor
+            {
+                EntityTypeName = nameof(TestTenantEntity),
+                Mode = QueryExecutionMode.ToList
+            })))!;
+
+        result.IsSuccess.Should().BeFalse();
+        result.Message.Should().Be("Remote DataContext access is not authorized.");
+        result.StatusCode.Should().Be(403);
+        dbContextResolutions.Should().Be(0);
+    }
+
+    [Test]
+    public async Task ExecuteChangesAsync_LaterUnauthorizedChange_FailsEntirePreflightBeforeDbContextResolution()
+    {
+        var dbContextResolutions = 0;
+        var featureService = new Mock<ITenantModuleFeatureService>(MockBehavior.Strict);
+        var services = new ServiceCollection()
+            .AddSingleton(featureService.Object)
+            .AddScoped<DbContext>(_ =>
+            {
+                Interlocked.Increment(ref dbContextResolutions);
+                throw new InvalidOperationException("The database must not be resolved.");
+            })
+            .BuildServiceProvider();
+        var actor = CreateActor(DefaultTenantId, Guid.NewGuid());
+        var service = CreateService(
+            services,
+            NullLogger<QueryExecutionService>.Instance,
+            CreateTrustedContext(DefaultTenantId, actor),
+            CreatePolicyRegistry(CreatePolicy(
+                    nameof(TestTenantEntity),
+                    GeneratedEntityOperation.Create) with
+                {
+                    AuthorizationFeature = "identity.tenants"
+                }));
+        service.RegisterEntity(typeof(TestTenantEntity), nameof(TestTenantEntity), allowRemoteMutation: true);
+        var entity = new TestTenantEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = DefaultTenantId,
+            Name = "Preflight"
+        };
+        var request = new SaveChangesRequest
+        {
+            Metadata = new RequestMetadata { RequestedTenantId = DefaultTenantId },
+            Changes =
+            [
+                new ChangeEntry
+                {
+                    EntityTypeName = nameof(TestTenantEntity),
+                    Operation = ChangeOperation.Add,
+                    SerializedEntity = MemoryPackSerializer.Serialize(entity)
+                },
+                new ChangeEntry
+                {
+                    EntityTypeName = nameof(TestTenantEntity),
+                    Operation = ChangeOperation.Update,
+                    SerializedEntity = MemoryPackSerializer.Serialize(entity)
+                }
+            ]
+        };
+
+        var result = MemoryPackSerializer.Deserialize<DataContextResult>(
+            await service.ExecuteChangesAsync(MemoryPackSerializer.Serialize(request)))!;
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(403);
+        result.Message.Should().Be("Remote DataContext access is not authorized.");
+        dbContextResolutions.Should().Be(0);
+        featureService.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task ExecuteAsync_ActorRequiredPolicy_RejectsServiceOnlyInvocation()
+    {
+        var service = CreateService(
+            new ServiceCollection().BuildServiceProvider(),
+            NullLogger<QueryExecutionService>.Instance,
+            CreateTrustedContext(DefaultTenantId),
+            CreatePolicyRegistry(CreatePolicy(
+                nameof(TestTenantEntity),
+                GeneratedEntityOperation.Read)));
+        service.RegisterEntity<TestTenantEntity>(nameof(TestTenantEntity));
+
+        var result = MemoryPackSerializer.Deserialize<DataContextResult>(await service.ExecuteAsync(
+            MemoryPackSerializer.Serialize(new QueryDescriptor
+            {
+                EntityTypeName = nameof(TestTenantEntity),
+                Mode = QueryExecutionMode.ToList
+            })))!;
+
+        result.IsSuccess.Should().BeFalse();
+        result.Message.Should().Be("Actor identity is required.");
+    }
+
+    [TestCase("missing-service", 401)]
+    [TestCase("disallowed-caller", 403)]
+    [TestCase("missing-scope", 403)]
+    [TestCase("query-filter-bypass", 403)]
+    public async Task ExecuteAsync_TrustedBoundaryFailure_PreservesAuthorizationStatus(
+        string failure,
+        int expectedStatusCode)
+    {
+        var dbContextResolutions = 0;
+        var services = new ServiceCollection()
+            .AddScoped<DbContext>(_ =>
+            {
+                Interlocked.Increment(ref dbContextResolutions);
+                throw new InvalidOperationException("The database must not be resolved.");
+            })
+            .BuildServiceProvider();
+        var actor = CreateActor(DefaultTenantId, Guid.NewGuid());
+        ITrustedInvocationContextAccessor trustedContext = failure switch
+        {
+            "missing-service" => new TestTrustedInvocationContextAccessor(
+                new TrustedInvocationContext(
+                    actor,
+                    null,
+                    DefaultTenantId,
+                    DefaultTenantId,
+                    Guid.NewGuid())),
+            "disallowed-caller" => CreateTrustedContext(
+                DefaultTenantId,
+                actor,
+                serviceClientId: "Untrusted.Caller"),
+            "missing-scope" => CreateTrustedContext(
+                DefaultTenantId,
+                actor,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase)),
+            _ => CreateTrustedContext(DefaultTenantId, actor)
+        };
+        var service = CreateService(
+            services,
+            NullLogger<QueryExecutionService>.Instance,
+            trustedContext,
+            CreatePolicyRegistry(CreatePolicy(
+                nameof(TestTenantEntity),
+                GeneratedEntityOperation.Read)));
+        service.RegisterEntity<TestTenantEntity>(nameof(TestTenantEntity));
+        var descriptor = new QueryDescriptor
+        {
+            EntityTypeName = nameof(TestTenantEntity),
+            Mode = QueryExecutionMode.ToList,
+            IgnoreQueryFilters = failure == "query-filter-bypass"
+        };
+
+        var result = MemoryPackSerializer.Deserialize<DataContextResult>(await service.ExecuteAsync(
+            MemoryPackSerializer.Serialize(descriptor)))!;
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(expectedStatusCode);
+        dbContextResolutions.Should().Be(0);
+    }
+
+    [TestCase("capability")]
+    [TestCase("role")]
+    [TestCase("attribute")]
+    public async Task ExecuteAsync_ActorMissingPolicyRequirement_IsRejected(string missingRequirement)
+    {
+        const string requiredCapability = "test.entities:view";
+        const string requiredRole = "TestReader";
+        var requiredAttributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["access_level"] = "trusted"
+        };
+        var actor = CreateActor(
+            DefaultTenantId,
+            Guid.NewGuid(),
+            roles: new HashSet<string>(
+                missingRequirement == "role" ? [] : [requiredRole],
+                StringComparer.OrdinalIgnoreCase),
+            capabilities: new HashSet<string>(
+                missingRequirement == "capability" ? [] : [requiredCapability],
+                StringComparer.OrdinalIgnoreCase),
+            attributes: missingRequirement == "attribute"
+                ? new Dictionary<string, string>()
+                : requiredAttributes);
+        var service = CreateService(
+            new ServiceCollection().BuildServiceProvider(),
+            NullLogger<QueryExecutionService>.Instance,
+            CreateTrustedContext(DefaultTenantId, actor),
+            CreatePolicyRegistry(CreatePolicy(
+                nameof(TestTenantEntity),
+                GeneratedEntityOperation.Read,
+                requiredCapability,
+                [requiredRole],
+                requiredAttributes)));
+        service.RegisterEntity<TestTenantEntity>(nameof(TestTenantEntity));
+
+        var result = MemoryPackSerializer.Deserialize<DataContextResult>(await service.ExecuteAsync(
+            MemoryPackSerializer.Serialize(new QueryDescriptor
+            {
+                EntityTypeName = nameof(TestTenantEntity),
+                Mode = QueryExecutionMode.ToList
+            })))!;
+
+        result.IsSuccess.Should().BeFalse();
+        result.Message.Should().Be("Actor is not authorized for this operation.");
+    }
+
+    [Test]
+    public async Task ExecuteAsync_ActorSatisfyingPolicy_ReturnsRows()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<TestTenantEntityDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new TestTenantEntityDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        db.TestTenantEntities.Add(new TestTenantEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = DefaultTenantId,
+            Name = "Authorized"
+        });
+        await db.SaveChangesAsync();
+
+        const string requiredCapability = "test.entities:view";
+        const string requiredRole = "TestReader";
+        var requiredAttributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["access_level"] = "trusted"
+        };
+        var actor = CreateActor(
+            DefaultTenantId,
+            Guid.NewGuid(),
+            roles: new HashSet<string>([requiredRole], StringComparer.OrdinalIgnoreCase),
+            capabilities: new HashSet<string>([requiredCapability], StringComparer.OrdinalIgnoreCase),
+            attributes: requiredAttributes);
+        var services = new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider();
+        var service = CreateService(
+            services,
+            NullLogger<QueryExecutionService>.Instance,
+            CreateTrustedContext(DefaultTenantId, actor),
+            CreatePolicyRegistry(CreatePolicy(
+                nameof(TestTenantEntity),
+                GeneratedEntityOperation.Read,
+                requiredCapability,
+                [requiredRole],
+                requiredAttributes)));
+        service.RegisterEntity<TestTenantEntity>(nameof(TestTenantEntity));
+
+        var rows = MemoryPackSerializer.Deserialize<List<TestTenantEntity>>(await service.ExecuteAsync(
+            MemoryPackSerializer.Serialize(new QueryDescriptor
+            {
+                EntityTypeName = nameof(TestTenantEntity),
+                Mode = QueryExecutionMode.ToList
+            })))!;
+
+        rows.Should().ContainSingle().Which.Name.Should().Be("Authorized");
     }
 
     [Test]
@@ -140,10 +413,14 @@ public partial class QueryExecutionServiceTests
             await dbContext.Database.EnsureCreatedAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
-            CreateTrustedContext(targetTenantId, CreateActor(actorTenantId, credentialId)));
+            CreateTrustedContext(targetTenantId, CreateActor(actorTenantId, credentialId)),
+            CreatePolicyRegistry(CreatePolicy(
+                nameof(Tenant),
+                GeneratedEntityOperation.Read,
+                "identity.tenants:view")));
         service.RegisterEntity<Tenant>(nameof(Tenant));
         var descriptor = new QueryDescriptor
         {
@@ -160,7 +437,7 @@ public partial class QueryExecutionServiceTests
 
         result.Should().NotBeNull();
         result!.IsSuccess.Should().BeFalse();
-        result.Message.Should().Be("Credential capability is not allowed for this operation.");
+        result.Message.Should().Be("Actor is not authorized for this operation.");
     }
 
     [Test]
@@ -184,10 +461,14 @@ public partial class QueryExecutionServiceTests
             await dbContext.Database.EnsureCreatedAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
-            CreateTrustedContext(targetTenantId, CreateActor(actorTenantId, credentialId)));
+            CreateTrustedContext(targetTenantId, CreateActor(actorTenantId, credentialId)),
+            CreatePolicyRegistry(CreatePolicy(
+                nameof(Tenant),
+                GeneratedEntityOperation.Create,
+                "identity.tenants:manage")));
         service.RegisterEntity(typeof(Tenant), nameof(Tenant), allowRemoteMutation: true);
         var request = new SaveChangesRequest
         {
@@ -218,7 +499,7 @@ public partial class QueryExecutionServiceTests
 
         result.Should().NotBeNull();
         result!.IsSuccess.Should().BeFalse();
-        result.Message.Should().Be("Credential capability is not allowed for this operation.");
+        result.Message.Should().Be("Actor is not authorized for this operation.");
 
         await using var verifyScope = services.CreateAsyncScope();
         var db = verifyScope.ServiceProvider.GetRequiredService<QueryExecutionDbContext>();
@@ -292,7 +573,7 @@ public partial class QueryExecutionServiceTests
             .AddSingleton<DbContext>(db)
             .AddSingleton(CreateEnabledTenantFeatureService(actorTenantId).Object)
             .BuildServiceProvider();
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(actorTenantId, actor));
@@ -314,7 +595,7 @@ public partial class QueryExecutionServiceTests
     public async Task ExecuteAsync_ActorlessCallerWithGenericQueryScope_IsRejected()
     {
         var tenantId = Guid.NewGuid();
-        var service = new QueryExecutionService(
+        var service = CreateService(
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(
@@ -348,7 +629,7 @@ public partial class QueryExecutionServiceTests
             .AddScoped<DbContext>(provider => provider.GetRequiredService<TestTenantEntityDbContext>())
             .BuildServiceProvider();
         var tenantId = Guid.NewGuid();
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(
@@ -415,7 +696,7 @@ public partial class QueryExecutionServiceTests
                 }
             ]
         };
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(trustedTenantId));
@@ -468,7 +749,7 @@ public partial class QueryExecutionServiceTests
                 }
             ]
         };
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(trustedTenantId));
@@ -524,7 +805,7 @@ public partial class QueryExecutionServiceTests
                 }
             ]
         };
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(trustedTenantId));
@@ -560,7 +841,7 @@ public partial class QueryExecutionServiceTests
             await dbContext.Database.EnsureCreatedAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -626,7 +907,7 @@ public partial class QueryExecutionServiceTests
             await dbContext.SaveChangesAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(DefaultTenantId));
@@ -666,7 +947,7 @@ public partial class QueryExecutionServiceTests
             await setupDbContext.Database.EnsureCreatedAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext());
@@ -683,7 +964,8 @@ public partial class QueryExecutionServiceTests
 
         result.Should().NotBeNull();
         result!.IsSuccess.Should().BeFalse();
-        result.Message.Should().Contain("trusted tenant");
+        result.Message.Should().Contain("trusted target tenant");
+        result.StatusCode.Should().Be(403);
     }
 
     [Test]
@@ -711,7 +993,7 @@ public partial class QueryExecutionServiceTests
             await setupDbContext.SaveChangesAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -754,7 +1036,7 @@ public partial class QueryExecutionServiceTests
             await db.SaveChangesAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(requestedTenantId));
@@ -798,7 +1080,7 @@ public partial class QueryExecutionServiceTests
             await db.SaveChangesAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(requestedTenantId));
@@ -840,7 +1122,7 @@ public partial class QueryExecutionServiceTests
         await using (var scope = services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<DbContext>().Database.EnsureCreatedAsync();
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -917,7 +1199,7 @@ public partial class QueryExecutionServiceTests
         await using (var scope = services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<DbContext>().Database.EnsureCreatedAsync();
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -969,7 +1251,7 @@ public partial class QueryExecutionServiceTests
             await scope.ServiceProvider.GetRequiredService<DbContext>().Database.EnsureCreatedAsync();
 
         var logger = new Mock<ILogger<QueryExecutionService>>();
-        var service = new QueryExecutionService(services, logger.Object, CreateTrustedContext(tenantId));
+        var service = CreateService(services, logger.Object, CreateTrustedContext(tenantId));
         service.RegisterEntity<Tenant>(nameof(Tenant));
         var descriptor = new QueryDescriptor
         {
@@ -1028,7 +1310,7 @@ public partial class QueryExecutionServiceTests
             await db.SaveChangesAsync();
         }
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -1137,7 +1419,7 @@ public partial class QueryExecutionServiceTests
             ]
         };
 
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -1194,7 +1476,7 @@ public partial class QueryExecutionServiceTests
                 }
             ]
         };
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -1231,7 +1513,7 @@ public partial class QueryExecutionServiceTests
 
         var entityTenantId = Guid.NewGuid();
         var requestTenantId = Guid.NewGuid();
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(requestTenantId));
@@ -1295,7 +1577,7 @@ public partial class QueryExecutionServiceTests
         }
 
         var logger = new Mock<ILogger<QueryExecutionService>>();
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             logger.Object,
             CreateTrustedContext(tenantId));
@@ -1346,7 +1628,7 @@ public partial class QueryExecutionServiceTests
         }
 
         var tenantId = Guid.NewGuid();
-        var service = new QueryExecutionService(
+        var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext(tenantId));
@@ -1471,7 +1753,7 @@ public partial class QueryExecutionServiceTests
                 })
                 .ToList()
         };
-        var service = new QueryExecutionService(
+        var service = CreateService(
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext());
@@ -1498,7 +1780,7 @@ public partial class QueryExecutionServiceTests
                 }
             ]
         };
-        var service = new QueryExecutionService(
+        var service = CreateService(
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext());
@@ -1513,7 +1795,7 @@ public partial class QueryExecutionServiceTests
     [Test]
     public async Task ExecuteChangesAsync_OversizedRequest_IsRejectedBeforeRequestDeserialization()
     {
-        var service = new QueryExecutionService(
+        var service = CreateService(
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext());
@@ -1529,7 +1811,7 @@ public partial class QueryExecutionServiceTests
     [Test]
     public async Task ExecuteAsync_OversizedDescriptor_IsRejectedBeforeDescriptorDeserialization()
     {
-        var service = new QueryExecutionService(
+        var service = CreateService(
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<QueryExecutionService>.Instance,
             CreateTrustedContext());
@@ -1607,6 +1889,70 @@ public partial class QueryExecutionServiceTests
             })
         };
 
+    private static QueryExecutionService CreateService(
+        IServiceProvider services,
+        ILogger<QueryExecutionService> logger,
+        ITrustedInvocationContextAccessor invocationContextAccessor,
+        GeneratedEntityAuthorizationPolicyRegistry? authorizationPolicies = null) =>
+        new(
+            services,
+            logger,
+            invocationContextAccessor,
+            authorizationPolicies ?? CreateDefaultPolicyRegistry());
+
+    private static GeneratedEntityAuthorizationPolicyRegistry CreateDefaultPolicyRegistry()
+    {
+        var policies = new List<GeneratedEntityAuthorizationPolicy>();
+        var entities = new (string EntityTypeName, string? AuthorizationFeature)[]
+        {
+            (nameof(TestTenantEntity), null),
+            (nameof(TestGlobalTenantEntity), null),
+            (nameof(Tenant), "identity.tenants"),
+            (nameof(TenantModuleFeature), "identity.tenants"),
+            (nameof(IdentityContact), "identity.contacts")
+        };
+
+        foreach (var entity in entities)
+        foreach (var operation in Enum.GetValues<GeneratedEntityOperation>())
+        {
+            policies.Add(new GeneratedEntityAuthorizationPolicy
+            {
+                EntityTypeName = entity.EntityTypeName,
+                Operation = operation,
+                ActorRequirement = ActorRequirement.Optional,
+                AuthorizationFeature = entity.AuthorizationFeature,
+                AllowRemoteMutation = operation != GeneratedEntityOperation.Read,
+                AllowServiceOnly = true,
+                AllowedServiceCallers = [XFrameworkServiceNames.Portal]
+            });
+        }
+
+        return new GeneratedEntityAuthorizationPolicyRegistry(policies);
+    }
+
+    private static GeneratedEntityAuthorizationPolicyRegistry CreatePolicyRegistry(
+        params GeneratedEntityAuthorizationPolicy[] policies)
+    {
+        return new GeneratedEntityAuthorizationPolicyRegistry(policies);
+    }
+
+    private static GeneratedEntityAuthorizationPolicy CreatePolicy(
+        string entityTypeName,
+        GeneratedEntityOperation operation,
+        string? requiredCapability = null,
+        IReadOnlyCollection<string>? requiredRoles = null,
+        IReadOnlyDictionary<string, string>? requiredAttributes = null) =>
+        new()
+        {
+            EntityTypeName = entityTypeName,
+            Operation = operation,
+            ActorRequirement = ActorRequirement.Required,
+            RequiredCapability = requiredCapability,
+            RequiredRoles = requiredRoles ?? [],
+            RequiredActorAttributes = requiredAttributes ?? new Dictionary<string, string>(),
+            AllowRemoteMutation = operation != GeneratedEntityOperation.Read
+        };
+
     private static ITrustedInvocationContextAccessor CreateTrustedContext(
         Guid? effectiveTenantId = null,
         TrustedActorIdentity? actor = null,
@@ -1629,16 +1975,22 @@ public partial class QueryExecutionServiceTests
             effectiveTenantId,
             Guid.NewGuid()));
 
-    private static TrustedActorIdentity CreateActor(Guid tenantId, Guid credentialId) =>
+    private static TrustedActorIdentity CreateActor(
+        Guid tenantId,
+        Guid credentialId,
+        IReadOnlySet<string>? roles = null,
+        IReadOnlySet<string>? capabilities = null,
+        IReadOnlyDictionary<string, string>? attributes = null) =>
         new(
             credentialId,
             Guid.NewGuid(),
             tenantId,
             Guid.NewGuid(),
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            roles ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            capabilities ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             "test-actor-generation",
-            DateTimeOffset.UtcNow.AddMinutes(5));
+            DateTimeOffset.UtcNow.AddMinutes(5),
+            attributes);
 
     private sealed class TestTrustedInvocationContextAccessor(TrustedInvocationContext current)
         : ITrustedInvocationContextAccessor

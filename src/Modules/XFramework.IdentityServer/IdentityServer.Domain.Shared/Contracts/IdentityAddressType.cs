@@ -8,7 +8,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-address-types",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity.addresses"
 )]
 public partial class IdentityAddressType : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows
 {

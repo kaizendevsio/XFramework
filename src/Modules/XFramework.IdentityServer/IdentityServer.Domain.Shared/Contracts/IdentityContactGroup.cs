@@ -8,7 +8,8 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-contact-groups",
-    RequireAuthorization = true
+    RequireAuthorization = true,
+    AuthorizationFeature = "identity.contacts"
 )]
 public partial class IdentityContactGroup : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows
 {

@@ -120,7 +120,7 @@ public sealed class DataContextBoltHandlerTests
             .Setup(x => x.ExecuteChangesAsync(It.IsAny<byte[]>(), cancellationToken))
             .ReturnsAsync(expectedResponse);
 
-        var requestPayload = MemoryPackSerializer.Serialize(new SaveChangesRequest { Metadata = metadata });
+        var requestPayload = MutationRequest(metadata);
         var payload = Envelope(requestPayload);
         var result = await handler(payload, context, cancellationToken);
 
@@ -136,7 +136,7 @@ public sealed class DataContextBoltHandlerTests
     {
         var metadata = CreateMetadata();
         var context = new BoltInboundRequestContext(Guid.NewGuid(), BoltCodec.Fnv1aHash("portal"));
-        var (client, authorizer, queryService, handler) = CreateHandler("__db_query__");
+        var (client, authorizer, queryService, handler) = CreateHandler("__db_query__", allowServiceOnly: true);
         await using var disposableClient = client;
 
         authorizer
@@ -172,7 +172,7 @@ public sealed class DataContextBoltHandlerTests
     {
         var metadata = CreateMetadata();
         var context = new BoltInboundRequestContext(Guid.NewGuid(), BoltCodec.Fnv1aHash("portal"));
-        var (client, authorizer, queryService, handler) = CreateHandler("__db_changes__");
+        var (client, authorizer, queryService, handler) = CreateHandler("__db_changes__", allowServiceOnly: true);
         await using var disposableClient = client;
 
         authorizer
@@ -191,7 +191,7 @@ public sealed class DataContextBoltHandlerTests
             .Setup(x => x.ExecuteChangesAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([4, 5, 6]);
 
-        var requestPayload = MemoryPackSerializer.Serialize(new SaveChangesRequest { Metadata = metadata });
+        var requestPayload = MutationRequest(metadata);
         var result = await handler(Envelope(requestPayload, actorAccessToken: null), context, CancellationToken.None);
 
         result.Item1.Should().Be(HttpStatusCode.OK);
@@ -281,7 +281,7 @@ public sealed class DataContextBoltHandlerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(TrustedInvocationResult.Failure("Service caller is not allowed.", 403));
 
-        var requestPayload = MemoryPackSerializer.Serialize(new SaveChangesRequest { Metadata = metadata });
+        var requestPayload = MutationRequest(metadata);
         var payload = Envelope(requestPayload);
         var result = await handler(payload, context, CancellationToken.None);
 
@@ -293,18 +293,89 @@ public sealed class DataContextBoltHandlerTests
         queryService.Verify(x => x.ExecuteAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Test]
+    public async Task QueryRoute_MissingEntityPolicy_FailsBeforeAuthorizationAndExecution()
+    {
+        var context = new BoltInboundRequestContext(Guid.NewGuid(), BoltCodec.Fnv1aHash("portal"));
+        var registry = new GeneratedEntityAuthorizationPolicyRegistry();
+        var (client, authorizer, queryService, handler) = CreateHandler("__db_query__", registry: registry);
+        await using var disposableClient = client;
+
+        var payload = Envelope(MemoryPackSerializer.Serialize(new QueryDescriptor
+        {
+            EntityTypeName = "UnregisteredEntity",
+            Metadata = CreateMetadata()
+        }));
+
+        var result = await handler(payload, context, CancellationToken.None);
+
+        result.Item1.Should().Be(HttpStatusCode.Forbidden);
+        authorizer.VerifyNoOtherCalls();
+        queryService.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task MutationRoute_MixedEntityBatchWithUnauthorizedPolicy_RejectsWholeBatch()
+    {
+        var metadata = CreateMetadata();
+        var context = new BoltInboundRequestContext(Guid.NewGuid(), BoltCodec.Fnv1aHash("portal"));
+        var registry = CreatePolicyRegistry(additionalPolicies:
+        [
+            new GeneratedEntityAuthorizationPolicy
+            {
+                EntityTypeName = "Wallet",
+                Operation = GeneratedEntityOperation.Create,
+                AuthorizationFeature = "wallets",
+                RequiredCapability = "wallets:manage",
+                AllowRemoteMutation = true
+            }
+        ]);
+        var (client, authorizer, queryService, handler) = CreateHandler("__db_changes__", registry: registry);
+        await using var disposableClient = client;
+
+        authorizer
+            .Setup(x => x.AuthorizeAsync(
+                It.IsAny<InvocationCredentials>(),
+                It.IsAny<RequestMetadata>(),
+                context,
+                It.IsAny<InvocationAuthorizationPolicy>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Authorized(metadata));
+
+        var request = new SaveChangesRequest
+        {
+            Metadata = metadata,
+            Changes =
+            [
+                Change("Tenant", ChangeOperation.Add),
+                Change("Wallet", ChangeOperation.Add)
+            ]
+        };
+        var result = await handler(
+            Envelope(MemoryPackSerializer.Serialize(request)),
+            context,
+            CancellationToken.None);
+
+        result.Item1.Should().Be(HttpStatusCode.Forbidden);
+        queryService.Verify(x => x.ExecuteChangesAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static (
         BoltClient Client,
         Mock<IBoltServiceInvocationAuthorizer> Authorizer,
         Mock<IQueryExecutionService> QueryService,
         Func<ReadOnlyMemory<byte>, BoltInboundRequestContext, CancellationToken, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> Handler)
-        CreateHandler(string commandName)
+        CreateHandler(
+            string commandName,
+            bool allowServiceOnly = false,
+            GeneratedEntityAuthorizationPolicyRegistry? registry = null)
     {
         var authorizer = new Mock<IBoltServiceInvocationAuthorizer>(MockBehavior.Strict);
         var queryService = new Mock<IQueryExecutionService>(MockBehavior.Strict);
         var services = new ServiceCollection()
             .AddSingleton(authorizer.Object)
             .AddSingleton(queryService.Object)
+            .AddSingleton(registry ?? CreatePolicyRegistry(allowServiceOnly))
             .BuildServiceProvider();
         var client = new BoltClient(
             new Uri("ws://localhost/bolt"),
@@ -335,6 +406,42 @@ public sealed class DataContextBoltHandlerTests
         OperationName = "DataContextBoltHandlerTests"
     };
 
+    private static byte[] MutationRequest(RequestMetadata metadata) =>
+        MemoryPackSerializer.Serialize(new SaveChangesRequest
+        {
+            Metadata = metadata,
+            Changes = [Change("Tenant", ChangeOperation.Add)]
+        });
+
+    private static ChangeEntry Change(string entityTypeName, ChangeOperation operation) => new()
+    {
+        EntityTypeName = entityTypeName,
+        Operation = operation,
+        SerializedEntity = []
+    };
+
+    private static GeneratedEntityAuthorizationPolicyRegistry CreatePolicyRegistry(
+        bool allowServiceOnly = false,
+        IReadOnlyCollection<GeneratedEntityAuthorizationPolicy>? additionalPolicies = null)
+    {
+        var policies = new List<GeneratedEntityAuthorizationPolicy>();
+        foreach (var operation in Enum.GetValues<GeneratedEntityOperation>())
+        {
+            policies.Add(new GeneratedEntityAuthorizationPolicy
+            {
+                EntityTypeName = "Tenant",
+                Operation = operation,
+                AuthorizationFeature = "identity.tenants",
+                AllowRemoteMutation = operation != GeneratedEntityOperation.Read,
+                AllowServiceOnly = allowServiceOnly,
+                AllowedServiceCallers = allowServiceOnly ? [XFrameworkServiceNames.Portal] : []
+            });
+        }
+
+        policies.AddRange(additionalPolicies ?? []);
+        return new GeneratedEntityAuthorizationPolicyRegistry(policies);
+    }
+
     private static bool HasSameMetadata(RequestMetadata actual, RequestMetadata expected) =>
         actual.RequestedTenantId == expected.RequestedTenantId &&
         actual.RequestId == expected.RequestId &&
@@ -346,12 +453,14 @@ public sealed class DataContextBoltHandlerTests
 
     private static bool HasPolicy(InvocationAuthorizationPolicy policy, params string[] scopes) =>
         policy.ActorRequirement == ActorRequirement.Required &&
-        policy.TenantAccessMode == TenantAccessMode.DelegatedTenant &&
+        policy.TenantAccessMode == TenantAccessMode.ActorTenant &&
         policy.RequiredActorCapabilities.SequenceEqual(
             scopes.Contains(XFrameworkServiceScopes.DataContextQueryAllTenants)
                 ? ["identity.tenants:manage"]
                 : []) &&
-        policy.RequiredCrossTenantActorCapabilities.SequenceEqual(["identity.tenants:manage"]) &&
+        policy.RequiredCrossTenantActorCapabilities.Count == 0 &&
+        policy.AllowedServiceCallers.Count == XFrameworkServiceNames.All.Count &&
+        XFrameworkServiceNames.All.All(policy.AllowedServiceCallers.Contains) &&
         policy.RequiredServiceScopes.Count == scopes.Length &&
         scopes.All(policy.RequiredServiceScopes.Contains);
 
@@ -360,7 +469,7 @@ public sealed class DataContextBoltHandlerTests
         params string[] scopes) =>
         policy.ActorRequirement == ActorRequirement.None &&
         policy.TenantAccessMode == TenantAccessMode.ServiceTargetTenant &&
-        policy.AllowedServiceCallers.SequenceEqual(XFrameworkServiceNames.All) &&
+        policy.AllowedServiceCallers.SequenceEqual([XFrameworkServiceNames.Portal]) &&
         policy.RequiredServiceScopes.Count == scopes.Length &&
         scopes.All(policy.RequiredServiceScopes.Contains);
 

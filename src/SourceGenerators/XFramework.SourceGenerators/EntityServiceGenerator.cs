@@ -83,6 +83,15 @@ public class EntityServiceGenerator : IIncrementalGenerator
                 HasTenantId = hasTenantId,
                 AllowsGlobalTenantRows = AllowsGlobalTenantRows(classSymbol),
                 IsBaseModel = isBaseModel,
+                RequireAuthorization = GetBoolValue(attributeData, "RequireAuthorization", true),
+                ActorRequirement = GetEnumValue(attributeData, "ActorRequirement", 0),
+                Roles = GetStringArrayValue(attributeData, "Roles") ?? [],
+                AuthorizationFeature = GetStringValue(attributeData, "AuthorizationFeature"),
+                ReadCapability = GetStringValue(attributeData, "ReadCapability") ?? "view",
+                CreateCapability = GetStringValue(attributeData, "CreateCapability") ?? "create",
+                UpdateCapability = GetStringValue(attributeData, "UpdateCapability") ?? "update",
+                DeleteCapability = GetStringValue(attributeData, "DeleteCapability") ?? "delete",
+                ActorAttributes = GetActorAttributes(classSymbol),
                 ExplicitResponseProperties = GetStringArrayValue(attributeData, "ResponseProperties")
             };
         }
@@ -357,6 +366,15 @@ public class EntityServiceGenerator : IIncrementalGenerator
                         HasTenantId = ImplementsTenantOwnership(type),
                         AllowsGlobalTenantRows = AllowsGlobalTenantRows(type),
                         IsBaseModel = isBaseModel,
+                        RequireAuthorization = GetBoolValue(attr, "RequireAuthorization", true),
+                        ActorRequirement = GetEnumValue(attr, "ActorRequirement", 0),
+                        Roles = GetStringArrayValue(attr, "Roles") ?? [],
+                        AuthorizationFeature = GetStringValue(attr, "AuthorizationFeature"),
+                        ReadCapability = GetStringValue(attr, "ReadCapability") ?? "view",
+                        CreateCapability = GetStringValue(attr, "CreateCapability") ?? "create",
+                        UpdateCapability = GetStringValue(attr, "UpdateCapability") ?? "update",
+                        DeleteCapability = GetStringValue(attr, "DeleteCapability") ?? "delete",
+                        ActorAttributes = GetActorAttributes(type),
                         ExplicitResponseProperties = GetStringArrayValue(attr, "ResponseProperties")
                     });
 
@@ -427,6 +445,8 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("using Mapster;");
         sb.AppendLine("using XFramework.Core.Patterns;");
         sb.AppendLine("using XFramework.Core.Services;");
+        sb.AppendLine("using XFramework.Core.DataContext;");
+        sb.AppendLine("using XFramework.Core.Services.FeatureGates;");
         sb.AppendLine("using XFramework.Domain.Shared.Contracts.Base;");
         sb.AppendLine("using XFramework.Integration.Security;");
         sb.AppendLine();
@@ -475,18 +495,28 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("        private readonly DbContext _context;");
         sb.AppendLine($"        private readonly IEnumerable<IValidator<{entityName}>> _entityValidators;");
         sb.AppendLine($"        private readonly ILogger<{entityName}Service> _logger;");
-        if (entity.HasTenantId)
+        if (entity.HasTenantId || entity.RequireAuthorization)
         {
             sb.AppendLine("        private readonly ITrustedInvocationContextAccessor _trustedInvocationContextAccessor;");
+        }
+        if (entity.RequireAuthorization)
+        {
+            sb.AppendLine("        private readonly GeneratedEntityAuthorizationPolicyRegistry _authorizationPolicies;");
+            sb.AppendLine("        private readonly ITrustedInvocationFeatureGate _trustedInvocationFeatureGate;");
         }
         sb.AppendLine();
 
         // Constructor
         sb.AppendLine($"        public {entityName}Service(");
         sb.AppendLine("            DbContext context,");
-        if (entity.HasTenantId)
+        if (entity.HasTenantId || entity.RequireAuthorization)
         {
             sb.AppendLine("            ITrustedInvocationContextAccessor trustedInvocationContextAccessor,");
+            if (entity.RequireAuthorization)
+            {
+                sb.AppendLine("            GeneratedEntityAuthorizationPolicyRegistry authorizationPolicies,");
+                sb.AppendLine("            ITrustedInvocationFeatureGate trustedInvocationFeatureGate,");
+            }
             sb.AppendLine($"            IEnumerable<IValidator<{entityName}>> entityValidators,");
             sb.AppendLine($"            ILogger<{entityName}Service> logger)");
         }
@@ -498,9 +528,14 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("        {");
         sb.AppendLine("            _context = context;");
         sb.AppendLine("            _entityValidators = entityValidators;");
-        if (entity.HasTenantId)
+        if (entity.HasTenantId || entity.RequireAuthorization)
         {
             sb.AppendLine("            _trustedInvocationContextAccessor = trustedInvocationContextAccessor;");
+        }
+        if (entity.RequireAuthorization)
+        {
+            sb.AppendLine("            _authorizationPolicies = authorizationPolicies;");
+            sb.AppendLine("            _trustedInvocationFeatureGate = trustedInvocationFeatureGate;");
         }
         sb.AppendLine("            _logger = logger;");
         sb.AppendLine("        }");
@@ -514,6 +549,31 @@ public class EntityServiceGenerator : IIncrementalGenerator
             sb.AppendLine("            if (_trustedInvocationContextAccessor.Current?.EffectiveTenantId is { } tenantId && tenantId != Guid.Empty)");
             sb.AppendLine("                return tenantId;");
             sb.AppendLine("            throw new UnauthorizedAccessException(\"No valid tenant context found\");");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+        }
+
+        if (entity.RequireAuthorization)
+        {
+            sb.AppendLine("        private async Task<InvocationPolicyCheckResult> EnsureAuthorizedAsync(GeneratedEntityOperation operation, CancellationToken ct)");
+            sb.AppendLine("        {");
+            sb.AppendLine($"            if (!_authorizationPolicies.TryGet(nameof({entityName}), operation, out var policy))");
+            sb.AppendLine("                return InvocationPolicyCheckResult.Failure(\"Generated entity authorization policy is unavailable.\", 403);");
+            sb.AppendLine("            var authorization = GeneratedEntityAuthorizationEvaluator.Evaluate(");
+            sb.AppendLine("                _trustedInvocationContextAccessor.Current,");
+            sb.AppendLine("                policy);");
+            sb.AppendLine("            if (!authorization.IsSuccess)");
+            sb.AppendLine("                return authorization;");
+            sb.AppendLine("            var separator = policy.RequiredCapability?.LastIndexOf(':') ?? -1;");
+            sb.AppendLine("            var capability = separator >= 0 ? policy.RequiredCapability![(separator + 1)..] : string.Empty;");
+            sb.AppendLine("            var feature = await _trustedInvocationFeatureGate.EnsureGeneratedEntityAllowedAsync(");
+            sb.AppendLine("                policy.AuthorizationFeature ?? string.Empty,");
+            sb.AppendLine("                capability,");
+            sb.AppendLine("                policy.TenantAccessMode != TenantAccessMode.Tenantless,");
+            sb.AppendLine("                ct);");
+            sb.AppendLine("            return feature.IsSuccess");
+            sb.AppendLine("                ? InvocationPolicyCheckResult.Success()");
+            sb.AppendLine("                : InvocationPolicyCheckResult.Failure(feature.Message ?? \"Generated entity feature is not allowed.\", feature.StatusCode);");
             sb.AppendLine("        }");
             sb.AppendLine();
         }
@@ -599,6 +659,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("        {");
         sb.AppendLine("            try");
         sb.AppendLine("            {");
+        AppendAuthorizationCheck(sb, entity, "create", 1, $"Result<{entityName}>");
         sb.AppendLine($"                var entity = request.Adapt<{entityName}>();");
         sb.AppendLine("                entity.Id = Guid.NewGuid();");
         if (entity.IsBaseModel)
@@ -614,6 +675,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
             sb.AppendLine("                ((IHasTenantId)entity).TenantId = tenantId;");
             sb.AppendLine();
         }
+
         AppendEntityValidation(sb, entityName);
         sb.AppendLine($"                _context.Set<{entityName}>().Add(entity);");
         sb.AppendLine("                await _context.SaveChangesAsync(ct);");
@@ -640,6 +702,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("        {");
         sb.AppendLine("            try");
         sb.AppendLine("            {");
+        AppendAuthorizationCheck(sb, entity, "view", 2 | 4, $"Result<Generated{entityName}Response>");
         sb.AppendLine($"                var query = _context.Set<{entityName}>().AsNoTracking();");
         sb.AppendLine();
         if (hasTenantId)
@@ -681,6 +744,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("        {");
         sb.AppendLine("            try");
         sb.AppendLine("            {");
+        AppendAuthorizationCheck(sb, entity, "view", 2 | 4, $"Result<List<Generated{entityName}Response>>");
         sb.AppendLine($"                var query = _context.Set<{entityName}>().AsNoTracking();");
         sb.AppendLine();
         if (hasTenantId)
@@ -760,6 +824,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("        {");
         sb.AppendLine("            try");
         sb.AppendLine("            {");
+        AppendAuthorizationCheck(sb, entity, "update", 8, $"Result<{entityName}>");
         if (entity.IsBaseModel)
         {
             sb.AppendLine("                if (expectedConcurrencyStamp == Guid.Empty)");
@@ -834,6 +899,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("        {");
         sb.AppendLine("            try");
         sb.AppendLine("            {");
+        AppendAuthorizationCheck(sb, entity, "delete", 16, "Result");
         if (entity.IsBaseModel)
         {
             sb.AppendLine("                if (expectedConcurrencyStamp == Guid.Empty)");
@@ -890,6 +956,100 @@ public class EntityServiceGenerator : IIncrementalGenerator
     {
         sb.AppendLine(
             $"                _logger.LogError(ex, \"Generated entity operation {{Operation}} failed for {{EntityType}}\", \"{operation}\", nameof({entityName}));");
+    }
+
+    private static void AppendAuthorizationCheck(
+        StringBuilder sb,
+        ServiceInfo entity,
+        string operation,
+        int actionMask,
+        string resultType)
+    {
+        if (!entity.RequireAuthorization)
+            return;
+
+        var generatedOperation = operation switch
+        {
+            "view" => "Read",
+            "create" => "Create",
+            "update" => "Update",
+            "delete" => "Delete",
+            _ => throw new InvalidOperationException($"Unknown generated operation '{operation}'.")
+        };
+        sb.AppendLine($"                var authorization = await EnsureAuthorizedAsync(GeneratedEntityOperation.{generatedOperation}, ct);");
+        sb.AppendLine("                if (!authorization.IsSuccess)");
+        sb.AppendLine($"                    return {resultType}.Failure(authorization.Error!, authorization.StatusCode);");
+        sb.AppendLine();
+    }
+
+    private static string ResolveCapability(ServiceInfo entity, string operation) => operation switch
+    {
+        "view" => entity.ReadCapability,
+        "create" => entity.CreateCapability,
+        "update" => entity.UpdateCapability,
+        "delete" => entity.DeleteCapability,
+        _ => operation
+    };
+
+    private static List<ActorAttributeInfo> GetActorAttributes(INamedTypeSymbol type)
+    {
+        var result = new List<ActorAttributeInfo>();
+        foreach (var attribute in type.GetAttributes().Where(attribute =>
+                     attribute.AttributeClass?.ToDisplayString() ==
+                     "XFramework.Domain.Shared.Attributes.RequireGeneratedActorAttributeAttribute"))
+        {
+            if (attribute.ConstructorArguments.Length == 2 &&
+                attribute.ConstructorArguments[0].Value is string name &&
+                attribute.ConstructorArguments[1].Value is string value)
+            {
+                result.Add(new ActorAttributeInfo(
+                    name,
+                    value,
+                    GetEnumValue(attribute, "Actions", 31)));
+            }
+        }
+
+        return result;
+    }
+
+    private static string ResolveActorRequirement(int actorRequirement) => actorRequirement switch
+    {
+        1 => "Optional",
+        2 => "None",
+        _ => "Required"
+    };
+
+    private static string StringArrayLiteral(IEnumerable<string> values) =>
+        $"[{string.Join(", ", values.Select(value => $"\"{Escape(value)}\""))}]";
+
+    private static string DictionaryLiteral(
+        IEnumerable<ActorAttributeInfo> attributes,
+        string actionMaskExpression) =>
+        $"new global::System.Collections.Generic.Dictionary<string, string>(global::System.StringComparer.OrdinalIgnoreCase) {{ {string.Join(", ", attributes.Select(attribute => $"[\"{Escape(attribute.Name)}\"] = ({actionMaskExpression} & {attribute.Actions}) != 0 ? \"{Escape(attribute.Value)}\" : string.Empty"))} }}.Where(static item => !string.IsNullOrEmpty(item.Value)).ToDictionary(static item => item.Key, static item => item.Value, global::System.StringComparer.OrdinalIgnoreCase)";
+
+    private static string Escape(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+    private static bool GetBoolValue(AttributeData attributeData, string propertyName, bool defaultValue)
+    {
+        foreach (var namedArg in attributeData.NamedArguments)
+        {
+            if (namedArg.Key == propertyName && namedArg.Value.Value is bool value)
+                return value;
+        }
+
+        return defaultValue;
+    }
+
+    private static string? GetStringValue(AttributeData attributeData, string propertyName)
+    {
+        foreach (var namedArg in attributeData.NamedArguments)
+        {
+            if (namedArg.Key == propertyName)
+                return namedArg.Value.Value as string;
+        }
+
+        return null;
     }
 
     private static void AppendCancellationCatch(StringBuilder sb)
@@ -978,6 +1138,15 @@ internal class ServiceInfo
     public List<ListFilterInfo> ListFilters { get; } = [];
     public List<ResponsePropertyInfo> ResponseProperties { get; } = [];
     public string[]? ExplicitResponseProperties { get; set; }
+    public bool RequireAuthorization { get; set; }
+    public int ActorRequirement { get; set; }
+    public string[] Roles { get; set; } = [];
+    public string? AuthorizationFeature { get; set; }
+    public string ReadCapability { get; set; } = "view";
+    public string CreateCapability { get; set; } = "create";
+    public string UpdateCapability { get; set; } = "update";
+    public string DeleteCapability { get; set; } = "delete";
+    public List<ActorAttributeInfo> ActorAttributes { get; set; } = [];
 }
 
 internal sealed class ResponsePropertyInfo(string name, string typeName, bool requiresInitializer)

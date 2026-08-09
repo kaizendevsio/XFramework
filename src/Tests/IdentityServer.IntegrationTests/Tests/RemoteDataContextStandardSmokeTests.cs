@@ -10,6 +10,19 @@ namespace IdentityServer.IntegrationTests.Tests;
 public sealed class RemoteDataContextStandardSmokeTests
 {
     [Test]
+    public async Task RemoteQuery_WithoutActor_IsUnauthorized()
+    {
+        using var actorSuppression = IntegrationTestFixture.SuppressActorAccessToken();
+
+        var query = async () => await IntegrationTestFixture.DataContext.Query<Tenant>()
+            .Where(item => item.Id == IntegrationTestFixture.TestTenantId)
+            .FirstOrDefaultAsync();
+
+        await query.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*status 401*");
+    }
+
+    [Test]
     public async Task RemoteQuery_CurrentTenant_RoundTripsThroughBolt()
     {
         var tenant = await IntegrationTestFixture.DataContext.Query<Tenant>()

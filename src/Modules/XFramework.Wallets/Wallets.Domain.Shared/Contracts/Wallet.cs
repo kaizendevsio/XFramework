@@ -5,10 +5,11 @@ namespace Wallets.Domain.Shared.Contracts;
 
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
-    Type = EndpointType.Both,
+    Type = EndpointType.Service,
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/wallets",
     RequireAuthorization = true,
+    AuthorizationFeature = "wallets",
     CacheDurationSeconds = 300,
     CacheKeyPrefix = "wallets"
 )]

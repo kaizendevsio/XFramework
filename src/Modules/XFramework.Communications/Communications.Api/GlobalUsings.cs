@@ -11,7 +11,7 @@ global using Communications.Domain.Shared.Contracts;
 global using Communications.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;
-global using XFramework.Core.Attributes;
+global using XFramework.Domain.Shared.Attributes;
 global using XFramework.Domain.Contexts;
 global using XFramework.Extensions;
 global using XFramework.Domain.Shared.ServiceIdentity;

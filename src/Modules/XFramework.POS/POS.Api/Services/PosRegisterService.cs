@@ -7,6 +7,9 @@ using Inventario.Integration.Drivers;
 using Wallets.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations;
+using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses;
 
 namespace POS.Api.Services;
 
@@ -57,6 +60,7 @@ public sealed class PosRegisterService(
             request.CurrencyId,
             request.DefaultWarehouseId,
             request.DefaultLocationId,
+            contextResult.Data.Metadata,
             ct);
         if (!referenceValidation.IsSuccess)
             return Result<PosRegisterResponse>.Failure(referenceValidation.Message!, referenceValidation.StatusCode);
@@ -132,6 +136,7 @@ public sealed class PosRegisterService(
             request.CurrencyId,
             request.DefaultWarehouseId,
             request.DefaultLocationId,
+            contextResult.Data.Metadata,
             ct);
         if (!referenceValidation.IsSuccess)
             return Result<PosRegisterResponse>.Failure(referenceValidation.Message!, referenceValidation.StatusCode);
@@ -179,6 +184,7 @@ public sealed class PosRegisterService(
         Guid currencyId,
         Guid warehouseId,
         Guid locationId,
+        RequestMetadata metadata,
         CancellationToken ct)
     {
         var merchantResponse = await identityServer.IdentityCredential.Get(merchantCredentialId, tenantId);
@@ -210,13 +216,22 @@ public sealed class PosRegisterService(
         if (cashDrawerWallet.WalletTypeId.HasValue && cashDrawerWallet.WalletTypeId.Value != walletTypeId)
             return Result.Conflict("Cash drawer wallet type does not match the POS register wallet type");
 
-        var warehouseResponse = await inventario.Warehouse.Get(warehouseId, tenantId);
-        var warehouse = warehouseResponse.Response;
+        var warehouseResponse = await inventario.GetWarehouses(new GetWarehousesRequest
+        {
+            Id = warehouseId,
+            Metadata = metadata
+        }, ct);
+        var warehouse = warehouseResponse.Response?.SingleOrDefault();
         if (!warehouseResponse.IsSuccess || warehouse is null || warehouse.IsDeleted || warehouse.TenantId != tenantId)
             return Result.NotFound("Warehouse was not found for this tenant");
 
-        var locationResponse = await inventario.InventoryLocation.Get(locationId, tenantId);
-        var location = locationResponse.Response;
+        var locationResponse = await inventario.GetInventoryLocations(new GetInventoryLocationsRequest
+        {
+            WarehouseId = warehouseId,
+            Id = locationId,
+            Metadata = metadata
+        }, ct);
+        var location = locationResponse.Response?.SingleOrDefault();
         if (!locationResponse.IsSuccess ||
             location is null ||
             location.IsDeleted ||

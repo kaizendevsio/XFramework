@@ -273,21 +273,37 @@ public sealed class WrapperContractCoverageTests : InventarioTestBase
         await using var db = CreateDbContext();
         var warehouse = await TestInventarioSeed.SeedWarehouse(db, code: UniqueCode("WH"));
         var location = await TestInventarioSeed.SeedLocation(db, warehouse.Id, code: UniqueCode("BIN"));
+        var sameTenantWarehouse = await TestInventarioSeed.SeedWarehouse(db, code: UniqueCode("WH"));
+        var sameTenantLocation = await TestInventarioSeed.SeedLocation(
+            db,
+            sameTenantWarehouse.Id,
+            code: UniqueCode("BIN"));
         var otherTenantId = Guid.NewGuid();
         var otherWarehouse = await TestInventarioSeed.SeedWarehouse(db, otherTenantId, UniqueCode("WH"));
         var otherLocation = await TestInventarioSeed.SeedLocation(db, otherWarehouse.Id, otherTenantId, UniqueCode("BIN"));
 
         var warehouses = await InventarioIntegrationTestFixture.ServiceWrapper.GetWarehouses(
-            new GetWarehousesRequest { Metadata = CreateMetadata() });
+            new GetWarehousesRequest
+            {
+                Id = warehouse.Id,
+                Metadata = CreateMetadata()
+            });
         var locations = await InventarioIntegrationTestFixture.ServiceWrapper.GetInventoryLocations(
-            new GetInventoryLocationsRequest { Metadata = CreateMetadata() });
+            new GetInventoryLocationsRequest
+            {
+                WarehouseId = warehouse.Id,
+                Id = location.Id,
+                Metadata = CreateMetadata()
+            });
 
         warehouses.IsSuccess.Should().BeTrue(warehouses.Message);
-        warehouses.Response.Should().Contain(x => x.Id == warehouse.Id);
+        warehouses.Response.Should().ContainSingle(x => x.Id == warehouse.Id);
+        warehouses.Response.Should().NotContain(x => x.Id == sameTenantWarehouse.Id);
         warehouses.Response.Should().NotContain(x => x.Id == otherWarehouse.Id);
 
         locations.IsSuccess.Should().BeTrue(locations.Message);
-        locations.Response.Should().Contain(x => x.Id == location.Id);
+        locations.Response.Should().ContainSingle(x => x.Id == location.Id);
+        locations.Response.Should().NotContain(x => x.Id == sameTenantLocation.Id);
         locations.Response.Should().NotContain(x => x.Id == otherLocation.Id);
     }
 
