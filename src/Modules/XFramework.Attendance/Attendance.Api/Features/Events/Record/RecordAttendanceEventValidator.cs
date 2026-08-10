@@ -19,6 +19,10 @@ public sealed class RecordAttendanceEventValidator : AbstractValidator<RecordAtt
         RuleFor(x => x.Source)
             .IsInEnum().WithMessage("Attendance event source is invalid");
 
+        RuleFor(x => x.OccurredAt)
+            .Must(value => !value.HasValue || value.Value.Kind == DateTimeKind.Utc)
+            .WithMessage("Attendance event time must be UTC");
+
         RuleFor(x => x.IdempotencyKey)
             .NotEmpty().WithMessage("Idempotency key is required")
             .MaximumLength(128).WithMessage("Idempotency key must not exceed 128 characters");

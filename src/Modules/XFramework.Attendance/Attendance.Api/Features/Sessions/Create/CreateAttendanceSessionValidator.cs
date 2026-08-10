@@ -19,13 +19,42 @@ public sealed class CreateAttendanceSessionValidator : AbstractValidator<CreateA
 
         RuleFor(x => x.TimeZoneId)
             .NotEmpty().WithMessage("Time zone ID is required")
-            .MaximumLength(100).WithMessage("Time zone ID must not exceed 100 characters");
+            .MaximumLength(100).WithMessage("Time zone ID must not exceed 100 characters")
+            .Must(BeValidTimeZone).WithMessage("Time zone ID is invalid");
 
         RuleFor(x => x.Status)
-            .IsInEnum().WithMessage("Attendance session status is invalid");
+            .IsInEnum().WithMessage("Attendance session status is invalid")
+            .Must(status => status is AttendanceSessionStatus.Scheduled or AttendanceSessionStatus.Open)
+            .WithMessage("New attendance sessions must be scheduled or open");
+
+        RuleFor(x => x.StartsAt)
+            .Must(BeUtc).WithMessage("Attendance session start must be UTC");
 
         RuleFor(x => x.EndsAt)
+            .Must(BeUtc).WithMessage("Attendance session end must be UTC")
             .GreaterThan(x => x.StartsAt).WithMessage("Attendance session end must be after start");
+    }
+
+    private static bool BeUtc(DateTime value) => value.Kind == DateTimeKind.Utc;
+
+    private static bool BeValidTimeZone(string timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+            return false;
+
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return false;
+        }
     }
 }
 

@@ -63,7 +63,10 @@ The mental model is:
 - Cross-module and Portal business operations must go through `IAttendanceServiceWrapper`.
 - Use wrapper methods for creating or updating contexts, participants, sessions, attendance events, adjustments, and reports.
 - Do not perform direct remote `IDataContext` mutations from Portal or another module for Attendance business actions.
-- Remote `IDataContext.Query<T>()` is acceptable only for tenant-scoped read projections that are covered by integration or Portal contract tests.
+- Attendance entity `GenerateEndpoints` declarations intentionally keep `Actions=None`; generic remote `IDataContext` reads and mutations must remain fail-closed.
+- Portal and cross-module Attendance reads must use the explicit read methods on `IAttendanceServiceWrapper`.
+- Custom Attendance Bolt handlers are Portal-only and require exactly `attendance.read` or `attendance.write`. Preserve the trusted actor, actor-tenant, feature, and capability checks when adding operations.
+- Pass cancellation tokens through every wrapper method and transport call.
 - Keep `Attendance.Api/Program.cs` explicit generated Bolt registration:
   `BoltHandlerRegistry.RegisterAll(client, logger, scopeFactory)`.
 - Pass `hostEnvironment` to `AddXFrameworkBoltClient` so non-Development startup validates secure `wss://` transport configuration. Do not bypass that validation with the environment-free overload or a plaintext client URL.
@@ -76,29 +79,32 @@ The mental model is:
 - `AttendanceSession` defines the scheduled window. Actual time-in/time-out is recorded through `RecordAttendanceEventRequest`.
 - `AttendanceEvent` is append-only and idempotent by tenant plus `IdempotencyKey`.
 - Generate a unique, deterministic-enough idempotency key per UI or device action. Portal keys should stay prefixed with a Portal-specific value.
-- Duplicate idempotency-key replays should return the existing event outcome, not create another event.
+- Duplicate idempotency-key replays should return the existing event outcome only when the complete event payload matches. Reusing a key for different data is a conflict, and concurrent matching retries must converge on one event.
+- Events are accepted only for `Open` sessions and must fall inside the UTC session window. Use the session transition operation for `Scheduled -> Open`, `Open -> Closed`, and cancellation from `Scheduled` or `Open`; closed and cancelled sessions are terminal.
 - Check-in after the grace period becomes `Late`.
 - Missing checkout can become `Incomplete` when the policy requires checkout.
-- Manual adjustments must include `ActorCredentialId` and a non-empty reason.
+- Manual adjustments must include a non-empty reason. Compatibility actor fields, when supplied, must match the authenticated actor.
 - Manual check-in/check-out from operators should use `AttendanceEventSource.Manual` and the validated operator credential from `ITrustedInvocationContextAccessor`.
+- Never persist a caller-selected audit actor. Event and adjustment actor attribution comes from `ITrustedInvocationContextAccessor`.
+- Participant removal ends the membership without soft-deleting it. Rosters and reports must apply `StartedAt`/`EndedAt` to each session so later membership changes do not rewrite history.
 
 ## Portal Integration Rules
 
 - Attendance navigation and pages must be feature-gated by `TenantModuleFeatureKeys.Attendance`.
 - Portal writes must call `IAttendanceServiceWrapper`.
-- Portal read-heavy screens may use `IDataContext.Query<T>()` through `AttendancePortalReadService` when tenant-scoped and tested.
+- Portal Attendance data reads must call the explicit wrapper read operations through `AttendancePortalReadService`; do not restore generic Attendance `IDataContext` queries or `IgnoreQueryFilters()`.
 - Use `XfEntityPicker<IdentityCredential>` or an equivalent credential picker for participant selection. Never make operators type credential GUIDs.
-- Copy `DisplayName` and `ReferenceCode` from the selected credential for participant display, but treat IdentityServer as authoritative.
+- `AddParticipantAsync` validates the selected credential through IdentityServer for the effective tenant and rejects missing, disabled, deleted, or cross-tenant credentials. The API persists authoritative alias/username labels; caller-provided labels are not authoritative.
 - Session rosters should show active context participants. If a participant has no `AttendanceRecord` for the session, display `Absent` without creating a record.
 - Use BlazorBlueprint `BbDataGrid` for list, roster, and report UI. Do not introduce raw tables or custom table components for tabular Attendance UI.
 - User Detail Attendance views are read-only in V1; operational changes belong in the Attendance workspace.
 
-## Remote DataContext Footguns
+## Read Boundary Footguns
 
-- Be careful with remote `IDataContext` expression serialization.
-- Do not push `DateTime` constants into remote Attendance predicates unless a deployed-shape integration test proves that query shape works.
-- For Portal session date filters, prefer bounded tenant/context/status reads followed by normalized in-process UTC filtering, or use wrapper/report endpoints.
-- If a remote query works locally but fails on xeon-dev, add coverage in `Attendance.IntegrationTests` or `Portal.E2ETests` before shipping the fix.
+- Do not enable generated CRUD or remote-query actions merely to make a screen load. Add or extend an explicit tenant-scoped read contract instead.
+- Keep the generated-authorization completeness test asserting zero generic Attendance policies and zero mutable Attendance entities.
+- Attendance read wrappers require an actor with `attendance:view`, the Attendance feature, the Portal caller identity, and `attendance.read`; service-only reads remain denied.
+- Identity credential option/label reads still belong to IdentityServer and must follow its authorized boundary.
 
 ## EF And Schema Rules
 
@@ -120,6 +126,7 @@ The mental model is:
 
 - Add or update `Attendance.Tests` for service rules, state transitions, idempotency, policies, tenant validation, and manual adjustments.
 - Add or update `Attendance.IntegrationTests` for PostgreSQL mappings, migrations, wrapper calls, remote `IDataContext` query surfaces, and production-like Bolt registration.
+- Keep `.github/workflows/attendance-integration-tests.yml` mandatory for Attendance changes. CI must fail when PostgreSQL/Testcontainers cannot start; local runs may skip only when no configured runtime is available.
 - Add or update Portal contract tests when Attendance read/display projection behavior changes.
 - For deployment or wrapper fixes, verify both HTTP endpoint behavior and wrapper/Bolt behavior.
 - Documentation-only changes do not require a full build, but run `git diff --check` and check links/paths you reference.

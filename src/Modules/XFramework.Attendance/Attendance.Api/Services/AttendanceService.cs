@@ -12,7 +12,8 @@ namespace Attendance.Api.Services;
 public sealed class AttendanceService(
     AppDbContext db,
     ILogger<AttendanceService> logger,
-    ITrustedInvocationContextAccessor trustedInvocationContextAccessor)
+    ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
+    IAttendanceCredentialResolver credentialResolver)
 {
     private const int DefaultGracePeriodMinutes = 5;
     private const int DefaultEarlyCheckoutGraceMinutes = 0;
@@ -145,6 +146,9 @@ public sealed class AttendanceService(
         if (!TryResolveTenantId(request.TenantId, request.Metadata, out var tenantId))
             return Result<AttendanceParticipantResponse>.Failure("Tenant ID is required", 400);
 
+        if (request.StartedAt.HasValue && !IsUtc(request.StartedAt.Value))
+            return Result<AttendanceParticipantResponse>.Failure("Participant start time must be UTC", 400);
+
         var contextExists = await db.Set<AttendanceContext>()
             .AsNoTracking()
             .AnyAsync(item => item.TenantId == tenantId && item.Id == request.ContextId && item.IsActive, ct);
@@ -163,15 +167,28 @@ public sealed class AttendanceService(
         if (existing is not null)
             return Result<AttendanceParticipantResponse>.Conflict("Credential is already an attendance participant in this context");
 
+        var credentialResult = await credentialResolver.ResolveAsync(request.CredentialId, tenantId, ct);
+        if (!credentialResult.IsSuccess)
+            return Result<AttendanceParticipantResponse>.Failure(
+                credentialResult.Message ?? "Identity credential could not be validated",
+                credentialResult.StatusCode);
+
+        var credential = credentialResult.Data!;
+        if (credential.CredentialId != request.CredentialId || credential.TenantId != tenantId)
+            return Result<AttendanceParticipantResponse>.NotFound("Identity credential was not found for this tenant");
+
+        if (!credential.IsEnabled || credential.IsDeleted)
+            return Result<AttendanceParticipantResponse>.Conflict("Identity credential is not active");
+
         var participant = new AttendanceParticipant
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ContextId = request.ContextId,
             CredentialId = request.CredentialId,
-            DisplayName = NormalizeOptional(request.DisplayName),
-            ReferenceCode = NormalizeOptional(request.ReferenceCode),
-            StartedAt = request.StartedAt ?? DateTime.UtcNow,
+            DisplayName = NormalizeOptional(credential.UserAlias) ?? NormalizeOptional(credential.UserName),
+            ReferenceCode = NormalizeOptional(credential.UserName),
+            StartedAt = NormalizeUtcPrecision(request.StartedAt ?? DateTime.UtcNow),
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             ConcurrencyStamp = Guid.NewGuid(),
@@ -198,10 +215,19 @@ public sealed class AttendanceService(
         if (participant is null)
             return Result.NotFound("Attendance participant was not found");
 
+        if (!participant.IsActive)
+            return Result.Conflict("Attendance participant is already inactive");
+
+        if (request.EndedAt.HasValue && !IsUtc(request.EndedAt.Value))
+            return Result.Failure("Participant end time must be UTC", 400);
+
+        var endedAt = NormalizeUtcPrecision(request.EndedAt ?? DateTime.UtcNow);
+        if (endedAt < participant.StartedAt)
+            return Result.Failure("Participant end time cannot be before the start time", 400);
+
         participant.IsActive = false;
-        participant.EndedAt = request.EndedAt ?? DateTime.UtcNow;
+        participant.EndedAt = endedAt;
         participant.ModifiedAt = DateTime.UtcNow;
-        db.Set<AttendanceParticipant>().Remove(participant);
         await db.SaveChangesAsync(ct);
 
         return Result.Success("Attendance participant removed");
@@ -270,6 +296,21 @@ public sealed class AttendanceService(
         if (!TryResolveTenantId(request.TenantId, request.Metadata, out var tenantId))
             return Result<AttendanceSessionResponse>.Failure("Tenant ID is required", 400);
 
+        if (!IsUtc(request.StartsAt) || !IsUtc(request.EndsAt))
+            return Result<AttendanceSessionResponse>.Failure("Attendance session start and end times must be UTC", 400);
+
+        var startsAt = NormalizeUtcPrecision(request.StartsAt);
+        var endsAt = NormalizeUtcPrecision(request.EndsAt);
+        if (endsAt <= startsAt)
+            return Result<AttendanceSessionResponse>.Failure("Attendance session end must be after start", 400);
+
+        var timeZoneId = NormalizeOptional(request.TimeZoneId);
+        if (timeZoneId is null || !IsValidTimeZone(timeZoneId))
+            return Result<AttendanceSessionResponse>.Failure("Attendance session time zone is invalid", 400);
+
+        if (request.Status is AttendanceSessionStatus.Closed or AttendanceSessionStatus.Cancelled)
+            return Result<AttendanceSessionResponse>.Failure("New attendance sessions must be scheduled or open", 400);
+
         var context = await db.Set<AttendanceContext>()
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == request.ContextId && item.IsActive, ct);
@@ -295,9 +336,9 @@ public sealed class AttendanceService(
             PolicyId = request.PolicyId ?? context.DefaultPolicyId,
             Name = request.Name.Trim(),
             Code = NormalizeOptional(request.Code),
-            StartsAt = request.StartsAt,
-            EndsAt = request.EndsAt,
-            TimeZoneId = request.TimeZoneId.Trim(),
+            StartsAt = startsAt,
+            EndsAt = endsAt,
+            TimeZoneId = timeZoneId,
             Status = request.Status,
             CreatedAt = DateTime.UtcNow,
             ConcurrencyStamp = Guid.NewGuid(),
@@ -361,6 +402,45 @@ public sealed class AttendanceService(
         });
     }
 
+    public async Task<Result<AttendanceSessionResponse>> TransitionSessionAsync(
+        TransitionAttendanceSessionRequest request,
+        CancellationToken ct)
+    {
+        if (!TryResolveTenantId(request.TenantId, request.Metadata, out var tenantId))
+            return Result<AttendanceSessionResponse>.Failure("Tenant ID is required", 400);
+
+        var session = await db.Set<AttendanceSession>()
+            .AsTracking()
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == request.SessionId, ct);
+
+        if (session is null)
+            return Result<AttendanceSessionResponse>.NotFound("Attendance session was not found");
+
+        if (session.Status == request.Status)
+            return Result<AttendanceSessionResponse>.Success(ToSessionResponse(session), "Attendance session status unchanged");
+
+        var transitionAllowed = session.Status switch
+        {
+            AttendanceSessionStatus.Scheduled => request.Status is AttendanceSessionStatus.Open or AttendanceSessionStatus.Cancelled,
+            AttendanceSessionStatus.Open => request.Status is AttendanceSessionStatus.Closed or AttendanceSessionStatus.Cancelled,
+            _ => false
+        };
+
+        if (!transitionAllowed)
+        {
+            return Result<AttendanceSessionResponse>.Conflict(
+                $"Attendance session cannot transition from {session.Status} to {request.Status}");
+        }
+
+        session.Status = request.Status;
+        session.ModifiedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Result<AttendanceSessionResponse>.Success(
+            ToSessionResponse(session),
+            "Attendance session status updated");
+    }
+
     public async Task<Result<AttendanceEventResponse>> RecordEventAsync(
         RecordAttendanceEventRequest request,
         CancellationToken ct)
@@ -368,17 +448,48 @@ public sealed class AttendanceService(
         if (!TryResolveTenantId(request.TenantId, request.Metadata, out var tenantId))
             return Result<AttendanceEventResponse>.Failure("Tenant ID is required", 400);
 
+        var actorCredentialId = trustedInvocationContextAccessor.Current?.Actor?.CredentialId;
+        if (!actorCredentialId.HasValue || actorCredentialId == Guid.Empty)
+            return Result<AttendanceEventResponse>.Failure("Authenticated actor credential is required", 401);
+
+        if (request.RecordedByCredentialId is { } suppliedActorCredentialId &&
+            suppliedActorCredentialId != Guid.Empty &&
+            suppliedActorCredentialId != actorCredentialId.Value)
+        {
+            return Result<AttendanceEventResponse>.Failure(
+                "Recorded-by credential must match the authenticated actor",
+                403);
+        }
+
+        var idempotencyKey = NormalizeOptional(request.IdempotencyKey);
+        if (idempotencyKey is null)
+            return Result<AttendanceEventResponse>.Failure("Idempotency key is required", 400);
+
+        if (request.OccurredAt.HasValue && !IsUtc(request.OccurredAt.Value))
+            return Result<AttendanceEventResponse>.Failure("Attendance event time must be UTC", 400);
+
+        var requestedOccurredAt = request.OccurredAt.HasValue
+            ? NormalizeUtcPrecision(request.OccurredAt.Value)
+            : (DateTime?)null;
+        var sourceReference = NormalizeOptional(request.SourceReference);
+        var notes = NormalizeOptional(request.Notes);
+        var metadataJson = SerializeMetadata(request.Data);
+
         var existingEvent = await db.Set<AttendanceEvent>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.IdempotencyKey == request.IdempotencyKey, ct);
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.IdempotencyKey == idempotencyKey, ct);
 
         if (existingEvent is not null)
-        {
-            var replayRecord = await GetRecordEntityAsync(tenantId, existingEvent.SessionId, existingEvent.ParticipantId, false, ct);
-            return Result<AttendanceEventResponse>.Success(
-                ToEventResponse(existingEvent, replayRecord is null ? null : ToRecordResponse(replayRecord, replayRecord.Status)),
-                "Attendance event replayed");
-        }
+            return await ResolveEventReplayAsync(
+                tenantId,
+                existingEvent,
+                request,
+                requestedOccurredAt,
+                actorCredentialId.Value,
+                sourceReference,
+                notes,
+                metadataJson,
+                ct);
 
         var session = await db.Set<AttendanceSession>()
             .AsNoTracking()
@@ -387,8 +498,17 @@ public sealed class AttendanceService(
         if (session is null)
             return Result<AttendanceEventResponse>.NotFound("Attendance session was not found");
 
-        if (session.Status == AttendanceSessionStatus.Cancelled)
-            return Result<AttendanceEventResponse>.Conflict("Cannot record attendance against a cancelled session");
+        if (session.Status != AttendanceSessionStatus.Open)
+            return Result<AttendanceEventResponse>.Conflict("Attendance events can only be recorded for open sessions");
+
+        var occurredAt = requestedOccurredAt ?? NormalizeUtcPrecision(DateTime.UtcNow);
+        if (occurredAt > DateTime.UtcNow)
+            return Result<AttendanceEventResponse>.Failure("Attendance event time cannot be in the future", 400);
+
+        var sessionStartsAt = NormalizeUtcPrecision(session.StartsAt);
+        var sessionEndsAt = NormalizeUtcPrecision(session.EndsAt);
+        if (occurredAt < sessionStartsAt || occurredAt > sessionEndsAt)
+            return Result<AttendanceEventResponse>.Conflict("Attendance event time must be within the session window");
 
         var participant = await db.Set<AttendanceParticipant>()
             .AsNoTracking()
@@ -396,14 +516,14 @@ public sealed class AttendanceService(
                 item.TenantId == tenantId &&
                 item.Id == request.ParticipantId &&
                 item.ContextId == session.ContextId &&
-                item.IsActive,
+                item.StartedAt <= session.StartsAt &&
+                (!item.EndedAt.HasValue || item.EndedAt.Value > session.StartsAt),
                 ct);
 
         if (participant is null)
             return Result<AttendanceEventResponse>.NotFound("Attendance participant was not found for this session context");
 
         var policy = await GetEffectivePolicyAsync(tenantId, session, ct);
-        var occurredAt = request.OccurredAt ?? DateTime.UtcNow;
         var attendanceEvent = new AttendanceEvent
         {
             Id = Guid.NewGuid(),
@@ -414,11 +534,11 @@ public sealed class AttendanceService(
             EventType = request.EventType,
             Source = request.Source,
             OccurredAt = occurredAt,
-            RecordedByCredentialId = request.RecordedByCredentialId ?? trustedInvocationContextAccessor.Current?.Actor?.CredentialId,
-            IdempotencyKey = request.IdempotencyKey.Trim(),
-            SourceReference = NormalizeOptional(request.SourceReference),
-            Notes = NormalizeOptional(request.Notes),
-            MetadataJson = request.Data is null ? null : JsonSerializer.Serialize(request.Data),
+            RecordedByCredentialId = actorCredentialId.Value,
+            IdempotencyKey = idempotencyKey,
+            SourceReference = sourceReference,
+            Notes = notes,
+            MetadataJson = metadataJson,
             CreatedAt = DateTime.UtcNow,
             ConcurrencyStamp = Guid.NewGuid(),
             IsEnabled = true
@@ -429,7 +549,33 @@ public sealed class AttendanceService(
             return Result<AttendanceEventResponse>.Failure(recordResult.Message ?? "Attendance event rejected", recordResult.StatusCode);
 
         db.Set<AttendanceEvent>().Add(attendanceEvent);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            var concurrentEvent = await db.Set<AttendanceEvent>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    item => item.TenantId == tenantId && item.IdempotencyKey == idempotencyKey,
+                    ct);
+
+            if (concurrentEvent is null)
+                throw;
+
+            return await ResolveEventReplayAsync(
+                tenantId,
+                concurrentEvent,
+                request,
+                requestedOccurredAt,
+                actorCredentialId.Value,
+                sourceReference,
+                notes,
+                metadataJson,
+                ct);
+        }
 
         logger.LogInformation(
             "Attendance event {AttendanceEventId} recorded for credential {CredentialId} in session {SessionId}",
@@ -492,6 +638,14 @@ public sealed class AttendanceService(
         if (!TryResolveTenantId(request.TenantId, request.Metadata, out var tenantId))
             return Result<AttendanceReportResponse>.Failure("Tenant ID is required", 400);
 
+        if (!IsUtc(request.FromUtc) || !IsUtc(request.ToUtc))
+            return Result<AttendanceReportResponse>.Failure("Attendance report range must be UTC", 400);
+
+        var fromUtc = NormalizeUtcPrecision(request.FromUtc);
+        var toUtc = NormalizeUtcPrecision(request.ToUtc);
+        if (toUtc <= fromUtc)
+            return Result<AttendanceReportResponse>.Failure("Attendance report end must be after start", 400);
+
         var contextExists = await db.Set<AttendanceContext>()
             .AsNoTracking()
             .AnyAsync(item => item.TenantId == tenantId && item.Id == request.ContextId, ct);
@@ -500,17 +654,31 @@ public sealed class AttendanceService(
             return Result<AttendanceReportResponse>.NotFound("Attendance context was not found");
 
         var (page, pageSize) = NormalizePage(request.Page, request.PageSize);
-        var activeParticipantCount = await db.Set<AttendanceParticipant>()
+        var participants = await db.Set<AttendanceParticipant>()
             .AsNoTracking()
-            .CountAsync(item => item.TenantId == tenantId && item.ContextId == request.ContextId && item.IsActive, ct);
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ContextId == request.ContextId &&
+                item.StartedAt <= toUtc)
+            .Select(item => new
+            {
+                item.Id,
+                item.StartedAt,
+                item.EndedAt
+            })
+            .ToListAsync(ct);
+
+        var activeParticipantCount = participants.Count(item =>
+            item.StartedAt <= toUtc &&
+            (!item.EndedAt.HasValue || item.EndedAt.Value > toUtc));
 
         IQueryable<AttendanceSession> sessionQuery = db.Set<AttendanceSession>()
             .AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId &&
                 item.ContextId == request.ContextId &&
-                item.StartsAt >= request.FromUtc &&
-                item.StartsAt <= request.ToUtc);
+                item.StartsAt >= fromUtc &&
+                item.StartsAt <= toUtc);
 
         var totalSessions = await sessionQuery.CountAsync(ct);
         var sessions = await sessionQuery
@@ -540,7 +708,17 @@ public sealed class AttendanceService(
 
         foreach (var session in sessions)
         {
-            var sessionRecords = records.Where(item => item.SessionId == session.SessionId).ToList();
+            var sessionParticipantIds = participants
+                .Where(item =>
+                    item.StartedAt <= session.StartsAt &&
+                    (!item.EndedAt.HasValue || item.EndedAt.Value > session.StartsAt))
+                .Select(item => item.Id)
+                .ToHashSet();
+            var sessionRecords = records
+                .Where(item =>
+                    item.SessionId == session.SessionId &&
+                    sessionParticipantIds.Contains(item.ParticipantId))
+                .ToList();
             session.PresentCount = sessionRecords.Count(item => item.Status == AttendanceRecordStatus.Present);
             session.LateCount = sessionRecords.Count(item => item.Status == AttendanceRecordStatus.Late);
             session.IncompleteCount = sessionRecords.Count(item => item.Status == AttendanceRecordStatus.Incomplete);
@@ -548,7 +726,7 @@ public sealed class AttendanceService(
             session.ExcusedCount = sessionRecords.Count(item => item.Status == AttendanceRecordStatus.Excused);
             session.AbsentCount = Math.Max(
                 0,
-                activeParticipantCount -
+                sessionParticipantIds.Count -
                 sessionRecords.Select(item => item.ParticipantId).Distinct().Count() +
                 sessionRecords.Count(item => item.Status == AttendanceRecordStatus.Absent));
         }
@@ -557,8 +735,8 @@ public sealed class AttendanceService(
         {
             TenantId = tenantId,
             ContextId = request.ContextId,
-            FromUtc = request.FromUtc,
-            ToUtc = request.ToUtc,
+            FromUtc = fromUtc,
+            ToUtc = toUtc,
             ActiveParticipantCount = activeParticipantCount,
             Page = page,
             PageSize = pageSize,
@@ -575,6 +753,38 @@ public sealed class AttendanceService(
         if (!TryResolveTenantId(request.TenantId, request.Metadata, out var tenantId))
             return Result<AttendanceAdjustmentResponse>.Failure("Tenant ID is required", 400);
 
+        var actorCredentialId = trustedInvocationContextAccessor.Current?.Actor?.CredentialId;
+        if (!actorCredentialId.HasValue || actorCredentialId == Guid.Empty)
+            return Result<AttendanceAdjustmentResponse>.Failure("Authenticated actor credential is required", 401);
+
+        if (request.ActorCredentialId != Guid.Empty && request.ActorCredentialId != actorCredentialId.Value)
+        {
+            return Result<AttendanceAdjustmentResponse>.Failure(
+                "Adjustment actor credential must match the authenticated actor",
+                403);
+        }
+
+        if (request.AdjustedCheckInAt.HasValue && !IsUtc(request.AdjustedCheckInAt.Value) ||
+            request.AdjustedCheckOutAt.HasValue && !IsUtc(request.AdjustedCheckOutAt.Value))
+        {
+            return Result<AttendanceAdjustmentResponse>.Failure("Adjusted attendance times must be UTC", 400);
+        }
+
+        var adjustedCheckInAt = request.AdjustedCheckInAt.HasValue
+            ? NormalizeUtcPrecision(request.AdjustedCheckInAt.Value)
+            : (DateTime?)null;
+        var adjustedCheckOutAt = request.AdjustedCheckOutAt.HasValue
+            ? NormalizeUtcPrecision(request.AdjustedCheckOutAt.Value)
+            : (DateTime?)null;
+
+        if (adjustedCheckOutAt.HasValue && !adjustedCheckInAt.HasValue)
+            return Result<AttendanceAdjustmentResponse>.Failure("Adjusted checkout requires an adjusted check-in", 400);
+
+        if (adjustedCheckInAt.HasValue &&
+            adjustedCheckOutAt.HasValue &&
+            adjustedCheckOutAt.Value < adjustedCheckInAt.Value)
+            return Result<AttendanceAdjustmentResponse>.Failure("Adjusted checkout cannot be before adjusted check-in", 400);
+
         var session = await db.Set<AttendanceSession>()
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == request.SessionId, ct);
@@ -582,12 +792,27 @@ public sealed class AttendanceService(
         if (session is null)
             return Result<AttendanceAdjustmentResponse>.NotFound("Attendance session was not found");
 
+        if (session.Status is AttendanceSessionStatus.Scheduled or AttendanceSessionStatus.Cancelled)
+            return Result<AttendanceAdjustmentResponse>.Conflict("Attendance adjustments require an open or closed session");
+
+        var sessionStartsAt = NormalizeUtcPrecision(session.StartsAt);
+        var sessionEndsAt = NormalizeUtcPrecision(session.EndsAt);
+        if (adjustedCheckInAt.HasValue &&
+            (adjustedCheckInAt.Value < sessionStartsAt || adjustedCheckInAt.Value > sessionEndsAt) ||
+            adjustedCheckOutAt.HasValue &&
+            (adjustedCheckOutAt.Value < sessionStartsAt || adjustedCheckOutAt.Value > sessionEndsAt))
+        {
+            return Result<AttendanceAdjustmentResponse>.Conflict("Adjusted attendance times must be within the session window");
+        }
+
         var participant = await db.Set<AttendanceParticipant>()
             .AsNoTracking()
             .FirstOrDefaultAsync(item =>
                 item.TenantId == tenantId &&
                 item.Id == request.ParticipantId &&
-                item.ContextId == session.ContextId,
+                item.ContextId == session.ContextId &&
+                item.StartedAt <= session.StartsAt &&
+                (!item.EndedAt.HasValue || item.EndedAt.Value > session.StartsAt),
                 ct);
 
         if (participant is null)
@@ -614,8 +839,8 @@ public sealed class AttendanceService(
             ? AttendanceRecordStatus.Absent
             : record.Status;
 
-        record.FirstCheckInAt = request.AdjustedCheckInAt;
-        record.LastCheckOutAt = request.AdjustedCheckOutAt;
+        record.FirstCheckInAt = adjustedCheckInAt;
+        record.LastCheckOutAt = adjustedCheckOutAt;
         record.Status = request.NewStatus;
         record.IsManual = true;
         record.Notes = NormalizeOptional(request.Notes);
@@ -631,9 +856,9 @@ public sealed class AttendanceService(
             CredentialId = participant.CredentialId,
             PreviousStatus = previousStatus,
             NewStatus = request.NewStatus,
-            AdjustedCheckInAt = request.AdjustedCheckInAt,
-            AdjustedCheckOutAt = request.AdjustedCheckOutAt,
-            ActorCredentialId = request.ActorCredentialId,
+            AdjustedCheckInAt = adjustedCheckInAt,
+            AdjustedCheckOutAt = adjustedCheckOutAt,
+            ActorCredentialId = actorCredentialId.Value,
             Reason = request.Reason.Trim(),
             Notes = NormalizeOptional(request.Notes),
             CreatedAt = DateTime.UtcNow,
@@ -683,6 +908,9 @@ public sealed class AttendanceService(
 
                 if (record.LastCheckOutAt.HasValue)
                     return Result<AttendanceRecordResponse>.Conflict("Participant is already checked out for this session");
+
+                if (attendanceEvent.OccurredAt < record.FirstCheckInAt.Value)
+                    return Result<AttendanceRecordResponse>.Conflict("Checkout cannot be before check-in");
 
                 record.LastCheckOutAt = attendanceEvent.OccurredAt;
                 record.SourceEventId = attendanceEvent.Id;
@@ -779,7 +1007,7 @@ public sealed class AttendanceService(
             return AttendanceRecordStatus.Absent;
 
         var graceMinutes = policy?.GracePeriodMinutes ?? DefaultGracePeriodMinutes;
-        if (record.FirstCheckInAt.Value > session.StartsAt.AddMinutes(graceMinutes))
+        if (record.FirstCheckInAt.Value > NormalizeUtcPrecision(session.StartsAt).AddMinutes(graceMinutes))
             return AttendanceRecordStatus.Late;
 
         var checkoutRequired = policy?.CheckoutRequired ?? true;
@@ -789,10 +1017,124 @@ public sealed class AttendanceService(
         var earlyCheckoutGrace = policy?.EarlyCheckoutGraceMinutes ?? DefaultEarlyCheckoutGraceMinutes;
         if (checkoutRequired &&
             record.LastCheckOutAt.HasValue &&
-            record.LastCheckOutAt.Value < session.EndsAt.AddMinutes(-earlyCheckoutGrace))
+            record.LastCheckOutAt.Value < NormalizeUtcPrecision(session.EndsAt).AddMinutes(-earlyCheckoutGrace))
             return AttendanceRecordStatus.Incomplete;
 
         return AttendanceRecordStatus.Present;
+    }
+
+    private async Task<Result<AttendanceEventResponse>> ResolveEventReplayAsync(
+        Guid tenantId,
+        AttendanceEvent existingEvent,
+        RecordAttendanceEventRequest request,
+        DateTime? requestedOccurredAt,
+        Guid actorCredentialId,
+        string? sourceReference,
+        string? notes,
+        string? metadataJson,
+        CancellationToken ct)
+    {
+        if (!EventPayloadMatches(
+                existingEvent,
+                request,
+                requestedOccurredAt,
+                actorCredentialId,
+                sourceReference,
+                notes,
+                metadataJson))
+        {
+            return Result<AttendanceEventResponse>.Conflict(
+                "Idempotency key is already associated with a different attendance event");
+        }
+
+        var replayRecord = await GetRecordEntityAsync(
+            tenantId,
+            existingEvent.SessionId,
+            existingEvent.ParticipantId,
+            false,
+            ct);
+        return Result<AttendanceEventResponse>.Success(
+            ToEventResponse(
+                existingEvent,
+                replayRecord is null ? null : ToRecordResponse(replayRecord, replayRecord.Status)),
+            "Attendance event replayed");
+    }
+
+    private static bool EventPayloadMatches(
+        AttendanceEvent existingEvent,
+        RecordAttendanceEventRequest request,
+        DateTime? requestedOccurredAt,
+        Guid actorCredentialId,
+        string? sourceReference,
+        string? notes,
+        string? metadataJson) =>
+        existingEvent.SessionId == request.SessionId &&
+        existingEvent.ParticipantId == request.ParticipantId &&
+        existingEvent.EventType == request.EventType &&
+        existingEvent.Source == request.Source &&
+        (!requestedOccurredAt.HasValue ||
+         NormalizeUtcPrecision(existingEvent.OccurredAt).Ticks == requestedOccurredAt.Value.Ticks) &&
+        existingEvent.RecordedByCredentialId == actorCredentialId &&
+        string.Equals(existingEvent.SourceReference, sourceReference, StringComparison.Ordinal) &&
+        string.Equals(existingEvent.Notes, notes, StringComparison.Ordinal) &&
+        MetadataMatches(existingEvent.MetadataJson, metadataJson);
+
+    private static string? SerializeMetadata(IReadOnlyDictionary<string, string>? data)
+    {
+        if (data is null)
+            return null;
+
+        var orderedData = data
+            .OrderBy(item => item.Key, StringComparer.Ordinal)
+            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+        return JsonSerializer.Serialize(orderedData);
+    }
+
+    private static bool MetadataMatches(string? existingJson, string? requestJson)
+    {
+        if (existingJson is null || requestJson is null)
+            return existingJson is null && requestJson is null;
+
+        try
+        {
+            var existing = JsonSerializer.Deserialize<Dictionary<string, string>>(existingJson);
+            var requested = JsonSerializer.Deserialize<Dictionary<string, string>>(requestJson);
+            return existing is not null &&
+                   requested is not null &&
+                   existing.Count == requested.Count &&
+                   existing.All(item =>
+                       requested.TryGetValue(item.Key, out var value) &&
+                       string.Equals(item.Value, value, StringComparison.Ordinal));
+        }
+        catch (JsonException)
+        {
+            return string.Equals(existingJson, requestJson, StringComparison.Ordinal);
+        }
+    }
+
+    private static bool IsUtc(DateTime value) => value.Kind == DateTimeKind.Utc;
+
+    private static DateTime NormalizeUtcPrecision(DateTime value) =>
+        new(value.Ticks - value.Ticks % 10, DateTimeKind.Utc);
+
+    private static bool IsValidTimeZone(string timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+            return false;
+
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return false;
+        }
     }
 
     private bool TryResolveTenantId(Guid? requestTenantId, RequestMetadata metadata, out Guid tenantId)

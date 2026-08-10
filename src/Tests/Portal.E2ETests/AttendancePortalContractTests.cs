@@ -99,17 +99,19 @@ public sealed class AttendancePortalContractTests
 
         service.Should().Contain("IDataContext dataContext");
         service.Should().Contain("IAttendanceServiceWrapper attendance");
-        service.Should().Contain("attendance.GetAttendanceContexts(new GetAttendanceContextsRequest");
-        service.Should().Contain("dataContext.Query<AttendanceContext>()");
-        service.Should().Contain("dataContext.Query<AttendanceSession>()");
-        service.Should().Contain("dataContext.Query<AttendanceParticipant>()");
-        service.Should().Contain("dataContext.Query<AttendanceRecord>()");
+        service.Should().Contain("attendance.GetAttendanceContextOverview(new");
+        service.Should().Contain("attendance.GetAttendanceSessionReadList(new");
+        service.Should().Contain("attendance.GetAttendanceSessionDetailRead(new");
+        service.Should().Contain("attendance.GetAttendanceParticipantReadList(new");
+        service.Should().Contain("attendance.GetAttendanceCredentialHistory(new");
         service.Should().Contain("dataContext.Query<IdentityCredential>()");
         service.Should().Contain("x.TenantId == tenantId");
         service.Should().Contain("BuildCredentialLabel");
         service.Should().Contain("AttendanceRecordStatus.Absent");
         service.Should().Contain("NormalizeUtc(fromUtc)");
         service.Should().Contain("context.Id != Guid.Empty");
+        service.Should().NotContain("dataContext.Query<Attendance");
+        service.Should().NotContain("IgnoreQueryFilters()");
         service.Should().NotContain("x.StartsAt >= fromUtc");
         service.Should().NotContain("SaveChangesAsync(");
     }

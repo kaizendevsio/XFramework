@@ -1,12 +1,15 @@
 using Attendance.Api.Services;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 
 namespace Attendance.Api.Features.Contexts.Create;
 
 public static class CreateAttendanceContextEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.AttendanceWrite],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal])]
     [MapPost("/api/attendance/contexts", Tags = ["Attendance"],
         Summary = "Create attendance context",
         Description = "Creates a tenant-scoped attendance context for school, HR, project, event, or gate attendance.")]

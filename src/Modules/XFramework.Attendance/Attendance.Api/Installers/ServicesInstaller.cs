@@ -13,7 +13,9 @@ public sealed class ServicesInstaller : IInstaller
     {
         services.AddTenantResolver();
         services.AddTenantModuleFeatures();
+        services.AddScoped<IAttendanceCredentialResolver, AttendanceCredentialResolver>();
         services.AddScoped<AttendanceService>();
+        services.AddScoped<IAttendanceReadService, AttendanceReadService>();
     }
 }
 

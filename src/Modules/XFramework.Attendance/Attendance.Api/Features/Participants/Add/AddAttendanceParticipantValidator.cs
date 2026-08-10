@@ -19,6 +19,10 @@ public sealed class AddAttendanceParticipantValidator : AbstractValidator<AddAtt
         RuleFor(x => x.ReferenceCode)
             .MaximumLength(128).WithMessage("Reference code must not exceed 128 characters")
             .When(x => !string.IsNullOrWhiteSpace(x.ReferenceCode));
+
+        RuleFor(x => x.StartedAt)
+            .Must(value => !value.HasValue || value.Value.Kind == DateTimeKind.Utc)
+            .WithMessage("Participant start time must be UTC");
     }
 }
 

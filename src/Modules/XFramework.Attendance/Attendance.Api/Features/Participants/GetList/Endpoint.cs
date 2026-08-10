@@ -1,12 +1,15 @@
 using Attendance.Api.Services;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 
 namespace Attendance.Api.Features.Participants.GetList;
 
 public static class GetAttendanceParticipantsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.AttendanceRead],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal])]
     [MapGet("/api/attendance/participants", Tags = ["Attendance"],
         Summary = "Get attendance participants",
         Description = "Retrieves paginated participants for an attendance context.")]

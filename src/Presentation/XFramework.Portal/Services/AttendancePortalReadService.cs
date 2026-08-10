@@ -20,29 +20,19 @@ public sealed class AttendancePortalReadService(
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var contexts = await dataContext.Query<AttendanceContext>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .OrderBy(x => x.Name)
-            .Take(500)
-            .ToListAsync(cancellationToken);
+        var response = await attendance.GetAttendanceContextOverview(new()
+        {
+            TenantId = tenantId,
+            Limit = 500,
+            Metadata = BuildMetadata(tenantId)
+        }, cancellationToken);
+        if (!response.IsSuccess || response.Response is null)
+        {
+            LogReadFailure("context overview", tenantId, response.HttpStatusCode, response.Message);
+            return [];
+        }
 
-        var participants = await dataContext.Query<AttendanceParticipant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .Take(5000)
-            .ToListAsync(cancellationToken);
-
-        var sessions = await dataContext.Query<AttendanceSession>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .Take(5000)
-            .ToListAsync(cancellationToken);
-
-        return contexts.Select(context =>
+        return response.Response.Items.Select(context =>
             new AttendanceContextRow(
                 context.Id,
                 context.TenantId,
@@ -51,8 +41,8 @@ public sealed class AttendancePortalReadService(
                 context.ContextType,
                 context.Description,
                 context.IsActive,
-                participants.Count(x => x.ContextId == context.Id && x.IsActive),
-                sessions.Count(x => x.ContextId == context.Id),
+                context.ActiveParticipantCount,
+                context.SessionCount,
                 context.CreatedAt))
             .ToList();
     }
@@ -65,37 +55,26 @@ public sealed class AttendancePortalReadService(
         AttendanceSessionStatus? status,
         CancellationToken cancellationToken = default)
     {
-        var contexts = await LoadContextLabelsAsync(tenantId, cancellationToken);
-        var query = dataContext.Query<AttendanceSession>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted);
-
-        if (contextId is Guid selectedContextId)
-        {
-            query = query.Where(x => x.ContextId == selectedContextId);
-        }
-
-        if (status is AttendanceSessionStatus selectedStatus)
-        {
-            query = query.Where(x => x.Status == selectedStatus);
-        }
-
-        var sessions = await query
-            .OrderByDescending(x => x.StartsAt)
-            .Take(2000)
-            .ToListAsync(cancellationToken);
-
         var from = NormalizeUtc(fromUtc);
         var to = NormalizeUtc(toUtc);
+        var response = await attendance.GetAttendanceSessionReadList(new()
+        {
+            TenantId = tenantId,
+            ContextId = contextId,
+            FromUtc = from,
+            ToUtc = to,
+            Status = status,
+            Limit = 500,
+            Metadata = BuildMetadata(tenantId)
+        }, cancellationToken);
+        if (!response.IsSuccess || response.Response is null)
+        {
+            LogReadFailure("session list", tenantId, response.HttpStatusCode, response.Message);
+            return [];
+        }
 
-        return sessions
-            .Where(session =>
-            {
-                var startsAt = NormalizeUtc(session.StartsAt);
-                return startsAt >= from && startsAt <= to;
-            })
-            .Take(500)
+        var contexts = response.Response.Contexts.ToDictionary(context => context.Id, ContextLabel);
+        return response.Response.Items
             .Select(session =>
                 new AttendanceSessionRow(
                     session.Id,
@@ -116,55 +95,30 @@ public sealed class AttendancePortalReadService(
         Guid sessionId,
         CancellationToken cancellationToken = default)
     {
-        var session = await dataContext.Query<AttendanceSession>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.Id == sessionId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (session is null)
+        var response = await attendance.GetAttendanceSessionDetailRead(new()
         {
+            TenantId = tenantId,
+            SessionId = sessionId,
+            Metadata = BuildMetadata(tenantId)
+        }, cancellationToken);
+        if (!response.IsSuccess || response.Response is null)
+        {
+            LogReadFailure("session detail", tenantId, response.HttpStatusCode, response.Message);
             return null;
         }
 
-        var context = await dataContext.Query<AttendanceContext>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.Id == session.ContextId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var participants = await dataContext.Query<AttendanceParticipant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.ContextId == session.ContextId && x.IsActive)
-            .OrderBy(x => x.DisplayName)
-            .Take(1000)
-            .ToListAsync(cancellationToken);
-
-        var records = await dataContext.Query<AttendanceRecord>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.SessionId == sessionId)
-            .Take(1000)
-            .ToListAsync(cancellationToken);
-
-        var events = await dataContext.Query<AttendanceEvent>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.SessionId == sessionId)
-            .OrderByDescending(x => x.OccurredAt)
-            .Take(100)
-            .ToListAsync(cancellationToken);
+        var detail = response.Response;
 
         var credentialLabels = await LoadCredentialLabelsAsync(
             tenantId,
-            participants.Select(x => (Guid?)x.CredentialId).Concat(records.Select(x => (Guid?)x.CredentialId)),
+            detail.Participants.Select(x => (Guid?)x.CredentialId)
+                .Concat(detail.Records.Select(x => (Guid?)x.CredentialId)),
             cancellationToken);
-        var recordsByParticipant = records
+        var recordsByParticipant = detail.Records
             .GroupBy(x => x.ParticipantId)
-            .ToDictionary(x => x.Key, x => x.OrderByDescending(record => record.ModifiedAt ?? record.CreatedAt).First());
+            .ToDictionary(x => x.Key, x => x.First());
 
-        var roster = participants.Select(participant =>
+        var roster = detail.Participants.Select(participant =>
         {
             recordsByParticipant.TryGetValue(participant.Id, out var record);
             return new AttendanceSessionRosterRow(
@@ -181,7 +135,7 @@ public sealed class AttendancePortalReadService(
                 record?.Notes);
         }).ToList();
 
-        return new AttendanceSessionDetail(session, context, roster, events);
+        return new AttendanceSessionDetail(detail.Session, detail.Context, roster, detail.RecentEvents);
     }
 
     public async Task<IReadOnlyList<AttendanceParticipantRow>> LoadParticipantRowsAsync(
@@ -189,13 +143,20 @@ public sealed class AttendancePortalReadService(
         Guid contextId,
         CancellationToken cancellationToken = default)
     {
-        var participants = await dataContext.Query<AttendanceParticipant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.ContextId == contextId)
-            .OrderBy(x => x.DisplayName)
-            .Take(1000)
-            .ToListAsync(cancellationToken);
+        var response = await attendance.GetAttendanceParticipantReadList(new()
+        {
+            TenantId = tenantId,
+            ContextId = contextId,
+            Limit = 1000,
+            Metadata = BuildMetadata(tenantId)
+        }, cancellationToken);
+        if (!response.IsSuccess || response.Response is null)
+        {
+            LogReadFailure("participant list", tenantId, response.HttpStatusCode, response.Message);
+            return [];
+        }
+
+        var participants = response.Response.Items;
 
         var labels = await LoadCredentialLabelsAsync(
             tenantId,
@@ -221,7 +182,6 @@ public sealed class AttendancePortalReadService(
         CancellationToken cancellationToken = default)
     {
         var credentials = await dataContext.Query<IdentityCredential>()
-            .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.IdentityInfo)
             .Where(x => x.TenantId == tenantId && !x.IsDeleted)
@@ -245,27 +205,22 @@ public sealed class AttendancePortalReadService(
             return [];
         }
 
-        var participants = await dataContext.Query<AttendanceParticipant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && credentialIds.Contains(x.CredentialId))
-            .OrderByDescending(x => x.StartedAt)
-            .Take(500)
-            .ToListAsync(cancellationToken);
+        var response = await attendance.GetAttendanceCredentialHistory(new()
+        {
+            TenantId = tenantId,
+            CredentialIds = credentialIds.ToList(),
+            Metadata = BuildMetadata(tenantId)
+        }, cancellationToken);
+        if (!response.IsSuccess || response.Response is null)
+        {
+            LogReadFailure("credential participation", tenantId, response.HttpStatusCode, response.Message);
+            return [];
+        }
 
-        var contextIds = participants.Select(x => x.ContextId).Distinct().ToArray();
-        var contexts = contextIds.Length == 0
-            ? []
-            : await dataContext.Query<AttendanceContext>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted && contextIds.Contains(x.Id))
-                .Take(500)
-                .ToListAsync(cancellationToken);
-        var contextsById = contexts.ToDictionary(x => x.Id);
+        var contextsById = response.Response.Contexts.ToDictionary(x => x.Id);
         var credentialLabels = credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
 
-        return participants.Select(participant =>
+        return response.Response.Participants.Select(participant =>
         {
             contextsById.TryGetValue(participant.ContextId, out var context);
             return
@@ -303,39 +258,23 @@ public sealed class AttendancePortalReadService(
             return [];
         }
 
-        var records = await dataContext.Query<AttendanceRecord>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && credentialIds.Contains(x.CredentialId))
-            .OrderByDescending(x => x.CreatedAt)
-            .Take(500)
-            .ToListAsync(cancellationToken);
-
-        var sessionIds = records.Select(x => x.SessionId).Distinct().ToArray();
-        List<AttendanceSession> sessions = sessionIds.Length == 0
-            ? []
-            : await dataContext.Query<AttendanceSession>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted && sessionIds.Contains(x.Id))
-                .Take(500)
-                .ToListAsync(cancellationToken);
-
-        var contextIds = sessions.Select(x => x.ContextId).Distinct().ToArray();
-        List<AttendanceContext> contexts = contextIds.Length == 0
-            ? []
-            : await dataContext.Query<AttendanceContext>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(x => x.TenantId == tenantId && !x.IsDeleted && contextIds.Contains(x.Id))
-                .Take(500)
-                .ToListAsync(cancellationToken);
+        var response = await attendance.GetAttendanceCredentialHistory(new()
+        {
+            TenantId = tenantId,
+            CredentialIds = credentialIds.ToList(),
+            Metadata = BuildMetadata(tenantId)
+        }, cancellationToken);
+        if (!response.IsSuccess || response.Response is null)
+        {
+            LogReadFailure("credential records", tenantId, response.HttpStatusCode, response.Message);
+            return [];
+        }
 
         var credentialLabels = credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
-        var sessionsById = sessions.ToDictionary(x => x.Id);
-        var contextsById = contexts.ToDictionary(x => x.Id);
+        var sessionsById = response.Response.Sessions.ToDictionary(x => x.Id);
+        var contextsById = response.Response.Contexts.ToDictionary(x => x.Id);
 
-        return records.Select(record =>
+        return response.Response.Records.Select(record =>
         {
             sessionsById.TryGetValue(record.SessionId, out var session);
             var contextName = session is not null && contextsById.TryGetValue(session.ContextId, out var context)
@@ -363,14 +302,12 @@ public sealed class AttendancePortalReadService(
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var response = await attendance.GetAttendanceContexts(new GetAttendanceContextsRequest
+        var response = await attendance.GetAttendanceContextOverview(new GetAttendanceContextOverviewRequest
         {
             TenantId = tenantId,
-            IsActive = true,
-            Page = 1,
-            PageSize = 500,
+            Limit = 500,
             Metadata = BuildMetadata(tenantId)
-        });
+        }, cancellationToken);
 
         if (!response.IsSuccess || response.Response is null)
         {
@@ -383,7 +320,7 @@ public sealed class AttendancePortalReadService(
         }
 
         var options = response.Response.Items
-            .Where(context => context.Id != Guid.Empty)
+            .Where(context => context.Id != Guid.Empty && context.IsActive)
             .OrderBy(context => context.Name)
             .Select(context => new AttendanceContextOption(context.Id, ContextLabel(context), context.ContextType, context.IsActive))
             .ToList();
@@ -412,7 +349,6 @@ public sealed class AttendancePortalReadService(
         }
 
         var credentials = await dataContext.Query<IdentityCredential>()
-            .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.IdentityInfo)
             .Where(x => x.TenantId == tenantId && !x.IsDeleted && ids.Contains(x.Id))
@@ -421,27 +357,12 @@ public sealed class AttendancePortalReadService(
         return credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
     }
 
-    private async Task<IReadOnlyDictionary<Guid, string>> LoadContextLabelsAsync(
-        Guid tenantId,
-        CancellationToken cancellationToken)
-    {
-        var contexts = await dataContext.Query<AttendanceContext>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
-            .Take(500)
-            .ToListAsync(cancellationToken);
-
-        return contexts.ToDictionary(x => x.Id, ContextLabel);
-    }
-
     private async Task<List<IdentityCredential>> LoadUserCredentialsAsync(
         Guid tenantId,
         Guid identityInfoId,
         CancellationToken cancellationToken)
     {
         return await dataContext.Query<IdentityCredential>()
-            .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.IdentityInfo)
             .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IdentityInfoId == identityInfoId)
@@ -515,15 +436,23 @@ public sealed class AttendancePortalReadService(
         IpAddress = requestMetadata.IpAddress
     };
 
-    private static string ContextLabel(AttendanceContext context) => ContextLabel(context.Name, context.Code);
-
     private static string ContextLabel(AttendanceContextResponse context) => ContextLabel(context.Name, context.Code);
+
+    private static string ContextLabel(AttendanceContextOverviewResponse context) => ContextLabel(context.Name, context.Code);
 
     private static string ContextLabel(string name, string? code) =>
         string.IsNullOrWhiteSpace(code) ? name : $"{code} - {name}";
 
-    private static string DisplayNameForParticipant(AttendanceParticipant participant) =>
+    private static string DisplayNameForParticipant(AttendanceParticipantResponse participant) =>
         Normalize(participant.DisplayName) ?? $"Credential {ShortId(participant.CredentialId)}";
+
+    private void LogReadFailure(string operation, Guid tenantId, object statusCode, string? message) =>
+        logger.LogWarning(
+            "Attendance {Operation} could not be loaded for tenant {TenantId}. Status: {StatusCode}. Message: {Message}",
+            operation,
+            tenantId,
+            statusCode,
+            message);
 
     private static string LabelOrFallback(Guid? id, IReadOnlyDictionary<Guid, string> labels, string noun)
     {
@@ -604,10 +533,10 @@ public sealed record AttendanceParticipantRow(
     bool IsActive);
 
 public sealed record AttendanceSessionDetail(
-    AttendanceSession Session,
-    AttendanceContext? Context,
+    AttendanceSessionResponse Session,
+    AttendanceContextResponse? Context,
     IReadOnlyList<AttendanceSessionRosterRow> Roster,
-    IReadOnlyList<AttendanceEvent> RecentEvents);
+    IReadOnlyList<AttendanceEventResponse> RecentEvents);
 
 public sealed record AttendanceSessionRosterRow(
     Guid ParticipantId,

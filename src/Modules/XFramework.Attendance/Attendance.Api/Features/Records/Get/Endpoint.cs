@@ -1,12 +1,15 @@
 using Attendance.Api.Services;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 
 namespace Attendance.Api.Features.Records.Get;
 
 public static class GetAttendanceRecordEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.AttendanceRead],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal])]
     [MapGet("/api/attendance/records", Tags = ["Attendance"],
         Summary = "Get attendance record",
         Description = "Gets the session-level attendance record for one participant.")]

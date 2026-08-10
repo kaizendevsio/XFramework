@@ -4,6 +4,7 @@ using Attendance.IntegrationTests.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using XFramework.Domain.Contexts;
+using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 
@@ -35,7 +36,8 @@ public abstract class AttendanceIntegrationTestBase
         new(
             db,
             NullLogger<AttendanceService>.Instance,
-            new AttendanceTestInvocationContextAccessor(AttendanceIntegrationTestFixture.TestTenantId));
+            new AttendanceTestInvocationContextAccessor(AttendanceIntegrationTestFixture.TestTenantId),
+            new TestCredentialResolver());
 
     protected static RequestMetadata CreateMetadata(Guid? tenantId = null) => new()
     {
@@ -49,4 +51,19 @@ public abstract class AttendanceIntegrationTestBase
 
     protected static string UniqueCode(string prefix) =>
         $"{prefix}-{Guid.NewGuid():N}"[..Math.Min(32, prefix.Length + 33)];
+
+    private sealed class TestCredentialResolver : IAttendanceCredentialResolver
+    {
+        public Task<Result<AttendanceCredentialSnapshot>> ResolveAsync(
+            Guid credentialId,
+            Guid tenantId,
+            CancellationToken ct) =>
+            Task.FromResult(Result<AttendanceCredentialSnapshot>.Success(new(
+                credentialId,
+                tenantId,
+                true,
+                false,
+                $"Credential {credentialId:N}",
+                credentialId.ToString("N"))));
+    }
 }
