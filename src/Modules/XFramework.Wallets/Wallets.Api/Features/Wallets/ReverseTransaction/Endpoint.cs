@@ -1,5 +1,6 @@
 using FluentValidation;
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts;
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
 
@@ -7,11 +8,12 @@ namespace Wallets.Api.Features.Wallets.ReverseTransaction;
 
 public static class ReverseTransactionEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage])]
     [MapPost("/api/wallets/reverse-transaction", Tags = ["Wallets"],
         Summary = "Reverse a transaction",
         Description = "Reverses a single transaction or a full transfer (paired). Creates inverse transactions and updates balances.",
         RequireAuthorization = true,
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ReverseTransactionRequest request,

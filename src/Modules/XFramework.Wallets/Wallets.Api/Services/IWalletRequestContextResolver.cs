@@ -14,7 +14,12 @@ public sealed record WalletRequestContext(
     string? IpAddress,
     string? UserAgent,
     bool IsPrivilegedActor,
-    bool IsSystemActor = false);
+    bool IsSystemActor = false,
+    IReadOnlySet<string>? ActorCapabilities = null)
+{
+    public bool HasCapability(string capability) =>
+        IsSystemActor || ActorCapabilities?.Contains(capability) == true;
+}
 
 public interface IWalletRequestContextResolver
 {
@@ -70,6 +75,7 @@ public sealed class WalletRequestContextResolver(
             request.Metadata.IpAddress,
             request.Metadata.UserAgent,
             isPrivilegedActor,
-            isSystemActor));
+            isSystemActor,
+            invocation?.Actor?.Capabilities));
     }
 }

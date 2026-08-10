@@ -74,6 +74,41 @@ public class DataContextTests : WalletsTestBase
     }
 
     [Test]
+    public async Task GeneratedWalletRead_RequiresReportingCapabilityAcrossGeneratedPaths()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 125m);
+
+        using (WalletsTestFixture.PushActor(
+                   credential.Id,
+                   [WalletAuthorizationCapabilities.View]))
+        {
+            var wrapperResponse = await WalletsTestFixture.ServiceWrapper.Wallet.Get(wallet.Id);
+            wrapperResponse.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+            var query = async () => await WalletsTestFixture.DataContext.Query<Wallet>()
+                .Where(x => x.Id == wallet.Id)
+                .FirstOrDefaultAsync();
+            await query.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*status 403*");
+        }
+
+        using (WalletsTestFixture.PushActor(
+                   credential.Id,
+                   [WalletAuthorizationCapabilities.ReportingView]))
+        {
+            var wrapperResponse = await WalletsTestFixture.ServiceWrapper.Wallet.Get(wallet.Id);
+            wrapperResponse.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+            wrapperResponse.Response.Should().NotBeNull();
+
+            var queriedWallet = await WalletsTestFixture.DataContext.Query<Wallet>()
+                .Where(x => x.Id == wallet.Id)
+                .FirstOrDefaultAsync();
+            queriedWallet.Should().NotBeNull();
+        }
+    }
+
+    [Test]
     public async Task RemoteQuery_ToListAsync_ReturnsWalletTypesFromService()
     {
         var ctx = WalletsTestFixture.DataContext;

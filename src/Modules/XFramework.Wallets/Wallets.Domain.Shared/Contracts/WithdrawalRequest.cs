@@ -123,6 +123,12 @@ public partial class WithdrawalRequest : BaseModel
 
     [MemoryPackOrder(35)]
     public virtual WalletTransaction? SettlementTransaction { get; set; }
+
+    [MemoryPackOrder(36)]
+    public string? IdempotencyKey { get; set; }
+
+    [MemoryPackOrder(37)]
+    public string? RequestHash { get; set; }
 }
 
 public class CreateWithdrawalRequestRequest

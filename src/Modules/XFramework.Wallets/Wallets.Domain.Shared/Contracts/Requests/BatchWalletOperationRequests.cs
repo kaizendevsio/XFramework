@@ -7,6 +7,7 @@ public partial record BatchIncrementWalletRequest : RequestBase,
 {
     public List<BatchIncrementRequest> Requests { get; init; } = [];
     public bool AllowPartialSuccess { get; init; }
+    public string? IdempotencyKey { get; init; }
 }
 
 [MemoryPackable]
@@ -16,6 +17,7 @@ public partial record BatchDecrementWalletRequest : RequestBase,
 {
     public List<BatchDecrementRequest> Requests { get; init; } = [];
     public bool AllowPartialSuccess { get; init; }
+    public string? IdempotencyKey { get; init; }
 }
 
 [MemoryPackable]
@@ -25,4 +27,5 @@ public partial record BatchTransferWalletRequest : RequestBase,
 {
     public List<BatchTransferRequest> Requests { get; init; } = [];
     public bool AllowPartialSuccess { get; init; }
+    public string? IdempotencyKey { get; init; }
 }

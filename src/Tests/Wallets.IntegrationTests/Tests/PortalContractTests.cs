@@ -210,7 +210,7 @@ public sealed class PortalContractTests
 
             foreach (var grid in grids)
             {
-                foreach (Match propertyColumn in Regex.Matches(grid, @"<BbDataGridPropertyColumn\b[^>]*>?", RegexOptions.Multiline))
+                foreach (Match propertyColumn in Regex.Matches(grid, @"<BbDataGridPropertyColumn\b[\s\S]*?/>", RegexOptions.Multiline))
                 {
                     propertyColumn.Value.Should().Contain("Filterable=\"true\"",
                         $"{page} property data columns should use native filtering");

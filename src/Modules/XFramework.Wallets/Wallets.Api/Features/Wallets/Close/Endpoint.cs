@@ -1,5 +1,6 @@
 using FluentValidation;
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts;
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
 
@@ -7,11 +8,12 @@ namespace Wallets.Api.Features.Wallets.Close;
 
 public static class CloseWalletEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage])]
     [MapPost("/api/wallets/close", Tags = ["Wallets"],
         Summary = "Close a wallet",
         Description = "Closes an empty wallet, preventing future financial operations.",
         RequireAuthorization = true,
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         CloseWalletRequest request,

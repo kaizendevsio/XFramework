@@ -1,4 +1,5 @@
 using IdentityServer.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -29,6 +30,10 @@ public sealed class WalletPolicyAdminService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletPolicyRuleResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.PolicyManage))
+        {
+            return Result<WalletPolicyRuleResponse>.Forbidden("Wallet policy capability is required");
         }
 
         var feature = await featureGateService.EnsureEnabledAsync(
@@ -100,6 +105,10 @@ public sealed class WalletPolicyAdminService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletFeeScheduleResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.PolicyManage))
+        {
+            return Result<WalletFeeScheduleResponse>.Forbidden("Wallet policy capability is required");
         }
 
         var feature = await featureGateService.EnsureEnabledAsync(

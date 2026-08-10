@@ -1,5 +1,6 @@
 using System.Text.Json;
 using IdentityServer.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
@@ -19,6 +20,10 @@ public sealed class WalletReconciliationService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletReconciliationRunResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.ReconciliationManage))
+        {
+            return Result<WalletReconciliationRunResponse>.Forbidden("Wallet reconciliation capability is required");
         }
 
         var feature = await featureGateService.EnsureEnabledAsync(
@@ -187,6 +192,10 @@ public sealed class WalletReconciliationService(
         if (!contextResult.IsSuccess)
         {
             return Result<WalletReconciliationItemResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+        }
+        if (!contextResult.Data!.HasCapability(WalletAuthorizationCapabilities.ReconciliationManage))
+        {
+            return Result<WalletReconciliationItemResponse>.Forbidden("Wallet reconciliation capability is required");
         }
 
         var feature = await featureGateService.EnsureEnabledAsync(

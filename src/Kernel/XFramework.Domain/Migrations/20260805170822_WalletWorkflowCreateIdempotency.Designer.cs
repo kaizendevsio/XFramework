@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
@@ -11,9 +12,11 @@ using XFramework.Domain.Contexts;
 namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260805170822_WalletWorkflowCreateIdempotency")]
+    partial class WalletWorkflowCreateIdempotency
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -8300,9 +8303,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("FailureMessage")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
-
-                    b.Property<int?>("FailureStatusCode")
-                        .HasColumnType("integer");
 
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(200)

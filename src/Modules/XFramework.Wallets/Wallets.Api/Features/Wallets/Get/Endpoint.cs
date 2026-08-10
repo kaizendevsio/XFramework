@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -44,7 +45,8 @@ public static class GetWalletEndpoint
             {
                 ActorRequirement = ActorRequirement.Required,
                 TenantAccessMode = TenantAccessMode.ActorTenant,
-                RequireServiceIdentity = false
+                RequireServiceIdentity = false,
+                RequiredActorCapabilities = [WalletAuthorizationCapabilities.View]
             },
             ct);
         if (!invocationResult.IsSuccess)
@@ -78,6 +80,15 @@ public static class GetWalletEndpoint
                 title: "Error retrieving wallet",
                 detail: result.Message,
                 statusCode: result.StatusCode);
+        }
+
+        if (!contextResult.Data.IsPrivilegedActor &&
+            contextResult.Data.ActorCredentialId != result.Data!.CredentialId)
+        {
+            return TypedResults.Problem(
+                title: "Wallet access denied",
+                detail: "Actor cannot access the requested wallet",
+                statusCode: StatusCodes.Status403Forbidden);
         }
 
         var response = WalletResponse.FromWallet(result.Data!);

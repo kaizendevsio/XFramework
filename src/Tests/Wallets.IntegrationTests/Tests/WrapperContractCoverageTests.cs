@@ -87,6 +87,7 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
         var incrementReference = Unique("batch-inc");
         var increment = await WalletsTestFixture.ServiceWrapper.BatchIncrementWallet(new BatchIncrementWalletRequest
         {
+            IdempotencyKey = Unique("batch-increment"),
             Metadata = Metadata(credential.Id),
             Requests =
             [
@@ -106,6 +107,7 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
         var decrementReference = Unique("batch-dec");
         var decrement = await WalletsTestFixture.ServiceWrapper.BatchDecrementWallet(new BatchDecrementWalletRequest
         {
+            IdempotencyKey = Unique("batch-decrement"),
             Metadata = Metadata(credential.Id),
             Requests =
             [
@@ -124,6 +126,7 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
         var transferReference = Unique("batch-xfer");
         var transfer = await WalletsTestFixture.ServiceWrapper.BatchTransferWallet(new BatchTransferWalletRequest
         {
+            IdempotencyKey = Unique("batch-transfer"),
             Metadata = Metadata(credential.Id),
             Requests =
             [
@@ -481,13 +484,14 @@ public sealed class WrapperContractCoverageTests : WalletsTestBase
         createCase.IsSuccess.Should().BeTrue(createCase.Message);
 
         var caseId = await LoadCaseIdByExternalReference(createCaseReference);
-        var resolveCase = await WalletsTestFixture.ServiceWrapper.ResolveWalletCase(new ResolveWalletCaseRequest
-        {
-            Metadata = Metadata(checker.Id),
-            CaseId = caseId,
-            Approve = false,
-            Reason = "wrapper case resolved"
-        });
+        var resolveCase = await AsActor(checker.Id, () =>
+            WalletsTestFixture.ServiceWrapper.ResolveWalletCase(new ResolveWalletCaseRequest
+            {
+                Metadata = Metadata(checker.Id),
+                CaseId = caseId,
+                Approve = false,
+                Reason = "wrapper case resolved"
+            }));
         resolveCase.IsSuccess.Should().BeTrue(resolveCase.Message);
 
         var reference = Unique("report-credit");

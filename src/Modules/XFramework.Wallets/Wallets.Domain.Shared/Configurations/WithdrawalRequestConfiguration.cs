@@ -39,6 +39,8 @@ public class WithdrawalRequestConfiguration : IEntityTypeConfiguration<Withdrawa
         entity.Property(e => e.RawRequestData).HasColumnType("jsonb");
         entity.Property(e => e.RawResponseData).HasColumnType("jsonb");
         entity.Property(e => e.FailureReason).HasMaxLength(4000);
+        entity.Property(e => e.IdempotencyKey).HasMaxLength(200);
+        entity.Property(e => e.RequestHash).HasMaxLength(64);
 
         entity.HasOne(d => d.Credential).WithMany()
             .HasForeignKey(d => d.CredentialId)
@@ -77,5 +79,8 @@ public class WithdrawalRequestConfiguration : IEntityTypeConfiguration<Withdrawa
         entity.HasIndex(e => new { e.TenantId, e.ProviderEventId })
             .IsUnique()
             .HasFilter("\"ProviderEventId\" IS NOT NULL");
+        entity.HasIndex(e => new { e.TenantId, e.IdempotencyKey })
+            .IsUnique()
+            .HasFilter("\"IdempotencyKey\" IS NOT NULL");
     }
 }

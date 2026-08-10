@@ -1,4 +1,6 @@
 using Wallets.Api.Events;
+using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
@@ -7,19 +9,34 @@ namespace Wallets.Api.Features.Events.GetList;
 
 public static class GetWalletEventsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.View])]
     [MapGet("/api/wallets/events", Tags = ["Wallet Events"],
         Summary = "Get recent wallet events",
         Description = "Retrieves recent wallet events from the in-memory buffer. Supports filtering by WalletId, CredentialId, and EventType with pagination.",
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.View],
         ExcludeFromOpenApi = true)]
     public static Task<Result<List<WalletEventResponse>>> Handle(
         GetWalletEventsRequest request,
         IWalletEventPublisher eventPublisher,
+        IWalletRequestContextResolver contextResolver,
         CancellationToken ct)
     {
+        var contextResult = contextResolver.Resolve(request, request.CredentialId);
+        if (!contextResult.IsSuccess)
+        {
+            return Task.FromResult(Result<List<WalletEventResponse>>.Failure(
+                contextResult.Message!,
+                contextResult.StatusCode));
+        }
+
+        var context = contextResult.Data!;
+        var credentialId = context.IsPrivilegedActor
+            ? request.CredentialId
+            : context.ActorCredentialId;
         var events = eventPublisher.GetRecentEvents(
+            context.TenantId,
             request.WalletId,
-            request.CredentialId,
+            credentialId,
             request.EventType,
             request.PageIndex,
             request.PageSize);

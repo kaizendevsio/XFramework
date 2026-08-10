@@ -83,6 +83,18 @@ public class WalletsTestFixture
         return TestInvocationActorTokenScope.Push(token);
     }
 
+    public static IDisposable PushActor(Guid credentialId, IReadOnlyCollection<string> capabilities)
+    {
+        var token = TestInvocationIdentityExtensions.CreateTestActorToken(
+            TestTenantId,
+            credentialId,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [],
+            capabilities);
+        return TestInvocationActorTokenScope.Push(token);
+    }
+
     public static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
     public static readonly Guid TestWalletTypeId = Guid.Parse("e1e2e3e4-e5f6-7890-abcd-ef1234567890");
 
@@ -554,17 +566,24 @@ public class WalletsTestFixture
                 .Where(static claim => claim.Type == ClaimTypes.Role)
                 .Select(static claim => claim.Value)
                 .ToArray();
+            var capabilities = Request.Headers.TryGetValue("X-Wallets-Test-Capabilities", out var capabilityHeader)
+                ? capabilityHeader
+                    .SelectMany(static value => value?.Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
+                    .ToArray()
+                : roles.Any(role =>
+                    string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+                    ? WalletAuthorizationCapabilities.All
+                    : [];
             var actorToken = TestInvocationIdentityExtensions.CreateTestActorToken(
                 tenantId,
                 credentialId ?? DefaultActorCredentialId,
                 identityId,
                 DefaultActorSessionId,
                 roles,
-                roles.Any(role =>
-                    string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
-                    ? WalletAuthorizationCapabilities.All
-                    : []);
+                capabilities);
             Request.Headers.Authorization = $"Bearer {actorToken}";
 
             return Task.FromResult(AuthenticateResult.Success(ticket));

@@ -41,6 +41,7 @@ public class WalletOperationConfiguration : IEntityTypeConfiguration<WalletOpera
         entity.Property(e => e.CalculatedFee).HasPrecision(24, 8);
         entity.Property(e => e.Reason).HasMaxLength(2000);
         entity.Property(e => e.FailureMessage).HasMaxLength(4000);
+        entity.Property(e => e.FailureStatusCode);
 
         entity.HasOne(e => e.OriginalOperation)
             .WithMany()

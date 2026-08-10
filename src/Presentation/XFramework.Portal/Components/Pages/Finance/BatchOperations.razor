@@ -299,6 +299,7 @@
             {
                 BatchIncrement => await WalletsAdminContracts.BatchIncrementAsync(new BatchIncrementWalletRequest
                 {
+                    IdempotencyKey = $"controlpanel-batch-increment-{Guid.NewGuid():N}",
                     Requests =
                     [
                         new BatchIncrementRequest
@@ -316,6 +317,7 @@
                 }),
                 BatchDecrement => await WalletsAdminContracts.BatchDecrementAsync(new BatchDecrementWalletRequest
                 {
+                    IdempotencyKey = $"controlpanel-batch-decrement-{Guid.NewGuid():N}",
                     Requests =
                     [
                         new BatchDecrementRequest
@@ -384,6 +386,7 @@
 
         return await WalletsAdminContracts.BatchTransferAsync(new BatchTransferWalletRequest
         {
+            IdempotencyKey = $"controlpanel-batch-transfer-{Guid.NewGuid():N}",
             Requests =
             [
                 new BatchTransferRequest

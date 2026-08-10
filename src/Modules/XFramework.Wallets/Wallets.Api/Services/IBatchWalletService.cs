@@ -25,6 +25,7 @@ public interface IBatchWalletService
         List<BatchIncrementRequest> requests,
         WalletRequestContext context,
         bool allowPartialSuccess = false,
+        string? idempotencyKey = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -43,6 +44,7 @@ public interface IBatchWalletService
         List<BatchDecrementRequest> requests,
         WalletRequestContext context,
         bool allowPartialSuccess = false,
+        string? idempotencyKey = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -63,6 +65,7 @@ public interface IBatchWalletService
         List<BatchTransferRequest> requests,
         WalletRequestContext context,
         bool allowPartialSuccess = false,
+        string? idempotencyKey = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

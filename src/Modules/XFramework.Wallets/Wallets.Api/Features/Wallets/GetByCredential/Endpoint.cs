@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -44,7 +45,8 @@ public static class GetWalletsByCredentialEndpoint
             {
                 ActorRequirement = ActorRequirement.Required,
                 TenantAccessMode = TenantAccessMode.ActorTenant,
-                RequireServiceIdentity = false
+                RequireServiceIdentity = false,
+                RequiredActorCapabilities = [WalletAuthorizationCapabilities.View]
             },
             ct);
         if (!invocationResult.IsSuccess)

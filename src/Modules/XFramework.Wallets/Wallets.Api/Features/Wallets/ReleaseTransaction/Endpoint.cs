@@ -1,5 +1,6 @@
 using FluentValidation;
 using Wallets.Api.Services;
+using Wallets.Domain.Shared.Contracts;
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
 
@@ -10,11 +11,12 @@ namespace Wallets.Api.Features.Wallets.ReleaseTransaction;
 /// </summary>
 public static class ReleaseTransactionEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage])]
     [MapPost("/api/wallets/release-transaction", Tags = ["Wallets"],
         Summary = "Release a held transaction",
         Description = "Releases a transaction that was previously placed on hold. Moves the amount from on-hold balances to available balances.",
         RequireAuthorization = true,
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Manage],
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ReleaseTransactionRequest request,
