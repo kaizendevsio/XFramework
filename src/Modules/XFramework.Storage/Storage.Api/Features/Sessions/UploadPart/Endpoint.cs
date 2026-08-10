@@ -63,7 +63,8 @@ public static class UploadStorageFilePartEndpoint
             {
                 ActorRequirement = ActorRequirement.Required,
                 TenantAccessMode = TenantAccessMode.ActorTenant,
-                RequireServiceIdentity = false
+                RequireServiceIdentity = false,
+                RequiredActorCapabilities = [StorageAuthorizationCapabilities.Manage]
             },
             ct);
         if (!invocationResult.IsSuccess)
@@ -72,7 +73,7 @@ public static class UploadStorageFilePartEndpoint
         var featureResult = await featureGate.EnsureAllowedAsync(
             "/api/storage/uploads/sessions/{uploadSessionId:guid}/parts",
             HttpMethods.Post,
-            null,
+            StorageAuthorizationCapabilities.ManageKey,
             ct);
         if (!featureResult.IsSuccess)
             return TypedResults.Problem(detail: featureResult.Message, statusCode: featureResult.StatusCode);

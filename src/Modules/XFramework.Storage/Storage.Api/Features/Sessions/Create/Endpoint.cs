@@ -7,6 +7,9 @@ public static class CreateStorageUploadSessionEndpoint
 {
     [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite])]
     [MapPost("/api/storage/uploads/sessions", Tags = ["Storage"],
+        RequiredServiceScopes = [],
+        RequiredActorCapabilities = [StorageAuthorizationCapabilities.Manage],
+        Capability = StorageAuthorizationCapabilities.ManageKey,
         Summary = "Create upload session",
         Description = "Creates tenant-scoped file metadata and a resumable upload session.")]
     public static Task<Result<StorageUploadSessionResponse>> Handle(

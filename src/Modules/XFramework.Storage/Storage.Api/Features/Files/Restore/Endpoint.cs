@@ -7,6 +7,9 @@ public static class RestoreStorageFileEndpoint
 {
     [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite])]
     [MapPost("/api/storage/files/{storageFileId:guid}/restore", Tags = ["Storage"],
+        RequiredServiceScopes = [],
+        RequiredActorCapabilities = [StorageAuthorizationCapabilities.Manage],
+        Capability = StorageAuthorizationCapabilities.ManageKey,
         Summary = "Restore storage file",
         Description = "Restores soft-deleted storage metadata before retention cleanup deletes the object.")]
     public static Task<Result<StorageFileResponse>> Handle(

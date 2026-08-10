@@ -6,7 +6,8 @@ namespace XFramework.Integration.Security;
 public sealed class TrustedServiceTargetContextInitializer(
     IServiceTokenProvider serviceTokenProvider,
     ITrustedInvocationResolver invocationResolver,
-    ITrustedInvocationContextStore contextStore)
+    ITrustedInvocationContextStore contextStore,
+    ITrustedServiceAccessTokenStore serviceAccessTokenStore)
     : ITrustedServiceTargetContextInitializer
 {
     public async Task<TrustedInvocationResult> EstablishAsync(
@@ -50,7 +51,14 @@ public sealed class TrustedServiceTargetContextInitializer(
             ct);
 
         if (authorization.IsSuccess)
+        {
             contextStore.Set(authorization.Context!);
+            serviceAccessTokenStore.Set(new TrustedServiceAccessToken(
+                serviceToken,
+                authorization.Context!.Service!.ClientId,
+                audience,
+                scopes.ToHashSet(StringComparer.OrdinalIgnoreCase)));
+        }
 
         return authorization;
     }
@@ -92,7 +100,14 @@ public sealed class TrustedServiceTargetContextInitializer(
             ct);
 
         if (authorization.IsSuccess)
+        {
             contextStore.Set(authorization.Context!);
+            serviceAccessTokenStore.Set(new TrustedServiceAccessToken(
+                serviceToken,
+                authorization.Context!.Service!.ClientId,
+                audience,
+                scopes.ToHashSet(StringComparer.OrdinalIgnoreCase)));
+        }
 
         return authorization;
     }

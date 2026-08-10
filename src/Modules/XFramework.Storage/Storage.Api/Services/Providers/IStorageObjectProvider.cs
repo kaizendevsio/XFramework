@@ -2,6 +2,8 @@ using Storage.Domain.Shared.Contracts.Responses;
 
 namespace Storage.Api.Services.Providers;
 
+public sealed record StorageObjectMetadata(long ContentLength, string? ETag);
+
 public interface IStorageObjectProvider
 {
     StorageProviderKind Kind { get; }
@@ -39,6 +41,20 @@ public interface IStorageObjectProvider
         StorageTenantBucket bucket,
         StorageFile file,
         CancellationToken ct);
+
+    Task<StorageObjectMetadata?> GetObjectMetadataAsync(
+        StorageProviderProfile profile,
+        StorageTenantBucket bucket,
+        StorageFile file,
+        CancellationToken ct);
+
+    Task EnsurePublicAccessAsync(
+        StorageProviderProfile profile,
+        StorageTenantBucket bucket,
+        StorageFile file,
+        CancellationToken ct);
+
+    Task CheckReadinessAsync(CancellationToken ct);
 
     Task AbortUploadAsync(
         StorageProviderProfile profile,

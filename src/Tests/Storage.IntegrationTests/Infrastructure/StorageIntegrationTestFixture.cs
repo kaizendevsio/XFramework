@@ -54,7 +54,8 @@ public sealed class StorageIntegrationTestFixture
         TestConstants.TenantId,
         TestCredentialId,
         TestIdentityId,
-        Guid.Parse("00000000-0000-0000-0000-000000000833"));
+        Guid.Parse("00000000-0000-0000-0000-000000000833"),
+        StorageAuthorizationCapabilities.All);
 
     private static PostgreSqlContainer postgres = null!;
     private static bool ownsPostgresContainer;
@@ -208,6 +209,13 @@ public sealed class StorageIntegrationTestFixture
             new XFramework.TestInfrastructure.TestEffectiveTenantContextAccessor(TestTenantId));
     }
 
+    public static void InvalidateStorageFeature(Guid tenantId)
+    {
+        using var scope = storageApp.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService>()
+            .Invalidate(tenantId, TenantModuleFeatureKeys.Storage);
+    }
+
     private static WebApplication StartBolt()
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -258,6 +266,10 @@ public sealed class StorageIntegrationTestFixture
             .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
         builder.Services.AddServerDataContext<AppDbContext>();
         builder.Services.InstallStandardServices<StorageService>(builder.Configuration);
+        typeof(StorageService).Assembly
+            .GetType("XFramework.GeneratedServices.GeneratedEntityServiceRegistrations", throwOnError: true)!
+            .GetMethod("AddGeneratedEntityServices")!
+            .Invoke(null, [builder.Services]);
         builder.Services.AddTenantResolver();
         builder.Services.AddTenantModuleFeatures();
         builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
@@ -286,6 +298,10 @@ public sealed class StorageIntegrationTestFixture
 
         var securedRoutes = app.MapGroup(string.Empty).RequireAuthorization();
         securedRoutes.MapGeneratedEndpoints();
+        typeof(StorageService).Assembly
+            .GetType("XFramework.GeneratedEndpoints.GeneratedEntityEndpointRoutes", throwOnError: true)!
+            .GetMethod("MapGeneratedEntityEndpoints")!
+            .Invoke(null, [app]);
         securedRoutes.MapUploadStorageFilePartRestEndpoint();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
@@ -539,8 +555,29 @@ public sealed class StorageIntegrationTestFixture
         var generationId = ResolveCredentialGeneration(request.ClientId, request.ClientSecret);
         if (generationId is null)
             return Results.Unauthorized();
-        if (string.IsNullOrWhiteSpace(request.Audience))
+        if (string.IsNullOrWhiteSpace(request.Audience) ||
+            !string.Equals(request.Audience, XFrameworkServiceNames.Storage, StringComparison.Ordinal))
             return Results.BadRequest();
+
+        var allowedScopes = request.ClientId switch
+        {
+            XFrameworkServiceNames.Storage => new HashSet<string>(
+                [XFrameworkServiceScopes.StorageRead, XFrameworkServiceScopes.StorageWrite],
+                StringComparer.Ordinal),
+            XFrameworkServiceNames.Portal => new HashSet<string>(
+                [
+                    XFrameworkServiceScopes.StorageRead,
+                    XFrameworkServiceScopes.StorageWrite,
+                    XFrameworkServiceScopes.BoltService,
+                    XFrameworkServiceScopes.DataContextQuery,
+                    XFrameworkServiceScopes.DataContextMutate,
+                    XFrameworkServiceScopes.TenantTarget
+                ],
+                StringComparer.Ordinal),
+            _ => []
+        };
+        if (request.Scopes.Any(scope => !allowedScopes.Contains(scope)))
+            return Results.Json(new { error = "invalid_scope" }, statusCode: StatusCodes.Status403Forbidden);
 
         var issuedAt = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds()).UtcDateTime;
         var expiresAt = issuedAt.AddMinutes(5);

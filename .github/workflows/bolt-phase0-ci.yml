@@ -182,6 +182,33 @@ jobs:
           dotnet restore XFramework.slnx
           dotnet build XFramework.slnx --configuration Release --no-restore
 
+      - name: Start Storage provider contract dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --rm \
+            --name storage-ci-minio \
+            --publish 9000:9000 \
+            --env MINIO_ROOT_USER=storage_test_admin \
+            --env MINIO_ROOT_PASSWORD=storage_test_password \
+            minio/minio:RELEASE.2025-04-22T22-12-26Z \
+            server /data
+          docker run --detach --rm \
+            --name storage-ci-azurite \
+            --publish 10000:10000 \
+            --env AZURITE_ACCOUNTS='storageaccount:c3RvcmFnZS10ZXN0LWtleS1zdG9yYWdlLXRlc3Qta2V5LXN0b3JhZ2UtdGVzdC1rZXktMTIzNDU2Nzg5MA==' \
+            mcr.microsoft.com/azure-storage/azurite:3.35.0 \
+            azurite-blob --blobHost 0.0.0.0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:9000/minio/health/live >/dev/null && \
+               curl --silent http://localhost:10000/storageaccount?comp=list >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs storage-ci-minio
+          exit 1
+
       - name: Test complete Bolt suite
         env:
           BOLT_TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=bolt_authorization_test;Username=bolt_test;Password=bolt_test_password
@@ -206,3 +233,20 @@ jobs:
           dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj \
             --configuration Release --no-build --no-restore \
             --filter "FullyQualifiedName~ServiceIdentityComposeContractTests"
+
+      - name: Test Storage authorization and provider contracts
+        env:
+          STORAGE_TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=bolt_authorization_test;Username=bolt_test;Password=bolt_test_password
+          STORAGE_TEST_MINIO_ENDPOINT: http://localhost:9000
+          STORAGE_TEST_MINIO_ACCESS_KEY: storage_test_admin
+          STORAGE_TEST_MINIO_SECRET_KEY: storage_test_password
+          STORAGE_TEST_AZURITE_ENDPOINT: http://localhost:10000
+        run: |
+          dotnet test src/Tests/Storage.IntegrationTests/Storage.IntegrationTests.csproj \
+            --configuration Release --no-build --no-restore
+
+      - name: Stop Storage provider contract dependencies
+        if: always()
+        run: |
+          docker rm --force storage-ci-minio >/dev/null 2>&1 || true
+          docker rm --force storage-ci-azurite >/dev/null 2>&1 || true

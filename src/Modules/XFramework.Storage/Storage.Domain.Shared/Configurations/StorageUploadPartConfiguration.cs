@@ -20,6 +20,7 @@ public sealed class StorageUploadPartConfiguration : IEntityTypeConfiguration<St
         entity.Property(e => e.IsDeleted).IsRequired().HasDefaultValueSql("false");
         entity.Property(e => e.Sha256Hash).HasMaxLength(128);
         entity.Property(e => e.ProviderPartId).HasColumnType("text");
+        entity.Property(e => e.Status).HasDefaultValue(StorageUploadPartStatus.Uploaded);
 
         entity.HasOne(e => e.UploadSession).WithMany(e => e.Parts)
             .HasForeignKey(e => e.UploadSessionId)

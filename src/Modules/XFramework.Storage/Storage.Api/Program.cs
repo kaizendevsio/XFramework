@@ -36,6 +36,7 @@ app.UseTenantModuleFeatureGate(options =>
 app.MapXFrameworkHealthChecks("Storage");
 var securedStorageEndpoints = app.MapGroup(string.Empty).RequireAuthorization();
 securedStorageEndpoints.MapGeneratedEndpoints();
+XFramework.GeneratedEndpoints.GeneratedEntityEndpointRoutes.MapGeneratedEntityEndpoints(app);
 securedStorageEndpoints.MapUploadStorageFilePartRestEndpoint();
 app.MapApiDocumentation();
 

@@ -218,6 +218,11 @@ public static class ServiceCollectionExtensions
             serviceProvider.GetRequiredService<CrossTenantWriteAuthorization>());
         services.TryAddScoped<ITrustedInvocationContextStore>(serviceProvider =>
             serviceProvider.GetRequiredService<TrustedInvocationContextAccessor>());
+        services.TryAddScoped<TrustedServiceAccessTokenContext>();
+        services.TryAddScoped<ITrustedServiceAccessTokenAccessor>(serviceProvider =>
+            serviceProvider.GetRequiredService<TrustedServiceAccessTokenContext>());
+        services.TryAddScoped<ITrustedServiceAccessTokenStore>(serviceProvider =>
+            serviceProvider.GetRequiredService<TrustedServiceAccessTokenContext>());
         services.TryAddScoped<ITrustedInvocationResolver, TrustedInvocationResolver>();
         services.TryAddScoped<ITrustedServiceTargetContextInitializer, TrustedServiceTargetContextInitializer>();
         services.TryAddScoped<IBoltServiceInvocationAuthorizer, BoltServiceInvocationAuthorizer>();

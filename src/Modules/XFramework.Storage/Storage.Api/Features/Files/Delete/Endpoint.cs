@@ -13,6 +13,12 @@ public static class DeleteStorageFileEndpoint
         RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite, XFrameworkServiceScopes.TenantTarget],
         AllowedServiceCallers = [XFrameworkServiceNames.IdentityServer, XFrameworkServiceNames.Portal])]
     [MapDelete("/api/storage/files/{storageFileId:guid}", Tags = ["Storage"],
+        ActorRequirement = ActorRequirement.Required,
+        TenantAccessMode = TenantAccessMode.ActorTenant,
+        RequiredServiceScopes = [],
+        AllowedServiceCallers = [],
+        RequiredActorCapabilities = [StorageAuthorizationCapabilities.Manage],
+        Capability = StorageAuthorizationCapabilities.ManageKey,
         Summary = "Delete storage file",
         Description = "Soft-deletes storage metadata and schedules physical deletion by retention cleanup.")]
     public static Task<Result> Handle(

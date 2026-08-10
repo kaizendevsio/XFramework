@@ -29,6 +29,8 @@ public sealed class BoltDriver : IMessageBusWrapper, IDisposable
     private readonly BoltConfiguration _config;
     private readonly IServiceTokenProvider _serviceTokenProvider;
     private readonly IActorAccessTokenProvider _actorAccessTokenProvider;
+    private readonly ITrustedInvocationContextAccessor _trustedInvocationContextAccessor;
+    private readonly ITrustedServiceAccessTokenAccessor _trustedServiceAccessTokenAccessor;
     private readonly ILogger<BoltDriver> _logger;
     private readonly Action _disconnectedHandler;
     private readonly Action _reconnectingHandler;
@@ -50,12 +52,16 @@ public sealed class BoltDriver : IMessageBusWrapper, IDisposable
         IOptions<BoltConfiguration> config,
         IServiceTokenProvider serviceTokenProvider,
         IActorAccessTokenProvider actorAccessTokenProvider,
+        ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
+        ITrustedServiceAccessTokenAccessor trustedServiceAccessTokenAccessor,
         ILogger<BoltDriver> logger)
     {
         _client = client;
         _config = config.Value;
         _serviceTokenProvider = serviceTokenProvider;
         _actorAccessTokenProvider = actorAccessTokenProvider;
+        _trustedInvocationContextAccessor = trustedInvocationContextAccessor;
+        _trustedServiceAccessTokenAccessor = trustedServiceAccessTokenAccessor;
         _logger = logger;
         _disconnectedHandler = () => OnDisconnected();
         _reconnectingHandler = () => OnReconnecting();
@@ -379,14 +385,31 @@ public sealed class BoltDriver : IMessageBusWrapper, IDisposable
         request.Metadata.RequestId ??= Guid.NewGuid();
 
         var audience = ResolveAudience(recipient);
+        var serviceAccessToken = ResolveTrustedServiceAccessToken(audience)
+            ?? await _serviceTokenProvider.GetTokenAsync(audience, null, ct);
         var envelope = new BoltInvocationEnvelope
         {
             Payload = MemoryPackSerializer.Serialize(request),
             ActorAccessToken = await _actorAccessTokenProvider.GetTokenAsync(ct),
-            ServiceAccessToken = await _serviceTokenProvider.GetTokenAsync(audience, null, ct)
+            ServiceAccessToken = serviceAccessToken
         };
 
         return (ResolveRecipientId(recipient), MemoryPackSerializer.Serialize(envelope));
+    }
+
+    private string? ResolveTrustedServiceAccessToken(string audience)
+    {
+        var invocation = _trustedInvocationContextAccessor.Current;
+        var credential = _trustedServiceAccessTokenAccessor.Current;
+        if (invocation?.Service is null || credential is null)
+            return null;
+
+        return string.Equals(invocation.Service.ClientId, credential.ClientId, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(invocation.Service.Audience, audience, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(credential.Audience, audience, StringComparison.OrdinalIgnoreCase) &&
+               invocation.Service.Scopes.SetEquals(credential.Scopes)
+            ? credential.Token
+            : null;
     }
 
     private static string ResolveAudience(string recipient)

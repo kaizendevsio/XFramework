@@ -26,4 +26,7 @@ public partial class StorageUploadPart : BaseModel
 
     [MemoryPackOrder(7)]
     public virtual StorageUploadSession UploadSession { get; set; } = null!;
+
+    [MemoryPackOrder(8)]
+    public StorageUploadPartStatus Status { get; set; } = StorageUploadPartStatus.Uploaded;
 }
