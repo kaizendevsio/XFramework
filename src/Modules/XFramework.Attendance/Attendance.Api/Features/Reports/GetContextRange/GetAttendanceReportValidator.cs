@@ -10,9 +10,11 @@ public sealed class GetAttendanceReportValidator : AbstractValidator<GetAttendan
             .NotEmpty().WithMessage("Attendance context ID is required");
 
         RuleFor(x => x.FromUtc)
-            .NotEmpty().WithMessage("From UTC is required");
+            .NotEmpty().WithMessage("From UTC is required")
+            .Must(value => value.Kind == DateTimeKind.Utc).WithMessage("From UTC must be UTC");
 
         RuleFor(x => x.ToUtc)
+            .Must(value => value.Kind == DateTimeKind.Utc).WithMessage("To UTC must be UTC")
             .GreaterThan(x => x.FromUtc).WithMessage("To UTC must be after From UTC");
 
         RuleFor(x => x.Page)

@@ -1,12 +1,15 @@
 using Attendance.Api.Services;
 using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 
 namespace Attendance.Api.Features.Participants.Remove;
 
 public static class RemoveAttendanceParticipantEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        RequiredServiceScopes = [XFrameworkServiceScopes.AttendanceWrite],
+        AllowedServiceCallers = [XFrameworkServiceNames.Portal])]
     [MapDelete("/api/attendance/participants", Tags = ["Attendance"],
         Summary = "Remove attendance participant",
         Description = "Soft-removes a participant from an attendance context.")]

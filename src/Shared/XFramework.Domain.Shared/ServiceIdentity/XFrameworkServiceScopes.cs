@@ -9,6 +9,8 @@ public static class XFrameworkServiceScopes
     public const string TenantTarget = "tenant.target";
 
     public const string AttendanceAdmin = "attendance.admin";
+    public const string AttendanceRead = "attendance.read";
+    public const string AttendanceWrite = "attendance.write";
     public const string CommunicationsAdmin = "communications.admin";
     public const string CommunicationsChat = "communications.chat";
     public const string CommunityAdmin = "community.admin";
@@ -30,6 +32,8 @@ public static class XFrameworkServiceScopes
         DataContextMutate,
         TenantTarget,
         AttendanceAdmin,
+        AttendanceRead,
+        AttendanceWrite,
         CommunicationsAdmin,
         CommunicationsChat,
         CommunityAdmin,

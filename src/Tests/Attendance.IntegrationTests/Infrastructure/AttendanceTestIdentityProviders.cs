@@ -1,3 +1,6 @@
+using Attendance.Domain.Shared.Contracts;
+using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Security;
 
@@ -15,7 +18,7 @@ internal static class AttendanceTestIdentity
         AttendanceIntegrationTestFixture.TestTenantId,
         Guid.Parse("00000000-0000-0000-0000-000000000187"),
         new HashSet<string>(StringComparer.Ordinal) { "attendance-test" },
-        new HashSet<string>(StringComparer.Ordinal),
+        new HashSet<string>(StringComparer.Ordinal) { AttendanceAuthorizationCapabilities.View },
         "attendance-tests-g1",
         DateTimeOffset.UtcNow.AddHours(1));
 
@@ -65,6 +68,49 @@ internal sealed class AttendanceTestServiceIdentityProvider : IServiceIdentityPr
                     AttendanceTestIdentity.Service.Scopes,
                     AttendanceTestIdentity.Service.GenerationId))
             : ServiceIdentityValidationResult.Failure("Invalid test service token."));
+}
+
+internal sealed class AttendanceBoltHubTestServiceIdentityProvider : IServiceIdentityProvider
+{
+    public Task<ServiceIdentityValidationResult> ValidateAsync(
+        string token,
+        string expectedAudience,
+        CancellationToken ct = default) =>
+        Task.FromResult(token == AttendanceTestIdentity.ServiceToken
+            ? ServiceIdentityValidationResult.Success(
+                new TrustedServiceIdentity(
+                    XFrameworkServiceNames.BoltHub,
+                    expectedAudience,
+                    new HashSet<string>(XFrameworkServiceScopes.AdminDefaults, StringComparer.Ordinal),
+                    "attendance-tests-g1"))
+            : ServiceIdentityValidationResult.Failure("Invalid test service token."));
+}
+
+internal sealed class AttendanceTestCapabilityService : ITenantCredentialCapabilityService
+{
+    public Task<Result<bool>> IsAllowedAsync(
+        Guid tenantId,
+        Guid credentialId,
+        string moduleKey,
+        string? subFeatureKey,
+        string capabilityKey,
+        CancellationToken ct = default) =>
+        Task.FromResult(Result<bool>.Success(IsTestActor(tenantId, credentialId)));
+
+    public Task<Result> EnsureAllowedAsync(
+        Guid tenantId,
+        Guid credentialId,
+        string moduleKey,
+        string? subFeatureKey,
+        string capabilityKey,
+        CancellationToken ct = default) =>
+        Task.FromResult(IsTestActor(tenantId, credentialId)
+            ? Result.Success()
+            : Result.Forbidden("Attendance test actor capability denied."));
+
+    private static bool IsTestActor(Guid tenantId, Guid credentialId) =>
+        tenantId == AttendanceIntegrationTestFixture.TestTenantId &&
+        credentialId == AttendanceTestIdentity.Actor.CredentialId;
 }
 
 internal sealed class AttendanceTestInvocationContextAccessor(Guid tenantId)

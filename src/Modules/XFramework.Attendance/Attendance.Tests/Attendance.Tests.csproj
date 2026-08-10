@@ -13,6 +13,8 @@
     <ItemGroup>
         <PackageReference Include="FluentAssertions" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+        <PackageReference Include="Moq" />
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="NUnit" />
         <PackageReference Include="NUnit3TestAdapter" />
@@ -21,6 +23,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Attendance.Api\Attendance.Api.csproj" />
+        <ProjectReference Include="..\Attendance.Integration\Attendance.Integration.csproj" />
     </ItemGroup>
 
 </Project>

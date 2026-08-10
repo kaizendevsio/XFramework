@@ -1,0 +1,91 @@
+name: Attendance Tests
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - "src/Modules/XFramework.Attendance/**"
+      - "src/Tests/Attendance.IntegrationTests/**"
+      - "src/Kernel/XFramework.Core/DataContext/**"
+      - "src/Infrastructure/XFramework.Integration/**"
+      - "src/SourceGenerators/XFramework.SourceGenerators/**"
+      - "src/Shared/XFramework.Domain.Shared/ServiceIdentity/XFrameworkServiceScopes.cs"
+      - "src/Kernel/XFramework.Domain/Migrations/*Attendance*"
+      - "src/Presentation/XFramework.Portal/Services/AttendancePortalReadService.cs"
+      - "src/Tests/Portal.E2ETests/AttendancePortalContractTests.cs"
+      - "docker-compose.yml"
+      - ".github/workflows/attendance-integration-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  attendance-tests:
+    name: Attendance unit and integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore XFramework.slnx
+
+      - name: Run Attendance unit tests
+        run: >
+          dotnet test
+          src/Modules/XFramework.Attendance/Attendance.Tests/Attendance.Tests.csproj
+          --no-restore
+          -m:1
+          /nr:false
+
+      - name: Run Attendance PostgreSQL integration tests
+        run: >
+          dotnet test
+          src/Tests/Attendance.IntegrationTests/Attendance.IntegrationTests.csproj
+          --no-restore
+          -m:1
+          /nr:false
+
+      - name: Run Portal Attendance contract tests
+        run: >
+          dotnet test
+          src/Tests/Portal.E2ETests/Portal.E2ETests.csproj
+          --no-restore
+          --filter "FullyQualifiedName~AttendancePortalContractTests"
+          -m:1
+          /nr:false
+
+      - name: Run generated authorization and data-context security tests
+        run: >
+          dotnet test
+          src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj
+          --no-restore
+          --filter "FullyQualifiedName~GeneratedEntityAuthorizationPolicyRegistryTests|FullyQualifiedName~DataContextBoltHandlerTests|FullyQualifiedName~QueryExecutionServiceTests"
+          -m:1
+          /nr:false
+
+      - name: Run authorization source-generator parity tests
+        run: >
+          dotnet test
+          src/Tests/XFramework.SourceGenerators.Tests/XFramework.SourceGenerators.Tests.csproj
+          --no-restore
+          --filter "FullyQualifiedName~DataContextRegistrationGeneratorTests|FullyQualifiedName~EntityEndpointGeneratorTests|FullyQualifiedName~EntityServiceGeneratorTests|FullyQualifiedName~ServiceWrapperGeneratorTests|FullyQualifiedName~BoltHandlerGeneratorTests"
+          -m:1
+          /nr:false
+
+      - name: Run service and Bolt token cache tests
+        run: >
+          dotnet test
+          src/Tests/Bolt.Tests/Bolt.Tests.csproj
+          --no-restore
+          --filter "FullyQualifiedName~IdentityServerTokenProviderTests"
+          -m:1
+          /nr:false

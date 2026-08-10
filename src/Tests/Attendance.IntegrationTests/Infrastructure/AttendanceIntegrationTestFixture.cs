@@ -16,6 +16,8 @@ using Testcontainers.PostgreSql;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
+using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Interceptors;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -93,6 +95,14 @@ public sealed class AttendanceIntegrationTestFixture
                 ex is TypeInitializationException ||
                 ex.Message.Contains("Docker", StringComparison.OrdinalIgnoreCase))
             {
+                if (string.Equals(
+                        Environment.GetEnvironmentVariable("CI"),
+                        "true",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw;
+                }
+
                 Assert.Ignore(
                     $"Attendance integration tests require a Testcontainers-compatible Docker endpoint or {ExternalConnectionStringEnvironmentVariable}.");
             }
@@ -158,6 +168,8 @@ public sealed class AttendanceIntegrationTestFixture
         var builder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
         builder.WebHost.UseUrls(BoltUrl);
         OverrideConfig(builder, "Bolt.AttendanceTest", "00000000-0000-0000-0000-000000000030");
+        builder.Services.AddSingleton<IServiceTokenProvider, AttendanceTestServiceTokenProvider>();
+        builder.Services.AddSingleton<IServiceIdentityProvider, AttendanceBoltHubTestServiceIdentityProvider>();
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
@@ -192,7 +204,10 @@ public sealed class AttendanceIntegrationTestFixture
         builder.Services.AddSingleton(CreateTestJwtOptions());
         builder.Services.AddTenantResolver();
         builder.Services.AddTenantModuleFeatures();
+        builder.Services.AddScoped<ITenantCredentialCapabilityService, AttendanceTestCapabilityService>();
+        builder.Services.AddScoped<IAttendanceCredentialResolver, AttendanceIntegrationCredentialResolver>();
         builder.Services.AddScoped<AttendanceService>();
+        builder.Services.AddScoped<IAttendanceReadService, AttendanceReadService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AttendanceService>();
         builder.Services.AddAuthentication("AttendanceTest")
             .AddScheme<AuthenticationSchemeOptions, AttendanceTestAuthHandler>("AttendanceTest", _ => { });
@@ -323,6 +338,12 @@ public sealed class AttendanceIntegrationTestFixture
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
             ["BoltConfiguration:Anonymous"] = "true",
+            ["ServiceIdentity:ClientId"] = clientName,
+            ["ServiceIdentity:Authority"] = BoltUrl,
+            ["ServiceIdentity:AllowInsecureHttp"] = "true",
+            ["ServiceIdentity:GenerationId"] = "attendance-tests-g1",
+            ["ServiceIdentity:ClientSecret"] = "attendance-tests-client-secret-2026",
+            ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.BoltService,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Logging:LogLevel:Default"] = "Warning"
         });
@@ -348,16 +369,24 @@ public sealed class AttendanceIntegrationTestFixture
                 Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
-        await using var db = new AppDbContext(
+        await using var primaryTenantDb = new AppDbContext(
             options,
             new Microsoft.AspNetCore.Http.HttpContextAccessor(),
             new ConfigurationBuilder().Build(),
             new XFramework.TestInfrastructure.TestEffectiveTenantContextAccessor(TestTenantId));
-        await db.Database.MigrateAsync();
-        await TestSeedData.SeedAll(db);
-        await SeedTenant(db, OtherTenantId, "Other Attendance Tenant");
-        await SeedAttendanceFeature(db, OtherTenantId);
-        await db.SaveChangesAsync();
+        await primaryTenantDb.Database.MigrateAsync();
+        await TestSeedData.SeedAll(primaryTenantDb);
+        await SeedAttendanceFeature(primaryTenantDb, TestTenantId);
+        await primaryTenantDb.SaveChangesAsync();
+
+        await using var otherTenantDb = new AppDbContext(
+            options,
+            new Microsoft.AspNetCore.Http.HttpContextAccessor(),
+            new ConfigurationBuilder().Build(),
+            new XFramework.TestInfrastructure.TestEffectiveTenantContextAccessor(OtherTenantId));
+        await SeedTenant(otherTenantDb, OtherTenantId, "Other Attendance Tenant");
+        await SeedAttendanceFeature(otherTenantDb, OtherTenantId);
+        await otherTenantDb.SaveChangesAsync();
     }
 
     private static async Task SeedTenant(AppDbContext db, Guid tenantId, string name)
@@ -413,5 +442,20 @@ public sealed class AttendanceIntegrationTestFixture
         RuntimeHelpers.RunClassConstructor(typeof(IdentityCredential).TypeHandle);
         RuntimeHelpers.RunClassConstructor(typeof(TenantModuleFeature).TypeHandle);
         RuntimeHelpers.RunClassConstructor(typeof(Wallets.Domain.Shared.Contracts.WalletType).TypeHandle);
+    }
+
+    private sealed class AttendanceIntegrationCredentialResolver : IAttendanceCredentialResolver
+    {
+        public Task<Result<AttendanceCredentialSnapshot>> ResolveAsync(
+            Guid credentialId,
+            Guid tenantId,
+            CancellationToken ct) =>
+            Task.FromResult(Result<AttendanceCredentialSnapshot>.Success(new(
+                credentialId,
+                tenantId,
+                true,
+                false,
+                $"Credential {credentialId:N}",
+                credentialId.ToString("N"))));
     }
 }

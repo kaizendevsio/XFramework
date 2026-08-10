@@ -14,33 +14,6 @@ namespace XFramework.Domain.Migrations
             migrationBuilder.EnsureSchema(
                 name: "Attendance");
 
-            migrationBuilder.Sql(
-                """
-                INSERT INTO "Identity"."TenantModuleFeature"
-                    ("ID", "ModuleKey", "SubFeatureKey", "DisplayName", "Description", "IsEnabled", "IsDeleted", "ConcurrencyStamp", "CreatedAt", "ModifiedAt", "TenantId")
-                SELECT
-                    uuid_generate_v4(),
-                    'attendance',
-                    '',
-                    'Attendance',
-                    'Attendance contexts, sessions, participants, time events, and reports.',
-                    true,
-                    false,
-                    uuid_generate_v4(),
-                    now(),
-                    now(),
-                    tenants."ID"
-                FROM "Application"."Application" tenants
-                WHERE tenants."IsDeleted" = false
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM "Identity"."TenantModuleFeature" existing
-                      WHERE existing."TenantId" = tenants."ID"
-                        AND existing."ModuleKey" = 'attendance'
-                        AND existing."SubFeatureKey" = ''
-                  );
-                """);
-
             migrationBuilder.CreateTable(
                 name: "AttendancePolicy",
                 schema: "Attendance",
@@ -572,12 +545,6 @@ namespace XFramework.Domain.Migrations
                 name: "AttendancePolicy",
                 schema: "Attendance");
 
-            migrationBuilder.Sql(
-                """
-                DELETE FROM "Identity"."TenantModuleFeature"
-                WHERE "ModuleKey" = 'attendance'
-                  AND "SubFeatureKey" = '';
-                """);
         }
     }
 }

@@ -6,6 +6,7 @@ namespace Attendance.Domain.Shared.Contracts;
     Actions = EndpointActions.None,
     RoutePrefix = "api/attendance/records",
     RequireAuthorization = true,
+    AuthorizationFeature = "attendance",
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "attendance-records"
 )]
