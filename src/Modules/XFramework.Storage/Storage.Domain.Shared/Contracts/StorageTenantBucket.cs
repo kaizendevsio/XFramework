@@ -23,4 +23,7 @@ public partial class StorageTenantBucket : BaseModel
 
     [MemoryPackOrder(6)]
     public virtual ICollection<StorageFile> Files { get; set; } = new List<StorageFile>();
+
+    [MemoryPackOrder(7)]
+    public StorageBucketPurpose Purpose { get; set; } = StorageBucketPurpose.Private;
 }

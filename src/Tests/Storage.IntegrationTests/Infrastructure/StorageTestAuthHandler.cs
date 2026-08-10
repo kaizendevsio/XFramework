@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.TestInfrastructure;
 
 namespace Storage.IntegrationTests.Infrastructure;
@@ -47,6 +48,13 @@ public sealed class StorageTestAuthHandler(
             : StorageIntegrationTestFixture.TestCredentialId;
         claims.Add(new Claim("credential_id", credentialId.ToString()));
 
+        var capabilities = Request.Headers.TryGetValue(TestAuthHeaders.Capabilities, out var capabilityHeader)
+            ? capabilityHeader.SelectMany(static value => value?.Split(
+                    ',',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
+                .ToArray()
+            : StorageAuthorizationCapabilities.All;
+
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);
@@ -55,7 +63,8 @@ public sealed class StorageTestAuthHandler(
             credentialId,
             identityId,
             Guid.Parse("00000000-0000-0000-0000-000000000693"),
-            ["Admin"]);
+            ["Admin"],
+            capabilities);
         Request.Headers.Authorization = $"Bearer {actorToken}";
 
         return Task.FromResult(AuthenticateResult.Success(ticket));

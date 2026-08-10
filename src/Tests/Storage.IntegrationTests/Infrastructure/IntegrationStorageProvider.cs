@@ -14,24 +14,44 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
 {
     private readonly object gate = new();
     private readonly Dictionary<Guid, SortedDictionary<int, byte[]>> bytesByFileId = [];
+    private TaskCompletionSource uploadPartStarted = CreateSignal();
+    private TaskCompletionSource deleteObjectStarted = CreateSignal();
 
     public StorageProviderKind Kind => StorageProviderKind.S3Compatible;
-    public int DeleteObjectCount { get; private set; }
-    public int DeleteObjectAttemptCount { get; private set; }
-    public int AbortUploadCount { get; private set; }
+    public int DeleteObjectCount => Volatile.Read(ref deleteObjectCount);
+    public int DeleteObjectAttemptCount => Volatile.Read(ref deleteObjectAttemptCount);
+    public int AbortUploadCount => Volatile.Read(ref abortUploadCount);
+    public int UploadPartCount => Volatile.Read(ref uploadPartCount);
+    public int CompleteUploadCount => Volatile.Read(ref completeUploadCount);
     public bool FailNextDelete { get; set; }
     public bool FailNextAbort { get; set; }
+    public bool FailReadiness { get; set; }
+    public int EnsurePublicAccessCount => Volatile.Read(ref ensurePublicAccessCount);
+    public TimeSpan UploadPartDelay { get; set; }
+    public TimeSpan CompleteUploadDelay { get; set; }
+    public TimeSpan DeleteObjectDelay { get; set; }
+    public Task UploadPartStarted => uploadPartStarted.Task;
+    public Task DeleteObjectStarted => deleteObjectStarted.Task;
 
     public void Reset()
     {
         lock (gate)
         {
             bytesByFileId.Clear();
-            DeleteObjectCount = 0;
-            DeleteObjectAttemptCount = 0;
-            AbortUploadCount = 0;
+            deleteObjectCount = 0;
+            deleteObjectAttemptCount = 0;
+            abortUploadCount = 0;
+            uploadPartCount = 0;
+            completeUploadCount = 0;
             FailNextDelete = false;
             FailNextAbort = false;
+            FailReadiness = false;
+            ensurePublicAccessCount = 0;
+            UploadPartDelay = TimeSpan.Zero;
+            CompleteUploadDelay = TimeSpan.Zero;
+            DeleteObjectDelay = TimeSpan.Zero;
+            uploadPartStarted = CreateSignal();
+            deleteObjectStarted = CreateSignal();
         }
     }
 
@@ -48,7 +68,7 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
         CancellationToken ct) =>
         Task.FromResult<string?>("integration-upload");
 
-    public Task<string> UploadPartAsync(
+    public async Task<string> UploadPartAsync(
         StorageProviderProfile profile,
         StorageTenantBucket bucket,
         StorageFile file,
@@ -57,6 +77,11 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
         byte[] bytes,
         CancellationToken ct)
     {
+        Interlocked.Increment(ref uploadPartCount);
+        uploadPartStarted.TrySetResult();
+        if (UploadPartDelay > TimeSpan.Zero)
+            await Task.Delay(UploadPartDelay, ct);
+
         lock (gate)
         {
             if (!bytesByFileId.TryGetValue(file.Id, out var parts))
@@ -68,17 +93,22 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
             parts[part.PartNumber] = bytes.ToArray();
         }
 
-        return Task.FromResult($"integration-part-{part.PartNumber}");
+        return $"integration-part-{part.PartNumber}";
     }
 
-    public Task<string?> CompleteUploadAsync(
+    public async Task<string?> CompleteUploadAsync(
         StorageProviderProfile profile,
         StorageTenantBucket bucket,
         StorageFile file,
         StorageUploadSession session,
         IReadOnlyList<StorageUploadPart> parts,
-        CancellationToken ct) =>
-        Task.FromResult<string?>("integration-etag");
+        CancellationToken ct)
+    {
+        Interlocked.Increment(ref completeUploadCount);
+        if (CompleteUploadDelay > TimeSpan.Zero)
+            await Task.Delay(CompleteUploadDelay, ct);
+        return "integration-etag";
+    }
 
     public Task<string> ComputeObjectSha256Async(
         StorageProviderProfile profile,
@@ -97,6 +127,36 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
         return Task.FromResult(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
     }
 
+    public Task<StorageObjectMetadata?> GetObjectMetadataAsync(
+        StorageProviderProfile profile,
+        StorageTenantBucket bucket,
+        StorageFile file,
+        CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var length = bytesByFileId.TryGetValue(file.Id, out var parts)
+                ? parts.Sum(part => (long)part.Value.Length)
+                : 0L;
+            return Task.FromResult<StorageObjectMetadata?>(new StorageObjectMetadata(length, "integration-etag"));
+        }
+    }
+
+    public Task EnsurePublicAccessAsync(
+        StorageProviderProfile profile,
+        StorageTenantBucket bucket,
+        StorageFile file,
+        CancellationToken ct)
+    {
+        Interlocked.Increment(ref ensurePublicAccessCount);
+        return Task.CompletedTask;
+    }
+
+    public Task CheckReadinessAsync(CancellationToken ct) =>
+        FailReadiness
+            ? Task.FromException(new InvalidOperationException("Injected readiness failure."))
+            : Task.CompletedTask;
+
     public Task AbortUploadAsync(
         StorageProviderProfile profile,
         StorageTenantBucket bucket,
@@ -104,7 +164,7 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
         StorageUploadSession session,
         CancellationToken ct)
     {
-        AbortUploadCount++;
+        Interlocked.Increment(ref abortUploadCount);
         if (FailNextAbort)
         {
             FailNextAbort = false;
@@ -114,21 +174,23 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
         return Task.CompletedTask;
     }
 
-    public Task DeleteObjectAsync(
+    public async Task DeleteObjectAsync(
         StorageProviderProfile profile,
         StorageTenantBucket bucket,
         StorageFile file,
         CancellationToken ct)
     {
-        DeleteObjectAttemptCount++;
+        Interlocked.Increment(ref deleteObjectAttemptCount);
+        deleteObjectStarted.TrySetResult();
+        if (DeleteObjectDelay > TimeSpan.Zero)
+            await Task.Delay(DeleteObjectDelay, ct);
         if (FailNextDelete)
         {
             FailNextDelete = false;
             throw new InvalidOperationException("Injected delete failure.");
         }
 
-        DeleteObjectCount++;
-        return Task.CompletedTask;
+        Interlocked.Increment(ref deleteObjectCount);
     }
 
     public Task<StorageDownloadUrlResponse> CreateDownloadUrlAsync(
@@ -144,4 +206,14 @@ public sealed class IntegrationStorageObjectProvider : IStorageObjectProvider
             ExpiresAt = expiresAt,
             IsPublic = false
         });
+
+    private int ensurePublicAccessCount;
+    private int abortUploadCount;
+    private int uploadPartCount;
+    private int completeUploadCount;
+    private int deleteObjectCount;
+    private int deleteObjectAttemptCount;
+
+    private static TaskCompletionSource CreateSignal() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

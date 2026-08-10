@@ -37,7 +37,8 @@ public sealed class TrustedServiceTargetContextInitializerTests
         var tokenProvider = new RecordingServiceTokenProvider();
         var resolver = new RecordingResolver(TrustedInvocationResult.Success(context));
         var store = new RecordingContextStore();
-        var initializer = new TrustedServiceTargetContextInitializer(tokenProvider, resolver, store);
+        var tokenStore = new RecordingServiceAccessTokenStore();
+        var initializer = new TrustedServiceTargetContextInitializer(tokenProvider, resolver, store, tokenStore);
 
         var result = await initializer.EstablishAsync(
             tenantId,
@@ -64,6 +65,13 @@ public sealed class TrustedServiceTargetContextInitializerTests
             XFrameworkServiceScopes.TenantTarget);
         resolver.Policy.AllowedServiceCallers.Should().Equal(XFrameworkServiceNames.IdentityServer);
         store.Current.Should().BeSameAs(context);
+        tokenStore.Current.Should().NotBeNull();
+        tokenStore.Current!.Token.Should().Be(RecordingServiceTokenProvider.Token);
+        tokenStore.Current.ClientId.Should().Be(XFrameworkServiceNames.IdentityServer);
+        tokenStore.Current.Audience.Should().Be(XFrameworkServiceNames.Storage);
+        tokenStore.Current.Scopes.Should().BeEquivalentTo(
+            XFrameworkServiceScopes.StorageWrite,
+            XFrameworkServiceScopes.TenantTarget);
     }
 
     [Test]
@@ -72,10 +80,12 @@ public sealed class TrustedServiceTargetContextInitializerTests
         var resolver = new RecordingResolver(
             TrustedInvocationResult.Failure("Service caller is not allowed.", 403));
         var store = new RecordingContextStore();
+        var tokenStore = new RecordingServiceAccessTokenStore();
         var initializer = new TrustedServiceTargetContextInitializer(
             new RecordingServiceTokenProvider(),
             resolver,
-            store);
+            store,
+            tokenStore);
 
         var result = await initializer.EstablishAsync(
             Guid.NewGuid(),
@@ -86,6 +96,7 @@ public sealed class TrustedServiceTargetContextInitializerTests
         result.IsSuccess.Should().BeFalse();
         result.StatusCode.Should().Be(403);
         store.Current.Should().BeNull();
+        tokenStore.Current.Should().BeNull();
     }
 
     [Test]
@@ -109,7 +120,8 @@ public sealed class TrustedServiceTargetContextInitializerTests
         var tokenProvider = new RecordingServiceTokenProvider();
         var resolver = new RecordingResolver(TrustedInvocationResult.Success(context));
         var store = new RecordingContextStore();
-        var initializer = new TrustedServiceTargetContextInitializer(tokenProvider, resolver, store);
+        var tokenStore = new RecordingServiceAccessTokenStore();
+        var initializer = new TrustedServiceTargetContextInitializer(tokenProvider, resolver, store, tokenStore);
 
         var result = await initializer.EstablishTenantlessAsync(
             XFrameworkServiceNames.Wallets,
@@ -132,6 +144,8 @@ public sealed class TrustedServiceTargetContextInitializerTests
         resolver.Policy.RequiredServiceScopes.Should().BeEquivalentTo(tokenProvider.Scopes);
         resolver.Policy.AllowedServiceCallers.Should().Equal(XFrameworkServiceNames.Wallets);
         store.Current.Should().BeSameAs(context);
+        tokenStore.Current.Should().NotBeNull();
+        tokenStore.Current!.Scopes.Should().BeEquivalentTo(tokenProvider.Scopes);
     }
 
     [Test]
@@ -209,6 +223,12 @@ public sealed class TrustedServiceTargetContextInitializerTests
     {
         public TrustedInvocationContext? Current { get; private set; }
         public void Set(TrustedInvocationContext context) => Current = context;
+    }
+
+    private sealed class RecordingServiceAccessTokenStore : ITrustedServiceAccessTokenStore
+    {
+        public TrustedServiceAccessToken? Current { get; private set; }
+        public void Set(TrustedServiceAccessToken credential) => Current = credential;
     }
 
     private sealed class ReplacementInitializer : ITrustedServiceTargetContextInitializer

@@ -91,6 +91,57 @@ public class BoltDriverIntegrationTests
     }
 
     [Test]
+    public async Task SendAsync_MatchingTrustedServiceContext_ReusesAuthorizedToken()
+    {
+        await using var caller = CreateClient("driver-trusted-caller", "DriverTrustedCaller");
+        await using var target = CreateClient(XFrameworkServiceNames.Storage.ToSha256(), XFrameworkServiceNames.Storage);
+        var fallbackProvider = new RecordingServiceTokenProvider();
+        var scopes = new HashSet<string>(
+            [XFrameworkServiceScopes.StorageWrite, XFrameworkServiceScopes.TenantTarget],
+            StringComparer.OrdinalIgnoreCase);
+        var context = new TrustedInvocationContext(
+            null,
+            new TrustedServiceIdentity(
+                XFrameworkServiceNames.IdentityServer,
+                XFrameworkServiceNames.Storage,
+                scopes,
+                "generation"),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid());
+        var driver = CreateDriver(
+            caller,
+            fallbackProvider,
+            new FixedTrustedInvocationContextAccessor(context),
+            new FixedTrustedServiceAccessTokenAccessor(new TrustedServiceAccessToken(
+                "authorized-token",
+                XFrameworkServiceNames.IdentityServer,
+                XFrameworkServiceNames.Storage,
+                scopes)));
+
+        target.RegisterHandler(nameof(BoltDriverTestRequest), (payload, _) =>
+        {
+            var envelope = MemoryPackSerializer.Deserialize<BoltInvocationEnvelope>(payload.Span);
+            envelope!.ServiceAccessToken.Should().Be("authorized-token");
+            return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(
+                new QueryResponse<BoltDriverTestResponse>
+                {
+                    HttpStatusCode = HttpStatusCode.OK,
+                    Response = new BoltDriverTestResponse { Text = "trusted" }
+                })));
+        });
+
+        await target.ConnectAsync();
+        await caller.ConnectAsync();
+        var result = await driver.SendAsync<BoltDriverTestRequest, BoltDriverTestResponse>(
+            new BoltDriverTestRequest(),
+            XFrameworkServiceNames.Storage);
+
+        result.Response!.Text.Should().Be("trusted");
+        fallbackProvider.Audiences.Should().BeEmpty();
+    }
+
+    [Test]
     public async Task Unsubscribe_CancelsLegacySubscriptionAndStopsDelivery()
     {
         await using var subscriber = CreateClient("driver-subscriber", "DriverSubscriber");
@@ -270,7 +321,11 @@ public class BoltDriverIntegrationTests
         new(_serverUri, id, name, new BoltClientOptions { RpcTimeoutSeconds = 5 },
             _loggerFactory.CreateLogger<BoltClient>());
 
-    private static BoltDriver CreateDriver(BoltClient client, IServiceTokenProvider tokenProvider)
+    private static BoltDriver CreateDriver(
+        BoltClient client,
+        IServiceTokenProvider tokenProvider,
+        ITrustedInvocationContextAccessor? invocationContextAccessor = null,
+        ITrustedServiceAccessTokenAccessor? serviceAccessTokenAccessor = null)
         => new(
             client,
             Options.Create(new BoltConfiguration
@@ -280,6 +335,8 @@ public class BoltDriverIntegrationTests
             }),
             tokenProvider,
             new NullActorAccessTokenProvider(),
+            invocationContextAccessor ?? new FixedTrustedInvocationContextAccessor(null),
+            serviceAccessTokenAccessor ?? new FixedTrustedServiceAccessTokenAccessor(null),
             NullLogger<BoltDriver>.Instance);
 
     private static int GetActiveStreamCount(BoltClient client)
@@ -320,6 +377,18 @@ public class BoltDriverIntegrationTests
     {
         public ValueTask<string?> GetTokenAsync(CancellationToken ct = default) =>
             ValueTask.FromResult<string?>(null);
+    }
+
+    private sealed class FixedTrustedInvocationContextAccessor(TrustedInvocationContext? current)
+        : ITrustedInvocationContextAccessor
+    {
+        public TrustedInvocationContext? Current { get; } = current;
+    }
+
+    private sealed class FixedTrustedServiceAccessTokenAccessor(TrustedServiceAccessToken? current)
+        : ITrustedServiceAccessTokenAccessor
+    {
+        public TrustedServiceAccessToken? Current { get; } = current;
     }
 }
 

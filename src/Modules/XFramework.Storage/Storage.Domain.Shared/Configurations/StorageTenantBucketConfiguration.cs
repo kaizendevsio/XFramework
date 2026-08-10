@@ -21,13 +21,14 @@ public sealed class StorageTenantBucketConfiguration : IEntityTypeConfiguration<
         entity.Property(e => e.BucketName).HasMaxLength(128);
         entity.Property(e => e.PublicBaseUrl).HasColumnType("text");
         entity.Property(e => e.CdnBaseUrl).HasColumnType("text");
+        entity.Property(e => e.Purpose).HasDefaultValue(StorageBucketPurpose.Private);
 
         entity.HasOne(e => e.ProviderProfile).WithMany(e => e.TenantBuckets)
             .HasForeignKey(e => e.ProviderProfileId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("storagetenantbucket_storageproviderprofile_id_fk");
 
-        entity.HasIndex(e => new { e.TenantId, e.ProviderProfileId })
+        entity.HasIndex(e => new { e.TenantId, e.ProviderProfileId, e.Purpose })
             .IsUnique()
             .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("ix_storagetenantbucket_tenant_provider");

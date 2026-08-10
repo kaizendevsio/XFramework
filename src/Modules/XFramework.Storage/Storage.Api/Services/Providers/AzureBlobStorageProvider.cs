@@ -23,8 +23,15 @@ public sealed class AzureBlobStorageProvider(
         CancellationToken ct)
     {
         var container = CreateContainer(profile, bucket);
+        var publicDeliveryMode = storageOptions.AzureBlob.PublicDeliveryMode;
+        var publicAccess = bucket.Purpose == StorageBucketPurpose.Public &&
+                           publicDeliveryMode == StoragePublicDeliveryMode.ProviderManaged
+            ? PublicAccessType.Blob
+            : PublicAccessType.None;
         if (profile.AutoCreateBuckets)
-            await container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: ct);
+            await container.CreateIfNotExistsAsync(publicAccess, cancellationToken: ct);
+
+        await container.SetAccessPolicyAsync(publicAccess, cancellationToken: ct);
     }
 
     public Task<string?> StartUploadAsync(
@@ -93,6 +100,40 @@ public sealed class AzureBlobStorageProvider(
         using var sha256 = SHA256.Create();
         var hash = await sha256.ComputeHashAsync(stream, ct);
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    public async Task<StorageObjectMetadata?> GetObjectMetadataAsync(
+        StorageProviderProfile profile,
+        StorageTenantBucket bucket,
+        StorageFile file,
+        CancellationToken ct)
+    {
+        var blob = CreateBlob(profile, bucket, file);
+        if (!await blob.ExistsAsync(ct))
+            return null;
+
+        var properties = await blob.GetPropertiesAsync(cancellationToken: ct);
+        return new StorageObjectMetadata(properties.Value.ContentLength, properties.Value.ETag.ToString());
+    }
+
+    public Task EnsurePublicAccessAsync(
+        StorageProviderProfile profile,
+        StorageTenantBucket bucket,
+        StorageFile file,
+        CancellationToken ct) =>
+        bucket.Purpose == StorageBucketPurpose.Public
+            ? Task.CompletedTask
+            : throw new InvalidOperationException("Public files must use a public-purpose Azure container.");
+
+    public async Task CheckReadinessAsync(CancellationToken ct)
+    {
+        var bucketName = storageOptions.AzureBlob.ReadinessBucketName;
+        if (string.IsNullOrWhiteSpace(bucketName))
+            throw new InvalidOperationException("Storage:AzureBlob:ReadinessBucketName is required.");
+
+        var profile = new StorageProviderProfile { Kind = StorageProviderKind.AzureBlob };
+        var bucket = new StorageTenantBucket { BucketName = bucketName };
+        await CreateContainer(profile, bucket).GetPropertiesAsync(cancellationToken: ct);
     }
 
     public Task AbortUploadAsync(

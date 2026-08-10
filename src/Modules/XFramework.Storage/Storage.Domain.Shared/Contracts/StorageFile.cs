@@ -8,8 +8,9 @@ namespace XFramework.Domain.Shared.Contracts;
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/storage-files",
     RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "storage-files"
+    AuthorizationFeature = StorageAuthorizationCapabilities.Feature,
+    ReadCapability = StorageAuthorizationCapabilities.ViewKey,
+    CacheDurationSeconds = 0
 )]
 public partial class StorageFile : BaseModel
 {

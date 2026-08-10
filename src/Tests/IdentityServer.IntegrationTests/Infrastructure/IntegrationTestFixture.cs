@@ -140,6 +140,8 @@ public class IntegrationTestFixture
             scopedServices.GetRequiredService<IOptions<BoltConfiguration>>(),
             tokenProvider,
             scopedServices.GetRequiredService<IActorAccessTokenProvider>(),
+            scopedServices.GetRequiredService<ITrustedInvocationContextAccessor>(),
+            scopedServices.GetRequiredService<ITrustedServiceAccessTokenAccessor>(),
             scopedServices.GetRequiredService<ILogger<BoltDriver>>());
 
         return ActivatorUtilities.CreateInstance<IdentityServerServiceWrapper>(

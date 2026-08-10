@@ -16,7 +16,7 @@ public sealed class StorageBoltScopeContractTests
 {
     private static readonly HashSet<string> ReadHandlers =
     [
-        "GetStorageFileEndpoint",
+        "GetStorageFileMetadataEndpoint",
         "GetStorageFilesEndpoint",
         "GetStoragePublicUrlEndpoint",
         "GetStorageDownloadUrlEndpoint",
@@ -33,7 +33,7 @@ public sealed class StorageBoltScopeContractTests
     [Test]
     public void EveryStorageBoltHandler_RequiresItsOperationScope()
     {
-        var handlers = typeof(GetStorageFileEndpoint).Assembly.GetTypes()
+        var handlers = typeof(GetStorageFileMetadataEndpoint).Assembly.GetTypes()
             .Where(type => type.Namespace?.StartsWith("Storage.Api.Features", StringComparison.Ordinal) == true)
             .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .Select(method => (Type: type, Attribute: method.GetCustomAttribute<BoltHandlerAttribute>())))

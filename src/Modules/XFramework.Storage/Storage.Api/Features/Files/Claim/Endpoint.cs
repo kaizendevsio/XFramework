@@ -1,4 +1,3 @@
-using FluentValidation;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
@@ -14,6 +13,12 @@ public static class ClaimStorageFileEndpoint
         RequiredServiceScopes = [XFrameworkServiceScopes.StorageWrite, XFrameworkServiceScopes.TenantTarget],
         AllowedServiceCallers = [XFrameworkServiceNames.IdentityServer, XFrameworkServiceNames.Portal])]
     [MapPost("/api/storage/files/{storageFileId:guid}/claim", Tags = ["Storage"],
+        ActorRequirement = ActorRequirement.Required,
+        TenantAccessMode = TenantAccessMode.ActorTenant,
+        RequiredServiceScopes = [],
+        AllowedServiceCallers = [],
+        RequiredActorCapabilities = [StorageAuthorizationCapabilities.Manage],
+        Capability = StorageAuthorizationCapabilities.ManageKey,
         Summary = "Claim storage file",
         Description = "Idempotently claims a completed file so unclaimed-file maintenance will not delete it.")]
     public static Task<Result<StorageFileResponse>> Handle(
@@ -21,10 +26,4 @@ public static class ClaimStorageFileEndpoint
         StorageService storageService,
         CancellationToken ct) =>
         storageService.ClaimFileAsync(request, ct);
-}
-
-public sealed class ClaimStorageFileRequestValidator : AbstractValidator<ClaimStorageFileRequest>
-{
-    public ClaimStorageFileRequestValidator() =>
-        RuleFor(request => request.StorageFileId).NotEmpty();
 }

@@ -7,6 +7,9 @@ public static class ListStorageUploadPartsEndpoint
 {
     [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.StorageRead])]
     [MapGet("/api/storage/uploads/sessions/{uploadSessionId:guid}/parts", Tags = ["Storage"],
+        RequiredServiceScopes = [],
+        RequiredActorCapabilities = [StorageAuthorizationCapabilities.View],
+        Capability = StorageAuthorizationCapabilities.ViewKey,
         Summary = "List upload parts",
         Description = "Lists uploaded and missing parts for a resumable upload session.")]
     public static Task<Result<StorageUploadPartListResponse>> Handle(
