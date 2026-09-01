@@ -431,6 +431,12 @@ public sealed class ServiceIdentityComposeContractTests
             "Empty-host bootstrap refused because xframework-${service} exists.");
         workflow.Should().Contain("$REMOTE_RUN_DIR/bootstrap-without-rollback");
         workflow.Should().Contain("down --remove-orphans");
+        const string minioInitialization =
+            "\"${compose[@]}\" run --rm --no-deps minio-init";
+        workflow.Should().Contain(minioInitialization);
+        workflow.IndexOf(minioInitialization, StringComparison.Ordinal).Should().BeLessThan(
+            workflow.IndexOf("clients=(notifications storage", StringComparison.Ordinal),
+            "the readiness bucket must exist before Storage is started without dependencies");
         workflow.Should().NotContain("APPROVE_BOLT_TAILSCALE_TRANSITION");
         workflow.Should().NotContain("xframework.bolt.transition-acceptance.v1");
         workflow.Should().NotContain("tailscale_acl_applied");
