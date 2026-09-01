@@ -784,6 +784,8 @@ jobs:
           compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE")
           /usr/bin/timeout --foreground --kill-after=30s 300s \
             "${compose[@]}" up -d --no-build postgres redis minio seq jaeger
+          /usr/bin/timeout --foreground --kill-after=10s 120s \
+            "${compose[@]}" run --rm --no-deps minio-init
           /usr/bin/timeout --foreground --kill-after=30s 600s \
             "${compose[@]}" run --rm migrate
           REMOTE_SCRIPT
