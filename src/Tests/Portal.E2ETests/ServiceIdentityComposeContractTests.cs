@@ -425,6 +425,12 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("systemctl is-active xframework-bolt-phase0-watchdog.service");
         workflow.Should().Contain("flock -n 9");
         workflow.Should().Contain("No complete previous release is available; transition is blocked before mutation.");
+        workflow.Should().Contain("bootstrap_without_rollback:");
+        workflow.Should().Contain("ALLOW_EMPTY_HOST_BOOTSTRAP:");
+        workflow.Should().Contain(
+            "Empty-host bootstrap refused because xframework-${service} exists.");
+        workflow.Should().Contain("$REMOTE_RUN_DIR/bootstrap-without-rollback");
+        workflow.Should().Contain("down --remove-orphans");
         workflow.Should().NotContain("APPROVE_BOLT_TAILSCALE_TRANSITION");
         workflow.Should().NotContain("xframework.bolt.transition-acceptance.v1");
         workflow.Should().NotContain("tailscale_acl_applied");
