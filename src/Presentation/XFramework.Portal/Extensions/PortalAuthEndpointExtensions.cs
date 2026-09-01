@@ -68,8 +68,10 @@ public static class PortalAuthEndpointExtensions
     private static async Task<IResult> Logout(
         HttpContext context,
         IIdentityServerServiceWrapper identityServer,
+        PortalActorTokenRefreshCoordinator refreshCoordinator,
         ILogger<PortalAuthService> logger)
     {
+        Guid? revokedSessionId = null;
         try
         {
             if (!PortalIdentitySessionValidator.TryReadSessionClaims(
@@ -83,6 +85,7 @@ public static class PortalAuthEndpointExtensions
             }
             else
             {
+                revokedSessionId = sessionId;
                 var request = new LogoutRequest
                 {
                     SessionId = sessionId,
@@ -121,6 +124,9 @@ public static class PortalAuthEndpointExtensions
         }
         finally
         {
+            if (revokedSessionId is { } sessionId)
+                refreshCoordinator.Remove(sessionId);
+
             await context.SignOutAsync(PortalAuthDefaults.AuthenticationScheme);
         }
 

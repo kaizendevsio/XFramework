@@ -20,7 +20,14 @@ public sealed class PortalActorAccessTokenProvider(PortalActorContext actorConte
         return new PopScope(_current, prior);
     }
 
-    private sealed record Holder(string Token);
+    public IDisposable Suppress()
+    {
+        var prior = _current.Value;
+        _current.Value = new Holder(null);
+        return new PopScope(_current, prior);
+    }
+
+    private sealed record Holder(string? Token);
 
     private sealed class PopScope(AsyncLocal<Holder?> current, Holder? prior) : IDisposable
     {
