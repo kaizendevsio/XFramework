@@ -32,6 +32,11 @@ on:
         description: Type DEPLOY_XEON_DEV to authorize deployment from develop
         required: true
         type: string
+      bootstrap_without_rollback:
+        description: Allow deployment only when no XFramework runtime containers exist
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -98,6 +103,7 @@ jobs:
       BOLT_SYNTHETIC_PORTAL_IDENTITY_SERVICE_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-portal-identity-service-token
       BOLT_SYNTHETIC_USER_ACTOR_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-user-actor-token
       BOLT_SYNTHETIC_EXPIRY_TRANSPORT_TOKEN_PATH: /tmp/xframework-compose-${{ github.run_id }}-${{ github.run_attempt }}-expiry-transport-token
+      ALLOW_EMPTY_HOST_BOOTSTRAP: ${{ inputs.bootstrap_without_rollback && 'true' || 'false' }}
 
     steps:
       - name: Authorize develop deployment
@@ -298,7 +304,7 @@ jobs:
           scp scripts/refresh-bolt-phase0-synthetic-tokens.py "$DEPLOY_HOST:$REMOTE_REFRESH_TOKENS"
 
           ssh "$DEPLOY_HOST" \
-            "REMOTE_DEPLOY_DIR='$REMOTE_DEPLOY_DIR' REMOTE_RELEASES_DIR='$REMOTE_RELEASES_DIR' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_ACTIVE_ENV='$REMOTE_ACTIVE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_CANDIDATE_ENV='$REMOTE_CANDIDATE_ENV' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' REMOTE_CONFIGURE_BOUNDARY='$REMOTE_CONFIGURE_BOUNDARY' REMOTE_VERIFY_BOUNDARY='$REMOTE_VERIFY_BOUNDARY' REMOTE_VERIFY_DIAGNOSTICS='$REMOTE_VERIFY_DIAGNOSTICS' REMOTE_REFRESH_TOKENS='$REMOTE_REFRESH_TOKENS' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' IDENTITY_PUBLIC_URL='$IDENTITY_PUBLIC_URL' HUB_PUBLIC_URL='$HUB_PUBLIC_URL' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' bash -s" <<'REMOTE_SCRIPT'
+            "REMOTE_DEPLOY_DIR='$REMOTE_DEPLOY_DIR' REMOTE_RELEASES_DIR='$REMOTE_RELEASES_DIR' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_ACTIVE_ENV='$REMOTE_ACTIVE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_CANDIDATE_ENV='$REMOTE_CANDIDATE_ENV' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' REMOTE_CONFIGURE_BOUNDARY='$REMOTE_CONFIGURE_BOUNDARY' REMOTE_VERIFY_BOUNDARY='$REMOTE_VERIFY_BOUNDARY' REMOTE_VERIFY_DIAGNOSTICS='$REMOTE_VERIFY_DIAGNOSTICS' REMOTE_REFRESH_TOKENS='$REMOTE_REFRESH_TOKENS' XFRAMEWORK_ENV_FILE='$XFRAMEWORK_ENV_FILE' IDENTITY_PUBLIC_URL='$IDENTITY_PUBLIC_URL' HUB_PUBLIC_URL='$HUB_PUBLIC_URL' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' ALLOW_EMPTY_HOST_BOOTSTRAP='$ALLOW_EMPTY_HOST_BOOTSTRAP' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
           umask 077
           chmod 600 "$REMOTE_CANDIDATE_COMPOSE"
@@ -528,8 +534,20 @@ jobs:
             selected_kind=normal
           fi
 
+          bootstrap_without_rollback=false
+          if [ "$ALLOW_EMPTY_HOST_BOOTSTRAP" = true ]; then
+            for service in "${runtime_services[@]}"; do
+              if docker inspect "xframework-${service}" >/dev/null 2>&1; then
+                echo "Empty-host bootstrap refused because xframework-${service} exists." >&2
+                exit 1
+              fi
+            done
+            bootstrap_without_rollback=true
+          fi
+
           current_pointer="$REMOTE_RELEASES_DIR/current"
-          if [ -z "$selected_release" ] && [ -f "$current_pointer" ] && [ ! -L "$current_pointer" ]; then
+          if [ "$bootstrap_without_rollback" = false ] && [ -z "$selected_release" ] && \
+             [ -f "$current_pointer" ] && [ ! -L "$current_pointer" ]; then
             current_release="$(cat "$current_pointer")"
             case "$current_release" in
               "$REMOTE_RELEASES_DIR"/*)
@@ -545,7 +563,8 @@ jobs:
           fi
 
           legacy_pointer="$REMOTE_DEPLOY_DIR/phase0-last-known-good/current"
-          if [ -z "$selected_release" ] && [ -f "$legacy_pointer" ] && [ ! -L "$legacy_pointer" ]; then
+          if [ "$bootstrap_without_rollback" = false ] && [ -z "$selected_release" ] && \
+             [ -f "$legacy_pointer" ] && [ ! -L "$legacy_pointer" ]; then
             legacy_release="$(cat "$legacy_pointer")"
             case "$legacy_release" in
               "$REMOTE_DEPLOY_DIR"/runs/*)
@@ -616,6 +635,10 @@ jobs:
             printf '%s\n' "$selected_kind" > "$REMOTE_RUN_DIR/previous-release-kind"
             chmod 600 "$REMOTE_RUN_DIR/previous-release" "$REMOTE_RUN_DIR/previous-release-kind"
             echo "Captured ${selected_kind} release: ${selected_release}"
+          elif [ "$bootstrap_without_rollback" = true ]; then
+            : > "$REMOTE_RUN_DIR/bootstrap-without-rollback"
+            chmod 600 "$REMOTE_RUN_DIR/bootstrap-without-rollback"
+            echo "Authorized empty-host bootstrap; no rollback release will be available."
           else
             echo "No complete previous release is available; transition is blocked before mutation." >&2
             exit 1
@@ -1044,7 +1067,7 @@ jobs:
           printf '%s\n' "$REMOTE_RUN_DIR" > "$pointer"
           chmod 600 "$pointer"
           mv -f "$pointer" "$REMOTE_RELEASES_DIR/current"
-          rm -f "$REMOTE_RUN_DIR/mutation-started"
+          rm -f "$REMOTE_RUN_DIR/mutation-started" "$REMOTE_RUN_DIR/bootstrap-without-rollback"
           REMOTE_SCRIPT
 
       - name: Restore previous release or stop Bolt Hub
@@ -1055,7 +1078,7 @@ jobs:
         run: |
           set -euo pipefail
           ssh "$DEPLOY_HOST" \
-            "REMOTE_RELEASES_DIR='$REMOTE_RELEASES_DIR' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_ACTIVE_ENV='$REMOTE_ACTIVE_ENV' REMOTE_CONFIGURE_BOUNDARY='$REMOTE_CONFIGURE_BOUNDARY' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' bash -s" <<'REMOTE_SCRIPT'
+            "REMOTE_RELEASES_DIR='$REMOTE_RELEASES_DIR' REMOTE_RUN_DIR='$REMOTE_RUN_DIR' REMOTE_COMPOSE_FILE='$REMOTE_COMPOSE_FILE' REMOTE_ACTIVE_ENV='$REMOTE_ACTIVE_ENV' REMOTE_CONFIGURE_BOUNDARY='$REMOTE_CONFIGURE_BOUNDARY' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_CANDIDATE_ENV='$REMOTE_CANDIDATE_ENV' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
           cleanup_synthetic_tokens() {
             rm -f \
@@ -1084,6 +1107,18 @@ jobs:
               /usr/bin/timeout --foreground --kill-after=10s 30s docker kill xframework-bolt-hub >/dev/null 2>&1 || true
           }
           trap 'stop_hub; exit 1' ERR
+
+          if [ -f "$REMOTE_RUN_DIR/bootstrap-without-rollback" ]; then
+            echo "No previous release exists; removing the failed bootstrap containers." >&2
+            compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" \
+              --env-file "$REMOTE_CANDIDATE_ENV" \
+              -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE")
+            /usr/bin/timeout --foreground --kill-after=30s 300s \
+              "${compose[@]}" down --remove-orphans
+            rm -f "$REMOTE_RUN_DIR/complete" "$REMOTE_RUN_DIR/mutation-started"
+            trap - ERR
+            exit 0
+          fi
 
           test -f "$REMOTE_RUN_DIR/previous-release"
           test -f "$REMOTE_RUN_DIR/previous-release-kind"
