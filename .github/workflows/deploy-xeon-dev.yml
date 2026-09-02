@@ -48,7 +48,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy all services to xeon-dev
-    runs-on: [self-hosted, Linux, xeon-dev-deploy]
+    runs-on: [self-hosted, Linux, X64, xframework-build]
     timeout-minutes: 120
     env:
       COMPOSE_FILE_PATH: docker-compose.yml
@@ -205,6 +205,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "$RUNNER_NAME" = build-server-01
+          test "$(hostname)" = xeon-buildserver01
           docker --version
           docker compose version
           test -S /var/run/docker.sock
