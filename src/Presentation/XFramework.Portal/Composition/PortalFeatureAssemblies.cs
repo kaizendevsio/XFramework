@@ -2,6 +2,7 @@ using System.Reflection;
 using XFramework.Portal.Features.Attendance;
 using XFramework.Portal.Features.Community;
 using XFramework.Portal.Features.Communications;
+using XFramework.Portal.Features.POS;
 using XFramework.Portal.Features.Storage;
 
 namespace XFramework.Portal.Composition;
@@ -13,6 +14,7 @@ public static class PortalFeatureAssemblies
         typeof(AttendancePortalFeature).Assembly,
         typeof(CommunityPortalFeature).Assembly,
         typeof(CommunicationsPortalFeature).Assembly,
+        typeof(PosPortalFeature).Assembly,
         typeof(StoragePortalFeature).Assembly
     ];
 }
