@@ -10,5 +10,6 @@ public static class PortalAuthClaims
     public const string SessionId = "sessionId";
     public const string DisplayName = "displayName";
     public const string ActorAccessToken = "actorAccessToken";
+    public const string RefreshToken = "refreshToken";
 }
 

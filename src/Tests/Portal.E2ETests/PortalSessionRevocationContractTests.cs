@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
+using System.Text.Json;
 using XFramework.Portal.Services;
 
 namespace Portal.E2ETests;
@@ -82,7 +83,11 @@ public sealed class PortalSessionRevocationContractTests
         validator.Should().Contain("PortalAuthClaims.RoleTypeId");
         validator.Should().Contain("IActorIdentityProvider actorIdentityProvider");
         validator.Should().Contain("PortalAuthClaims.ActorAccessToken");
+        validator.Should().Contain("PortalAuthClaims.RefreshToken");
         validator.Should().Contain("actorIdentityProvider.ValidateAsync(");
+        validator.Should().Contain("identityServer.RefreshToken(");
+        validator.Should().Contain("actorAccessTokenProvider.Suppress()");
+        validator.Should().Contain("refreshCoordinator.RefreshAsync(");
         validator.Should().Contain("timeout.CancelAfter(ValidationTimeout)");
         validator.Should().Contain("actor.TenantId == tenantId");
         validator.Should().Contain("actor.CredentialId == credentialId");
@@ -93,6 +98,7 @@ public sealed class PortalSessionRevocationContractTests
 
         events.Should().Contain("context.RejectPrincipal();");
         events.Should().Contain("context.HttpContext.SignOutAsync(PortalAuthDefaults.AuthenticationScheme)");
+        events.Should().Contain("context.ShouldRenew = validation.WasRefreshed;");
     }
 
     [Test]
@@ -135,7 +141,7 @@ public sealed class PortalSessionRevocationContractTests
         provider.Should().Contain("TimeSpan.FromMinutes(1)");
         provider.Should().Contain("scopeFactory.CreateAsyncScope()");
         provider.Should().Contain("GetRequiredService<PortalIdentitySessionValidator>()");
-        provider.Should().Contain("validator.ValidateAsync(authenticationState.User, cancellationToken)");
+        provider.Should().Contain("validator.ValidateAndRefreshAsync(");
     }
 
     [Test]
@@ -167,6 +173,107 @@ public sealed class PortalSessionRevocationContractTests
         }
 
         (await tokenProvider.GetTokenAsync()).Should().Be(actorToken);
+
+        using (tokenProvider.Suppress())
+        {
+            (await tokenProvider.GetTokenAsync()).Should().BeNull();
+        }
+
+        (await tokenProvider.GetTokenAsync()).Should().Be(actorToken);
+    }
+
+    [Test]
+    public async Task ConcurrentRefreshes_WithTheSameRotatedToken_CallIdentityServerOnce()
+    {
+        var coordinator = new PortalActorTokenRefreshCoordinator();
+        var sessionId = Guid.NewGuid();
+        var refreshCalls = 0;
+        var releaseRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task<PortalActorTokenPair?> Refresh(CancellationToken ct)
+        {
+            Interlocked.Increment(ref refreshCalls);
+            await releaseRefresh.Task.WaitAsync(ct);
+            return new PortalActorTokenPair("new-access", "new-refresh", sessionId, 1800);
+        }
+
+        var first = coordinator.RefreshAsync(sessionId, "old-refresh", Refresh, CancellationToken.None);
+        var second = coordinator.RefreshAsync(sessionId, "old-refresh", Refresh, CancellationToken.None);
+        releaseRefresh.SetResult();
+
+        var results = await Task.WhenAll(first, second);
+
+        refreshCalls.Should().Be(1);
+        results.Should().NotContainNulls();
+        results.Select(result => result!.RefreshToken).Should().OnlyContain(token => token == "new-refresh");
+    }
+
+    [Test]
+    public async Task RefreshCoordinator_DoesNotExposeCachedTokensForAnUnrelatedCredential()
+    {
+        var coordinator = new PortalActorTokenRefreshCoordinator();
+        var sessionId = Guid.NewGuid();
+        var expected = new PortalActorTokenPair("new-access", "new-refresh", sessionId, 1800);
+        var first = await coordinator.RefreshAsync(
+            sessionId,
+            "old-refresh",
+            _ => Task.FromResult<PortalActorTokenPair?>(expected),
+            CancellationToken.None);
+        var unexpectedRefreshCalls = 0;
+
+        var unrelated = await coordinator.RefreshAsync(
+            sessionId,
+            "unrelated-refresh",
+            _ =>
+            {
+                Interlocked.Increment(ref unexpectedRefreshCalls);
+                return Task.FromResult<PortalActorTokenPair?>(expected);
+            },
+            CancellationToken.None);
+
+        first.Should().Be(expected);
+        unrelated.Should().BeNull();
+        unexpectedRefreshCalls.Should().Be(0);
+    }
+
+    [Test]
+    public void PortalLogin_PersistsTheRotatingRefreshCredentialInTheProtectedTicket()
+    {
+        var portalRoot = GetPortalRoot();
+        var authService = File.ReadAllText(Path.Combine(portalRoot, "Services", "PortalAuthService.cs"));
+        var claims = File.ReadAllText(Path.Combine(portalRoot, "Services", "PortalAuthClaims.cs"));
+
+        claims.Should().Contain("public const string RefreshToken");
+        authService.Should().Contain("response.Response.RefreshToken");
+        authService.Should().Contain("new(PortalAuthClaims.RefreshToken, response.RefreshToken!)");
+    }
+
+    [Test]
+    public void IdentityServerRefreshCredential_OutlivesTheShortLivedAccessToken()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var identityServerRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Modules",
+            "XFramework.IdentityServer",
+            "IdentityServer.Api");
+
+        foreach (var fileName in new[]
+                 {
+                     "appsettings.json",
+                     "appsettings.Development.json",
+                     "appsettings.Staging.json"
+                 })
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(identityServerRoot, fileName)));
+            var jwtOptions = document.RootElement.GetProperty("JwtOptions");
+            var accessLifetime = TimeSpan.Parse(jwtOptions.GetProperty("AccessTokenLifespan").GetString()!);
+            var refreshLifetime = TimeSpan.Parse(jwtOptions.GetProperty("RefreshTokenLifespan").GetString()!);
+
+            refreshLifetime.Should().BeGreaterThan(accessLifetime, fileName);
+            refreshLifetime.Should().BeGreaterThanOrEqualTo(TimeSpan.FromDays(14), fileName);
+        }
     }
 
     [Test]
@@ -214,6 +321,7 @@ public sealed class PortalSessionRevocationContractTests
 
         program.Should().Contain("builder.Services.AddScoped<PortalActorContext>();");
         program.Should().Contain("builder.Services.AddScoped<PortalActorAccessTokenProvider>();");
+        program.Should().Contain("builder.Services.AddSingleton<PortalActorTokenRefreshCoordinator>();");
         program.Should().Contain("ServiceDescriptor.Scoped<IActorAccessTokenProvider>");
         program.Should().Contain("ServiceDescriptor.Scoped<IActorAccessTokenScope>");
         program.Should().NotContain(

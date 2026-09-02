@@ -9,8 +9,12 @@ public sealed class PortalCookieAuthenticationEvents(
 {
     public override async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
-        if (await sessionValidator.ValidateAsync(context.Principal, context.HttpContext.RequestAborted))
+        var validation = await sessionValidator.ValidateAndRefreshAsync(
+            context.Principal,
+            context.HttpContext.RequestAborted);
+        if (validation.IsValid)
         {
+            context.ShouldRenew = validation.WasRefreshed;
             return;
         }
 

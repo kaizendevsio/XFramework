@@ -137,6 +137,7 @@ builder.Services.AddScoped<AttendancePortalReadService>();
 builder.Services.AddScoped<WalletsAdminBackendContractService>();
 builder.Services.AddScoped<WalletsPortalDisplayService>();
 builder.Services.AddScoped<PortalAuthService>();
+builder.Services.AddSingleton<PortalActorTokenRefreshCoordinator>();
 builder.Services.AddScoped<PortalIdentitySessionValidator>();
 builder.Services.AddScoped<PortalCookieAuthenticationEvents>();
 builder.Services.AddScoped<AuthenticationStateProvider, PortalRevalidatingAuthenticationStateProvider>();

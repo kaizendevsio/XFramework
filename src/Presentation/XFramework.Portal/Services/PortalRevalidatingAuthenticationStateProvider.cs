@@ -18,6 +18,9 @@ public sealed class PortalRevalidatingAuthenticationStateProvider(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var validator = scope.ServiceProvider.GetRequiredService<PortalIdentitySessionValidator>();
-        return await validator.ValidateAsync(authenticationState.User, cancellationToken);
+        var validation = await validator.ValidateAndRefreshAsync(
+            authenticationState.User,
+            cancellationToken);
+        return validation.IsValid;
     }
 }

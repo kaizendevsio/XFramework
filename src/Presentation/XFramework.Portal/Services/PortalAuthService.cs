@@ -51,8 +51,13 @@ public sealed class PortalAuthService(
             return PortalLoginResult.Failed(message);
         }
 
-        if (string.IsNullOrWhiteSpace(response.Response.AccessToken))
-            return PortalLoginResult.Failed("IdentityServer did not issue an actor token.");
+        if (string.IsNullOrWhiteSpace(response.Response.AccessToken) ||
+            string.IsNullOrWhiteSpace(response.Response.RefreshToken) ||
+            response.Response.SessionId is not { } sessionId ||
+            sessionId == Guid.Empty)
+        {
+            return PortalLoginResult.Failed("IdentityServer did not issue a complete Portal session.");
+        }
 
         var principal = BuildPrincipal(
             response.Response,
@@ -96,7 +101,8 @@ public sealed class PortalAuthService(
             new(PortalAuthClaims.TenantId, tenantId.ToString()),
             new(PortalAuthClaims.RoleTypeId, roleTypeId.ToString()),
             new(PortalAuthClaims.IsSuperUser, IsSuperUserRole(roleTypeId).ToString()),
-            new(PortalAuthClaims.ActorAccessToken, response.AccessToken!)
+            new(PortalAuthClaims.ActorAccessToken, response.AccessToken!),
+            new(PortalAuthClaims.RefreshToken, response.RefreshToken!)
         };
 
         if (response.SessionId is { } sessionId)
