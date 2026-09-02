@@ -265,8 +265,8 @@ else
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
-    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
-    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<Product> _products = [];

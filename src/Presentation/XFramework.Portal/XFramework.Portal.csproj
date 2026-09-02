@@ -23,6 +23,7 @@
         <ProjectReference Include="..\XFramework.Portal.Features.Communications\XFramework.Portal.Features.Communications.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Features.POS\XFramework.Portal.Features.POS.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Features.Finance\XFramework.Portal.Features.Finance.csproj" />
+        <ProjectReference Include="..\XFramework.Portal.Features.Inventario\XFramework.Portal.Features.Inventario.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Features.Storage\XFramework.Portal.Features.Storage.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Shared\XFramework.Portal.Shared.csproj" />
         <!-- Domain.Shared for entity types -->
