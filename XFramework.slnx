@@ -110,6 +110,7 @@
     <Project Path="src/Presentation/XFramework.Portal.Features.Attendance/XFramework.Portal.Features.Attendance.csproj" />
     <Project Path="src/Presentation/XFramework.Portal.Features.Communications/XFramework.Portal.Features.Communications.csproj" />
     <Project Path="src/Presentation/XFramework.Portal.Features.Community/XFramework.Portal.Features.Community.csproj" />
+    <Project Path="src/Presentation/XFramework.Portal.Features.Finance/XFramework.Portal.Features.Finance.csproj" />
     <Project Path="src/Presentation/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.csproj" />
   </Folder>
   <Folder Name="/Tests/">

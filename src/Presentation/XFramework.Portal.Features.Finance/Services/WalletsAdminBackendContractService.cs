@@ -4,12 +4,13 @@ using Wallets.Domain.Shared.Contracts.Responses;
 using Wallets.Domain.Shared.Enums;
 using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Portal.Shared;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Finance.Services;
 
 public sealed class WalletsAdminBackendContractService(
     IWalletsServiceWrapper wallets,
-    TenantFilterService tenantFilter,
+    IPortalTenantContext tenantFilter,
     RequestMetadata requestMetadata)
 {
     public const string CreateDepositRoute = "POST /api/wallets/deposits";
