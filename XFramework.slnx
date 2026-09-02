@@ -107,6 +107,7 @@
   <Folder Name="/src/Modules/XFramework.POS/" />
   <Folder Name="/src/Modules/XFramework.Wallets/" />
   <Folder Name="/src/Presentation/">
+    <Project Path="src/Presentation/XFramework.Portal.Features.Administration/XFramework.Portal.Features.Administration.csproj" />
     <Project Path="src/Presentation/XFramework.Portal.Features.Attendance/XFramework.Portal.Features.Attendance.csproj" />
     <Project Path="src/Presentation/XFramework.Portal.Features.Communications/XFramework.Portal.Features.Communications.csproj" />
     <Project Path="src/Presentation/XFramework.Portal.Features.Community/XFramework.Portal.Features.Community.csproj" />
