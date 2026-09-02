@@ -7,7 +7,7 @@ using Communications.Domain.Shared.Contracts.Responses;
 using Communications.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Communications.Services;
 
 public sealed class CommunicationsPortalReadService(
     ICommunicationsServiceWrapper communications,

@@ -1,11 +1,12 @@
 using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Portal.Shared;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Communications.Services;
 
 public sealed class CommunicationsPortalGuard(
     IDataContext dataContext,
-    TenantFilterService tenantFilter)
+    IPortalTenantContext tenantFilter)
 {
     public async Task<CommunicationsPortalGuardResult> GetCurrentTenantStateAsync(
         CancellationToken ct = default)

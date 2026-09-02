@@ -26,6 +26,7 @@ using XFramework.Portal.Shared.Services;
 using XFramework.Portal.Composition;
 using XFramework.Portal.Features.Attendance;
 using XFramework.Portal.Features.Community;
+using XFramework.Portal.Features.Communications;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -137,10 +138,7 @@ builder.Services.AddScoped<IPortalTenantContext>(services =>
 builder.Services.AddScoped<IPortalModuleAvailability>(services =>
     services.GetRequiredService<TenantModuleNavigationService>());
 builder.Services.AddScoped<TenantModuleFeatureDefinitionResolver>();
-builder.Services.AddScoped<CommunicationsPortalGuard>();
-builder.Services.AddScoped<CommunicationsPortalReadService>();
-builder.Services.AddScoped<CommunicationsPortalSettingsService>();
-builder.Services.AddScoped<CommunicationsPortalTemplateService>();
+builder.Services.AddCommunicationsPortalFeature();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddCommunityPortalFeature();
 builder.Services.AddAttendancePortalFeature();

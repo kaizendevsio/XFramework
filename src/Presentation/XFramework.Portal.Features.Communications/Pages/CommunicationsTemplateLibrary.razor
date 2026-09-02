@@ -279,7 +279,7 @@ else
 
 @code {
     [Inject] private CommunicationsPortalTemplateService TemplateService { get; set; } = default!;
-    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private DialogService DialogService { get; set; } = default!;
 
