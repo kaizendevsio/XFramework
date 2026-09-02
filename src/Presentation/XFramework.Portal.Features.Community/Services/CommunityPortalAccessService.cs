@@ -1,11 +1,12 @@
 using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Portal.Shared;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Community.Services;
 
 public sealed class CommunityPortalAccessService(
     IDataContext dataContext,
-    TenantFilterService tenantFilter)
+    IPortalTenantContext tenantFilter)
 {
     public async Task<CommunityPortalAccessState> GetStateAsync(
         bool includeNotifications = false,

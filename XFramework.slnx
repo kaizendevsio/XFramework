@@ -100,9 +100,11 @@
   <Folder Name="/src/Infrastructure/" />
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/XFramework.Attendance/" />
+  <Folder Name="/src/Modules/XFramework.Community/" />
   <Folder Name="/src/Modules/XFramework.IdentityServer/" />
   <Folder Name="/src/Presentation/">
     <Project Path="src/Presentation/XFramework.Portal.Features.Attendance/XFramework.Portal.Features.Attendance.csproj" />
+    <Project Path="src/Presentation/XFramework.Portal.Features.Community/XFramework.Portal.Features.Community.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\Attendance.IntegrationTests\Attendance.IntegrationTests.csproj" />
