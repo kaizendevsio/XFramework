@@ -1,11 +1,12 @@
 using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Portal.Shared;
 
 namespace XFramework.Portal.Services;
 
 public sealed class TenantModuleNavigationService(
     TenantFilterService tenantFilter,
-    IDataContext dataContext) : IDisposable
+    IDataContext dataContext) : IPortalModuleAvailability, IDisposable
 {
     private readonly Dictionary<string, bool> _features = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _loadGate = new(1, 1);

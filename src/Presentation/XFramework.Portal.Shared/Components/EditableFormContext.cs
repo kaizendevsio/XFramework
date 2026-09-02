@@ -1,4 +1,4 @@
-namespace XFramework.Portal.Components.Shared;
+namespace XFramework.Portal.Shared.Components;
 
 public class EditableFormContext
 {

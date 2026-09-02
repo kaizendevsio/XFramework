@@ -356,13 +356,18 @@ public sealed class IdentityServerPortalContractTests
             "XFramework.Portal",
             "Components");
         var mainLayout = File.ReadAllText(Path.Combine(portalRoot, "Layout", "MainLayout.razor"));
-        var containerHost = File.ReadAllText(Path.Combine(portalRoot, "Shared", "XfContainerPortalHost.razor"));
+        var containerHost = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal.Shared",
+            "Components",
+            "XfContainerPortalHost.razor"));
         var portalService = File.ReadAllText(Path.Combine(
             repositoryRoot.FullName,
             "src",
             "Presentation",
-            "XFramework.Portal",
-            "Services",
+            "XFramework.Portal.Shared",
             "XfPortalService.cs"));
         var program = File.ReadAllText(Path.Combine(
             repositoryRoot.FullName,
@@ -1058,9 +1063,8 @@ public sealed class IdentityServerPortalContractTests
             repositoryRoot.FullName,
             "src",
             "Presentation",
-            "XFramework.Portal",
+            "XFramework.Portal.Shared",
             "Components",
-            "Shared",
             "ConfirmDeleteDialog.razor"));
 
         source.Should().Contain("<BbAlertDialogAction>");
@@ -1123,9 +1127,8 @@ public sealed class IdentityServerPortalContractTests
             repositoryRoot.FullName,
             "src",
             "Presentation",
-            "XFramework.Portal",
+            "XFramework.Portal.Shared",
             "Components",
-            "Shared",
             "XfEntityPicker.razor");
 
         var pickerText = File.ReadAllText(pickerPath);
