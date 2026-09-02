@@ -1,6 +1,6 @@
 using IdentityServer.Domain.Shared.Contracts;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Identity.Services;
 
 public sealed record ResolvedTenantModuleFeatureDefinition(
     TenantModuleFeatureDefinition Definition,

@@ -131,7 +131,7 @@
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
-    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
 
     private List<IdentityAddress> _addresses = [];
     private List<IdentityInformation> _users = [];

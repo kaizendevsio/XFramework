@@ -29,17 +29,9 @@ public sealed class IdentityServerPortalContractTests
     [Test]
     public void IdentityServerEntityRelationshipDialogs_UseSharedEntityPickerAdvancedSearch()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var pagesRoot = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Identity");
+        var pagesRoot = GetIdentityPagesRoot();
 
-        var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
         var contacts = File.ReadAllText(Path.Combine(pagesRoot, "Contacts.razor"));
         var contactDetail = File.ReadAllText(Path.Combine(pagesRoot, "ContactDetail.razor"));
         var addresses = File.ReadAllText(Path.Combine(pagesRoot, "Addresses.razor"));
@@ -116,7 +108,7 @@ public sealed class IdentityServerPortalContractTests
         var pagesRoot = GetIdentityPagesRoot();
         var contacts = File.ReadAllText(Path.Combine(pagesRoot, "Contacts.razor"));
         var addresses = File.ReadAllText(Path.Combine(pagesRoot, "Addresses.razor"));
-        var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
 
         contacts.Should().Contain("@page \"/identity/contacts\"");
         contacts.Should().Contain("OnRowClick=\"@((IdentityContact item) => OpenContactDetail(item))\"");
@@ -149,7 +141,7 @@ public sealed class IdentityServerPortalContractTests
             "Components",
             "Layout");
 
-        var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
         var mainLayout = File.ReadAllText(Path.Combine(layoutRoot, "MainLayout.razor"));
         var sidebar = File.ReadAllText(Path.Combine(layoutRoot, "UserDetailSidebar.razor"));
 
@@ -177,7 +169,7 @@ public sealed class IdentityServerPortalContractTests
     public void IdentityServerSensitiveMutations_UseServiceWrapperPaths()
     {
         var pagesRoot = GetIdentityPagesRoot();
-        var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
         var credentials = File.ReadAllText(Path.Combine(pagesRoot, "Credentials.razor"));
         var tenants = File.ReadAllText(Path.Combine(pagesRoot, "Tenants.razor"));
         var tenantDetail = File.ReadAllText(Path.Combine(pagesRoot, "TenantDetail.razor"));
@@ -230,7 +222,7 @@ public sealed class IdentityServerPortalContractTests
         var pagesRoot = GetIdentityPagesRoot();
         var tenantDetail = File.ReadAllText(Path.Combine(pagesRoot, "TenantDetail.razor"));
         var roleTypeDetail = File.ReadAllText(Path.Combine(pagesRoot, "RoleTypeDetail.razor"));
-        var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
 
         tenantDetail.Should().Contain("/identity/tenants/{Id}/role-types/{rt.Id}");
         tenantDetail.Should().Contain("title=\"Edit role type permissions\"");
@@ -280,7 +272,7 @@ public sealed class IdentityServerPortalContractTests
     [Test]
     public void IdentityServerRolePermissionDialog_LoadsBeforeOpeningAndRendersOnlyTheSelectedFeature()
     {
-        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
 
         var dialogStart = userDetail.IndexOf(
             "<!-- Credential Role Permission Overrides Dialog -->",
@@ -559,7 +551,7 @@ public sealed class IdentityServerPortalContractTests
     {
         var pagesRoot = GetIdentityPagesRoot();
         var credentials = File.ReadAllText(Path.Combine(pagesRoot, "Credentials.razor"));
-        var userDetail = File.ReadAllText(Path.Combine(pagesRoot, "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
         var source = credentials + Environment.NewLine + userDetail;
 
         credentials.Should().Contain("<BbAvatar");
@@ -675,7 +667,7 @@ public sealed class IdentityServerPortalContractTests
     [Test]
     public void UserDetail_SessionAndAuthorizationLogReads_AreTenantBoundedSingleQueries()
     {
-        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
         var sessionsStart = userDetail.IndexOf("private async Task LoadSessions()", StringComparison.Ordinal);
         var authLogsStart = userDetail.IndexOf("private async Task LoadAuthLogs()", sessionsStart, StringComparison.Ordinal);
         var walletsStart = userDetail.IndexOf("private async Task LoadWallets()", authLogsStart, StringComparison.Ordinal);
@@ -703,7 +695,7 @@ public sealed class IdentityServerPortalContractTests
     [Test]
     public void UserDetail_LoadsOnlyTheActiveSection_AndBatchesCredentialRelationships()
     {
-        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
 
         var reloadStart = userDetail.IndexOf("private async Task ReloadAllData()", StringComparison.Ordinal);
         var dispatcherStart = userDetail.IndexOf("private async Task LoadActiveSectionData(string section)", reloadStart, StringComparison.Ordinal);
@@ -801,7 +793,7 @@ public sealed class IdentityServerPortalContractTests
             "Tests",
             "Portal.E2ETests",
             "PortalE2ETests.cs"));
-        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
 
         browserTests.Should().Contain("AriaRole.Link, new() { Name = \"Credentials\", Exact = true }");
         browserTests.Should().Contain("/credentials$");
@@ -850,7 +842,7 @@ public sealed class IdentityServerPortalContractTests
             "Services",
             "IdentityAdministrationService.cs"));
         var users = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "Users.razor"));
-        var userDetail = File.ReadAllText(Path.Combine(GetIdentityPagesRoot(), "UserDetail.razor"));
+        var userDetail = ReadIdentityPage("UserDetail.razor");
 
         identityContract.Should().Contain("Actions = EndpointActions.Get | EndpointActions.GetList");
         identityContract.Should().NotContain("[AllowRemoteDataContextMutation]");
@@ -1139,6 +1131,26 @@ public sealed class IdentityServerPortalContractTests
         pickerText.Should().Contain("FilterBy=\"@(item => FormatAdvancedCell(column.ValueSelector(item)))\"");
     }
 
+    private static string ReadIdentityPage(string fileName)
+    {
+        var featurePath = Path.Combine(GetIdentityPagesRoot(), fileName);
+        if (File.Exists(featurePath))
+        {
+            return File.ReadAllText(featurePath);
+        }
+
+        var repositoryRoot = FindRepositoryRoot();
+        return File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal",
+            "Components",
+            "Pages",
+            "Identity",
+            fileName));
+    }
+
     private static string GetIdentityPagesRoot()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -1146,10 +1158,8 @@ public sealed class IdentityServerPortalContractTests
             repositoryRoot.FullName,
             "src",
             "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Identity");
+            "XFramework.Portal.Features.Identity",
+            "Pages");
     }
 
     private static DirectoryInfo FindRepositoryRoot()

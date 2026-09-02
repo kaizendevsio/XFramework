@@ -1,9 +1,11 @@
 using System.Security.Claims;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Shared;
 
 public static class PortalAccess
 {
+    public static readonly Guid AdminRoleTypeId = new("14524d87-582d-4af6-8d6c-4f58ffad34f5");
+
     public static bool CanManageTenants(ClaimsPrincipal? user)
     {
         if (user?.Identity?.IsAuthenticated != true)
@@ -18,6 +20,6 @@ public static class PortalAccess
         }
 
         return Guid.TryParse(user.FindFirst(PortalAuthClaims.RoleTypeId)?.Value, out var roleTypeId)
-            && roleTypeId == PortalBootstrapConstants.AdminRoleTypeId;
+            && roleTypeId == AdminRoleTypeId;
     }
 }
