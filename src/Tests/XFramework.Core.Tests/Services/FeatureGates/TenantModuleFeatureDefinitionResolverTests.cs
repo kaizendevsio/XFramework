@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
-using XFramework.Portal.Services;
+using XFramework.Portal.Features.Identity.Services;
 using FluentAssertions;
 using IdentityServer.Domain.Shared.Contracts;
 using NUnit.Framework;
