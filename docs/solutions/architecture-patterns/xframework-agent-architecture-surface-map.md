@@ -35,23 +35,34 @@ Use this map to answer "where should I look first?" It is intentionally navigati
 
 ## Repository Shape
 
-`XFramework.slnx` is the current solution map. It groups the repo into Shared, Kernel, Infrastructure, SourceGenerators, Services, Presentation, Libraries/Bolt, Tests, and Tools.
+`XFramework.slnx` is the current solution map. Its logical folders describe architectural ownership rather than mirroring the physical `src` directory. The top-level groups are Foundation, Libraries, Modules, Applications, and Tooling. Test and benchmark projects are colocated beneath the architecture surface they verify.
 
 | Surface | Role | Representative paths |
 |---|---|---|
-| Shared | Cross-module contracts and attributes that stay lightweight | `src/Shared/XFramework.Domain.Shared/XFramework.Domain.Shared.csproj`, `src/Shared/XFramework.Domain.Shared/Attributes/GenerateEndpointsAttribute.cs` |
-| Kernel/Core | Cross-cutting runtime primitives, endpoint discovery, caching, observability, and result/data-context infrastructure | `src/Kernel/XFramework.Core/XFramework.Core.csproj`, `src/Kernel/XFramework.Core/Extensions/EndpointDiscoveryExtensions.cs`, `src/Kernel/XFramework.Core/Services/Caching/HybridCacheService.cs`, `src/Kernel/XFramework.Core/Extensions/OpenTelemetryExtensions.cs` |
-| Kernel/Domain | EF Core domain context and persistence base | `src/Kernel/XFramework.Domain/XFramework.Domain.csproj`, `src/Kernel/XFramework.Domain/Contexts/AppDbContext.cs`, `src/Kernel/XFramework.Domain/Contexts/XDbContext.cs` |
-| Infrastructure | Integration attributes, remote data-context, wrappers, logging extensions, and Bolt helper surfaces | `src/Infrastructure/XFramework.Integration/XFramework.Integration.csproj`, `src/Infrastructure/XFramework.Integration/Attributes/MapEndpointAttributes.cs`, `src/Infrastructure/XFramework.Integration/Attributes/BoltHandlerAttribute.cs`, `src/Infrastructure/XFramework.Integration/DataContext/RemoteDataContext.cs`, `src/Infrastructure/XFramework.Integration/Extensions/LoggingExtensions.cs` |
-| SourceGenerators | Build-time generation for endpoints, services, wrappers, Bolt handlers, data-context registration, and change tracking | `src/SourceGenerators/XFramework.SourceGenerators/XFramework.SourceGenerators.csproj`, `src/SourceGenerators/XFramework.SourceGenerators/EntityEndpointGenerator.cs`, `src/SourceGenerators/XFramework.SourceGenerators/BoltHandlerGenerator.cs`, `src/SourceGenerators/XFramework.SourceGenerators/DataContextRegistrationGenerator.cs` |
-| Modules/Services | Business modules and service apps | `src/Modules/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj`, `src/Modules/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj`, `src/Modules/XFramework.Bolt/Bolt.Hub/Bolt.Hub.csproj` |
-| Libraries/Bolt | Reusable Bolt protocol, server, client, media, and browser packages | `src/Libraries/Bolt/Bolt.Protocol/Bolt.Protocol.csproj`, `src/Libraries/Bolt/Bolt.Client/Bolt.Client.csproj`, `src/Libraries/Bolt/Bolt.Server/Bolt.Server.csproj`, `src/Libraries/Bolt/Bolt.Media/Bolt.Media.csproj`, `src/Libraries/Bolt/Bolt.Media.Browser/Bolt.Media.Browser.csproj` |
-| Presentation | Blazor/portal, gateway, and app shells | `src/Modules/XFramework.Blazor/XFramework.Blazor.csproj`, `src/Presentation/XFramework.Portal/XFramework.Portal.csproj`, `src/Presentation/Gateway/Gateway.csproj`, `src/Presentation/Fluid/Fluid.csproj` |
-| Tests | Unit, integration, E2E, benchmarks, and test infrastructure | `src/Tests/Bolt.Tests/Bolt.Tests.csproj`, `src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj`, `src/Tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj`, `src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj`, `src/Tests/Portal.E2ETests/Portal.E2ETests.csproj` |
-| Tools | Operational tools, especially migrations | `src/Tools/XFramework.MigrationRunner/XFramework.MigrationRunner.csproj` |
+| Foundation/Shared | Cross-module contracts and attributes that stay lightweight | `src/Shared/XFramework.Domain.Shared/XFramework.Domain.Shared.csproj`, `src/Shared/XFramework.Domain.Shared/Attributes/GenerateEndpointsAttribute.cs` |
+| Foundation/Kernel | Cross-cutting runtime primitives, endpoint discovery, caching, observability, result/data-context infrastructure, and EF Core persistence bases | `src/Kernel/XFramework.Core/XFramework.Core.csproj`, `src/Kernel/XFramework.Domain/XFramework.Domain.csproj`, `src/Kernel/XFramework.Core/Extensions/EndpointDiscoveryExtensions.cs`, `src/Kernel/XFramework.Domain/Contexts/AppDbContext.cs` |
+| Foundation/Infrastructure | Integration attributes, remote data-context, wrappers, logging extensions, and Bolt helper surfaces | `src/Infrastructure/XFramework.Integration/XFramework.Integration.csproj`, `src/Infrastructure/XFramework.Integration/Attributes/MapEndpointAttributes.cs`, `src/Infrastructure/XFramework.Integration/DataContext/RemoteDataContext.cs` |
+| Foundation/SourceGenerators | Build-time generation for endpoints, services, wrappers, Bolt handlers, data-context registration, and change tracking | `src/SourceGenerators/XFramework.SourceGenerators/XFramework.SourceGenerators.csproj`, `src/SourceGenerators/XFramework.SourceGenerators/EntityEndpointGenerator.cs`, `src/SourceGenerators/XFramework.SourceGenerators/BoltHandlerGenerator.cs` |
+| Foundation/Testing | Shared test infrastructure; Foundation-specific tests remain beneath their owning Foundation area | `src/Tests/XFramework.TestInfrastructure/XFramework.TestInfrastructure.csproj`, `src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj`, `src/Tests/XFramework.SourceGenerators.Tests/XFramework.SourceGenerators.Tests.csproj` |
+| Libraries/Bolt | Reusable Bolt protocol, server, client, media, and browser packages, with Bolt library tests colocated in the solution | `src/Libraries/Bolt/Bolt.Protocol/Bolt.Protocol.csproj`, `src/Libraries/Bolt/Bolt.Client/Bolt.Client.csproj`, `src/Libraries/Bolt/Bolt.Server/Bolt.Server.csproj`, `src/Tests/Bolt.Tests/Bolt.Tests.csproj` |
+| Libraries/UI | Reusable Blazor UI and client-state primitives | `src/Modules/XFramework.Blazor/XFramework.Blazor.csproj` |
+| Modules | Business modules, service hosts, integration contracts, and their module-owned tests | `src/Modules/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj`, `src/Modules/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj`, `src/Tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj`, `src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj` |
+| Applications/Portal | Portal host, shared shell contracts, feature Razor class libraries, and E2E tests | `src/Presentation/XFramework.Portal/XFramework.Portal.csproj`, `src/Presentation/XFramework.Portal.Shared/XFramework.Portal.Shared.csproj`, `src/Presentation/XFramework.Portal.Features.Identity/XFramework.Portal.Features.Identity.csproj`, `src/Tests/Portal.E2ETests/Portal.E2ETests.csproj` |
+| Applications | Other user-facing or edge applications and their application-owned tests | `src/Presentation/XFramework.Operations.Dashboard/XFramework.Operations.Dashboard.csproj`, `src/Presentation/Gateway/Gateway.csproj`, `src/Presentation/Fluid/Fluid.csproj` |
+| Tooling | Operational tools, migration runners, synthetics, and performance harnesses | `src/Tools/XFramework.MigrationRunner/XFramework.MigrationRunner.csproj`, `src/Tools/XFramework.Bolt.Phase0Synthetics/XFramework.Bolt.Phase0Synthetics.csproj`, `src/Tests/SerializerPerfTest/SerializerPerfTest.csproj` |
 | Docs | Current knowledgebase and historical execution plans | `docs/README.md`, `docs/solutions/README.md`, `docs/plans/README.md` |
 | Build/config | SDK, central package versions, package metadata, container image, and publish workflow | `global.json`, `Directory.Packages.props`, `Directory.Build.props`, `Version.props`, `Dockerfile`, `.github/workflows/publish.yml` |
 | Historical/deferred workflow config | Legacy StreamFlow deployment surface retained as config evidence, not current architecture guidance | `.workflows/streamflow.service.yaml` references historical/deferred `src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj` |
+
+### Solution Folder Maintenance
+
+Solution folders express ownership and should not duplicate the physical `src` tree. When adding a project, place it explicitly beneath its owning architecture area:
+
+```powershell
+dotnet sln XFramework.slnx add <project-path> --solution-folder <owner>
+```
+
+For example, a new Wallets integration test belongs under `Modules/Wallets/Tests`, while a Portal feature belongs under `Applications/Portal/Features/<Feature>`. Do not accept an automatically generated root `/src` hierarchy into `XFramework.slnx`.
 
 ## Current Stack Anchors
 
@@ -73,7 +84,7 @@ Use this map to answer "where should I look first?" It is intentionally navigati
 | Caching | `src/Kernel/XFramework.Core/Services/Caching/HybridCacheService.cs`, `src/Infrastructure/XFramework.Integration/DataContext/Cache/ClientCacheService.cs`, `src/Infrastructure/XFramework.Integration/DataContext/Cache/CacheKeyBuilder.cs` | Cache key and invalidation details belong to the caching strategy doc. |
 | Observability | `src/Infrastructure/XFramework.Integration/Extensions/LoggingExtensions.cs`, `src/Infrastructure/XFramework.Integration/Logging/ZLoggerSeqSink.cs`, `src/Kernel/XFramework.Core/Observability/ActivitySources.cs`, `src/Kernel/XFramework.Core/Middlewares/CorrelationIdMiddleware.cs` | Use the logging and OpenTelemetry docs for detailed standards. |
 | Blazor state/actions | `src/Modules/XFramework.Blazor/Core/Features/BaseActionHandler.cs`, `src/Modules/XFramework.Blazor/Core/Services/IndexedDbService.cs` | The module provides reusable UI/client state and IndexedDB surfaces. |
-| Portal pages | `src/Presentation/XFramework.Portal/Program.cs`, `src/Presentation/XFramework.Portal/Components/Pages/Finance/Wallets.razor`, `src/Presentation/XFramework.Portal/Components/Pages/Identity/Users.razor` | UI implementation details belong to presentation docs and patterns. |
+| Portal pages | `src/Presentation/XFramework.Portal/Program.cs`, `src/Presentation/XFramework.Portal.Features.Finance/Pages/Wallets.razor`, `src/Presentation/XFramework.Portal.Features.Identity/Pages/Users.razor` | UI implementation details belong to presentation docs and patterns. |
 | Bolt protocol and media | `src/Libraries/Bolt/Bolt.Protocol/Protocol/BoltCodec.cs`, `src/Libraries/Bolt/Bolt.Client/BoltClient.cs`, `src/Libraries/Bolt/Bolt.Server/BoltServer.cs`, `src/Libraries/Bolt/Bolt.Media/BoltMediaClient.cs`, `src/Libraries/Bolt/Bolt.Media.Browser/BoltMediaService.cs` | Start with `src/Libraries/Bolt/BOLT.md` and `src/Libraries/Bolt/BOLT-MEDIA.md`. |
 
 ## Build, Deployment, And Runtime Config Surfaces
