@@ -10,6 +10,7 @@ Primary route:
 - [docs/solutions/conventions/xframework-best-practices.md](docs/solutions/conventions/xframework-best-practices.md) - canonical implementation standard.
 - [rules/BackendGuidelines.md](rules/BackendGuidelines.md) - mandatory backend rules for the single-database, schema-per-module architecture.
 - [docs/solutions/developer-experience/portal-service-wrapper-and-integration-test-contract.md](docs/solutions/developer-experience/portal-service-wrapper-and-integration-test-contract.md) - Portal wrapper vs `IDataContext` rules and integration-test coverage tiers.
+- [docs/solutions/developer-experience/portal-feature-rcl-architecture.md](docs/solutions/developer-experience/portal-feature-rcl-architecture.md) - Portal host, shared UI, feature RCL, routing, and dependency-direction rules.
 - [rules/UiGuidelines.md](rules/UiGuidelines.md) - primary UI rules for Portal and Blazor surfaces.
 
 Backend rule:

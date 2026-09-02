@@ -1,6 +1,8 @@
 using System.Xml.Linq;
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.AspNetCore.Components;
+using XFramework.Portal.Components;
 using XFramework.Portal.Composition;
 
 namespace Portal.E2ETests;
@@ -45,6 +47,19 @@ public sealed class PortalArchitectureTests
             "XFramework.Portal.Features.*.csproj",
             SearchOption.AllDirectories);
 
+        featureProjects.Select(Path.GetFileNameWithoutExtension).Should().BeEquivalentTo(
+        [
+            "XFramework.Portal.Features.Administration",
+            "XFramework.Portal.Features.Attendance",
+            "XFramework.Portal.Features.Communications",
+            "XFramework.Portal.Features.Community",
+            "XFramework.Portal.Features.Finance",
+            "XFramework.Portal.Features.Identity",
+            "XFramework.Portal.Features.Inventario",
+            "XFramework.Portal.Features.POS",
+            "XFramework.Portal.Features.Storage"
+        ]);
+
         foreach (var featureProject in featureProjects)
         {
             var references = ResolveProjectReferences(featureProject);
@@ -75,16 +90,29 @@ public sealed class PortalArchitectureTests
     }
 
     [Test]
-    public void RegisteredFeatureAssemblies_ExposeUniqueRoutes()
+    public void HostAndRegisteredFeatureAssemblies_ExposeUniqueRoutes()
     {
-        var routes = PortalFeatureAssemblies.All
+        Assembly[] routeAssemblies = [typeof(App).Assembly, .. PortalFeatureAssemblies.All];
+        var routes = routeAssemblies
             .SelectMany(assembly => assembly.ExportedTypes)
             .SelectMany(type => type.GetCustomAttributes(typeof(RouteAttribute), inherit: false)
                 .Cast<RouteAttribute>()
                 .Select(attribute => attribute.Template))
             .ToList();
 
-        routes.Should().Contain("/storage/files");
+        routes.Should().Contain(
+        [
+            "/",
+            "/admin/reference-data",
+            "/attendance/contexts",
+            "/communications/threads",
+            "/community/identities",
+            "/finance/wallets",
+            "/identity/tenants",
+            "/inventario/products",
+            "/pos/cashier",
+            "/storage/files"
+        ]);
         routes.Should().OnlyHaveUniqueItems();
     }
 
