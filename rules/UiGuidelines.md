@@ -8,6 +8,7 @@ This is the primary UI rules entrypoint for XFramework agents. Read this file be
 - This file owns agent-facing UI rules. Do not create parallel UI guidance elsewhere unless explicitly requested.
 - For exact BlazorBlueprint component APIs, setup details, overlay pitfalls, and visual verification workflow, use [BlazorBlueprint Portal Agent Guide](../docs/solutions/tooling-decisions/blazor-blueprint-portal-agent-guide.md).
 - For Portal business operations, wrapper vs `IDataContext` decisions, and UI write-path tests, use [Portal Service Wrapper And Integration Test Contract](../docs/solutions/developer-experience/portal-service-wrapper-and-integration-test-contract.md).
+- For Portal host, shared UI, feature-project boundaries, and route discovery, use [Portal Feature Razor Class Library Architecture](../docs/solutions/developer-experience/portal-feature-rcl-architecture.md).
 - Before using newer or less-common BlazorBlueprint parameters/components, inspect the installed NuGet XML because website docs can lead the pinned package version.
 
 ```powershell
@@ -222,8 +223,8 @@ dotnet build src/Presentation/XFramework.Portal/XFramework.Portal.csproj -m:1 /n
 ## Useful Searches
 
 ```powershell
-rg -n "BlazorBlueprint|BbPortalHost|BbToastProvider|BbDialogProvider|AddBlazorBlueprint|@rendermode|Interactive" Directory.Packages.props src/Presentation/XFramework.Portal
-rg -n "<table\b|<BbDataGrid\b|Filterable=|FilterBy=|OnRowClick=" src/Presentation/XFramework.Portal
-rg -n "DataContext\.(Add|Update|Remove)|SaveChangesAsync\(" src/Presentation/XFramework.Portal/Components/Pages
-rg -n "BbDynamicForm|FormSchema|FormFieldDefinition|FilterDefinition|ToastData|DialogOpenOptions|<select\b|<table\b" src/Presentation/XFramework.Portal
+rg -n "BlazorBlueprint|BbPortalHost|BbToastProvider|BbDialogProvider|AddBlazorBlueprint|@rendermode|Interactive" Directory.Packages.props src/Presentation
+rg -n "<table\b|<BbDataGrid\b|Filterable=|FilterBy=|OnRowClick=" src/Presentation
+rg -n "DataContext\.(Add|Update|Remove)|SaveChangesAsync\(" src/Presentation
+rg -n "BbDynamicForm|FormSchema|FormFieldDefinition|FilterDefinition|ToastData|DialogOpenOptions|<select\b|<table\b" src/Presentation
 ```

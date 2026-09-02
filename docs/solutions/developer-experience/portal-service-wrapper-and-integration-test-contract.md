@@ -141,7 +141,7 @@ When touching a Portal module page:
 Useful searches:
 
 ```bash
-rg -n "DataContext\.(Add|Update|Remove)|SaveChangesAsync\(" src/Presentation/XFramework.Portal/Components/Pages
+rg -n "DataContext\.(Add|Update|Remove)|SaveChangesAsync\(" src/Presentation
 rg -n "class .*Request|record .*Request" src/Modules/<Module>/<Module>.Domain.Shared/Contracts
 rg -n "\[AllowRemoteDataContextMutation\]" src/Modules/<Module>
 ```
