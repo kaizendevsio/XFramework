@@ -3,7 +3,7 @@ using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Finance.Services;
 
 public sealed class WalletsPortalDisplayService(IDataContext dataContext)
 {

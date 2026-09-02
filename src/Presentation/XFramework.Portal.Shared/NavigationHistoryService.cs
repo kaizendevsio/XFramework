@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Shared;
 
 public sealed class NavigationHistoryService : IDisposable
 {
