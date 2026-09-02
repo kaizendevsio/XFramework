@@ -2,13 +2,14 @@ using Communications.Domain.Shared.Contracts.Requests.Settings;
 using Communications.Domain.Shared.Contracts.Responses;
 using Communications.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Portal.Shared;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Communications.Services;
 
 public sealed class CommunicationsPortalSettingsService(
     ICommunicationsServiceWrapper communications,
     RequestMetadata metadata,
-    TenantFilterService tenantFilter)
+    IPortalTenantContext tenantFilter)
 {
     public async Task<CommunicationsSettingsLoadResult> GetSettingsAsync(CancellationToken ct = default)
     {

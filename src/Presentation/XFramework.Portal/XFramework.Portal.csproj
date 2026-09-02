@@ -20,6 +20,7 @@
     <ItemGroup>
         <ProjectReference Include="..\XFramework.Portal.Features.Attendance\XFramework.Portal.Features.Attendance.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Features.Community\XFramework.Portal.Features.Community.csproj" />
+        <ProjectReference Include="..\XFramework.Portal.Features.Communications\XFramework.Portal.Features.Communications.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Features.Storage\XFramework.Portal.Features.Storage.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Shared\XFramework.Portal.Shared.csproj" />
         <!-- Domain.Shared for entity types -->
