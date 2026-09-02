@@ -1,5 +1,7 @@
 using System.Xml.Linq;
 using FluentAssertions;
+using Microsoft.AspNetCore.Components;
+using XFramework.Portal.Composition;
 
 namespace Portal.E2ETests;
 
@@ -70,6 +72,20 @@ public sealed class PortalArchitectureTests
         project.Should().Contain("XFramework.Portal.Shared.csproj");
         program.Should().Contain("AddAdditionalAssemblies(PortalFeatureAssemblies.All)");
         routes.Should().Contain("AdditionalAssemblies=\"PortalFeatureAssemblies.All\"");
+    }
+
+    [Test]
+    public void RegisteredFeatureAssemblies_ExposeUniqueRoutes()
+    {
+        var routes = PortalFeatureAssemblies.All
+            .SelectMany(assembly => assembly.ExportedTypes)
+            .SelectMany(type => type.GetCustomAttributes(typeof(RouteAttribute), inherit: false)
+                .Cast<RouteAttribute>()
+                .Select(attribute => attribute.Template))
+            .ToList();
+
+        routes.Should().Contain("/storage/files");
+        routes.Should().OnlyHaveUniqueItems();
     }
 
     private static IReadOnlyList<string> ResolveProjectReferences(string projectPath) =>
