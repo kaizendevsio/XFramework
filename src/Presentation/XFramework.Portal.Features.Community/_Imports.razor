@@ -1,0 +1,21 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.JSInterop
+@using BlazorBlueprint.Components
+@using BlazorBlueprint.Icons.Lucide.Components
+@using BlazorBlueprint.Primitives
+@using BlazorBlueprint.Primitives.Services
+@using global::Community.Domain.Shared.Contracts
+@using global::Community.Domain.Shared.Enums
+@using global::Community.Integration.Drivers
+@using global::IdentityServer.Domain.Shared.Contracts
+@using global::XFramework.Domain.Shared.BusinessObjects
+@using global::XFramework.Domain.Shared.DataContext
+@using XFramework.Portal.Features.Community.Services
+@using XFramework.Portal.Shared
+@using XFramework.Portal.Shared.Components
+
+@attribute [Authorize]

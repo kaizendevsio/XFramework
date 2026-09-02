@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework><LangVersion>14</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>XFramework.Portal.Features.Community</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <PackageReference Include="BlazorBlueprint.Components" />
+        <PackageReference Include="BlazorBlueprint.Icons.Lucide" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\XFramework.Portal.Shared\XFramework.Portal.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Community\Community.Domain.Shared\Community.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Community\Community.Integration\Community.Integration.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+    </ItemGroup>
+</Project>

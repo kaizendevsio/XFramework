@@ -119,7 +119,7 @@ else
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
-    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private CommunityPortalAccessService AccessService { get; set; } = default!;
 
     private static readonly Guid CommunitySettingsGroupSystemReferenceId =

@@ -25,6 +25,7 @@ using XFramework.Portal.Shared;
 using XFramework.Portal.Shared.Services;
 using XFramework.Portal.Composition;
 using XFramework.Portal.Features.Attendance;
+using XFramework.Portal.Features.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -141,7 +142,7 @@ builder.Services.AddScoped<CommunicationsPortalReadService>();
 builder.Services.AddScoped<CommunicationsPortalSettingsService>();
 builder.Services.AddScoped<CommunicationsPortalTemplateService>();
 builder.Services.AddScoped<NavigationHistoryService>();
-builder.Services.AddScoped<CommunityPortalAccessService>();
+builder.Services.AddCommunityPortalFeature();
 builder.Services.AddAttendancePortalFeature();
 builder.Services.AddScoped<WalletsAdminBackendContractService>();
 builder.Services.AddScoped<WalletsPortalDisplayService>();
