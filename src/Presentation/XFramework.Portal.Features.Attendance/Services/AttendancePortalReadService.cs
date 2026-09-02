@@ -5,10 +5,11 @@ using Attendance.Domain.Shared.Enums;
 using Attendance.Integration.Drivers;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Attendance.Services;
 
 public sealed class AttendancePortalReadService(
     IDataContext dataContext,

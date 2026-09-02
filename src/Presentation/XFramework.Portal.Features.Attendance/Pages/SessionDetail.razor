@@ -275,11 +275,11 @@ else
     [Inject] private AttendancePortalReadService AttendanceReadService { get; set; } = default!;
     [Inject] private IAttendanceServiceWrapper Attendance { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
-    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
-    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
-    [Inject] private PortalActorContext ActorContext { get; set; } = default!;
+    [Inject] private IPortalActorContext ActorContext { get; set; } = default!;
     [Inject] private ILogger<SessionDetail> Logger { get; set; } = default!;
 
     private AttendanceSessionDetail? _detail;
