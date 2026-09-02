@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 using System.Text.Json;
 using XFramework.Portal.Services;
+using XFramework.Portal.Shared;
 
 namespace Portal.E2ETests;
 
@@ -241,7 +242,7 @@ public sealed class PortalSessionRevocationContractTests
     {
         var portalRoot = GetPortalRoot();
         var authService = File.ReadAllText(Path.Combine(portalRoot, "Services", "PortalAuthService.cs"));
-        var claims = File.ReadAllText(Path.Combine(portalRoot, "Services", "PortalAuthClaims.cs"));
+        var claims = File.ReadAllText(Path.Combine(FindRepositoryRoot().FullName, "src", "Presentation", "XFramework.Portal.Shared", "PortalAuthClaims.cs"));
 
         claims.Should().Contain("public const string RefreshToken");
         authService.Should().Contain("response.Response.RefreshToken");

@@ -25,6 +25,7 @@
         <ProjectReference Include="..\XFramework.Portal.Features.Finance\XFramework.Portal.Features.Finance.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Features.Inventario\XFramework.Portal.Features.Inventario.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Features.Administration\XFramework.Portal.Features.Administration.csproj" />
+        <ProjectReference Include="..\XFramework.Portal.Features.Identity\XFramework.Portal.Features.Identity.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Features.Storage\XFramework.Portal.Features.Storage.csproj" />
         <ProjectReference Include="..\XFramework.Portal.Shared\XFramework.Portal.Shared.csproj" />
         <!-- Domain.Shared for entity types -->

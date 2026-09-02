@@ -1,8 +1,9 @@
 using Bolt.Client;
 using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
 using IdentityServer.Domain.Shared.Contracts;
+using Microsoft.Extensions.Logging;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Features.Identity.Services;
 
 public sealed class TenantModuleFeatureDefinitionResolver(
     ITenantModuleFeatureCatalog localCatalog,

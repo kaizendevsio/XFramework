@@ -28,6 +28,7 @@ using XFramework.Portal.Features.Attendance;
 using XFramework.Portal.Features.Community;
 using XFramework.Portal.Features.Communications;
 using XFramework.Portal.Features.Finance;
+using XFramework.Portal.Features.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -138,7 +139,7 @@ builder.Services.AddScoped<IPortalTenantContext>(services =>
     services.GetRequiredService<TenantFilterService>());
 builder.Services.AddScoped<IPortalModuleAvailability>(services =>
     services.GetRequiredService<TenantModuleNavigationService>());
-builder.Services.AddScoped<TenantModuleFeatureDefinitionResolver>();
+builder.Services.AddIdentityPortalFeature();
 builder.Services.AddCommunicationsPortalFeature();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddCommunityPortalFeature();

@@ -149,7 +149,7 @@
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
-    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
 
     private List<IdentityContact> _contacts = [];
     private List<IdentityCredential> _credentials = [];

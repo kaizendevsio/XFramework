@@ -1,4 +1,4 @@
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Shared;
 
 public static class PortalAuthClaims
 {
