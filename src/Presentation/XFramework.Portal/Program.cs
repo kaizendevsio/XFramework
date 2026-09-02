@@ -21,6 +21,9 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Core.Health;
 using XFramework.Integration.Security;
 using IdentityServer.Integration.Security;
+using XFramework.Portal.Shared;
+using XFramework.Portal.Shared.Services;
+using XFramework.Portal.Composition;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -126,6 +129,10 @@ builder.Services.AddRemoteDataContext();
 // Tenant filter state (sidebar selection)
 builder.Services.AddScoped<TenantFilterService>();
 builder.Services.AddScoped<TenantModuleNavigationService>();
+builder.Services.AddScoped<IPortalTenantContext>(services =>
+    services.GetRequiredService<TenantFilterService>());
+builder.Services.AddScoped<IPortalModuleAvailability>(services =>
+    services.GetRequiredService<TenantModuleNavigationService>());
 builder.Services.AddScoped<TenantModuleFeatureDefinitionResolver>();
 builder.Services.AddScoped<CommunicationsPortalGuard>();
 builder.Services.AddScoped<CommunicationsPortalReadService>();
@@ -162,6 +169,7 @@ app.MapXFrameworkHealthChecks("XFramework.Portal");
 app.MapStaticAssets();
 app.MapPortalAuthEndpoints();
 app.MapRazorComponents<XFramework.Portal.Components.App>()
+    .AddAdditionalAssemblies(PortalFeatureAssemblies.All)
     .AddInteractiveServerRenderMode();
 
 app.Run();

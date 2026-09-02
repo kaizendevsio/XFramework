@@ -1,5 +1,6 @@
 <CascadingAuthenticationState>
-    <Router AppAssembly="typeof(XFramework.Portal.Components.App).Assembly">
+    <Router AppAssembly="typeof(XFramework.Portal.Components.App).Assembly"
+            AdditionalAssemblies="PortalFeatureAssemblies.All">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
                 <NotAuthorized>

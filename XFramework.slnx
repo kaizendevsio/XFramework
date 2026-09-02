@@ -80,6 +80,7 @@
   </Folder>
   <Folder Name="/Presentation/">
     <Project Path="src\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
+    <Project Path="src\Presentation\XFramework.Portal.Shared\XFramework.Portal.Shared.csproj" />
     <Project Path="src\Presentation\XFramework.Portal\XFramework.Portal.csproj" />
     <Project Path="src\Presentation\Fluid\Fluid.csproj" />
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />

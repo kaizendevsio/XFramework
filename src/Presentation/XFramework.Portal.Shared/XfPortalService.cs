@@ -2,8 +2,9 @@ using System.Collections.Concurrent;
 using BlazorBlueprint.Primitives;
 using BlazorBlueprint.Primitives.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 
-namespace XFramework.Portal.Services;
+namespace XFramework.Portal.Shared.Services;
 
 // Compatibility implementation adapted from BlazorBlueprint 3.12.0 PortalService (Apache-2.0).
 public sealed class XfPortalService(ILogger<XfPortalService> logger) : IPortalService

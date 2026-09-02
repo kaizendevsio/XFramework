@@ -4,7 +4,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using XFramework.Portal.Services;
+using XFramework.Portal.Shared.Services;
 
 namespace Portal.E2ETests;
 
