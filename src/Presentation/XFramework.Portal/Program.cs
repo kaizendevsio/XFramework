@@ -24,6 +24,7 @@ using IdentityServer.Integration.Security;
 using XFramework.Portal.Shared;
 using XFramework.Portal.Shared.Services;
 using XFramework.Portal.Composition;
+using XFramework.Portal.Features.Attendance;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +71,7 @@ builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(
 // Bolt - thin binary RPC transport to microservices
 builder.Services.AddXFrameworkBoltClient(builder.Configuration, hostEnvironment: builder.Environment);
 builder.Services.AddScoped<PortalActorContext>();
+builder.Services.AddScoped<IPortalActorContext>(services => services.GetRequiredService<PortalActorContext>());
 builder.Services.AddScoped<PortalActorAccessTokenProvider>();
 builder.Services.Replace(ServiceDescriptor.Scoped<IActorAccessTokenProvider>(services =>
     services.GetRequiredService<PortalActorAccessTokenProvider>()));
@@ -140,7 +142,7 @@ builder.Services.AddScoped<CommunicationsPortalSettingsService>();
 builder.Services.AddScoped<CommunicationsPortalTemplateService>();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddScoped<CommunityPortalAccessService>();
-builder.Services.AddScoped<AttendancePortalReadService>();
+builder.Services.AddAttendancePortalFeature();
 builder.Services.AddScoped<WalletsAdminBackendContractService>();
 builder.Services.AddScoped<WalletsPortalDisplayService>();
 builder.Services.AddScoped<PortalAuthService>();

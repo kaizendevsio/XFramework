@@ -1,11 +1,12 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
+using XFramework.Portal.Shared;
 
 namespace XFramework.Portal.Services;
 
 public sealed class PortalActorContext(
     IHttpContextAccessor httpContextAccessor,
-    AuthenticationStateProvider authenticationStateProvider)
+    AuthenticationStateProvider authenticationStateProvider) : IPortalActorContext
 {
     public Guid? CredentialId => ReadGuidClaim(GetAvailablePrincipal(), PortalAuthClaims.CredentialId);
     public Guid? SessionId => ReadGuidClaim(GetAvailablePrincipal(), PortalAuthClaims.SessionId);

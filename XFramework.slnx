@@ -87,6 +87,7 @@
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
     <Project Path="src\Presentation\XFramework.Operations.Dashboard\XFramework.Operations.Dashboard.csproj" />
   </Folder>
+  <Folder Name="/Libraries/" />
   <Folder Name="/Libraries/Bolt/">
     <Project Path="src\Libraries\Bolt\Bolt.Protocol\Bolt.Protocol.csproj" />
     <Project Path="src\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
@@ -94,6 +95,14 @@
     <Project Path="src\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" />
     <Project Path="src\Libraries\Bolt\Bolt.Media.Browser\Bolt.Media.Browser.csproj" />
     <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Infrastructure/" />
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/XFramework.Attendance/" />
+  <Folder Name="/src/Modules/XFramework.IdentityServer/" />
+  <Folder Name="/src/Presentation/">
+    <Project Path="src/Presentation/XFramework.Portal.Features.Attendance/XFramework.Portal.Features.Attendance.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\Attendance.IntegrationTests\Attendance.IntegrationTests.csproj" />

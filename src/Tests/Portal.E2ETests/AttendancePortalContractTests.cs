@@ -92,7 +92,7 @@ public sealed class AttendancePortalContractTests
             repositoryRoot.FullName,
             "src",
             "Presentation",
-            "XFramework.Portal",
+            "XFramework.Portal.Features.Attendance",
             "Services",
             "AttendancePortalReadService.cs");
         var service = File.ReadAllText(servicePath);
@@ -150,7 +150,7 @@ public sealed class AttendancePortalContractTests
     private static string GetAttendancePagesRoot()
     {
         var repositoryRoot = FindRepositoryRoot();
-        return Path.Combine(repositoryRoot.FullName, "src", "Presentation", "XFramework.Portal", "Components", "Pages", "Attendance");
+        return Path.Combine(repositoryRoot.FullName, "src", "Presentation", "XFramework.Portal.Features.Attendance", "Pages");
     }
 
     private static DirectoryInfo FindRepositoryRoot()
