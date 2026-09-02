@@ -1,145 +1,204 @@
 <Solution>
-  <Folder Name="/Shared/">
-    <Project Path="src\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
+  <Folder Name="/Foundation/" />
+  <Folder Name="/Foundation/Kernel/">
+    <Project Path="src/Kernel/XFramework.Core/XFramework.Core.csproj" />
+    <Project Path="src/Kernel/XFramework.Domain/XFramework.Domain.csproj" />
   </Folder>
-  <Folder Name="/Kernel/">
-    <Project Path="src\Kernel\XFramework.Core\XFramework.Core.csproj" />
-    <Project Path="src\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
+  <Folder Name="/Foundation/Kernel/Tests/">
+    <Project Path="src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj" />
   </Folder>
-  <Folder Name="/Infrastructure/">
-    <Project Path="src\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+  <Folder Name="/Foundation/Shared/">
+    <Project Path="src/Shared/XFramework.Domain.Shared/XFramework.Domain.Shared.csproj" />
   </Folder>
-  <Folder Name="/SourceGenerators/">
-    <Project Path="src\SourceGenerators\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj" />
+  <Folder Name="/Foundation/Infrastructure/">
+    <Project Path="src/Infrastructure/XFramework.Integration/XFramework.Integration.csproj" />
   </Folder>
-  <Folder Name="/Services/" />
-  <Folder Name="/Services/Coins/">
-    <Project Path="src\Modules\XFramework.Coins\Server\Coins.Api\Coins.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Coins\Server\Coins.Tests\Coins.Tests.csproj" />
+  <Folder Name="/Foundation/SourceGenerators/">
+    <Project Path="src/SourceGenerators/XFramework.SourceGenerators/XFramework.SourceGenerators.csproj" />
   </Folder>
-  <Folder Name="/Services/Community/">
-    <Project Path="src\Modules\XFramework.Community\Community.Api\Community.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Community\Community.Domain.Shared\Community.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Community\Community.Integration\Community.Integration.csproj" />
+  <Folder Name="/Foundation/SourceGenerators/Tests/">
+    <Project Path="src/Tests/XFramework.SourceGenerators.Tests/XFramework.SourceGenerators.Tests.csproj" />
   </Folder>
-  <Folder Name="/Services/IdentityServer/">
-    <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" />
-    <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
+  <Folder Name="/Foundation/Testing/">
+    <Project Path="src/Tests/XFramework.TestInfrastructure/XFramework.TestInfrastructure.csproj" />
   </Folder>
-  <Folder Name="/Services/Inventario/">
-    <Project Path="src\Modules\XFramework.Inventario\Inventario.Api\Inventario.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Inventario\Inventario.Integration\Inventario.Integration.csproj" />
-  </Folder>
-  <Folder Name="/Services/POS/">
-    <Project Path="src\Modules\XFramework.POS\POS.Api\POS.Api.csproj" />
-    <Project Path="src\Modules\XFramework.POS\POS.Domain.Shared\POS.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.POS\POS.Integration\POS.Integration.csproj" />
-  </Folder>
-  <Folder Name="/Services/Communications/">
-    <Project Path="src\Modules\XFramework.Communications\Communications.Api\Communications.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Communications\Communications.Domain.Shared\Communications.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Communications\Communications.Integration\Communications.Integration.csproj" />
-    <Project Path="src\Modules\XFramework.Communications\Communications.Tests\Communications.Tests.csproj" />
-  </Folder>
-  <Folder Name="/Services/Notifications/">
-    <Project Path="src\Modules\XFramework.Notifications\Notifications.Api\Notifications.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Notifications\Notifications.Domain.Shared\Notifications.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Notifications\Notifications.Integration\Notifications.Integration.csproj" />
-    <Project Path="src\Modules\XFramework.Notifications\Notifications.Tests\Notifications.Tests.csproj" />
-  </Folder>
-  <Folder Name="/Services/Storage/">
-    <Project Path="src\Modules\XFramework.Storage\Storage.Api\Storage.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Storage\Storage.Domain.Shared\Storage.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Storage\Storage.Integration\Storage.Integration.csproj" />
-  </Folder>
-  <Folder Name="/Services/Attendance/">
-    <Project Path="src\Modules\XFramework.Attendance\Attendance.Api\Attendance.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Attendance\Attendance.Domain.Shared\Attendance.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Attendance\Attendance.Integration\Attendance.Integration.csproj" />
-    <Project Path="src\Modules\XFramework.Attendance\Attendance.Tests\Attendance.Tests.csproj" />
-  </Folder>
-  <Folder Name="/Services/Payments/">
-    <Project Path="src\Modules\XFramework.Payments\Payments.Core\Payments.Core.csproj" />
-    <Project Path="src\Modules\XFramework.Payments\Payments.Domain.Shared\Payments.Domain.Shared.csproj" />
-  </Folder>
-  <Folder Name="/Services/SmsGateway/">
-    <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj" />
-    <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
-  </Folder>
-  <Folder Name="/Services/Bolt/">
-    <Project Path="src\Modules\XFramework.Bolt\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Bolt\Bolt.Hub\Bolt.Hub.csproj" />
-  </Folder>
-  <Folder Name="/Services/Wallets/">
-    <Project Path="src\Modules\XFramework.Wallets\Wallets.Api\Wallets.Api.csproj" />
-    <Project Path="src\Modules\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
-  </Folder>
-  <Folder Name="/Presentation/">
-    <Project Path="src\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
-    <Project Path="src\Presentation\XFramework.Portal.Features.Storage\XFramework.Portal.Features.Storage.csproj" />
-    <Project Path="src\Presentation\XFramework.Portal.Shared\XFramework.Portal.Shared.csproj" />
-    <Project Path="src\Presentation\XFramework.Portal\XFramework.Portal.csproj" />
-    <Project Path="src\Presentation\Fluid\Fluid.csproj" />
-    <Project Path="src\Presentation\Gateway\Gateway.csproj" />
-    <Project Path="src\Presentation\XFramework.Operations.Dashboard\XFramework.Operations.Dashboard.csproj" />
-  </Folder>
+
   <Folder Name="/Libraries/" />
   <Folder Name="/Libraries/Bolt/">
-    <Project Path="src\Libraries\Bolt\Bolt.Protocol\Bolt.Protocol.csproj" />
-    <Project Path="src\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
-    <Project Path="src\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
-    <Project Path="src\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" />
-    <Project Path="src\Libraries\Bolt\Bolt.Media.Browser\Bolt.Media.Browser.csproj" />
-    <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
+    <Project Path="src/Libraries/Bolt/Bolt.Client/Bolt.Client.csproj" />
+    <Project Path="src/Libraries/Bolt/Bolt.Media/Bolt.Media.csproj" />
+    <Project Path="src/Libraries/Bolt/Bolt.Media.Browser/Bolt.Media.Browser.csproj" />
+    <Project Path="src/Libraries/Bolt/Bolt.Protocol/Bolt.Protocol.csproj" />
+    <Project Path="src/Libraries/Bolt/Bolt.Server/Bolt.Server.csproj" />
   </Folder>
-  <Folder Name="/src/" />
-  <Folder Name="/src/Infrastructure/" />
-  <Folder Name="/src/Libraries/" />
-  <Folder Name="/src/Libraries/Bolt/" />
-  <Folder Name="/src/Modules/" />
-  <Folder Name="/src/Modules/XFramework.Attendance/" />
-  <Folder Name="/src/Modules/XFramework.Bolt/" />
-  <Folder Name="/src/Modules/XFramework.Communications/" />
-  <Folder Name="/src/Modules/XFramework.Community/" />
-  <Folder Name="/src/Modules/XFramework.IdentityServer/" />
-  <Folder Name="/src/Modules/XFramework.Inventario/" />
-  <Folder Name="/src/Modules/XFramework.POS/" />
-  <Folder Name="/src/Modules/XFramework.Wallets/" />
-  <Folder Name="/src/Presentation/">
+  <Folder Name="/Libraries/Bolt/Tests/">
+    <Project Path="src/Tests/Bolt.Tests/Bolt.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/UI/">
+    <Project Path="src/Modules/XFramework.Blazor/XFramework.Blazor.csproj" />
+  </Folder>
+
+  <Folder Name="/Modules/" />
+  <Folder Name="/Modules/Attendance/">
+    <Project Path="src/Modules/XFramework.Attendance/Attendance.Api/Attendance.Api.csproj" />
+    <Project Path="src/Modules/XFramework.Attendance/Attendance.Domain.Shared/Attendance.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Attendance/Attendance.Integration/Attendance.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Attendance/Tests/">
+    <Project Path="src/Modules/XFramework.Attendance/Attendance.Tests/Attendance.Tests.csproj" />
+    <Project Path="src/Tests/Attendance.IntegrationTests/Attendance.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Bolt/">
+    <Project Path="src/Modules/XFramework.Bolt/Bolt.Domain.Shared/Bolt.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Bolt/Bolt.Hub/Bolt.Hub.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Coins/">
+    <Project Path="src/Modules/XFramework.Coins/Server/Coins.Api/Coins.Api.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Coins/Tests/">
+    <Project Path="src/Modules/XFramework.Coins/Server/Coins.Tests/Coins.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Communications/">
+    <Project Path="src/Modules/XFramework.Communications/Communications.Api/Communications.Api.csproj" />
+    <Project Path="src/Modules/XFramework.Communications/Communications.Domain.Shared/Communications.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Communications/Communications.Integration/Communications.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Communications/Tests/">
+    <Project Path="src/Modules/XFramework.Communications/Communications.Tests/Communications.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Community/">
+    <Project Path="src/Modules/XFramework.Community/Community.Api/Community.Api.csproj" />
+    <Project Path="src/Modules/XFramework.Community/Community.Domain.Shared/Community.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Community/Community.Integration/Community.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Community/Tests/">
+    <Project Path="src/Tests/Community.Tests/Community.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/IdentityServer/">
+    <Project Path="src/Modules/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" />
+    <Project Path="src/Modules/XFramework.IdentityServer/IdentityServer.Domain.Shared/IdentityServer.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/IdentityServer/Tests/">
+    <Project Path="src/Tests/IdentityServer.Benchmarks/IdentityServer.Benchmarks.csproj" />
+    <Project Path="src/Tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj" />
+    <Project Path="src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Inventario/">
+    <Project Path="src/Modules/XFramework.Inventario/Inventario.Api/Inventario.Api.csproj" />
+    <Project Path="src/Modules/XFramework.Inventario/Inventario.Domain.Shared/Inventario.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Inventario/Inventario.Integration/Inventario.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Inventario/Tests/">
+    <Project Path="src/Tests/Inventario.Api.Tests/Inventario.Api.Tests.csproj" />
+    <Project Path="src/Tests/Inventario.IntegrationTests/Inventario.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Notifications/">
+    <Project Path="src/Modules/XFramework.Notifications/Notifications.Api/Notifications.Api.csproj" />
+    <Project Path="src/Modules/XFramework.Notifications/Notifications.Domain.Shared/Notifications.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Notifications/Notifications.Integration/Notifications.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Notifications/Tests/">
+    <Project Path="src/Modules/XFramework.Notifications/Notifications.Tests/Notifications.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Payments/">
+    <Project Path="src/Modules/XFramework.Payments/Payments.Core/Payments.Core.csproj" />
+    <Project Path="src/Modules/XFramework.Payments/Payments.Domain.Shared/Payments.Domain.Shared.csproj" />
+  </Folder>
+  <Folder Name="/Modules/POS/">
+    <Project Path="src/Modules/XFramework.POS/POS.Api/POS.Api.csproj" />
+    <Project Path="src/Modules/XFramework.POS/POS.Domain.Shared/POS.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.POS/POS.Integration/POS.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/POS/Tests/">
+    <Project Path="src/Tests/POS.Api.Tests/POS.Api.Tests.csproj" />
+    <Project Path="src/Tests/POS.IntegrationTests/POS.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/SmsGateway/">
+    <Project Path="src/Modules/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj" />
+    <Project Path="src/Modules/XFramework.SmsGateway/SmsGateway.Domain.Shared/SmsGateway.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.SmsGateway/SmsGateway.Integration/SmsGateway.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Storage/">
+    <Project Path="src/Modules/XFramework.Storage/Storage.Api/Storage.Api.csproj" />
+    <Project Path="src/Modules/XFramework.Storage/Storage.Domain.Shared/Storage.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Storage/Storage.Integration/Storage.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Storage/Tests/">
+    <Project Path="src/Tests/Storage.IntegrationTests/Storage.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Wallets/">
+    <Project Path="src/Modules/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" />
+    <Project Path="src/Modules/XFramework.Wallets/Wallets.Domain.Shared/Wallets.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Wallets/Wallets.Integration/Wallets.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Wallets/Tests/">
+    <Project Path="src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj" />
+  </Folder>
+
+  <Folder Name="/Applications/" />
+  <Folder Name="/Applications/Portal/" />
+  <Folder Name="/Applications/Portal/Host/">
+    <Project Path="src/Presentation/XFramework.Portal/XFramework.Portal.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Shared/">
+    <Project Path="src/Presentation/XFramework.Portal.Shared/XFramework.Portal.Shared.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Features/" />
+  <Folder Name="/Applications/Portal/Features/Administration/">
     <Project Path="src/Presentation/XFramework.Portal.Features.Administration/XFramework.Portal.Features.Administration.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Features/Attendance/">
     <Project Path="src/Presentation/XFramework.Portal.Features.Attendance/XFramework.Portal.Features.Attendance.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Features/Communications/">
     <Project Path="src/Presentation/XFramework.Portal.Features.Communications/XFramework.Portal.Features.Communications.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Features/Community/">
     <Project Path="src/Presentation/XFramework.Portal.Features.Community/XFramework.Portal.Features.Community.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Features/Finance/">
     <Project Path="src/Presentation/XFramework.Portal.Features.Finance/XFramework.Portal.Features.Finance.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Features/Identity/">
     <Project Path="src/Presentation/XFramework.Portal.Features.Identity/XFramework.Portal.Features.Identity.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Features/Inventario/">
     <Project Path="src/Presentation/XFramework.Portal.Features.Inventario/XFramework.Portal.Features.Inventario.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Portal/Features/POS/">
     <Project Path="src/Presentation/XFramework.Portal.Features.POS/XFramework.Portal.Features.POS.csproj" />
   </Folder>
-  <Folder Name="/Tests/">
-    <Project Path="src\Tests\Attendance.IntegrationTests\Attendance.IntegrationTests.csproj" />
-    <Project Path="src\Tests\Bolt.Phase0Synthetics.Tests\Bolt.Phase0Synthetics.Tests.csproj" />
-    <Project Path="src\Tests\Portal.E2ETests\Portal.E2ETests.csproj" />
-    <Project Path="src\Tests\Inventario.Api.Tests\Inventario.Api.Tests.csproj" />
-    <Project Path="src\Tests\Inventario.IntegrationTests\Inventario.IntegrationTests.csproj" />
-    <Project Path="src\Tests\POS.Api.Tests\POS.Api.Tests.csproj" />
-    <Project Path="src\Tests\POS.IntegrationTests\POS.IntegrationTests.csproj" />
-    <Project Path="src\Tests\OperationsDashboard.Tests\OperationsDashboard.Tests.csproj" />
-    <Project Path="src\Tests\Storage.IntegrationTests\Storage.IntegrationTests.csproj" />
-    <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
-    <Project Path="src\Tests\XFramework.SourceGenerators.Tests\XFramework.SourceGenerators.Tests.csproj" />
-    <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
-    <Project Path="src\Tests\IdentityServer.IntegrationTests\IdentityServer.IntegrationTests.csproj" />
-    <Project Path="src\Tests\IdentityServer.UnitTests\IdentityServer.UnitTests.csproj" />
-    <Project Path="src\Tests\IdentityServer.Benchmarks\IdentityServer.Benchmarks.csproj" />
-    <Project Path="src\Tests\Wallets.IntegrationTests\Wallets.IntegrationTests.csproj" />
-    <Project Path="src\Tests\SerializerPerfTest\SerializerPerfTest.csproj" />
+  <Folder Name="/Applications/Portal/Features/Storage/">
+    <Project Path="src/Presentation/XFramework.Portal.Features.Storage/XFramework.Portal.Features.Storage.csproj" />
   </Folder>
-  <Folder Name="/Tools/">
-    <Project Path="src\Tools\XFramework.Bolt.Phase0Synthetics\XFramework.Bolt.Phase0Synthetics.csproj" />
-    <Project Path="src\Tools\XFramework.MigrationRunner\XFramework.MigrationRunner.csproj" />
+  <Folder Name="/Applications/Portal/Tests/">
+    <Project Path="src/Tests/Portal.E2ETests/Portal.E2ETests.csproj" />
+  </Folder>
+  <Folder Name="/Applications/OperationsDashboard/">
+    <Project Path="src/Presentation/XFramework.Operations.Dashboard/XFramework.Operations.Dashboard.csproj" />
+  </Folder>
+  <Folder Name="/Applications/OperationsDashboard/Tests/">
+    <Project Path="src/Tests/OperationsDashboard.Tests/OperationsDashboard.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Fluid/">
+    <Project Path="src/Presentation/Fluid/Fluid.csproj" />
+  </Folder>
+  <Folder Name="/Applications/Gateway/">
+    <Project Path="src/Presentation/Gateway/Gateway.csproj" />
+  </Folder>
+
+  <Folder Name="/Tooling/" />
+  <Folder Name="/Tooling/BoltPhase0Synthetics/">
+    <Project Path="src/Tools/XFramework.Bolt.Phase0Synthetics/XFramework.Bolt.Phase0Synthetics.csproj" />
+  </Folder>
+  <Folder Name="/Tooling/BoltPhase0Synthetics/Tests/">
+    <Project Path="src/Tests/Bolt.Phase0Synthetics.Tests/Bolt.Phase0Synthetics.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Tooling/MigrationRunner/">
+    <Project Path="src/Tools/XFramework.MigrationRunner/XFramework.MigrationRunner.csproj" />
+  </Folder>
+  <Folder Name="/Tooling/SerializerPerformance/">
+    <Project Path="src/Tests/SerializerPerfTest/SerializerPerfTest.csproj" />
   </Folder>
 </Solution>
