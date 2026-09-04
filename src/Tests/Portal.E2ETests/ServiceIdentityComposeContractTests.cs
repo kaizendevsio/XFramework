@@ -464,6 +464,23 @@ public sealed class ServiceIdentityComposeContractTests
         }
     }
 
+    [Test]
+    public void DeploymentWorkflow_RequiresVerifiedNonInteractiveDatabaseMigration()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            ".github",
+            "workflows",
+            "deploy-xeon-dev.yml"));
+
+        workflow.Should().Contain("run --rm --no-TTY migrate");
+        workflow.Should().Contain("Migration runner did not report a successful result.");
+        workflow.Should().Contain("Migration verification found pending database migrations.");
+        workflow.Should().Contain(
+            "[MigrationRunner] Database is up to date. No migrations to apply.");
+    }
+
     private static string ExtractService(string compose, string service)
     {
         var lines = NormalizeLines(compose).Split('\n');
