@@ -787,10 +787,10 @@ jobs:
           /usr/bin/timeout --foreground --kill-after=30s 300s \
             "${compose[@]}" up -d --no-build postgres redis minio seq jaeger
           /usr/bin/timeout --foreground --kill-after=10s 120s \
-            "${compose[@]}" run --rm --no-TTY --no-interactive --no-deps minio-init
+            "${compose[@]}" run --rm --no-TTY --no-deps minio-init </dev/null
           if ! migration_output="$(
               /usr/bin/timeout --foreground --kill-after=30s 600s \
-                "${compose[@]}" run --rm --no-TTY --no-interactive migrate 2>&1
+                "${compose[@]}" run --rm --no-TTY migrate </dev/null 2>&1
             )"
           then
             printf '%s\n' "$migration_output"
@@ -805,7 +805,7 @@ jobs:
 
           if ! verification_output="$(
               /usr/bin/timeout --foreground --kill-after=30s 600s \
-                "${compose[@]}" run --rm --no-TTY --no-interactive migrate 2>&1
+                "${compose[@]}" run --rm --no-TTY migrate </dev/null 2>&1
             )"
           then
             printf '%s\n' "$verification_output"
@@ -945,7 +945,7 @@ jobs:
             docker compose --project-name "$COMPOSE_PROJECT_NAME" \
               --env-file "$REMOTE_CANDIDATE_ENV" \
               -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE" \
-              --profile phase0-verification run --rm --no-TTY --no-interactive --no-deps bolt-phase0-synthetics \
+              --profile phase0-verification run --rm --no-TTY --no-deps bolt-phase0-synthetics </dev/null \
               | tee "$REMOTE_RUN_DIR/bolt-smoke.json"
           REMOTE_SCRIPT
 
