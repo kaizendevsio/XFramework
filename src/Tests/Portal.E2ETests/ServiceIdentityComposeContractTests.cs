@@ -432,7 +432,7 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("$REMOTE_RUN_DIR/bootstrap-without-rollback");
         workflow.Should().Contain("down --remove-orphans");
         const string minioInitialization =
-            "\"${compose[@]}\" run --rm --no-TTY --no-interactive --no-deps minio-init";
+            "\"${compose[@]}\" run --rm --no-TTY --no-deps minio-init </dev/null";
         workflow.Should().Contain(minioInitialization);
         workflow.IndexOf(minioInitialization, StringComparison.Ordinal).Should().BeLessThan(
             workflow.IndexOf("clients=(notifications storage", StringComparison.Ordinal),
@@ -474,9 +474,10 @@ public sealed class ServiceIdentityComposeContractTests
             "workflows",
             "deploy-xeon-dev.yml"));
 
-        workflow.Should().Contain("run --rm --no-TTY --no-interactive migrate");
+        workflow.Should().Contain("run --rm --no-TTY migrate </dev/null");
         workflow.Should().Contain(
-            "run --rm --no-TTY --no-interactive --no-deps bolt-phase0-synthetics");
+            "run --rm --no-TTY --no-deps bolt-phase0-synthetics </dev/null");
+        workflow.Should().NotContain("--no-interactive");
         workflow.Should().Contain("Migration runner did not report a successful result.");
         workflow.Should().Contain("Migration verification found pending database migrations.");
         workflow.Should().Contain(
