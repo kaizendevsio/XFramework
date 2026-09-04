@@ -788,8 +788,35 @@ jobs:
             "${compose[@]}" up -d --no-build postgres redis minio seq jaeger
           /usr/bin/timeout --foreground --kill-after=10s 120s \
             "${compose[@]}" run --rm --no-deps minio-init
-          /usr/bin/timeout --foreground --kill-after=30s 600s \
-            "${compose[@]}" run --rm migrate
+          if ! migration_output="$(
+              /usr/bin/timeout --foreground --kill-after=30s 600s \
+                "${compose[@]}" run --rm --no-TTY migrate 2>&1
+            )"
+          then
+            printf '%s\n' "$migration_output"
+            echo "Migration runner failed." >&2
+            exit 1
+          fi
+          printf '%s\n' "$migration_output"
+          if ! grep -Eq '\[MigrationRunner\] (All migrations applied successfully\.|Database is up to date\. No migrations to apply\.)' <<<"$migration_output"; then
+            echo "Migration runner did not report a successful result." >&2
+            exit 1
+          fi
+
+          if ! verification_output="$(
+              /usr/bin/timeout --foreground --kill-after=30s 600s \
+                "${compose[@]}" run --rm --no-TTY migrate 2>&1
+            )"
+          then
+            printf '%s\n' "$verification_output"
+            echo "Migration verification runner failed." >&2
+            exit 1
+          fi
+          printf '%s\n' "$verification_output"
+          if ! grep -Fq '[MigrationRunner] Database is up to date. No migrations to apply.' <<<"$verification_output"; then
+            echo "Migration verification found pending database migrations." >&2
+            exit 1
+          fi
           REMOTE_SCRIPT
 
       - name: Configure and verify Tailscale Serve boundary
