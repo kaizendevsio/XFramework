@@ -16,6 +16,43 @@ namespace IdentityServer.IntegrationTests.Tests;
 public sealed class IdentityServerMigrationUpgradeTests
 {
     private const string PreRemediationMigration = "20260705084341_AddIdentityRoleCapabilities";
+    private const string PreTenantConcurrencyRepairMigration = "20260810144201_StorageProductionHardening";
+
+    [Test]
+    public async Task TenantConcurrencyRepair_LegacyEmptyStamp_IsBackfilled()
+    {
+        await using var postgres = new PostgreSqlBuilder()
+            .WithDatabase("IdentityServer_Tenant_Concurrency_Upgrade")
+            .WithUsername("test_user")
+            .WithPassword("test_password")
+            .Build();
+        await postgres.StartAsync();
+
+        TestDatabaseModel.LoadMigrationAssemblies();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(postgres.GetConnectionString())
+            .Options;
+
+        await using var db = new AppDbContext(options);
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync(PreTenantConcurrencyRepairMigration);
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO "Application"."Application"
+                ("ID", "Name", "Version", "IsEnabled", "IsDeleted", "ConcurrencyStamp", "CreatedAt", "TenantId")
+            VALUES
+                ('00000000-0000-0000-0000-000000000901', 'Legacy tenant with empty stamp', 1,
+                 true, false, '00000000-0000-0000-0000-000000000000', '2026-01-01T00:00:00Z',
+                 '00000000-0000-0000-0000-000000000901');
+            """);
+
+        await migrator.MigrateAsync();
+
+        (await ScalarAsync<long>(db, """
+            SELECT count(*) FROM "Application"."Application"
+            WHERE "ID" = '00000000-0000-0000-0000-000000000901'
+              AND "ConcurrencyStamp" <> '00000000-0000-0000-0000-000000000000'::uuid
+            """)).Should().Be(1, "legacy tenants must remain deletable through optimistic concurrency");
+    }
 
     [Test]
     public async Task RemediationMigrations_LegacyIdentityData_UpgradeAndEnforceLatestConstraints()
