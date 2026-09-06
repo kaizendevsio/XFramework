@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Wallets.Domain.Shared.Contracts;
 using XFramework.Core.DataContext;
 using XFramework.Domain.Shared.Attributes;
+using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 using XFramework.Integration.Security;
@@ -15,6 +16,12 @@ namespace GeneratedAuthorizationContractTests.Wallets;
 [Category("Area:GeneratedAuthorization")]
 public sealed class GeneratedEntityAuthorizationCompletenessTests
 {
+    [Test]
+    public void CurrencyType_IsSharedAcrossTenantBoundaries()
+    {
+        typeof(IAllowsGlobalTenantRows).IsAssignableFrom(typeof(CurrencyType)).Should().BeTrue();
+    }
+
     [Test]
     public void GeneratedWalletEntities_HaveCompleteCanonicalAuthorizationPolicies()
     {

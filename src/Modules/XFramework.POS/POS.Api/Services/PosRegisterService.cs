@@ -200,10 +200,15 @@ public sealed class PosRegisterService(
         if (walletType.CurrencyTypeId.HasValue && walletType.CurrencyTypeId.Value != currencyId)
             return Result.Conflict("Wallet type currency does not match the POS register currency");
 
-        var currencyResponse = await wallets.CurrencyType.Get(currencyId);
+        var currencyResponse = await wallets.CurrencyType.Get(currencyId, tenantId);
         var currency = currencyResponse.Response;
-        if (!currencyResponse.IsSuccess || currency is null || currency.IsDeleted)
+        if (!currencyResponse.IsSuccess ||
+            currency is null ||
+            currency.IsDeleted ||
+            currency.TenantId != tenantId && currency.TenantId != Guid.Empty)
+        {
             return Result.NotFound("Currency was not found for this tenant");
+        }
 
         var cashDrawerWalletResponse = await wallets.Wallet.Get(cashDrawerWalletId, tenantId);
         var cashDrawerWallet = cashDrawerWalletResponse.Response;

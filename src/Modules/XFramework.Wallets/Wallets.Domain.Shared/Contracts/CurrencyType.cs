@@ -14,7 +14,7 @@ namespace Wallets.Domain.Shared.Contracts;
     CacheDurationSeconds = 3600,
     CacheKeyPrefix = "currencies"
 )]
-public partial class CurrencyType : BaseModel, IHasSystemReferenceId
+public partial class CurrencyType : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows
 {
     
     [MemoryPackOrder(0)]

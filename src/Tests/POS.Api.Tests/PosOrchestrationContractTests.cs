@@ -96,8 +96,8 @@ public sealed class PosOrchestrationContractTests
 
         source.Should().Contain("identityServer.IdentityCredential.Get");
         source.Should().Contain("wallets.Wallet.Get");
-        source.Should().Contain("wallets.CurrencyType.Get(currencyId)");
-        source.Should().NotContain("currency.TenantId != tenantId");
+        source.Should().Contain("wallets.CurrencyType.Get(currencyId, tenantId)");
+        source.Should().Contain("currency.TenantId != tenantId && currency.TenantId != Guid.Empty");
         source.Should().Contain("inventario.GetWarehouses");
         source.Should().Contain("inventario.GetInventoryLocations");
         source.Should().Contain("Id = warehouseId");
