@@ -59,6 +59,7 @@ public sealed class PosOrchestrationContractTests
         source.Should().Contain("BuildCheckoutRequest", "cart checkout should reuse the existing POS sale checkout flow");
         source.Should().Contain("salesService.CheckoutAsync", "cart conversion must delegate to sale orchestration");
         source.Should().Contain("POS.CartCheckout", "cart checkout needs a stable idempotency key");
+        source.Should().Contain("? query.AsTracking()", "cart mutations must opt in to tracking when the context defaults to no-tracking");
         source.Should().NotContain("ReserveInventory", "suspending a draft cart must not reserve inventory");
         source.Should().NotContain("IncrementWallet", "draft carts must not post Wallets ledger entries");
         source.Should().NotContain("TransferWallet", "draft carts must not post Wallets ledger entries");

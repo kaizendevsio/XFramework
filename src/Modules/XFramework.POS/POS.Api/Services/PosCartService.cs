@@ -612,8 +612,9 @@ public sealed class PosCartService(
             .Include(item => item.Lines)
             .Where(item => item.TenantId == tenantId && item.Id == cartId && !item.IsDeleted);
 
-        if (!tracking)
-            query = query.AsNoTracking();
+        query = tracking
+            ? query.AsTracking()
+            : query.AsNoTracking();
 
         return await query.FirstOrDefaultAsync(ct);
     }
