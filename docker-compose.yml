@@ -31,7 +31,6 @@ x-common-env: &common-env
   Seq__ApiKey: ${SEQ_API_KEY:-}
   OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
   OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-false}
-  OpenTelemetry__Exporters__OTLP__Endpoint: ${OTEL_OTLP_ENDPOINT:-http://jaeger:4317}
 
 services:
 
@@ -645,6 +644,8 @@ services:
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${PORTAL_EXPOSE_PORT:-5000}:8080"
+    volumes:
+      - portal-keydata:/root/.aspnet/DataProtection-Keys
     depends_on:
       bolt-hub:
         condition: service_healthy
@@ -703,10 +704,8 @@ services:
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       Seq__Url: http://seq:80
       Seq__ApiKey: ${SEQ_API_KEY:-}
-      Jaeger__QueryUrl: ${JAEGER_QUERY_URL:-}
       OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
       OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-false}
-      OpenTelemetry__Exporters__OTLP__Endpoint: ${OTEL_OTLP_ENDPOINT:-http://jaeger:4317}
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${OPERATIONS_DASHBOARD_EXPOSE_PORT:-5050}:8080"
@@ -784,19 +783,6 @@ services:
     volumes:
       - seqdata:/data
 
-  # Jaeger (OpenTelemetry trace backend for dev)
-  jaeger:
-    profiles: [observability]
-    container_name: xframework-jaeger
-    image: jaegertracing/all-in-one:1.57
-    command: ["--memory.max-traces=${JAEGER_MEMORY_MAX_TRACES:-10000}"]
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-    ports:
-      - "${JAEGER_EXPOSE_PORT:-16686}:16686"
-      - "${JAEGER_OTLP_GRPC_EXPOSE_PORT:-4317}:4317"
-      - "${JAEGER_OTLP_HTTP_EXPOSE_PORT:-4318}:4318"
-
 secrets:
   identity-user-jwt-public-key:
     file: ${IDENTITY_USER_JWT_PUBLIC_KEY_PATH:?Set IDENTITY_USER_JWT_PUBLIC_KEY_PATH in the protected deployment env}
@@ -821,3 +807,4 @@ volumes:
   miniodata:
   seqdata:
   identity-keydata:
+  portal-keydata:

@@ -943,7 +943,7 @@
 
     private async Task SaveRoleType()
     {
-        var name = _formName.Trim();
+        var name = (_formName ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(name)) { ToastService.Show("Name is required."); return; }
 
         if (!Guid.TryParse(_formGroupId, out var groupId) || groupId == Guid.Empty)
@@ -1163,9 +1163,9 @@
 
     private async Task SaveWalletType()
     {
-        var code = _formCode.Trim();
-        var name = _formName.Trim();
-        var description = _formDescription.Trim();
+        var code = (_formCode ?? string.Empty).Trim();
+        var name = (_formName ?? string.Empty).Trim();
+        var description = (_formDescription ?? string.Empty).Trim();
 
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code))
         {

@@ -73,7 +73,7 @@ public sealed class PortalContractTests
     ];
 
     [Test]
-    public void Reports_MovementAndAllocationSections_UseSupportedReportEndpoints()
+    public void Reports_AllSections_UseSupportedReportEndpoints()
     {
         var repositoryRoot = FindRepositoryRoot();
         var reportsPath = Path.Combine(
@@ -85,10 +85,20 @@ public sealed class PortalContractTests
             "Reports.razor");
         var text = File.ReadAllText(reportsPath);
 
-        text.Should().Contain("Inventario.GetMovementLedgerReport(");
-        text.Should().Contain("Inventario.GetReservationAllocationStatusReport(");
-        text.Should().NotContain("DataContext.Query<InventoryMovement>()");
-        text.Should().NotContain("DataContext.Query<ReservationAllocation>()");
+        var reportMethods = new[]
+        {
+            "GetLowStockReport",
+            "GetNearExpiryStockReport",
+            "GetExpiredStockReport",
+            "GetStockPositionReport",
+            "GetMovementLedgerReport",
+            "GetReservationAllocationStatusReport"
+        };
+
+        foreach (var method in reportMethods)
+            text.Should().Contain($"Inventario.{method}(");
+
+        text.Should().NotContain("DataContext.Query<");
     }
 
     [Test]

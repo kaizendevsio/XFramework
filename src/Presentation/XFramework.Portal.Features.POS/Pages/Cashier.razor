@@ -23,7 +23,7 @@ else
             <div class="xf-page-header pos-cashier-header">
                 <div>
                     <BbTypographyH3>Cashier</BbTypographyH3>
-                    <BbTypographyMuted>@CartItemCount item(s) | @Total.ToString("N2") total</BbTypographyMuted>
+                    <BbTypographyMuted>@FormatQuantity(CartItemCount) item(s) | @Total.ToString("N2") total</BbTypographyMuted>
                 </div>
                 <div class="xf-page-actions pos-cashier-header-actions">
                     @if (_cartsEnabled)
@@ -218,7 +218,7 @@ else
                         <div class="pos-cart-title-row">
                             <div>
                                 <h2>Cart</h2>
-                                <span>@CartItemCount item(s)</span>
+                                <span>@FormatQuantity(CartItemCount) item(s)</span>
                             </div>
                             @if (_cartsEnabled)
                             {

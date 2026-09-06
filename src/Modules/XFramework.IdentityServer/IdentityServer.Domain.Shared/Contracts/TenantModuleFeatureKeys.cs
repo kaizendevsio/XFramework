@@ -115,7 +115,7 @@ public static class TenantModuleFeatureKeys
         new(Inventario, TraceabilitySubFeature, "Traceability", "Lot, serial, batch, and inventory lineage tracking.", "scan-line", false),
         new(Inventario, PlanningSubFeature, "Planning", "Demand planning, reorder planning, and replenishment forecasting.", "calendar-clock", false),
         new(Inventario, InventarioReportingSubFeature, "Reporting", "Inventory analytics, valuation, audit, and operational reports.", "bar-chart-3", false),
-        new(Inventario, NegativeStockSubFeature, "Negative Stock", "Controls for allowing or blocking negative stock positions.", "minus-circle", false),
+        new(Inventario, NegativeStockSubFeature, "Negative Stock", "Controls for allowing or blocking negative stock positions.", "circle-minus", false),
         new(Pos, string.Empty, "POS", "Point of sale checkout, payment capture, returns, and receipts.", "scan-barcode"),
         new(Pos, RegistersSubFeature, "POS Registers", "Register setup, default warehouse/location, cash drawer wallet, and merchant credentials.", "store"),
         new(Pos, SalesSubFeature, "POS Sales", "Cashier checkout, receipts, inventory reservation, and sale recovery.", "receipt"),

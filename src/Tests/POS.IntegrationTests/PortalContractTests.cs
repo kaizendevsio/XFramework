@@ -208,8 +208,21 @@ public sealed class PortalContractTests
         returns.Should().Contain("POS.SearchPosSales(new SearchPosSalesRequest");
         returns.Should().Contain("POS.SearchPosReturns(new SearchPosReturnsRequest");
         returns.Should().Contain("POS.GetPosSale(new GetPosSaleRequest");
+        returns.Should().Contain("POS.GetPosReturn(new GetPosReturnRequest");
         returns.Should().NotContain("DataContext.Query<PosReturn>()");
         returns.Should().NotContain("DataContext.Query<PosSaleLine>()");
+    }
+
+    [Test]
+    public void Returns_SubtractsPriorReturnsAndPreviewsAllocatedRefund()
+    {
+        var returns = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Returns.razor"));
+
+        returns.Should().Contain("PreviouslyReturnedQuantity");
+        returns.Should().Contain("RemainingQuantity");
+        returns.Should().Contain("BuildSaleRefundAllocations");
+        returns.Should().Contain("OriginalRefundAmount - PreviouslyReturnedRefundAmount");
+        returns.Should().Contain("Math.Clamp(line.ReturnQuantity + delta, 0, line.RemainingQuantity)");
     }
 
     [Test]

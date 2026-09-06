@@ -171,6 +171,10 @@ public sealed class ServiceIdentityComposeContractTests
         var pos = ExtractService(compose, "pos");
         pos.Should().Contain("ServiceIdentity__DefaultScopes__2: datacontext.query");
         pos.Should().Contain("ServiceIdentity__DefaultScopes__3: tenant.target");
+
+        var portal = ExtractService(compose, "portal");
+        portal.Should().Contain("- portal-keydata:/root/.aspnet/DataProtection-Keys");
+        compose.Should().Contain("  portal-keydata:");
     }
 
     [Test]
@@ -397,15 +401,25 @@ public sealed class ServiceIdentityComposeContractTests
     }
 
     [Test]
-    public void Jaeger_IsOptInAndTelemetryExportDefaultsOff()
+    public void Jaeger_IsRemovedAndTelemetryExportDefaultsOff()
     {
         var repositoryRoot = FindRepositoryRoot();
         var compose = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "docker-compose.yml"));
+        var dashboardRoot = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Operations.Dashboard");
+        var mainLayout = File.ReadAllText(Path.Combine(dashboardRoot, "Components", "Layout", "MainLayout.razor"));
+        var dockerSettings = File.ReadAllText(Path.Combine(dashboardRoot, "appsettings.Docker.json"));
 
-        ExtractService(compose, "jaeger").Should().Contain("profiles: [observability]");
+        compose.Should().NotContain("xframework-jaeger");
+        compose.Should().NotContain("jaegertracing/");
+        compose.Should().NotContain("http://jaeger:");
         compose.Should().Contain("OTEL_OTLP_ENABLED:-false");
-        ExtractService(compose, "operations-dashboard").Should().NotContain(
-            "jaeger:\n        condition: service_started");
+        mainLayout.Should().NotContain("Jaeger");
+        dockerSettings.Should().NotContain("\"Jaeger\"");
+        dockerSettings.Should().Contain("\"Enabled\": false");
     }
 
     [Test]

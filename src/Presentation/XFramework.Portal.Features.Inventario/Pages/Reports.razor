@@ -1,6 +1,6 @@
 @page "/inventario/reports"
-@using XFramework.Domain.Shared.DataContext
 @using XFramework.Inventario.Domain.Shared.Enums
+@using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports
 @implements IDisposable
 
 <PageTitle>Inventario Reports - Portal</PageTitle>
@@ -264,18 +264,15 @@ else
 }
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private ILogger<Reports> Logger { get; set; } = default!;
 
     private List<Product> _products = [];
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
-    private List<InventoryLot> _lots = [];
-    private List<StockBalance> _balances = [];
-    private List<InventoryReorderRule> _rules = [];
     private List<LowStockRow> _lowStock = [];
     private List<ExpiryRow> _nearExpiry = [];
     private List<ExpiryRow> _expired = [];
@@ -313,18 +310,11 @@ else
             ClearRows();
             if (!_hasTenant || !_reportingEnabled) return;
 
-            var tenantId = TenantFilter.SelectedTenantId!.Value;
-            _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
-            _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
-            _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
-            _lots = await DataContext.Query<InventoryLot>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
-            _balances = await DataContext.Query<StockBalance>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(2000).ToListAsync();
-            _rules = await DataContext.Query<InventoryReorderRule>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted).Take(1000).ToListAsync();
-            BuildRows();
-            await LoadEventReports();
+            await LoadReports(refreshFilterOptions: true);
         }
-        catch
+        catch (Exception exception)
         {
+            Logger.LogError(exception, "Could not load inventory reports for tenant {TenantId}", TenantFilter.SelectedTenantId);
             ToastService.Show("Could not load inventory reports.");
         }
         finally
@@ -339,9 +329,6 @@ else
         _products = [];
         _warehouses = [];
         _locations = [];
-        _lots = [];
-        _balances = [];
-        _rules = [];
         _lowStock = [];
         _nearExpiry = [];
         _expired = [];
@@ -350,62 +337,37 @@ else
         _allocations = [];
     }
 
-    private void BuildRows()
+    private async Task LoadReports(bool refreshFilterOptions)
     {
         var productId = ParseFilterGuid(_filterProductId);
         var warehouseId = ParseFilterGuid(_filterWarehouseId);
         var locationId = ParseFilterGuid(_filterLocationId);
-        var balances = _balances
-            .Where(x => MatchesProduct(productId, x.ProductId))
-            .Where(x => MatchesWarehouse(warehouseId, x.WarehouseId))
-            .Where(x => MatchesLocation(locationId, x.LocationId))
-            .ToList();
-        var rules = _rules
-            .Where(x => MatchesProduct(productId, x.ProductId))
-            .Where(x => MatchesNullableScope(warehouseId, x.WarehouseId))
-            .Where(x => MatchesNullableScope(locationId, x.LocationId))
-            .ToList();
 
-        _lowStock = rules.Select(rule =>
-            {
-                var available = balances.Where(x =>
-                        x.ProductId == rule.ProductId &&
-                        (rule.WarehouseId is null || x.WarehouseId == rule.WarehouseId) &&
-                        (rule.LocationId is null || x.LocationId == rule.LocationId))
-                    .Sum(x => x.AvailableQuantity);
-                var reorderPoint = rule.ReorderPoint > 0 ? rule.ReorderPoint : rule.MinimumQuantity;
-                return new LowStockRow(GetProductName(rule.ProductId), GetScope(rule.WarehouseId, rule.LocationId), available, reorderPoint);
-            })
-            .Where(x => x.AvailableQuantity <= x.ReorderPoint)
-            .ToList();
-
-        var now = DateTime.UtcNow;
-        var expiryWindow = Math.Clamp(_nearExpiryWindowDays, 1, 365);
-        _nearExpiry = BuildExpiryRows(
-            balances,
-            lot => MatchesProduct(productId, lot.ProductId) &&
-                   lot.ExpiresAt is not null &&
-                   lot.ExpiresAt > now &&
-                   lot.ExpiresAt <= now.AddDays(expiryWindow));
-        _expired = BuildExpiryRows(
-            balances,
-            lot => MatchesProduct(productId, lot.ProductId) &&
-                   (lot.Status == InventoryLotStatus.Expired || lot.ExpiresAt is not null && lot.ExpiresAt <= now));
-        _stockPositions = balances.Select(balance => new StockRow(
-                GetProductName(balance.ProductId),
-                GetScope(balance.WarehouseId, balance.LocationId),
-                GetLotNumber(balance.LotId),
-                balance.OnHandQuantity,
-                balance.ReservedQuantity,
-                balance.AvailableQuantity))
-            .ToList();
-    }
-
-    private async Task LoadEventReports()
-    {
-        var productId = ParseFilterGuid(_filterProductId);
-        var warehouseId = ParseFilterGuid(_filterWarehouseId);
-        var locationId = ParseFilterGuid(_filterLocationId);
+        var lowStockResponse = await Inventario.GetLowStockReport(new GetLowStockReportRequest
+        {
+            Metadata = BuildMetadata(),
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId
+        });
+        var nearExpiryResponse = await Inventario.GetNearExpiryStockReport(new GetNearExpiryStockReportRequest
+        {
+            Metadata = BuildMetadata(),
+            ProductId = productId,
+            DaysAhead = Math.Clamp(_nearExpiryWindowDays, 1, 365)
+        });
+        var expiredResponse = await Inventario.GetExpiredStockReport(new GetExpiredStockReportRequest
+        {
+            Metadata = BuildMetadata(),
+            ProductId = productId
+        });
+        var stockResponse = await Inventario.GetStockPositionReport(new GetStockPositionReportRequest
+        {
+            Metadata = BuildMetadata(),
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId
+        });
 
         var movementResponse = await Inventario.GetMovementLedgerReport(new GetMovementLedgerReportRequest
         {
@@ -430,6 +392,42 @@ else
             Metadata = BuildMetadata(),
             ProductId = productId
         });
+
+        var lowStockRows = lowStockResponse.Response ?? [];
+        var nearExpiryRows = (nearExpiryResponse.Response ?? [])
+            .Where(row => MatchesWarehouse(warehouseId, row.WarehouseId))
+            .Where(row => MatchesLocation(locationId, row.LocationId))
+            .ToList();
+        var expiredRows = (expiredResponse.Response ?? [])
+            .Where(row => MatchesWarehouse(warehouseId, row.WarehouseId))
+            .Where(row => MatchesLocation(locationId, row.LocationId))
+            .ToList();
+        var stockRows = stockResponse.Response ?? [];
+
+        _lowStock = lowStockRows.Select(row => new LowStockRow(
+            row.ProductName,
+            GetReportScope(row.WarehouseName, row.LocationName),
+            row.AvailableQuantity,
+            row.ReorderPoint)).ToList();
+        _nearExpiry = nearExpiryRows.Select(row => new ExpiryRow(
+            row.ProductName,
+            row.LotNumber,
+            GetReportScope(row.WarehouseName, row.LocationName),
+            row.AvailableQuantity,
+            row.ExpiresAt)).ToList();
+        _expired = expiredRows.Select(row => new ExpiryRow(
+            row.ProductName,
+            row.LotNumber,
+            GetReportScope(row.WarehouseName, row.LocationName),
+            row.AvailableQuantity,
+            row.ExpiresAt)).ToList();
+        _stockPositions = stockRows.Select(row => new StockRow(
+            row.ProductName,
+            GetReportScope(row.WarehouseName, row.LocationName),
+            row.LotNumber ?? "Untracked",
+            row.OnHandQuantity,
+            row.ReservedQuantity,
+            row.AvailableQuantity)).ToList();
         _allocations = allocationResponse.IsSuccess
             ? (allocationResponse.Response ?? []).Select(allocation => new AllocationRow(
                 allocation.ProductName,
@@ -439,38 +437,67 @@ else
                 allocation.ReservedAt)).ToList()
             : [];
 
-        if (!movementResponse.IsSuccess || !allocationResponse.IsSuccess)
+        if (refreshFilterOptions)
+            BuildFilterOptions(stockRows, lowStockRows, nearExpiryRows, expiredRows);
+
+        var failures = new[]
+        {
+            (lowStockResponse.IsSuccess, lowStockResponse.Message),
+            (nearExpiryResponse.IsSuccess, nearExpiryResponse.Message),
+            (expiredResponse.IsSuccess, expiredResponse.Message),
+            (stockResponse.IsSuccess, stockResponse.Message),
+            (movementResponse.IsSuccess, movementResponse.Message),
+            (allocationResponse.IsSuccess, allocationResponse.Message)
+        }.Where(result => !result.IsSuccess).Select(result => result.Message ?? "Unknown report failure").ToArray();
+
+        if (failures.Length > 0)
+        {
+            Logger.LogWarning("Inventory report sections failed: {Failures}", string.Join(" | ", failures));
             ToastService.Show("Could not load all inventory report sections.");
+        }
     }
 
-    private List<ExpiryRow> BuildExpiryRows(
-        IReadOnlyCollection<StockBalance> balances,
-        Func<InventoryLot, bool> lotFilter)
+    private void BuildFilterOptions(
+        IReadOnlyCollection<StockPositionReportRow> stockRows,
+        IReadOnlyCollection<LowStockReportRow> lowStockRows,
+        IReadOnlyCollection<NearExpiryStockReportRow> nearExpiryRows,
+        IReadOnlyCollection<NearExpiryStockReportRow> expiredRows)
     {
-        var lots = _lots.Where(lotFilter).ToDictionary(x => x.Id);
-        if (lots.Count == 0) return [];
-
-        return balances
-            .Where(x => x.LotId is { } lotId && lots.ContainsKey(lotId) && x.OnHandQuantity > 0)
-            .Select(balance =>
+        _products = stockRows.Select(row => (row.ProductId, row.ProductName))
+            .Concat(lowStockRows.Select(row => (row.ProductId, row.ProductName)))
+            .Concat(nearExpiryRows.Select(row => (row.ProductId, row.ProductName)))
+            .Concat(expiredRows.Select(row => (row.ProductId, row.ProductName)))
+            .DistinctBy(row => row.ProductId)
+            .Select(row => new Product { Id = row.ProductId, Name = row.ProductName, IsEnabled = true })
+            .OrderBy(product => product.Name)
+            .ToList();
+        _warehouses = stockRows.DistinctBy(row => row.WarehouseId)
+            .Select(row => new Warehouse
             {
-                var lot = lots[balance.LotId!.Value];
-                return new ExpiryRow(
-                    GetProductName(lot.ProductId),
-                    lot.LotNumber ?? lot.Id.ToString()[..8],
-                    GetScope(balance.WarehouseId, balance.LocationId),
-                    balance.AvailableQuantity,
-                    lot.ExpiresAt);
+                Id = row.WarehouseId,
+                Code = row.WarehouseName,
+                Name = row.WarehouseName,
+                IsEnabled = true
             })
-            .OrderBy(x => x.ExpiresAt)
+            .OrderBy(warehouse => warehouse.Name)
+            .ToList();
+        _locations = stockRows.DistinctBy(row => row.LocationId)
+            .Select(row => new InventoryLocation
+            {
+                Id = row.LocationId,
+                WarehouseId = row.WarehouseId,
+                Code = row.LocationName,
+                Name = row.LocationName,
+                IsEnabled = true
+            })
+            .OrderBy(location => location.Name)
             .ToList();
     }
 
     private async Task ApplyReportFilters()
     {
         _nearExpiryWindowDays = Math.Clamp(_nearExpiryWindowDays, 1, 365);
-        BuildRows();
-        await LoadEventReports();
+        await LoadReports(refreshFilterOptions: false);
     }
 
     private async Task ResetReportFilters()
@@ -481,8 +508,7 @@ else
         _nearExpiryWindowDays = 30;
         _movementFrom = null;
         _movementTo = null;
-        BuildRows();
-        await LoadEventReports();
+        await LoadReports(refreshFilterOptions: true);
     }
 
     private Task OnFilterWarehouseChanged(string? value)
@@ -503,38 +529,17 @@ else
     private static Guid? ParseFilterGuid(string? value) =>
         Guid.TryParse(value, out var parsed) ? parsed : null;
 
-    private static bool MatchesProduct(Guid? filterProductId, Guid productId) =>
-        filterProductId is null || productId == filterProductId.Value;
-
-    private static bool MatchesWarehouse(Guid? filterWarehouseId, Guid warehouseId) =>
-        filterWarehouseId is null || warehouseId == filterWarehouseId.Value;
-
     private static bool MatchesWarehouse(Guid? filterWarehouseId, Guid? warehouseId) =>
         filterWarehouseId is null || warehouseId == filterWarehouseId.Value;
-
-    private static bool MatchesLocation(Guid? filterLocationId, Guid locationId) =>
-        filterLocationId is null || locationId == filterLocationId.Value;
 
     private static bool MatchesLocation(Guid? filterLocationId, Guid? locationId) =>
         filterLocationId is null || locationId == filterLocationId.Value;
 
-    private static bool MatchesNullableScope(Guid? filterId, Guid? scopeId) =>
-        filterId is null || scopeId is null || scopeId == filterId.Value;
-
-    private string GetProductName(Guid productId) =>
-        _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
-
-    private string GetScope(Guid? warehouseId, Guid? locationId) =>
-        $"{GetWarehouseName(warehouseId)} / {GetLocationName(locationId)}";
-
     private string GetWarehouseName(Guid? id) =>
-        id is { } value ? _warehouses.FirstOrDefault(x => x.Id == value) is { } warehouse ? $"{warehouse.Code} - {warehouse.Name}" : value.ToString()[..8] : "Any warehouse";
+        id is { } value ? _warehouses.FirstOrDefault(x => x.Id == value)?.Name ?? value.ToString()[..8] : "Any warehouse";
 
-    private string GetLocationName(Guid? id) =>
-        id is { } value ? _locations.FirstOrDefault(x => x.Id == value) is { } location ? $"{location.Code} - {location.Name}" : value.ToString()[..8] : "Any location";
-
-    private string GetLotNumber(Guid? id) =>
-        id is { } value ? _lots.FirstOrDefault(x => x.Id == value)?.LotNumber ?? value.ToString()[..8] : "Untracked";
+    private static string GetReportScope(string? warehouseName, string? locationName) =>
+        $"{warehouseName ?? "Any warehouse"} / {locationName ?? "Any location"}";
 
     private static string FormatReference(string? type, Guid? id) =>
         string.IsNullOrWhiteSpace(type) ? "N/A" : id is { } value ? $"{type} / {value.ToString()[..8]}" : type;
@@ -557,10 +562,13 @@ else
             ? product.Name ?? product.Id.ToString()[..8]
             : $"{product.SKU} - {product.Name ?? product.Id.ToString()[..8]}";
 
-    private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
+    private static string GetWarehouseLabel(Warehouse warehouse) =>
+        string.Equals(warehouse.Code, warehouse.Name, StringComparison.Ordinal)
+            ? warehouse.Name
+            : $"{warehouse.Code} - {warehouse.Name}";
 
     private string GetLocationLabel(InventoryLocation location) =>
-        $"{location.Code} - {location.Name} ({GetWarehouseName(location.WarehouseId)})";
+        $"{(string.Equals(location.Code, location.Name, StringComparison.Ordinal) ? location.Name : $"{location.Code} - {location.Name}")} ({GetWarehouseName(location.WarehouseId)})";
 
     private static string GetProductSearchText(Product product) =>
         $"{product.SKU} {product.Name} {product.Description}";

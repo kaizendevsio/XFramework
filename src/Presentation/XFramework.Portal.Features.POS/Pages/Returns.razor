@@ -104,6 +104,8 @@ else
                 <Columns>
                     <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Item" Filterable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.PurchasedQuantity)" Title="Purchased" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.PreviouslyReturnedQuantity)" Title="Returned" Sortable="true" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.RemainingQuantity)" Title="Remaining" Sortable="true" Filterable="true" />
                     <BbDataGridTemplateColumn Title="Return Qty" Sortable="true" Filterable="true" FilterBy="@(item => item.ReturnQuantity)">
                         <ChildContent Context="item">
                             <div class="flex items-center gap-2">
@@ -276,18 +278,52 @@ else
             return;
         }
 
-        _returnLines = response.Response.Lines.OrderBy(line => line.LineNumber).Select(line => new ReturnLineForm
+        var previousLines = new List<PosReturnLineResponse>();
+        foreach (var existingReturn in _returns.Where(item => item.SaleId == saleId))
         {
-            SaleLineId = line.Id,
-            ProductName = string.IsNullOrWhiteSpace(line.VariantName) ? line.ProductName : $"{line.ProductName} - {line.VariantName}",
-            PurchasedQuantity = line.Quantity,
-            UnitPrice = line.UnitPrice
+            var returnResponse = await POS.GetPosReturn(new GetPosReturnRequest
+            {
+                Metadata = BuildMetadata(),
+                Id = existingReturn.Id
+            });
+
+            if (!returnResponse.IsSuccess || returnResponse.Response is null)
+            {
+                ToastService.Show(returnResponse.Message ?? "Could not load prior return quantities.");
+                return;
+            }
+
+            previousLines.AddRange(returnResponse.Response.Lines);
+        }
+
+        var previousBySaleLine = previousLines
+            .GroupBy(line => line.SaleLineId)
+            .ToDictionary(
+                group => group.Key,
+                group => new PreviousReturnAllocation(
+                    group.Sum(line => line.Quantity),
+                    group.Sum(line => line.RefundAmount)));
+        var allocations = BuildSaleRefundAllocations(response.Response);
+
+        _returnLines = response.Response.Lines.OrderBy(line => line.LineNumber).Select(line =>
+        {
+            previousBySaleLine.TryGetValue(line.Id, out var previous);
+            return new ReturnLineForm
+            {
+                SaleLineId = line.Id,
+                ProductName = string.IsNullOrWhiteSpace(line.VariantName) ? line.ProductName : $"{line.ProductName} - {line.VariantName}",
+                PurchasedQuantity = line.Quantity,
+                PreviouslyReturnedQuantity = previous.Quantity,
+                PreviouslyReturnedRefundAmount = previous.RefundAmount,
+                UnitPrice = line.UnitPrice,
+                OriginalRefundAmount = allocations[line.Id].RefundAmount
+            };
         }).ToList();
     }
 
     private void ChangeReturnQuantity(ReturnLineForm line, int delta)
     {
-        line.ReturnQuantity = Math.Clamp(line.ReturnQuantity + delta, 0, line.PurchasedQuantity);
+        line.ReturnQuantity = Math.Clamp(line.ReturnQuantity + delta, 0, line.RemainingQuantity);
     }
 
     private async Task CreateReturn()
@@ -357,6 +393,39 @@ else
     private static string GetSaleLabel(PosSaleSummaryResponse item) => $"{item.SaleNumber} - {item.TotalAmount:N2}";
     private string GetSaleSearchText(PosSaleSummaryResponse item) => $"{item.SaleNumber} {GetRegisterName(item.RegisterId)} {item.TotalAmount:N2} {item.CreatedAt:yyyy-MM-dd}";
     private static string NewReturnIdempotencyKey() => $"Portal.POS.Return.{Guid.NewGuid():N}";
+    private static IReadOnlyDictionary<Guid, RefundAllocation> BuildSaleRefundAllocations(PosSaleReceiptResponse sale)
+    {
+        var orderedLines = sale.Lines.OrderBy(line => line.LineNumber).ToList();
+        var grossSubtotal = orderedLines.Sum(line => line.Quantity * line.UnitPrice);
+        var remainingHeaderDiscount = sale.DiscountAmount;
+        var remainingHeaderTax = sale.TaxAmount;
+        var allocations = new Dictionary<Guid, RefundAllocation>(orderedLines.Count);
+
+        for (var index = 0; index < orderedLines.Count; index++)
+        {
+            var line = orderedLines[index];
+            var isLast = index == orderedLines.Count - 1;
+            var grossLineAmount = line.Quantity * line.UnitPrice;
+            var headerDiscount = isLast
+                ? remainingHeaderDiscount
+                : AllocateProportion(sale.DiscountAmount, grossLineAmount, grossSubtotal);
+            var headerTax = isLast
+                ? remainingHeaderTax
+                : AllocateProportion(sale.TaxAmount, grossLineAmount, grossSubtotal);
+
+            remainingHeaderDiscount -= headerDiscount;
+            remainingHeaderTax -= headerTax;
+            allocations[line.Id] = new RefundAllocation(line.LineTotal - headerDiscount + headerTax);
+        }
+
+        return allocations;
+    }
+
+    private static decimal AllocateProportion(decimal amount, decimal lineAmount, decimal totalAmount) =>
+        amount == 0 || totalAmount == 0
+            ? 0
+            : decimal.Round(amount * lineAmount / totalAmount, 2, MidpointRounding.AwayFromZero);
+
     private static string GetReturnStatusBadge(PosReturnStatus status) =>
         status switch
         {
@@ -387,8 +456,17 @@ else
         public Guid SaleLineId { get; set; }
         public string ProductName { get; set; } = "";
         public decimal PurchasedQuantity { get; set; }
+        public decimal PreviouslyReturnedQuantity { get; set; }
+        public decimal PreviouslyReturnedRefundAmount { get; set; }
         public decimal ReturnQuantity { get; set; }
         public decimal UnitPrice { get; set; }
-        public decimal RefundAmount => ReturnQuantity * UnitPrice;
+        public decimal OriginalRefundAmount { get; set; }
+        public decimal RemainingQuantity => PurchasedQuantity - PreviouslyReturnedQuantity;
+        public decimal RefundAmount => ReturnQuantity == RemainingQuantity
+            ? OriginalRefundAmount - PreviouslyReturnedRefundAmount
+            : decimal.Round(OriginalRefundAmount * ReturnQuantity / PurchasedQuantity, 2, MidpointRounding.AwayFromZero);
     }
+
+    private readonly record struct RefundAllocation(decimal RefundAmount);
+    private readonly record struct PreviousReturnAllocation(decimal Quantity, decimal RefundAmount);
 }
