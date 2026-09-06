@@ -489,7 +489,7 @@ jobs:
           selected_kind=""
           runtime_snapshot="$REMOTE_RUN_DIR/pre-deployment"
           runtime_services=(
-            postgres redis minio seq jaeger identityserver bolt-hub communications notifications storage attendance
+            postgres redis minio seq identityserver bolt-hub communications notifications storage attendance
             smsgateway wallets inventario pos portal operations-dashboard
           )
           runtime_snapshot_ready=false
@@ -608,7 +608,7 @@ jobs:
 
           document = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
           required_services = (
-              "postgres", "redis", "minio", "seq", "jaeger", "identityserver", "bolt-hub",
+              "postgres", "redis", "minio", "seq", "identityserver", "bolt-hub",
               "communications", "notifications", "storage", "attendance", "smsgateway", "wallets",
               "inventario", "pos", "portal", "operations-dashboard",
           )
@@ -654,7 +654,7 @@ jobs:
         run: |
           set -euo pipefail
           services=(
-            postgres redis minio seq jaeger migrate identityserver bolt-hub communications
+            postgres redis minio seq migrate identityserver bolt-hub communications
             notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard bolt-phase0-synthetics
           )
@@ -785,7 +785,7 @@ jobs:
           set -euo pipefail
           compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE")
           /usr/bin/timeout --foreground --kill-after=30s 300s \
-            "${compose[@]}" up -d --no-build postgres redis minio seq jaeger
+            "${compose[@]}" up -d --no-build postgres redis minio seq
           /usr/bin/timeout --foreground --kill-after=10s 120s \
             "${compose[@]}" run --rm --no-TTY --no-deps minio-init </dev/null
           if ! migration_output="$(
@@ -1006,10 +1006,6 @@ jobs:
           seq_binding="$("${compose[@]}" port seq 80 | head -n 1)"
           [[ "$seq_binding" =~ :([1-9][0-9]{0,4})$ ]]
           seq_port="${BASH_REMATCH[1]}"
-          jaeger_binding="$("${compose[@]}" port jaeger 16686 | head -n 1)"
-          [[ "$jaeger_binding" =~ :([1-9][0-9]{0,4})$ ]]
-          jaeger_port="${BASH_REMATCH[1]}"
-
           /usr/bin/timeout --foreground --kill-after=10s 180s \
             python3 -B "$REMOTE_VERIFY_DIAGNOSTICS" \
               --candidate-env "$REMOTE_CANDIDATE_ENV" \
@@ -1018,7 +1014,6 @@ jobs:
               --bounded-file "$REMOTE_RUN_DIR/bolt-smoke.json" \
               --window-start "$window_start" \
               --seq-base-url "http://127.0.0.1:${seq_port}" \
-              --jaeger-base-url "http://127.0.0.1:${jaeger_port}" \
               --evidence "$REMOTE_RUN_DIR/diagnostic-sinks.json"
           rm -f \
             "$REMOTE_RUN_DIR/synthetic-tokens/communications-transport-token" \
@@ -1188,7 +1183,7 @@ jobs:
 
           compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$deploy_env" "${compose_files[@]}")
           /usr/bin/timeout --foreground --kill-after=30s 300s \
-            "${compose[@]}" up -d --no-build postgres redis minio seq jaeger
+            "${compose[@]}" up -d --no-build postgres redis minio seq
           for service in "${services[@]}"; do
             /usr/bin/timeout --foreground --kill-after=30s 180s \
               "${compose[@]}" up -d --no-build --no-deps --force-recreate "$service"

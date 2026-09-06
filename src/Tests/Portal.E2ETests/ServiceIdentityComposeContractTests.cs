@@ -379,7 +379,7 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("Verify diagnostic sink marker absence");
         workflow.Should().Contain("verify-bolt-phase0-diagnostic-sinks.py");
         workflow.Should().Contain("--seq-base-url");
-        workflow.Should().Contain("--jaeger-base-url");
+        workflow.Should().NotContain("--jaeger-base-url");
         syntheticRunner.Should().Contain("SendAccessTokenAsQueryString = true");
 
         workflow.Should().NotContain("run-bolt-phase0-synthetics.sh");
@@ -388,13 +388,15 @@ public sealed class ServiceIdentityComposeContractTests
     }
 
     [Test]
-    public void Jaeger_InMemoryTraceStore_IsBoundedForDevHostStability()
+    public void Jaeger_IsOptInAndTelemetryExportDefaultsOff()
     {
         var repositoryRoot = FindRepositoryRoot();
         var compose = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "docker-compose.yml"));
 
-        ExtractService(compose, "jaeger").Should().Contain(
-            "--memory.max-traces=${JAEGER_MEMORY_MAX_TRACES:-10000}");
+        ExtractService(compose, "jaeger").Should().Contain("profiles: [observability]");
+        compose.Should().Contain("OTEL_OTLP_ENABLED:-false");
+        ExtractService(compose, "operations-dashboard").Should().NotContain(
+            "jaeger:\n        condition: service_started");
     }
 
     [Test]
@@ -419,7 +421,8 @@ public sealed class ServiceIdentityComposeContractTests
         workflow.Should().Contain("if ! image_id=\"$(docker inspect --format '{{.Image}}'");
         workflow.Should().Contain("! docker image inspect \"$image_id\" >/dev/null 2>&1; then");
         workflow.Should().Contain("if [ \"$runtime_snapshot_ready\" = true ]; then");
-        workflow.Should().Contain("postgres redis minio seq jaeger identityserver bolt-hub");
+        workflow.Should().Contain("postgres redis minio seq identityserver bolt-hub");
+        workflow.Should().NotContain("postgres redis minio seq jaeger");
         workflow.Should().Contain("docker inspect --format '{{.Image}}'");
         workflow.Should().Contain("docker image inspect \"$value\"");
         workflow.Should().Contain("docker pull \"$value\"");

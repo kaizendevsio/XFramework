@@ -230,7 +230,7 @@ def scan_seq(seq_url: str, start: dt.datetime, end: dt.datetime,
     return events
 
 
-def scan_sinks(seq_url: str, jaeger_url: str, start: dt.datetime, end: dt.datetime,
+def scan_sinks(seq_url: str, jaeger_url: str | None, start: dt.datetime, end: dt.datetime,
                needles: Sequence[bytes], api_key: str) -> tuple[int, int, int, int]:
     budget: dict[str, float | int] = {"started": time.monotonic(), "requests": 0}
     if api_key and (
@@ -238,6 +238,9 @@ def scan_sinks(seq_url: str, jaeger_url: str, start: dt.datetime, end: dt.dateti
     ):
         fail("SEQ_API_KEY")
     events = scan_seq(seq_url, start, end, needles, api_key, budget)
+
+    if jaeger_url is None:
+        return events, 0, 0, int(budget["requests"])
 
     services = result_list(request_json(f"{jaeger_url}/api/services", {}, needles, budget),
                            ("data",), "JAEGER_RESPONSE")
@@ -301,8 +304,9 @@ def verify(args: argparse.Namespace) -> None:
     end = parse_utc(args.window_end, "WINDOW") if args.window_end else now
     if end <= start or (end - start).total_seconds() > MAX_WINDOW_SECONDS:
         fail("WINDOW")
+    jaeger_url = origin(args.jaeger_base_url, "JAEGER_URL") if args.jaeger_base_url else None
     seq_events, services, traces, requests = scan_sinks(
-        origin(args.seq_base_url, "SEQ_URL"), origin(args.jaeger_base_url, "JAEGER_URL"),
+        origin(args.seq_base_url, "SEQ_URL"), jaeger_url,
         start, end, needles, values.get("SEQ_API_KEY", ""))
     write_evidence(args.evidence, {
         "credentials": 4, "files": len(files), "fileBytes": file_bytes,
@@ -316,7 +320,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--window-start", required=True)
     parser.add_argument("--window-end")
     parser.add_argument("--seq-base-url", required=True)
-    parser.add_argument("--jaeger-base-url", required=True)
+    parser.add_argument("--jaeger-base-url")
     parser.add_argument("--evidence", required=True)
     try:
         verify(parser.parse_args(argv))

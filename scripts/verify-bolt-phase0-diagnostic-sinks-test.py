@@ -189,6 +189,7 @@ class DiagnosticSinkVerifierTests(unittest.TestCase):
         evidence: Path | None = None,
         seq_url: str | None = None,
         jaeger_url: str | None = None,
+        include_jaeger: bool = True,
     ) -> tuple[subprocess.CompletedProcess[str], Path]:
         self.sequence += 1
         output = evidence or self.root / f"evidence-{self.sequence}.json"
@@ -205,11 +206,14 @@ class DiagnosticSinkVerifierTests(unittest.TestCase):
             self.window_end,
             "--seq-base-url",
             seq_url or self.seq_server.url,
-            "--jaeger-base-url",
-            jaeger_url or self.jaeger_server.url,
             "--evidence",
             str(output),
         ]
+        if include_jaeger:
+            command[command.index("--evidence"):command.index("--evidence")] = [
+                "--jaeger-base-url",
+                jaeger_url or self.jaeger_server.url,
+            ]
         return subprocess.run(
             command,
             capture_output=True,
@@ -274,6 +278,16 @@ class DiagnosticSinkVerifierTests(unittest.TestCase):
         self.assertEqual({"bolt-hub", "identityserver"}, {query["service"][0] for query in trace_requests})
         self.assertTrue(all(query["limit"] == ["201"] for query in trace_requests))
         self.assertTrue(all("start" in query and "end" in query for query in trace_requests))
+
+    def test_success_without_jaeger_scans_seq_and_bounded_files(self) -> None:
+        result, output = self._run(include_jaeger=False)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        evidence = json.loads(output.read_text(encoding="ascii"))
+        self.assertEqual(0, evidence["counts"]["jaegerServices"])
+        self.assertEqual(0, evidence["counts"]["jaegerTraces"])
+        self.assertEqual(1, evidence["counts"]["httpRequests"])
+        self.assertEqual([], self.jaeger_server.state.requests)
 
     def test_full_token_and_jti_leaks_in_local_files_fail(self) -> None:
         for leak in (self.tokens[0], self.jtis[1]):

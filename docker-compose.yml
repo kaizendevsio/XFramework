@@ -30,7 +30,7 @@ x-common-env: &common-env
   SERVICE_CREDENTIAL_GENERATION_ID: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
   Seq__ApiKey: ${SEQ_API_KEY:-}
   OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
-  OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-true}
+  OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-false}
   OpenTelemetry__Exporters__OTLP__Endpoint: ${OTEL_OTLP_ENDPOINT:-http://jaeger:4317}
 
 services:
@@ -701,9 +701,9 @@ services:
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       Seq__Url: http://seq:80
       Seq__ApiKey: ${SEQ_API_KEY:-}
-      Jaeger__QueryUrl: http://jaeger:16686
+      Jaeger__QueryUrl: ${JAEGER_QUERY_URL:-}
       OpenTelemetry__Sampling__Probability: ${OTEL_SAMPLING_PROBABILITY:-1.0}
-      OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-true}
+      OpenTelemetry__Exporters__OTLP__Enabled: ${OTEL_OTLP_ENABLED:-false}
       OpenTelemetry__Exporters__OTLP__Endpoint: ${OTEL_OTLP_ENDPOINT:-http://jaeger:4317}
     secrets: *identity-user-jwt-public-key-secret
     ports:
@@ -714,8 +714,6 @@ services:
       identityserver:
         condition: service_healthy
       seq:
-        condition: service_started
-      jaeger:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
@@ -786,6 +784,7 @@ services:
 
   # Jaeger (OpenTelemetry trace backend for dev)
   jaeger:
+    profiles: [observability]
     container_name: xframework-jaeger
     image: jaegertracing/all-in-one:1.57
     command: ["--memory.max-traces=${JAEGER_MEMORY_MAX_TRACES:-10000}"]
