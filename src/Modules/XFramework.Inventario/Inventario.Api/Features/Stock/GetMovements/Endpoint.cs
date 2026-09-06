@@ -10,7 +10,7 @@ public static class GetInventoryMovementsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/stock/movements", Tags = ["Inventario Stock"],
         Summary = "Get inventory movement ledger",
         Description = "Gets append-only inventory movements for the authenticated tenant.")]

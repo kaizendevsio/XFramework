@@ -10,7 +10,7 @@ public static class CreateInventoryReorderRuleEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/reorder-rules", Tags = ["Inventario Planning"],
         Summary = "Create inventory reorder rule",
         Description = "Creates a tenant-scoped reorder rule for product, warehouse, or location planning.")]

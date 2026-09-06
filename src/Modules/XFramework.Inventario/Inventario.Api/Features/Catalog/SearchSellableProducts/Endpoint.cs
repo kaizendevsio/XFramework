@@ -10,7 +10,7 @@ public static class SearchSellableProductsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/catalog/sellable-products", Tags = ["Inventario Catalog"],
         Summary = "Search sellable products",
         Description = "Returns POS-friendly product and variant catalog rows for line selection.")]

@@ -50,6 +50,8 @@ public sealed class DelegatedTenantAuthorizationTests
         policies.Should().NotBeEmpty();
         policies.Should().OnlyContain(attribute =>
             attribute.TenantAccessMode == GeneratedTenantAccessMode.DelegatedTenant &&
+            !string.IsNullOrWhiteSpace(attribute.AuthorizationFeature) &&
+            attribute.AuthorizationFeature.StartsWith("inventario", StringComparison.Ordinal) &&
             attribute.CrossTenantCapability == XFrameworkActorCapabilities.IdentityTenantsManage);
     }
 }

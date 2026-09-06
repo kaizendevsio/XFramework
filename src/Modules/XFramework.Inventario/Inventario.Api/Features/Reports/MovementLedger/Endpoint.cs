@@ -10,7 +10,7 @@ public static class MovementLedgerReportEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/reports/movement-ledger", Tags = ["Inventario Reports"])]
     public static async Task<Result<List<MovementLedgerReportRow>>> Handle(
         GetMovementLedgerReportRequest request,

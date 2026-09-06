@@ -10,7 +10,7 @@ public static class GetInventoryLotsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/lots", Tags = ["Inventario Traceability"],
         Summary = "Get inventory lots",
         Description = "Gets traceability lots or batches for the authenticated tenant.")]

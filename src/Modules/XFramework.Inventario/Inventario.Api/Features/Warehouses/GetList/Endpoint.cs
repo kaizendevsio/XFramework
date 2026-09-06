@@ -10,7 +10,7 @@ public static class GetWarehousesEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/warehouses", Tags = ["Inventario Warehousing"],
         Summary = "Get warehouses",
         Description = "Gets warehouses for the authenticated tenant.")]

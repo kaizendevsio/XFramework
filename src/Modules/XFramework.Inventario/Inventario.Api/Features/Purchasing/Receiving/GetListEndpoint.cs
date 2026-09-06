@@ -10,7 +10,7 @@ public static class GetReceivingDocumentsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/receiving", Tags = ["Inventario Purchasing"],
         Summary = "List receiving documents",
         Description = "Lists posted receiving documents for the current tenant.")]

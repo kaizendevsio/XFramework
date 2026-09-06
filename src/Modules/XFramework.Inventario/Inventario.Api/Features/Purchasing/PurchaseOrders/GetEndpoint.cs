@@ -10,7 +10,7 @@ public static class GetPurchaseOrderEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/purchase-orders/{id:guid}", Tags = ["Inventario Purchasing"],
         Summary = "Get purchase order",
         Description = "Gets a purchase order with line items.")]

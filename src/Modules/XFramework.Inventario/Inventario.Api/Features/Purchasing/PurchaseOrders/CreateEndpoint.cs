@@ -10,7 +10,7 @@ public static class CreatePurchaseOrderEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/purchase-orders", Tags = ["Inventario Purchasing"],
         Summary = "Create purchase order",
         Description = "Creates a purchase order with line items.")]

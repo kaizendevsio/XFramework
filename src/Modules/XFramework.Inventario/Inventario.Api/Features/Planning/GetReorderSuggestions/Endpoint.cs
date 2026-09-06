@@ -10,7 +10,7 @@ public static class GetReorderSuggestionsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/planning/reorder-suggestions", Tags = ["Inventario Planning"],
         Summary = "Get reorder suggestions",
         Description = "Returns reorder suggestions from active product, warehouse, and location rules.")]

@@ -10,7 +10,7 @@ public static class CancelReservationEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/reservations/cancel", Tags = ["Inventario Reservations"],
         Summary = "Cancel reservation",
         Description = "Cancels an active reservation and releases its reserved quantity.")]

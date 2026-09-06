@@ -9,7 +9,7 @@ public static class CreateProductEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/products", Tags = ["Products"],
         Summary = "Create a new product",
         Description = "Creates a new product in the inventory system")]

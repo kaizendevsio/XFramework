@@ -10,6 +10,7 @@ namespace XFramework.Inventario.Domain.Shared.Contracts;
     Actions = EndpointActions.None,
     RoutePrefix = "api/inventario/stock/movements",
     RequireAuthorization = true,
+    AuthorizationFeature = "inventario.movements",
     TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "inventario-stock-movements"

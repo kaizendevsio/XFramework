@@ -9,7 +9,7 @@ public static class UpdateProductWrapperEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPut("/api/products", Tags = ["Products"],
         Summary = "Update an existing product",
         Description = "Updates catalog fields for a product and invalidates the cache")]

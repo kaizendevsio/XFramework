@@ -9,6 +9,7 @@ namespace XFramework.Inventario.Domain.Shared.Contracts;
     Actions = EndpointActions.None,
     RoutePrefix = "api/inventario/stock/balances",
     RequireAuthorization = true,
+    AuthorizationFeature = "inventario.stock_balances",
     TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "inventario-stock-balances"

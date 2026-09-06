@@ -10,7 +10,7 @@ public static class SetPurchaseOrderStatusEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/purchase-orders/status", Tags = ["Inventario Purchasing"],
         Summary = "Set purchase order status",
         Description = "Opens or cancels a purchase order. Receiving controls partially received and received statuses.")]

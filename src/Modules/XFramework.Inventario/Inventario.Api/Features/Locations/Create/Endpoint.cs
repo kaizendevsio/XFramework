@@ -10,7 +10,7 @@ public static class CreateInventoryLocationEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/locations", Tags = ["Inventario Warehousing"],
         Summary = "Create inventory location",
         Description = "Creates an inventory location for a warehouse.")]

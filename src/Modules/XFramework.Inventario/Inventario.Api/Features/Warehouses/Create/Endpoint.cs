@@ -10,7 +10,7 @@ public static class CreateWarehouseEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/warehouses", Tags = ["Inventario Warehousing"],
         Summary = "Create warehouse",
         Description = "Creates a warehouse for the authenticated tenant.")]

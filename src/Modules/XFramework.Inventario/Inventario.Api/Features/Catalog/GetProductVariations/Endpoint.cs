@@ -10,7 +10,7 @@ public static class GetProductVariationsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/catalog/products/{productId:guid}/variations", Tags = ["Inventario Catalog"],
         Summary = "Get product variations",
         Description = "Returns enabled sellable variants for one product.")]

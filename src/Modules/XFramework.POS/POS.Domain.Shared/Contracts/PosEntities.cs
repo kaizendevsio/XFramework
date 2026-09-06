@@ -6,6 +6,8 @@ namespace POS.Domain.Shared.Contracts;
     Actions = EndpointActions.None,
     RoutePrefix = "api/pos/registers",
     RequireAuthorization = true,
+    AuthorizationFeature = "pos.registers",
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     CacheDurationSeconds = 120,
     CacheKeyPrefix = "pos-registers"
 )]
@@ -54,6 +56,8 @@ public partial class PosRegister : BaseModel
     Actions = EndpointActions.None,
     RoutePrefix = "api/pos/carts",
     RequireAuthorization = true,
+    AuthorizationFeature = "pos.carts",
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "pos-carts"
 )]
@@ -196,6 +200,8 @@ public partial class PosCartLine : BaseModel
     Actions = EndpointActions.None,
     RoutePrefix = "api/pos/sales",
     RequireAuthorization = true,
+    AuthorizationFeature = "pos.sales",
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "pos-sales"
 )]
@@ -396,6 +402,8 @@ public partial class PosPayment : BaseModel
     Actions = EndpointActions.None,
     RoutePrefix = "api/pos/returns",
     RequireAuthorization = true,
+    AuthorizationFeature = "pos.returns",
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "pos-returns"
 )]

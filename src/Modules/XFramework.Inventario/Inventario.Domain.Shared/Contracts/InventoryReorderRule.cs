@@ -9,6 +9,7 @@ namespace XFramework.Inventario.Domain.Shared.Contracts;
     Actions = EndpointActions.None,
     RoutePrefix = "api/inventario/reorder-rules",
     RequireAuthorization = true,
+    AuthorizationFeature = "inventario.planning",
     TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     CacheDurationSeconds = 60,
     CacheKeyPrefix = "inventario-reorder-rules"

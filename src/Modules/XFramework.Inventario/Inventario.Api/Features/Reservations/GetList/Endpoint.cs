@@ -10,7 +10,7 @@ public static class GetReservationsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/reservations", Tags = ["Inventario Reservations"],
         Summary = "Get inventory reservations",
         Description = "Gets inventory reservations for the authenticated tenant.")]

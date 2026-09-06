@@ -10,7 +10,7 @@ public static class FulfillReservationEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/reservations/fulfill", Tags = ["Inventario Reservations"],
         Summary = "Fulfill reservation",
         Description = "Fulfills an active reservation by releasing reserved stock and posting a shipment movement.")]

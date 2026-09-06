@@ -10,7 +10,7 @@ public static class CreateInventoryLotEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/lots", Tags = ["Inventario Traceability"],
         Summary = "Create inventory lot",
         Description = "Creates a traceability lot or batch for the authenticated tenant.")]

@@ -10,7 +10,7 @@ public static class GetSuppliersEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/suppliers", Tags = ["Inventario Purchasing"],
         Summary = "List suppliers",
         Description = "Lists tenant-scoped inventory suppliers.")]

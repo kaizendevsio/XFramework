@@ -11,7 +11,7 @@ public static class UpdateProductVariationEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPut("/api/inventario/product-variations", Tags = ["Inventario Variations"],
         Summary = "Update product variant",
         Description = "Updates a product variant type, name, and absolute catalog price.")]

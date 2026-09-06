@@ -9,7 +9,7 @@ public static class ExpireReservationsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/reservations/expire", Tags = ["Inventario Reservations"],
         Summary = "Expire reservations",
         Description = "Expires active reservations whose expiration time is due and releases their reserved quantity.")]

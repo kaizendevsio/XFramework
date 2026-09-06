@@ -10,7 +10,7 @@ public static class GetInventoryLocationsEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/locations", Tags = ["Inventario Warehousing"],
         Summary = "Get inventory locations",
         Description = "Gets inventory locations for the authenticated tenant.")]

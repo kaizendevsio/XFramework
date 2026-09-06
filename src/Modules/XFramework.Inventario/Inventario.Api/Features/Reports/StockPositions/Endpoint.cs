@@ -10,7 +10,7 @@ public static class StockPositionsReportEndpoint
 {
     [BoltHandler(
         TenantAccessMode = TenantAccessMode.DelegatedTenant,
-        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapGet("/api/inventario/reports/stock-positions", Tags = ["Inventario Reports"])]
     public static async Task<Result<List<StockPositionReportRow>>> Handle(
         GetStockPositionReportRequest request,
