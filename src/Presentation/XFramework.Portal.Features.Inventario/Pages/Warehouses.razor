@@ -1,8 +1,6 @@
 @page "/inventario/warehouses"
 @using XFramework.Domain.Shared.DataContext
-@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
-@using XFramework.Inventario.Domain.Shared.Enums
 @implements IDisposable
 
 <PageTitle>Inventario Warehouses - Portal</PageTitle>
@@ -26,16 +24,12 @@ else
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Warehouses</BbTypographyH3>
-                    <BbTypographyMuted>Set up stock storage warehouses and internal locations.</BbTypographyMuted>
+                    <BbTypographyMuted>Set up stock storage warehouses and open a warehouse to manage its locations.</BbTypographyMuted>
                 </div>
                 <div class="xf-page-actions">
                     <BbButton OnClick="@OpenWarehouseDialog">
                         <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                         Create Warehouse
-                    </BbButton>
-                    <BbButton Variant="ButtonVariant.Outline" OnClick="@OpenLocationDialog" Disabled="@(_warehouses.Count == 0)">
-                        <LucideIcon Name="map-pin" class="mr-2 h-4 w-4" />
-                        Create Location
                     </BbButton>
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
                         <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
@@ -78,39 +72,6 @@ else
                 </BbCardContent>
             </BbCard>
 
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Locations</BbCardTitle>
-                    <BbCardDescription>Internal stock positions by warehouse.</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    <BbDataGrid Items="@_locations" ShowPagination="true" InitialPageSize="20"
-                                OnRowClick="@((InventoryLocation item) => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))"
-                                Class="cursor-pointer">
-                        <Columns>
-                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
-                                <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.LocationType)" Title="Type" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Pickable" Filterable="true" FilterBy="@(item => item.IsPickable)">
-                                <ChildContent Context="item">
-                                    <StatusBadge Text="@(item.IsPickable ? "Pickable" : "Storage")" Status="@(item.IsPickable ? "active" : "inactive")" />
-                                </ChildContent>
-                            </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Actions">
-                                <ChildContent Context="item">
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View location"
-                                              OnClick="@(() => Navigation.NavigateTo($"/inventario/locations/{item.Id}"))">
-                                        <LucideIcon Name="eye" class="h-4 w-4" />
-                                    </BbButton>
-                                </ChildContent>
-                            </BbDataGridTemplateColumn>
-                        </Columns>
-                    </BbDataGrid>
-                </BbCardContent>
-            </BbCard>
         </div>
     </FadeInContent>
 }
@@ -146,54 +107,6 @@ else
     </BbDialogContent>
 </BbDialog>
 
-<BbDialog Open="@_locationDialogOpen" OpenChanged="@(v => _locationDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
-        <BbDialogHeader>
-            <BbDialogTitle>Create Location</BbDialogTitle>
-            <BbDialogDescription>Locations belong to a warehouse and represent bins, shelves, or zones.</BbDialogDescription>
-        </BbDialogHeader>
-        <div class="grid gap-4 py-4">
-            <XfEntityPicker TItem="Warehouse"
-                            Label="Warehouse"
-                            Value="@_locationForm.WarehouseId"
-                            ValueChanged="@(value => _locationForm.WarehouseId = value ?? "")"
-                            Items="@_warehouses"
-                            ValueSelector="@GetWarehousePickerValue"
-                            TextSelector="@GetWarehouseLabel"
-                            SearchTextSelector="@GetWarehouseSearchText"
-                            AdvancedColumns="@WarehouseAdvancedColumns"
-                            AdvancedFilters="@WarehouseAdvancedFilters"
-                            AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
-                            Placeholder="Select warehouse"
-                            SearchPlaceholder="Search warehouses..."
-                            EmptyMessage="No warehouses found."
-                            ShowCreate="false"
-                            AdvancedSearchTitle="Find Warehouse"
-                            AdvancedSearchDescription="Select the warehouse that owns this location." />
-            <div class="grid gap-3 md:grid-cols-2">
-                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
-                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
-            </div>
-            <BbFormFieldSelect TValue="string" @bind-Value="_locationForm.LocationType" Label="Location Type">
-                @foreach (var type in Enum.GetValues<InventoryLocationType>())
-                {
-                    <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
-                }
-            </BbFormFieldSelect>
-            <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Description" Label="Description" />
-            <BbFormFieldSwitch Checked="@_locationForm.IsPickable"
-                               CheckedChanged="@((bool value) => _locationForm.IsPickable = value)"
-                               Label="Pickable location" />
-        </div>
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _locationDialogOpen = false)">Cancel</BbButton>
-            <BbButton OnClick="@CreateLocation" Disabled="@IsCreateLocationDisabled">
-                Create
-            </BbButton>
-        </BbDialogFooter>
-    </BbDialogContent>
-</BbDialog>
-
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
@@ -203,17 +116,13 @@ else
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private readonly WarehouseForm _warehouseForm = new();
-    private readonly LocationForm _locationForm = new();
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
     private bool _loading = true;
     private bool _hasTenant;
     private bool _warehousingEnabled;
     private bool _savingWarehouse;
-    private bool _savingLocation;
     private bool _warehouseDialogOpen;
-    private bool _locationDialogOpen;
-    private bool IsCreateLocationDisabled => _savingLocation || _warehouses.Count == 0;
 
     protected override void OnInitialized()
     {
@@ -246,8 +155,6 @@ else
                 .OrderBy(x => x.Code)
                 .Take(200)
                 .ToListAsync();
-            _locationForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
-
             _locations = await DataContext.Query<InventoryLocation>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -271,13 +178,6 @@ else
     {
         _warehouseForm.Reset();
         _warehouseDialogOpen = true;
-    }
-
-    private void OpenLocationDialog()
-    {
-        _locationForm.Reset();
-        _locationForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
-        _locationDialogOpen = true;
     }
 
     private async Task CreateWarehouse()
@@ -323,101 +223,12 @@ else
         }
     }
 
-    private async Task CreateLocation()
-    {
-        if (!Guid.TryParse(_locationForm.WarehouseId, out var warehouseId))
-        {
-            ToastService.Show("Select a warehouse.");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_locationForm.Code) || string.IsNullOrWhiteSpace(_locationForm.Name))
-        {
-            ToastService.Show("Location code and name are required.");
-            return;
-        }
-
-        _savingLocation = true;
-        try
-        {
-            var result = await Inventario.CreateInventoryLocation(new CreateInventoryLocationRequest
-            {
-                Metadata = BuildMetadata(),
-                WarehouseId = warehouseId,
-                Code = _locationForm.Code,
-                Name = _locationForm.Name,
-                Description = NullIfEmpty(_locationForm.Description),
-                LocationType = Enum.TryParse<InventoryLocationType>(_locationForm.LocationType, out var type) ? type : InventoryLocationType.Bin,
-                IsPickable = _locationForm.IsPickable
-            });
-            ToastService.Show(result.IsSuccess ? "Location created." : "Could not create location.");
-            if (result.IsSuccess)
-            {
-                _locationForm.Reset();
-                _locationForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
-                _locationDialogOpen = false;
-                await Reload();
-            }
-        }
-        finally
-        {
-            _savingLocation = false;
-        }
-    }
-
     private RequestMetadata BuildMetadata() => new()
     {
         RequestedTenantId = TenantFilter.SelectedTenantId,
         RequestId = Guid.NewGuid(),
         OperationName = "Portal"
     };
-
-    private string GetWarehouseName(Guid warehouseId) =>
-        _warehouses.FirstOrDefault(x => x.Id == warehouseId) is { } warehouse
-            ? GetWarehouseLabel(warehouse)
-            : warehouseId.ToString()[..8];
-
-    private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
-    private static string GetWarehousePickerValue(Warehouse warehouse) => warehouse.Id.ToString();
-    private static string GetWarehouseSearchText(Warehouse warehouse) =>
-        $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
-
-    private IReadOnlyList<XfEntityPickerColumn<Warehouse>> WarehouseAdvancedColumns =>
-    [
-        new("Code", x => x.Code),
-        new("Name", x => x.Name),
-        new("City", x => x.City),
-        new("Region", x => x.Region),
-        new("Country", x => x.CountryCode),
-        new("Default", x => FormatBoolean(x.IsDefault)),
-        new("Locations", x => _locations.Count(location => location.WarehouseId == x.Id).ToString()),
-        new("Created", x => x.CreatedAt.ToString("yyyy-MM-dd"))
-    ];
-
-    private IReadOnlyList<XfEntityPickerFilter<Warehouse>> WarehouseAdvancedFilters =>
-    [
-        new("default", "Default warehouse", YesNoFilterOptions, x => x.IsDefault ? "true" : "false", "All warehouses"),
-        new("country", "Country", BuildDistinctFilterOptions(_warehouses, x => x.CountryCode), x => x.CountryCode, "All countries")
-    ];
-
-    private static readonly IReadOnlyList<XfEntityPickerFilterOption> YesNoFilterOptions =
-    [
-        new("true", "Yes"),
-        new("false", "No")
-    ];
-
-    private static IReadOnlyList<XfEntityPickerFilterOption> BuildDistinctFilterOptions<TItem>(
-        IEnumerable<TItem> items,
-        Func<TItem, string?> selector) =>
-        items
-            .Select(selector)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(value => value)
-            .Select(value => new XfEntityPickerFilterOption(value!, value!))
-            .ToList();
-
-    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -452,22 +263,4 @@ else
         }
     }
 
-    private sealed class LocationForm
-    {
-        public string WarehouseId { get; set; } = "";
-        public string Code { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Description { get; set; } = "";
-        public string LocationType { get; set; } = InventoryLocationType.Bin.ToString();
-        public bool IsPickable { get; set; } = true;
-
-        public void Reset()
-        {
-            Code = "";
-            Name = "";
-            Description = "";
-            LocationType = InventoryLocationType.Bin.ToString();
-            IsPickable = true;
-        }
-    }
 }

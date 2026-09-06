@@ -2,7 +2,7 @@
 @using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
-<PageTitle>Inventario Transaction - Portal</PageTitle>
+<PageTitle>Inventario Sales Transaction - Portal</PageTitle>
 
 @if (_loading)
 {
@@ -21,29 +21,29 @@ else if (_outsideTenantContext)
     <div class="space-y-4">
         <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/inventario/transactions"))">
             <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
-            Back to Transactions
+            Back to Sales Transactions
         </BbButton>
         <BbAlert>
-            <BbAlertTitle>Transaction Outside Active Tenant</BbAlertTitle>
-            <BbAlertDescription>Switch to this transaction's tenant to view its details.</BbAlertDescription>
+            <BbAlertTitle>Sales Transaction Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to this sales transaction's tenant to view its details.</BbAlertDescription>
         </BbAlert>
     </div>
 }
 else if (_transaction is null)
 {
-    <BbTypographyMuted>Inventory transaction not found.</BbTypographyMuted>
+    <BbTypographyMuted>Sales transaction not found.</BbTypographyMuted>
 }
 else
 {
     <FadeInContent>
         <div class="space-y-6">
             <div class="flex items-center gap-4">
-                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to transactions"
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to sales transactions"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/transactions"))">
                     <LucideIcon Name="arrow-left" class="h-4 w-4" />
                 </BbButton>
                 <div class="flex-1">
-                    <BbTypographyH3>Inventory Transaction</BbTypographyH3>
+                    <BbTypographyH3>Sales Transaction</BbTypographyH3>
                     <BbTypographyMuted>@GetProductLabel() - @FormatDate(_transaction.TransactionDate)</BbTypographyMuted>
                 </div>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
@@ -81,8 +81,8 @@ else
 
             <BbCard>
                 <BbCardHeader>
-                    <BbCardTitle>Transaction Details</BbCardTitle>
-                    <BbCardDescription>Read-only product transaction record.</BbCardDescription>
+                    <BbCardTitle>Sales Transaction Details</BbCardTitle>
+                    <BbCardDescription>Read-only product sales transaction record.</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
                     <div class="grid gap-4 md:grid-cols-2">
@@ -172,7 +172,7 @@ else
         }
         catch
         {
-            ToastService.Show("Could not load transaction.");
+            ToastService.Show("Could not load sales transaction.");
         }
         finally
         {

@@ -2,7 +2,7 @@
 @using XFramework.Domain.Shared.DataContext
 @implements IDisposable
 
-<PageTitle>Inventario Transactions - Portal</PageTitle>
+<PageTitle>Inventario Sales Transactions - Portal</PageTitle>
 
 @if (_loading)
 {
@@ -22,8 +22,8 @@ else
         <div class="space-y-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <BbTypographyH3>Inventory Transactions</BbTypographyH3>
-                    <BbTypographyMuted>Read-only stock and sales movement history for the selected tenant.</BbTypographyMuted>
+                    <BbTypographyH3>Sales Transactions</BbTypographyH3>
+                    <BbTypographyMuted>Read-only product sales history. Inventory quantity changes are recorded in Stock.</BbTypographyMuted>
                 </div>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
                     <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
@@ -33,8 +33,8 @@ else
 
             <BbCard>
                 <BbCardHeader>
-                    <BbCardTitle>Transactions</BbCardTitle>
-                    <BbCardDescription>@_transactions.Count transaction(s) loaded</BbCardDescription>
+                    <BbCardTitle>Sales Transaction History</BbCardTitle>
+                    <BbCardDescription>@_transactions.Count sales transaction(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
                     <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20"
@@ -52,7 +52,7 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View transaction"
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View sales transaction"
                                               OnClick="@(() => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))">
                                         <LucideIcon Name="eye" class="h-4 w-4" />
                                     </BbButton>

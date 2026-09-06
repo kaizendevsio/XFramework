@@ -820,7 +820,7 @@ else
         "lots" => "Inventario Traceability",
         "replenishment" => "Inventario Planning",
         "variations" => "Inventario Variations",
-        "transactions" => "Inventario Transactions",
+        "transactions" => "Inventario Sales Transactions",
         _ => "Inventario Product"
     };
 
@@ -1468,8 +1468,8 @@ else
     private RenderFragment TransactionsSection => @<div class="space-y-6">
         <BbCard>
             <BbCardHeader>
-                <BbCardTitle>Transaction History</BbCardTitle>
-                <BbCardDescription>@_transactions.Count product transaction(s) loaded</BbCardDescription>
+                <BbCardTitle>Sales Transaction History</BbCardTitle>
+                <BbCardDescription>@_transactions.Count product sales transaction(s) loaded</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
                 <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
