@@ -788,6 +788,7 @@ services:
   jaeger:
     container_name: xframework-jaeger
     image: jaegertracing/all-in-one:1.57
+    command: ["--memory.max-traces=${JAEGER_MEMORY_MAX_TRACES:-10000}"]
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:

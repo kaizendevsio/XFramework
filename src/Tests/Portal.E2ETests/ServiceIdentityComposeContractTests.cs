@@ -388,6 +388,16 @@ public sealed class ServiceIdentityComposeContractTests
     }
 
     [Test]
+    public void Jaeger_InMemoryTraceStore_IsBoundedForDevHostStability()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var compose = File.ReadAllText(Path.Combine(repositoryRoot.FullName, "docker-compose.yml"));
+
+        ExtractService(compose, "jaeger").Should().Contain(
+            "--memory.max-traces=${JAEGER_MEMORY_MAX_TRACES:-10000}");
+    }
+
+    [Test]
     public void DeploymentWorkflow_PreservesExactRollbackStateWithoutPartialDeploymentWrappers()
     {
         var repositoryRoot = FindRepositoryRoot();
