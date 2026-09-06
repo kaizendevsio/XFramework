@@ -1,4 +1,5 @@
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Domain.Shared.Security;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Security;
 using XFramework.Core.Services.FeatureGates;
@@ -9,6 +10,7 @@ public sealed class IdentityAuthorizationService(
     IDataContext dataContext,
     ITrustedInvocationContextAccessor trustedInvocationContextAccessor,
     XFramework.Core.Services.FeatureGates.ITenantModuleFeatureService tenantModuleFeatureService,
+    ICrossTenantWriteAuthorizationScopeFactory crossTenantWriteAuthorizationScopeFactory,
     ILogger<IdentityAuthorizationService> logger) : IIdentityAuthorizationService
 {
     private const string SourceCredentialOverrideAllow = "CredentialRoleOverrideAllow";
@@ -126,6 +128,10 @@ public sealed class IdentityAuthorizationService(
             }
         }
 
+        using var crossTenantWriteScope =
+            trustedInvocationContextAccessor.Current?.EffectiveTenantId == request.TenantId
+                ? null
+                : crossTenantWriteAuthorizationScopeFactory.BeginTenantAdministrationScope();
         var saveResult = await dataContext.SaveChangesAsync(ct);
         if (!saveResult.IsSuccess)
             return Result.Failure("Tenant module features could not be saved", saveResult.StatusCode);

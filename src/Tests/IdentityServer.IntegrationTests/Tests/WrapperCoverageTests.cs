@@ -1016,6 +1016,58 @@ public sealed class WrapperCoverageTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task SetTenantModuleFeatures_ForManagedTenant_UpsertsTenantOwnedFeatureConfiguration()
+    {
+        var tenantName = $"Managed Feature Tenant {Guid.NewGuid():N}";
+        var create = await IntegrationTestFixture.ServiceWrapper.CreateTenant(new CreateTenantRequest
+        {
+            Name = tenantName,
+            Description = "Created for cross-tenant feature administration coverage",
+            Version = 1.0m,
+            Status = 1,
+            ParentTenantId = IntegrationTestFixture.TestTenantId,
+            Metadata = CreateMetadata()
+        });
+        create.HttpStatusCode.Should().Be(HttpStatusCode.OK, create.Message);
+
+        await using var tenantDb = CreateDbContext();
+        var tenant = await tenantDb.Set<Tenant>()
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.Name == tenantName);
+        var subFeature = $"managed_{Guid.NewGuid():N}";
+
+        var result = await IntegrationTestFixture.ServiceWrapper.SetTenantModuleFeatures(
+            new SetTenantModuleFeaturesRequest
+            {
+                TenantId = tenant.Id,
+                ExpectedConcurrencyStamp = tenant.ConcurrencyStamp,
+                Metadata = CreateMetadata(),
+                Features =
+                [
+                    new TenantModuleFeatureUpdate
+                    {
+                        ModuleKey = TenantModuleFeatureKeys.Inventario,
+                        SubFeatureKey = subFeature,
+                        DisplayName = "Managed tenant feature",
+                        Description = "Cross-tenant administration coverage",
+                        IsEnabled = true
+                    }
+                ]
+            });
+
+        result.HttpStatusCode.Should().Be(HttpStatusCode.OK, result.Message);
+        result.IsSuccess.Should().BeTrue();
+
+        await using var verificationDb = CreateDbContext();
+        var feature = await verificationDb.Set<TenantModuleFeature>()
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.TenantId == tenant.Id &&
+                                 item.ModuleKey == TenantModuleFeatureKeys.Inventario &&
+                                 item.SubFeatureKey == subFeature);
+        feature.IsEnabled.Should().BeTrue();
+    }
+
+    [Test]
     public async Task SetTenantModuleFeatures_WithStaleTenantVersion_ReturnsConflict()
     {
         var result = await IntegrationTestFixture.ServiceWrapper.SetTenantModuleFeatures(
