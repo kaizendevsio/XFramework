@@ -116,6 +116,20 @@ public sealed class PortalContractTests
     }
 
     [Test]
+    public void DetailLookups_DoNotSendInMemoryIdCollectionsThroughRemoteDataContext()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
+        var warehouseDetail = File.ReadAllText(Path.Combine(pagesRoot, "WarehouseDetail.razor"));
+        var locationDetail = File.ReadAllText(Path.Combine(pagesRoot, "LocationDetail.razor"));
+        var reservationDetail = File.ReadAllText(Path.Combine(pagesRoot, "ReservationDetail.razor"));
+
+        warehouseDetail.Should().NotContain("productIds.Contains(x.Id) && !x.IsDeleted");
+        locationDetail.Should().NotContain("productIds.Contains(x.Id) && !x.IsDeleted");
+        reservationDetail.Should().NotContain("lotIds.Contains(x.Id) && !x.IsDeleted");
+    }
+
+    [Test]
     public void InventarioPages_BusinessWorkflowMutations_DoNotUseDirectRemoteDataContextMutation()
     {
         var repositoryRoot = FindRepositoryRoot();

@@ -214,6 +214,7 @@ else
     private bool _hasTenant;
     private bool _warehousingEnabled;
     private bool _outsideTenantContext;
+    private bool _reloading;
     private Guid? _loadedId;
 
     protected override void OnInitialized()
@@ -229,10 +230,17 @@ else
         await Reload();
     }
 
-    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+    private void OnTenantChanged()
+    {
+        if (_reloading) return;
+        _ = InvokeAsync(Reload);
+    }
 
     private async Task Reload()
     {
+        if (_reloading) return;
+
+        _reloading = true;
         _loading = true;
         try
         {
@@ -309,10 +317,12 @@ else
                 var products = await DataContext.Query<Product>()
                     .IgnoreQueryFilters()
                     .NoCache()
-                    .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id) && !x.IsDeleted)
+                    .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                     .Take(500)
                     .ToListAsync();
-                _productNames = products.ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]);
+                _productNames = products
+                    .Where(x => productIds.Contains(x.Id))
+                    .ToDictionary(x => x.Id, x => x.Name ?? x.Id.ToString()[..8]);
             }
         }
         catch
@@ -321,6 +331,7 @@ else
         }
         finally
         {
+            _reloading = false;
             _loading = false;
             StateHasChanged();
         }
