@@ -11,6 +11,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-credentials",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.credentials"
 )]
 public partial class IdentityCredential : BaseModel, IHasOnlineStatus

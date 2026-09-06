@@ -48,8 +48,10 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
         }
     }
 
-    [Test]
-    public void TenantModuleFeature_ReadPolicy_AllowsManagedTenantDelegation()
+    [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.TenantModuleFeature))]
+    [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.IdentityInformation))]
+    [TestCase(typeof(global::IdentityServer.Domain.Shared.Contracts.IdentityCredential))]
+    public void ManagedTenantPortalEntity_ReadPolicy_AllowsDelegation(Type entityType)
     {
         var registryType = typeof(global::IdentityServer.Api.Features.Auth.ValidateSession.ValidateIdentitySessionEndpoint)
             .Assembly
@@ -60,8 +62,7 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
         var policies = (IReadOnlyCollection<GeneratedEntityAuthorizationPolicy>)registryType
             .GetMethod("GetDataContextAuthorizationPolicies")!
             .Invoke(null, null)!;
-        var entityName = entities.Single(candidate =>
-            candidate.Value == typeof(global::IdentityServer.Domain.Shared.Contracts.TenantModuleFeature)).Key;
+        var entityName = entities.Single(candidate => candidate.Value == entityType).Key;
 
         var policy = policies.Single(candidate =>
             candidate.EntityTypeName == entityName &&

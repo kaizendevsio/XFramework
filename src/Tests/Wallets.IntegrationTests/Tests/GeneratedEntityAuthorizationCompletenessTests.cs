@@ -3,6 +3,9 @@ using NUnit.Framework;
 using Wallets.Domain.Shared.Contracts;
 using XFramework.Core.DataContext;
 using XFramework.Domain.Shared.Attributes;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace GeneratedAuthorizationContractTests.Wallets;
 
@@ -81,6 +84,45 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
                     allowsRemoteMutation && operation != GeneratedEntityOperation.Read);
             }
         }
+    }
+
+    [TestCase(typeof(Wallet))]
+    [TestCase(typeof(WalletType))]
+    [TestCase(typeof(CurrencyType))]
+    public void PosPrerequisiteEntity_ReadPolicy_AllowsManagedTenantDelegation(Type entityType)
+    {
+        var registryType = typeof(global::Wallets.Api.Services.IWalletOperationsService)
+            .Assembly
+            .GetType("XFramework.Core.DataContext.DataContextEntityRegistrations", throwOnError: true)!;
+        var entities = (Dictionary<string, Type>)registryType
+            .GetMethod("GetDataContextEntityTypes")!
+            .Invoke(null, null)!;
+        var policies = (IReadOnlyCollection<GeneratedEntityAuthorizationPolicy>)registryType
+            .GetMethod("GetDataContextAuthorizationPolicies")!
+            .Invoke(null, null)!;
+        var entityName = entities.Single(candidate => candidate.Value == entityType).Key;
+
+        var policy = policies.Single(candidate =>
+            candidate.EntityTypeName == entityName &&
+            candidate.Operation == GeneratedEntityOperation.Read);
+
+        policy.TenantAccessMode.Should().Be(TenantAccessMode.DelegatedTenant);
+        policy.RequiredCrossTenantActorCapabilities.Should().ContainSingle()
+            .Which.Should().Be(XFrameworkActorCapabilities.IdentityTenantsManage);
+    }
+
+    [Test]
+    public void CreateWalletBoltHandler_AllowsManagedTenantDelegation()
+    {
+        var policy = typeof(global::Wallets.Api.Features.Wallets.Create.CreateWalletEndpoint)
+            .GetMethod("Handle")!
+            .GetCustomAttributes(typeof(BoltHandlerAttribute), false)
+            .Cast<BoltHandlerAttribute>()
+            .Single();
+
+        policy.TenantAccessMode.Should().Be(TenantAccessMode.DelegatedTenant);
+        policy.RequiredCrossTenantActorCapabilities.Should().ContainSingle()
+            .Which.Should().Be(XFrameworkActorCapabilities.IdentityTenantsManage);
     }
 
     private sealed record GeneratedEntityExpectation(

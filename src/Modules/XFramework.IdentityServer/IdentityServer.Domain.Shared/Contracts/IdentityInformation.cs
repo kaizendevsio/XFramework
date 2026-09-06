@@ -11,6 +11,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/identity-info",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.users"
 )]
 public partial class IdentityInformation : BaseModel

@@ -18,7 +18,10 @@ public static class CreateWalletEndpoint
         RequireAuthorization = true,
         RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update],
         ExcludeFromOpenApi = true)]
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     public static async Task<Result<WalletResponse>> Handle(
         CreateWalletRequest request,
         IWalletOperationsService walletService,
