@@ -288,20 +288,23 @@
         _saving = true;
         try
         {
-            // Get the selected tenant, or the first available tenant when viewing all tenants.
-            var tenantQuery = DataContext.Query<Tenant>()
-                .IgnoreQueryFilters()
-                .NoCache()
-                .Where(t => !t.IsDeleted)
-                .OrderBy(t => t.Name);
-
-            if (TenantFilter.SelectedTenantId is { } selectedTenantId)
+            // Use the explicit tenant selection directly. A platform administrator is
+            // allowed to administer the tenant through the endpoint, while a generic
+            // tenant-scoped DataContext read is intentionally forbidden.
+            var tenantId = TenantFilter.SelectedTenantId;
+            if (tenantId is null)
             {
-                tenantQuery = tenantQuery.Where(t => t.Id == selectedTenantId);
+                var tenant = await DataContext.Query<Tenant>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(t => !t.IsDeleted)
+                    .OrderBy(t => t.Name)
+                    .Take(1)
+                    .FirstOrDefaultAsync();
+                tenantId = tenant?.Id;
             }
 
-            var tenant = await tenantQuery.Take(1).FirstOrDefaultAsync();
-            if (tenant is null)
+            if (tenantId is null)
             {
                 ToastService.Warning(TenantFilter.SelectedTenantId is null
                     ? "No tenants exist. Create a tenant first."
@@ -321,7 +324,7 @@
                 BirthDate = DateOnly.TryParse(_form.BirthDateString, out var d) ? d : null,
                 Gender = Enum.TryParse<Gender>(_form.GenderString, out var g) ? g : null,
                 CivilStatus = Enum.TryParse<CivilStatus>(_form.CivilStatusString, out var cs) ? cs : null,
-                Metadata = new RequestMetadata { RequestedTenantId = tenant.Id }
+                Metadata = new RequestMetadata { RequestedTenantId = tenantId.Value }
             });
 
             if (result.IsSuccess)
