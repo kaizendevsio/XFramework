@@ -169,17 +169,14 @@ public sealed class PosCartService(
         if (!lineResult.IsSuccess)
             return Result<PosCartResponse>.Failure(lineResult.Message!, lineResult.StatusCode);
 
-        var existingLines = cart.Lines.ToList();
-        db.Set<PosCartLine>().RemoveRange(existingLines);
-        cart.Lines.Clear();
-        foreach (var line in lineResult.Data!)
-            cart.Lines.Add(line);
+        var activeLines = SynchronizeCartLines(cart, lineResult.Data!);
 
-        var totalsResult = ApplyTotals(cart);
+        var totalsResult = ApplyTotals(cart, activeLines);
         if (!totalsResult.IsSuccess)
             return Result<PosCartResponse>.Failure(totalsResult.Message!, totalsResult.StatusCode);
 
         await db.SaveChangesAsync(ct);
+        cart.Lines = activeLines;
         return Result<PosCartResponse>.Success(PosServiceHelpers.ToCartResponse(cart), "POS cart updated");
     }
 
@@ -652,10 +649,63 @@ public sealed class PosCartService(
                 ct);
     }
 
-    private static Result ApplyTotals(PosCart cart)
+    private static List<PosCartLine> SynchronizeCartLines(
+        PosCart cart,
+        IReadOnlyList<PosCartLine> replacements)
     {
-        cart.SubtotalAmount = cart.Lines.Sum(line => line.Quantity * line.UnitPrice);
-        cart.TotalAmount = cart.Lines.Sum(line => line.LineTotal) - cart.DiscountAmount + cart.TaxAmount;
+        var existing = cart.Lines.OrderBy(line => line.LineNumber).ToList();
+        var active = new List<PosCartLine>(replacements.Count);
+        var now = DateTime.UtcNow;
+
+        for (var index = 0; index < replacements.Count; index++)
+        {
+            var replacement = replacements[index];
+            if (index >= existing.Count)
+            {
+                cart.Lines.Add(replacement);
+                active.Add(replacement);
+                continue;
+            }
+
+            var line = existing[index];
+            line.LineNumber = replacement.LineNumber;
+            line.ProductId = replacement.ProductId;
+            line.ProductVariationId = replacement.ProductVariationId;
+            line.ProductName = replacement.ProductName;
+            line.VariantName = replacement.VariantName;
+            line.SKU = replacement.SKU;
+            line.Quantity = replacement.Quantity;
+            line.UnitPrice = replacement.UnitPrice;
+            line.ExpectedUnitPrice = replacement.ExpectedUnitPrice;
+            line.DiscountAmount = replacement.DiscountAmount;
+            line.TaxAmount = replacement.TaxAmount;
+            line.LineTotal = replacement.LineTotal;
+            line.WarehouseId = replacement.WarehouseId;
+            line.LocationId = replacement.LocationId;
+            line.LotId = replacement.LotId;
+            line.ModifiedAt = now;
+            line.ConcurrencyStamp = Guid.NewGuid();
+            active.Add(line);
+        }
+
+        foreach (var line in existing.Skip(replacements.Count))
+        {
+            line.IsDeleted = true;
+            line.DeletedAt = now;
+            line.ModifiedAt = now;
+            line.ConcurrencyStamp = Guid.NewGuid();
+        }
+
+        return active;
+    }
+
+    private static Result ApplyTotals(
+        PosCart cart,
+        IEnumerable<PosCartLine>? activeLines = null)
+    {
+        var lines = activeLines ?? cart.Lines;
+        cart.SubtotalAmount = lines.Sum(line => line.Quantity * line.UnitPrice);
+        cart.TotalAmount = lines.Sum(line => line.LineTotal) - cart.DiscountAmount + cart.TaxAmount;
 
         return cart.TotalAmount < 0
             ? Result.Failure("Cart total cannot be negative", 400)
