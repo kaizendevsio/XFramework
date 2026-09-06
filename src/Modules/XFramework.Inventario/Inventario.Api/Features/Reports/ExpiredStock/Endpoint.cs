@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reports.ExpiredStock;
 
 public static class ExpiredStockReportEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/reports/expired-stock", Tags = ["Inventario Reports"])]
     public static async Task<Result<List<NearExpiryStockReportRow>>> Handle(
         GetExpiredStockReportRequest request,

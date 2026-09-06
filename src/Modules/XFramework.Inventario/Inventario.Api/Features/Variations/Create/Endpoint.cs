@@ -9,7 +9,9 @@ namespace Inventario.Api.Features.Variations.Create;
 
 public static class CreateProductVariationEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/product-variations", Tags = ["Inventario Variations"],
         Summary = "Create product variant",
         Description = "Creates a sellable product variant with an absolute catalog price.")]

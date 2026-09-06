@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Purchasing.Receiving;
 
 public static class ReceiveInventoryEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/receiving", Tags = ["Inventario Purchasing"],
         Summary = "Receive inventory",
         Description = "Posts received stock into a warehouse/location, optionally creating/selecting lots and updating a purchase order.")]

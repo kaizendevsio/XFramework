@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reservations.Cancel;
 
 public static class CancelReservationEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/reservations/cancel", Tags = ["Inventario Reservations"],
         Summary = "Cancel reservation",
         Description = "Cancels an active reservation and releases its reserved quantity.")]

@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reservations.GetList;
 
 public static class GetReservationsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/reservations", Tags = ["Inventario Reservations"],
         Summary = "Get inventory reservations",
         Description = "Gets inventory reservations for the authenticated tenant.")]

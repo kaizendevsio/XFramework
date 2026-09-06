@@ -9,6 +9,7 @@ namespace XFramework.Inventario.Domain.Shared.Contracts;
     Actions = EndpointActions.None,
     RoutePrefix = "api/inventario/product-categories",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     CacheDurationSeconds = 300,
     CacheKeyPrefix = "inventario-product-categories"
 )]

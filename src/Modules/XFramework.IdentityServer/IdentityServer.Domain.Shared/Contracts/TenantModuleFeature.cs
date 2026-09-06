@@ -8,6 +8,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/tenant-module-features",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.tenants"
 )]
 public partial class TenantModuleFeature : BaseModel

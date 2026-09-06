@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Planning.GetLowStock;
 
 public static class GetPlanningLowStockEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/planning/low-stock", Tags = ["Inventario Planning"],
         Summary = "Get low-stock planning rows",
         Description = "Returns products and scoped stock positions at or below active reorder thresholds.")]

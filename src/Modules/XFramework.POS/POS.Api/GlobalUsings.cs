@@ -4,4 +4,6 @@ global using POS.Domain.Shared.Contracts.Requests;
 global using POS.Domain.Shared.Contracts.Responses;
 global using POS.Domain.Shared.Enums;
 global using XFramework.Domain.Contexts;
+global using XFramework.Domain.Shared.ServiceIdentity;
 global using XFramework.Extensions;
+global using XFramework.Integration.Security;

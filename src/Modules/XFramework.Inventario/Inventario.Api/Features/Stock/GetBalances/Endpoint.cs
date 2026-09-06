@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Stock.GetBalances;
 
 public static class GetStockBalancesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/stock/balances", Tags = ["Inventario Stock"],
         Summary = "Get stock balances",
         Description = "Gets stock balances for the authenticated tenant.")]

@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Catalog.GetProductVariations;
 
 public static class GetProductVariationsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/catalog/products/{productId:guid}/variations", Tags = ["Inventario Catalog"],
         Summary = "Get product variations",
         Description = "Returns enabled sellable variants for one product.")]

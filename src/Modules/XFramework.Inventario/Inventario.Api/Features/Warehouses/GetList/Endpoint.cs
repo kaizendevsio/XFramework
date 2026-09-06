@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Warehouses.GetList;
 
 public static class GetWarehousesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/warehouses", Tags = ["Inventario Warehousing"],
         Summary = "Get warehouses",
         Description = "Gets warehouses for the authenticated tenant.")]

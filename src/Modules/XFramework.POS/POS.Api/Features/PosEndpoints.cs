@@ -10,7 +10,10 @@ namespace POS.Api.Features;
 
 public static class SearchPosCatalogEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     [MapGet("/api/pos/catalog", Tags = ["POS Catalog"],
         Summary = "Search POS catalog",
         Description = "Delegates to Inventario sellable product search for POS line selection.",
@@ -25,7 +28,10 @@ public static class SearchPosCatalogEndpoint
 
 public static class GetPosRegisterEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersView])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersView])]
     [MapGet("/api/pos/registers/{id:guid}", Tags = ["POS Registers"],
         Summary = "Get POS register",
         Capability = IdentityAuthorizationConstants.View,
@@ -39,7 +45,10 @@ public static class GetPosRegisterEndpoint
 
 public static class CreatePosRegisterEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersCreate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersCreate])]
     [MapPost("/api/pos/registers", Tags = ["POS Registers"],
         Summary = "Create POS register",
         Capability = IdentityAuthorizationConstants.Create,
@@ -53,7 +62,10 @@ public static class CreatePosRegisterEndpoint
 
 public static class UpdatePosRegisterEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersUpdate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersUpdate])]
     [MapPut("/api/pos/registers/{id:guid}", Tags = ["POS Registers"],
         Summary = "Update POS register",
         Capability = IdentityAuthorizationConstants.Update,
@@ -67,7 +79,10 @@ public static class UpdatePosRegisterEndpoint
 
 public static class CreatePosCartEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsCreate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsCreate])]
     [MapPost("/api/pos/carts", Tags = ["POS Carts"],
         Summary = "Create POS cart",
         Capability = IdentityAuthorizationConstants.Create,
@@ -81,7 +96,10 @@ public static class CreatePosCartEndpoint
 
 public static class UpdatePosCartEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     [MapPut("/api/pos/carts/{id:guid}", Tags = ["POS Carts"],
         Summary = "Update POS cart",
         Capability = IdentityAuthorizationConstants.Update,
@@ -95,7 +113,10 @@ public static class UpdatePosCartEndpoint
 
 public static class GetPosCartEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsView])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsView])]
     [MapGet("/api/pos/carts/{id:guid}", Tags = ["POS Carts"],
         Summary = "Get POS cart",
         Capability = IdentityAuthorizationConstants.View,
@@ -109,7 +130,10 @@ public static class GetPosCartEndpoint
 
 public static class SearchPosCartsEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsView])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsView])]
     [MapGet("/api/pos/carts", Tags = ["POS Carts"],
         Summary = "Search POS carts",
         Capability = IdentityAuthorizationConstants.View,
@@ -123,7 +147,10 @@ public static class SearchPosCartsEndpoint
 
 public static class SuspendPosCartEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     [MapPost("/api/pos/carts/{cartId:guid}/suspend", Tags = ["POS Carts"],
         Summary = "Suspend POS cart",
         Capability = IdentityAuthorizationConstants.Update,
@@ -137,7 +164,10 @@ public static class SuspendPosCartEndpoint
 
 public static class ResumePosCartEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate])]
     [MapPost("/api/pos/carts/{cartId:guid}/resume", Tags = ["POS Carts"],
         Summary = "Resume POS cart",
         Capability = IdentityAuthorizationConstants.Update,
@@ -151,7 +181,10 @@ public static class ResumePosCartEndpoint
 
 public static class CancelPosCartEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsDelete])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsDelete])]
     [MapPost("/api/pos/carts/{cartId:guid}/cancel", Tags = ["POS Carts"],
         Summary = "Cancel POS cart",
         Capability = IdentityAuthorizationConstants.Delete,
@@ -165,7 +198,10 @@ public static class CancelPosCartEndpoint
 
 public static class CheckoutPosCartEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate, PosAuthorizationCapabilities.SalesCreate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.CartsUpdate, PosAuthorizationCapabilities.SalesCreate])]
     [MapPost("/api/pos/carts/{cartId:guid}/checkout", Tags = ["POS Carts"],
         Summary = "Checkout POS cart",
         Description = "Converts a persisted POS cart into a sale through the existing checkout orchestration.",
@@ -180,7 +216,10 @@ public static class CheckoutPosCartEndpoint
 
 public static class CheckoutPosSaleEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesCreate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesCreate])]
     [MapPost("/api/pos/sales/checkout", Tags = ["POS Sales"],
         Summary = "Checkout POS sale",
         Description = "Creates a sale, reserves Inventario stock, captures Wallets payment, and fulfills reservations.",
@@ -195,7 +234,10 @@ public static class CheckoutPosSaleEndpoint
 
 public static class GetPosSaleEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     [MapGet("/api/pos/sales/{id:guid}", Tags = ["POS Sales"],
         Summary = "Get POS sale",
         Capability = IdentityAuthorizationConstants.View,
@@ -209,7 +251,10 @@ public static class GetPosSaleEndpoint
 
 public static class SearchPosSalesEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesView])]
     [MapGet("/api/pos/sales", Tags = ["POS Sales"],
         Summary = "Search POS sales",
         Capability = IdentityAuthorizationConstants.View,
@@ -223,7 +268,10 @@ public static class SearchPosSalesEndpoint
 
 public static class CancelPosSaleEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesDelete])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesDelete])]
     [MapPost("/api/pos/sales/{saleId:guid}/cancel", Tags = ["POS Sales"],
         Summary = "Cancel POS sale",
         Capability = IdentityAuthorizationConstants.Delete,
@@ -237,7 +285,10 @@ public static class CancelPosSaleEndpoint
 
 public static class RetryPosSaleFulfillmentEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesUpdate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesUpdate])]
     [MapPost("/api/pos/sales/{saleId:guid}/retry-fulfillment", Tags = ["POS Sales"],
         Summary = "Retry POS sale fulfillment",
         Capability = IdentityAuthorizationConstants.Update,
@@ -251,7 +302,10 @@ public static class RetryPosSaleFulfillmentEndpoint
 
 public static class CreatePosReturnEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsCreate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsCreate])]
     [MapPost("/api/pos/returns", Tags = ["POS Returns"],
         Summary = "Create POS return",
         Description = "Posts returned stock through Inventario and refunds through Wallets.",
@@ -266,7 +320,10 @@ public static class CreatePosReturnEndpoint
 
 public static class GetPosReturnEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsView])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsView])]
     [MapGet("/api/pos/returns/{id:guid}", Tags = ["POS Returns"],
         Summary = "Get POS return",
         Capability = IdentityAuthorizationConstants.View,
@@ -280,7 +337,10 @@ public static class GetPosReturnEndpoint
 
 public static class SearchPosReturnsEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsView])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsView])]
     [MapGet("/api/pos/returns", Tags = ["POS Returns"],
         Summary = "Search POS returns",
         Capability = IdentityAuthorizationConstants.View,
@@ -294,7 +354,10 @@ public static class SearchPosReturnsEndpoint
 
 public static class RetryPosReturnEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsUpdate])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.ReturnsUpdate])]
     [MapPost("/api/pos/returns/{returnId:guid}/retry", Tags = ["POS Returns"],
         Summary = "Retry POS return",
         Description = "Retries recoverable inventory posting or refund failures for a POS return.",

@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reports.NearExpiry;
 
 public static class NearExpiryReportEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/reports/near-expiry", Tags = ["Inventario Reports"])]
     public static async Task<Result<List<NearExpiryStockReportRow>>> Handle(
         GetNearExpiryStockReportRequest request,

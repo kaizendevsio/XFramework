@@ -7,7 +7,9 @@ namespace Inventario.Api.Features.Products.Update;
 
 public static class UpdateProductWrapperEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPut("/api/products", Tags = ["Products"],
         Summary = "Update an existing product",
         Description = "Updates catalog fields for a product and invalidates the cache")]

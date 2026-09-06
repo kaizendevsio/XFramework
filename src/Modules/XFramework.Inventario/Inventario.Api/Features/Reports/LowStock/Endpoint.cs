@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reports.LowStock;
 
 public static class LowStockReportEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/reports/low-stock", Tags = ["Inventario Reports"])]
     public static async Task<Result<List<LowStockReportRow>>> Handle(
         GetLowStockReportRequest request,

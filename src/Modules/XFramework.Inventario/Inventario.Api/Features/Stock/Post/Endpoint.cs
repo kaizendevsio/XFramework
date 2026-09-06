@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Stock.Post;
 
 public static class PostStockMovementEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/stock/post", Tags = ["Inventario Stock"],
         Summary = "Post an inventory stock movement",
         Description = "Creates an append-only stock movement and updates the matching stock balance.")]

@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reports.AllocationStatus;
 
 public static class AllocationStatusReportEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/reports/reservation-allocations", Tags = ["Inventario Reports"])]
     public static async Task<Result<List<ReservationAllocationStatusReportRow>>> Handle(
         GetReservationAllocationStatusReportRequest request,

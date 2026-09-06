@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Purchasing.Receiving;
 
 public static class GetReceivingDocumentsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/receiving", Tags = ["Inventario Purchasing"],
         Summary = "List receiving documents",
         Description = "Lists posted receiving documents for the current tenant.")]

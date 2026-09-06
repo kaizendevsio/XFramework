@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reservations.Reserve;
 
 public static class ReserveInventoryEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/reservations/reserve", Tags = ["Inventario Reservations"],
         Summary = "Reserve inventory",
         Description = "Creates an active reservation and updates reserved stock through the stock posting service.")]

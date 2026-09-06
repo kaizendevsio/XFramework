@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reports.MovementLedger;
 
 public static class MovementLedgerReportEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/reports/movement-ledger", Tags = ["Inventario Reports"])]
     public static async Task<Result<List<MovementLedgerReportRow>>> Handle(
         GetMovementLedgerReportRequest request,

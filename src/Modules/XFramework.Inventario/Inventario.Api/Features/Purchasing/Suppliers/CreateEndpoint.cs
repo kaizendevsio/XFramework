@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Purchasing.Suppliers;
 
 public static class CreateSupplierEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/suppliers", Tags = ["Inventario Purchasing"],
         Summary = "Create supplier",
         Description = "Creates a tenant-scoped inventory supplier.")]

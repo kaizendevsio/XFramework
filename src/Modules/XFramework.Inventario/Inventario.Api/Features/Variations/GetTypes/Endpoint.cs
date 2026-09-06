@@ -9,7 +9,9 @@ namespace Inventario.Api.Features.Variations.GetTypes;
 
 public static class GetProductVariationTypesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/product-variation-types", Tags = ["Inventario Variations"],
         Summary = "Get product variation types",
         Description = "Returns tenant-wide and product-local variation type lookups for the authenticated tenant.")]

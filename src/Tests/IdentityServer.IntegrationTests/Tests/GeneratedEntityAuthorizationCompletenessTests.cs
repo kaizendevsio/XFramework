@@ -48,6 +48,30 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
         }
     }
 
+    [Test]
+    public void TenantModuleFeature_ReadPolicy_AllowsManagedTenantDelegation()
+    {
+        var registryType = typeof(global::IdentityServer.Api.Features.Auth.ValidateSession.ValidateIdentitySessionEndpoint)
+            .Assembly
+            .GetType("XFramework.Core.DataContext.DataContextEntityRegistrations", throwOnError: true)!;
+        var entities = (Dictionary<string, Type>)registryType
+            .GetMethod("GetDataContextEntityTypes")!
+            .Invoke(null, null)!;
+        var policies = (IReadOnlyCollection<GeneratedEntityAuthorizationPolicy>)registryType
+            .GetMethod("GetDataContextAuthorizationPolicies")!
+            .Invoke(null, null)!;
+        var entityName = entities.Single(candidate =>
+            candidate.Value == typeof(global::IdentityServer.Domain.Shared.Contracts.TenantModuleFeature)).Key;
+
+        var policy = policies.Single(candidate =>
+            candidate.EntityTypeName == entityName &&
+            candidate.Operation == GeneratedEntityOperation.Read);
+
+        policy.TenantAccessMode.Should().Be(XFramework.Integration.Security.TenantAccessMode.DelegatedTenant);
+        policy.RequiredCrossTenantActorCapabilities.Should().ContainSingle()
+            .Which.Should().Be("identity.tenants:manage");
+    }
+
     private static IEnumerable<GeneratedEntityOperation> ExpectedOperations(
         EndpointActions actions,
         bool allowsRemoteMutation)

@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Catalog.SearchSellableProducts;
 
 public static class SearchSellableProductsEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/catalog/sellable-products", Tags = ["Inventario Catalog"],
         Summary = "Search sellable products",
         Description = "Returns POS-friendly product and variant catalog rows for line selection.")]

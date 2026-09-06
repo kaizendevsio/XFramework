@@ -9,4 +9,6 @@ global using Inventario.Api.Endpoints;
 global using XFramework.Domain.Contexts;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;
+global using XFramework.Integration.Security;
+global using XFramework.Domain.Shared.ServiceIdentity;
 global using XFramework.Extensions;

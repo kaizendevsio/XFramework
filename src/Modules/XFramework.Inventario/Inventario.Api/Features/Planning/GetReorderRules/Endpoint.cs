@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Planning.GetReorderRules;
 
 public static class GetInventoryReorderRulesEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/reorder-rules", Tags = ["Inventario Planning"],
         Summary = "Get inventory reorder rules",
         Description = "Gets active or inactive reorder rules for the authenticated tenant.")]

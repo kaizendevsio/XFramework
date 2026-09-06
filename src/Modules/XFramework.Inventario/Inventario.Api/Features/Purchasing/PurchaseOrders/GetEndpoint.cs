@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Purchasing.PurchaseOrders;
 
 public static class GetPurchaseOrderEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapGet("/api/inventario/purchase-orders/{id:guid}", Tags = ["Inventario Purchasing"],
         Summary = "Get purchase order",
         Description = "Gets a purchase order with line items.")]

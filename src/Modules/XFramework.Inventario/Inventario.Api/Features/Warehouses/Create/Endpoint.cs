@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Warehouses.Create;
 
 public static class CreateWarehouseEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/warehouses", Tags = ["Inventario Warehousing"],
         Summary = "Create warehouse",
         Description = "Creates a warehouse for the authenticated tenant.")]

@@ -9,7 +9,9 @@ namespace Inventario.Api.Features.Variations.CreateType;
 
 public static class CreateProductVariationTypeEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/product-variation-types", Tags = ["Inventario Variations"],
         Summary = "Create product variation type",
         Description = "Creates a tenant-wide or product-local reusable variation type.")]

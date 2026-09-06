@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Purchasing.PurchaseOrders;
 
 public static class CreatePurchaseOrderEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])
     [MapPost("/api/inventario/purchase-orders", Tags = ["Inventario Purchasing"],
         Summary = "Create purchase order",
         Description = "Creates a purchase order with line items.")]
