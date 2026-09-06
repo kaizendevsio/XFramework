@@ -1,5 +1,7 @@
 @page "/inventario/warehouses/{Id:guid}"
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations
+@using XFramework.Inventario.Domain.Shared.Enums
 @implements IDisposable
 
 <PageTitle>Inventario Warehouse - Portal</PageTitle>
@@ -50,10 +52,16 @@ else
                     </div>
                     <BbTypographyMuted>@_warehouse.Code - ID: @_warehouse.Id</BbTypographyMuted>
                 </div>
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
-                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                    Refresh
-                </BbButton>
+                <div class="xf-page-actions">
+                    <BbButton OnClick="@OpenLocationDialog">
+                        <LucideIcon Name="map-pin-plus" class="mr-2 h-4 w-4" />
+                        Create Location
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
             </div>
 
             <BbCard>
@@ -186,10 +194,40 @@ else
     </FadeInContent>
 }
 
+<BbDialog Open="@_locationDialogOpen" OpenChanged="@(value => _locationDialogOpen = value)">
+    <BbDialogContent Class="xf-dialog-wide">
+        <BbDialogHeader>
+            <BbDialogTitle>Create Location</BbDialogTitle>
+            <BbDialogDescription>Add a bin, shelf, or zone inside @_warehouse?.Name.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 md:grid-cols-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
+                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
+            </div>
+            <BbFormFieldSelect TValue="string" @bind-Value="_locationForm.LocationType" Label="Location Type">
+                @foreach (var type in Enum.GetValues<InventoryLocationType>())
+                {
+                    <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Description" Label="Description" />
+            <BbFormFieldSwitch Checked="@_locationForm.IsPickable"
+                               CheckedChanged="@((bool value) => _locationForm.IsPickable = value)"
+                               Label="Pickable location" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _locationDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@CreateLocation" Disabled="@_savingLocation">Create</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
@@ -200,10 +238,14 @@ else
     private List<StockBalance> _balances = [];
     private List<InventoryMovement> _movements = [];
     private Dictionary<Guid, string> _productNames = [];
+    private readonly LocationForm _locationForm = new();
     private bool _loading = true;
     private bool _hasTenant;
     private bool _warehousingEnabled;
     private bool _outsideTenantContext;
+    private bool _locationDialogOpen;
+    private bool _savingLocation;
+    private bool _reloading;
     private Guid? _loadedId;
 
     protected override void OnInitialized()
@@ -223,6 +265,9 @@ else
 
     private async Task Reload()
     {
+        if (_reloading) return;
+
+        _reloading = true;
         _loading = true;
         try
         {
@@ -290,10 +335,60 @@ else
         }
         finally
         {
+            _reloading = false;
             _loading = false;
             StateHasChanged();
         }
     }
+
+    private void OpenLocationDialog()
+    {
+        _locationForm.Reset();
+        _locationDialogOpen = true;
+    }
+
+    private async Task CreateLocation()
+    {
+        if (string.IsNullOrWhiteSpace(_locationForm.Code) || string.IsNullOrWhiteSpace(_locationForm.Name))
+        {
+            ToastService.Show("Location code and name are required.");
+            return;
+        }
+
+        _savingLocation = true;
+        try
+        {
+            var result = await Inventario.CreateInventoryLocation(new CreateInventoryLocationRequest
+            {
+                Metadata = BuildMetadata(),
+                WarehouseId = Id,
+                Code = _locationForm.Code,
+                Name = _locationForm.Name,
+                Description = NullIfEmpty(_locationForm.Description),
+                LocationType = Enum.TryParse<InventoryLocationType>(_locationForm.LocationType, out var type)
+                    ? type
+                    : InventoryLocationType.Bin,
+                IsPickable = _locationForm.IsPickable
+            });
+            ToastService.Show(result.IsSuccess ? "Location created." : "Could not create location.");
+            if (result.IsSuccess)
+            {
+                _locationDialogOpen = false;
+                await Reload();
+            }
+        }
+        finally
+        {
+            _savingLocation = false;
+        }
+    }
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        RequestedTenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        OperationName = "Portal"
+    };
 
     private string GetProductName(Guid productId) =>
         _productNames.TryGetValue(productId, out var name) ? name : productId.ToString()[..8];
@@ -309,9 +404,30 @@ else
         return string.IsNullOrWhiteSpace(address) ? "N/A" : address;
     }
 
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     public void Dispose()
     {
         TenantFilter.OnChanged -= OnTenantChanged;
         ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class LocationForm
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string LocationType { get; set; } = InventoryLocationType.Bin.ToString();
+        public bool IsPickable { get; set; } = true;
+
+        public void Reset()
+        {
+            Code = "";
+            Name = "";
+            Description = "";
+            LocationType = InventoryLocationType.Bin.ToString();
+            IsPickable = true;
+        }
     }
 }
