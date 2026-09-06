@@ -41,7 +41,7 @@ else
                         <LucideIcon Name="clipboard-list" class="mr-2 h-4 w-4" />
                         Sale Details
                     </BbButton>
-                    <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Destructive" OnClick="@ConfirmClearCurrentCart" Disabled="@(!_cart.Any())">
+                    <BbButton Size="ButtonSize.Large" Variant="ButtonVariant.Destructive" OnClick="@ConfirmClearCurrentCart" Disabled="@(_actingOnCart || !_cart.Any())">
                         <LucideIcon Name="x" class="mr-2 h-4 w-4" />
                         Clear
                     </BbButton>
@@ -997,8 +997,34 @@ else
             return;
         }
 
+        if (_activeCartId.HasValue)
+        {
+            _actingOnCart = true;
+            try
+            {
+                var response = await POS.CancelPosCart(new CancelPosCartRequest
+                {
+                    Metadata = BuildMetadata(),
+                    CartId = _activeCartId.Value,
+                    ExpectedConcurrencyStamp = _activeCartConcurrencyStamp,
+                    Reason = "Cleared from Portal"
+                });
+
+                if (!response.IsSuccess)
+                {
+                    ToastService.Show(response.Message ?? "Could not clear the persisted cart.");
+                    return;
+                }
+            }
+            finally
+            {
+                _actingOnCart = false;
+            }
+        }
+
         _lastReceipt = null;
         ClearCurrentCart();
+        ToastService.Show("Cart cleared.");
     }
 
     private void StartNewSale()

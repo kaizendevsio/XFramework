@@ -241,6 +241,8 @@ public sealed class PortalContractTests
         cashier.Should().NotContain("@if (_paymentMethod == PosPaymentMethod.CashDrawer)");
 
         cashier.Should().Contain("ConfirmClearCurrentCart");
+        cashier.Should().Contain("Reason = \"Cleared from Portal\"");
+        cashier.Should().Contain("if (!response.IsSuccess)");
         cashier.Should().Contain("Cancel Suspended Cart");
         cashier.Should().Contain("Held Carts");
         sales.Should().Contain("Cancel POS Sale");
