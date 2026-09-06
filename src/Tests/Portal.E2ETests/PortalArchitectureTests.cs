@@ -90,6 +90,22 @@ public sealed class PortalArchitectureTests
     }
 
     [Test]
+    public void InventarioSettings_UsesTenantOwnedRegistryGroup()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var settingsPage = File.ReadAllText(Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal.Features.Inventario",
+            "Pages",
+            "Settings.razor"));
+
+        settingsPage.Should().Contain(".Where(x => x.TenantId == tenantId && !x.IsDeleted)");
+        settingsPage.Should().Contain("TenantId = tenantId");
+    }
+
+    [Test]
     public void HostAndRegisteredFeatureAssemblies_ExposeUniqueRoutes()
     {
         Assembly[] routeAssemblies = [typeof(App).Assembly, .. PortalFeatureAssemblies.All];

@@ -155,10 +155,11 @@ else
 
     private async Task<Guid> EnsureSettingsGroup()
     {
+        var tenantId = TenantFilter.SelectedTenantId ?? Guid.Empty;
         var groups = await DataContext.Query<RegistryConfigurationGroup>()
             .IgnoreQueryFilters()
             .NoCache()
-            .Where(x => !x.IsDeleted)
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
             .Take(100)
             .ToListAsync();
 
@@ -175,7 +176,7 @@ else
         var created = new RegistryConfigurationGroup
         {
             Id = Guid.NewGuid(),
-            TenantId = TenantFilter.SelectedTenantId ?? Guid.Empty,
+            TenantId = tenantId,
             Name = "Inventario",
             Description = "Inventario module settings",
             SystemReferenceId = Guid.NewGuid(),
