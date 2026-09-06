@@ -10,7 +10,10 @@ namespace Wallets.Api.Features.Wallets.Transfer;
 /// </summary>
 public static class TransferEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     [MapPost("/api/wallets/transfer", Tags = ["Wallets"],
         Summary = "Transfer funds between wallets",
         Description = "Transfers funds from one wallet to another. Handles fee deduction based on TransferDeductionType. Automatically creates recipient wallet if it doesn't exist.",

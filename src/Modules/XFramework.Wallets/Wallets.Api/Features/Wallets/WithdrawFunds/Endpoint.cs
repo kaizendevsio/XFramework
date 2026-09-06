@@ -10,7 +10,10 @@ namespace Wallets.Api.Features.Wallets.WithdrawFunds;
 /// </summary>
 public static class WithdrawFundsEndpoint
 {
-    [BoltHandler(RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [WalletAuthorizationCapabilities.Update])]
     [MapPost("/api/wallets/withdraw-funds", Tags = ["Wallets"],
         Summary = "Withdraw funds from a wallet",
         Description = "Decrements (subtracts from) a wallet's balance. Supports both immediate and on-hold decrements. Validates sufficient available balance.",
