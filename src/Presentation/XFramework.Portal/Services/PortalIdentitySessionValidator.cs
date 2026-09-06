@@ -10,11 +10,13 @@ namespace XFramework.Portal.Services;
 public sealed class PortalIdentitySessionValidator(
     IActorIdentityProvider actorIdentityProvider,
     IIdentityServerServiceWrapper identityServer,
-    PortalActorAccessTokenProvider actorAccessTokenProvider,
+    PortalActorAccessTokenScope actorAccessTokenScope,
     PortalActorTokenRefreshCoordinator refreshCoordinator,
+    TimeProvider timeProvider,
     ILogger<PortalIdentitySessionValidator> logger)
 {
     public static readonly TimeSpan ValidationTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan RefreshWindow = TimeSpan.FromMinutes(1);
 
     public async Task<bool> ValidateAsync(ClaimsPrincipal? principal, CancellationToken ct = default) =>
         (await ValidateAndRefreshAsync(principal, ct)).IsValid;
@@ -37,10 +39,14 @@ public sealed class PortalIdentitySessionValidator(
             timeout.CancelAfter(ValidationTimeout);
             var accessToken = principal.FindFirst(PortalAuthClaims.ActorAccessToken)!.Value;
             var validation = await actorIdentityProvider.ValidateAsync(accessToken, timeout.Token);
-            if (HasExpectedBindings(validation, tenantId, credentialId, sessionId))
+            var hasExpectedBindings = HasExpectedBindings(validation, tenantId, credentialId, sessionId);
+            if (hasExpectedBindings &&
+                validation.Identity!.ExpiresAtUtc > timeProvider.GetUtcNow().Add(RefreshWindow))
+            {
                 return PortalSessionValidationResult.Valid;
+            }
 
-            if (validation.StatusCode != (int)HttpStatusCode.Unauthorized)
+            if (!hasExpectedBindings && validation.StatusCode != (int)HttpStatusCode.Unauthorized)
                 return PortalSessionValidationResult.Invalid;
 
             var refreshToken = principal.FindFirst(PortalAuthClaims.RefreshToken)?.Value;
@@ -116,7 +122,7 @@ public sealed class PortalIdentitySessionValidator(
         Guid sessionId,
         CancellationToken ct)
     {
-        using var suppressedActor = actorAccessTokenProvider.Suppress();
+        using var suppressedActor = actorAccessTokenScope.Suppress();
         var response = await identityServer.RefreshToken(
             new RefreshTokenRequest
             {

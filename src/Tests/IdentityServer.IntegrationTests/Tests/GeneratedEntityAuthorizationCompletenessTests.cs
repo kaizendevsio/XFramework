@@ -41,7 +41,7 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
                 policy.AuthorizationFeature.Should().StartWith("identity");
                 policy.RequiredCapability.Should().StartWith($"{policy.AuthorizationFeature}:");
                 policy.AllowServiceOnly.Should().BeFalse();
-                policy.AllowRemoteQuery.Should().BeTrue();
+                policy.AllowRemoteQuery.Should().Be(operation == GeneratedEntityOperation.Read);
                 policy.AllowRemoteMutation.Should().Be(
                     allowsRemoteMutation && operation != GeneratedEntityOperation.Read);
             }

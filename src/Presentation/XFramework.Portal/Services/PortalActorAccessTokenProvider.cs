@@ -1,45 +1,84 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using XFramework.Integration.Security;
+using XFramework.Portal.Shared;
 
 namespace XFramework.Portal.Services;
 
-public sealed class PortalActorAccessTokenProvider(PortalActorContext actorContext)
-    : IActorAccessTokenProvider, IActorAccessTokenScope
+public sealed class PortalActorAccessTokenProvider : IActorAccessTokenProvider
 {
-    private readonly AsyncLocal<Holder?> _current = new();
+    private static readonly TimeSpan RefreshWindow = TimeSpan.FromMinutes(1);
+    private static readonly JwtSecurityTokenHandler TokenHandler = new();
+    private readonly PortalActorContext _actorContext;
+    private readonly PortalActorAccessTokenScope _actorAccessTokenScope;
+    private readonly Func<ClaimsPrincipal?, CancellationToken, Task<PortalSessionValidationResult>> _validateAndRefresh;
+    private readonly TimeProvider _timeProvider;
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
-    public ValueTask<string?> GetTokenAsync(CancellationToken ct = default) =>
-        _current.Value is { } current
-            ? ValueTask.FromResult<string?>(current.Token)
-            : actorContext.GetActorAccessTokenAsync(ct);
-
-    public IDisposable Push(string actorAccessToken)
+    public PortalActorAccessTokenProvider(
+        PortalActorContext actorContext,
+        PortalActorAccessTokenScope actorAccessTokenScope,
+        PortalIdentitySessionValidator sessionValidator,
+        TimeProvider timeProvider)
+        : this(
+            actorContext,
+            actorAccessTokenScope,
+            sessionValidator.ValidateAndRefreshAsync,
+            timeProvider)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(actorAccessToken);
-        var prior = _current.Value;
-        _current.Value = new Holder(actorAccessToken);
-        return new PopScope(_current, prior);
     }
 
-    public IDisposable Suppress()
+    internal PortalActorAccessTokenProvider(
+        PortalActorContext actorContext,
+        PortalActorAccessTokenScope actorAccessTokenScope,
+        Func<ClaimsPrincipal?, CancellationToken, Task<PortalSessionValidationResult>> validateAndRefresh,
+        TimeProvider timeProvider)
     {
-        var prior = _current.Value;
-        _current.Value = new Holder(null);
-        return new PopScope(_current, prior);
+        _actorContext = actorContext;
+        _actorAccessTokenScope = actorAccessTokenScope;
+        _validateAndRefresh = validateAndRefresh;
+        _timeProvider = timeProvider;
     }
 
-    private sealed record Holder(string? Token);
-
-    private sealed class PopScope(AsyncLocal<Holder?> current, Holder? prior) : IDisposable
+    public async ValueTask<string?> GetTokenAsync(CancellationToken ct = default)
     {
-        private bool _disposed;
+        if (_actorAccessTokenScope.TryGetToken(out var scopedToken))
+            return scopedToken;
 
-        public void Dispose()
+        var principal = await _actorContext.GetAuthenticatedPrincipalAsync(ct);
+        var accessToken = principal?.FindFirst(PortalAuthClaims.ActorAccessToken)?.Value;
+        if (string.IsNullOrWhiteSpace(accessToken) || HasUsableLifetime(accessToken))
+            return accessToken;
+
+        await _refreshGate.WaitAsync(ct);
+        try
         {
-            if (_disposed)
-                return;
+            principal = await _actorContext.GetAuthenticatedPrincipalAsync(ct);
+            accessToken = principal?.FindFirst(PortalAuthClaims.ActorAccessToken)?.Value;
+            if (string.IsNullOrWhiteSpace(accessToken) || HasUsableLifetime(accessToken))
+                return accessToken;
 
-            current.Value = prior;
-            _disposed = true;
+            var validation = await _validateAndRefresh(principal, ct);
+            return validation.IsValid
+                ? principal?.FindFirst(PortalAuthClaims.ActorAccessToken)?.Value
+                : null;
+        }
+        finally
+        {
+            _refreshGate.Release();
+        }
+    }
+
+    private bool HasUsableLifetime(string token)
+    {
+        try
+        {
+            var expiresAt = TokenHandler.ReadJwtToken(token).ValidTo;
+            return expiresAt > _timeProvider.GetUtcNow().UtcDateTime.Add(RefreshWindow);
+        }
+        catch (ArgumentException)
+        {
+            return false;
         }
     }
 }

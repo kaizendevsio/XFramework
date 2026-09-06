@@ -385,8 +385,8 @@ public sealed class IdentityServerPortalContractTests
         containerHost.Should().NotContain("_isDeferredRefreshRender");
         containerHost.Should().Contain("await InvokeAsync(StateHasChanged);");
 
-        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Components\" Version=\"3.12.0\" />");
-        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Primitives\" Version=\"3.12.0\" />");
+        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Components\" Version=\"3.16.0\" />");
+        packageVersions.Should().Contain("<PackageVersion Include=\"BlazorBlueprint.Primitives\" Version=\"3.16.0\" />");
     }
 
     [Test]

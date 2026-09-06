@@ -76,11 +76,12 @@ builder.Services.Replace(ServiceDescriptor.Scoped<IPortalService>(
 builder.Services.AddXFrameworkBoltClient(builder.Configuration, hostEnvironment: builder.Environment);
 builder.Services.AddScoped<PortalActorContext>();
 builder.Services.AddScoped<IPortalActorContext>(services => services.GetRequiredService<PortalActorContext>());
+builder.Services.AddScoped<PortalActorAccessTokenScope>();
 builder.Services.AddScoped<PortalActorAccessTokenProvider>();
 builder.Services.Replace(ServiceDescriptor.Scoped<IActorAccessTokenProvider>(services =>
     services.GetRequiredService<PortalActorAccessTokenProvider>()));
 builder.Services.Replace(ServiceDescriptor.Scoped<IActorAccessTokenScope>(services =>
-    services.GetRequiredService<PortalActorAccessTokenProvider>()));
+    services.GetRequiredService<PortalActorAccessTokenScope>()));
 builder.Services.Replace(ServiceDescriptor.Scoped<IActorIdentityProvider, IdentityServerActorIdentityProvider>());
 
 builder.Services.AddHealthChecks()

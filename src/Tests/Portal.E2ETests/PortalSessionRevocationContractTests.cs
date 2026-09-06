@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Json;
 using XFramework.Portal.Services;
@@ -87,7 +88,7 @@ public sealed class PortalSessionRevocationContractTests
         validator.Should().Contain("PortalAuthClaims.RefreshToken");
         validator.Should().Contain("actorIdentityProvider.ValidateAsync(");
         validator.Should().Contain("identityServer.RefreshToken(");
-        validator.Should().Contain("actorAccessTokenProvider.Suppress()");
+        validator.Should().Contain("actorAccessTokenScope.Suppress()");
         validator.Should().Contain("refreshCoordinator.RefreshAsync(");
         validator.Should().Contain("timeout.CancelAfter(ValidationTimeout)");
         validator.Should().Contain("actor.TenantId == tenantId");
@@ -150,7 +151,7 @@ public sealed class PortalSessionRevocationContractTests
     {
         var credentialId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
-        var actorToken = "actor-token";
+        var actorToken = CreateActorToken(DateTime.UtcNow.AddMinutes(30));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(
         [
             new Claim(PortalAuthClaims.CredentialId, credentialId.ToString()),
@@ -160,7 +161,8 @@ public sealed class PortalSessionRevocationContractTests
         var actorContext = new PortalActorContext(
             new HttpContextAccessor(),
             new FixedAuthenticationStateProvider(principal));
-        var tokenProvider = new PortalActorAccessTokenProvider(actorContext);
+        var actorTokenScope = new PortalActorAccessTokenScope();
+        var tokenProvider = CreateTokenProvider(actorContext, actorTokenScope);
 
         var token = await tokenProvider.GetTokenAsync();
 
@@ -168,19 +170,83 @@ public sealed class PortalSessionRevocationContractTests
         actorContext.CredentialId.Should().Be(credentialId);
         actorContext.SessionId.Should().Be(sessionId);
 
-        using (tokenProvider.Push("validation-token"))
+        using (actorTokenScope.Push("validation-token"))
         {
             (await tokenProvider.GetTokenAsync()).Should().Be("validation-token");
         }
 
         (await tokenProvider.GetTokenAsync()).Should().Be(actorToken);
 
-        using (tokenProvider.Suppress())
+        using (actorTokenScope.Suppress())
         {
             (await tokenProvider.GetTokenAsync()).Should().BeNull();
         }
 
         (await tokenProvider.GetTokenAsync()).Should().Be(actorToken);
+    }
+
+    [Test]
+    public async Task ExpiredCircuitActorToken_IsRefreshedBeforeParallelRemoteCalls()
+    {
+        var expiredToken = CreateActorToken(DateTime.UtcNow.AddMinutes(-1));
+        var refreshedToken = CreateActorToken(DateTime.UtcNow.AddMinutes(30));
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(PortalAuthClaims.ActorAccessToken, expiredToken)],
+            PortalAuthDefaults.AuthenticationScheme));
+        var actorContext = new PortalActorContext(
+            new HttpContextAccessor(),
+            new FixedAuthenticationStateProvider(principal));
+        var actorTokenScope = new PortalActorAccessTokenScope();
+        var refreshCalls = 0;
+        var releaseRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tokenProvider = new PortalActorAccessTokenProvider(
+            actorContext,
+            actorTokenScope,
+            async (currentPrincipal, ct) =>
+            {
+                Interlocked.Increment(ref refreshCalls);
+                await releaseRefresh.Task.WaitAsync(ct);
+                var identity = (ClaimsIdentity)currentPrincipal!.Identity!;
+                identity.RemoveClaim(identity.FindFirst(PortalAuthClaims.ActorAccessToken)!);
+                identity.AddClaim(new Claim(PortalAuthClaims.ActorAccessToken, refreshedToken));
+                return PortalSessionValidationResult.Refreshed;
+            },
+            TimeProvider.System);
+
+        var first = tokenProvider.GetTokenAsync().AsTask();
+        var second = tokenProvider.GetTokenAsync().AsTask();
+        releaseRefresh.SetResult();
+        var tokens = await Task.WhenAll(first, second);
+
+        tokens.Should().OnlyContain(token => token == refreshedToken);
+        refreshCalls.Should().Be(1);
+    }
+
+    [Test]
+    public async Task HealthyCircuitActorToken_DoesNotTriggerRefreshValidation()
+    {
+        var actorToken = CreateActorToken(DateTime.UtcNow.AddMinutes(30));
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(PortalAuthClaims.ActorAccessToken, actorToken)],
+            PortalAuthDefaults.AuthenticationScheme));
+        var actorContext = new PortalActorContext(
+            new HttpContextAccessor(),
+            new FixedAuthenticationStateProvider(principal));
+        var refreshCalls = 0;
+        var tokenProvider = new PortalActorAccessTokenProvider(
+            actorContext,
+            new PortalActorAccessTokenScope(),
+            (_, _) =>
+            {
+                Interlocked.Increment(ref refreshCalls);
+                return Task.FromResult(PortalSessionValidationResult.Valid);
+            },
+            TimeProvider.System);
+
+        var token = await tokenProvider.GetTokenAsync();
+
+        token.Should().Be(actorToken);
+        refreshCalls.Should().Be(0);
     }
 
     [Test]
@@ -294,7 +360,7 @@ public sealed class PortalSessionRevocationContractTests
             httpContextAccessor,
             new FixedAuthenticationStateProvider(circuitPrincipal));
 
-        var token = await new PortalActorAccessTokenProvider(actorContext).GetTokenAsync();
+        var token = await CreateTokenProvider(actorContext).GetTokenAsync();
 
         token.Should().Be("circuit-token");
     }
@@ -306,7 +372,7 @@ public sealed class PortalSessionRevocationContractTests
             new HttpContextAccessor(),
             new UninitializedAuthenticationStateProvider());
 
-        var token = await new PortalActorAccessTokenProvider(actorContext).GetTokenAsync();
+        var token = await CreateTokenProvider(actorContext).GetTokenAsync();
 
         token.Should().BeNull();
         actorContext.CredentialId.Should().BeNull();
@@ -321,6 +387,7 @@ public sealed class PortalSessionRevocationContractTests
         var context = File.ReadAllText(Path.Combine(portalRoot, "Services", "PortalActorContext.cs"));
 
         program.Should().Contain("builder.Services.AddScoped<PortalActorContext>();");
+        program.Should().Contain("builder.Services.AddScoped<PortalActorAccessTokenScope>();");
         program.Should().Contain("builder.Services.AddScoped<PortalActorAccessTokenProvider>();");
         program.Should().Contain("builder.Services.AddSingleton<PortalActorTokenRefreshCoordinator>();");
         program.Should().Contain("ServiceDescriptor.Scoped<IActorAccessTokenProvider>");
@@ -330,6 +397,18 @@ public sealed class PortalSessionRevocationContractTests
         context.Should().Contain("AuthenticationStateProvider authenticationStateProvider");
         context.Should().Contain("authenticationStateProvider.GetAuthenticationStateAsync()");
     }
+
+    private static PortalActorAccessTokenProvider CreateTokenProvider(
+        PortalActorContext actorContext,
+        PortalActorAccessTokenScope? actorTokenScope = null) =>
+        new(
+            actorContext,
+            actorTokenScope ?? new PortalActorAccessTokenScope(),
+            (_, _) => Task.FromResult(PortalSessionValidationResult.Valid),
+            TimeProvider.System);
+
+    private static string CreateActorToken(DateTime expiresAt) =>
+        new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(expires: expiresAt));
 
     private static string GetPortalRoot()
     {
