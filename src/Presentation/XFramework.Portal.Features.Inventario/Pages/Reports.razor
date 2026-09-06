@@ -1,5 +1,4 @@
 @page "/inventario/reports"
-@using XFramework.Inventario.Domain.Shared.Enums
 @using XFramework.Inventario.Domain.Shared.Contracts.Responses.Reports
 @implements IDisposable
 
@@ -23,8 +22,8 @@ else
         <div class="space-y-6">
             <div class="xf-page-header">
                 <div>
-                    <BbTypographyH3>Inventory Reports</BbTypographyH3>
-                    <BbTypographyMuted>Focused inventory views for stock, expiry, movement, and allocation status.</BbTypographyMuted>
+                    <BbTypographyH3>Inventory Risk Reports</BbTypographyH3>
+                    <BbTypographyMuted>Review near-expiry and expired stock without repeating operational inventory pages.</BbTypographyMuted>
                 </div>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
                     <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
@@ -32,11 +31,9 @@ else
                 </BbButton>
             </div>
 
-            <div class="xf-summary-grid xf-summary-grid-4">
-                <ReportMetric Title="Low Stock" Value="@_lowStock.Count.ToString()" />
+            <div class="xf-summary-grid xf-summary-grid-2">
                 <ReportMetric Title="Near Expiry" Value="@_nearExpiry.Count.ToString()" />
                 <ReportMetric Title="Expired Lots" Value="@_expired.Count.ToString()" />
-                <ReportMetric Title="Stock Positions" Value="@_stockPositions.Count.ToString()" />
             </div>
 
             <BbCard>
@@ -95,8 +92,6 @@ else
                                                  Min="1"
                                                  Max="365"
                                                  Step="1" />
-                        <BbFormFieldDatePicker @bind-Value="_movementFrom" Label="Movement From" />
-                        <BbFormFieldDatePicker @bind-Value="_movementTo" Label="Movement To" />
                     </div>
                     <div class="mt-4 flex flex-wrap justify-end gap-2">
                         <BbButton Variant="ButtonVariant.Outline" OnClick="@ResetReportFilters">
@@ -107,30 +102,6 @@ else
                             Apply Filters
                         </BbButton>
                     </div>
-                </BbCardContent>
-            </BbCard>
-
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Low Stock</BbCardTitle>
-                    <BbCardDescription>@_lowStock.Count scoped rule(s) at or below reorder point</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    @if (_lowStock.Count == 0)
-                    {
-                        <BbEmpty Title="No low-stock rows" Description="Adjust filters or configure active reorder rules." />
-                    }
-                    else
-                    {
-                        <BbDataGrid Items="@_lowStock" ShowPagination="true" InitialPageSize="10">
-                            <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Scope" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
-                            </Columns>
-                        </BbDataGrid>
-                    }
                 </BbCardContent>
             </BbCard>
 
@@ -184,81 +155,6 @@ else
                 </BbCardContent>
             </BbCard>
 
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Stock By Product / Location / Lot</BbCardTitle>
-                    <BbCardDescription>@_stockPositions.Count balance row(s)</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    @if (_stockPositions.Count == 0)
-                    {
-                        <BbEmpty Title="No stock positions" Description="No balances match the current filters." />
-                    }
-                    else
-                    {
-                        <BbDataGrid Items="@_stockPositions" ShowPagination="true" InitialPageSize="20">
-                            <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Filterable="true" />
-                            </Columns>
-                        </BbDataGrid>
-                    }
-                </BbCardContent>
-            </BbCard>
-
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Recent Movement Ledger</BbCardTitle>
-                    <BbCardDescription>@_movements.Count latest movement(s)</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    @if (_movements.Count == 0)
-                    {
-                        <BbEmpty Title="No movements" Description="No movement rows match the current filters." />
-                    }
-                    else
-                    {
-                        <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20">
-                            <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Reference)" Title="Reference" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Date" Sortable="true" Filterable="true" />
-                            </Columns>
-                        </BbDataGrid>
-                    }
-                </BbCardContent>
-            </BbCard>
-
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Reservation Allocation Status</BbCardTitle>
-                    <BbCardDescription>@_allocations.Count allocation row(s)</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    @if (_allocations.Count == 0)
-                    {
-                        <BbEmpty Title="No allocations" Description="No reservation allocations match the current filters." />
-                    }
-                    else
-                    {
-                        <BbDataGrid Items="@_allocations" ShowPagination="true" InitialPageSize="20">
-                            <Columns>
-                                <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
-                            </Columns>
-                        </BbDataGrid>
-                    }
-                </BbCardContent>
-            </BbCard>
         </div>
     </FadeInContent>
 }
@@ -273,18 +169,12 @@ else
     private List<Product> _products = [];
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
-    private List<LowStockRow> _lowStock = [];
     private List<ExpiryRow> _nearExpiry = [];
     private List<ExpiryRow> _expired = [];
-    private List<StockRow> _stockPositions = [];
-    private List<MovementRow> _movements = [];
-    private List<AllocationRow> _allocations = [];
     private string? _filterProductId;
     private string? _filterWarehouseId;
     private string? _filterLocationId;
     private int _nearExpiryWindowDays = 30;
-    private DateTime? _movementFrom;
-    private DateTime? _movementTo;
     private bool _loading = true;
     private bool _hasTenant;
     private bool _reportingEnabled;
@@ -329,12 +219,8 @@ else
         _products = [];
         _warehouses = [];
         _locations = [];
-        _lowStock = [];
         _nearExpiry = [];
         _expired = [];
-        _stockPositions = [];
-        _movements = [];
-        _allocations = [];
     }
 
     private async Task LoadReports(bool refreshFilterOptions)
@@ -343,13 +229,6 @@ else
         var warehouseId = ParseFilterGuid(_filterWarehouseId);
         var locationId = ParseFilterGuid(_filterLocationId);
 
-        var lowStockResponse = await Inventario.GetLowStockReport(new GetLowStockReportRequest
-        {
-            Metadata = BuildMetadata(),
-            ProductId = productId,
-            WarehouseId = warehouseId,
-            LocationId = locationId
-        });
         var nearExpiryResponse = await Inventario.GetNearExpiryStockReport(new GetNearExpiryStockReportRequest
         {
             Metadata = BuildMetadata(),
@@ -361,39 +240,6 @@ else
             Metadata = BuildMetadata(),
             ProductId = productId
         });
-        var stockResponse = await Inventario.GetStockPositionReport(new GetStockPositionReportRequest
-        {
-            Metadata = BuildMetadata(),
-            ProductId = productId,
-            WarehouseId = warehouseId,
-            LocationId = locationId
-        });
-
-        var movementResponse = await Inventario.GetMovementLedgerReport(new GetMovementLedgerReportRequest
-        {
-            Metadata = BuildMetadata(),
-            ProductId = productId,
-            WarehouseId = warehouseId,
-            LocationId = locationId,
-            From = _movementFrom?.Date,
-            To = _movementTo?.Date.AddDays(1).AddTicks(-1)
-        });
-        _movements = movementResponse.IsSuccess
-            ? (movementResponse.Response ?? []).Select(movement => new MovementRow(
-                movement.ProductName,
-                movement.MovementType,
-                movement.QuantityDelta,
-                FormatReference(movement.ReferenceType, movement.ReferenceId),
-                movement.MovementDate)).ToList()
-            : [];
-
-        var allocationResponse = await Inventario.GetReservationAllocationStatusReport(new GetReservationAllocationStatusReportRequest
-        {
-            Metadata = BuildMetadata(),
-            ProductId = productId
-        });
-
-        var lowStockRows = lowStockResponse.Response ?? [];
         var nearExpiryRows = (nearExpiryResponse.Response ?? [])
             .Where(row => MatchesWarehouse(warehouseId, row.WarehouseId))
             .Where(row => MatchesLocation(locationId, row.LocationId))
@@ -402,13 +248,6 @@ else
             .Where(row => MatchesWarehouse(warehouseId, row.WarehouseId))
             .Where(row => MatchesLocation(locationId, row.LocationId))
             .ToList();
-        var stockRows = stockResponse.Response ?? [];
-
-        _lowStock = lowStockRows.Select(row => new LowStockRow(
-            row.ProductName,
-            GetReportScope(row.WarehouseName, row.LocationName),
-            row.AvailableQuantity,
-            row.ReorderPoint)).ToList();
         _nearExpiry = nearExpiryRows.Select(row => new ExpiryRow(
             row.ProductName,
             row.LotNumber,
@@ -421,33 +260,13 @@ else
             GetReportScope(row.WarehouseName, row.LocationName),
             row.AvailableQuantity,
             row.ExpiresAt)).ToList();
-        _stockPositions = stockRows.Select(row => new StockRow(
-            row.ProductName,
-            GetReportScope(row.WarehouseName, row.LocationName),
-            row.LotNumber ?? "Untracked",
-            row.OnHandQuantity,
-            row.ReservedQuantity,
-            row.AvailableQuantity)).ToList();
-        _allocations = allocationResponse.IsSuccess
-            ? (allocationResponse.Response ?? []).Select(allocation => new AllocationRow(
-                allocation.ProductName,
-                allocation.LotNumber ?? "Untracked",
-                allocation.Quantity,
-                allocation.Status,
-                allocation.ReservedAt)).ToList()
-            : [];
-
         if (refreshFilterOptions)
-            BuildFilterOptions(stockRows, lowStockRows, nearExpiryRows, expiredRows);
+            BuildFilterOptions(nearExpiryRows, expiredRows);
 
         var failures = new[]
         {
-            (lowStockResponse.IsSuccess, lowStockResponse.Message),
             (nearExpiryResponse.IsSuccess, nearExpiryResponse.Message),
-            (expiredResponse.IsSuccess, expiredResponse.Message),
-            (stockResponse.IsSuccess, stockResponse.Message),
-            (movementResponse.IsSuccess, movementResponse.Message),
-            (allocationResponse.IsSuccess, allocationResponse.Message)
+            (expiredResponse.IsSuccess, expiredResponse.Message)
         }.Where(result => !result.IsSuccess).Select(result => result.Message ?? "Unknown report failure").ToArray();
 
         if (failures.Length > 0)
@@ -458,36 +277,37 @@ else
     }
 
     private void BuildFilterOptions(
-        IReadOnlyCollection<StockPositionReportRow> stockRows,
-        IReadOnlyCollection<LowStockReportRow> lowStockRows,
         IReadOnlyCollection<NearExpiryStockReportRow> nearExpiryRows,
         IReadOnlyCollection<NearExpiryStockReportRow> expiredRows)
     {
-        _products = stockRows.Select(row => (row.ProductId, row.ProductName))
-            .Concat(lowStockRows.Select(row => (row.ProductId, row.ProductName)))
-            .Concat(nearExpiryRows.Select(row => (row.ProductId, row.ProductName)))
+        _products = nearExpiryRows.Select(row => (row.ProductId, row.ProductName))
             .Concat(expiredRows.Select(row => (row.ProductId, row.ProductName)))
             .DistinctBy(row => row.ProductId)
             .Select(row => new Product { Id = row.ProductId, Name = row.ProductName, IsEnabled = true })
             .OrderBy(product => product.Name)
             .ToList();
-        _warehouses = stockRows.DistinctBy(row => row.WarehouseId)
+        var expiryRows = nearExpiryRows.Concat(expiredRows).ToList();
+        _warehouses = expiryRows
+            .Where(row => row.WarehouseId.HasValue)
+            .DistinctBy(row => row.WarehouseId)
             .Select(row => new Warehouse
             {
-                Id = row.WarehouseId,
-                Code = row.WarehouseName,
-                Name = row.WarehouseName,
+                Id = row.WarehouseId!.Value,
+                Code = row.WarehouseName ?? row.WarehouseId.Value.ToString()[..8],
+                Name = row.WarehouseName ?? row.WarehouseId.Value.ToString()[..8],
                 IsEnabled = true
             })
             .OrderBy(warehouse => warehouse.Name)
             .ToList();
-        _locations = stockRows.DistinctBy(row => row.LocationId)
+        _locations = expiryRows
+            .Where(row => row.WarehouseId.HasValue && row.LocationId.HasValue)
+            .DistinctBy(row => row.LocationId)
             .Select(row => new InventoryLocation
             {
-                Id = row.LocationId,
-                WarehouseId = row.WarehouseId,
-                Code = row.LocationName,
-                Name = row.LocationName,
+                Id = row.LocationId!.Value,
+                WarehouseId = row.WarehouseId!.Value,
+                Code = row.LocationName ?? row.LocationId.Value.ToString()[..8],
+                Name = row.LocationName ?? row.LocationId.Value.ToString()[..8],
                 IsEnabled = true
             })
             .OrderBy(location => location.Name)
@@ -506,8 +326,6 @@ else
         _filterWarehouseId = null;
         _filterLocationId = null;
         _nearExpiryWindowDays = 30;
-        _movementFrom = null;
-        _movementTo = null;
         await LoadReports(refreshFilterOptions: true);
     }
 
@@ -540,9 +358,6 @@ else
 
     private static string GetReportScope(string? warehouseName, string? locationName) =>
         $"{warehouseName ?? "Any warehouse"} / {locationName ?? "Any location"}";
-
-    private static string FormatReference(string? type, Guid? id) =>
-        string.IsNullOrWhiteSpace(type) ? "N/A" : id is { } value ? $"{type} / {value.ToString()[..8]}" : type;
 
     private RequestMetadata BuildMetadata() => new()
     {
@@ -585,9 +400,5 @@ else
         ModuleNavigation.OnChanged -= OnTenantChanged;
     }
 
-    private sealed record LowStockRow(string ProductName, string Scope, decimal AvailableQuantity, decimal ReorderPoint);
     private sealed record ExpiryRow(string ProductName, string LotNumber, string Scope, decimal AvailableQuantity, DateTime? ExpiresAt);
-    private sealed record StockRow(string ProductName, string Scope, string LotNumber, decimal OnHandQuantity, decimal ReservedQuantity, decimal AvailableQuantity);
-    private sealed record MovementRow(string ProductName, InventoryMovementType MovementType, decimal QuantityDelta, string Reference, DateTime MovementDate);
-    private sealed record AllocationRow(string ProductName, string LotNumber, decimal Quantity, ReservationAllocationStatus Status, DateTime ReservedAt);
 }

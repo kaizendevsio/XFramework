@@ -300,7 +300,7 @@
         "lots" => "Lots / Batches",
         "replenishment" => "Replenishment",
         "variations" => "Variations",
-        "transactions" => "Transactions",
+        "transactions" => "Sales Transactions",
         _ => HumanizeSegment(section)
     };
 
@@ -327,7 +327,9 @@
     };
 
     private static string HumanizeSegment(string segment) =>
-        System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(segment.Replace("-", " "));
+        Guid.TryParse(segment, out var id)
+            ? ShortId(id)
+            : System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(segment.Replace("-", " "));
 
     private static string ShortId(Guid id) => id.ToString("N")[..8];
 

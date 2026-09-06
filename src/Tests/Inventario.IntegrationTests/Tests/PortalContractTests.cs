@@ -68,12 +68,11 @@ public sealed class PortalContractTests
         "Receiving.razor",
         "PurchaseOrders.razor",
         "Reservations.razor",
-        "Planning.razor",
-        "Warehouses.razor"
+        "Planning.razor"
     ];
 
     [Test]
-    public void Reports_AllSections_UseSupportedReportEndpoints()
+    public void Reports_OnlyLoadsExpiryRiskReports()
     {
         var repositoryRoot = FindRepositoryRoot();
         var reportsPath = Path.Combine(
@@ -85,34 +84,42 @@ public sealed class PortalContractTests
             "Reports.razor");
         var text = File.ReadAllText(reportsPath);
 
-        var reportMethods = new[]
+        var expiryReportMethods = new[]
         {
-            "GetLowStockReport",
             "GetNearExpiryStockReport",
-            "GetExpiredStockReport",
-            "GetStockPositionReport",
-            "GetMovementLedgerReport",
-            "GetReservationAllocationStatusReport"
+            "GetExpiredStockReport"
         };
 
-        foreach (var method in reportMethods)
+        foreach (var method in expiryReportMethods)
             text.Should().Contain($"Inventario.{method}(");
 
+        text.Should().NotContain("GetLowStockReport");
+        text.Should().NotContain("GetStockPositionReport");
+        text.Should().NotContain("GetMovementLedgerReport");
+        text.Should().NotContain("GetReservationAllocationStatusReport");
         text.Should().NotContain("DataContext.Query<");
+    }
+
+    [Test]
+    public void WarehouseLocations_AreOwnedByWarehouseDetail()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
+        var warehousesText = File.ReadAllText(Path.Combine(pagesRoot, "Warehouses.razor"));
+        var warehouseDetailText = File.ReadAllText(Path.Combine(pagesRoot, "WarehouseDetail.razor"));
+
+        warehousesText.Should().NotContain("<BbCardTitle>Locations</BbCardTitle>");
+        warehousesText.Should().NotContain("CreateInventoryLocation");
+        warehouseDetailText.Should().Contain("<BbCardTitle>Locations</BbCardTitle>");
+        warehouseDetailText.Should().Contain("<BbDialogTitle>Create Location</BbDialogTitle>");
+        warehouseDetailText.Should().Contain("Inventario.CreateInventoryLocation(");
     }
 
     [Test]
     public void InventarioPages_BusinessWorkflowMutations_DoNotUseDirectRemoteDataContextMutation()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var pagesRoot = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario");
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
 
         var offenders = Directory.EnumerateFiles(pagesRoot, "*.razor", SearchOption.AllDirectories)
             .SelectMany(path =>
@@ -130,15 +137,7 @@ public sealed class PortalContractTests
     public void ProductDetail_DependencyCreation_UsesEntityPickerOwnedDialogs()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var productDetailPath = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario",
-            "ProductDetail.razor");
+        var productDetailPath = Path.Combine(GetInventarioPagesRoot(repositoryRoot), "ProductDetail.razor");
 
         var text = File.ReadAllText(productDetailPath);
 
@@ -156,15 +155,7 @@ public sealed class PortalContractTests
     public void ProductDetail_EntityPickers_DefineAdvancedSearchColumnsAndFilters()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var productDetailPath = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario",
-            "ProductDetail.razor");
+        var productDetailPath = Path.Combine(GetInventarioPagesRoot(repositoryRoot), "ProductDetail.razor");
         var pickerPath = Path.Combine(
             repositoryRoot.FullName,
             "src",
@@ -206,14 +197,7 @@ public sealed class PortalContractTests
     public void ProductPages_ProductWrites_UseInventarioServiceWrapper()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var pagesRoot = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario");
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
         var productsText = File.ReadAllText(Path.Combine(pagesRoot, "Products.razor"));
         var productDetailText = File.ReadAllText(Path.Combine(pagesRoot, "ProductDetail.razor"));
 
@@ -230,14 +214,7 @@ public sealed class PortalContractTests
     public void ProductPages_CategorySelectors_UseEntityPicker()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var pagesRoot = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario");
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
         var productsText = File.ReadAllText(Path.Combine(pagesRoot, "Products.razor"));
         var productDetailText = File.ReadAllText(Path.Combine(pagesRoot, "ProductDetail.razor"));
 
@@ -254,15 +231,7 @@ public sealed class PortalContractTests
     public void ProductDetail_LongWorkflowDialogs_UseWideResponsiveLayoutsAndTypedInputs()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var productDetailPath = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario",
-            "ProductDetail.razor");
+        var productDetailPath = Path.Combine(GetInventarioPagesRoot(repositoryRoot), "ProductDetail.razor");
         var text = File.ReadAllText(productDetailPath);
 
         text.Should().Contain("Class=\"xf-dialog-wide\"");
@@ -293,11 +262,7 @@ public sealed class PortalContractTests
             "Presentation",
             "XFramework.Portal",
             "Components");
-        var productDetailPath = Path.Combine(
-            controlPanelRoot,
-            "Pages",
-            "Inventario",
-            "ProductDetail.razor");
+        var productDetailPath = Path.Combine(GetInventarioPagesRoot(repositoryRoot), "ProductDetail.razor");
         var productSidebarPath = Path.Combine(
             controlPanelRoot,
             "Layout",
@@ -329,7 +294,7 @@ public sealed class PortalContractTests
         productSidebarText.Should().Contain("Label=\"Lots / Batches\"");
         productSidebarText.Should().Contain("Label=\"Replenishment\"");
         productSidebarText.Should().Contain("Label=\"Variations\"");
-        productSidebarText.Should().Contain("Label=\"Transactions\"");
+        productSidebarText.Should().Contain("Label=\"Sales Transactions\"");
 
         mainLayoutText.Should().Contain("BuildInventarioProductBreadcrumbs");
         mainLayoutText.Should().Contain("RefreshBreadcrumbEntityLabels");
@@ -352,14 +317,7 @@ public sealed class PortalContractTests
     public void InventarioPages_Toasts_DoNotExposeRawTechnicalDetails()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var pagesRoot = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario");
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
 
         var forbiddenPatterns = new[]
         {
@@ -387,14 +345,7 @@ public sealed class PortalContractTests
     public void InventarioListPages_TabularSurfaces_UseFilteredBlazorBlueprintDataGrids()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var pagesRoot = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario");
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
 
         foreach (var page in InventarioListPagesRequiringFilteredDataGrids)
         {
@@ -423,14 +374,7 @@ public sealed class PortalContractTests
     public void InventarioDetailPages_TabularSurfaces_UseFilteredBlazorBlueprintDataGrids()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var pagesRoot = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario");
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
 
         foreach (var page in InventarioDetailPagesRequiringFilteredDataGrids)
         {
@@ -459,14 +403,7 @@ public sealed class PortalContractTests
     public void InventarioWorkflowPages_DomainEntitySelectors_UseSharedEntityPicker()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var pagesRoot = Path.Combine(
-            repositoryRoot.FullName,
-            "src",
-            "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "Inventario");
+        var pagesRoot = GetInventarioPagesRoot(repositoryRoot);
 
         foreach (var page in InventarioWorkflowPagesRequiringEntityPickers)
         {
@@ -540,6 +477,14 @@ public sealed class PortalContractTests
             }
         }
     }
+
+    private static string GetInventarioPagesRoot(DirectoryInfo repositoryRoot) =>
+        Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal.Features.Inventario",
+            "Pages");
 
     private static DirectoryInfo FindRepositoryRoot()
     {

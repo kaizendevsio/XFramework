@@ -388,6 +388,7 @@ public sealed class PortalSessionRevocationContractTests
 
         program.Should().Contain("builder.Services.AddScoped<PortalActorContext>();");
         program.Should().Contain("builder.Services.AddScoped<PortalActorAccessTokenScope>();");
+        program.Should().Contain("builder.Services.AddScoped<Func<PortalIdentitySessionValidator>>");
         program.Should().Contain("builder.Services.AddScoped<PortalActorAccessTokenProvider>();");
         program.Should().Contain("builder.Services.AddSingleton<PortalActorTokenRefreshCoordinator>();");
         program.Should().Contain("ServiceDescriptor.Scoped<IActorAccessTokenProvider>");
@@ -396,6 +397,14 @@ public sealed class PortalSessionRevocationContractTests
             "ServiceDescriptor.Singleton<IActorAccessTokenProvider, PortalActorAccessTokenProvider>()");
         context.Should().Contain("AuthenticationStateProvider authenticationStateProvider");
         context.Should().Contain("authenticationStateProvider.GetAuthenticationStateAsync()");
+
+        var providerConstructor = typeof(PortalActorAccessTokenProvider)
+            .GetConstructors()
+            .Single();
+        providerConstructor.GetParameters()
+            .Select(parameter => parameter.ParameterType)
+            .Should().NotContain(typeof(PortalIdentitySessionValidator),
+                "eager validator resolution creates a cycle through the IdentityServer wrapper");
     }
 
     private static PortalActorAccessTokenProvider CreateTokenProvider(
