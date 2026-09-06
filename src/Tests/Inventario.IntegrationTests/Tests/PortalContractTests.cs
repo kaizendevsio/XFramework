@@ -73,6 +73,25 @@ public sealed class PortalContractTests
     ];
 
     [Test]
+    public void Reports_MovementAndAllocationSections_UseSupportedReportEndpoints()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var reportsPath = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "Presentation",
+            "XFramework.Portal.Features.Inventario",
+            "Pages",
+            "Reports.razor");
+        var text = File.ReadAllText(reportsPath);
+
+        text.Should().Contain("Inventario.GetMovementLedgerReport(");
+        text.Should().Contain("Inventario.GetReservationAllocationStatusReport(");
+        text.Should().NotContain("DataContext.Query<InventoryMovement>()");
+        text.Should().NotContain("DataContext.Query<ReservationAllocation>()");
+    }
+
+    [Test]
     public void InventarioPages_BusinessWorkflowMutations_DoNotUseDirectRemoteDataContextMutation()
     {
         var repositoryRoot = FindRepositoryRoot();

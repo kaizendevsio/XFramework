@@ -265,6 +265,7 @@ else
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
@@ -275,8 +276,6 @@ else
     private List<InventoryLot> _lots = [];
     private List<StockBalance> _balances = [];
     private List<InventoryReorderRule> _rules = [];
-    private List<InventoryMovement> _rawMovements = [];
-    private List<ReservationAllocation> _rawAllocations = [];
     private List<LowStockRow> _lowStock = [];
     private List<ExpiryRow> _nearExpiry = [];
     private List<ExpiryRow> _expired = [];
@@ -321,10 +320,8 @@ else
             _lots = await DataContext.Query<InventoryLot>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _balances = await DataContext.Query<StockBalance>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(2000).ToListAsync();
             _rules = await DataContext.Query<InventoryReorderRule>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted).Take(1000).ToListAsync();
-            _rawMovements = await DataContext.Query<InventoryMovement>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.MovementDate).Take(500).ToListAsync();
-            _rawAllocations = await DataContext.Query<ReservationAllocation>().IgnoreQueryFilters().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderByDescending(x => x.ReservedAt).Take(500).ToListAsync();
-
             BuildRows();
+            await LoadEventReports();
         }
         catch
         {
@@ -345,8 +342,6 @@ else
         _lots = [];
         _balances = [];
         _rules = [];
-        _rawMovements = [];
-        _rawAllocations = [];
         _lowStock = [];
         _nearExpiry = [];
         _expired = [];
@@ -369,17 +364,6 @@ else
             .Where(x => MatchesProduct(productId, x.ProductId))
             .Where(x => MatchesNullableScope(warehouseId, x.WarehouseId))
             .Where(x => MatchesNullableScope(locationId, x.LocationId))
-            .ToList();
-        var movements = _rawMovements
-            .Where(x => MatchesProduct(productId, x.ProductId))
-            .Where(x => MatchesWarehouse(warehouseId, x.WarehouseId))
-            .Where(x => MatchesLocation(locationId, x.LocationId))
-            .Where(MatchesMovementDateRange)
-            .ToList();
-        var allocations = _rawAllocations
-            .Where(x => MatchesProduct(productId, x.ProductId))
-            .Where(x => MatchesWarehouse(warehouseId, x.WarehouseId))
-            .Where(x => MatchesLocation(locationId, x.LocationId))
             .ToList();
 
         _lowStock = rules.Select(rule =>
@@ -415,20 +399,48 @@ else
                 balance.ReservedQuantity,
                 balance.AvailableQuantity))
             .ToList();
-        _movements = movements.Select(movement => new MovementRow(
-                GetProductName(movement.ProductId),
+    }
+
+    private async Task LoadEventReports()
+    {
+        var productId = ParseFilterGuid(_filterProductId);
+        var warehouseId = ParseFilterGuid(_filterWarehouseId);
+        var locationId = ParseFilterGuid(_filterLocationId);
+
+        var movementResponse = await Inventario.GetMovementLedgerReport(new GetMovementLedgerReportRequest
+        {
+            Metadata = BuildMetadata(),
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            LocationId = locationId,
+            From = _movementFrom?.Date,
+            To = _movementTo?.Date.AddDays(1).AddTicks(-1)
+        });
+        _movements = movementResponse.IsSuccess
+            ? (movementResponse.Response ?? []).Select(movement => new MovementRow(
+                movement.ProductName,
                 movement.MovementType,
                 movement.QuantityDelta,
                 FormatReference(movement.ReferenceType, movement.ReferenceId),
-                movement.MovementDate))
-            .ToList();
-        _allocations = allocations.Select(allocation => new AllocationRow(
-                GetProductName(allocation.ProductId),
-                GetLotNumber(allocation.LotId),
+                movement.MovementDate)).ToList()
+            : [];
+
+        var allocationResponse = await Inventario.GetReservationAllocationStatusReport(new GetReservationAllocationStatusReportRequest
+        {
+            Metadata = BuildMetadata(),
+            ProductId = productId
+        });
+        _allocations = allocationResponse.IsSuccess
+            ? (allocationResponse.Response ?? []).Select(allocation => new AllocationRow(
+                allocation.ProductName,
+                allocation.LotNumber ?? "Untracked",
                 allocation.Quantity,
                 allocation.Status,
-                allocation.ReservedAt))
-            .ToList();
+                allocation.ReservedAt)).ToList()
+            : [];
+
+        if (!movementResponse.IsSuccess || !allocationResponse.IsSuccess)
+            ToastService.Show("Could not load all inventory report sections.");
     }
 
     private List<ExpiryRow> BuildExpiryRows(
@@ -454,13 +466,14 @@ else
             .ToList();
     }
 
-    private void ApplyReportFilters()
+    private async Task ApplyReportFilters()
     {
         _nearExpiryWindowDays = Math.Clamp(_nearExpiryWindowDays, 1, 365);
         BuildRows();
+        await LoadEventReports();
     }
 
-    private void ResetReportFilters()
+    private async Task ResetReportFilters()
     {
         _filterProductId = null;
         _filterWarehouseId = null;
@@ -469,6 +482,7 @@ else
         _movementFrom = null;
         _movementTo = null;
         BuildRows();
+        await LoadEventReports();
     }
 
     private Task OnFilterWarehouseChanged(string? value)
@@ -507,17 +521,6 @@ else
     private static bool MatchesNullableScope(Guid? filterId, Guid? scopeId) =>
         filterId is null || scopeId is null || scopeId == filterId.Value;
 
-    private bool MatchesMovementDateRange(InventoryMovement movement)
-    {
-        if (_movementFrom is { } from && movement.MovementDate.Date < from.Date)
-            return false;
-
-        if (_movementTo is { } to && movement.MovementDate.Date > to.Date)
-            return false;
-
-        return true;
-    }
-
     private string GetProductName(Guid productId) =>
         _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
 
@@ -535,6 +538,13 @@ else
 
     private static string FormatReference(string? type, Guid? id) =>
         string.IsNullOrWhiteSpace(type) ? "N/A" : id is { } value ? $"{type} / {value.ToString()[..8]}" : type;
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        RequestedTenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        OperationName = "Portal"
+    };
 
     private static string GetProductPickerValue(Product product) => product.Id.ToString();
 
