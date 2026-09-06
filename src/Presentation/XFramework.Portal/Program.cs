@@ -77,6 +77,8 @@ builder.Services.AddXFrameworkBoltClient(builder.Configuration, hostEnvironment:
 builder.Services.AddScoped<PortalActorContext>();
 builder.Services.AddScoped<IPortalActorContext>(services => services.GetRequiredService<PortalActorContext>());
 builder.Services.AddScoped<PortalActorAccessTokenScope>();
+builder.Services.AddScoped<Func<PortalIdentitySessionValidator>>(services =>
+    services.GetRequiredService<PortalIdentitySessionValidator>);
 builder.Services.AddScoped<PortalActorAccessTokenProvider>();
 builder.Services.Replace(ServiceDescriptor.Scoped<IActorAccessTokenProvider>(services =>
     services.GetRequiredService<PortalActorAccessTokenProvider>()));
