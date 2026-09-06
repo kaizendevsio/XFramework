@@ -50,7 +50,8 @@ public sealed class WalletRequestContextResolver(
         var isSystemActor = invocation is { Actor: null, Service: not null };
         var isPrivilegedActor = isSystemActor ||
             invocation?.Actor?.Roles.Contains("Admin") == true ||
-            invocation?.Actor?.Roles.Contains("SuperAdmin") == true;
+            invocation?.Actor?.Roles.Contains("SuperAdmin") == true ||
+            invocation?.Actor?.Capabilities.Contains(XFrameworkActorCapabilities.IdentityTenantsManage) == true;
         var actorCredentialId = invocation?.Actor?.CredentialId;
 
         if (requestCredentialId.HasValue &&

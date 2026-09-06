@@ -1941,6 +1941,34 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     }
 
     [Test]
+    public void Resolver_TenantManagerCanOperateOnAnotherCredential()
+    {
+        var actorCredentialId = Guid.NewGuid();
+        var resolver = new WalletRequestContextResolver(
+            TrustedContext(Actor(
+                WalletsTestFixture.TestTenantId,
+                actorCredentialId,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    XFrameworkActorCapabilities.IdentityTenantsManage
+                })));
+
+        var result = resolver.Resolve(
+            new RequestBase
+            {
+                Metadata = new XFramework.Domain.Shared.BusinessObjects.RequestMetadata
+                {
+                    RequestedTenantId = WalletsTestFixture.TestTenantId
+                }
+            },
+            requestCredentialId: Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.IsPrivilegedActor.Should().BeTrue();
+        result.Data.ActorCredentialId.Should().Be(actorCredentialId);
+    }
+
+    [Test]
     public void Resolver_ServiceOnlyContext_RemainsSystemAuthority()
     {
         var resolver = new WalletRequestContextResolver(
@@ -2446,13 +2474,16 @@ public class WalletAdvancedSystemTests : WalletsTestBase
             null,
             Guid.NewGuid()));
 
-    private static TrustedActorIdentity Actor(Guid tenantId, Guid credentialId) => new(
+    private static TrustedActorIdentity Actor(
+        Guid tenantId,
+        Guid credentialId,
+        IReadOnlySet<string>? capabilities = null) => new(
         credentialId,
         Guid.NewGuid(),
         tenantId,
         Guid.NewGuid(),
         new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        capabilities ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
         "test-generation",
         DateTimeOffset.UtcNow.AddMinutes(5));
 
