@@ -11,24 +11,24 @@ public sealed class PortalActorContext(
     public Guid? CredentialId => ReadGuidClaim(GetAvailablePrincipal(), PortalAuthClaims.CredentialId);
     public Guid? SessionId => ReadGuidClaim(GetAvailablePrincipal(), PortalAuthClaims.SessionId);
 
-    public async ValueTask<string?> GetActorAccessTokenAsync(CancellationToken ct = default)
+    public async ValueTask<ClaimsPrincipal?> GetAuthenticatedPrincipalAsync(CancellationToken ct = default)
     {
         try
         {
             var state = await authenticationStateProvider.GetAuthenticationStateAsync().WaitAsync(ct);
-            var circuitToken = state.User.Identity?.IsAuthenticated == true
-                ? state.User.FindFirst(PortalAuthClaims.ActorAccessToken)?.Value
-                : null;
-            if (!string.IsNullOrWhiteSpace(circuitToken))
-                return circuitToken;
+            if (state.User.Identity?.IsAuthenticated == true)
+                return state.User;
         }
         catch (InvalidOperationException)
         {
             // Authentication state exists only inside a Blazor circuit; HTTP and background scopes use the fallback.
         }
 
-        return GetAuthenticatedRequestPrincipal()?.FindFirst(PortalAuthClaims.ActorAccessToken)?.Value;
+        return GetAuthenticatedRequestPrincipal();
     }
+
+    public async ValueTask<string?> GetActorAccessTokenAsync(CancellationToken ct = default) =>
+        (await GetAuthenticatedPrincipalAsync(ct))?.FindFirst(PortalAuthClaims.ActorAccessToken)?.Value;
 
     private ClaimsPrincipal? GetAvailablePrincipal()
     {
