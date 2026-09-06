@@ -3,8 +3,8 @@ using Communications.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using XFramework.Core.DataContext;
+using XFramework.Domain.Auditing;
 using XFramework.Domain.Shared.Interfaces;
-using XFramework.Domain.Interceptors;
 
 namespace Bolt.Hub.Installers;
 
@@ -17,18 +17,14 @@ public sealed class DbInstaller : IInstaller
         RuntimeHelpers.RunClassConstructor(typeof(IdentityCredential).TypeHandle);
         RuntimeHelpers.RunClassConstructor(typeof(MessageThreadMember).TypeHandle);
 
-        // Register HttpContextAccessor for audit tracking
-        services.AddHttpContextAccessor();
-        
-        // Register AuditInterceptor
-        services.AddScoped<AuditInterceptor>();
+        services.AddXFrameworkAuditing();
         
         services.AddDbContext<DbContext, AppDbContext>((serviceProvider, options) => options
             .UseNpgsql(ResolveConnectionString(configuration),
                 npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
-            .AddInterceptors(serviceProvider.GetRequiredService<AuditInterceptor>())
+            .AddXFrameworkAuditInterceptors(serviceProvider)
         );
 
         services.AddServerDataContext<AppDbContext>();

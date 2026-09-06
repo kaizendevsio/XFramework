@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using XFramework.Domain.Interceptors;
+using XFramework.Domain.Auditing;
 
 namespace Gateway.Installers;
 
@@ -7,11 +7,7 @@ public sealed class DbInstaller : IInstaller
 {
     public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        // Register HttpContextAccessor for both audit tracking and global query filters (tenant context)
-        services.AddHttpContextAccessor();
-        
-        // Register AuditInterceptor
-        services.AddScoped<AuditInterceptor>();
+        services.AddXFrameworkAuditing();
         
         // Register DbContext with proper dependency injection for HttpContextAccessor and AuditInterceptor
         services.AddDbContext<DbContext, AppDbContext>((serviceProvider, options) => options
@@ -21,7 +17,7 @@ public sealed class DbInstaller : IInstaller
                 npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
-            .AddInterceptors(serviceProvider.GetRequiredService<AuditInterceptor>())
+            .AddXFrameworkAuditInterceptors(serviceProvider)
         );
     }
 }

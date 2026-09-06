@@ -18,11 +18,19 @@ public interface IServiceIdentityProvider
         CancellationToken ct = default);
 }
 
-public interface ITrustedInvocationContextAccessor : IEffectiveTenantContextAccessor
+public interface ITrustedInvocationContextAccessor : IEffectiveTenantContextAccessor, IAuditContextAccessor
 {
     TrustedInvocationContext? Current { get; }
     bool IEffectiveTenantContextAccessor.HasTrustedInvocation => Current is not null;
     Guid? IEffectiveTenantContextAccessor.EffectiveTenantId => Current?.EffectiveTenantId;
+    bool IAuditContextAccessor.HasAuditContext => Current is not null;
+    Guid? IAuditContextAccessor.ActorCredentialId => Current?.Actor?.CredentialId;
+    Guid? IAuditContextAccessor.ActorIdentityId => Current?.Actor?.IdentityId;
+    Guid? IAuditContextAccessor.ActorTenantId => Current?.Actor?.TenantId;
+    Guid? IAuditContextAccessor.EffectiveTenantId => Current?.EffectiveTenantId;
+    Guid? IAuditContextAccessor.SessionId => Current?.Actor?.SessionId;
+    string? IAuditContextAccessor.ServiceClientId => Current?.Service?.ClientId;
+    Guid? IAuditContextAccessor.CorrelationId => Current?.CorrelationId;
 }
 
 public interface ITrustedInvocationContextStore : ITrustedInvocationContextAccessor

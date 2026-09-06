@@ -211,6 +211,8 @@ public static class ServiceCollectionExtensions
             serviceProvider.GetRequiredService<TrustedInvocationContextAccessor>());
         services.TryAddScoped<IEffectiveTenantContextAccessor>(serviceProvider =>
             serviceProvider.GetRequiredService<TrustedInvocationContextAccessor>());
+        services.TryAddScoped<IAuditContextAccessor>(serviceProvider =>
+            serviceProvider.GetRequiredService<TrustedInvocationContextAccessor>());
         services.TryAddScoped<CrossTenantWriteAuthorization>();
         services.TryAddScoped<ICrossTenantWriteAuthorizationAccessor>(serviceProvider =>
             serviceProvider.GetRequiredService<CrossTenantWriteAuthorization>());

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using XFramework.Core.DataContext;
-using XFramework.Domain.Interceptors;
+using XFramework.Domain.Auditing;
 using XFramework.Domain.Shared.Interfaces;
 
 namespace Storage.Api.Installers;
@@ -12,8 +12,7 @@ public sealed class DbInstaller : IInstaller
         IConfiguration configuration,
         IHostEnvironment hostEnvironment)
     {
-        services.AddHttpContextAccessor();
-        services.AddScoped<AuditInterceptor>();
+        services.AddXFrameworkAuditing();
 
         services.AddDbContext<DbContext, AppDbContext>((serviceProvider, options) => options
             .UseNpgsql(string.IsNullOrEmpty(configuration["DefaultDatabaseConnection"])
@@ -23,7 +22,7 @@ public sealed class DbInstaller : IInstaller
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .ConfigureWarnings(warnings => warnings.Ignore(
                 RelationalEventId.BoolWithDefaultWarning))
-            .AddInterceptors(serviceProvider.GetRequiredService<AuditInterceptor>()));
+            .AddXFrameworkAuditInterceptors(serviceProvider));
 
         services.AddServerDataContext<AppDbContext>();
     }

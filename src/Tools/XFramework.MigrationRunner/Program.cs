@@ -44,24 +44,62 @@ var options = new DbContextOptionsBuilder<AppDbContext>()
 try
 {
     using var context = new AppDbContext(options);
+    var connection = context.Database.GetDbConnection();
+    context.Database.OpenConnection();
+
+    using (var auditContextCommand = connection.CreateCommand())
+    {
+        auditContextCommand.CommandText =
+            """
+            SELECT
+                set_config('xframework.audit.actor_kind', 'System', false),
+                set_config('xframework.audit.service_name', 'XFramework.MigrationRunner', false),
+                set_config('xframework.audit.environment', @environment, false),
+                set_config('xframework.audit.instance_id', @instance_id, false),
+                set_config('xframework.audit.operation_name', 'Database migration', false),
+                set_config('xframework.audit.transaction_ordinal', '', false);
+            """;
+        AddParameter(
+            auditContextCommand,
+            "environment",
+            Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Unknown");
+        AddParameter(auditContextCommand, "instance_id", Environment.MachineName);
+        auditContextCommand.ExecuteNonQuery();
+    }
 
     var pending = context.Database.GetPendingMigrations().ToList();
 
     if (pending.Count == 0)
     {
         Console.WriteLine("[MigrationRunner] Database is up to date. No migrations to apply.");
-        return 0;
     }
-
-    Console.WriteLine($"[MigrationRunner] Applying {pending.Count} pending migration(s)...");
-    foreach (var migration in pending)
+    else
     {
-        Console.WriteLine($"  - {migration}");
+        Console.WriteLine($"[MigrationRunner] Applying {pending.Count} pending migration(s)...");
+        foreach (var migration in pending)
+        {
+            Console.WriteLine($"  - {migration}");
+        }
+
+        context.Database.Migrate();
+        Console.WriteLine("[MigrationRunner] All migrations applied successfully.");
     }
 
-    context.Database.Migrate();
+    using var ensureAuditCommand = connection.CreateCommand();
+    ensureAuditCommand.CommandText = "SELECT audit.ensure_table_triggers();";
+    var installedTriggerCount = Convert.ToInt32(ensureAuditCommand.ExecuteScalar());
+    Console.WriteLine($"[MigrationRunner] Audit coverage installed on {installedTriggerCount} new table(s).");
 
-    Console.WriteLine("[MigrationRunner] All migrations applied successfully.");
+    using var verifyAuditCommand = connection.CreateCommand();
+    verifyAuditCommand.CommandText =
+        "SELECT string_agg(format('%I.%I', schema_name, table_name), ', ') FROM audit.missing_table_triggers();";
+    var missingTables = verifyAuditCommand.ExecuteScalar() as string;
+    if (!string.IsNullOrWhiteSpace(missingTables))
+    {
+        throw new InvalidOperationException($"Audit trigger coverage is incomplete: {missingTables}");
+    }
+
+    Console.WriteLine("[MigrationRunner] Audit trigger coverage verified.");
     return 0;
 }
 catch (Exception ex)
@@ -69,4 +107,12 @@ catch (Exception ex)
     Console.Error.WriteLine($"[MigrationRunner] Migration failed: {ex.Message}");
     Console.Error.WriteLine(ex.ToString());
     return 1;
+}
+
+static void AddParameter(System.Data.Common.DbCommand command, string name, string value)
+{
+    var parameter = command.CreateParameter();
+    parameter.ParameterName = name;
+    parameter.Value = value;
+    command.Parameters.Add(parameter);
 }

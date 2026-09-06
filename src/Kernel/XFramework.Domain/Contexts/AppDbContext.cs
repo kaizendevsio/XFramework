@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Security;
+using XFramework.Domain.Auditing;
 
 namespace XFramework.Domain.Contexts;
 
@@ -61,6 +62,7 @@ public partial class AppDbContext : XDbContext
     }
 
     // Framework-level entities (XFramework.Domain.Shared)
+    public virtual DbSet<AuditEvent> AuditEvents { get; set; }
     public virtual DbSet<MetaData> MetaData { get; set; }
     public virtual DbSet<MetaDataType> MetaDataTypes { get; set; }
     public virtual DbSet<MetaDataTypeGroup> MetaDataTypeGroups { get; set; }
