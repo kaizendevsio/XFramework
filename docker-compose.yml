@@ -299,7 +299,7 @@ services:
       ServiceIdentity__Clients__10__ValidationFallback__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__10__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__10__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__10__AllowedScopes: bolt.service,identity.session.validate
+      ServiceIdentity__Clients__10__AllowedScopes: bolt.service,identity.session.validate,datacontext.query,tenant.target
       ServiceIdentity__Clients__11__ClientId: XFramework.Operations.Dashboard
       ServiceIdentity__Clients__11__ClientSecret: ${OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET:?Set OPERATIONS_DASHBOARD_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__11__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -596,6 +596,8 @@ services:
       ServiceIdentity__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET:?Set POS_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__DefaultScopes__0: bolt.service
       ServiceIdentity__DefaultScopes__1: identity.session.validate
+      ServiceIdentity__DefaultScopes__2: datacontext.query
+      ServiceIdentity__DefaultScopes__3: tenant.target
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${POS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}

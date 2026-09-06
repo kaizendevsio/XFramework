@@ -157,11 +157,20 @@ public sealed class ServiceIdentityComposeContractTests
             XFrameworkServiceScopes.WalletsAdmin,
             XFrameworkServiceScopes.DataContextQueryAllTenants
         ]);
+        ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.Pos).Should().Contain(
+        [
+            XFrameworkServiceScopes.DataContextQuery,
+            XFrameworkServiceScopes.TenantTarget
+        ]);
 
         var wallets = ExtractService(compose, "wallets");
         wallets.Should().NotContain("ServiceIdentity__DefaultScopes__2:");
         wallets.Should().NotContain("ServiceIdentity__DefaultScopes__3:");
         wallets.Should().NotContain("ServiceIdentity__DefaultScopes__4:");
+
+        var pos = ExtractService(compose, "pos");
+        pos.Should().Contain("ServiceIdentity__DefaultScopes__2: datacontext.query");
+        pos.Should().Contain("ServiceIdentity__DefaultScopes__3: tenant.target");
     }
 
     [Test]
