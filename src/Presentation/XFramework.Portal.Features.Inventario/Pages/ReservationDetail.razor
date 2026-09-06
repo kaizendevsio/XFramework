@@ -304,8 +304,9 @@ else
                 _lots = await DataContext.Query<InventoryLot>()
                     .IgnoreQueryFilters()
                     .NoCache()
-                    .Where(x => x.TenantId == tenantId && lotIds.Contains(x.Id) && !x.IsDeleted)
+                    .Where(x => x.TenantId == tenantId && !x.IsDeleted)
                     .ToListAsync();
+                _lots = _lots.Where(x => lotIds.Contains(x.Id)).ToList();
             }
         }
         catch
