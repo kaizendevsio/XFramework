@@ -383,7 +383,7 @@ else
     [Inject] private DialogService DialogService { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
-    private readonly List<CartLine> _cart = [];
+    private List<CartLine> _cart = [];
     private List<PosRegister> _registers = [];
     private List<IdentityCredential> _credentials = [];
     private List<ProductCategory> _categories = [];
@@ -593,24 +593,30 @@ else
         if (existing is not null)
         {
             SetQuantity(existing, existing.Quantity + 1);
+            _cart = [.. _cart];
             _ = InvokeAsync(FocusCatalogSearchAsync);
             return;
         }
 
-        _cart.Add(new CartLine
-        {
-            ProductId = item.ProductId,
-            ProductVariationId = item.ProductVariationId,
-            DisplayName = item.DisplayName,
-            UnitPrice = item.Price,
-            Quantity = 1
-        });
+        _cart =
+        [
+            .. _cart,
+            new CartLine
+            {
+                ProductId = item.ProductId,
+                ProductVariationId = item.ProductVariationId,
+                DisplayName = item.DisplayName,
+                UnitPrice = item.Price,
+                Quantity = 1
+            }
+        ];
         _ = InvokeAsync(FocusCatalogSearchAsync);
     }
 
     private void ChangeQuantity(CartLine line, decimal delta)
     {
         SetQuantity(line, line.Quantity + delta);
+        _cart = [.. _cart];
     }
 
     private static void SetQuantity(CartLine line, decimal quantity)
@@ -621,7 +627,7 @@ else
     private void RemoveFromCart(CartLine line)
     {
         _lastReceipt = null;
-        _cart.Remove(line);
+        _cart = _cart.Where(item => !ReferenceEquals(item, line)).ToList();
     }
 
     private async Task SuspendCart()
@@ -947,10 +953,9 @@ else
         _taxAmount = cart.TaxAmount;
         _cashTenderedAmount = 0;
 
-        _cart.Clear();
-        foreach (var line in cart.Lines.OrderBy(item => item.LineNumber))
-        {
-            _cart.Add(new CartLine
+        _cart = cart.Lines
+            .OrderBy(item => item.LineNumber)
+            .Select(line => new CartLine
             {
                 ProductId = line.ProductId,
                 ProductVariationId = line.ProductVariationId,
@@ -959,13 +964,13 @@ else
                     : $"{line.ProductName} - {line.VariantName}",
                 UnitPrice = line.ExpectedUnitPrice,
                 Quantity = line.Quantity
-            });
-        }
+            })
+            .ToList();
     }
 
     private void ClearCurrentCart()
     {
-        _cart.Clear();
+        _cart = [];
         _activeCartId = null;
         _activeCartConcurrencyStamp = null;
         _activeCartNumber = null;

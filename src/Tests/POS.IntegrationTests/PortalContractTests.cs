@@ -235,6 +235,17 @@ public sealed class PortalContractTests
     }
 
     [Test]
+    public void Cashier_ReplacesCartCollectionAfterMutationsSoDataViewRefreshes()
+    {
+        var cashier = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Cashier.razor"));
+
+        cashier.Should().Contain("private List<CartLine> _cart = [];");
+        cashier.Should().Contain("_cart = [.. _cart];");
+        cashier.Should().Contain("_cart = _cart.Where(item => !ReferenceEquals(item, line)).ToList();");
+        cashier.Should().NotContain("private readonly List<CartLine> _cart");
+    }
+
+    [Test]
     public void PosEntityPickers_DefineAdvancedSearchColumnsAndScope()
     {
         var pagesRoot = GetPosPagesRoot();
@@ -290,10 +301,8 @@ public sealed class PortalContractTests
             repositoryRoot.FullName,
             "src",
             "Presentation",
-            "XFramework.Portal",
-            "Components",
-            "Pages",
-            "POS");
+            "XFramework.Portal.Features.POS",
+            "Pages");
     }
 
     private static DirectoryInfo FindRepositoryRoot()
