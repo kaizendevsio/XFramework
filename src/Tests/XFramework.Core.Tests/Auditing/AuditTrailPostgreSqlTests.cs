@@ -9,8 +9,6 @@ using DotNet.Testcontainers.Builders;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Moq;
 using Npgsql;
 using NUnit.Framework;
 using Testcontainers.PostgreSql;
@@ -65,14 +63,9 @@ public sealed class AuditTrailPostgreSqlTests
         httpContext.Request.Headers.UserAgent = "XFramework audit integration test";
         httpContext.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(), "Audit test mutation"));
 
-        var environment = new Mock<IHostEnvironment>();
-        environment.SetupGet(item => item.ApplicationName).Returns("XFramework.Core.Tests");
-        environment.SetupGet(item => item.EnvironmentName).Returns("Test");
-
         var interceptor = new AuditContextConnectionInterceptor(
             [auditContext],
-            new HttpContextAccessor { HttpContext = httpContext },
-            environment.Object);
+            new HttpContextAccessor { HttpContext = httpContext });
 
         options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(connectionString)

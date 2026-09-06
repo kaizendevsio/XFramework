@@ -1,8 +1,8 @@
 using System.Data.Common;
 using System.Diagnostics;
+using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Hosting;
 using XFramework.Domain.Shared.Security;
 
 namespace XFramework.Domain.Auditing;
@@ -13,8 +13,7 @@ namespace XFramework.Domain.Auditing;
 /// </summary>
 public sealed class AuditContextConnectionInterceptor(
     IEnumerable<IAuditContextAccessor> contextAccessors,
-    IHttpContextAccessor httpContextAccessor,
-    IHostEnvironment hostEnvironment) : DbConnectionInterceptor
+    IHttpContextAccessor httpContextAccessor) : DbConnectionInterceptor
 {
     private const int MaxOperationNameLength = 300;
     private const int MaxUserAgentLength = 512;
@@ -73,8 +72,17 @@ public sealed class AuditContextConnectionInterceptor(
         AddParameter(command, "actor_tenant_id", Format(context?.ActorTenantId));
         AddParameter(command, "effective_tenant_id", Format(context?.EffectiveTenantId));
         AddParameter(command, "session_id", Format(context?.SessionId));
-        AddParameter(command, "service_name", FirstNonEmpty(context?.ServiceClientId, hostEnvironment.ApplicationName));
-        AddParameter(command, "environment", hostEnvironment.EnvironmentName);
+        AddParameter(
+            command,
+            "service_name",
+            FirstNonEmpty(context?.ServiceClientId, Assembly.GetEntryAssembly()?.GetName().Name));
+        AddParameter(
+            command,
+            "environment",
+            FirstNonEmpty(
+                Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"),
+                "Unknown"));
         AddParameter(command, "instance_id", Environment.MachineName);
         AddParameter(command, "correlation_id", Format(context?.CorrelationId));
         AddParameter(command, "operation_name", Truncate(httpContext?.GetEndpoint()?.DisplayName, MaxOperationNameLength));
