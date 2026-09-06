@@ -18,12 +18,12 @@ public sealed class PortalActorAccessTokenProvider : IActorAccessTokenProvider
     public PortalActorAccessTokenProvider(
         PortalActorContext actorContext,
         PortalActorAccessTokenScope actorAccessTokenScope,
-        PortalIdentitySessionValidator sessionValidator,
+        Func<PortalIdentitySessionValidator> getSessionValidator,
         TimeProvider timeProvider)
         : this(
             actorContext,
             actorAccessTokenScope,
-            sessionValidator.ValidateAndRefreshAsync,
+            (principal, ct) => getSessionValidator().ValidateAndRefreshAsync(principal, ct),
             timeProvider)
     {
     }
