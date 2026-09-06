@@ -126,9 +126,9 @@ public sealed class InventoryLotService(
             SupplierReference = NormalizeOptional(request.SupplierReference),
             SourceReferenceType = NormalizeOptional(request.SourceReferenceType),
             SourceReferenceId = request.SourceReferenceId,
-            ReceivedAt = request.ReceivedAt ?? DateTime.UtcNow,
-            ManufacturedAt = request.ManufacturedAt,
-            ExpiresAt = request.ExpiresAt,
+            ReceivedAt = NormalizeUtc(request.ReceivedAt) ?? DateTime.UtcNow,
+            ManufacturedAt = NormalizeUtc(request.ManufacturedAt),
+            ExpiresAt = NormalizeUtc(request.ExpiresAt),
             UnitCost = request.UnitCost,
             Status = request.Status,
             IsEnabled = true,
@@ -157,6 +157,14 @@ public sealed class InventoryLotService(
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    internal static DateTime? NormalizeUtc(DateTime? value) => value?.Kind switch
+    {
+        null => null,
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.Value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+    };
 
     private async Task<Result> EnsureTraceabilityEnabledAsync(Guid tenantId, CancellationToken ct) =>
         await featureService.EnsureEnabledAsync(
