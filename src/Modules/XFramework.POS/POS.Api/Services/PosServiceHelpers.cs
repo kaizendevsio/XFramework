@@ -35,10 +35,10 @@ internal static class PosServiceHelpers
         $"POS-SALE-{sale.Id:N}-PAYMENT";
 
     public static string SaleLineReservationReference(PosSaleLine line) =>
-        $"POS-LINE-{line.Id:N}"[..80];
+        $"POS-LINE-{line.Id:N}";
 
     public static string ReturnRefundReference(PosReturn posReturn) =>
-        $"POS-RETURN-{posReturn.Id:N}"[..80];
+        $"POS-RETURN-{posReturn.Id:N}";
 
     public static string BuildSaleRequestHash(CheckoutPosSaleRequest request) =>
         Hash(new

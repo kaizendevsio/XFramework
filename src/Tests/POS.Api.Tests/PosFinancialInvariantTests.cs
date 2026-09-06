@@ -9,6 +9,18 @@ namespace POS.Api.Tests;
 public sealed class PosFinancialInvariantTests
 {
     [Test]
+    public void CrossModuleReferences_UseCompleteIdsWithoutInvalidFixedLengthSlicing()
+    {
+        var saleLine = new PosSaleLine { Id = Guid.NewGuid() };
+        var posReturn = new PosReturn { Id = Guid.NewGuid() };
+
+        PosServiceHelpers.SaleLineReservationReference(saleLine)
+            .Should().Be($"POS-LINE-{saleLine.Id:N}");
+        PosServiceHelpers.ReturnRefundReference(posReturn)
+            .Should().Be($"POS-RETURN-{posReturn.Id:N}");
+    }
+
+    [Test]
     public void BuildSaleRefundAllocations_ReconcilesLineAndHeaderAdjustmentsExactly()
     {
         var sale = new PosSale
