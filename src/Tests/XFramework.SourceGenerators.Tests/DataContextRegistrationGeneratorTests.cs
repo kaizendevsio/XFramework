@@ -136,6 +136,28 @@ public sealed class GeneratedCreateEntity;
         GetPolicyBlock(RunGenerator(source), "Read").Should().Contain("AllowRemoteQuery = false");
     }
 
+    [Test]
+    public void GenerateRegistration_ExplicitRemoteQueryOptInExposesRestOnlyEntityToDataContext()
+    {
+        const string source = """
+        namespace Sample;
+        using XFramework.Domain.Shared.Attributes;
+
+        [AllowRemoteDataContextQuery]
+        [GenerateEndpoints(
+            Type = EndpointType.Rest,
+            Actions = EndpointActions.None,
+            AuthorizationFeature = "inventario.catalog")]
+        public sealed class PortalQueryEntity;
+        """;
+
+        var readPolicy = GetPolicyBlock(RunGenerator(source), "Read");
+
+        readPolicy.Should().Contain("EntityTypeName = \"PortalQueryEntity\"");
+        readPolicy.Should().Contain("AllowRemoteQuery = true");
+        readPolicy.Should().Contain("RequiredCapability = \"inventario.catalog:view\"");
+    }
+
     [TestCase("wallets reporting", "view")]
     [TestCase("wallets.reporting", "View")]
     [TestCase("wallets.reporting", "view:all")]
@@ -345,6 +367,9 @@ namespace XFramework.Domain.Shared.Attributes
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class AllowRemoteDataContextMutationAttribute : Attribute;
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public sealed class AllowRemoteDataContextQueryAttribute : Attribute;
 }
 
 namespace XFramework.Integration.Security

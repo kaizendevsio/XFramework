@@ -3,6 +3,7 @@ using XFramework.Domain.Shared.Contracts.Base;
 
 namespace XFramework.Inventario.Domain.Shared.Contracts;
 
+[AllowRemoteDataContextQuery]
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Rest,

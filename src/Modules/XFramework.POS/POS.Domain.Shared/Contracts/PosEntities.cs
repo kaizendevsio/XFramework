@@ -1,5 +1,6 @@
 namespace POS.Domain.Shared.Contracts;
 
+[AllowRemoteDataContextQuery]
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Rest,
@@ -50,6 +51,7 @@ public partial class PosRegister : BaseModel
     public virtual ICollection<PosCart> Carts { get; set; } = new List<PosCart>();
 }
 
+[AllowRemoteDataContextQuery]
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Rest,
@@ -194,6 +196,7 @@ public partial class PosCartLine : BaseModel
     public virtual PosCart Cart { get; set; } = null!;
 }
 
+[AllowRemoteDataContextQuery]
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Rest,
@@ -396,6 +399,7 @@ public partial class PosPayment : BaseModel
     public virtual PosSale Sale { get; set; } = null!;
 }
 
+[AllowRemoteDataContextQuery]
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Rest,

@@ -34,6 +34,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
     private const int MutatingEndpointActions = 1 | 8 | 16; // Create | Update | Delete
     private const string CoreGenerateEndpointsAttribute = "XFramework.Core.Attributes.GenerateEndpointsAttribute";
     private const string SharedGenerateEndpointsAttribute = "XFramework.Domain.Shared.Attributes.GenerateEndpointsAttribute";
+    private const string SharedAllowRemoteQueryAttribute = "XFramework.Domain.Shared.Attributes.AllowRemoteDataContextQueryAttribute";
     private const string SharedAllowRemoteMutationAttribute = "XFramework.Domain.Shared.Attributes.AllowRemoteDataContextMutationAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -76,6 +77,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
                 Location = classSymbol.Locations.FirstOrDefault(),
                 EndpointTypeValue = GetEnumValue(attributeData, "Type", 3),
                 EndpointActionsValue = GetEndpointActionsValue(attributeData),
+                AllowRemoteQuery = HasAllowRemoteQueryAttribute(classSymbol),
                 AllowRemoteMutation = HasAllowRemoteMutationAttribute(classSymbol),
                 Authorization = GetAuthorizationInfo(classSymbol, attributeData)
             };
@@ -125,6 +127,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
                         Location = type.Locations.FirstOrDefault(),
                         EndpointTypeValue = GetEnumValue(generateEndpointsAttribute, "Type", 3),
                         EndpointActionsValue = GetEndpointActionsValue(generateEndpointsAttribute),
+                        AllowRemoteQuery = HasAllowRemoteQueryAttribute(type),
                         AllowRemoteMutation = HasAllowRemoteMutationAttribute(type),
                         Authorization = GetAuthorizationInfo(type, generateEndpointsAttribute)
                     });
@@ -304,6 +307,10 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
     private static bool HasMutatingEndpointActions(int endpointActionsValue) =>
         (endpointActionsValue & MutatingEndpointActions) != 0;
 
+    private static bool HasAllowRemoteQueryAttribute(INamedTypeSymbol type) =>
+        type.GetAttributes().Any(static a =>
+            a.AttributeClass?.ToDisplayString() == SharedAllowRemoteQueryAttribute);
+
     private static bool HasAllowRemoteMutationAttribute(INamedTypeSymbol type) =>
         type.GetAttributes().Any(static a =>
             a.AttributeClass?.ToDisplayString() == SharedAllowRemoteMutationAttribute);
@@ -360,7 +367,9 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         string capability)
     {
         var isMutation = operation is "Create" or "Update" or "Delete";
+        var isRead = operation == "Read";
         if ((entity.EndpointActionsValue & actionMask) == 0 &&
+            !(isRead && entity.AllowRemoteQuery) &&
             !(isMutation && entity.AllowRemoteMutation))
             return;
 
@@ -398,7 +407,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         sb.AppendLine($"            RequiredCrossTenantActorCapabilities = {StringArrayLiteral(string.IsNullOrWhiteSpace(authorization.CrossTenantCapability) ? [] : [authorization.CrossTenantCapability])},");
         sb.AppendLine($"            RequiredRoles = {StringArrayLiteral(authorization.Roles)},");
         sb.AppendLine($"            RequiredActorAttributes = {DictionaryLiteral(actorAttributes)},");
-        sb.AppendLine($"            AllowRemoteQuery = {(entity.EndpointTypeValue != 2).ToString().ToLowerInvariant()},");
+        sb.AppendLine($"            AllowRemoteQuery = {(isRead && (entity.AllowRemoteQuery || entity.EndpointTypeValue != 2)).ToString().ToLowerInvariant()},");
         sb.AppendLine($"            AllowRemoteMutation = {(isMutation && entity.AllowRemoteMutation).ToString().ToLowerInvariant()},");
         sb.AppendLine($"            AllowServiceOnly = {serviceAccess.Any().ToString().ToLowerInvariant()},");
         sb.AppendLine($"            AllowedServiceCallers = {StringArrayLiteral(allowedCallers)},");
@@ -535,6 +544,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         public Location? Location { get; set; }
         public int EndpointTypeValue { get; set; } = 3;
         public int EndpointActionsValue { get; set; } = 31;
+        public bool AllowRemoteQuery { get; set; }
         public bool AllowRemoteMutation { get; set; }
         public AuthorizationInfo Authorization { get; set; } = new();
     }

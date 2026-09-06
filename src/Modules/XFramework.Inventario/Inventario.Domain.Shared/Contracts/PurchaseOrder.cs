@@ -4,6 +4,7 @@ using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Inventario.Domain.Shared.Contracts;
 
+[AllowRemoteDataContextQuery]
 [MemoryPackable(GenerateType.CircularReference)]
 [GenerateEndpoints(
     Type = EndpointType.Rest,

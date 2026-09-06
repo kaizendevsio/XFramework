@@ -8,7 +8,9 @@ namespace Inventario.Api.Features.Reservations.Release;
 
 public static class ReleaseReservationEndpoint
 {
-    [BoltHandler]
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage])]
     [MapPost("/api/inventario/reservations/release", Tags = ["Inventario Reservations"],
         Summary = "Release reservation",
         Description = "Releases an active reservation and returns reserved quantity to available stock.")]

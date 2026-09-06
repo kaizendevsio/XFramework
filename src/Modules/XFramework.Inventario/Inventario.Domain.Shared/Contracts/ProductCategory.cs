@@ -2,6 +2,7 @@ using XFramework.Domain.Shared.Attributes;
 
 namespace XFramework.Inventario.Domain.Shared.Contracts;
 
+[AllowRemoteDataContextQuery]
 [MemoryPackable(GenerateType.CircularReference)]
 [AllowRemoteDataContextMutation]
 [GenerateEndpoints(
