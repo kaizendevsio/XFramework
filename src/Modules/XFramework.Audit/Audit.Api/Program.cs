@@ -17,7 +17,7 @@ var app = (WebApplication)builder.Build();
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
 app.MapXFrameworkHealthChecks("Audit");
-app.MapGeneratedEndpoints();
+Audit.Api.Generated.GeneratedEndpointRoutes.MapGeneratedEndpoints(app);
 app.MapApiDocumentation();
 app.Run();
 public partial class Program;
