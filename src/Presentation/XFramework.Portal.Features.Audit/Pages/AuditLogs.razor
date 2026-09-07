@@ -79,6 +79,7 @@
         _ready = false; _error = null; _version++;
         StateHasChanged();
         await Refresh();
+        StateHasChanged();
     });
     private async Task Refresh()
     {
