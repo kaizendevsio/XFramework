@@ -34,7 +34,7 @@ public sealed class AuditQueryService(
             query = AuditGridFilters.Apply(query, filter);
         if (request.AnchorEventId is long anchorId)
         {
-            var anchor = await query.FirstOrDefaultAsync(e => e.EventId == anchorId, ct);
+            var anchor = await Visible(auth.Data).FirstOrDefaultAsync(e => e.EventId == anchorId, ct);
             if (anchor is null) return Result<AuditPage>.NotFound("Audit event not found.");
             query = request.RelatedMode switch
             {

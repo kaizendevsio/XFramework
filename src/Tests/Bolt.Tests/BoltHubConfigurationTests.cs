@@ -396,7 +396,7 @@ public class BoltHubConfigurationTests
             bolt.GetProperty("RequireSecureTransport").GetBoolean().Should().BeFalse(because: path);
         }
 
-        clients.Should().Be(11, "every deployed Docker Bolt client must be covered");
+        clients.Should().Be(12, "every deployed Docker Bolt client, including Audit, must be covered");
     }
 
     private static JsonDocument ReadAppSettings(

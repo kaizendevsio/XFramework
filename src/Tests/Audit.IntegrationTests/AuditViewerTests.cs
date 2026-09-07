@@ -120,6 +120,17 @@ public sealed class AuditViewerTests
         (await service.SearchAsync(new() { AnchorEventId = long.MaxValue, RelatedMode = "record" }, default)).StatusCode.Should().Be(404);
     }
     [Test]
+    public async Task Search_RelatedHistory_FilterDoesNotExcludeAnchor()
+    {
+        var result = await service.SearchAsync(new()
+        {
+            AnchorEventId = eventId, RelatedMode = "record", To = DateTimeOffset.UtcNow.AddMinutes(1),
+            Filters = [new() { Field = "Action", Operator = "Equals", Value = "update" }]
+        }, default);
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Items.Should().ContainSingle().Which.EventId.Should().Be(eventId + 1);
+    }
+    [Test]
     public void Validate_UnboundedOrUnsupportedQuery_IsRejected()
     {
         var validator = new SearchAuditEventsValidator();
