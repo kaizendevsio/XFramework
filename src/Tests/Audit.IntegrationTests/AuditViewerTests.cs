@@ -126,4 +126,40 @@ public sealed class AuditViewerTests
         validator.Validate(new SearchAuditEventsRequest { Count = 101, From = DateTimeOffset.UtcNow.AddYears(-1), Filters = [new() { Field = "OldValues" }] }).IsValid.Should().BeFalse();
         validator.Validate(new SearchAuditEventsRequest { EntityKey = "not json" }).IsValid.Should().BeFalse();
     }
+
+    [Test]
+    public async Task Presentation_UnreviewedSource_DoesNotReturnPayload()
+    {
+        var row = await db.Set<XFramework.Domain.Auditing.AuditEvent>().AsNoTracking().SingleAsync(e => e.EventId == eventId);
+        db.Entry(row).Property(e => e.SchemaName).CurrentValue = "Identity";
+        var detail = AuditPresentation.ToDetail(row, tenant);
+        detail.Before.Should().BeNull();
+        detail.After.Should().BeNull();
+        detail.Fields.Should().BeEmpty();
+        db.Entry(row).State = EntityState.Detached;
+    }
+
+    [Test]
+    public void Presentation_CompositeKey_HidesNonIdComponents()
+    {
+        AuditPresentation.SafeKey("""{"ID":"visible","TenantId":"other-tenant","SecretToken":"hidden"}""")
+            .Should().Contain("visible").And.NotContain("other-tenant").And.NotContain("hidden");
+    }
+
+    [Test]
+    public void Endpoints_RequireTrustedActorCapabilityAndServiceScope()
+    {
+        foreach (var type in new[] {
+            typeof(Audit.Api.Features.Events.Search.SearchAuditEventsEndpoint),
+            typeof(Audit.Api.Features.Events.Get.GetAuditEventsEndpoint) })
+        {
+            var policy = (XFramework.Integration.Attributes.BoltHandlerAttribute)Attribute.GetCustomAttribute(
+                type.GetMethod("Handle")!, typeof(XFramework.Integration.Attributes.BoltHandlerAttribute))!;
+            policy.RequiredActorCapabilities.Should().Contain("audit:view");
+            policy.RequiredServiceScopes.Should().Contain("audit.read");
+            policy.RequiredCrossTenantActorCapabilities.Should().Contain("identity.tenants:manage");
+            policy.AllowAnonymous.Should().BeFalse();
+            policy.ActorRequirement.Should().Be(ActorRequirement.Required);
+        }
+    }
 }
