@@ -21,18 +21,20 @@
     }
     else if (_ready)
     {
-        <div class="xf-filter-actions">
-            <label>Date range (UTC)<BbDateRangePicker @bind-Value="_dateRange" /></label>
-            <label>Schema<BbInput @bind-Value="_schema" Placeholder="e.g. Inventario" /></label>
-            <label>Changed field<BbInput @bind-Value="_field" Placeholder="Exact field name" /></label>
-            <label>Actor credential ID<BbInput @bind-Value="_actor" /></label>
-            <label>Record key (JSON)<BbInput @bind-Value="_entityKey" Placeholder="Complete record key" /></label>
-            <label>Correlation ID<BbInput @bind-Value="_correlation" /></label>
-            <label>Transaction ID<BbInput @bind-Value="_transaction" /></label>
+        <div class="xf-detail-field-grid-wide" aria-label="Audit search filters">
+            <BbFormFieldDateRangePicker Label="Date range (UTC)" @bind-Value="_dateRange" ShowTwoMonths="false" InputClass="w-full" />
+            <BbFormFieldInput TValue="string" Label="Schema" @bind-Value="_schema" Placeholder="e.g. Inventario" />
+            <BbFormFieldInput TValue="string" Label="Changed field" @bind-Value="_field" Placeholder="Exact field name" />
+            <BbFormFieldInput TValue="string" Label="Actor credential ID" @bind-Value="_actor" Placeholder="Optional credential ID" />
+            <BbFormFieldInput TValue="string" Label="Record key (JSON)" @bind-Value="_entityKey" Placeholder="Complete record key" />
+            <BbFormFieldInput TValue="string" Label="Correlation ID" @bind-Value="_correlation" Placeholder="Optional request correlation ID" />
+            <BbFormFieldInput TValue="string" Label="Transaction ID" @bind-Value="_transaction" Placeholder="Optional database transaction ID" />
+        </div>
+        <div class="xf-page-actions">
             <BbButton OnClick="Refresh">Apply filters</BbButton>
         </div>
         @if (Anchor.HasValue) { <BbTypographyMuted>Showing @Mode history for event @Anchor. Date filters still apply.</BbTypographyMuted> }
-        @if (_error is not null) { <BbAlert>@_error</BbAlert> }
+        @if (_error is not null) { <BbAlert role="alert">@_error</BbAlert> }
         <BbDataGrid @key="_version" TData="AuditSummary" ItemsProvider="Load" ShowPagination="true" InitialPageSize="25"
                     OnRowClick="@((AuditSummary row) => Navigation.NavigateTo($"/audit/logs/{row.EventId}"))" Class="cursor-pointer">
             <Columns>
@@ -47,7 +49,12 @@
                 <BbDataGridPropertyColumn Property="@(r => r.EntityKey)" Title="Record key" />
                 <BbDataGridPropertyColumn Property="@(r => r.ChangedFields)" Title="Changed fields" />
             </Columns>
-            <EmptyTemplate><BbEmpty Title="No audit events" Description="Try a different date range or filter. Only authorized tenant events are shown." /></EmptyTemplate>
+            <EmptyTemplate>
+                @if (_error is null)
+                {
+                    <BbEmpty Title="No audit events" Description="Try a different date range or filter. Only authorized tenant events are shown." />
+                }
+            </EmptyTemplate>
         </BbDataGrid>
     }
     else { <CenteredSpinner /> }
