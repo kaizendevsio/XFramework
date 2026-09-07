@@ -3,6 +3,12 @@
 
 <SidebarNavItem Href="/" Label="Dashboard" Icon="layout-dashboard" Match="NavLinkMatch.All" Strong="true" />
 
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Audit))
+{
+    <SidebarSection GroupId="audit" Title="Audit" Icon="history">
+        <SidebarNavItem Href="/audit/logs" Label="Database changes" Icon="history" />
+    </SidebarSection>
+}
 <SidebarSection GroupId="identity" Title="Identity" Icon="users">
     <SidebarNavItem Href="/identity/users" Label="Users" Icon="users" />
     <SidebarNavItem Href="/identity/sessions" Label="Sessions" Icon="monitor" />

@@ -2,6 +2,7 @@ namespace XFramework.Domain.Shared.ServiceIdentity;
 
 public static class XFrameworkServiceNames
 {
+    public const string Audit = "XFramework.Audit";
     public const string Attendance = "XFramework.Attendance";
     public const string BoltHub = "XFramework.Bolt.Hub";
     public const string Coins = "XFramework.Coins";
@@ -21,6 +22,7 @@ public static class XFrameworkServiceNames
 
     public static readonly IReadOnlyList<string> All =
     [
+        Audit,
         Attendance,
         BoltHub,
         Coins,

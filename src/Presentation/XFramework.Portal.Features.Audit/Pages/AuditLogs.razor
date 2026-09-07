@@ -1,0 +1,131 @@
+@page "/audit/logs"
+@implements IDisposable
+@inject IAuditServiceWrapper Audit
+@inject IPortalTenantContext Tenant
+@inject IPortalModuleAvailability Modules
+@inject NavigationManager Navigation
+
+<PageTitle>Audit logs - Portal</PageTitle>
+<div class="space-y-4">
+    <div class="xf-page-header">
+        <div><BbTypographyH3>Audit logs</BbTypographyH3><BbTypographyMuted>Database changes · @Tenant.SelectedTenantName</BbTypographyMuted></div>
+        <div class="xf-page-actions"><BbButton OnClick="Refresh">Refresh</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="Clear">Clear filters</BbButton></div>
+    </div>
+    @if (Tenant.SelectedTenantId is null)
+    {
+        <ModuleUnavailable ModuleName="Audit" RequiresTenant="true" />
+    }
+    else if (_ready && !_enabled)
+    {
+        <ModuleUnavailable ModuleName="Audit" />
+    }
+    else if (_ready)
+    {
+        <div class="xf-filter-actions">
+            <label>Date range (UTC)<BbDateRangePicker @bind-Value="_dateRange" /></label>
+            <label>Schema<BbInput @bind-Value="_schema" Placeholder="e.g. Inventario" /></label>
+            <label>Changed field<BbInput @bind-Value="_field" Placeholder="Exact field name" /></label>
+            <label>Actor credential ID<BbInput @bind-Value="_actor" /></label>
+            <label>Record key (JSON)<BbInput @bind-Value="_entityKey" Placeholder="Complete record key" /></label>
+            <label>Correlation ID<BbInput @bind-Value="_correlation" /></label>
+            <label>Transaction ID<BbInput @bind-Value="_transaction" /></label>
+            <BbButton OnClick="Refresh">Apply filters</BbButton>
+        </div>
+        @if (Anchor.HasValue) { <BbTypographyMuted>Showing @Mode history for event @Anchor. Date filters still apply.</BbTypographyMuted> }
+        @if (_error is not null) { <BbAlert>@_error</BbAlert> }
+        <BbDataGrid @key="_version" TData="AuditSummary" ItemsProvider="Load" ShowPagination="true" InitialPageSize="25"
+                    OnRowClick="@((AuditSummary row) => Navigation.NavigateTo($"/audit/logs/{row.EventId}"))" Class="cursor-pointer">
+            <Columns>
+                <BbDataGridPropertyColumn Property="@(r => r.RecordedAt)" Title="Recorded at (UTC)" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(r => r.Action)" Title="Action" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(r => r.ActorKind)" Title="Actor kind" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Actor">
+                    <ChildContent Context="row">@(row.ActorName is not null ? row.ActorName + " (current)" : row.ActorId?.ToString() ?? row.ActorKind)</ChildContent>
+                </BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(r => r.Service)" Title="Service" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(r => r.Table)" Title="Record type" Filterable="true" />
+                <BbDataGridPropertyColumn Property="@(r => r.EntityKey)" Title="Record key" />
+                <BbDataGridPropertyColumn Property="@(r => r.ChangedFields)" Title="Changed fields" />
+            </Columns>
+            <EmptyTemplate><BbEmpty Title="No audit events" Description="Try a different date range or filter. Only authorized tenant events are shown." /></EmptyTemplate>
+        </BbDataGrid>
+    }
+    else { <CenteredSpinner /> }
+</div>
+@code {
+    [SupplyParameterFromQuery] public long? Anchor { get; set; }
+    [SupplyParameterFromQuery] public string? Mode { get; set; }
+    private DateTime _from = DateTime.UtcNow.Date.AddDays(-7), _to = DateTime.UtcNow.Date;
+    private DateRange _dateRange = DateRange.Create(DateTime.UtcNow.Date.AddDays(-7), DateTime.UtcNow.Date);
+    private string? _schema, _field, _actor, _entityKey, _correlation, _transaction, _error;
+    private bool _ready, _enabled;
+    private int _version;
+    private CancellationTokenSource _lifetime = new();
+    protected override async Task OnInitializedAsync()
+    {
+        Tenant.OnChanged += TenantChanged;
+        await Refresh();
+    }
+    private void TenantChanged() => _ = InvokeAsync(async () =>
+    {
+        _lifetime.Cancel(); _lifetime.Dispose(); _lifetime = new();
+        _ready = false; _error = null; _version++;
+        StateHasChanged();
+        await Refresh();
+    });
+    private async Task Refresh()
+    {
+        _error = null;
+        await Modules.ReloadAsync(_lifetime.Token);
+        _enabled = Modules.IsFeatureEnabled("audit");
+        _ready = true; _version++;
+    }
+    private async Task Clear()
+    {
+        _schema = _field = _actor = _entityKey = _correlation = _transaction = null;
+        _from = DateTime.UtcNow.Date.AddDays(-7); _to = DateTime.UtcNow.Date;
+        _dateRange = DateRange.Create(_from, _to);
+        Navigation.NavigateTo("/audit/logs");
+        await Refresh();
+    }
+    private async ValueTask<BlazorBlueprint.Primitives.DataGrid.DataGridResult<AuditSummary>> Load(DataGridRequest grid)
+    {
+        var tenant = Tenant.SelectedTenantId;
+        var version = _version;
+        if (tenant is null) return new() { Items = [], TotalItemCount = 0 };
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(grid.CancellationToken, _lifetime.Token);
+        try
+        {
+            _from = _dateRange.Start;
+            _to = _dateRange.End;
+            var request = new SearchAuditEventsRequest
+            {
+                Metadata = new RequestMetadata { RequestedTenantId = tenant, RequestId = Guid.NewGuid(), OperationName = "Portal.Audit" },
+                From = new DateTimeOffset(DateTime.SpecifyKind(_from, DateTimeKind.Utc)),
+                To = new DateTimeOffset(DateTime.SpecifyKind(_to.AddDays(1), DateTimeKind.Utc)),
+                StartIndex = grid.StartIndex, Count = grid.Count ?? 25, Schema = _schema, ChangedField = _field,
+                ActorId = string.IsNullOrWhiteSpace(_actor) ? null : Guid.Parse(_actor),
+                EntityKey = _entityKey, AnchorEventId = Anchor, RelatedMode = Mode,
+                CorrelationId = string.IsNullOrWhiteSpace(_correlation) ? null : Guid.Parse(_correlation),
+                TransactionId = string.IsNullOrWhiteSpace(_transaction) ? null : long.Parse(_transaction),
+                OldestFirst = grid.SortDefinitions?.FirstOrDefault()?.Direction == SortDirection.Ascending
+            };
+            if (grid.Filters is not null)
+                foreach (var filter in grid.Filters.Values)
+                {
+                    request.Filters.Add(new AuditFilter { Field = filter.Field, Operator = filter.Operator.ToString(), Value = Convert.ToString(filter.Value) });
+                }
+            var response = await Audit.SearchAuditEvents(request, linked.Token);
+            if (tenant != Tenant.SelectedTenantId || version != _version) return new() { Items = [], TotalItemCount = 0 };
+            if (!response.IsSuccess || response.Response is null)
+                throw new InvalidOperationException(response.Message ?? "Audit service is unavailable.");
+            return new() { Items = response.Response.Items, TotalItemCount = response.Response.TotalItemCount };
+        }
+        catch (OperationCanceledException) { return new() { Items = [], TotalItemCount = 0 }; }
+        catch (FormatException) { _error = "Enter valid actor/correlation/transaction IDs."; }
+        catch (Exception) { _error = "Audit logs could not be loaded. Check module access, audit viewing permission, filters, and service availability."; }
+        await InvokeAsync(StateHasChanged);
+        return new() { Items = [], TotalItemCount = 0 };
+    }
+    public void Dispose() { Tenant.OnChanged -= TenantChanged; _lifetime.Cancel(); _lifetime.Dispose(); }
+}

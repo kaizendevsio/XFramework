@@ -187,6 +187,25 @@
   <Folder Name="/Applications/Gateway/">
     <Project Path="src/Presentation/Gateway/Gateway.csproj" />
   </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Infrastructure/" />
+  <Folder Name="/src/Kernel/" />
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/XFramework.Audit/">
+    <Project Path="src/Modules/XFramework.Audit/Audit.Api/Audit.Api.csproj" />
+    <Project Path="src/Modules/XFramework.Audit/Audit.Domain.Shared/Audit.Domain.Shared.csproj" />
+    <Project Path="src/Modules/XFramework.Audit/Audit.Integration/Audit.Integration.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/XFramework.Bolt/" />
+  <Folder Name="/src/Modules/XFramework.IdentityServer/" />
+  <Folder Name="/src/Presentation/">
+    <Project Path="src/Presentation/XFramework.Portal.Features.Audit/XFramework.Portal.Features.Audit.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/" />
+  <Folder Name="/src/SourceGenerators/" />
+  <Folder Name="/src/Tests/">
+    <Project Path="src/Tests/Audit.IntegrationTests/Audit.IntegrationTests.csproj" />
+  </Folder>
 
   <Folder Name="/Tooling/" />
   <Folder Name="/Tooling/BoltPhase0Synthetics/">

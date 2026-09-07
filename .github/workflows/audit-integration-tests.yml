@@ -1,0 +1,24 @@
+name: Audit Tests
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'src/Modules/XFramework.Audit/**'
+      - 'src/Tests/Audit.IntegrationTests/**'
+      - 'src/Presentation/XFramework.Portal.Features.Audit/**'
+      - 'src/Modules/XFramework.IdentityServer/**'
+      - '.github/workflows/audit-integration-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet test src/Tests/Audit.IntegrationTests/Audit.IntegrationTests.csproj -m:1 /nr:false
+      - run: dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj -m:1 /nr:false --filter 'FullyQualifiedName!~Portal.E2ETests.PortalE2ETests.'

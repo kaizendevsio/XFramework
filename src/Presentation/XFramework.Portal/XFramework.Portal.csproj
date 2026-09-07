@@ -49,6 +49,7 @@
         <!-- Bolt client infrastructure (BoltClient, BoltDriver, IMessageBusWrapper) -->
         <ProjectReference Include="..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
         <ProjectReference Include="..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+        <ProjectReference Include="..\XFramework.Portal.Features.Audit\XFramework.Portal.Features.Audit.csproj" />
     </ItemGroup>
 
 </Project>

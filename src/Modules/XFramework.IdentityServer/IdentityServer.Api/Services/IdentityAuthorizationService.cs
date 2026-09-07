@@ -421,6 +421,9 @@ public sealed class IdentityAuthorizationService(
         if (decisions.FirstOrDefault(x => x.IsAllowed) is { } allowed)
             return allowed;
 
+        // Audit data always requires an explicit role grant, even in permissive tenants.
+        if (string.Equals(moduleKey, TenantModuleFeatureKeys.Audit, StringComparison.OrdinalIgnoreCase))
+            return new CapabilityDecision(false, SourceTenantDefaultDeny);
         return missingBehavior == MissingPermissionBehavior.Allow
             ? new CapabilityDecision(true, SourceTenantDefaultAllow)
             : new CapabilityDecision(false, SourceTenantDefaultDeny);
@@ -1129,6 +1132,8 @@ public sealed class IdentityAuthorizationService(
         if (decisions.Any(x => x.IsAllowed))
             return decisions.First(x => x.IsAllowed);
 
+        if (string.Equals(moduleKey, TenantModuleFeatureKeys.Audit, StringComparison.OrdinalIgnoreCase))
+            return new CapabilityDecision(false, SourceTenantDefaultDeny);
         return await ResolveMissingPermissionAsync(tenantId, ct);
     }
 
@@ -1374,8 +1379,10 @@ public sealed class IdentityAuthorizationService(
     }
 
     private static bool RequiresTenantFeature(string moduleKey, string subFeatureKey) =>
-        !string.Equals(moduleKey, TenantModuleFeatureKeys.Identity, StringComparison.OrdinalIgnoreCase) ||
-        !string.IsNullOrWhiteSpace(subFeatureKey);
+        // Audit API checks the selected tenant's gate on every request, including delegated access.
+        !string.Equals(moduleKey, TenantModuleFeatureKeys.Audit, StringComparison.OrdinalIgnoreCase) &&
+        (!string.Equals(moduleKey, TenantModuleFeatureKeys.Identity, StringComparison.OrdinalIgnoreCase) ||
+         !string.IsNullOrWhiteSpace(subFeatureKey));
 
     private static string[] BuildCapabilityKeySet(string capabilityKey)
     {
