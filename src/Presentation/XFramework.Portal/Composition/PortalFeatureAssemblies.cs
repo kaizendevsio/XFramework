@@ -15,6 +15,7 @@ public static class PortalFeatureAssemblies
 {
     public static Assembly[] All { get; } =
     [
+        typeof(XFramework.Portal.Features.Audit.AuditPortalFeature).Assembly,
         typeof(AttendancePortalFeature).Assembly,
         typeof(CommunityPortalFeature).Assembly,
         typeof(CommunicationsPortalFeature).Assembly,

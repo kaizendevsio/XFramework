@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><LangVersion>14</LangVersion></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../SourceGenerators/XFramework.SourceGenerators/XFramework.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../../Kernel/XFramework.Core/XFramework.Core.csproj" />
+    <ProjectReference Include="../../../Kernel/XFramework.Domain/XFramework.Domain.csproj" />
+    <ProjectReference Include="../../XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj" />
+    <ProjectReference Include="../Audit.Domain.Shared/Audit.Domain.Shared.csproj" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+</Project>

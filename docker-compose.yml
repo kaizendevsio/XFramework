@@ -226,7 +226,7 @@ services:
       ServiceIdentity__Clients__1__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__Clients__1__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__1__AllowedAudiences: *service-identity-audiences
-      ServiceIdentity__Clients__1__AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,tenant.target,attendance.read,attendance.write,communications.admin,communications.chat,identity.admin,identity.session.validate
+      ServiceIdentity__Clients__1__AllowedScopes: bolt.service,datacontext.query,datacontext.query.all-tenants,datacontext.mutate,tenant.target,attendance.read,attendance.write,communications.admin,communications.chat,identity.admin,identity.session.validate,audit.read
       ServiceIdentity__Clients__2__ClientId: XFramework.Bolt.Hub
       ServiceIdentity__Clients__2__ClientSecret: ${BOLT_HUB_SERVICE_IDENTITY_SECRET:?Set BOLT_HUB_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__2__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -259,6 +259,14 @@ services:
       ServiceIdentity__Clients__5__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__5__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__5__AllowedScopes: bolt.service,identity.session.validate
+      ServiceIdentity__Clients__12__ClientId: XFramework.Audit
+      ServiceIdentity__Clients__12__ClientSecret: ${AUDIT_SERVICE_IDENTITY_SECRET:?Set AUDIT_SERVICE_IDENTITY_SECRET in .env}
+      ServiceIdentity__Clients__12__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__12__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__Clients__12__ValidationFallback__ClientSecret: ${AUDIT_SERVICE_IDENTITY_SECRET_SECONDARY:-}
+      ServiceIdentity__Clients__12__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+      ServiceIdentity__Clients__12__AllowedAudiences: *service-identity-audiences
+      ServiceIdentity__Clients__12__AllowedScopes: bolt.service,identity.session.validate
       ServiceIdentity__Clients__6__ClientId: XFramework.Attendance
       ServiceIdentity__Clients__6__ClientSecret: ${ATTENDANCE_SERVICE_IDENTITY_SECRET:?Set ATTENDANCE_SERVICE_IDENTITY_SECRET in .env}
       ServiceIdentity__Clients__6__GenerationId: ${SERVICE_CREDENTIAL_GENERATION_ID:?Set SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
@@ -392,6 +400,37 @@ services:
     secrets: *identity-user-jwt-public-key-secret
     ports:
       - "${NOTIFICATIONS_EXPOSE_PORT:-5166}:8080"
+    depends_on:
+      bolt-hub:
+        condition: service_healthy
+      identityserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
+  audit:
+    container_name: xframework-audit
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/audit:${IMAGE_TAG:-develop}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.Audit/Audit.Api/Audit.Api.csproj
+    environment:
+      <<: *common-env
+      ServiceIdentity__ClientSecret: ${AUDIT_SERVICE_IDENTITY_SECRET:?Set AUDIT_SERVICE_IDENTITY_SECRET in .env}
+      ServiceIdentity__DefaultScopes__0: bolt.service
+      ServiceIdentity__DefaultScopes__1: identity.session.validate
+      ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
+      ServiceIdentity__ValidationFallback__ClientSecret: ${AUDIT_SERVICE_IDENTITY_SECRET_SECONDARY:-}
+      ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
+    secrets: *identity-user-jwt-public-key-secret
+    ports:
+      - "${AUDIT_EXPOSE_PORT:-5185}:8080"
     depends_on:
       bolt-hub:
         condition: service_healthy
@@ -638,6 +677,7 @@ services:
       ServiceIdentity__DefaultScopes__3: tenant.target
       ServiceIdentity__DefaultScopes__4: communications.admin
       ServiceIdentity__DefaultScopes__5: communications.chat
+      ServiceIdentity__DefaultScopes__6: audit.read
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${PORTAL_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}

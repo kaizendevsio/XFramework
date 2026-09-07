@@ -2,6 +2,7 @@ namespace IdentityServer.Domain.Shared.Contracts;
 
 public static class TenantModuleFeatureKeys
 {
+    public const string Audit = "audit";
     public const string Wallets = "wallets";
     public const string WalletsTransfers = "wallets.transfers";
     public const string WalletsDeposits = "wallets.deposits";
@@ -92,6 +93,7 @@ public static class TenantModuleFeatureKeys
 
     public static IReadOnlyList<TenantModuleFeatureDefinition> All { get; } =
     [
+        new(Audit, string.Empty, "Audit", "View database change history. Disabling access does not stop recording.", "history", false),
         new(Wallets, string.Empty, "Wallets", "Wallet accounts, balances, transfers, deposits, and withdrawals.", "wallet"),
         new(Wallets, TransfersSubFeature, "Wallet Transfers", "Wallet transfer and conversion operations.", "arrow-left-right"),
         new(Wallets, DepositsSubFeature, "Wallet Deposits", "Deposit requests, approvals, provider callbacks, and settlement.", "circle-plus"),

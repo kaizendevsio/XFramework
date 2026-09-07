@@ -49,6 +49,7 @@ public sealed class PortalArchitectureTests
 
         featureProjects.Select(Path.GetFileNameWithoutExtension).Should().BeEquivalentTo(
         [
+            "XFramework.Portal.Features.Audit",
             "XFramework.Portal.Features.Administration",
             "XFramework.Portal.Features.Attendance",
             "XFramework.Portal.Features.Communications",

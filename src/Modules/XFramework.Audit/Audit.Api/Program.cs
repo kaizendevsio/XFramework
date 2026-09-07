@@ -1,0 +1,23 @@
+using FluentValidation;
+using IdentityServer.Integration.Extensions;
+using XFramework.Core.Extensions;
+using XFramework.Core.Health;
+using XFramework.Core.Middlewares;
+using XFramework.Core.RateLimiting;
+using XFramework.Integration.Extensions;
+
+var builder = XApplication.Configure<Program>();
+builder.Logging.AddXFrameworkLogging(builder.Configuration);
+builder.Services.AddIdentityServerSessionValidation();
+builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Audit");
+builder.Services.AddXFrameworkHealthChecks<AppDbContext>(builder.Configuration, "Audit");
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+builder.Services.AddXFrameworkRateLimiting();
+var app = (WebApplication)builder.Build();
+app.UseCorrelationId();
+app.UseXFrameworkRateLimiting();
+app.MapXFrameworkHealthChecks("Audit");
+app.MapGeneratedEndpoints();
+app.MapApiDocumentation();
+app.Run();
+public partial class Program;

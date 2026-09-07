@@ -10,6 +10,7 @@ public sealed class ServiceIdentityComposeContractTests
 {
     private static readonly string[] ServiceSecretVariables =
     [
+        "AUDIT_SERVICE_IDENTITY_SECRET",
         "IDENTITYSERVER_SERVICE_IDENTITY_SECRET",
         "BOLT_HUB_SERVICE_IDENTITY_SECRET",
         "COMMUNICATIONS_SERVICE_IDENTITY_SECRET",
@@ -26,6 +27,7 @@ public sealed class ServiceIdentityComposeContractTests
 
     private static readonly string[] RegisteredServiceClients =
     [
+        "XFramework.Audit",
         "XFramework.IdentityServer",
         "XFramework.Portal",
         "XFramework.Bolt.Hub",
@@ -42,6 +44,7 @@ public sealed class ServiceIdentityComposeContractTests
 
     private static readonly string[] IdentityDependentServices =
     [
+        "audit",
         "bolt-hub",
         "communications",
         "notifications",
@@ -58,6 +61,7 @@ public sealed class ServiceIdentityComposeContractTests
 
     private static readonly string[] CentralIdentityServices =
     [
+        "audit",
         "bolt-hub",
         "identityserver",
         "communications",
@@ -134,6 +138,7 @@ public sealed class ServiceIdentityComposeContractTests
         compose.Should().Contain("AllowedScopes: bolt.service");
         ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.Portal).Should().BeEquivalentTo(
         [
+            XFrameworkServiceScopes.AuditRead,
             XFrameworkServiceScopes.BoltService,
             XFrameworkServiceScopes.DataContextQuery,
             XFrameworkServiceScopes.DataContextQueryAllTenants,
@@ -471,7 +476,7 @@ public sealed class ServiceIdentityComposeContractTests
             "\"${compose[@]}\" run --rm --no-TTY --no-deps minio-init </dev/null";
         workflow.Should().Contain(minioInitialization);
         workflow.IndexOf(minioInitialization, StringComparison.Ordinal).Should().BeLessThan(
-            workflow.IndexOf("clients=(notifications storage", StringComparison.Ordinal),
+            workflow.IndexOf("clients=(audit notifications storage", StringComparison.Ordinal),
             "the readiness bucket must exist before Storage is started without dependencies");
         workflow.Should().NotContain("APPROVE_BOLT_TAILSCALE_TRANSITION");
         workflow.Should().NotContain("xframework.bolt.transition-acceptance.v1");

@@ -1,0 +1,75 @@
+@page "/audit/logs/{EventId:long}"
+@implements IDisposable
+@inject IAuditServiceWrapper Audit
+@inject IPortalTenantContext Tenant
+@inject NavigationManager Navigation
+<PageTitle>Audit event - Portal</PageTitle>
+<div class="space-y-4">
+    <div class="xf-page-header"><BbTypographyH3>Audit event @EventId</BbTypographyH3><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo("/audit/logs"))">Back to logs</BbButton></div>
+    @if (_loading) { <CenteredSpinner /> }
+    else if (_item is null) { <BbAlert>@_error</BbAlert> }
+    else
+    {
+        <BbCard><BbCardHeader><BbCardTitle>@_item.Summary.Action · @_item.Summary.Schema.@_item.Summary.Table</BbCardTitle>
+            <BbCardDescription>@_item.Summary.RecordedAt.ToString("O") (UTC) · @_item.Summary.Service</BbCardDescription></BbCardHeader>
+            <BbCardContent>
+                <p>Actor: @(_item.Summary.ActorName is not null ? _item.Summary.ActorName + " (current username)" : _item.Summary.ActorKind) · @_item.Summary.ActorId</p>
+                <p>Record key: @_item.Summary.EntityKey</p>
+                <p>@_item.Notice</p>
+            </BbCardContent>
+        </BbCard>
+        <div class="xf-page-actions">
+            <BbButton OnClick="@(() => Related("record"))">Record history</BbButton>
+            <BbButton OnClick="@(() => Related("transaction"))">Same transaction</BbButton>
+            @if (_item.CorrelationId.HasValue) { <BbButton OnClick="@(() => Related("correlation"))">Same request</BbButton> }
+            <label><BbCheckbox @bind-Checked="_allFields" /> Show all available fields</label>
+        </div>
+        <BbDataGrid TData="AuditFieldChange" Items="@(_item.Fields.Where(f => _allFields || f.Changed || f.Before == "Restricted" || f.After == "Restricted").ToList())" ShowPagination="true" InitialPageSize="25">
+            <Columns>
+                <BbDataGridPropertyColumn Property="@(f => f.Field)" Title="Field" Filterable="true" />
+                <BbDataGridTemplateColumn Title="Before" Filterable="true" FilterBy="@(f => f.Before)"><ChildContent Context="field"><pre class="whitespace-pre-wrap break-all">@Preview(field.Before)</pre></ChildContent></BbDataGridTemplateColumn>
+                <BbDataGridTemplateColumn Title="After" Filterable="true" FilterBy="@(f => f.After)"><ChildContent Context="field"><pre class="whitespace-pre-wrap break-all">@Preview(field.After)</pre></ChildContent></BbDataGridTemplateColumn>
+                <BbDataGridPropertyColumn Property="@(f => f.Changed)" Title="Changed" />
+            </Columns>
+            <EmptyTemplate><BbEmpty Title="No visible field changes" Description="This event may expose metadata only, or its changed values were redacted." /></EmptyTemplate>
+        </BbDataGrid>
+        <details><summary>Sanitized JSON</summary><h4>Before</h4><pre class="whitespace-pre-wrap break-all">@(_item.Before ?? "Not present or restricted")</pre><h4>After</h4><pre class="whitespace-pre-wrap break-all">@(_item.After ?? "Not present or restricted")</pre></details>
+        <details><summary>Technical details</summary>
+            <p>Event UUID: @_item.EventUuid</p><p>Transaction: @_item.TransactionId · Order within transaction: @_item.TransactionOrdinal</p>
+            <p>Correlation: @_item.CorrelationId · Change set: @_item.ChangeSetId</p><p>Trace: @_item.TraceId · Span: @_item.SpanId</p>
+            <p>Recorded time is capture time, not commit time. Ordering across concurrent transactions is not guaranteed.</p>
+        </details>
+    }
+</div>
+@code {
+    [Parameter] public long EventId { get; set; }
+    private AuditDetail? _item;
+    private bool _loading = true, _allFields;
+    private string _error = "Audit event is unavailable or you do not have access.";
+    private CancellationTokenSource _load = new();
+    protected override void OnInitialized() => Tenant.OnChanged += ChangedTenant;
+    protected override async Task OnParametersSetAsync() => await Load();
+    private void ChangedTenant() => _ = InvokeAsync(Load);
+    private async Task Load()
+    {
+        _load.Cancel(); _load.Dispose(); _load = new();
+        var token = _load.Token;
+        _item = null; _loading = true; StateHasChanged();
+        try
+        {
+            if (Tenant.SelectedTenantId is not Guid tenant) { _error = "Select a tenant to view audit logs."; return; }
+            var response = await Audit.GetAuditEvent(new GetAuditEventRequest
+            {
+                EventId = EventId, Metadata = new RequestMetadata { RequestedTenantId = tenant, RequestId = Guid.NewGuid(), OperationName = "Portal.Audit.Detail" }
+            }, token);
+            if (!token.IsCancellationRequested && tenant == Tenant.SelectedTenantId)
+                _item = response.IsSuccess ? response.Response : null;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) { _error = "Audit event could not be loaded. Check access and service availability."; }
+        finally { if (!token.IsCancellationRequested) _loading = false; }
+    }
+    private void Related(string mode) => Navigation.NavigateTo($"/audit/logs?anchor={EventId}&mode={mode}");
+    private static string Preview(string value) => value.Length > 2000 ? value[..2000] + "… (full value in sanitized JSON)" : value;
+    public void Dispose() { Tenant.OnChanged -= ChangedTenant; _load.Cancel(); _load.Dispose(); }
+}

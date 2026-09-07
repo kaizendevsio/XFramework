@@ -82,6 +82,7 @@ jobs:
       IDENTITYSERVER_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       BOLT_HUB_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       COMMUNICATIONS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
+      AUDIT_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       NOTIFICATIONS_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       STORAGE_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
       ATTENDANCE_SERVICE_IDENTITY_SECRET: compose-validation-placeholder
@@ -271,7 +272,7 @@ jobs:
           set -euo pipefail
           services=(
             migrate identityserver bolt-hub communications
-            notifications storage attendance smsgateway wallets inventario pos
+            audit notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard bolt-phase0-synthetics
           )
           for service in "${services[@]}"; do
@@ -285,7 +286,7 @@ jobs:
           set -euo pipefail
           services=(
             migrate identityserver bolt-hub communications
-            notifications storage attendance smsgateway wallets inventario pos
+            audit notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard bolt-phase0-synthetics
           )
           for service in "${services[@]}"; do
@@ -459,7 +460,7 @@ jobs:
 
           image_services=(
             migrate identityserver bolt-hub communications
-            notifications storage attendance smsgateway wallets inventario pos
+            audit notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard bolt-phase0-synthetics
           )
           python3 - "$REMOTE_IMAGE_OVERRIDE" "$REGISTRY_HOST" "$REGISTRY_NAMESPACE" "$IMAGE_TAG" "${image_services[@]}" <<'PY'
@@ -493,6 +494,9 @@ jobs:
             smsgateway wallets inventario pos portal operations-dashboard
           )
           runtime_snapshot_ready=false
+          if docker inspect xframework-audit >/dev/null 2>&1; then
+            runtime_services+=(audit)
+          fi
           image_arguments=()
           if [ -f "$REMOTE_ACTIVE_ENV" ] && [ ! -L "$REMOTE_ACTIVE_ENV" ] && \
              [ -f "$REMOTE_COMPOSE_FILE" ] && [ ! -L "$REMOTE_COMPOSE_FILE" ]; then
@@ -613,6 +617,8 @@ jobs:
               "inventario", "pos", "portal", "operations-dashboard",
           )
           services = document.get("services", {})
+          if "audit" in services:
+              required_services += ("audit",)
           for name in required_services:
               image = services.get(name, {}).get("image")
               if not image:
@@ -655,7 +661,7 @@ jobs:
           set -euo pipefail
           services=(
             postgres redis minio seq migrate identityserver bolt-hub communications
-            notifications storage attendance smsgateway wallets inventario pos
+            audit notifications storage attendance smsgateway wallets inventario pos
             portal operations-dashboard bolt-phase0-synthetics
           )
           service_args="$(printf '%q ' "${services[@]}")"
@@ -1032,12 +1038,13 @@ jobs:
           ssh "$DEPLOY_HOST" \
             "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$REMOTE_CANDIDATE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
-          clients=(notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          clients=(audit notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
           compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE")
           /usr/bin/timeout --foreground --kill-after=30s 600s \
             "${compose[@]}" up -d --no-build --no-deps --force-recreate "${clients[@]}"
 
           checks=(
+            audit=http://127.0.0.1:5185/health/ready
             notifications=http://127.0.0.1:5166/health/ready
             storage=http://127.0.0.1:5190/health/ready
             attendance=http://127.0.0.1:5182/health/ready
@@ -1182,6 +1189,11 @@ jobs:
           fi
 
           compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$deploy_env" "${compose_files[@]}")
+          if "${compose[@]}" config --services | grep -qx audit; then
+            services+=(audit)
+          elif docker inspect xframework-audit >/dev/null 2>&1; then
+            docker stop xframework-audit
+          fi
           /usr/bin/timeout --foreground --kill-after=30s 300s \
             "${compose[@]}" up -d --no-build postgres redis minio seq
           for service in "${services[@]}"; do

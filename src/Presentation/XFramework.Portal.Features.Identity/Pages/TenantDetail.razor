@@ -1211,6 +1211,7 @@ else
     private static string GetModuleFeatureCoverageText(ModuleFeatureRow row) =>
         row.Key switch
         {
+            TenantModuleFeatureKeys.Audit or
             TenantModuleFeatureKeys.Wallets or
             TenantModuleFeatureKeys.Inventario or
             TenantModuleFeatureKeys.InventarioCatalog or

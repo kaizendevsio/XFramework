@@ -104,6 +104,7 @@ builder.Services.AddInventarioWrapperServices();
 builder.Services.AddPOSWrapperServices();
 builder.Services.AddCommunicationsWrapperServices();
 builder.Services.AddStorageWrapperServices();
+builder.Services.AddScoped<Audit.Integration.IAuditServiceWrapper, Audit.Integration.AuditServiceWrapper>();
 builder.Services.AddWalletsWrapperServices();
 builder.Services.AddTenantModuleFeatureDefinitions(builder.Configuration);
 

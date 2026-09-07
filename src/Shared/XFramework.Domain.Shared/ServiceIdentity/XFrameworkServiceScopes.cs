@@ -2,6 +2,7 @@ namespace XFramework.Domain.Shared.ServiceIdentity;
 
 public static class XFrameworkServiceScopes
 {
+    public const string AuditRead = "audit.read";
     public const string BoltService = "bolt.service";
     public const string DataContextQuery = "datacontext.query";
     public const string DataContextQueryAllTenants = "datacontext.query.all-tenants";
@@ -26,6 +27,7 @@ public static class XFrameworkServiceScopes
 
     public static readonly IReadOnlyList<string> AdminDefaults =
     [
+        AuditRead,
         BoltService,
         DataContextQuery,
         DataContextQueryAllTenants,

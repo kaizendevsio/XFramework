@@ -35,7 +35,7 @@ public sealed class TenantModuleNavigationService(
         return tenantFilter.SelectedTenantId is Guid && _features.TryGetValue(key, out var enabled) && enabled;
     }
 
-    public async Task ReloadAsync(CancellationToken ct = default) => await LoadAsync(ct);
+    public async Task ReloadAsync(CancellationToken ct = default) => await LoadAsync(ct, force: true);
 
     public void Initialize()
     {
@@ -49,7 +49,7 @@ public sealed class TenantModuleNavigationService(
         _ = LoadAsync();
     }
 
-    private async Task LoadAsync(CancellationToken ct = default)
+    private async Task LoadAsync(CancellationToken ct = default, bool force = false)
     {
         await _loadGate.WaitAsync(ct);
 
@@ -57,7 +57,7 @@ public sealed class TenantModuleNavigationService(
 
         try
         {
-            if (_loadedTenantId == tenantFilter.SelectedTenantId)
+            if (!force && _loadedTenantId == tenantFilter.SelectedTenantId)
             {
                 return;
             }
