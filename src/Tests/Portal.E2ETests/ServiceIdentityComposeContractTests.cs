@@ -77,6 +77,23 @@ public sealed class ServiceIdentityComposeContractTests
     ];
 
     [Test]
+    public void DockerCompose_AllServiceClients_AreAllowedAudiences()
+    {
+        var compose = File.ReadAllLines(Path.Combine(FindRepositoryRoot().FullName, "docker-compose.yml"));
+        var audienceLine = compose.Single(line => line.StartsWith("x-service-identity-audiences:"));
+        var audiences = audienceLine.Split(' ', StringSplitOptions.RemoveEmptyEntries).Last().Split(',');
+        audiences.Should().BeEquivalentTo(RegisteredServiceClients);
+    }
+
+    [Test]
+    public void AuditStartup_UsesModuleGeneratedRoutes()
+    {
+        var program = File.ReadAllText(Path.Combine(FindRepositoryRoot().FullName,
+            "src", "Modules", "XFramework.Audit", "Audit.Api", "Program.cs"));
+        program.Should().Contain("Audit.Api.Generated.GeneratedEndpointRoutes.MapGeneratedEndpoints(app);");
+    }
+
+    [Test]
     public void Repository_IgnoresGeneratedJwtKeyDirectories()
     {
         var repositoryRoot = FindRepositoryRoot();

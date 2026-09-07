@@ -11,6 +11,19 @@ namespace Portal.E2ETests;
 public sealed class PortalArchitectureTests
 {
     [Test]
+    public void AuditFilters_UseResponsiveLabeledFieldsInsteadOfFixedWidthToolbar()
+    {
+        var page = File.ReadAllText(Path.Combine(FindRepositoryRoot().FullName,
+            "src", "Presentation", "XFramework.Portal.Features.Audit", "Pages", "AuditLogs.razor"));
+        page.Should().Contain("xf-detail-field-grid-wide");
+        page.Should().NotContain("xf-filter-actions");
+        page.Should().Contain("BbFormFieldDateRangePicker Label=\"Date range (UTC)\"");
+        foreach (var label in new[] { "Schema", "Changed field", "Actor credential ID", "Record key (JSON)", "Correlation ID", "Transaction ID" })
+            page.Should().Contain($"BbFormFieldInput TValue=\"string\" Label=\"{label}\"");
+        page.Should().Contain("@if (_error is null)", "a failed request must not be presented as an empty audit history");
+    }
+
+    [Test]
     public void SharedProject_RemainsIndependentFromPortalHostAndBackendModules()
     {
         var repositoryRoot = FindRepositoryRoot();

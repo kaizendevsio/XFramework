@@ -7,7 +7,7 @@
 # Portal uses appsettings.dev.json for the xeon-dev admin surface.
 # Only secrets and infra overrides go in env vars / .env files.
 
-x-service-identity-audiences: &service-identity-audiences XFramework.Attendance,XFramework.Bolt.Hub,XFramework.Communications,XFramework.Portal,XFramework.IdentityServer,XFramework.Inventario,XFramework.Notifications,XFramework.Operations.Dashboard,XFramework.POS,XFramework.SmsGateway,XFramework.Storage,XFramework.Wallets
+x-service-identity-audiences: &service-identity-audiences XFramework.Audit,XFramework.Attendance,XFramework.Bolt.Hub,XFramework.Communications,XFramework.Portal,XFramework.IdentityServer,XFramework.Inventario,XFramework.Notifications,XFramework.Operations.Dashboard,XFramework.POS,XFramework.SmsGateway,XFramework.Storage,XFramework.Wallets
 x-identity-user-jwt-public-key-secret: &identity-user-jwt-public-key-secret
   - source: identity-user-jwt-public-key
     target: /run/secrets/identity-user-jwt-public-key.pem

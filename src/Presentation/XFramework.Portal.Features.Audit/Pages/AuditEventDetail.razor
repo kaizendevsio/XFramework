@@ -54,7 +54,9 @@
     {
         _load.Cancel(); _load.Dispose(); _load = new();
         var token = _load.Token;
-        _item = null; _loading = true; StateHasChanged();
+        _item = null; _loading = true;
+        _error = "Audit event is unavailable or you do not have access.";
+        StateHasChanged();
         try
         {
             if (Tenant.SelectedTenantId is not Guid tenant) { _error = "Select a tenant to view audit logs."; return; }
@@ -67,7 +69,14 @@
         }
         catch (OperationCanceledException) { }
         catch (Exception) { _error = "Audit event could not be loaded. Check access and service availability."; }
-        finally { if (!token.IsCancellationRequested) _loading = false; }
+        finally
+        {
+            if (!token.IsCancellationRequested)
+            {
+                _loading = false;
+                StateHasChanged();
+            }
+        }
     }
     private void Related(string mode) => Navigation.NavigateTo($"/audit/logs?anchor={EventId}&mode={mode}");
     private static string Preview(string value) => value.Length > 2000 ? value[..2000] + "… (full value in sanitized JSON)" : value;
