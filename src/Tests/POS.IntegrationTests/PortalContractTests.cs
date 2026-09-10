@@ -234,7 +234,7 @@ public sealed class PortalContractTests
         var returns = File.ReadAllText(Path.Combine(pagesRoot, "Returns.razor"));
 
         cashier.Should().Contain("<BbRadioGroup TValue=\"PosPaymentMethod\" @bind-Value=\"_paymentMethod\"");
-        cashier.Should().Contain("BbFormFieldCurrencyInput @bind-Value=\"_cashTenderedAmount\"");
+        cashier.Should().Contain("<BbCurrencyInput Id=\"pos-cash-amount\" @bind-Value=\"_cashTenderedAmount\" AriaLabel=\"Cash received\"");
         returns.Should().Contain("<BbFormFieldSelect TValue=\"string\" @bind-Value=\"RefundMethodValue\" Label=\"Refund Method\">");
         cashier.Should().NotContain("grid-cols-[");
         returns.Should().NotContain("@if (_refundMethod == PosPaymentMethod.CashDrawer)");
@@ -243,8 +243,8 @@ public sealed class PortalContractTests
         cashier.Should().Contain("ConfirmClearCurrentCart");
         cashier.Should().Contain("Reason = \"Cleared from Portal\"");
         cashier.Should().Contain("if (!response.IsSuccess)");
-        cashier.Should().Contain("Cancel Suspended Cart");
-        cashier.Should().Contain("Held Carts");
+        cashier.Should().Contain("Cancel held sale");
+        cashier.Should().Contain("Held sales");
         sales.Should().Contain("Cancel POS Sale");
         (cashier + sales).Should().Contain("new ConfirmDialogOptions { Destructive = true }");
     }

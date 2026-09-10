@@ -54,7 +54,7 @@ public sealed class PosCatalogService(
             Page = request.Page,
             PageSize = request.PageSize,
             Metadata = context.Metadata
-        });
+        }, ct);
 
         if (!response.IsSuccess)
             return Result<List<PosCatalogItemResponse>>.Failure(
@@ -91,7 +91,7 @@ public sealed class PosCatalogService(
                     WarehouseId = warehouseId,
                     LocationId = locationId,
                     Metadata = context.Metadata
-                });
+                }, ct);
 
                 if (!balanceResponse.IsSuccess)
                     return Result<List<PosCatalogItemResponse>>.Failure(

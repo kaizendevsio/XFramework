@@ -30,12 +30,12 @@
 
             <label>
                 <span>Username</span>
-                <input name="username" autocomplete="username" required autofocus placeholder="admin@example.com" />
+                <input name="username" autocomplete="username" required autofocus placeholder="admin@example.com" disabled="@(!_interactive)" />
             </label>
 
             <label>
                 <span>Password</span>
-                <input name="password" type="password" autocomplete="current-password" required placeholder="Enter your password" />
+                <input name="password" type="password" autocomplete="current-password" required placeholder="Enter your password" disabled="@(!_interactive)" />
             </label>
 
             <div class="login-form-row">
@@ -46,7 +46,7 @@
                 <span>Protected session</span>
             </div>
 
-            <button type="submit">
+            <button type="submit" disabled="@(!_interactive)">
                 <span>Sign in</span>
                 <LucideIcon Name="arrow-right" class="login-submit-icon" />
             </button>
@@ -82,6 +82,18 @@
 </section>
 
 @code {
+    private bool _interactive;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Prerendered fields are replaced when the interactive circuit starts.
+            _interactive = true;
+            StateHasChanged();
+        }
+    }
+
     [SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
 
