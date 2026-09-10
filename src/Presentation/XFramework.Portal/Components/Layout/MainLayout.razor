@@ -80,7 +80,14 @@
                         {
                             <BbBreadcrumbSeparator />
                             <BbBreadcrumbItem>
-                                <BbBreadcrumbPage>@crumb</BbBreadcrumbPage>
+                                @if (crumb.Href is { } href)
+                                {
+                                    <BbBreadcrumbLink Href="@href">@crumb.Label</BbBreadcrumbLink>
+                                }
+                                else
+                                {
+                                    <BbBreadcrumbPage>@crumb.Label</BbBreadcrumbPage>
+                                }
                             </BbBreadcrumbItem>
                         }
                     </BbBreadcrumbList>
@@ -225,24 +232,44 @@
 
     private void OnProfileMenuOpenChanged(bool open) => _profileMenuOpen = open;
 
-    private List<string> GetBreadcrumbs()
+    private List<(string Label, string? Href)> GetBreadcrumbs()
     {
+        var path = new Uri(Nav.Uri).AbsolutePath.Trim('/');
+        if (path.Equals("audit/logs", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("audit/logs/", StringComparison.OrdinalIgnoreCase))
+        {
+            return BuildAuditBreadcrumbs(path);
+        }
+
         if (TryGetInventarioProductDetailRoute(out var productId, out var section))
         {
-            return BuildInventarioProductBreadcrumbs(productId, section);
+            return BuildInventarioProductBreadcrumbs(productId, section)
+                .Select(label => (label, (string?)null)).ToList();
         }
 
         if (TryGetWalletDetailRoute(out var walletId, out section))
         {
-            return BuildWalletBreadcrumbs(walletId, section);
+            return BuildWalletBreadcrumbs(walletId, section)
+                .Select(label => (label, (string?)null)).ToList();
         }
 
-        var path = new Uri(Nav.Uri).AbsolutePath.Trim('/');
         if (string.IsNullOrEmpty(path)) return [];
 
         return path.Split('/')
-            .Select(HumanizeSegment)
+            .Select(segment => (HumanizeSegment(segment), (string?)null))
             .ToList();
+    }
+
+    internal static List<(string Label, string? Href)> BuildAuditBreadcrumbs(string path)
+    {
+        var segments = path.Trim('/').Split('/');
+        List<(string Label, string? Href)> crumbs =
+        [
+            ("Audit", "/audit/logs"),
+            ("Logs", segments.Length > 2 ? "/audit/logs" : null)
+        ];
+        crumbs.AddRange(segments.Skip(2).Select(segment => (HumanizeSegment(segment), (string?)null)));
+        return crumbs;
     }
 
     private List<string> BuildInventarioProductBreadcrumbs(Guid productId, string section)
