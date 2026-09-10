@@ -8,6 +8,7 @@ on:
       - "src/Tests/Attendance.IntegrationTests/**"
       - "src/Kernel/XFramework.Core/DataContext/**"
       - "src/Infrastructure/XFramework.Integration/**"
+      - "src/Tests/XFramework.Core.Tests/Security/IdentityServerSigningKeyProviderTests.cs"
       - "src/SourceGenerators/XFramework.SourceGenerators/**"
       - "src/Shared/XFramework.Domain.Shared/ServiceIdentity/XFrameworkServiceScopes.cs"
       - "src/Kernel/XFramework.Domain/Migrations/*Attendance*"
@@ -68,7 +69,7 @@ jobs:
           dotnet test
           src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj
           --no-restore
-          --filter "FullyQualifiedName~GeneratedEntityAuthorizationPolicyRegistryTests|FullyQualifiedName~DataContextBoltHandlerTests|FullyQualifiedName~QueryExecutionServiceTests"
+          --filter "FullyQualifiedName~GeneratedEntityAuthorizationPolicyRegistryTests|FullyQualifiedName~DataContextBoltHandlerTests|FullyQualifiedName~QueryExecutionServiceTests|FullyQualifiedName~IdentityServerSigningKeyProviderTests"
           -m:1
           /nr:false
 
