@@ -464,9 +464,19 @@ public sealed class PosCashierE2ETests : PageTest
 
         for (var pass = 0; pass < 2; pass++)
         {
+            var register = Page.GetByTestId("pos-register-picker");
+            var labelBounds = await register.Locator("label").BoundingBoxAsync();
+            var triggerBounds = await register.Locator("button.xf-entity-picker-trigger").BoundingBoxAsync();
+            labelBounds.Should().NotBeNull();
+            triggerBounds.Should().NotBeNull();
+            Math.Abs(labelBounds!.Y + labelBounds.Height / 2 - triggerBounds!.Y - triggerBounds.Height / 2)
+                .Should().BeLessThan(2, "the register label and selector should share a horizontal centerline");
+            (labelBounds.X + labelBounds.Width).Should().BeLessThan(triggerBounds.X,
+                "the register label must sit beside, not above or over, its selector");
             await AssertNoOverflowAsync();
             await Pay.ScrollIntoViewIfNeededAsync();
-            await Expect(Pay).ToBeInViewportAsync(new() { Ratio = 1 });
+            // Browser scroll rounding can clip a fraction of a CSS pixel at the viewport edge.
+            await Expect(Pay).ToBeInViewportAsync(new() { Ratio = .99f });
             await Expect(Status).ToBeVisibleAsync();
             await Page.GetByRole(AriaRole.Button, new() { Name = "Exact amount", Exact = true }).ClickAsync();
             await Expect(Pay).ToBeEnabledAsync();
