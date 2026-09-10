@@ -829,6 +829,8 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
                             ct: ct);
                     if (!authorization.IsSuccess)
                     {{
+                        logger.LogWarning(""Bolt authorization rejected {{RequestType}}: Status={{StatusCode}}, Reason={{Reason}}, RequestId={{RequestId}}"",
+                            ""{h.RequestTypeName}"", authorization.StatusCode, authorization.Error, request.Metadata.RequestId);
                         return ((System.Net.HttpStatusCode)authorization.StatusCode, ReadOnlyMemory<byte>.Empty);
                     }}
 

@@ -354,6 +354,8 @@ public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserReq
         generatedSource.Should().Contain("ActorRequirement = (ActorRequirement)0");
         generatedSource.Should().Contain("TenantAccessMode = (TenantAccessMode)0");
         generatedSource.Should().Contain("(System.Net.HttpStatusCode)authorization.StatusCode");
+        generatedSource.Should().Contain("Bolt authorization rejected {RequestType}: Status={StatusCode}, Reason={Reason}, RequestId={RequestId}");
+        generatedSource.Should().Contain("authorization.StatusCode, authorization.Error, request.Metadata.RequestId");
         generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
             .Should().BeLessThan(generatedSource.IndexOf("ValidateAsync(request, ct)", StringComparison.Ordinal));
         generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
@@ -966,6 +968,7 @@ namespace Microsoft.Extensions.Logging
     public interface ILogger
     {
         void LogInformation(string message, params object[] args);
+        void LogWarning(string message, params object[] args);
 
         void LogError(Exception exception, string message, params object[] args);
     }
@@ -995,6 +998,7 @@ namespace XFramework.Domain.Shared.BusinessObjects
 {
     public sealed class RequestMetadata
     {
+        public System.Guid? RequestId { get; set; }
         public string? IpAddress { get; set; }
         public string? UserAgent { get; set; }
     }

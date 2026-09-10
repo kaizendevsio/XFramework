@@ -13,7 +13,7 @@ public sealed class IdentityServerSigningKeyProvider(
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private CachedKeys? _cache;
     private DateTime _lastUnknownKeyRefreshAttemptUtc = DateTime.MinValue;
-    private DateTime _lastGenerationRefreshAttemptUtc = DateTime.MinValue;
+    private DateTime _lastSuccessfulGenerationRefreshUtc = DateTime.MinValue;
     private Exception? _lastUnknownKeyRefreshError;
 
     public async Task<IReadOnlyList<ServiceSigningKeyResponse>> GetSigningKeysAsync(
@@ -138,10 +138,9 @@ public sealed class IdentityServerSigningKeyProvider(
                 return true;
             }
 
-            if (now - _lastGenerationRefreshAttemptUtc < GetGenerationPolicyRefreshInterval())
+            if (now - _lastSuccessfulGenerationRefreshUtc < GetGenerationPolicyRefreshInterval())
                 return false;
 
-            _lastGenerationRefreshAttemptUtc = now;
             var response = await FetchAsync(
                 new GetServiceSigningKeysRequest
                 {
@@ -152,12 +151,16 @@ public sealed class IdentityServerSigningKeyProvider(
                     }
                 },
                 ct);
+            // A canceled/failed fetch says nothing about credential validity. Only a
+            // completed policy refresh may throttle subsequent unknown generations.
+            now = DateTime.UtcNow;
             var cacheMinutes = Math.Clamp(options.Value.SigningKeyCacheMinutes, 1, 60);
             _cache = new CachedKeys(
                 response.Keys,
                 response.CredentialGenerationsByClient,
-                DateTime.UtcNow.AddMinutes(cacheMinutes),
-                GetGenerationPolicyExpiry(DateTime.UtcNow));
+                now.AddMinutes(cacheMinutes),
+                GetGenerationPolicyExpiry(now));
+            _lastSuccessfulGenerationRefreshUtc = now;
             return IsAccepted(_cache, clientId, generationId);
         }
         finally
