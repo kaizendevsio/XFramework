@@ -22,8 +22,10 @@
 .pos-cashier-page * { letter-spacing: 0; }
 .pos-cashier-page .pos-cashier-header { flex: 0 0 auto; flex-direction: row; align-items: center; gap: 1rem; }
 .pos-cashier-header h3 { font-size: 1.375rem; }
-.pos-register-picker { width: min(22rem, 100%); min-width: 0; margin-right: auto; }
-.pos-register-picker label { font-size: .75rem; }
+.pos-register-picker { width: min(26rem, 100%); min-width: 0; margin-right: auto; padding-left: 1rem; border-left: 1px solid var(--border); }
+.pos-register-picker .xf-entity-picker { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .625rem; }
+.pos-register-picker label { margin: 0; font-size: .875rem; color: var(--muted-foreground); }
+.pos-register-picker .xf-entity-picker-trigger { min-height: 2.75rem; }
 .pos-cashier-header-actions { gap: .375rem; }
 .pos-cashier-header-actions button { min-height: 2.75rem; }
 
@@ -206,7 +208,7 @@
 @media (max-width: 600px) {
     .app-main:has(.pos-cashier-page) { padding-inline: .75rem; }
     .pos-cashier-page .pos-cashier-header { gap: .5rem; }
-    .pos-register-picker { flex-basis: 100%; order: 1; }
+    .pos-register-picker { flex-basis: 100%; order: 1; padding-left: 0; border-left: 0; }
     .pos-cashier-header-actions { flex-wrap: wrap; width: 100%; justify-content: flex-start; order: 2; }
     .pos-catalog-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
     .pos-search-button { padding-inline: .75rem !important; }
