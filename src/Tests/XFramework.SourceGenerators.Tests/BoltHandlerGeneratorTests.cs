@@ -333,6 +333,7 @@ public static class CreateUserEndpoint
     public static Task<Result<UserResponse>> Handle(
         CreateUserRequest request,
         UserService userService,
+        Microsoft.Extensions.Logging.ILogger logger,
         CancellationToken ct) =>
         Task.FromResult(Result<UserResponse>.Success(new UserResponse()));
 }
@@ -356,6 +357,8 @@ public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserReq
         generatedSource.Should().Contain("(System.Net.HttpStatusCode)authorization.StatusCode");
         generatedSource.Should().Contain("Bolt authorization rejected {RequestType}: Status={StatusCode}, Reason={Reason}, RequestId={RequestId}");
         generatedSource.Should().Contain("authorization.StatusCode, authorization.Error, request.Metadata.RequestId");
+        generatedSource.Should().Contain("var boltAuthorizationLogger = logger;");
+        generatedSource.Should().Contain("boltAuthorizationLogger.LogWarning(");
         generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
             .Should().BeLessThan(generatedSource.IndexOf("ValidateAsync(request, ct)", StringComparison.Ordinal));
         generatedSource.IndexOf(".AuthorizeAsync(", StringComparison.Ordinal)
