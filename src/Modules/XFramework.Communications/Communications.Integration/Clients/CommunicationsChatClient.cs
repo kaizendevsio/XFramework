@@ -5,6 +5,7 @@ using Communications.Domain.Shared.Contracts.Requests.Create;
 using Communications.Domain.Shared.Contracts.Requests.Delete;
 using Communications.Domain.Shared.Contracts.Requests.Edit;
 using Communications.Domain.Shared.Contracts.Requests.Reactions;
+using Communications.Domain.Shared.Contracts.Requests.ReferenceData;
 using Communications.Domain.Shared.Contracts.Requests.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Responses;
@@ -45,6 +46,13 @@ public interface ICommunicationsChatSession
     Guid TenantId { get; }
     Guid CredentialId { get; }
     string DeviceId { get; }
+
+    Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(CancellationToken ct = default);
+    Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(CancellationToken ct = default);
+    Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetReactionsAsync(
+        Guid threadId, Guid messageId, int pageIndex = 0, int pageSize = 100, CancellationToken ct = default);
+    Task<QueryResponse<GetThreadMessagesResponse>> GetRepliesAsync(
+        Guid threadId, Guid parentMessageId, int pageIndex = 0, int pageSize = 20, CancellationToken ct = default);
 
     Task<QueryResponse<CreateThreadResponse>> CreateThreadAsync(
         CreateThreadRequest request,
@@ -223,6 +231,26 @@ internal sealed class CommunicationsChatSession(
     public Guid TenantId { get; } = tenantId;
     public Guid CredentialId { get; } = credentialId;
     public string DeviceId { get; } = deviceId;
+
+    public Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.EnsureChatDefaultsAsync(Prepare(new EnsureChatDefaultsRequest()), callCt), ct);
+
+    public Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetChatReferenceDataAsync(Prepare(new GetChatReferenceDataRequest()), callCt), ct);
+
+    public Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetReactionsAsync(
+        Guid threadId, Guid messageId, int pageIndex = 0, int pageSize = 100, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetMessageReactionsAsync(Prepare(new GetMessageReactionsRequest
+        {
+            ThreadId = threadId, MessageId = messageId, PageIndex = pageIndex, PageSize = pageSize
+        }), callCt), ct);
+
+    public Task<QueryResponse<GetThreadMessagesResponse>> GetRepliesAsync(
+        Guid threadId, Guid parentMessageId, int pageIndex = 0, int pageSize = 20, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetThreadMessagesAsync(Prepare(new GetThreadMessagesRequest
+        {
+            ThreadId = threadId, ParentMessageId = parentMessageId, PageIndex = pageIndex, PageSize = pageSize
+        }), callCt), ct);
 
     public Task<QueryResponse<CreateThreadResponse>> CreateThreadAsync(
         CreateThreadRequest request,
