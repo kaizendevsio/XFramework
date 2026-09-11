@@ -203,8 +203,8 @@ public sealed class PurchasingService(
             OrderNumber = orderNumber,
             SupplierId = request.SupplierId,
             Status = request.Status,
-            OrderDate = request.OrderDate ?? now,
-            ExpectedDate = request.ExpectedDate,
+            OrderDate = InventoryLotService.NormalizeUtc(request.OrderDate) ?? now,
+            ExpectedDate = InventoryLotService.NormalizeUtc(request.ExpectedDate),
             Notes = NormalizeOptional(request.Notes),
             IsEnabled = true,
             CreatedAt = now,
@@ -373,7 +373,7 @@ public sealed class PurchasingService(
             LocationId = request.LocationId,
             SupplierId = request.SupplierId ?? purchaseOrder?.SupplierId,
             Status = ReceivingDocumentStatus.Posted,
-            ReceivedAt = request.ReceivedAt ?? now,
+            ReceivedAt = InventoryLotService.NormalizeUtc(request.ReceivedAt) ?? now,
             ReferenceNumber = NormalizeOptional(request.ReferenceNumber),
             Notes = NormalizeOptional(request.Notes),
             IdempotencyKey = idempotencyKey,
@@ -554,8 +554,8 @@ public sealed class PurchasingService(
         if (existingLot is not null)
             return Result<InventoryLot?>.Success(existingLot);
 
-        if (lineRequest.ManufacturedAt is { } manufacturedAt &&
-            lineRequest.ExpiresAt is { } expiresAt &&
+        if (InventoryLotService.NormalizeUtc(lineRequest.ManufacturedAt) is { } manufacturedAt &&
+            InventoryLotService.NormalizeUtc(lineRequest.ExpiresAt) is { } expiresAt &&
             manufacturedAt > expiresAt)
         {
             return Result<InventoryLot?>.Failure("Lot manufacture date must be before expiration date.", 400);
@@ -572,8 +572,8 @@ public sealed class PurchasingService(
             SourceReferenceType = "receiving",
             SourceReferenceId = document.Id,
             ReceivedAt = document.ReceivedAt,
-            ManufacturedAt = lineRequest.ManufacturedAt,
-            ExpiresAt = lineRequest.ExpiresAt,
+            ManufacturedAt = InventoryLotService.NormalizeUtc(lineRequest.ManufacturedAt),
+            ExpiresAt = InventoryLotService.NormalizeUtc(lineRequest.ExpiresAt),
             UnitCost = lineRequest.UnitCost,
             Status = InventoryLotStatus.Available,
             IsEnabled = true,

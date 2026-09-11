@@ -38,7 +38,7 @@ else
                     <BbCardDescription>Choose product and storage scope, then apply. Column filters refine the loaded results.</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <div class="xf-detail-field-grid-wide">
+                    <div class="inv-report-filters">
                         <XfEntityPicker TItem="Product"
                                         @bind-Value="_filterProductId"
                                         Items="@_products"
@@ -88,8 +88,7 @@ else
                                                  Min="1"
                                                  Max="365"
                                                  Step="1" />
-                    </div>
-                    <div class="mt-4 flex flex-wrap justify-end gap-2">
+                    <div class="flex flex-wrap justify-end gap-2">
                         <BbButton Variant="ButtonVariant.Outline" OnClick="@ResetReportFilters">
                             <LucideIcon Name="rotate-ccw" class="mr-2 h-4 w-4" />
                             Reset
@@ -97,6 +96,7 @@ else
                         <BbButton OnClick="@ApplyReportFilters">
                             Apply Filters
                         </BbButton>
+                    </div>
                     </div>
                 </BbCardContent>
             </BbCard>
@@ -117,7 +117,7 @@ else
                         <BbDataGrid Items="@_nearExpiry" ShowPagination="true" InitialPageSize="10">
                             <Columns>
                                 <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => item.LotNumber)" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></BbDataGridTemplateColumn>
                                 <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
@@ -142,7 +142,7 @@ else
                         <BbDataGrid Items="@_expired" ShowPagination="true" InitialPageSize="10">
                             <Columns>
                                 <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Filterable="true" />
-                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => item.LotNumber)" FilterBy="@(item => item.LotNumber)"><ChildContent Context="item"><a href="@($"/inventario/lots/{item.LotId}")">@item.LotNumber</a></ChildContent></BbDataGridTemplateColumn>
                                 <BbDataGridPropertyColumn Property="@(x => x.Scope)" Title="Location" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expired" Sortable="true" Filterable="true" />

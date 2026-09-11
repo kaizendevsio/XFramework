@@ -22,6 +22,13 @@ else
 {
     <FadeInContent>
         <div class="space-y-6 inv-page">
+            @if (SupplierId is { } supplierId)
+            {
+                <div class="flex flex-wrap items-center gap-3">
+                    <span>Supplier: @GetSupplierName(supplierId)</span>
+                    <a href="/inventario/purchase-orders">Clear supplier filter</a>
+                </div>
+            }
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Purchase Orders</BbTypographyH3>
@@ -39,7 +46,7 @@ else
                 </div>
             </div>
 
-            <BbFormFieldSelect TValue="string" @bind-Value="_view" Label="Order view"><BbSelectItem Value="@("all")">All orders</BbSelectItem><BbSelectItem Value="@("outstanding")">Outstanding</BbSelectItem><BbSelectItem Value="@("overdue")">Overdue</BbSelectItem></BbFormFieldSelect><BbCard>
+            <InventorySelect TValue="string" @bind-Value="_view" Label="Order view" DisplayTextSelector="@(value => value switch { "outstanding" => "Outstanding", "overdue" => "Overdue", _ => "All orders" })"><BbSelectItem Value="@("all")">All orders</BbSelectItem><BbSelectItem Value="@("outstanding")">Outstanding</BbSelectItem><BbSelectItem Value="@("overdue")">Overdue</BbSelectItem></InventorySelect><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Purchase Order List</BbCardTitle>
                     <BbCardDescription>@_orders.Count purchase order(s) loaded</BbCardDescription>
@@ -50,17 +57,17 @@ else
                                 Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.OrderNumber)" Title="Order" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Supplier" Filterable="true" FilterBy="@(item => GetSupplierName(item.SupplierId))">
+                            <BbDataGridTemplateColumn Title="Supplier" Filterable="true" SortBy="@(item => GetSupplierName(item.SupplierId))" FilterBy="@(item => GetSupplierName(item.SupplierId))">
                                 <ChildContent Context="item">@GetSupplierName(item.SupplierId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.Status)" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.OrderDate)" Title="Order Date" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ExpectedDate)" Title="Expected" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Lines" Filterable="true" FilterBy="@(item => _lines.Count(x => x.PurchaseOrderId == item.Id))">
+                            <BbDataGridTemplateColumn Title="Lines" Filterable="true" SortBy="@(item => _lines.Count(x => x.PurchaseOrderId == item.Id))" FilterBy="@(item => _lines.Count(x => x.PurchaseOrderId == item.Id))">
                                 <ChildContent Context="item">@_lines.Count(x => x.PurchaseOrderId == item.Id)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
@@ -102,10 +109,10 @@ else
                                 ClearText="No supplier"
                                 AdvancedSearchTitle="Find Supplier"
                                 AdvancedSearchDescription="Search suppliers in the active tenant." />
-                <BbFormFieldSelect TValue="string" @bind-Value="_form.Status" Label="Status">
+                <InventorySelect TValue="string" @bind-Value="_form.Status" Label="Status">
                     <BbSelectItem Value="@PurchaseOrderStatus.Open.ToString()">Open</BbSelectItem>
                     <BbSelectItem Value="@PurchaseOrderStatus.Draft.ToString()">Draft</BbSelectItem>
-                </BbFormFieldSelect>
+                </InventorySelect>
             </div>
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldDatePicker @bind-Value="_form.ExpectedDate" Label="Expected Date" />
@@ -138,7 +145,8 @@ else
                                             SearchTextSelector="@GetProductSearchText"
                                             AdvancedSearchTitle="Find Product"
                                             AdvancedSearchDescription="Search products in the active tenant." />
-                            <BbFormFieldSelect TValue="string" @bind-Value="line.ProductVariationId" Label="Variant"><BbSelectItem Value="@("base")">Base product</BbSelectItem>@foreach (var variant in _variants.Where(x => x.ProductId.ToString() == line.ProductId)) { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }</BbFormFieldSelect>
+                            <InventorySelect TValue="string" @bind-Value="line.ProductVariationId" Label="Variant" DisplayTextSelector="@(value => InventoryDisplay.Variant(_variants, Guid.TryParse(value, out var id) ? id : null))"><BbSelectItem Value="@("base")">Base product</BbSelectItem>@foreach (var variant in _variants.Where(x => x.ProductId.ToString() == line.ProductId)) { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }</InventorySelect>
+                            <BbFormFieldInput TValue="string" @bind-Value="line.UnitOfMeasure" Label="Unit" Placeholder="each, kg, box" />
                             <BbFormFieldNumericInput TValue="decimal"
                                                      @bind-Value="line.Quantity"
                                                      Label="Quantity"
@@ -170,6 +178,8 @@ else
 </BbDialog>
 
 @code {
+    [Inject] private Microsoft.JSInterop.IJSRuntime FocusJs { get; set; } = default!;
+    private bool _wasDialogOpen;
     private string _currency = "PHP";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
@@ -187,6 +197,7 @@ else
     [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
     [SupplyParameterFromQuery] public Guid? VariantId { get; set; }
     [SupplyParameterFromQuery] public Guid? SupplierId { get; set; }
+    [SupplyParameterFromQuery] public string? PreferredSupplier { get; set; }
     [SupplyParameterFromQuery] public decimal? Quantity { get; set; }
     [SupplyParameterFromQuery] public string? Scope { get; set; }
     private Guid? _openedProduct;
@@ -267,14 +278,16 @@ else
         }
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_wasDialogOpen && !_createDialogOpen) await FocusJs.InvokeVoidAsync("inventarioFocus.restore", "purchase-order");
+        _wasDialogOpen = _createDialogOpen;
         if (!_loading && _hasTenant && _purchasingEnabled && ProductId is { } id && _openedProduct != id)
         {
             _openedProduct = id;
-            OpenCreateDialog();
+            await OpenCreateDialog();
             _form.Status = PurchaseOrderStatus.Draft.ToString();
-            _form.SupplierId = SupplierId?.ToString() ?? "";
+            _form.SupplierId = ResolvePreferredSupplier();
             _form.Notes = Scope ?? "";
             _form.Lines[0].ProductId = id.ToString();
             _form.Lines[0].ProductVariationId = VariantId?.ToString() ?? "base";
@@ -283,10 +296,23 @@ else
         }
     }
 
-    private void OpenCreateDialog()
+    private async Task OpenCreateDialog()
     {
+        await FocusJs.InvokeVoidAsync("inventarioFocus.capture", "purchase-order");
         _form.Reset("");
         _createDialogOpen = true;
+    }
+
+    private string ResolvePreferredSupplier()
+    {
+        if (string.IsNullOrWhiteSpace(PreferredSupplier)) return SupplierId?.ToString() ?? "";
+        var preference = PreferredSupplier.Trim();
+        var matches = _suppliers.Where(x => x.IsActive &&
+            (string.Equals(x.Code, preference, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(x.Name, preference, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(GetSupplierLabel(x), preference, StringComparison.OrdinalIgnoreCase)))
+            .Take(2).ToList();
+        return matches.Count == 1 ? matches[0].Id.ToString() : "";
     }
 
     private void AddLine() => _form.Lines.Add(new PurchaseOrderLineForm { ProductId = "", Quantity = 1m });
@@ -299,6 +325,7 @@ else
 
     private async Task CreatePurchaseOrder()
     {
+        if (_form.Lines.Any(x => x.UnitOfMeasure.Length > 25)) { ToastService.Error("Units allow up to 25 characters."); return; }
         _saving = true;
         try
         {
@@ -308,7 +335,7 @@ else
                 OrderNumber = NullIfEmpty(_form.OrderNumber),
                 SupplierId = Guid.TryParse(_form.SupplierId, out var supplierId) ? supplierId : null,
                 Status = Enum.TryParse<PurchaseOrderStatus>(_form.Status, out var status) ? status : PurchaseOrderStatus.Open,
-                ExpectedDate = _form.ExpectedDate,
+                ExpectedDate = InventoryDisplay.CalendarDateUtc(_form.ExpectedDate),
                 Notes = NullIfEmpty(_form.Notes),
                 Lines = _form.Lines
                     .Where(x => Guid.TryParse(x.ProductId, out _) && x.Quantity > 0)
@@ -399,6 +426,6 @@ else
         public string ProductVariationId { get; set; } = "base";
         public decimal Quantity { get; set; } = 1m;
         public decimal UnitCost { get; set; }
-        public string UnitOfMeasure { get; set; } = "";
+        public string UnitOfMeasure { get; set; } = "each";
     }
 }

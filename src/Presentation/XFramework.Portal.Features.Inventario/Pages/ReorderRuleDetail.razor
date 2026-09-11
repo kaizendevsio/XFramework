@@ -7,6 +7,7 @@ else if (_rule is null) { <BbEmpty Title="Record not found" Description="Choose 
 else
 {
     <div class="space-y-6 inv-page">
+        <a href="/inventario/planning">Back to planning</a>
         <div class="xf-page-header"><BbTypographyH3>Reorder Rule</BbTypographyH3><BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Refresh</BbButton></div>
         <p><a href="@($"/inventario/products/{_rule.ProductId}/replenishment")">@_productName</a> ? @_variantName ? @_warehouseName ? @_locationName</p>
         <p>Stock scope stays unchanged. Deactivate this rule to stop suggestions without deleting its history.</p>

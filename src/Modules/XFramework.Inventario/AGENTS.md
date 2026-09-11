@@ -132,6 +132,14 @@ Inventario is not the owner of identities, tenant membership, payments, wallet b
 
 ## Testing Expectations
 
+- Calendar controls produce dates without a timezone. Portal sends these as UTC midnight without shifting the selected day (`InventoryDisplay.CalendarDateUtc`); services normalize incoming timestamps with `InventoryLotService.NormalizeUtc` before PostgreSQL `timestamptz` persistence and date comparisons. Cover purchasing, receiving lot dates, lot maintenance, and reservation expiry with real PostgreSQL wrapper tests.
+- Inventario selects use `InventorySelect` to provide an associated label and human-readable selected text before popup options mount. BlazorBlueprint 3.16 `BbFormFieldSelect` does not forward the required accessible name in this usage.
+- `XfEntityPicker` has one native trigger button; do not nest a button inside `BbPopoverTrigger AsChild="false"`. Preserve disabled state and keyboard focus when changing shared picker markup.
+- Programmatic Inventario dialogs and mobile navigation capture and restore their keyboard opener through `inventario-focus.js`. Verify Escape focus return and a reachable footer at 390×844; allow grid children to shrink with `min-width: 0` instead of clipping horizontal overflow.
+- Mounted tab panels contain hidden grid controls. Browser QA must target the visible panel and verify resulting state; focus plus Enter avoids misleading offscreen click results.
+- BlazorBlueprint 3.16 client-side template filtering reads `GetSortAndFilterValue`, which obtains its value from `SortBy`. For filterable template columns, supply matching `SortBy` and `FilterBy` selectors even when sorting is disabled; otherwise a visible lookup label can filter to zero rows.
+- Keep planning draft supplier prefill distinct from purchase-order list supplier scope. Reorder rules store a supplier preference as text; resolve only an unambiguous active tenant supplier by exact code/name/display label, and retain the preference in Notes when manual review is needed. Show and clear product/supplier route scopes explicitly.
+
 - Add or update unit/service tests for business rules, validators, idempotency, tenant validation, variant matching, stock math, reservation allocation, and purchasing/receiving transitions.
 - Add or update `Inventario.IntegrationTests` for PostgreSQL mappings, migrations, service wrappers, remote `IDataContext`, feature gates, and deployed-shape behavior.
 - Add or update Portal contract tests when Inventario UI write paths, grids, entity pickers, breadcrumbs, detail navigation, or toast behavior change.

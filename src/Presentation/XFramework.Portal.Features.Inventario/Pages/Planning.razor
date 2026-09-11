@@ -74,12 +74,13 @@ else
                     <BbDataGrid Items="@_suggestions" ShowPagination="true" InitialPageSize="20">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.SuggestedQuantity)" Title="Suggested Qty" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" Filterable="true" /><BbDataGridTemplateColumn Title="Next step"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/inventario/purchase-orders?productId={item.ProductId}&variantId={item.ProductVariationId}&quantity={item.SuggestedQuantity.ToString(CultureInfo.InvariantCulture)}&scope={Uri.EscapeDataString($"Replenish {item.WarehouseName} / {item.LocationName}. Preferred supplier: {item.PreferredSupplier}")}"))">Prepare draft PO</BbButton></ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" Filterable="true" /><BbDataGridTemplateColumn Title="Next step"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/inventario/purchase-orders?productId={item.ProductId}&variantId={item.ProductVariationId}&preferredSupplier={Uri.EscapeDataString(item.PreferredSupplier ?? "")}&quantity={item.SuggestedQuantity.ToString(CultureInfo.InvariantCulture)}&scope={Uri.EscapeDataString($"Replenish {item.WarehouseName} / {item.LocationName}. Preferred supplier: {item.PreferredSupplier}")}"))">Prepare draft PO</BbButton></ChildContent></BbDataGridTemplateColumn>
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -93,10 +94,10 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_rules" OnRowClick="@((InventoryReorderRule item) => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Scope" Filterable="true" FilterBy="@(item => GetScopeLabel(item))">
+                            <BbDataGridTemplateColumn Title="Scope" Filterable="true" SortBy="@(item => GetScopeLabel(item))" FilterBy="@(item => GetScopeLabel(item))">
                                 <ChildContent Context="item">@GetScopeLabel(item)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" Filterable="true" />
@@ -104,7 +105,7 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Point" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Qty" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Supplier" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsActive)">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>
@@ -215,6 +216,7 @@ else
 
     private readonly RuleForm _form = new();
     private List<Product> _products = [];
+    private List<ProductVariation> _variants = [];
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
     private List<StockBalance> _balances = [];
@@ -246,6 +248,7 @@ else
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _planningEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "planning");
             _products = [];
+            _variants = [];
             _warehouses = [];
             _locations = [];
             _balances = [];
@@ -256,6 +259,7 @@ else
             if (!_hasTenant || !_planningEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
             _products = await DataContext.Query<Product>().IgnoreQueryFilters().NoCache()
                 .Where(x => x.TenantId == tenantId && !x.IsDeleted).OrderBy(x => x.Name).Take(500).ToListAsync();
             _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()

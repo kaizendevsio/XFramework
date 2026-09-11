@@ -660,6 +660,20 @@
     gap: 0.5rem;
 }
 
+.inv-report-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 1rem;
+}
+.inv-report-filters > * { min-width: 0; }
+@media (min-width: 1200px) {
+    .inv-report-filters { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, .85fr) auto; }
+}
+@media (max-width: 640px) {
+    .inv-report-filters { grid-template-columns: minmax(0, 1fr); }
+}
+
 .xf-filter-actions {
     display: flex;
     flex-direction: column;
@@ -2250,3 +2264,8 @@
     .inventario-shell .inv-workspace-tabs [role="tablist"] { max-width: 100%; overflow-x: auto; }
     .inv-dialog { max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }
 }
+
+/* Keep grid children within narrow Inventario dialogs. */
+.inv-dialog-body, .inv-dialog-body .grid, .inv-dialog-body .grid > * { min-width: 0; }
+.inventario-shell [role="grid"] [role="gridcell"] { padding-block: .5rem; }
+.inventario-shell [role="grid"] [role="gridcell"]:last-child { white-space: nowrap; }

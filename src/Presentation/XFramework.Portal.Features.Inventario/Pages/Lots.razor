@@ -46,25 +46,25 @@ else
                 </BbCardHeader>
                 <BbCardContent>
                     <div class="xf-filter-actions"><BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search lots" />
-<BbFormFieldSelect TValue="string" @bind-Value="_expiry" Label="Expiry"><BbSelectItem Value="@("all")">All dates</BbSelectItem><BbSelectItem Value="@("soon")">Next 30 days</BbSelectItem><BbSelectItem Value="@("expired")">Expired</BbSelectItem><BbSelectItem Value="@("none")">No expiry</BbSelectItem></BbFormFieldSelect>
-<BbFormFieldSelect TValue="string" @bind-Value="_eligibility" Label="Eligibility"><BbSelectItem Value="@("all")">All statuses</BbSelectItem>@foreach (var status in Enum.GetValues<InventoryLotStatus>()) { <BbSelectItem Value="@status.ToString()">@status</BbSelectItem> }</BbFormFieldSelect></div><BbDataGrid Items="@_lots.Where(MatchesLot).Where(x => ($"{x.LotNumber} {GetProductName(x.ProductId)}" ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
+<InventorySelect TValue="string" @bind-Value="_expiry" Label="Expiry" DisplayTextSelector="@(value => value switch { "soon" => "Next 30 days", "expired" => "Expired", "none" => "No expiry", _ => "All dates" })"><BbSelectItem Value="@("all")">All dates</BbSelectItem><BbSelectItem Value="@("soon")">Next 30 days</BbSelectItem><BbSelectItem Value="@("expired")">Expired</BbSelectItem><BbSelectItem Value="@("none")">No expiry</BbSelectItem></InventorySelect>
+<InventorySelect TValue="string" @bind-Value="_eligibility" Label="Eligibility" DisplayTextSelector="@(value => value == "all" ? "All statuses" : value == "Available" ? "Eligible" : value)"><BbSelectItem Value="@("all")">All statuses</BbSelectItem>@foreach (var status in Enum.GetValues<InventoryLotStatus>()) { <BbSelectItem Value="@status.ToString()">@status</BbSelectItem> }</InventorySelect></div><BbDataGrid Items="@_lots.Where(MatchesLot).Where(x => ($"{x.LotNumber} {GetProductName(x.ProductId)}" ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList()" ShowPagination="true" InitialPageSize="20"
                                 OnRowClick="@((InventoryLot item) => Navigation.NavigateTo($"/inventario/lots/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.LotNumber)" Title="Lot / Batch" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Eligibility" Filterable="true" FilterBy="@(item => item.Status)">
+                            <BbDataGridTemplateColumn Title="Eligibility" Filterable="true" SortBy="@(item => item.Status)" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.Status == InventoryLotStatus.Available ? "Eligible" : item.Status.ToString())" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="On Hand" Filterable="true" FilterBy="@(item => GetLotOnHand(item.Id))">
+                            <BbDataGridTemplateColumn Title="On Hand" Filterable="true" SortBy="@(item => GetLotOnHand(item.Id))" FilterBy="@(item => GetLotOnHand(item.Id))">
                                 <ChildContent Context="item">@GetLotOnHand(item.Id).ToString("0.####") @(GetLotOnHand(item.Id) == 0 ? "(Depleted)" : "")</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Expires" Filterable="true" FilterBy="@(item => item.ExpiresAt)"><ChildContent Context="item">@(item.ExpiresAt?.ToString("dd MMM yyyy") ?? "No expiry")</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Expires" Filterable="true" SortBy="@(item => item.ExpiresAt)" FilterBy="@(item => item.ExpiresAt)"><ChildContent Context="item">@(item.ExpiresAt?.ToString("dd MMM yyyy") ?? "No expiry")</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View lot"
@@ -102,12 +102,12 @@ else
                             AdvancedSearchDescription="Search products in the active tenant." />
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.LotNumber" Label="Lot / Batch Number" Required="true" />
-                <BbFormFieldSelect TValue="string" @bind-Value="_form.Status" Label="Status">
+                <InventorySelect TValue="string" @bind-Value="_form.Status" Label="Status">
                     @foreach (var status in Enum.GetValues<InventoryLotStatus>())
                     {
                         <BbSelectItem Value="@status.ToString()">@status</BbSelectItem>
                     }
-                </BbFormFieldSelect>
+                </InventorySelect>
             </div>
             <div class="grid gap-3 md:grid-cols-2">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.SupplierReference" Label="Supplier / Source Ref" />
@@ -245,8 +245,8 @@ else
                 SourceReferenceType = NullIfEmpty(_form.SourceReferenceType),
                 SourceReferenceId = Guid.TryParse(_form.SourceReferenceId, out var sourceId) ? sourceId : null,
                 ReceivedAt = _form.ReceivedAt,
-                ManufacturedAt = _form.ManufacturedAt,
-                ExpiresAt = _form.ExpiresAt,
+                ManufacturedAt = InventoryDisplay.CalendarDateUtc(_form.ManufacturedAt),
+                ExpiresAt = InventoryDisplay.CalendarDateUtc(_form.ExpiresAt),
                 UnitCost = _form.UnitCost > 0 ? _form.UnitCost : null,
                 Status = Enum.TryParse<InventoryLotStatus>(_form.Status, out var status) ? status : InventoryLotStatus.Available
             });

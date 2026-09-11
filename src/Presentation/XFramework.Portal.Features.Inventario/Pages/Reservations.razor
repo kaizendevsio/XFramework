@@ -48,10 +48,10 @@ else
 
             <div class="xf-filter-actions">
                 <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search reservations" />
-                <BbFormFieldSelect TValue="string" @bind-Value="_view" Label="Status">
+                <InventorySelect TValue="string" @bind-Value="_view" Label="Status" DisplayTextSelector="@(value => value switch { "active" => "Active", "expiring" => "Due within 24 hours", "all" => "All history", _ => value })">
                     <BbSelectItem Value="@("active")">Active</BbSelectItem><BbSelectItem Value="@("expiring")">Due within 24 hours</BbSelectItem><BbSelectItem Value="@("all")">All history</BbSelectItem>
                     @foreach (var status in Enum.GetValues<ReservationStatus>()) { <BbSelectItem Value="@status.ToString()">@status</BbSelectItem> }
-                </BbFormFieldSelect>
+                </InventorySelect>
             </div><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Reservation List</BbCardTitle>
@@ -62,22 +62,22 @@ else
                                 OnRowClick="@((Reservation item) => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))"><ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Allocated lots" Filterable="true" FilterBy="@(item => AllocationLabel(item))"><ChildContent Context="item">@AllocationLabel(item)</ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))"><ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Allocated lots" Filterable="true" SortBy="@(item => AllocationLabel(item))" FilterBy="@(item => AllocationLabel(item))"><ChildContent Context="item">@AllocationLabel(item)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
+                            <BbDataGridTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
                                 <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.Status)" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Reference" Filterable="true" FilterBy="@(item => InventoryDisplay.Reference(item.ReferenceType))"><ChildContent Context="item">@InventoryDisplay.Reference(item.ReferenceType)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Reference" Filterable="true" SortBy="@(item => InventoryDisplay.Reference(item.ReferenceType))" FilterBy="@(item => InventoryDisplay.Reference(item.ReferenceType))"><ChildContent Context="item">@InventoryDisplay.Reference(item.ReferenceType)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
@@ -156,11 +156,11 @@ else
                                 AdvancedSearchTitle="Find Location"
                                 AdvancedSearchDescription="Search locations for the selected warehouse." />
             </div>
-            <BbFormFieldSelect TValue="string" Value="@_form.ProductVariationId" ValueChanged="@((string value) => { _form.ProductVariationId = value; _form.LotId = ""; })" Label="Variant">
+            <InventorySelect TValue="string" Value="@_form.ProductVariationId" ValueChanged="@((string value) => { _form.ProductVariationId = value; _form.LotId = ""; })" Label="Variant" DisplayTextSelector="@(value => InventoryDisplay.Variant(_variants, Guid.TryParse(value, out var id) ? id : null))">
                 <BbSelectItem Value="@("base")">Base product</BbSelectItem>
                 @foreach (var variant in _variants.Where(x => x.ProductId.ToString() == _form.ProductId))
                 { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }
-            </BbFormFieldSelect>
+            </InventorySelect>
             <p>Available stock: @AvailableStock.ToString("0.####"). Leaving the lot empty allocates eligible stock with the earliest expiry first.</p>
             @if (_traceabilityEnabled)
             {
@@ -363,7 +363,7 @@ else
                 LocationId = locationId,
                 Quantity = _form.Quantity,
                 LotId = Guid.TryParse(_form.LotId, out var lotId) ? lotId : null,
-                ExpiresAt = _form.ExpiresAt,
+                ExpiresAt = InventoryDisplay.CalendarDateUtc(_form.ExpiresAt),
                 ReferenceType = NullIfEmpty(_form.ReferenceType),
                 ReferenceId = Guid.TryParse(_form.ReferenceId, out var referenceId) ? referenceId : (Guid?)null,
                 Reason = NullIfEmpty(_form.Reason),

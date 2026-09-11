@@ -50,7 +50,7 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ContactName)" Title="Contact" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Email)" Title="Email" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsActive)">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>
