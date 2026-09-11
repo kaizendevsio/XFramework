@@ -4,6 +4,7 @@
 
 ## Live checks after PR #439
 
+- Follow-up PR **#440** passed all CI checks and merged as `94cc21b02f697ef070384f11267e5e29ce6209e0`. Normal deployment `34580364797` is in progress. Yap has merged this develop revision and its 26 tests pass; the live failures below were observed before this new rollout and still require retesting afterward.
 - Normal deployment run `34577532429` completed successfully for develop `f39f095744957fa6a2778af6a9776e933f7fc3a7`. Local Yap uses the merged SDK contracts.
 - Imported the dedicated Yap service identity through the protected local handoff into server-only user secrets. Yap connected to Bolt through the loopback SSH tunnel at `08:18:41Z`; Bob signed in through Chrome using his regular tenant account.
 - At `08:19:06Z`, `EnsureChatDefaultsRequest` returned **403**. The fix task correlated Communications logs and found that the trusted route gate infers **Manage** for `/api/communications/chat/defaults`, despite the endpoint declaring **Create**. The fix task owns the correction and deployment. No extra user permission was granted.
