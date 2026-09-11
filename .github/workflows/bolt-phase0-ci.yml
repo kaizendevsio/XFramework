@@ -248,6 +248,11 @@ jobs:
             --configuration Release --no-build --no-restore \
             --filter "FullyQualifiedName~ServiceIdentityComposeContractTests"
 
+      - name: Test Yap chat application
+        run: |
+          dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj \
+            --configuration Release --no-build --no-restore
+
       - name: Test Storage authorization and provider contracts
         shell: bash
         env:
