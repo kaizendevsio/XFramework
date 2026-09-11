@@ -1,5 +1,6 @@
 using Payments.Core;
 using Wallets.Api.Events;
+using Wallets.Api.Features.ReferenceData;
 using Wallets.Api.Services;
 using XFramework.Core.Extensions;
 using XFramework.Domain.Shared.Interfaces;
@@ -12,6 +13,7 @@ public class ServicesInstaller : IInstaller
     {
         services.AddTenantResolver();
         services.AddTenantModuleFeatures();
+        services.AddWalletsReferenceDataValidation();
         services.AddPaymentServices(
             configuration["Wallets:Payments:CallbackBaseUrl"]
             ?? configuration["Payments:CallbackBaseUrl"]

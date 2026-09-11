@@ -90,7 +90,7 @@ public class DataContextBoltHandler : IBoltHandler
                             out var entityPolicy) ||
                         !entityPolicy.AllowRemoteMutation)
                     {
-                        return (HttpStatusCode.Forbidden, SerializeFailure("Remote DataContext access is not authorized."));
+                        return (HttpStatusCode.Forbidden, SerializeFailure("Remote DataContext access is not authorized.", 403));
                     }
 
                     entityPolicies.Add(entityPolicy);

@@ -4,11 +4,13 @@ namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-role-type-groups",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.roles"
 )]
 public partial class IdentityRoleTypeGroup : BaseModel, IHasSystemReferenceId

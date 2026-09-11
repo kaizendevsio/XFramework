@@ -3,7 +3,9 @@ namespace Wallets.Domain.Shared.Contracts;
 public static class WalletAuthorizationCapabilities
 {
     public const string View = "wallets:view";
+    public const string Create = "wallets:create";
     public const string Update = "wallets:update";
+    public const string Delete = "wallets:delete";
     public const string Manage = "wallets:manage";
     public const string ReportingView = "wallets.reporting:view";
     public const string PolicyManage = "wallets.policy:manage";
@@ -13,7 +15,9 @@ public static class WalletAuthorizationCapabilities
     public static IReadOnlyList<string> All { get; } =
     [
         View,
+        Create,
         Update,
+        Delete,
         Manage,
         ReportingView,
         PolicyManage,

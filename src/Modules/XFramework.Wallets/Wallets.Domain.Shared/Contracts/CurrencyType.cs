@@ -4,6 +4,7 @@ namespace Wallets.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.Get | EndpointActions.GetList,

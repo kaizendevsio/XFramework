@@ -4,11 +4,13 @@ namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-contact-groups",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.contacts"
 )]
 public partial class IdentityContactGroup : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows

@@ -18,6 +18,91 @@ namespace IdentityServer.IntegrationTests;
 [Category(TestCategories.DataContext)]
 public class DataContextTests
 {
+    [Test, Category("ReferenceData")]
+    public Task ReferenceData_RoleGroup_Lifecycle() =>
+        AssertReferenceLifecycle(new IdentityRoleTypeGroup { Name = "Group", Description = "" }, x => x.Name = "Updated",
+            x => x.Name.Should().Be("Updated"));
+
+    [Test, Category("ReferenceData")]
+    public Task ReferenceData_ContactType_Lifecycle() =>
+        AssertReferenceLifecycle(new IdentityContactType { Name = "Contact" }, x => x.Name = "Updated",
+            x => x.Name.Should().Be("Updated"));
+
+    [Test, Category("ReferenceData")]
+    public Task ReferenceData_ContactGroup_Lifecycle() =>
+        AssertReferenceLifecycle(new IdentityContactGroup { Name = "Contacts" }, x => x.Name = "Updated",
+            x => x.Name.Should().Be("Updated"));
+
+    [Test, Category("ReferenceData")]
+    public Task ReferenceData_AddressType_Lifecycle() =>
+        AssertReferenceLifecycle(new IdentityAddressType { Name = "Address" }, x => x.Name = "Updated",
+            x => x.Name.Should().Be("Updated"));
+
+    [Test, Category("ReferenceData")]
+    public Task ReferenceData_VerificationType_Lifecycle() =>
+        AssertReferenceLifecycle(new IdentityVerificationType { Name = "Verification" }, x => x.Name = "Updated",
+            x => x.Name.Should().Be("Updated"));
+
+    [Test, Category("ReferenceData")]
+    public Task ReferenceData_SessionType_Lifecycle() =>
+        AssertReferenceLifecycle(new SessionType { Name = "Session" }, x => x.Name = "Updated",
+            x => x.Name.Should().Be("Updated"));
+
+    [Test, Category("ReferenceData")]
+    public async Task ReferenceData_RoleType_LifecycleAndTenantRelationship()
+    {
+        var group = new IdentityRoleTypeGroup
+        {
+            Id = Guid.NewGuid(), TenantId = IntegrationTestFixture.TestTenantId, Name = "Parent",
+            Description = "", SystemReferenceId = Guid.NewGuid(), IsEnabled = true, CreatedAt = DateTime.UtcNow
+        };
+        var context = IntegrationTestFixture.DataContext;
+        context.Add(group);
+        var result = await context.SaveChangesAsync();
+        result.IsSuccess.Should().BeTrue(result.Message);
+
+        await AssertReferenceLifecycle(new IdentityRoleType { Name = "Role", GroupId = group.Id },
+            x => x.Name = "Updated", x => x.Name.Should().Be("Updated"));
+
+        await using var db = OpenDbContext();
+        group.Id = Guid.NewGuid();
+        group.TenantId = Guid.NewGuid();
+        db.Add(group);
+        await db.SaveChangesAsync();
+        await AssertRelationshipRejected(new IdentityRoleType
+        {
+            Id = Guid.NewGuid(), TenantId = IntegrationTestFixture.TestTenantId, Name = "Invalid",
+            GroupId = group.Id, IsEnabled = true, CreatedAt = DateTime.UtcNow, SystemReferenceId = Guid.NewGuid()
+        });
+    }
+
+    [Test, Category("ReferenceData")]
+    public async Task ReferenceData_InvalidNameAndSpoofedTenant_AreRejected()
+    {
+        await AssertRelationshipRejected(new IdentityRoleTypeGroup
+        {
+            Id = Guid.NewGuid(), TenantId = IntegrationTestFixture.TestTenantId, Name = "",
+            Description = "", IsEnabled = true, SystemReferenceId = Guid.NewGuid()
+        });
+        await AssertTenantMismatchRejected(new IdentityRoleTypeGroup
+        {
+            Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), Name = "Other tenant",
+            Description = "", IsEnabled = true, SystemReferenceId = Guid.NewGuid()
+        });
+    }
+
+    private static Task AssertReferenceLifecycle<T>(T entity, Action<T> mutate, Action<T> assertUpdated)
+        where T : BaseModel, IHasSystemReferenceId
+    {
+        entity.Id = Guid.NewGuid();
+        entity.TenantId = IntegrationTestFixture.TestTenantId;
+        entity.SystemReferenceId = Guid.NewGuid();
+        entity.ConcurrencyStamp = Guid.NewGuid();
+        entity.IsEnabled = true;
+        entity.CreatedAt = DateTime.UtcNow;
+        return AssertRemoteLifecycle(entity, mutate, assertUpdated);
+    }
+
     [Test]
     public async Task RemoteQuery_ToListAsync_ReturnsEntitiesFromService()
     {

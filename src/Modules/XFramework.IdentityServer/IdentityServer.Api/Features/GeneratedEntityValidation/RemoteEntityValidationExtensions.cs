@@ -19,6 +19,20 @@ public static class RemoteEntityValidationExtensions
         services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
             new FluentRemoteDataContextEntityValidator<RegistryConfigurationGroup>(
                 provider.GetRequiredService<IValidator<RegistryConfigurationGroup>>()));
+        services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
+            new FluentRemoteDataContextEntityValidator<IdentityRoleType>(provider.GetRequiredService<IValidator<IdentityRoleType>>()));
+        services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
+            new FluentRemoteDataContextEntityValidator<IdentityRoleTypeGroup>(provider.GetRequiredService<IValidator<IdentityRoleTypeGroup>>()));
+        services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
+            new FluentRemoteDataContextEntityValidator<IdentityContactType>(provider.GetRequiredService<IValidator<IdentityContactType>>()));
+        services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
+            new FluentRemoteDataContextEntityValidator<IdentityContactGroup>(provider.GetRequiredService<IValidator<IdentityContactGroup>>()));
+        services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
+            new FluentRemoteDataContextEntityValidator<IdentityAddressType>(provider.GetRequiredService<IValidator<IdentityAddressType>>()));
+        services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
+            new FluentRemoteDataContextEntityValidator<IdentityVerificationType>(provider.GetRequiredService<IValidator<IdentityVerificationType>>()));
+        services.AddScoped<IRemoteDataContextEntityValidator>(provider =>
+            new FluentRemoteDataContextEntityValidator<SessionType>(provider.GetRequiredService<IValidator<SessionType>>()));
         return services;
     }
 }

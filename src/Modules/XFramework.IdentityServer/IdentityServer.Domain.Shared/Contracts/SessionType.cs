@@ -4,11 +4,13 @@ namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/session-types",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.sessions"
 )]
 public partial class SessionType : BaseModel, IHasSystemReferenceId

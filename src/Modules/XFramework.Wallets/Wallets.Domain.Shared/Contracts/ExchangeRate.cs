@@ -4,11 +4,13 @@ namespace Wallets.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.Get | EndpointActions.GetList,
     RoutePrefix = "api/exchange-rates",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "wallets",
     CacheDurationSeconds = 1800,
     CacheKeyPrefix = "exchange-rates"

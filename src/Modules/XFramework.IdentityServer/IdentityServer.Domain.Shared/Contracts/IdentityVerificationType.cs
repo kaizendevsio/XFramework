@@ -4,11 +4,13 @@ namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.ReadOnly,
     RoutePrefix = "api/identity-verification-types",
     RequireAuthorization = true,
+    TenantAccessMode = GeneratedTenantAccessMode.DelegatedTenant,
     AuthorizationFeature = "identity.verifications"
 )]
 public partial class IdentityVerificationType : BaseModel, IHasSystemReferenceId, IAllowsGlobalTenantRows
