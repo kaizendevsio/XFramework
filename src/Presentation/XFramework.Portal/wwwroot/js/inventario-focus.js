@@ -3,7 +3,7 @@
 // Route Escape through the popover's outside-dismiss path, inside its parent dialog.
 document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || !document.querySelector('.inventario-shell')) return;
-    const trigger = document.querySelector('.xf-entity-picker-trigger[aria-expanded="true"]');
+    const trigger = document.querySelector('.inv-dialog button[aria-haspopup][aria-expanded="true"]');
     if (!trigger || !trigger.getClientRects().length) return;
     const dialog = trigger.closest('.inv-dialog');
     if (!dialog) return;
@@ -11,6 +11,7 @@ document.addEventListener('keydown', event => {
     event.stopImmediatePropagation();
     dialog.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     dialog.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    trigger.focus({ preventScroll: true });
 }, true);
 
 window.inventarioFocus = (() => {
