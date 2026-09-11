@@ -172,7 +172,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash -n scripts/configure-bolt-tailscale-boundary.sh
+            bash -n scripts/configure-bolt-tailscale-boundary.sh
+            bash -n scripts/configure-yap-dev-ingress.sh scripts/provision-yap-dev-secret.sh
           python3 -B scripts/verify-bolt-tailscale-boundary-test.py
           python3 -B scripts/verify-bolt-phase0-diagnostic-sinks-test.py
           python3 -B scripts/refresh-bolt-phase0-synthetic-tokens-test.py
@@ -247,6 +248,11 @@ jobs:
           dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj \
             --configuration Release --no-build --no-restore \
             --filter "FullyQualifiedName~ServiceIdentityComposeContractTests"
+
+      - name: Test Yap chat application
+        run: |
+          dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj \
+            --configuration Release --no-build --no-restore
 
       - name: Test Storage authorization and provider contracts
         shell: bash

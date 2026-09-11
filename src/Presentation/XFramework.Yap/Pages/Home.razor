@@ -1,0 +1,350 @@
+@page "/"
+@page "/chat/{ThreadId:guid}"
+@attribute [Authorize]
+@implements IDisposable
+@inject ChatWorkspace Chat
+@inject IChatDirectory Directory
+@inject ChatFiles Files
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ILogger<Home> Logger
+@inject AuthenticationStateProvider Authentication
+<PageTitle>@(Chat.Selected?.Name ?? "Your conversations") · Yap</PageTitle>
+
+<div class="chat-workspace @(ThreadId is not null ? "conversation-open" : "")">
+    <aside class="inbox" aria-label="Conversations">
+        <ScrollSurface>
+            <Header>
+                <div class="appbar plain liquid-glass"><GlassLayer /><Brand /><span class="sp"></span>
+                    <ThemeToggle />
+                    <BbButton Class="iconbtn" Variant="ButtonVariant.Ghost" aria-label="Search messages" Disabled="!Chat.Ready || busy || sending" OnClick="() => searchOpen = true"><YapIcon Name="search" Size="19" /></BbButton>
+                    <BbButton Class="iconbtn" Variant="ButtonVariant.Ghost" aria-label="Refresh conversations" Disabled="busy" OnClick="Refresh"><YapIcon Name="refresh" Size="19" /></BbButton>
+                    <a class="iconbtn" href="/settings" aria-label="Settings"><YapIcon Name="settings" Size="20" /></a>
+                </div>
+                <label class="searchbar liquid-glass"><GlassLayer /><YapIcon Name="search" Size="18" /><input aria-label="Search conversations" placeholder="Find a conversation" @bind="search" @bind:event="oninput" /></label>
+                <div class="tabs liquid-glass" role="tablist" aria-label="Conversation filter"><GlassLayer />
+                    @foreach (var item in new[] { "All", "Unread", "Groups" })
+                    { <button class="tab" role="tab" aria-selected="@(filter == item ? "true" : "false")" @onclick="() => filter = item">@item @if (item == "Unread" && Chat.Conversations.Sum(c => c.UnreadCount) > 0) { <span class="n">@Chat.Conversations.Sum(c => c.UnreadCount)</span> }</button> }
+                </div>
+            </Header>
+            <ChildContent>
+                <div class="body inbox-panel">
+                    <div class="sectionhead">Your conversations <span>@Filtered.Count()</span></div>
+                    @if (loading) { <div class="loading-state"><BbSpinner /><span>Connecting your conversations</span></div> }
+                    @foreach (var conversation in Filtered)
+                    {
+                        <button class="row @(Chat.Selected?.Id == conversation.Id ? "selected" : "")" @onclick="() => Open(conversation.Id)" disabled="@(busy || sending)">
+                            <Avatar Initials="@ChatMessage.InitialsFor(conversation.Name)" Color="@(!conversation.IsDirect ? "g3" : "g1")" Size="a48" />
+                            <span class="mid"><span class="t1">@conversation.Name</span><span class="t2 @(conversation.UnreadCount > 0 ? "unread" : "")">@(conversation.LastMessagePreview ?? "Say hello to start the conversation")</span></span>
+                            <span class="end"><span class="time">@conversation.LastMessageAt?.ToLocalTime().ToString("HH:mm")</span>@if (conversation.UnreadCount > 0) { <span class="badge">@conversation.UnreadCount</span> }</span>
+                        </button>
+                    }
+                    @if (!loading && !Filtered.Any())
+                    { <div class="empty-state"><YapIcon Name="chat" Size="36" /><h2>A little hello goes a long way.</h2><p>@(search.Length > 0 ? "No conversations match your search." : "Start a conversation with someone in your workspace.")</p></div> }
+                    @if (Chat.Conversations.Count < Chat.ConversationTotal)
+                    { <BbButton Class="load-more" Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="LoadMoreConversations">Load more conversations</BbButton> }
+                </div>
+            </ChildContent>
+            <Footer><div class="inbox-footer liquid-glass"><GlassLayer /><BbButton Class="btn" Disabled="!Chat.Ready || busy || sending" OnClick="ShowNew"><YapIcon Name="edit" Size="18" />New conversation</BbButton></div></Footer>
+        </ScrollSurface>
+    </aside>
+    <section class="conversation" aria-label="Conversation">
+        @if (Chat.Selected is { } conversation)
+        {
+            <ScrollSurface>
+                <Header><div class="appbar liquid-glass"><GlassLayer /><BbButton Class="iconbtn back-to-inbox" Variant="ButtonVariant.Ghost" aria-label="Back to conversations" Disabled="sending" OnClick="Back"><YapIcon Name="back" /></BbButton>
+                    <Avatar Initials="@ChatMessage.InitialsFor(conversation.Name)" Size="a40" /><div class="mid"><h1 class="t1">@conversation.Name</h1><span class="t2">@(Chat.IsTyping ? "Someone is typing…" : $"{conversation.Members.Count} members")</span></div>
+                    <BbButton Class="iconbtn" Variant="ButtonVariant.Ghost" aria-label="Conversation details" OnClick="() => detailsOpen = true"><YapIcon Name="more" /></BbButton>
+                </div></Header>
+                <ChildContent><div class="chatbody" data-messages>
+                    @if (Chat.Messages.Count < Chat.MessageTotal) { <BbButton Class="load-more" Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="LoadEarlier">Earlier messages</BbButton> }
+                    @foreach (var day in Chat.Messages.GroupBy(m => m.CreatedAt.ToLocalTime().Date))
+                    {
+                        <div class="daysep">@(day.Key == DateTime.Today ? "Today" : day.Key.ToString("ddd, d MMM"))</div>
+                        @foreach (var message in day)
+                        { <LiveMessage Message="message" Parent="Chat.Messages.FirstOrDefault(m => m.Id == message.ParentId)" OnSelect="SelectMessage" OnReply="Reply" OnReact="ToggleReaction" Busy="busy" @key="message.Id" /> }
+                    }
+                    @if (Chat.Messages.Count == 0) { <div class="empty-state"><YapIcon Name="chat" Size="36" /><h2>This is where it starts.</h2><p>Send your first message to @conversation.Name.</p></div> }
+                </div></ChildContent>
+                <Footer><div class="composer-wrap liquid-glass"><GlassLayer />
+                    @if (reply is not null) { <div class="replybar"><div><b>Replying to @reply.Sender</b><p>@reply.Text</p></div><BbButton Class="iconbtn" Variant="ButtonVariant.Ghost" aria-label="Cancel reply" OnClick="() => reply = null"><YapIcon Name="close" Size="18" /></BbButton></div> }
+                    @if (file is not null) { <div class="replybar"><span><YapIcon Name="file" Size="16" /> @file.Name @(sending ? $"· {uploadProgress}%" : "")</span>@if (!sending && pendingMessageId is null) { <BbButton Class="iconbtn" Variant="ButtonVariant.Ghost" aria-label="Remove attachment" OnClick="ClearFile"><YapIcon Name="close" Size="18" /></BbButton> }</div> }
+                    <form class="composer" @onsubmit="Send" @onsubmit:preventDefault>
+                        <label class="iconbtn attachment-picker @(sending || pendingMessageId is not null ? "disabled" : "")" title="Attach a file"><YapIcon Name="file" /><InputFile @key="fileInputVersion" OnChange="ChooseFile" disabled="@(sending || pendingMessageId is not null)" aria-label="Attach a file up to 20 MB" /></label>
+                        <textarea aria-label="Message" placeholder="Say something good…" value="@draft" @oninput="DraftChanged" @onkeydown="ComposerKeyDown" maxlength="4000" rows="1" disabled="@(sending || pendingMessageId is not null)"></textarea>
+                        <button class="send" type="submit" aria-label="@(pendingMessageId is null ? "Send message" : "Retry attachment")" disabled="@(sending || (string.IsNullOrWhiteSpace(draft) && file is null))">@if (sending) { <BbSpinner /> } else { <YapIcon Name="send" Size="20" /> }</button>
+                    </form>
+                    <span class="composer-hint">Ctrl + Enter to send</span>
+                </div></Footer>
+            </ScrollSurface>
+        }
+        else
+        { <div class="welcome-panel"><Brand /><span class="welcome-orbit"><YapIcon Name="chat" Size="60" /></span><h1>A little closer.</h1><p>Big ideas. Small updates. Your people.<br />Pick a conversation and keep it going.</p><BbButton Class="btn" Disabled="!Chat.Ready" OnClick="ShowNew">Start a conversation <YapIcon Name="arrow" Size="18" /></BbButton></div> }
+    </section>
+</div>
+@if (error is not null || Chat.LiveError is not null)
+{ <div class="live-alert" role="alert"><span>@(error ?? Chat.LiveError)</span><BbButton Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="Refresh">Refresh</BbButton><a href="/login">Sign in</a><BbButton Variant="ButtonVariant.Ghost" aria-label="Dismiss error" OnClick="() => error = null"><YapIcon Name="close" Size="16" /></BbButton></div> }
+
+<MessageSearch @bind-Open="searchOpen" OpenResult="OpenSearchResult" />
+
+<BbSheet Open="@(Chat.ReplyParent is not null)" OpenChanged="ReplyThreadOpenChanged"><BbSheetContent Class="reply-thread">
+    <BbSheetHeader><BbSheetTitle>Thread</BbSheetTitle><BbSheetDescription>@Chat.ReplyTotal @(Chat.ReplyTotal == 1 ? "reply" : "replies") in @Chat.Selected?.Name</BbSheetDescription></BbSheetHeader>
+    @if (Chat.ReplyParent is { } threadParent)
+    {
+        <div class="thread-history">
+            <p class="thread-parent"><strong>@threadParent.Sender</strong><span>@threadParent.Text</span></p>
+            @if (Chat.Replies.Count < Chat.ReplyTotal) { <BbButton Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="() => Run(() => Chat.LoadEarlierRepliesAsync())">Earlier replies</BbButton> }
+            @foreach (var item in Chat.Replies)
+            { <div class="thread-reply"><strong>@item.Sender</strong><span>@item.Text</span><small>@item.CreatedAt.ToLocalTime().ToString("g")</small></div> }
+            @if (Chat.Replies.Count == 0) { <p class="empty">Be the first to reply.</p> }
+        </div>
+        <form class="thread-composer" @onsubmit="SendThreadReply" @onsubmit:preventDefault>
+            <label class="field"><span class="lab">Reply to thread</span><BbTextarea UpdateTiming="UpdateTiming.Immediate" @bind-Value="threadDraft" @bind-Value:after="ThreadDraftChanged" maxlength="4000" Disabled="threadSending" /></label>
+            @if (threadError is not null) { <p class="form-error" role="alert">@threadError</p> }
+            <BbButton Type="ButtonType.Submit" Disabled="threadSending || string.IsNullOrWhiteSpace(threadDraft)">@(threadSending ? "Sending…" : "Send reply")</BbButton>
+        </form>
+    }
+</BbSheetContent></BbSheet>
+
+<BbDialog @bind-Open="newOpen"><BbDialogContent Class="yap-dialog"><BbDialogHeader><BbDialogTitle>Start something good</BbDialogTitle><BbDialogDescription>Find people in your workspace.</BbDialogDescription></BbDialogHeader>
+    <form @onsubmit="SearchPeople" @onsubmit:preventDefault class="people-search"><label class="field"><span class="lab">Name or username</span><BbInput UpdateTiming="UpdateTiming.Immediate" @bind-Value="peopleSearch" Placeholder="Search workspace members" /></label><BbButton Type="ButtonType.Submit" Disabled="searching || peopleSearch.Trim().Length < 2">Search</BbButton></form>
+    @if (searching) { <BbSpinner /> }
+    <div class="people-results">@foreach (var person in people) { <button class="row" aria-pressed="@(selectedPeople.ContainsKey(person.Id) ? "true" : "false")" @onclick="() => TogglePerson(person)"><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" Size="a40" /><span class="mid"><span class="t1">@person.Name</span><span class="t2">@@@person.UserName</span></span><span>@(selectedPeople.ContainsKey(person.Id) ? "✓" : "+")</span></button> }</div>
+    @if (searched && people.Count == 0) { <p class="empty">No members found. Try another name.</p> }
+    @if (selectedPeople.Count > 0) { <p class="selected-people">@string.Join(", ", selectedPeople.Values.Select(p => p.Name))</p> }
+    <label class="check"><input type="checkbox" @bind="createGroup" />Create a group</label>
+    @if (createGroup || selectedPeople.Count > 1) { <label class="field"><span class="lab">Group name</span><BbInput UpdateTiming="UpdateTiming.Immediate" @bind-Value="groupName" Placeholder="Give your group a name" /></label> }
+    @if (dialogError is not null) { <p class="form-error" role="alert">@dialogError</p> }
+    <BbDialogFooter><BbButton Variant="ButtonVariant.Ghost" OnClick="() => newOpen = false">Cancel</BbButton><BbButton Disabled="busy || selectedPeople.Count == 0" OnClick="CreateConversation">@(busy ? "Creating…" : "Let's yap")</BbButton></BbDialogFooter>
+</BbDialogContent></BbDialog>
+
+<BbDialog @bind-Open="actionOpen"><BbDialogContent Class="yap-dialog"><BbDialogHeader><BbDialogTitle>Message</BbDialogTitle><BbDialogDescription>@actionMessage?.Sender · @actionMessage?.Time</BbDialogDescription></BbDialogHeader>
+    @if (actionMessage is { } selected)
+    {
+        <p class="selected-message">@selected.Text</p>
+        <div class="reaction-picker" aria-label="React to message">
+            @foreach (var reaction in Chat.ReferenceData?.ReactionTypes ?? [])
+            {
+                <BbButton Class="reaction-choice" Variant="ButtonVariant.Ghost" Disabled="busy" aria-label="@($"React with {reaction.Name}")" aria-pressed="@(selected.Reactions.Any(r => r.TypeId == reaction.Id && r.MyReactionId is not null) ? "true" : "false")" OnClick="() => ToggleReaction((selected, reaction.Id))">@reaction.Emoji</BbButton>
+            }
+        </div>
+        @if (editing) { <label class="field"><span class="lab">Edit message</span><BbTextarea UpdateTiming="UpdateTiming.Immediate" @bind-Value="editText" maxlength="4000" /></label><BbButton Disabled="busy || string.IsNullOrWhiteSpace(editText)" OnClick="EditMessage">Save changes</BbButton> }
+        else
+        {
+            <div class="message-action-list">
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="() => Reply(selected)">Reply</BbButton>
+                <BbButton Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="() => OpenReplyThread(selected)">View thread</BbButton>
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="CopyMessage">Copy text</BbButton>
+                <BbButton Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="PinMessage">@(selected.Pinned ? "Unpin" : "Pin message")</BbButton>
+                <BbButton Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="SaveMessage">@(selected.Saved ? "Unsave" : "Save message")</BbButton>
+                <BbButton Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="ShowAttachments">Attachments</BbButton>
+                @if (selected.Mine) { <BbButton Variant="ButtonVariant.Ghost" OnClick="() => { editing = true; editText = selected.Text; }">Edit</BbButton><BbButton Variant="ButtonVariant.Destructive" OnClick="() => deleteOpen = true">Delete</BbButton> }
+            </div>
+        }
+        @if (attachmentLinks is not null) { @if (attachmentLinks.Count == 0) { <p>No attachments on this message.</p> } @foreach (var link in attachmentLinks) { <a class="attachment-link" href="@link.Url" target="_blank" rel="noopener noreferrer">Open attachment <YapIcon Name="arrow" Size="16" /></a> } }
+        @if (dialogError is not null) { <p class="form-error" role="alert">@dialogError</p> }
+    }
+</BbDialogContent></BbDialog>
+
+<BbAlertDialog @bind-Open="deleteOpen"><BbAlertDialogContent><BbAlertDialogHeader><BbAlertDialogTitle>Delete this message?</BbAlertDialogTitle><BbAlertDialogDescription>The message will be removed from this conversation.</BbAlertDialogDescription></BbAlertDialogHeader><BbAlertDialogFooter><BbAlertDialogCancel AsChild="false">Keep message</BbAlertDialogCancel><BbButton Variant="ButtonVariant.Destructive" OnClick="DeleteMessage">Delete message</BbButton></BbAlertDialogFooter></BbAlertDialogContent></BbAlertDialog>
+
+<BbDialog @bind-Open="detailsOpen"><BbDialogContent Class="yap-dialog"><BbDialogHeader><BbDialogTitle>@Chat.Selected?.Name</BbDialogTitle><BbDialogDescription>Conversation details</BbDialogDescription></BbDialogHeader>
+    @if (Chat.Selected is { } details) { <div class="people-results">@foreach (var member in details.Members) { <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(member.Alias)" Size="a34" /><span>@(member.CredentialId == Chat.CredentialId ? "You" : string.IsNullOrWhiteSpace(member.Alias) ? "Workspace member" : member.Alias)</span></div> }</div><BbButton Disabled="busy" OnClick="ToggleMute">@(IsMuted ? "Unmute conversation" : "Mute conversation")</BbButton> }
+</BbDialogContent></BbDialog>
+
+@code {
+    [Parameter] public Guid? ThreadId { get; set; }
+    private string search = "", filter = "All", draft = "", peopleSearch = "", groupName = "", editText = "";
+    private bool loading = true, busy, sending, newOpen, actionOpen, deleteOpen, detailsOpen, editing, searching, searched, createGroup, disposed, scroll;
+    private string? error, dialogError;
+    private ChatMessage? reply, actionMessage;
+    private IBrowserFile? file;
+    private Guid? uploadedFileId, pendingMessageId;
+    private Guid? focusMessageId;
+    private bool searchOpen;
+    private bool threadSending;
+    private string threadDraft = "";
+    private string? threadError;
+    private int uploadProgress;
+    private int fileInputVersion;
+    private IReadOnlyList<ChatPerson> people = [];
+    private readonly Dictionary<Guid, ChatPerson> selectedPeople = [];
+    private IReadOnlyList<ChatFileLink>? attachmentLinks;
+    private readonly HashSet<Guid> markedRead = [];
+    private IEnumerable<Communications.Domain.Shared.Contracts.Responses.ThreadListItemResponse> Filtered => Chat.Conversations.Where(c =>
+        (filter != "Unread" || c.UnreadCount > 0) && (filter != "Groups" || !c.IsDirect) && c.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+    private bool IsMuted => Chat.Conversations.FirstOrDefault(c => c.Id == Chat.Selected?.Id)?.IsMuted == true;
+
+    protected override void OnInitialized() => Chat.Changed += ChatChanged;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Chat.Ready) return;
+        if (ThreadId is { } id) await Run(() => Chat.SelectAsync(id));
+        else await Chat.CloseConversationAsync();
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Run(async () => { await Chat.StartAsync(await JS.InvokeAsync<string>("yap.deviceId")); if (ThreadId is { } id) { await Chat.SelectAsync(id); scroll = true; } });
+            loading = false;
+            StateHasChanged();
+        }
+        if (scroll) { scroll = false; await JS.InvokeVoidAsync("yap.scrollMessages"); }
+        if (focusMessageId is { } focusId) { focusMessageId = null; await JS.InvokeVoidAsync("yap.focusMessage", focusId.ToString()); }
+        if (Chat.Selected is { } conversation && await JS.InvokeAsync<bool>("yap.isVisible"))
+        {
+            var ids = Chat.Messages.Where(m => !m.Mine && !markedRead.Contains(m.Id)).Select(m => m.Id).ToArray();
+            if (ids.Length > 0)
+            {
+                try { await Chat.MarkReadAsync(conversation.Id, ids); markedRead.UnionWith(ids); }
+                catch (Exception ex) { Logger.LogDebug(ex, "Could not mark visible messages read."); }
+            }
+        }
+    }
+    private void ChatChanged() { if (!disposed) _ = InvokeAsync(RenderUpdate); }
+    private async Task RenderUpdate()
+    {
+        if (disposed) return;
+        if (actionMessage is not null)
+        {
+            actionMessage = Chat.Messages.FirstOrDefault(m => m.Id == actionMessage.Id);
+            if (actionMessage is null) actionOpen = deleteOpen = false;
+        }
+        try { scroll |= await JS.InvokeAsync<bool>("yap.nearBottom"); }
+        catch (JSDisconnectedException) { return; }
+        catch (InvalidOperationException) { }
+        if (!disposed) StateHasChanged();
+    }
+    private async Task Run(Func<Task> action, bool dialog = false)
+    {
+        if (busy) return;
+        busy = true;
+        if (dialog) dialogError = null; else error = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (Chat.Cancellation.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Yap could not complete a chat operation.");
+            var message = ex is ChatOperationException or UnauthorizedAccessException ? ex.Message : "We couldn't reach your workspace. Please try again.";
+            if (dialog) dialogError = message; else error = message;
+        }
+        finally { busy = false; }
+    }
+    private Task Refresh() => Run(async () => { if (!Chat.Ready) await Chat.StartAsync(await JS.InvokeAsync<string>("yap.deviceId")); else await Chat.RefreshAsync(); });
+    private Task LoadMoreConversations() => Run(() => Chat.RefreshAsync(true));
+    private Task LoadEarlier() => Run(() => Chat.LoadEarlierAsync());
+    private Task Open(Guid id) => Run(async () => { await Chat.SelectAsync(id); reply = null; draft = ""; ClearFile(); scroll = true; Navigation.NavigateTo($"/chat/{id}"); });
+    private Task OpenSearchResult(Communications.Domain.Shared.Contracts.Responses.SearchMessageItemResponse result) => Run(async () =>
+    {
+        await Chat.OpenMessageAsync(result.ThreadId, result.MessageId);
+        searchOpen = false; reply = null; draft = ""; ClearFile(); scroll = false;
+        focusMessageId = result.MessageId;
+        Navigation.NavigateTo($"/chat/{result.ThreadId}");
+    });
+    private async Task Back() { await Chat.CloseConversationAsync(); Navigation.NavigateTo("/"); }
+    private void ShowNew() { selectedPeople.Clear(); people = []; peopleSearch = groupName = ""; createGroup = searched = false; dialogError = null; newOpen = true; }
+    private async Task SearchPeople()
+    {
+        searching = true;
+        try { await Run(async () => { people = await Directory.SearchAsync(peopleSearch, Chat.Cancellation); searched = true; }, true); }
+        finally { searching = false; }
+    }
+    private void TogglePerson(ChatPerson person) { if (!selectedPeople.Remove(person.Id)) selectedPeople.Add(person.Id, person); }
+    private Task CreateConversation() => Run(async () =>
+    {
+        Guid id;
+        if (createGroup || selectedPeople.Count > 1)
+        {
+            if (string.IsNullOrWhiteSpace(groupName)) throw new ChatOperationException("Give your group a name.");
+            var type = Chat.ReferenceData?.ThreadTypeId ?? Guid.Empty;
+            if (type == Guid.Empty)
+                throw new ChatOperationException("Group creation is not configured for this workspace yet.");
+            id = await Chat.CreateGroupAsync(groupName, type, selectedPeople.Keys.ToArray());
+        }
+        else
+        {
+            var person = selectedPeople.Values.Single();
+            var me = (await Authentication.GetAuthenticationStateAsync()).User.Identity?.Name ?? "Me";
+            id = await Chat.CreateDirectAsync(person.Id, $"{me} & {person.Name}");
+        }
+        await Chat.RefreshAsync(); await Chat.SelectAsync(id); newOpen = false; scroll = true; Navigation.NavigateTo($"/chat/{id}");
+    }, true);
+    private void Reply(ChatMessage message) { reply = message; actionOpen = false; }
+    private Task OpenReplyThread(ChatMessage message) => Run(async () =>
+    {
+        await Chat.OpenRepliesAsync(message);
+        threadDraft = ""; threadError = null; actionOpen = false;
+    }, true);
+    private async Task ReplyThreadOpenChanged(bool open) { if (!open) await Chat.CloseRepliesAsync(); }
+    private async Task SendThreadReply()
+    {
+        if (threadSending || Chat.Selected is null || Chat.ReplyParent is null || string.IsNullOrWhiteSpace(threadDraft)) return;
+        threadSending = true; threadError = null;
+        var committed = false;
+        try
+        {
+            await Chat.SendAsync(Chat.Selected.Id, threadDraft, Chat.ReplyParent.Id);
+            committed = true; threadDraft = "";
+            await Chat.PublishTypingAsync(false);
+            await Chat.RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Yap could not complete a thread reply.");
+            threadError = committed ? "Reply sent. Refresh to see the latest thread."
+                : "The reply couldn't be confirmed. Check the thread before sending again; your draft is still here.";
+        }
+        finally { threadSending = false; }
+    }
+    private void SelectMessage(ChatMessage message) { actionMessage = message; editing = false; attachmentLinks = null; dialogError = null; actionOpen = true; }
+    private async Task CopyMessage() { await Run(async () => await JS.InvokeVoidAsync("yap.copy", actionMessage?.Text), true); }
+    private Task PinMessage() => MessageAction((id, m) => Chat.PinAsync(id, m));
+    private Task ToggleReaction((ChatMessage Message, Guid TypeId) value) => Run(async () =>
+    {
+        if (Chat.Selected is null) return;
+        await Chat.ToggleReactionAsync(Chat.Selected.Id, Chat.Messages.FirstOrDefault(m => m.Id == value.Message.Id) ?? value.Message, value.TypeId);
+        actionOpen = false;
+        await Chat.RefreshAsync();
+    }, actionOpen);
+    private Task SaveMessage() => MessageAction((id, m) => Chat.SaveAsync(id, m));
+    private Task EditMessage() => MessageAction((id, m) => Chat.EditAsync(id, m.Id, editText));
+    private Task DeleteMessage() => MessageAction((id, m) => Chat.DeleteAsync(id, m.Id));
+    private Task MessageAction(Func<Guid, ChatMessage, Task> action) => Run(async () =>
+    { if (Chat.Selected is null || actionMessage is null) return; await action(Chat.Selected.Id, actionMessage); actionOpen = deleteOpen = false; await Chat.RefreshAsync(); }, true);
+    private Task ShowAttachments() => Run(async () => { if (Chat.Selected is not null && actionMessage is not null) attachmentLinks = await Files.GetLinksAsync(Chat.Selected.Id, actionMessage.Id, Chat.Cancellation); }, true);
+    private Task ToggleMute() => Run(async () => { if (Chat.Selected is not null) await Chat.MuteAsync(Chat.Selected.Id, !IsMuted); await Chat.RefreshAsync(); detailsOpen = false; });
+    private async Task DraftChanged(ChangeEventArgs args) { draft = args.Value?.ToString() ?? ""; await Chat.PublishTypingAsync(!string.IsNullOrWhiteSpace(draft)); }
+    private Task ThreadDraftChanged() => Chat.PublishTypingAsync(!string.IsNullOrWhiteSpace(threadDraft));
+    private async Task ComposerKeyDown(KeyboardEventArgs args) { if (args.Key == "Enter" && (args.CtrlKey || args.MetaKey)) await Send(); }
+    private void ChooseFile(InputFileChangeEventArgs args)
+    { if (args.File.Size is <= 0 or > ChatFiles.MaxFileBytes) { error = "Choose a file between 1 byte and 20 MB."; return; } file = args.File; uploadedFileId = pendingMessageId = null; }
+    private void ClearFile() { file = null; uploadedFileId = pendingMessageId = null; uploadProgress = 0; fileInputVersion++; }
+    private async Task Send()
+    {
+        if (sending || Chat.Selected is null || (string.IsNullOrWhiteSpace(draft) && file is null)) return;
+        sending = true; error = null;
+        var threadId = Chat.Selected.Id;
+        var committed = false;
+        try
+        {
+            if (file is not null && uploadedFileId is null)
+                uploadedFileId = await Files.UploadAsync(file, threadId, new Progress<int>(value => { uploadProgress = value; if (!disposed) _ = InvokeAsync(StateHasChanged); }), Chat.Cancellation);
+            pendingMessageId ??= await Chat.SendAsync(threadId, string.IsNullOrWhiteSpace(draft) ? file!.Name : draft, reply?.Id);
+            if (uploadedFileId is { } storageId) await Files.AttachAsync(threadId, pendingMessageId.Value, storageId, Chat.Cancellation);
+            committed = true;
+            draft = ""; reply = null; ClearFile(); scroll = true;
+            await Chat.PublishTypingAsync(false);
+            await Chat.RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Yap could not finish sending a message.");
+            error = committed ? "Your message was sent. Refresh to see the latest conversation."
+                : pendingMessageId is not null ? "Your message was sent, but the attachment wasn't linked. Use Send to retry attaching it."
+                : "The send couldn't be confirmed. Refresh the conversation before retrying; your draft is still here.";
+        }
+        finally { sending = false; }
+    }
+    public void Dispose() { disposed = true; Chat.Changed -= ChatChanged; }
+}

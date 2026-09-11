@@ -25,6 +25,8 @@ on:
       - scripts/verify-bolt-tailscale-boundary.py
       - scripts/verify-bolt-phase0-diagnostic-sinks.py
       - scripts/refresh-bolt-phase0-synthetic-tokens.py
+      - scripts/provision-yap-dev-secret.sh
+      - scripts/configure-yap-dev-ingress.sh
       - .github/workflows/deploy-xeon-dev.yml
   workflow_dispatch:
     inputs:
@@ -275,7 +277,7 @@ jobs:
           services=(
             migrate identityserver bolt-hub communications
             audit notifications storage attendance smsgateway wallets inventario pos
-            portal operations-dashboard bolt-phase0-synthetics
+            portal operations-dashboard yap bolt-phase0-synthetics
           )
           for service in "${services[@]}"; do
             timeout --foreground --kill-after=30s 15m \
@@ -289,7 +291,7 @@ jobs:
           services=(
             migrate identityserver bolt-hub communications
             audit notifications storage attendance smsgateway wallets inventario pos
-            portal operations-dashboard bolt-phase0-synthetics
+            portal operations-dashboard yap bolt-phase0-synthetics
           )
           for service in "${services[@]}"; do
             image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${service}:${IMAGE_TAG}"
@@ -308,6 +310,7 @@ jobs:
           scp scripts/verify-bolt-phase0-diagnostic-sinks.py "$DEPLOY_HOST:$REMOTE_VERIFY_DIAGNOSTICS"
           scp scripts/refresh-bolt-phase0-synthetic-tokens.py "$DEPLOY_HOST:$REMOTE_REFRESH_TOKENS"
           scp scripts/provision-yap-dev-secret.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/provision-yap-dev-secret.sh"
+          scp scripts/configure-yap-dev-ingress.sh "$DEPLOY_HOST:$REMOTE_RUN_DIR/configure-yap-dev-ingress.sh"
           ssh "$DEPLOY_HOST" "chmod 700 '$REMOTE_RUN_DIR/provision-yap-dev-secret.sh' && '$REMOTE_RUN_DIR/provision-yap-dev-secret.sh'"
 
           ssh "$DEPLOY_HOST" \
@@ -465,7 +468,7 @@ jobs:
           image_services=(
             migrate identityserver bolt-hub communications
             audit notifications storage attendance smsgateway wallets inventario pos
-            portal operations-dashboard bolt-phase0-synthetics
+            portal operations-dashboard yap bolt-phase0-synthetics
           )
           python3 - "$REMOTE_IMAGE_OVERRIDE" "$REGISTRY_HOST" "$REGISTRY_NAMESPACE" "$IMAGE_TAG" "${image_services[@]}" <<'PY'
           import json
@@ -500,6 +503,9 @@ jobs:
           runtime_snapshot_ready=false
           if docker inspect xframework-audit >/dev/null 2>&1; then
             runtime_services+=(audit)
+          fi
+          if docker inspect xframework-yap >/dev/null 2>&1; then
+            runtime_services+=(yap)
           fi
           image_arguments=()
           if [ -f "$REMOTE_ACTIVE_ENV" ] && [ ! -L "$REMOTE_ACTIVE_ENV" ] && \
@@ -623,6 +629,8 @@ jobs:
           services = document.get("services", {})
           if "audit" in services:
               required_services += ("audit",)
+          if "yap" in services:
+              required_services += ("yap",)
           for name in required_services:
               image = services.get(name, {}).get("image")
               if not image:
@@ -666,7 +674,7 @@ jobs:
           services=(
             postgres redis minio seq migrate identityserver bolt-hub communications
             audit notifications storage attendance smsgateway wallets inventario pos
-            portal operations-dashboard bolt-phase0-synthetics
+            portal operations-dashboard yap bolt-phase0-synthetics
           )
           service_args="$(printf '%q ' "${services[@]}")"
           ssh "$DEPLOY_HOST" \
@@ -1042,7 +1050,7 @@ jobs:
           ssh "$DEPLOY_HOST" \
             "COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' XFRAMEWORK_ENV_FILE='$REMOTE_CANDIDATE_ENV' REMOTE_CANDIDATE_COMPOSE='$REMOTE_CANDIDATE_COMPOSE' REMOTE_IMAGE_OVERRIDE='$REMOTE_IMAGE_OVERRIDE' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
-          clients=(audit notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard)
+          clients=(audit notifications storage attendance smsgateway wallets inventario pos portal operations-dashboard yap)
           compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$XFRAMEWORK_ENV_FILE" -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE")
           /usr/bin/timeout --foreground --kill-after=30s 600s \
             "${compose[@]}" up -d --no-build --no-deps --force-recreate "${clients[@]}"
@@ -1058,6 +1066,7 @@ jobs:
             pos=http://127.0.0.1:8115/health/ready
             portal=http://127.0.0.1:5000/health/ready
             operations-dashboard=http://127.0.0.1:5050/health/ready
+            yap=http://127.0.0.1:5188/health/ready
           )
           for check in "${checks[@]}"; do
             name="${check%%=*}"
@@ -1074,6 +1083,12 @@ jobs:
             test "$ready" -eq 1
           done
           REMOTE_SCRIPT
+
+      - name: Configure and verify Yap HTTPS ingress
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_HOST" "bash '$REMOTE_RUN_DIR/configure-yap-dev-ingress.sh' '$REMOTE_RUN_DIR/yap-ingress-owned'"
 
       - name: Activate complete release
         shell: bash
@@ -1152,6 +1167,9 @@ jobs:
               -f "$REMOTE_CANDIDATE_COMPOSE" -f "$REMOTE_IMAGE_OVERRIDE")
             /usr/bin/timeout --foreground --kill-after=30s 300s \
               "${compose[@]}" down --remove-orphans
+            if [ -f "$REMOTE_RUN_DIR/yap-ingress-owned" ]; then
+              tailscale serve --bg --yes --https=5188 off
+            fi
             rm -f "$REMOTE_RUN_DIR/complete" "$REMOTE_RUN_DIR/mutation-started"
             trap - ERR
             exit 0
@@ -1197,6 +1215,14 @@ jobs:
             services+=(audit)
           elif docker inspect xframework-audit >/dev/null 2>&1; then
             docker stop xframework-audit
+          fi
+          if "${compose[@]}" config --services | grep -qx yap; then
+            services+=(yap)
+          elif docker inspect xframework-yap >/dev/null 2>&1; then
+            docker stop xframework-yap
+            if [ -f "$REMOTE_RUN_DIR/yap-ingress-owned" ]; then
+              tailscale serve --bg --yes --https=5188 off
+            fi
           fi
           /usr/bin/timeout --foreground --kill-after=30s 300s \
             "${compose[@]}" up -d --no-build postgres redis minio seq
