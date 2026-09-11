@@ -72,7 +72,13 @@ h1:focus { outline:none; }
 .settings-body { max-width:520px; margin:auto; padding:30px; }.settings-body p { line-height:1.8; margin:18px 0; font-size:14px; }.profile-card { display:flex; align-items:center; flex-direction:column; padding:25px; }.profile-card h2 { font-size:24px; margin-top:16px; }.settings-body form { margin-top:30px; }
 .authbody .field-help { font-size:12px; color:var(--dim); margin:-6px 3px 18px; }
 .authbody .foot a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
-/* Keep focused controls readable on iPhone/iPad without disabling user zoom. */
+/* Permit scrolling but exclude browser pinch/double-tap zoom, including nested scrollers. */
+html, body, body * { touch-action:pan-x pan-y; }
+.install-help { margin-top:24px; font-size:14px; line-height:1.7; color:var(--dim); }
+.install-help summary { cursor:pointer; color:var(--text); }
+.install-help p { margin:12px 0; }
+@media (display-mode: standalone) { .install-help { display:none; } }
+/* Keep focused controls at 16px to avoid Safari input-focus zoom. */
 @media (max-width: 1024px), (pointer: coarse) {
   input:not([type=checkbox]):not([type=radio]):not([type=file]), textarea, select,
   .inp input, .composer textarea { font-size:16px; }
