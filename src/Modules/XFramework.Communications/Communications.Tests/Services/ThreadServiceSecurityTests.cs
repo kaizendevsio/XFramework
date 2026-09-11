@@ -828,6 +828,8 @@ public sealed class ThreadServiceSecurityTests
     [TestCase("nonmember", 403)]
     [TestCase("deleted", 404)]
     [TestCase("hidden", 404)]
+    [TestCase("deletedthread", 404)]
+    [TestCase("disabledthread", 404)]
     [TestCase("unlinked", 404)]
     [TestCase("wrongtenant", 404)]
     public async Task GetChatAttachmentDownloadUrlAsync_RequiresVisibleLinkedMessage(string scenario, int expected)
@@ -841,6 +843,8 @@ public sealed class ThreadServiceSecurityTests
         var link = new MessageFile { Id = Guid.NewGuid(), TenantId = tenant, MessageId = message.Id,
             StorageId = Guid.NewGuid(), IsEnabled = true };
         if (scenario == "deleted") message.IsDeleted = true;
+        if (scenario == "deletedthread") thread.IsDeleted = true;
+        if (scenario == "disabledthread") thread.IsEnabled = false;
         if (scenario == "wrongtenant") link.TenantId = Guid.NewGuid();
         var context = new InMemoryDataContext();
         context.Seed(thread, sender, message);

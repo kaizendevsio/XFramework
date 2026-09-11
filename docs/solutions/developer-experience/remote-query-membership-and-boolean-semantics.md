@@ -6,7 +6,7 @@ an in-memory `IDataContext` fake does not exercise query serialization.
 
 Generated query and query-stream wrappers use `CreateDataContextQueryAsync` to
 request only `datacontext.query` for ordinary actor-bound reads. Actorless reads
-still require `tenant.target`; filter bypass still requests both `query.alltenants`
+still require `tenant.target`; filter bypass still requests both `datacontext.query.all-tenants`
 and `tenant.target`. Actor tokens are resolved once and propagated unchanged, and
 the owning service continues to enforce tenant/actor authorization. Mutation scope
 selection is unchanged. `GeneratedQueryTokenScopeTests` captures token acquisition

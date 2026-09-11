@@ -56,6 +56,10 @@ public sealed partial class ThreadService
             .Where(x => x.CredentialId == caller.CredentialId && !x.IsDeleted && x.IsEnabled)
             .FirstOrDefaultAsync(ct);
         if (member is null) return Result<StorageDownloadUrlResponse>.Forbidden("Requester is not a member of this thread");
+        var activeThread = await dataContext.Query<MessageThread>()
+            .Where(x => x.Id == request.ThreadId && x.TenantId == caller.TenantId && !x.IsDeleted && x.IsEnabled)
+            .AnyAsync(ct);
+        if (!activeThread) return Result<StorageDownloadUrlResponse>.NotFound("Thread not found");
         var message = await dataContext.Query<Message>()
             .Where(x => x.Id == request.MessageId && x.MessageThreadId == request.ThreadId)
             .Where(x => x.TenantId == caller.TenantId && !x.IsDeleted && x.IsEnabled)

@@ -86,6 +86,17 @@ public sealed class ServiceIdentityComposeContractTests
     }
 
     [Test]
+    public void Communications_RequestsItsAllowedStorageReadAndWriteScopes()
+    {
+        var compose = File.ReadAllText(Path.Combine(FindRepositoryRoot().FullName, "docker-compose.yml"));
+        var communications = ExtractService(compose, "communications");
+        communications.Should().Contain("ServiceIdentity__DefaultScopes__4: storage.read");
+        communications.Should().Contain("ServiceIdentity__DefaultScopes__5: storage.write");
+        ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.Communications).Should().Contain(
+            [XFrameworkServiceScopes.StorageRead, XFrameworkServiceScopes.StorageWrite]);
+    }
+
+    [Test]
     public void AuditStartup_UsesModuleGeneratedRoutes()
     {
         var program = File.ReadAllText(Path.Combine(FindRepositoryRoot().FullName,
