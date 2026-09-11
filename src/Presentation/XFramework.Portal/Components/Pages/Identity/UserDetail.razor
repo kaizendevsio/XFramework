@@ -252,7 +252,8 @@ else
                                 </BbDataGridTemplateColumn>
                             </Columns>
                             <EmptyTemplate>
-                                <BbEmpty Title="No assigned roles" Description="No roles are assigned to this user's credentials." />
+                                <BbEmpty Title="@(_rolesLoadFailed ? "Could not load assigned roles" : "No assigned roles")"
+                                         Description="@(_rolesLoadFailed ? "Refresh to try again. Existing assignments have not been changed." : "No roles are assigned to this user's credentials.")" />
                             </EmptyTemplate>
                         </BbDataGrid>
                     </BbCardContent>
@@ -1051,6 +1052,7 @@ else
     private IdentityInformation? _user;
     private List<IdentityCredential> _credentials = [];
     private List<IdentityRole> _roles = [];
+    private bool _rolesLoadFailed;
     private List<IdentityContact> _contacts = [];
     private List<IdentityAddress> _addresses = [];
     private List<Session> _sessions = [];
@@ -1328,6 +1330,7 @@ else
 
     private async Task LoadRoles()
     {
+        _rolesLoadFailed = false;
         try
         {
             var tenantId = _user?.TenantId ?? Guid.Empty;
@@ -1344,11 +1347,16 @@ else
                     .Where(role => credentialIds.Contains(role.CredentialId))
                     .Include(x => x.Type)
                     .OrderByDescending(x => x.CreatedAt)
-                    .Take(10_000)
+                    .Take(1_000)
                     .ToListAsync())
                 .ToList();
         }
-        catch { _roles = []; }
+        catch (Exception ex)
+        {
+            _roles = [];
+            _rolesLoadFailed = true;
+            Logger.LogWarning(ex, "Could not load assigned roles for identity {IdentityId}", Id);
+        }
     }
 
     private async Task LoadContacts()

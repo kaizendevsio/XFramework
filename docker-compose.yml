@@ -315,6 +315,11 @@ services:
       ServiceIdentity__Clients__11__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
       ServiceIdentity__Clients__11__AllowedAudiences: *service-identity-audiences
       ServiceIdentity__Clients__11__AllowedScopes: bolt.service
+      ServiceIdentity__Clients__13__ClientId: XFramework.Yap
+      ServiceIdentity__Clients__13__ClientSecret: ${YAP_SERVICE_IDENTITY_SECRET:?Set YAP_SERVICE_IDENTITY_SECRET in the protected deployment env}
+      ServiceIdentity__Clients__13__GenerationId: ${YAP_SERVICE_CREDENTIAL_GENERATION_ID:?Set YAP_SERVICE_CREDENTIAL_GENERATION_ID in the protected deployment env}
+      ServiceIdentity__Clients__13__AllowedAudiences: XFramework.Bolt.Hub,XFramework.IdentityServer,XFramework.Communications,XFramework.Storage
+      ServiceIdentity__Clients__13__AllowedScopes: bolt.service,communications.chat,identity.session.validate,datacontext.query,storage.read,storage.write
       TrustedProxyForwarding__KnownProxies__0: host.docker.internal
     extra_hosts:
       - "host.docker.internal:host-gateway"

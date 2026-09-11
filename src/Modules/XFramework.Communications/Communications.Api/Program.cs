@@ -21,6 +21,8 @@ builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
 // Register services
 builder.Services.AddScoped<ICommunicationsService, CommunicationsService>();
 builder.Services.AddScoped<IThreadService, ThreadService>();
+builder.Services.AddScoped<ChatReferenceDataService>();
+builder.Services.AddScoped<IMessageReactionSummaryReader, MessageReactionSummaryReader>();
 builder.Services.AddScoped<ICommunicationsRequestContextResolver, CommunicationsRequestContextResolver>();
 builder.Services.AddScoped<ICommunicationsRealtimePublisher, CommunicationsRealtimePublisher>();
 builder.Services.AddScoped<ICommunicationsTransientRealtimePublisher, CommunicationsTransientRealtimePublisher>();
@@ -49,6 +51,7 @@ app.UseTenantModuleFeatureGate(options =>
     options.RequireFeature(TenantModuleFeatureKeys.Communications, "/api/communications/settings");
     options.RequireFeature(TenantModuleFeatureKeys.Communications, "/api/communications/templates");
     options.RequireFeature(TenantModuleFeatureKeys.CommunicationsChat, "/api/communications/threads");
+    options.RequireFeature(TenantModuleFeatureKeys.CommunicationsChat, "/api/communications/chat");
     options.RequireFeature(TenantModuleFeatureKeys.CommunicationsChat, "/api/communications/messages");
     options.RequireFeature(TenantModuleFeatureKeys.CommunicationsChat, "/api/communications/realtime");
     options.RequireFeature(TenantModuleFeatureKeys.CommunicationsChat, "/api/communications/blocks");
