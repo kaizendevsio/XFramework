@@ -9,6 +9,19 @@ namespace Yap.Tests;
 public sealed class AuthEndpointTests
 {
     [Test]
+    public async Task Readiness_RejectsDisconnectedBoltWhileLivenessRemainsHealthy()
+    {
+        await using var app = UiFixture.Create(0);
+        await app.StartAsync();
+        using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        Assert.That((await client.GetAsync("/health/live")).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var ready = await client.GetAsync("/health/ready");
+        Assert.That(ready.StatusCode, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+        Assert.That(await ready.Content.ReadAsStringAsync(), Does.Contain("Bolt is disconnected"));
+        await app.StopAsync();
+    }
+
+    [Test]
     public async Task LoginAndLogout_RequireAntiforgeryAndIssueOnlyAuthenticatedSession()
     {
         await using var app = UiFixture.Create(0);

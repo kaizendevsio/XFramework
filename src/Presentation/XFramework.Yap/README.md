@@ -17,6 +17,8 @@ Voice/video calls and account signup are outside this first build. There are no 
 
 ## Connect to XFramework
 
+The xeon-dev deployment hosts Yap at `https://xeon-dev.tailed40e.ts.net:5188` for tailnet users. The normal workflow builds its image, checks Bolt readiness, and configures its own Tailscale Serve listener. Backend HTTP binds only to `127.0.0.1:5188`; other Serve routes are preserved. The protected deployment environment supplies the dedicated service credentials plus `YAP_TENANT_ID` and `YAP_ROLE_ID`. The dev provisioning script initializes missing workspace values to the provisioned Yap test workspace and preserves explicit overrides. Data Protection keys persist in the `yap-keydata` volume; login sessions remain in memory, so deployments require signing in again.
+
 Use an existing XFramework environment with IdentityServer, Communications, Storage, and Bolt Hub running. This app needs no database connection or new database. Modules retain their existing single-database, schema-per-module ownership.
 
 1. Register a dedicated service client named `XFramework.Yap` in the environment's `ServiceIdentity:Clients` configuration using its normal credential provisioning process. Give it a new generation ID and secret; do not reuse another application's credentials.

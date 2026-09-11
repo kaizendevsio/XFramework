@@ -172,7 +172,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash -n scripts/configure-bolt-tailscale-boundary.sh
+            bash -n scripts/configure-bolt-tailscale-boundary.sh
+            bash -n scripts/configure-yap-dev-ingress.sh scripts/provision-yap-dev-secret.sh
           python3 -B scripts/verify-bolt-tailscale-boundary-test.py
           python3 -B scripts/verify-bolt-phase0-diagnostic-sinks-test.py
           python3 -B scripts/refresh-bolt-phase0-synthetic-tokens-test.py

@@ -1,4 +1,5 @@
 using BlazorBlueprint.Components;
+using Bolt.Client;
 using Communications.Integration.Clients;
 using Communications.Integration.Drivers;
 using IdentityServer.Integration.Drivers;
@@ -56,7 +57,8 @@ public static class YapApplication
         {
             app.UseExceptionHandler("/error");
             app.UseHsts();
-            app.UseHttpsRedirection();
+            app.UseWhen(context => !context.Request.Path.StartsWithSegments("/health"),
+                branch => branch.UseHttpsRedirection());
         }
         app.UseAuthentication();
         app.UseAuthorization();
@@ -64,6 +66,15 @@ public static class YapApplication
         app.MapStaticAssets();
         app.MapYapAuth();
         app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
+        app.MapGet("/health/ready", (BoltClient client, IConfiguration configuration) =>
+        {
+            var configured = Guid.TryParse(configuration["Yap:TenantId"], out var tenant) && tenant != Guid.Empty &&
+                             Guid.TryParse(configuration["Yap:RoleId"], out var role) && role != Guid.Empty;
+            return client.IsConnected && configured
+                ? Results.Ok(new { status = "Healthy" })
+                : Results.Json(new { status = "Unhealthy", reason = configured ? "Bolt is disconnected" : "Workspace is not configured" },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+        });
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
         return app;
     }

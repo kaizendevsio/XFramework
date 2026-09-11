@@ -148,6 +148,16 @@ public sealed class ServiceIdentityComposeContractTests
         provision.Should().Contain("umask 077");
         provision.Should().Contain("openssl rand -hex 48");
         provision.Should().Contain("os.chmod(path, 0o600)");
+        var yap = ExtractService(compose, "yap");
+        yap.Should().Contain("127.0.0.1:5188:8080");
+        yap.Should().Contain("ServiceIdentity__ClientSecret: ${YAP_SERVICE_IDENTITY_SECRET:");
+        yap.Should().Contain("/health/ready");
+        yap.Should().NotContain("DefaultDatabaseConnection");
+        yap.Should().NotContain("<<: *common-env");
+        workflow.Should().Contain("portal operations-dashboard yap bolt-phase0-synthetics");
+        workflow.Should().Contain("yap=http://127.0.0.1:5188/health/ready");
+        workflow.Should().Contain("services+=(yap)");
+        workflow.Should().Contain("Configure and verify Yap HTTPS ingress");
     }
 
     [Test]
