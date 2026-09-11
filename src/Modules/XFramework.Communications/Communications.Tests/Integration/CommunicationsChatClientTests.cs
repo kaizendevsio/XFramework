@@ -1,6 +1,10 @@
 using System.Net;
 using System.Reflection;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
+using Communications.Domain.Shared.Contracts.Requests.ReferenceData;
+using Communications.Domain.Shared.Contracts.Requests.Reactions;
+using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Domain.Shared.Contracts.Responses;
 using Communications.Domain.Shared.Contracts.Responses;
 using Communications.Integration.Clients;
 using Communications.Integration.Drivers;
@@ -62,6 +66,47 @@ public sealed class CommunicationsChatClientTests
             Assert.That(tokenScope.CurrentToken, Is.Null);
             Assert.That(actorProvider.CallCount, Is.EqualTo(2));
         });
+    }
+
+    [Test]
+    public async Task NewChatReadsAndDefaults_PropagateActorTenantParametersAndCancellation()
+    {
+        var tenant = Guid.NewGuid();
+        var thread = Guid.NewGuid();
+        var message = Guid.NewGuid();
+        var scope = new RecordingActorAccessTokenScope();
+        var proxy = DispatchProxy.Create<ICommunicationsServiceWrapper, RecordingWrapperProxy>();
+        var requests = new List<RequestBase>();
+        using var cancellation = new CancellationTokenSource();
+        ((RecordingWrapperProxy)(object)proxy).OnInvoke = (method, args) =>
+        {
+            var request = (RequestBase)args[0]!;
+            requests.Add(request);
+            Assert.That(request.Metadata!.RequestedTenantId, Is.EqualTo(tenant));
+            Assert.That(scope.CurrentToken, Is.EqualTo("actor-token"));
+            Assert.That(args[1], Is.EqualTo(cancellation.Token));
+            return request switch
+            {
+                EnsureChatDefaultsRequest or GetChatReferenceDataRequest => Task.FromResult(new QueryResponse<ChatReferenceDataResponse>()),
+                GetMessageReactionsRequest => Task.FromResult(new QueryResponse<PaginatedResult<MessageReactionResponse>>()),
+                GetThreadMessagesRequest => Task.FromResult(new QueryResponse<GetThreadMessagesResponse>()),
+                _ => throw new InvalidOperationException(method.Name)
+            };
+        };
+        var client = new CommunicationsChatClient(proxy, new ConfigurationBuilder().Build(),
+            new StubActorProvider(new(tenant, Guid.NewGuid(), AccessToken: "actor-token")), scope);
+        var session = await client.ForCurrentActorAsync();
+        await session.EnsureChatDefaultsAsync(cancellation.Token);
+        await session.GetChatReferenceDataAsync(cancellation.Token);
+        await session.GetReactionsAsync(thread, message, 2, 10, cancellation.Token);
+        await session.GetRepliesAsync(thread, message, 3, 20, cancellation.Token);
+        var reactions = requests.OfType<GetMessageReactionsRequest>().Single();
+        Assert.That((reactions.ThreadId, reactions.MessageId, reactions.PageIndex, reactions.PageSize),
+            Is.EqualTo((thread, message, 2, 10)));
+        var replies = requests.OfType<GetThreadMessagesRequest>().Single();
+        Assert.That(replies.ParentMessageId, Is.EqualTo(message));
+        Assert.That(replies.ThreadId, Is.EqualTo(thread));
+        Assert.That(scope.CurrentToken, Is.Null);
     }
 
     private sealed class StubActorProvider(CommunicationsChatActor actor) : ICommunicationsChatActorProvider

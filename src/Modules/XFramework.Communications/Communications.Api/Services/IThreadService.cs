@@ -43,6 +43,7 @@ public interface IThreadService
     Task<Result<PaginatedResult<MessageFileResponse>>> GetMessageFilesAsync(GetMessageFilesRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> DeleteMessageFileAsync(DeleteMessageFileRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> CreateMessageReactionAsync(CreateMessageReactionRequest request, CancellationToken ct = default);
+    Task<Result<PaginatedResult<MessageReactionResponse>>> GetMessageReactionsAsync(GetMessageReactionsRequest request, CancellationToken ct = default);
     Task<Result<CmdResponse>> DeleteMessageReactionAsync(DeleteMessageReactionRequest request, CancellationToken ct = default);
 
     // Round 3: Read Receipts

@@ -396,7 +396,8 @@ public sealed class ThreadServiceSecurityTests
             Message(readMessageId, threadId, otherMemberId, tenantId, "read"),
             Message(unreadMessageId, threadId, otherMemberId, tenantId, "unread"),
             Message(Guid.NewGuid(), threadId, callerMemberId, tenantId, "own"),
-            Delivery(Guid.NewGuid(), callerMemberId, readMessageId, tenantId, MessageDeliveryTypes.Read));
+            Delivery(Guid.NewGuid(), callerMemberId, readMessageId, tenantId, MessageDeliveryTypes.Read),
+            new MessageDeliveryType { Id = MessageDeliveryTypes.Read, TenantId = tenantId, Name = "Read", IsEnabled = true });
 
         var service = CreateService(dataContext);
         var result = await service.GetUnreadCountsAsync(new GetUnreadCountsRequest
@@ -643,6 +644,127 @@ public sealed class ThreadServiceSecurityTests
         Assert.That(dataContext.Set<MessageOutboxEvent>().Single().EventType, Is.EqualTo(MessageRealtimeEvents.MessageFileDetached));
     }
 
+    [TestCase(false, false, 200)]
+    [TestCase(true, false, 403)]
+    [TestCase(false, true, 404)]
+    public async Task GetMessageReactionsAsync_EnforcesMembershipAndMessageVisibility(bool outsider, bool hidden, int status)
+    {
+        var tenant = Guid.NewGuid();
+        var thread = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var member = Member(Guid.NewGuid(), thread, actor, tenant);
+        var message = Message(Guid.NewGuid(), thread, member.Id, tenant, "hello");
+        var type = new MessageReactionType { Id = Guid.NewGuid(), TenantId = tenant, Name = "Like", Emoji = "👍", IsEnabled = true };
+        var reaction = new MessageReaction
+        {
+            Id = Guid.NewGuid(), TenantId = tenant, MessageId = message.Id, TypeId = type.Id,
+            MessageThreadMemberId = member.Id, IsEnabled = true, CreatedAt = DateTime.UtcNow
+        };
+        var context = new InMemoryDataContext();
+        context.Seed(member, message, type, reaction);
+        if (hidden)
+            context.Seed(new MessageHidden { Id = Guid.NewGuid(), TenantId = tenant, MessageId = message.Id,
+                MessageThreadMemberId = member.Id, IsEnabled = true });
+        var service = CreateService(context);
+        var result = await service.GetMessageReactionsAsync(new GetMessageReactionsRequest
+        {
+            ThreadId = thread, MessageId = message.Id, Metadata = Metadata(outsider ? Guid.NewGuid() : actor, tenant)
+        });
+        Assert.That(result.StatusCode, Is.EqualTo(status));
+        if (result.IsSuccess)
+        {
+            var item = result.Data!.Items.Single();
+            Assert.That(item.Id, Is.EqualTo(reaction.Id));
+            Assert.That(item.CredentialId, Is.EqualTo(actor));
+            Assert.That(item.Emoji, Is.EqualTo("👍"));
+        }
+    }
+
+    [Test]
+    public async Task CreateMessageReactionAsync_ForeignTenantType_IsRejectedWithoutWrite()
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var member = Member(Guid.NewGuid(), Guid.NewGuid(), actor, tenant);
+        var message = Message(Guid.NewGuid(), member.MessageThreadId, member.Id, tenant, "hello");
+        var type = new MessageReactionType { Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), IsEnabled = true };
+        var context = new InMemoryDataContext();
+        context.Seed(member, message, type);
+        var service = CreateService(context);
+        var result = await service.CreateMessageReactionAsync(new CreateMessageReactionRequest
+        {
+            ThreadId = member.MessageThreadId, MessageId = message.Id, TypeId = type.Id, Metadata = Metadata(actor, tenant)
+        });
+        Assert.That(result.StatusCode, Is.EqualTo(404));
+        Assert.That(context.Set<MessageReaction>(), Is.Empty);
+    }
+
+    [Test]
+    public async Task GetThreadMessagesAsync_ParentFilter_ReturnsOnlyRepliesAndUsesTenantDeliveryType()
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var member = Member(Guid.NewGuid(), Guid.NewGuid(), actor, tenant);
+        var parent = Message(Guid.NewGuid(), member.MessageThreadId, member.Id, tenant, "parent");
+        var reply = Message(Guid.NewGuid(), member.MessageThreadId, member.Id, tenant, "reply");
+        reply.ParentMessageId = parent.Id;
+        var deliveryType = new MessageDeliveryType { Id = Guid.NewGuid(), TenantId = tenant,
+            SystemReferenceId = MessageDeliveryTypes.Delivered, Name = "Delivered", IsEnabled = true };
+        var context = new InMemoryDataContext();
+        context.Seed(member, parent, reply, deliveryType,
+            Message(Guid.NewGuid(), member.MessageThreadId, member.Id, tenant, "unrelated"));
+        var service = CreateService(context);
+        var result = await service.GetThreadMessagesAsync(new GetThreadMessagesRequest
+        {
+            ThreadId = member.MessageThreadId, ParentMessageId = parent.Id, Metadata = Metadata(actor, tenant)
+        });
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.TotalCount, Is.EqualTo(1));
+        Assert.That(result.Data.Items.Single().Id, Is.EqualTo(reply.Id));
+        Assert.That(context.Set<MessageDelivery>().Single().TypeId, Is.EqualTo(deliveryType.Id));
+    }
+
+    [Test]
+    public async Task CreateDirectThreadAsync_ForeignTenantType_IsRejected()
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var type = ThreadType(Guid.NewGuid(), Guid.NewGuid());
+        var context = new InMemoryDataContext();
+        context.Seed(type, Credential(other, tenant));
+        var service = CreateService(context);
+        var result = await service.CreateDirectThreadAsync(new CreateDirectThreadRequest
+        {
+            TypeId = type.Id, OtherCredentialId = other, Metadata = Metadata(actor, tenant)
+        });
+        Assert.That(result.StatusCode, Is.EqualTo(404));
+        Assert.That(context.Set<MessageThread>(), Is.Empty);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task GetThreadAsync_UsesDirectIndexRatherThanMemberCount(bool direct)
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var thread = Thread(Guid.NewGuid(), tenant);
+        var context = new InMemoryDataContext();
+        context.Seed(thread, Member(Guid.NewGuid(), thread.Id, actor, tenant),
+            Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant));
+        if (direct)
+            context.Seed(new MessageDirectThread { Id = Guid.NewGuid(), TenantId = tenant,
+                MessageThreadId = thread.Id, IsEnabled = true });
+        var service = CreateService(context);
+        var result = await service.GetThreadAsync(new GetThreadRequest
+        {
+            Id = thread.Id, Metadata = Metadata(actor, tenant)
+        });
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.Members.Count, Is.EqualTo(2));
+        Assert.That(result.Data.IsDirect, Is.EqualTo(direct));
+    }
+
     private static ThreadService CreateService(
         InMemoryDataContext dataContext,
         ICommunicationsTemplateService? templateService = null)
@@ -661,7 +783,15 @@ public sealed class ThreadServiceSecurityTests
             new CommunicationsActionRateLimiter(),
             new CommunicationsModerationService(dataContext, resolver),
             new TestTransientRealtimePublisher(),
+            new EmptyReactionSummaryReader(),
             NullLogger<ThreadService>.Instance);
+    }
+
+    private sealed class EmptyReactionSummaryReader : IMessageReactionSummaryReader
+    {
+        public Task<Dictionary<Guid, List<MessageReactionSummaryResponse>>> ReadAsync(
+            Guid tenantId, Guid credentialId, IReadOnlyCollection<Guid> visibleMessageIds, CancellationToken ct) =>
+            Task.FromResult(new Dictionary<Guid, List<MessageReactionSummaryResponse>>());
     }
 
     private static RequestMetadata Metadata(Guid credentialId, Guid tenantId)

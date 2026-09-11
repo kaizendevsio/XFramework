@@ -7,6 +7,7 @@ public sealed class GetThreadMessagesValidator : AbstractValidator<GetThreadMess
 {
     public GetThreadMessagesValidator()
     {
+        RuleFor(x => x.ParentMessageId).NotEqual(Guid.Empty).When(x => x.ParentMessageId.HasValue);
         RuleFor(x => x.ThreadId)
             .NotEmpty().WithMessage("Thread ID is required");
 

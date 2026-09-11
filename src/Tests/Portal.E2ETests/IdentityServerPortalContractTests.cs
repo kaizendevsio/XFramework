@@ -769,6 +769,10 @@ public sealed class IdentityServerPortalContractTests
 
         roles.Should().Contain("credentialIds.Contains(role.CredentialId)");
         roles.Should().Contain("role.TenantId == tenantId");
+        roles.Should().Contain(".Take(1_000)");
+        roles.Should().NotContain(".Take(10_000)");
+        roles.Should().Contain("_rolesLoadFailed = true");
+        roles.Should().Contain("Logger.LogWarning");
         roles.Should().NotContain("foreach");
         roles.Split("DataContext.Query<IdentityRole>()", StringSplitOptions.None).Should().HaveCount(2);
 

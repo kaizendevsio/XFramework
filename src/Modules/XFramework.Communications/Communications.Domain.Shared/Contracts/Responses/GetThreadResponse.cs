@@ -9,4 +9,5 @@ public partial record GetThreadResponse
     public Guid TypeId { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<ThreadMemberResponse> Members { get; set; } = [];
+    public bool IsDirect { get; set; }
 }
