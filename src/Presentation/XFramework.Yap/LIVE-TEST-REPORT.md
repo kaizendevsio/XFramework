@@ -1,6 +1,22 @@
 # Yap live setup and test report — 2026-09-11
 
-**Status: direct and three-person group messaging, replies, direct-chat reactions, message search, editing, pinning, saved messages, and non-member rejection now have live passing evidence. Shared typing subscriptions and regular-user attachment upload remain blocked. Further recovery, delete, mute, and persistence checks are pending.** Fixture tests remain separate from the live evidence below.
+**Status: direct and three-person group messaging, replies/threads, reactions, search, editing, pinning, saved messages, deletion, mute, unread/read transitions, persistence, and non-member rejection have live passing evidence. Shared typing subscriptions and regular-user attachment upload remain blocked pending their fixes and deployment.** Fixture tests remain separate from the live evidence below.
+
+## Live checks after PR #441 deployment
+
+Deployment `34583099498` completed successfully. These checks ran against that deployed server with the scope-corrected client, before importing PR #442's new transient subscription protocol. Local Yap was stopped once PR #442 deployment `34584776953` reached service rollout.
+
+- **Restart/persistence:** all three accounts logged in again and loaded the existing group history and edited text. The earlier unpin had persisted for Bob and Carol. Carol's direct Love reaction and both direct replies survived app restarts. Removing her final Love reaction removed the chip for Bob too.
+- **Mute:** Bob muted the group, reloaded, and saw Unmute conversation. Carol still saw Mute conversation. Bob unmuted; after another app restart/login, his action was Mute conversation again.
+- **Timed delivery:** Bob sent `Yap E2E timed group delivery 0936`; browser DOM observers recorded arrival in Carol's and Dave's existing sessions at 3,995 ms and 3,979 ms respectively, without refresh. The server's outbox dispatcher polls every five seconds, so the earlier 2.5-second probe was too short to establish a delivery failure.
+- **Delete UI repair:** opening Delete initially crashed the Blazor circuit because `BbAlertDialogAction` forwarded a string `OnClick` attribute to `BbDialogClose`. The confirm action now uses `BbButton` with a typed callback, and Cancel explicitly uses `AsChild="false"` to render a button. Live verification: the alert dialog opens, Keep message dismisses it without deletion, and Delete message removes Dave's disposable `Yap E2E delete probe 0932` from the other accounts. Searching that exact text returns zero results. All 26 Yap tests pass after the repair.
+- **Group reactions:** all three members added Celebrate to Bob's timed-delivery message; Bob saw count 3. Dave removed his; Carol saw count 2 with her pressed state true, Dave saw count 2 with his false.
+- **Group replies/threads:** Carol replied to that parent. Bob's thread showed one reply, then he sent a response from its thread composer. Carol's open thread updated to two replies with both correct authors. Bob subsequently deleted the parent while Carol's thread was open; her thread closed gracefully and `Yap E2E after deleted parent 0938` arrived afterward. The child messages remain in group history with their earlier-message reference.
+- **Conversation filters and reuse:** Groups showed only the group. Starting a direct conversation with Carol again returned the same `ad1e82d5-6521-40b7-bb74-608929607586` URL and All still contained exactly two conversations, not a duplicate.
+- **Search:** mixed-case `sTaBlE rEcOvErY` returned the group's matching message globally. Restricting to Carol's current direct chat returned zero. Restoring global scope and selecting the result navigated to the group and focused `message-3b99b416-4a17-492f-a0c4-b25d8f26eb28` with the matching text.
+- **Unread/read:** with Carol viewing the group, Bob sent `Yap E2E unread check 0941` in their direct chat. Carol's direct row and Unread tab displayed 1. Unread filtered to that single direct conversation. Opening it while the document was visible and focused cleared the unread badge and left zero unread conversations.
+
+Remaining acceptance work includes the deployed multi-actor typing fix, secure attachment upload/download (small and multipart), and final recovery/visual checks with the final client/server combination. PR #442 must finish deployment before importing its client because its transient routing protocol requires the matching Hub.
 
 ## Live chat checks with query-scope fix `7f2ba968`
 

@@ -146,7 +146,7 @@
     }
 </BbDialogContent></BbDialog>
 
-<BbAlertDialog @bind-Open="deleteOpen"><BbAlertDialogContent><BbAlertDialogHeader><BbAlertDialogTitle>Delete this message?</BbAlertDialogTitle><BbAlertDialogDescription>The message will be removed from this conversation.</BbAlertDialogDescription></BbAlertDialogHeader><BbAlertDialogFooter><BbAlertDialogCancel>Keep message</BbAlertDialogCancel><BbAlertDialogAction OnClick="DeleteMessage">Delete message</BbAlertDialogAction></BbAlertDialogFooter></BbAlertDialogContent></BbAlertDialog>
+<BbAlertDialog @bind-Open="deleteOpen"><BbAlertDialogContent><BbAlertDialogHeader><BbAlertDialogTitle>Delete this message?</BbAlertDialogTitle><BbAlertDialogDescription>The message will be removed from this conversation.</BbAlertDialogDescription></BbAlertDialogHeader><BbAlertDialogFooter><BbAlertDialogCancel AsChild="false">Keep message</BbAlertDialogCancel><BbButton Variant="ButtonVariant.Destructive" OnClick="DeleteMessage">Delete message</BbButton></BbAlertDialogFooter></BbAlertDialogContent></BbAlertDialog>
 
 <BbDialog @bind-Open="detailsOpen"><BbDialogContent Class="yap-dialog"><BbDialogHeader><BbDialogTitle>@Chat.Selected?.Name</BbDialogTitle><BbDialogDescription>Conversation details</BbDialogDescription></BbDialogHeader>
     @if (Chat.Selected is { } details) { <div class="people-results">@foreach (var member in details.Members) { <div class="row"><Avatar Initials="@ChatMessage.InitialsFor(member.Alias)" Size="a34" /><span>@(member.CredentialId == Chat.CredentialId ? "You" : string.IsNullOrWhiteSpace(member.Alias) ? "Workspace member" : member.Alias)</span></div> }</div><BbButton Disabled="busy" OnClick="ToggleMute">@(IsMuted ? "Unmute conversation" : "Mute conversation")</BbButton> }
