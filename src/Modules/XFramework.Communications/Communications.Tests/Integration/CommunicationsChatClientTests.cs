@@ -3,6 +3,8 @@ using System.Reflection;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Requests.ReferenceData;
 using Communications.Domain.Shared.Contracts.Requests.Reactions;
+using Communications.Domain.Shared.Contracts.Requests.Attachments;
+using Storage.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Contracts.Responses;
 using Communications.Domain.Shared.Contracts.Responses;
@@ -90,6 +92,8 @@ public sealed class CommunicationsChatClientTests
                 EnsureChatDefaultsRequest or GetChatReferenceDataRequest => Task.FromResult(new QueryResponse<ChatReferenceDataResponse>()),
                 GetMessageReactionsRequest => Task.FromResult(new QueryResponse<PaginatedResult<MessageReactionResponse>>()),
                 GetThreadMessagesRequest => Task.FromResult(new QueryResponse<GetThreadMessagesResponse>()),
+                CreateChatAttachmentUploadRequest => Task.FromResult(new QueryResponse<StorageUploadSessionResponse>()),
+                GetChatAttachmentDownloadUrlRequest => Task.FromResult(new QueryResponse<StorageDownloadUrlResponse>()),
                 _ => throw new InvalidOperationException(method.Name)
             };
         };
@@ -100,6 +104,15 @@ public sealed class CommunicationsChatClientTests
         await session.GetChatReferenceDataAsync(cancellation.Token);
         await session.GetReactionsAsync(thread, message, 2, 10, cancellation.Token);
         await session.GetRepliesAsync(thread, message, 3, 20, cancellation.Token);
+        await session.CreateAttachmentUploadAsync(new CreateChatAttachmentUploadRequest
+            { ThreadId = thread, FileName = "report.txt", ContentType = "text/plain", TotalSizeBytes = 50 }, cancellation.Token);
+        var file = Guid.NewGuid();
+        await session.GetAttachmentDownloadUrlAsync(thread, message, file, cancellation.Token);
+        var upload = requests.OfType<CreateChatAttachmentUploadRequest>().Single();
+        Assert.That((upload.ThreadId, upload.FileName, upload.ContentType, upload.TotalSizeBytes),
+            Is.EqualTo((thread, "report.txt", "text/plain", 50L)));
+        var download = requests.OfType<GetChatAttachmentDownloadUrlRequest>().Single();
+        Assert.That((download.ThreadId, download.MessageId, download.FileId), Is.EqualTo((thread, message, file)));
         var reactions = requests.OfType<GetMessageReactionsRequest>().Single();
         Assert.That((reactions.ThreadId, reactions.MessageId, reactions.PageIndex, reactions.PageSize),
             Is.EqualTo((thread, message, 2, 10)));
