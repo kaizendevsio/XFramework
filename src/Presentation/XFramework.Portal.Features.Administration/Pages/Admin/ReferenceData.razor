@@ -4,7 +4,6 @@
 @using XFramework.Domain.Shared.DataContext
 @using XFramework.Domain.Shared.BusinessObjects
 @using XFramework.Integration.DataContext
-@using Microsoft.Extensions.DependencyInjection
 
 <PageTitle>Reference Data - Portal</PageTitle>
 
@@ -1174,9 +1173,9 @@
 
     // Keep each save isolated: failed remote batches remain queued in their context.
     // Reuse this circuit's service provider so the actor token is preserved.
+    // Match Portal's uncached registration; client-cache services are not registered by the host.
     private IDataContext CreateMutationContext(Guid tenantId) =>
-        ActivatorUtilities.CreateInstance<CachingDataContext>(
-            Services, new RemoteDataContext(Services, new RequestMetadata { RequestedTenantId = tenantId }));
+        new RemoteDataContext(Services, new RequestMetadata { RequestedTenantId = tenantId });
 
     private async Task PersistAndClose<T>(Action<T> applyChanges) where T : BaseModel, new()
     {

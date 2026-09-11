@@ -42,12 +42,15 @@ public sealed class ReferenceDataSaveTests
         _wrapper = new RecordingWrapper();
         var services = new ServiceCollection().AddLogging().AddSingleton(_wrapper);
         services.AddTrustedInvocationSecurity();
-        RemoteDataContextExtensions.AddRemoteDataContext(services);
+        services.AddScoped(_ => new RequestMetadata { RequestedTenantId = _tenantId });
+        // Match Portal Program.cs: the host uses the uncached registration, not
+        // DataContext.RemoteDataContextExtensions (which adds optional client-cache services).
+        XFramework.Integration.Extensions.ServiceCollectionExtensions.AddRemoteDataContext(services);
         _services = services.BuildServiceProvider();
         _page = new ReferenceData();
         SetProperty("Services", _services);
-        SetProperty("RequestMetadata", new RequestMetadata { RequestedTenantId = _tenantId });
-        SetProperty("DataContext", new RemoteDataContext(_services));
+        SetProperty("RequestMetadata", _services.GetRequiredService<RequestMetadata>());
+        SetProperty("DataContext", _services.GetRequiredService<IDataContext>());
         SetProperty("ToastService", ActivatorUtilities.CreateInstance<ToastService>(_services));
         SetProperty("Logger", NullLogger<ReferenceData>.Instance);
         SetField("_activeTab", "role-type-groups");
