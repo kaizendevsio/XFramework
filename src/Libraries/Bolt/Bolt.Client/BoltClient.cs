@@ -98,7 +98,7 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly ConcurrentDictionary<byte, Action<BoltConnection, byte[], int>> _frameHandlers = new();
 
     // Pub/sub state
-    private readonly ConcurrentDictionary<int, TransientSubscription> _transientSubscriptions = new();
+    private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), TransientSubscription> _transientSubscriptions = new();
     private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), DurableSubscription> _durableSubscriptions = new();
 
     /// <summary>
@@ -1145,11 +1145,13 @@ public sealed class BoltClient : IAsyncDisposable
         var payload = new byte[payloadLength];
         buffer.AsSpan(payloadOffset, payloadLength).CopyTo(payload);
 
-        // Try transient first
-        if (string.IsNullOrEmpty(subscriberId) && _transientSubscriptions.TryGetValue(topicHash, out var transient))
+        // Never fan out an untagged event to actor subscriptions. The Hub must authorize
+        // each subscriber and address its event explicitly, even on a shared connection.
+        if (!string.IsNullOrEmpty(subscriberId) &&
+            _transientSubscriptions.TryGetValue((topicHash, subscriberId), out var transient))
         {
             if (!transient.Channel.Writer.TryWrite(payload))
-                _transientSubscriptions.TryRemove(topicHash, out _);
+                _transientSubscriptions.TryRemove((topicHash, subscriberId), out _);
             return;
         }
 
@@ -1199,26 +1201,23 @@ public sealed class BoltClient : IAsyncDisposable
         Func<CancellationToken, ValueTask<string?>> actorAccessTokenProvider)
     {
         var topicHash = BoltCodec.Fnv1aHash(topic);
+        var subscriberId = BoltTransientSubscriberId.Create(_clientId);
+        var key = (topicHash, subscriberId);
         var channel = CreateTransientPubSubChannel<byte[]>();
         var sub = new TransientSubscription
         {
             Topic = topic,
+            SubscriberId = subscriberId,
             Channel = channel,
             ActorAccessTokenProvider = actorAccessTokenProvider
         };
 
-        if (!_transientSubscriptions.TryAdd(topicHash, sub))
-            throw new InvalidOperationException($"Already subscribed to topic '{topic}'");
-
-        // Send Subscribe frame
-        var conn = GetPrimaryConnection();
-        var actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, ct);
-        var writer = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteSubscribe(writer, topic, _clientId, durable: false, actorAccessToken);
-        await conn.SendReliableAsync(writer, ct);
+        _transientSubscriptions.TryAdd(key, sub);
 
         try
         {
+            await BindTransientSubscriptionAsync(key, sub, ct);
+
             while (await channel.Reader.WaitToReadAsync(ct))
             {
                 while (channel.Reader.TryRead(out var payload))
@@ -1230,15 +1229,9 @@ public sealed class BoltClient : IAsyncDisposable
         }
         finally
         {
-            _transientSubscriptions.TryRemove(topicHash, out _);
-            try
-            {
-                actorAccessToken = await ResolveActorAccessTokenAsync(actorAccessTokenProvider, CancellationToken.None);
-                var w = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteUnsubscribe(w, topic, _clientId, actorAccessToken: actorAccessToken);
-                await conn.SendReliableAsync(w, CancellationToken.None);
-            }
-            catch { /* best-effort */ }
+            channel.Writer.TryComplete();
+            if (_transientSubscriptions.TryRemove(key, out _))
+                await DetachTransientSubscriptionAsync(sub, CancellationToken.None);
         }
     }
 
@@ -1381,12 +1374,47 @@ public sealed class BoltClient : IAsyncDisposable
         CancellationToken ct)
     {
         var topicHash = BoltCodec.Fnv1aHash(topic);
-        _transientSubscriptions.TryRemove(topicHash, out _);
+        foreach (var (key, sub) in _transientSubscriptions)
+        {
+            if (key.TopicHash != topicHash) continue;
+            var subscriptionActor = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, ct);
+            if (!string.Equals(subscriptionActor, actorAccessToken, StringComparison.Ordinal)) continue;
+            if (!_transientSubscriptions.TryRemove(key, out _)) continue;
+            sub.Channel.Writer.TryComplete();
+            await DetachTransientSubscriptionAsync(sub, ct);
+        }
+    }
 
-        var conn = GetPrimaryConnection();
-        var w = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteUnsubscribe(w, topic, _clientId, actorAccessToken: actorAccessToken);
-        await conn.SendReliableAsync(w, ct);
+    private async Task BindTransientSubscriptionAsync(
+        (int TopicHash, string SubscriberId) key, TransientSubscription sub, CancellationToken ct)
+    {
+        await sub.BindingGate.WaitAsync(ct);
+        try
+        {
+            if (!_transientSubscriptions.ContainsKey(key)) return;
+            var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, ct);
+            var writer = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteSubscribe(writer, sub.Topic, sub.SubscriberId, durable: false, actorAccessToken);
+            await GetPrimaryConnection().SendReliableAsync(writer, ct);
+        }
+        finally { sub.BindingGate.Release(); }
+    }
+
+    private async Task DetachTransientSubscriptionAsync(TransientSubscription sub, CancellationToken ct)
+    {
+        await sub.BindingGate.WaitAsync(ct);
+        try
+        {
+            var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, ct);
+            var writer = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteUnsubscribe(writer, sub.Topic, sub.SubscriberId, actorAccessToken: actorAccessToken);
+            await GetPrimaryConnection().SendReliableAsync(writer, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Transient subscription detach failed. topic={Topic}", sub.Topic);
+        }
+        finally { sub.BindingGate.Release(); }
     }
 
     /// <summary>
@@ -2048,14 +2076,11 @@ public sealed class BoltClient : IAsyncDisposable
             RaiseLifecycleEvent(Reconnected);
 
             // Re-send all active subscriptions after reconnect
-            foreach (var (_, sub) in _transientSubscriptions)
+            foreach (var (key, sub) in _transientSubscriptions)
             {
                 try
                 {
-                    var actorAccessToken = await ResolveActorAccessTokenAsync(sub.ActorAccessTokenProvider, CancellationToken.None);
-                    var w = RentedBufferWriter.GetThreadLocal();
-                    BoltCodec.WriteSubscribe(w, sub.Topic, _clientId, durable: false, actorAccessToken);
-                    await GetPrimaryConnection().SendReliableAsync(w, CancellationToken.None);
+                    await BindTransientSubscriptionAsync(key, sub, CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -2216,8 +2241,10 @@ public sealed class BoltClient : IAsyncDisposable
     private sealed class TransientSubscription
     {
         public required string Topic { get; init; }
+        public required string SubscriberId { get; init; }
         public required Func<CancellationToken, ValueTask<string?>> ActorAccessTokenProvider { get; init; }
         public required Channel<byte[]> Channel { get; init; }
+        public SemaphoreSlim BindingGate { get; } = new(1, 1);
     }
 
     private sealed class DurableSubscription
