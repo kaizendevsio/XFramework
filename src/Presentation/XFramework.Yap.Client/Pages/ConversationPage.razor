@@ -62,7 +62,7 @@ else
 else if (mode == "files" && selected is not null)
 { <div class="picker">@foreach (var file in selected.Attachments) { <button class="row" @onclick="() => State.OpenFileAsync(selected, file)"><Icon Name="file" /><span>@file.Name <small>@(file.Size / 1024) KB</small></span></button> }<p class="muted">Opened files are saved on this device for offline use.</p></div> }
 else if (mode == "edit")
-{ <div class="picker"><textarea aria-label="Edit message" @bind="edit" maxlength="4000"></textarea><button class="btn" @onclick='() => ActionAsync("edit", edit)'>Save changes</button></div> }
+{ <div class="picker"><textarea aria-label="Edit message" @bind="edit" @bind:event="oninput" maxlength="4000"></textarea><button class="btn" @onclick='() => ActionAsync("edit", edit)'>Save changes</button></div> }
 else if (mode == "delete")
 { <div class="picker"><p>Delete this message for everyone?</p><button class="btn" @onclick='() => ActionAsync("delete")'>Delete message</button></div> }
 else if (mode == "details" && State.Selected is { } details)

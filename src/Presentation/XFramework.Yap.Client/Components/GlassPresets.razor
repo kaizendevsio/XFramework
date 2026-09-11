@@ -1,7 +1,7 @@
 @inject IJSRuntime JS
 <div class="glass-presets">
     <label for="glass-preset-name">Save current look</label>
-    <div class="preset-save"><input id="glass-preset-name" @bind="name" maxlength="40" placeholder="Preset name" /><button type="button" class="pillbtn" @onclick="Save">Save preset</button></div>
+    <div class="preset-save"><input id="glass-preset-name" @bind="name" @bind:event="oninput" maxlength="40" placeholder="Preset name" /><button type="button" class="pillbtn" @onclick="Save">Save preset</button></div>
     @if(names.Length>0){
         <label for="glass-preset-select">Switch preset</label>
         <select id="glass-preset-select" value="@selected" @onchange="Switch"><option value="">Choose a saved preset</option>@foreach(var item in names){<option value="@item">@item</option>}</select>

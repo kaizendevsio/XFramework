@@ -29,7 +29,7 @@ else
 <BottomSheet Title="New conversation" OnClose="() => choosing = false"><div class="picker"><label class="field"><span class="lab">Find people</span><span class="inp"><input aria-label="Find people" placeholder="Name or username" @bind="peopleSearch" @bind:event="oninput" @bind:after="SearchAsync" /></span></label>
 @foreach (var person in people) { <label class="row"><input type="checkbox" checked="@members.Contains(person.Id)" @onchange="() => Toggle(person.Id)" /><Avatar Initials="@ChatMessage.InitialsFor(person.Name)" Size="a34" /><span>@person.Name <small class="muted">@person.UserName</small></span></label> }
 <label class="check"><input type="checkbox" @bind="group" />Create a group</label>
-@if (group || members.Count > 1) { <label class="field"><span class="lab">Group name</span><span class="inp"><input @bind="groupName" maxlength="100" /></span></label> }
+@if (group || members.Count > 1) { <label class="field"><span class="lab">Group name</span><span class="inp"><input @bind="groupName" @bind:event="oninput" maxlength="100" /></span></label> }
 <button class="btn" disabled="@(members.Count == 0 || creating)" @onclick="CreateAsync">Start conversation</button></div></BottomSheet>
 }
 @code {
