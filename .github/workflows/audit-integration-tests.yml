@@ -21,4 +21,6 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet test src/Tests/Audit.IntegrationTests/Audit.IntegrationTests.csproj -m:1 /nr:false
-      - run: dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj -m:1 /nr:false --filter 'FullyQualifiedName!~Portal.E2ETests.PortalE2ETests.'
+      # Live browser suites require a separately provisioned Portal and authorized fixture data.
+      - name: Run Portal non-browser tests
+        run: dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj -m:1 /nr:false --filter 'FullyQualifiedName!~Portal.E2ETests.PortalE2ETests.&TestCategory!=Kind:E2E'
