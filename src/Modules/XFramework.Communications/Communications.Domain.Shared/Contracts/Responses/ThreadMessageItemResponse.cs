@@ -12,4 +12,5 @@ public partial record ThreadMessageItemResponse
     public List<Guid> MentionedCredentialIds { get; set; } = [];
     public bool IsPinned { get; set; }
     public bool IsSaved { get; set; }
+    public List<MessageReactionSummaryResponse> Reactions { get; set; } = [];
 }
