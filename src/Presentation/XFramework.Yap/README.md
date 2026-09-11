@@ -66,4 +66,4 @@ dotnet run --project src/Tests/Yap.Tests/Yap.Tests.csproj -- --serve
 
 Open `http://127.0.0.1:5189` and sign in with `fixture` / `fixture`. This test host removes Bolt background connections and supplies fixture wrappers. Its local `POST /test/incoming` endpoint injects an incoming message for realtime UI checks. None of this fixture data, authentication, or endpoint is registered by the production host. Stop the fixture before rebuilding the test project on Windows to avoid locked output files.
 
-UI assets were adapted from the user-supplied `Yap-source.zip`. Live backend integration still requires verification against the configured environment; fixture results do not establish that the environment's permissions, service registration, storage provider, or network routes are ready.
+UI assets were adapted from the user-supplied `Yap-source.zip`. Verified live scenarios, deployed revisions, attachment integrity results, and recovery checks are recorded in [the live test report](LIVE-TEST-REPORT.md). Configure and validate the service identity, permissions, provider, and network routes when connecting a different environment.

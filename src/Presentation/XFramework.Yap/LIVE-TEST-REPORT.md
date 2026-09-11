@@ -1,6 +1,25 @@
 # Yap live setup and test report — 2026-09-11
 
-**Status: direct and three-person group messaging, replies/threads, reactions, search, editing, pinning, saved messages, deletion, mute, unread/read transitions, persistence, non-member rejection, multi-user typing, and small/multipart attachments have live passing evidence. Final acceptance remains open: recurring Communications background errors were reported to the backend fix task, which is preparing a tenant-context correction and deployment.** Fixture tests remain separate from the live evidence below. Earlier blocked statuses below are historical.
+**Status: requested chat E2E acceptance passed.** Direct and three-person group messaging, replies/threads, reactions, search, editing, pinning, saved messages, deletion, mute, unread/read transitions, persistence, non-member rejection, multi-user typing, and small/multipart attachments have live passing evidence. The final delivery/recovery pass ran against deployed `55591121` after PR #447. Fixture and unit tests remain separate from live evidence. Earlier blocked statuses below are historical.
+
+## Final acceptance after PR #447
+
+The user approved merge and deployment. PR #447 was squash-merged as `55591121c7235540483a756daffc3a194e49d8a2`; normal deployment `34594710472` completed successfully, including authenticated Bolt smoke, core observation, diagnostics, remaining services, and complete-release activation. The remote release pointer and commit matched `34594710472-1` / `55591121`; all 13 application containers were healthy. Data volumes were preserved.
+
+Yap incorporated the merged code in `7ad4a52f`. All 30 local tests and all PR #445 CI checks passed. The actual app restarted at `11:49:24Z`, and Bob, Carol, and Dave signed in through Chrome using ordinary member accounts. The final live pass ran through approximately `11:56Z`:
+
+- **Backlog repair:** all 79 previously pending outbox events processed automatically, with zero dead letters and no database writes or manual replay by this task. Existing group history contained exactly 10 messages for all three users; replay did not duplicate messages.
+- **Fresh group delivery:** each user sent a distinct `Yap 447 acceptance group ... 1151` message. All three sessions received all three messages without refresh.
+- **Typing and transport recovery:** all six group sender/recipient directions passed start and stop. Typing still reached both peers after renewal. Direct typing worked in both directions without appearing in Dave's unrelated group. Group-thread typing also reached Bob. Normal transport renewals at `11:51:24Z`, `11:53:24Z`, and `11:55:24Z` reconnected successfully; the former request 503 errors did not recur during the pass.
+- **Reactions:** Bob, Carol, and Dave each added Celebrate to Bob's new group message. All saw count 3 and their own pressed state. Dave removed his; all saw count 2, with Bob/Carol pressed and Dave unpressed. Dave's group navigation preserved this state.
+- **Replies/threads:** Carol replied in the new group thread, and Bob saw it. Bob responded from the thread composer; Carol's already-open thread updated to two replies with correct authors. Earlier direct-thread cases remain covered by the live evidence below.
+- **Direct messages:** after two renewals, Bob and Carol each sent a new direct message; both received both messages. Bob reloaded and retained the complete 10-message direct history.
+- **Search:** Dave's mixed-case `aCcEpTaNcE gRoUp BoB 1151` search returned exactly one result. Selecting it focused the matching group message, `528df37b-30d0-4c23-8760-fec1130093fe`.
+- **Attachment persistence and authorization:** Bob obtained a fresh, membership-authorized download link for the existing private attachment on the reachable `xeon-dev:9000` host. The earlier small/multipart upload and exact-byte download checks below passed; this final repair did not change the file contracts.
+- **Private access remains denied:** Dave opened the Bob/Carol direct URL and received the expected permissions error, with no private messages rendered. The corresponding `GetThreadRequest` returned 403 at `11:55:31Z`.
+- **Persisted processing and counts:** the post-send checkpoint contained 102 outbox events, all processed, none pending or dead-lettered. Persisted history was exactly 10 direct messages and 15 group messages: the baseline plus two direct sends, three group sends, and two group replies. Communications logs from app startup through this check contained no matching tenant-context errors, error-level entries, or 503 responses. The deliberate nonmember 403 is an expected negative test.
+
+The local test host was stopped after acceptance to release the shared environment for the separately authorized Inventario rollout. PR #445 contains the Yap application; PR #447 is the deployed shared-backend repair.
 
 ## Live retest after PR #443 and PR #444 deployment
 
