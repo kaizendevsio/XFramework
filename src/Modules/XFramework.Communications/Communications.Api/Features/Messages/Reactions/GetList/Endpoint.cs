@@ -11,7 +11,7 @@ public static class GetMessageReactionsEndpoint
     [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.CommunicationsChat],
         RequiredActorCapabilities = ["communications.chat:view"])]
     [MapGet("/api/communications/threads/{threadId:guid}/messages/{messageId:guid}/reactions",
-        Tags = ["Messages"], Summary = "List reactions visible to a thread member")]
+        Tags = ["Messages"], Capability = "view", Summary = "List reactions visible to a thread member")]
     public static Task<Result<PaginatedResult<MessageReactionResponse>>> Handle(
         GetMessageReactionsRequest request, IThreadService service, CancellationToken ct) =>
         service.GetMessageReactionsAsync(request, ct);

@@ -228,13 +228,22 @@ jobs:
           dotnet test src/Modules/XFramework.Communications/Communications.Tests/Communications.Tests.csproj \
             --configuration Release --no-build --no-restore
 
+      - name: Test remote query authorization and PostgreSQL semantics
+        run: |
+          dotnet test src/Tests/XFramework.SourceGenerators.Tests/XFramework.SourceGenerators.Tests.csproj \
+            --configuration Release --no-build --no-restore \
+            --filter "FullyQualifiedName~BoltHandlerGeneratorTests"
+          dotnet test src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj \
+            --configuration Release --no-build --no-restore \
+            --filter "FullyQualifiedName~DataContext|FullyQualifiedName~TrustedInvocationFeatureGateTests"
+
       - name: Test focused IdentityServer and Portal contracts
         shell: bash
         run: |
           set -euo pipefail
           dotnet test src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj \
             --configuration Release --no-build --no-restore \
-            --filter "FullyQualifiedName~BoltTransportTokenIssuerTests"
+            --filter "FullyQualifiedName~BoltTransportTokenIssuerTests|FullyQualifiedName~LogoutAuthorizationContractTests"
           dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj \
             --configuration Release --no-build --no-restore \
             --filter "FullyQualifiedName~ServiceIdentityComposeContractTests"

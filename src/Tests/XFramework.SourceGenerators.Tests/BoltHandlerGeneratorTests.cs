@@ -9,6 +9,39 @@ namespace XFramework.SourceGenerators.Tests;
 [TestFixture]
 public sealed class BoltHandlerGeneratorTests
 {
+    [TestCase("MapGet", "GET")]
+    [TestCase("MapPost", "POST")]
+    [TestCase("MapPut", "PUT")]
+    [TestCase("MapPatch", "PATCH")]
+    [TestCase("MapDelete", "DELETE")]
+    public void GenerateHandlers_FeatureGateReceivesHttpVerbNotAttributeName(string attribute, string verb)
+    {
+        var source = $$"""
+namespace Sample.Features.Chat;
+using System.Threading;
+using System.Threading.Tasks;
+using Bolt.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Attributes;
+public static class ChatEndpoint
+{
+    [BoltHandler]
+    [{{attribute}}("/api/communications/chat/defaults")]
+    public static Task<Result> Handle(ChatRequest request, CancellationToken ct) => Task.FromResult(new Result());
+}
+public sealed record ChatRequest : RequestBase, IBoltRequest<ChatRequest, CmdResponse>;
+""";
+        foreach (var suffix in new[] { "BoltHandler", "RestEndpoint" })
+        {
+            var generated = RunGenerator(source, $"ChatEndpoint_Handle_{suffix}.g.cs");
+            var call = generated[generated.IndexOf(".EnsureAllowedAsync(", StringComparison.Ordinal)..];
+            call = call[..call.IndexOf(");", StringComparison.Ordinal)];
+            call.Should().Contain($"\"{verb}\"");
+            call.Should().NotContain($"\"{attribute}\"");
+        }
+    }
+
     [Test]
     public void GenerateRestEndpoint_BodylessEndpointWithPositionalRecordRequest_UsesConstructor()
     {
@@ -828,6 +861,18 @@ namespace XFramework.Integration.Attributes
         public string[]? RequiredCrossTenantActorCapabilities { get; set; }
         public bool AllowAnonymous { get; set; }
     }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class MapPutAttribute(string route) : Attribute
+    {
+        public string Route { get; } = route;
+    }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class MapPatchAttribute(string route) : Attribute
+    {
+        public string Route { get; } = route;
+    }
 }
 
 namespace XFramework.Integration.Abstractions
@@ -1072,6 +1117,8 @@ namespace Microsoft.AspNetCore.Builder
 {
     public static class EndpointRouteBuilderExtensions
     {
+        public static RouteHandlerBuilder MapPut(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder app, string pattern, Delegate handler) => new();
+        public static RouteHandlerBuilder MapPatch(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder app, string pattern, Delegate handler) => new();
         public static RouteHandlerBuilder MapPost(
             this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder app,
             string pattern,

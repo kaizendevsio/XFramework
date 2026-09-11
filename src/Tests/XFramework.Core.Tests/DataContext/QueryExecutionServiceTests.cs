@@ -302,8 +302,9 @@ public partial class QueryExecutionServiceTests
         result.Message.Should().Be("Actor is not authorized for this operation.");
     }
 
-    [Test]
-    public async Task ExecuteAsync_ActorSatisfyingPolicy_ReturnsRows()
+    [TestCase(XFrameworkServiceNames.Portal)]
+    [TestCase(XFrameworkServiceNames.Yap)]
+    public async Task ExecuteAsync_ActorSatisfyingPolicy_ReturnsRows(string serviceClientId)
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
@@ -336,7 +337,9 @@ public partial class QueryExecutionServiceTests
         var service = CreateService(
             services,
             NullLogger<QueryExecutionService>.Instance,
-            CreateTrustedContext(DefaultTenantId, actor),
+            CreateTrustedContext(DefaultTenantId, actor,
+                serviceScopes: new HashSet<string> { XFrameworkServiceScopes.DataContextQuery },
+                serviceClientId: serviceClientId),
             CreatePolicyRegistry(CreatePolicy(
                 nameof(TestTenantEntity),
                 GeneratedEntityOperation.Read,

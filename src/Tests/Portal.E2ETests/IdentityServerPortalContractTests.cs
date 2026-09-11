@@ -767,13 +767,14 @@ public sealed class IdentityServerPortalContractTests
         var contacts = userDetail[contactsStart..addressesStart];
         var wallets = userDetail[walletsStart..attendanceStart];
 
-        roles.Should().Contain("credentialIds.Contains(role.CredentialId)");
+        roles.Should().Contain("credentialIds.Chunk(50)");
+        roles.Should().Contain("credentialBatch.Contains(role.CredentialId)");
         roles.Should().Contain("role.TenantId == tenantId");
         roles.Should().Contain(".Take(1_000)");
         roles.Should().NotContain(".Take(10_000)");
         roles.Should().Contain("_rolesLoadFailed = true");
         roles.Should().Contain("Logger.LogWarning");
-        roles.Should().NotContain("foreach");
+        roles.Should().NotContain("foreach (var credential in");
         roles.Split("DataContext.Query<IdentityRole>()", StringSplitOptions.None).Should().HaveCount(2);
 
         contacts.Should().Contain("credentialIds.Contains(contact.CredentialId)");

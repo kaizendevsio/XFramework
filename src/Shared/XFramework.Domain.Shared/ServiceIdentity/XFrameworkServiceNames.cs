@@ -19,6 +19,7 @@ public static class XFrameworkServiceNames
     public const string SmsGateway = "XFramework.SmsGateway";
     public const string Storage = "XFramework.Storage";
     public const string Wallets = "XFramework.Wallets";
+    public const string Yap = "XFramework.Yap";
 
     public static readonly IReadOnlyList<string> All =
     [
@@ -38,6 +39,7 @@ public static class XFrameworkServiceNames
         Pos,
         SmsGateway,
         Storage,
-        Wallets
+        Wallets,
+        Yap
     ];
 }
