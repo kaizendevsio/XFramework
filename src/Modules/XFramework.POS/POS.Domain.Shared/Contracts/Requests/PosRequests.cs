@@ -26,6 +26,17 @@ public partial record GetPosRegisterRequest : RequestBase,
 }
 
 [MemoryPackable]
+public partial record SearchPosRegistersRequest : RequestBase,
+    IQuery<QueryResponse<List<PosRegisterResponse>>>,
+    IBoltRequest<SearchPosRegistersRequest, QueryResponse<List<PosRegisterResponse>>>
+{
+    public string? Search { get; set; }
+    public bool? IsEnabled { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 50;
+}
+
+[MemoryPackable]
 public partial record CreatePosRegisterRequest : RequestBase,
     ICommand<CmdResponse<PosRegisterResponse>>,
     IBoltRequest<CreatePosRegisterRequest, CmdResponse<PosRegisterResponse>>
@@ -217,6 +228,7 @@ public partial record CheckoutPosPaymentRequest
     public PosPaymentMethod Method { get; set; } = PosPaymentMethod.CashDrawer;
     public decimal Amount { get; set; }
     public Guid? CustomerCredentialId { get; set; }
+    public decimal? CashTenderedAmount { get; set; }
 }
 
 [MemoryPackable]
@@ -254,6 +266,14 @@ public partial record CancelPosSaleRequest : RequestBase,
 public partial record RetryPosSaleFulfillmentRequest : RequestBase,
     ICommand<CmdResponse<PosSaleReceiptResponse>>,
     IBoltRequest<RetryPosSaleFulfillmentRequest, CmdResponse<PosSaleReceiptResponse>>
+{
+    public Guid SaleId { get; set; }
+}
+
+[MemoryPackable]
+public partial record RetryPosSalePaymentRequest : RequestBase,
+    ICommand<CmdResponse<PosSaleReceiptResponse>>,
+    IBoltRequest<RetryPosSalePaymentRequest, CmdResponse<PosSaleReceiptResponse>>
 {
     public Guid SaleId { get; set; }
 }

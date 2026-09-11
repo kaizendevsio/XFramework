@@ -165,10 +165,13 @@ public partial record PosPaymentResponse
     public PosPaymentMethod Method { get; init; }
     public PosPaymentStatus Status { get; init; }
     public decimal Amount { get; init; }
+    public decimal RefundedAmount { get; init; }
     public string ReferenceNumber { get; init; } = string.Empty;
     public string IdempotencyKey { get; init; } = string.Empty;
     public string? FailureReason { get; init; }
     public DateTime? CapturedAt { get; init; }
+    public decimal? CashTenderedAmount { get; init; }
+    public decimal? ChangeAmount { get; init; }
 }
 
 [MemoryPackable]

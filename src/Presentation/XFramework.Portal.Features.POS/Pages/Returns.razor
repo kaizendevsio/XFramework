@@ -1,5 +1,6 @@
 @page "/pos/returns"
 @using XFramework.Domain.Shared.DataContext
+@inject NavigationManager Navigation
 @implements IDisposable
 
 <PageTitle>POS Returns - Portal</PageTitle>
@@ -43,7 +44,22 @@ else
                     <BbCardDescription>@_returns.Count return(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_returns" ShowPagination="true" InitialPageSize="20">
+                    <div class="mb-4 flex flex-wrap items-end gap-3">
+                        <BbFormFieldInput TValue="string" @bind-Value="_returnSearch" Label="Return or idempotency key" />
+                        <BbFormFieldSelect TValue="string" @bind-Value="_returnStatusFilter" Label="Status">
+                            <BbSelectItem Value="@AllStatusesValue">All statuses</BbSelectItem>
+                            @foreach (var status in Enum.GetValues<PosReturnStatus>())
+                            {
+                                <BbSelectItem Value="@status.ToString()">@status</BbSelectItem>
+                            }
+                        </BbFormFieldSelect>
+                        <BbButton OnClick="@ApplyReturnFilters" Disabled="@_loadingPage">
+                            <LucideIcon Name="search" class="mr-2 h-4 w-4" />Search
+                        </BbButton>
+                    </div>
+                    <BbDataGrid Items="@_returns" ShowPagination="false"
+                                OnRowClick="@((PosReturnSummaryResponse item) => OpenReturn(item.Id))"
+                                Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.ReturnNumber)" Title="Return" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Sale" Filterable="true" FilterBy="@(item => GetSaleNumber(item.SaleId))">
@@ -53,7 +69,7 @@ else
                                 <ChildContent Context="item">@GetRegisterName(item.RegisterId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Refund" Sortable="true" Filterable="true" FilterBy="@(item => item.TotalRefundAmount)">
-                                <ChildContent Context="item">@item.TotalRefundAmount.ToString("N2")</ChildContent>
+                                <ChildContent Context="item">@FormatMoney(item.TotalRefundAmount, item.CurrencyId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
@@ -61,11 +77,23 @@ else
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost" OnClick="@(() => OpenReturn(item.Id))">View</BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
                         </Columns>
                         <EmptyTemplate>
                             <BbEmpty Title="No POS returns" Description="Return and refund records will appear here." />
                         </EmptyTemplate>
                     </BbDataGrid>
+                    <div class="mt-4 flex items-center justify-between">
+                        <BbTypographyMuted>Page @_returnPage · up to @PageSize results per page</BbTypographyMuted>
+                        <div class="flex gap-2">
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@PreviousReturnPage" Disabled="@(_returnPage == 1 || _loadingPage)">Previous</BbButton>
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@NextReturnPage" Disabled="@(!_hasNextReturnPage || _loadingPage)">Next</BbButton>
+                        </div>
+                    </div>
                 </BbCardContent>
             </BbCard>
         </div>
@@ -79,6 +107,12 @@ else
             <BbDialogDescription>Select a completed sale and the quantities to return.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
+            <div class="flex items-end gap-2">
+                <BbFormFieldInput TValue="string" @bind-Value="_saleSearch" Label="Find older receipt" />
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => SearchCompletedSales())" Disabled="@_searchingSales">
+                    <LucideIcon Name="search" class="mr-2 h-4 w-4" />Find Receipt
+                </BbButton>
+            </div>
             <XfEntityPicker TItem="PosSaleSummaryResponse"
                             Value="@_selectedSaleId"
                             ValueChanged="@OnSaleChanged"
@@ -90,15 +124,17 @@ else
                             ValueSelector="@GetSaleValue"
                             TextSelector="@GetSaleLabel"
                             SearchTextSelector="@GetSaleSearchText"
+                            SearchRequested="@SearchCompletedSalesFromPicker"
                             AdvancedColumns="@SaleAdvancedColumns"
                             AdvancedSearchScope="Searches sale number, register, total, status, created date, completed date, and sale id."
                             AdvancedSearchTitle="Find Original Sale"
                             AdvancedSearchDescription="Select the completed sale for this return." />
 
-            <BbFormFieldSelect TValue="string" @bind-Value="RefundMethodValue" Label="Refund Method">
-                <BbSelectItem Value="@PosPaymentMethod.CashDrawer.ToString()">Cash Drawer</BbSelectItem>
-                <BbSelectItem Value="@PosPaymentMethod.WalletTransfer.ToString()">Wallet Transfer</BbSelectItem>
-            </BbFormFieldSelect>
+            <div class="space-y-1">
+                <BbTypographyMuted>Refund Method</BbTypographyMuted>
+                <div class="font-medium" data-testid="pos-original-refund-method">@GetRefundMethodLabel(_refundMethod)</div>
+                <BbTypographyMuted>Refunds are always sent through the original captured payment method and account.</BbTypographyMuted>
+            </div>
 
             <BbDataGrid Items="@_returnLines" ShowPagination="false">
                 <Columns>
@@ -116,10 +152,10 @@ else
                         </ChildContent>
                     </BbDataGridTemplateColumn>
                     <BbDataGridTemplateColumn Title="Unit" Filterable="true" FilterBy="@(item => item.UnitPrice)">
-                        <ChildContent Context="item">@item.UnitPrice.ToString("N2")</ChildContent>
+                        <ChildContent Context="item">@FormatSelectedMoney(item.UnitPrice)</ChildContent>
                     </BbDataGridTemplateColumn>
                     <BbDataGridTemplateColumn Title="Refund" Filterable="true" FilterBy="@(item => item.RefundAmount)">
-                        <ChildContent Context="item">@item.RefundAmount.ToString("N2")</ChildContent>
+                        <ChildContent Context="item">@FormatSelectedMoney(item.RefundAmount)</ChildContent>
                     </BbDataGridTemplateColumn>
                 </Columns>
                 <EmptyTemplate>
@@ -147,6 +183,7 @@ else
     [Inject] private IPortalActorContext ActorContext { get; set; } = default!;
 
     private List<PosReturnSummaryResponse> _returns = [];
+    private List<Wallets.Domain.Shared.Contracts.CurrencyType> _currencies = [];
     private List<PosSaleSummaryResponse> _completedSales = [];
     private List<PosRegister> _registers = [];
     private List<ReturnLineForm> _returnLines = [];
@@ -155,20 +192,20 @@ else
     private bool _hasTenant;
     private bool _moduleEnabled;
     private bool _dialogOpen;
+    private bool _loadingPage;
+    private bool _searchingSales;
+    private bool _hasNextReturnPage;
+    private int _returnPage = 1;
+    private const int PageSize = 50;
+    private string _returnSearch = "";
+    private const string AllStatusesValue = "all";
+    private string _returnStatusFilter = AllStatusesValue;
+    private string _saleSearch = "";
     private string? _selectedSaleId;
     private string _reason = "";
     private string _returnIdempotencyKey = NewReturnIdempotencyKey();
     private PosPaymentMethod _refundMethod = PosPaymentMethod.CashDrawer;
-
-    private string RefundMethodValue
-    {
-        get => _refundMethod.ToString();
-        set
-        {
-            if (Enum.TryParse<PosPaymentMethod>(value, out var method))
-                _refundMethod = method;
-        }
-    }
+    private Guid? _selectedSaleCurrencyId;
 
     protected override void OnInitialized()
     {
@@ -187,7 +224,11 @@ else
         }
     }
 
-    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+    private void OnTenantChanged()
+    {
+        _returnPage = 1;
+        _ = InvokeAsync(Reload);
+    }
 
     private async Task Reload()
     {
@@ -200,34 +241,13 @@ else
             _returns = [];
             _completedSales = [];
             _registers = [];
+            _currencies = [];
 
-            if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
+            if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid)
                 return;
 
-            _registers = await DataContext.Query<PosRegister>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-                .Take(200)
-                .ToListAsync();
-            var completedSalesResponse = await POS.SearchPosSales(new SearchPosSalesRequest
-            {
-                Metadata = BuildMetadata(),
-                Status = PosSaleStatus.Completed,
-                Page = 1,
-                PageSize = 100
-            });
-            _completedSales = completedSalesResponse.Response ?? [];
-            if (!completedSalesResponse.IsSuccess)
-                ToastService.Show(completedSalesResponse.Message ?? "Could not load completed POS sales.");
-
-            var returnsResponse = await POS.SearchPosReturns(new SearchPosReturnsRequest
-            {
-                Metadata = BuildMetadata(),
-                Page = 1,
-                PageSize = 100
-            });
-            _returns = returnsResponse.Response ?? [];
-            if (!returnsResponse.IsSuccess)
-                ToastService.Show(returnsResponse.Message ?? "Could not load POS returns.");
+            await SearchCompletedSales();
+            await LoadReturnPage();
         }
         catch
         {
@@ -240,13 +260,120 @@ else
         }
     }
 
+    private async Task LoadReturnPage()
+    {
+        _loadingPage = true;
+        try
+        {
+            var response = await POS.SearchPosReturns(new SearchPosReturnsRequest
+            {
+                Metadata = BuildMetadata(),
+                Search = string.IsNullOrWhiteSpace(_returnSearch) ? null : _returnSearch.Trim(),
+                Status = Enum.TryParse<PosReturnStatus>(_returnStatusFilter, out var status) ? status : null,
+                Page = _returnPage,
+                PageSize = PageSize
+            });
+            _returns = response.Response ?? [];
+            await LoadReferenceLabels();
+            _hasNextReturnPage = response.IsSuccess && _returns.Count == PageSize;
+            if (!response.IsSuccess)
+                ToastService.Show(response.Message ?? "Could not load POS returns.");
+        }
+        finally
+        {
+            _loadingPage = false;
+        }
+    }
+
+    private async Task SearchCompletedSales()
+    {
+        _searchingSales = true;
+        try
+        {
+            var selected = _completedSales.FirstOrDefault(item => item.Id.ToString() == _selectedSaleId);
+            var response = await POS.SearchPosSales(new SearchPosSalesRequest
+            {
+                Metadata = BuildMetadata(),
+                Status = PosSaleStatus.Completed,
+                Search = string.IsNullOrWhiteSpace(_saleSearch) ? null : _saleSearch.Trim(),
+                Page = 1,
+                PageSize = 100
+            });
+            _completedSales = response.Response ?? [];
+            if (selected is not null && _completedSales.All(item => item.Id != selected.Id))
+                _completedSales.Insert(0, selected);
+            await LoadReferenceLabels();
+            if (!response.IsSuccess)
+                ToastService.Show(response.Message ?? "Could not load completed POS sales.");
+        }
+        finally
+        {
+            _searchingSales = false;
+        }
+    }
+
+    private async Task SearchCompletedSalesFromPicker(string search)
+    {
+        _saleSearch = search;
+        await SearchCompletedSales();
+    }
+
+    private async Task LoadReferenceLabels()
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId)
+            return;
+
+        var registerIds = _returns.Select(item => item.RegisterId)
+            .Concat(_completedSales.Select(item => item.RegisterId))
+            .Distinct()
+            .ToList();
+        _registers = await DataContext.Query<PosRegister>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted && registerIds.Contains(item.Id))
+            .ToListAsync();
+        var currencyIds = _returns.Select(item => item.CurrencyId)
+            .Concat(_completedSales.Select(item => item.CurrencyId))
+            .Distinct()
+            .ToList();
+        _currencies = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>()
+            .IgnoreQueryFilters().NoCache().Where(item => currencyIds.Contains(item.Id)).ToListAsync();
+    }
+
+    private async Task ApplyReturnFilters()
+    {
+        _returnPage = 1;
+        await LoadReturnPage();
+    }
+
+    private async Task PreviousReturnPage()
+    {
+        if (_returnPage <= 1)
+            return;
+        _returnPage--;
+        await LoadReturnPage();
+    }
+
+    private async Task NextReturnPage()
+    {
+        if (!_hasNextReturnPage)
+            return;
+        _returnPage++;
+        await LoadReturnPage();
+        if (_returns.Count == 0)
+        {
+            _returnPage--;
+            await LoadReturnPage();
+        }
+    }
+
+    private void OpenReturn(Guid returnId) => Navigation.NavigateTo($"/pos/returns/{returnId}");
+
     private async Task OpenReturnDialog()
     {
         _selectedSaleId = _completedSales.FirstOrDefault()?.Id.ToString();
         _reason = "";
         _returnIdempotencyKey = NewReturnIdempotencyKey();
-        _refundMethod = PosPaymentMethod.CashDrawer;
         _returnLines = [];
+        _selectedSaleCurrencyId = null;
         if (Guid.TryParse(_selectedSaleId, out var saleId))
             await LoadSaleLines(saleId);
         _dialogOpen = true;
@@ -257,6 +384,7 @@ else
         _selectedSaleId = value;
         _returnIdempotencyKey = NewReturnIdempotencyKey();
         _returnLines = [];
+        _selectedSaleCurrencyId = null;
         if (Guid.TryParse(value, out var saleId))
             await LoadSaleLines(saleId);
     }
@@ -278,8 +406,33 @@ else
             return;
         }
 
+        _refundMethod = response.Response.PaymentMethod;
+        _selectedSaleCurrencyId = response.Response.CurrencyId;
+
+        var saleReturns = new List<PosReturnSummaryResponse>();
+        for (var page = 1; ; page++)
+        {
+            var priorReturnsResponse = await POS.SearchPosReturns(new SearchPosReturnsRequest
+            {
+                Metadata = BuildMetadata(),
+                SaleId = saleId,
+                Page = page,
+                PageSize = 100
+            });
+            if (!priorReturnsResponse.IsSuccess)
+            {
+                ToastService.Show(priorReturnsResponse.Message ?? "Could not load prior returns.");
+                return;
+            }
+
+            var pageItems = priorReturnsResponse.Response ?? [];
+            saleReturns.AddRange(pageItems);
+            if (pageItems.Count < 100)
+                break;
+        }
+
         var previousLines = new List<PosReturnLineResponse>();
-        foreach (var existingReturn in _returns.Where(item => item.SaleId == saleId))
+        foreach (var existingReturn in saleReturns)
         {
             var returnResponse = await POS.GetPosReturn(new GetPosReturnRequest
             {
@@ -390,9 +543,23 @@ else
     private string GetSaleNumber(Guid saleId) => _completedSales.FirstOrDefault(item => item.Id == saleId)?.SaleNumber ?? saleId.ToString()[..8];
     private string GetRegisterName(Guid registerId) => _registers.FirstOrDefault(item => item.Id == registerId)?.Name ?? registerId.ToString()[..8];
     private static string GetSaleValue(PosSaleSummaryResponse item) => item.Id.ToString();
-    private static string GetSaleLabel(PosSaleSummaryResponse item) => $"{item.SaleNumber} - {item.TotalAmount:N2}";
+    private string GetSaleLabel(PosSaleSummaryResponse item) => $"{item.SaleNumber} - {FormatMoney(item.TotalAmount, item.CurrencyId)}";
     private string GetSaleSearchText(PosSaleSummaryResponse item) => $"{item.SaleNumber} {GetRegisterName(item.RegisterId)} {item.TotalAmount:N2} {item.CreatedAt:yyyy-MM-dd}";
+    private string FormatMoney(decimal amount, Guid currencyId)
+    {
+        var code = _currencies.FirstOrDefault(item => item.Id == currencyId)?.CurrencyIsoCode3?.Trim().ToUpperInvariant();
+        return code is { Length: 3 } && code.All(char.IsAsciiLetter) ? $"{code} {amount:N2}" : amount.ToString("N2");
+    }
+    private string FormatSelectedMoney(decimal amount) => _selectedSaleCurrencyId is { } currencyId
+        ? FormatMoney(amount, currencyId)
+        : amount.ToString("N2");
     private static string NewReturnIdempotencyKey() => $"Portal.POS.Return.{Guid.NewGuid():N}";
+    private static string GetRefundMethodLabel(PosPaymentMethod method) => method switch
+    {
+        PosPaymentMethod.CashDrawer => "Cash Drawer",
+        PosPaymentMethod.WalletTransfer => "Wallet Transfer",
+        _ => method.ToString()
+    };
     private static IReadOnlyDictionary<Guid, RefundAllocation> BuildSaleRefundAllocations(PosSaleReceiptResponse sale)
     {
         var orderedLines = sale.Lines.OrderBy(line => line.LineNumber).ToList();

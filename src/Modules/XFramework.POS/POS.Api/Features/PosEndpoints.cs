@@ -43,6 +43,23 @@ public static class GetPosRegisterEndpoint
         service.GetAsync(request, ct);
 }
 
+public static class SearchPosRegistersEndpoint
+{
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersView])]
+    [MapGet("/api/pos/registers", Tags = ["POS Registers"],
+        Summary = "Search POS registers",
+        Capability = IdentityAuthorizationConstants.View,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.RegistersView])]
+    public static Task<Result<List<PosRegisterResponse>>> Handle(
+        SearchPosRegistersRequest request,
+        PosRegisterService service,
+        CancellationToken ct) =>
+        service.SearchAsync(request, ct);
+}
+
 public static class CreatePosRegisterEndpoint
 {
     [BoltHandler(
@@ -298,6 +315,24 @@ public static class RetryPosSaleFulfillmentEndpoint
         PosSalesService service,
         CancellationToken ct) =>
         service.RetryFulfillmentAsync(request, ct);
+}
+
+public static class RetryPosSalePaymentEndpoint
+{
+    [BoltHandler(
+        TenantAccessMode = TenantAccessMode.DelegatedTenant,
+        RequiredCrossTenantActorCapabilities = [XFrameworkActorCapabilities.IdentityTenantsManage],
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesUpdate])]
+    [MapPost("/api/pos/sales/{saleId:guid}/retry-payment", Tags = ["POS Sales"],
+        Summary = "Retry a pending POS sale payment",
+        Description = "Reuses the persisted payment snapshot and idempotency key after an ambiguous payment response.",
+        Capability = IdentityAuthorizationConstants.Update,
+        RequiredActorCapabilities = [PosAuthorizationCapabilities.SalesUpdate])]
+    public static Task<Result<PosSaleReceiptResponse>> Handle(
+        RetryPosSalePaymentRequest request,
+        PosSalesService service,
+        CancellationToken ct) =>
+        service.RetryPaymentAsync(request, ct);
 }
 
 public static class CreatePosReturnEndpoint

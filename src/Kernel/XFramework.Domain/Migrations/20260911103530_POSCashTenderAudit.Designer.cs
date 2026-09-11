@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
@@ -11,9 +12,11 @@ using XFramework.Domain.Contexts;
 namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911103530_POSCashTenderAudit")]
+    partial class POSCashTenderAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -10299,18 +10302,11 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTime?>("UnclaimedUntil")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("UploadPurpose")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
                     b.Property<DateTime?>("UploadStartedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("UploadedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UploadedByCredentialId")
-                        .HasColumnType("uuid");
 
                     b.Property<int>("Visibility")
                         .ValueGeneratedOnAdd()

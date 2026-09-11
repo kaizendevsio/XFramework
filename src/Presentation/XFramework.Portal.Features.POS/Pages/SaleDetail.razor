@@ -1,0 +1,205 @@
+@page "/pos/sales/{Id:guid}"
+@implements IDisposable
+
+<PageTitle>POS Sale - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="POS" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="POS Sales" />
+}
+else if (_sale is null)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@Back"><LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />Back to Sales</BbButton>
+        <BbAlert><BbAlertTitle>Sale unavailable</BbAlertTitle><BbAlertDescription>@(_loadError ?? "The sale was not found in the active tenant.")</BbAlertDescription></BbAlert>
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6 pos-sale-receipt" data-testid="pos-sale-detail">
+            <div class="xf-detail-header">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to sales" OnClick="@Back" Class="no-print"><LucideIcon Name="arrow-left" class="h-4 w-4" /></BbButton>
+                <div class="xf-detail-header-main">
+                    <div class="xf-detail-header-title"><BbTypographyH3>@_sale.SaleNumber</BbTypographyH3><StatusBadge Text="@_sale.Status.ToString()" Status="@StatusBadgeValue(_sale.Status)" /></div>
+                    <BbTypographyMuted>Completed @(_sale.CompletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-") &middot; ID @_sale.Id</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions no-print">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@PrintReceipt"><LucideIcon Name="printer" class="mr-2 h-4 w-4" />Print receipt</BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload" Disabled="@_acting"><LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />Refresh</BbButton>
+                    @if (_sale.Status == PosSaleStatus.InventoryFulfillmentFailed)
+                    {
+                        <BbButton OnClick="@RetryFulfillment" Disabled="@_acting">Retry Fulfillment</BbButton>
+                    }
+                    @if (_sale.Status == PosSaleStatus.PaymentPending)
+                    {
+                        <BbButton OnClick="@RetryPayment" Disabled="@_acting">Retry Payment</BbButton>
+                    }
+                    @if (_sale.Status == PosSaleStatus.Completed)
+                    {
+                        <BbButton OnClick="@StartReturn" Disabled="@_acting">Create Return</BbButton>
+                    }
+                    @if (_sale.Status is PosSaleStatus.Draft or PosSaleStatus.InventoryReserved or PosSaleStatus.PaymentFailed or PosSaleStatus.InventoryReservationFailed)
+                    {
+                        <BbButton Variant="ButtonVariant.Destructive" OnClick="@CancelSale" Disabled="@_acting">Cancel Sale</BbButton>
+                    }
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_sale.FailureReason) || !string.IsNullOrWhiteSpace(_sale.RecoveryState))
+            {
+                <BbAlert Variant="AlertVariant.Warning"><BbAlertTitle>Recovery context</BbAlertTitle><BbAlertDescription>@_sale.FailureReason @_sale.RecoveryState</BbAlertDescription></BbAlert>
+            }
+
+            <div class="grid gap-4 md:grid-cols-2">
+                <BbCard><BbCardHeader><BbCardTitle>Receipt Totals</BbCardTitle></BbCardHeader><BbCardContent>
+                    <div class="grid gap-2"><div>Subtotal: @FormatMoney(_sale.SubtotalAmount)</div><div>Discount: @FormatMoney(_sale.DiscountAmount)</div><div>Tax: @FormatMoney(_sale.TaxAmount)</div><strong>Total: @FormatMoney(_sale.TotalAmount)</strong></div>
+                </BbCardContent></BbCard>
+                <BbCard><BbCardHeader><BbCardTitle>Transaction Context</BbCardTitle></BbCardHeader><BbCardContent>
+                    <div class="grid gap-2"><div>Register: @_registerLabel</div><div>Cashier: @_cashierLabel</div><div>Customer: @_customerLabel</div><div>Payment: @_sale.PaymentMethod</div><div>Idempotency: @_sale.IdempotencyKey</div></div>
+                </BbCardContent></BbCard>
+            </div>
+
+            <BbCard><BbCardHeader><BbCardTitle>Items</BbCardTitle></BbCardHeader><BbCardContent>
+                <BbDataGrid Items="@_sale.Lines" ShowPagination="false"><Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.LineNumber)" Title="#" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Item" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.VariantName)" Title="Variant" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Sortable="true" />
+                    <BbDataGridTemplateColumn Title="Unit Price" Sortable="true" Filterable="true" FilterBy="@(x => x.UnitPrice)"><ChildContent Context="item">@FormatMoney(item.UnitPrice)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Line Total" Sortable="true" Filterable="true" FilterBy="@(x => x.LineTotal)"><ChildContent Context="item">@FormatMoney(item.LineTotal)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.FulfilledAt)" Title="Fulfilled" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.FailureReason)" Title="Failure" Filterable="true" />
+                </Columns></BbDataGrid>
+            </BbCardContent></BbCard>
+
+            <BbCard><BbCardHeader><BbCardTitle>Payment Audit</BbCardTitle></BbCardHeader><BbCardContent>
+                <BbDataGrid Items="@_sale.Payments" ShowPagination="false"><Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Method)" Title="Method" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Status)" Title="Status" Filterable="true" />
+                    <BbDataGridTemplateColumn Title="Captured Amount" Sortable="true" Filterable="true" FilterBy="@(x => x.Amount)"><ChildContent Context="item">@FormatMoney(item.Amount)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Refunded Amount" Sortable="true" Filterable="true" FilterBy="@(x => x.RefundedAmount)"><ChildContent Context="item">@FormatMoney(item.RefundedAmount)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Cash Received" Sortable="true" Filterable="true" FilterBy="@(x => x.CashTenderedAmount)"><ChildContent Context="item">@FormatOptionalMoney(item.CashTenderedAmount)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Change" Sortable="true" Filterable="true" FilterBy="@(x => x.ChangeAmount)"><ChildContent Context="item">@FormatOptionalMoney(item.ChangeAmount)</ChildContent></BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.CapturedAt)" Title="Captured" Sortable="true" />
+                </Columns></BbDataGrid>
+            </BbCardContent></BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Inject] private IPOSServiceWrapper POS { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+    private PosSaleReceiptResponse? _sale;
+    private bool _loading = true;
+    private bool _acting;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private string? _loadError;
+    private string _registerLabel = "-";
+    private string _cashierLabel = "-";
+    private string _customerLabel = "-";
+    private string? _currencyCode;
+
+    protected override void OnInitialized() { TenantFilter.OnChanged += OnContextChanged; ModuleNavigation.OnChanged += OnContextChanged; }
+    protected override async Task OnInitializedAsync() => await Reload();
+    private void OnContextChanged() => _ = InvokeAsync(Reload);
+    private async Task Reload()
+    {
+        _loading = true; _sale = null; _loadError = null;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "sales");
+            if (!_hasTenant || !_moduleEnabled) return;
+            var response = await POS.GetPosSale(new GetPosSaleRequest { Id = Id, Metadata = BuildMetadata() });
+            _sale = response.Response;
+            if (!response.IsSuccess) _loadError = response.Message;
+            if (_sale is not null)
+            {
+                SetReferenceFallbacks(_sale.RegisterId, _sale.CashierCredentialId, _sale.CustomerCredentialId);
+                try { await LoadReferenceLabels(); }
+                catch { ToastService.Show("The sale loaded, but some reference labels are unavailable."); }
+            }
+        }
+        catch { _loadError = "Could not load the sale."; }
+        finally { _loading = false; }
+    }
+    private async Task RetryFulfillment()
+    {
+        _acting = true;
+        try { var response = await POS.RetryPosSaleFulfillment(new RetryPosSaleFulfillmentRequest { SaleId = Id, Metadata = BuildMetadata() }); ToastService.Show(response.IsSuccess ? "Fulfillment retry submitted." : response.Message ?? "Retry failed."); await Reload(); }
+        finally { _acting = false; }
+    }
+    private async Task RetryPayment()
+    {
+        _acting = true;
+        try { var response = await POS.RetryPosSalePayment(new RetryPosSalePaymentRequest { SaleId = Id, Metadata = BuildMetadata() }); ToastService.Show(response.IsSuccess ? "Payment retry submitted." : response.Message ?? "Retry failed."); await Reload(); }
+        finally { _acting = false; }
+    }
+    private async Task CancelSale()
+    {
+        if (!await DialogService.Confirm("Cancel POS Sale", "Cancel this unpaid sale and release its inventory reservations?", new ConfirmDialogOptions { Destructive = true })) return;
+        _acting = true;
+        try { var response = await POS.CancelPosSale(new CancelPosSaleRequest { SaleId = Id, Reason = "Cancelled from Portal", Metadata = BuildMetadata() }); ToastService.Show(response.IsSuccess ? "Sale cancelled." : response.Message ?? "Cancellation failed."); await Reload(); }
+        finally { _acting = false; }
+    }
+    private void StartReturn() => Navigation.NavigateTo($"/pos/returns?saleId={Id}");
+    private async Task PrintReceipt() => await JSRuntime.InvokeVoidAsync("print");
+    private void Back() => Navigation.NavigateTo("/pos/sales");
+    private void SetReferenceFallbacks(Guid registerId, Guid cashierId, Guid? customerId)
+    {
+        _registerLabel = registerId.ToString()[..8];
+        _cashierLabel = cashierId.ToString()[..8];
+        _customerLabel = customerId is { } id ? id.ToString()[..8] : "Walk-in customer";
+    }
+    private async Task LoadReferenceLabels()
+    {
+        var sale = _sale!;
+        var registerResponse = await POS.GetPosRegister(new GetPosRegisterRequest { Id = sale.RegisterId, Metadata = BuildMetadata() });
+        if (registerResponse.Response is { } register)
+            _registerLabel = string.IsNullOrWhiteSpace(register.Code) ? register.Name : $"{register.Name} ({register.Code})";
+
+        var currency = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>()
+            .IgnoreQueryFilters().NoCache().Where(item => item.Id == sale.CurrencyId).FirstOrDefaultAsync();
+        var code = currency?.CurrencyIsoCode3?.Trim().ToUpperInvariant();
+        _currencyCode = code is { Length: 3 } && code.All(char.IsAsciiLetter) ? code : null;
+
+        var credentials = await DataContext.Query<IdentityCredential>()
+            .IgnoreQueryFilters().NoCache()
+            .Where(item => item.Id == sale.CashierCredentialId || item.Id == sale.CustomerCredentialId)
+            .ToListAsync();
+        _cashierLabel = CredentialLabel(credentials.FirstOrDefault(item => item.Id == sale.CashierCredentialId), sale.CashierCredentialId);
+        _customerLabel = sale.CustomerCredentialId is { } customerId
+            ? CredentialLabel(credentials.FirstOrDefault(item => item.Id == customerId), customerId)
+            : "Walk-in customer";
+    }
+    private string FormatMoney(decimal value) => _currencyCode is { } code ? $"{code} {value:N2}" : value.ToString("N2");
+    private string FormatOptionalMoney(decimal? value) => value.HasValue ? FormatMoney(value.Value) : "-";
+    private static string CredentialLabel(IdentityCredential? credential, Guid id) => credential is null
+        ? id.ToString()[..8]
+        : !string.IsNullOrWhiteSpace(credential.UserAlias)
+            ? $"{credential.UserName ?? id.ToString()[..8]} ({credential.UserAlias})"
+            : credential.UserName ?? id.ToString()[..8];
+    private RequestMetadata BuildMetadata() => new() { RequestedTenantId = TenantFilter.SelectedTenantId, RequestId = Guid.NewGuid(), OperationName = "Portal" };
+    private static string StatusBadgeValue(PosSaleStatus status) => status switch { PosSaleStatus.Completed => "active", PosSaleStatus.Cancelled => "inactive", PosSaleStatus.PaymentFailed or PosSaleStatus.InventoryFulfillmentFailed or PosSaleStatus.InventoryReservationFailed => "warning", _ => "pending" };
+    public void Dispose() { TenantFilter.OnChanged -= OnContextChanged; ModuleNavigation.OnChanged -= OnContextChanged; }
+}

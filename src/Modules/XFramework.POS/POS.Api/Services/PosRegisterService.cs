@@ -43,6 +43,39 @@ public sealed class PosRegisterService(
             : Result<PosRegisterResponse>.Success(PosServiceHelpers.ToRegisterResponse(register));
     }
 
+    public async Task<Result<List<PosRegisterResponse>>> SearchAsync(
+        SearchPosRegistersRequest request,
+        CancellationToken ct)
+    {
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<List<PosRegisterResponse>>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var tenantId = contextResult.Data!.TenantId;
+        var (page, pageSize) = PosServiceHelpers.NormalizePage(request.Page, request.PageSize);
+        IQueryable<PosRegister> query = db.Set<PosRegister>().AsNoTracking()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+
+        if (request.IsEnabled.HasValue)
+            query = query.Where(item => item.IsEnabled == request.IsEnabled.Value);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim();
+            query = query.Where(item => item.Name.Contains(search) ||
+                (item.Code != null && item.Code.Contains(search)) ||
+                (item.Description != null && item.Description.Contains(search)));
+        }
+
+        var registers = await query.OrderBy(item => item.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return Result<List<PosRegisterResponse>>.Success(
+            registers.Select(PosServiceHelpers.ToRegisterResponse).ToList());
+    }
+
     public async Task<Result<PosRegisterResponse>> CreateAsync(
         CreatePosRegisterRequest request,
         CancellationToken ct)

@@ -13,8 +13,11 @@ public sealed class PortalContractTests
     [
         "Cashier.razor",
         "Registers.razor",
+        "RegisterDetail.razor",
         "Sales.razor",
-        "Returns.razor"
+        "SaleDetail.razor",
+        "Returns.razor",
+        "ReturnDetail.razor"
     ];
 
     private static readonly string[] PosTabularPages =
@@ -106,10 +109,13 @@ public sealed class PortalContractTests
         var pagesRoot = GetPosPagesRoot();
         var cashier = File.ReadAllText(Path.Combine(pagesRoot, "Cashier.razor"));
         var registers = File.ReadAllText(Path.Combine(pagesRoot, "Registers.razor"));
+        var registerDetail = File.ReadAllText(Path.Combine(pagesRoot, "RegisterDetail.razor"));
         var sales = File.ReadAllText(Path.Combine(pagesRoot, "Sales.razor"));
+        var saleDetail = File.ReadAllText(Path.Combine(pagesRoot, "SaleDetail.razor"));
         var returns = File.ReadAllText(Path.Combine(pagesRoot, "Returns.razor"));
+        var returnDetail = File.ReadAllText(Path.Combine(pagesRoot, "ReturnDetail.razor"));
 
-        foreach (var text in new[] { cashier, registers, sales, returns })
+        foreach (var text in new[] { cashier, registers, registerDetail, sales, saleDetail, returns, returnDetail })
             text.Should().Contain("IPOSServiceWrapper POS");
 
         cashier.Should().Contain("POS.CheckoutPosSale(");
@@ -120,14 +126,21 @@ public sealed class PortalContractTests
         cashier.Should().Contain("POS.CancelPosCart(");
         cashier.Should().Contain("POS.CheckoutPosCart(");
         cashier.Should().Contain("POS.SearchPosCatalog(");
+        cashier.Should().Contain("POS.RetryPosSalePayment(");
         cashier.Should().Contain("NewSaleIdempotencyKey()");
         cashier.Should().Contain("_cashTenderedAmount < Total");
         registers.Should().Contain("POS.CreatePosRegister(");
+        registerDetail.Should().Contain("POS.GetPosRegister(");
+        registerDetail.Should().Contain("POS.UpdatePosRegister(");
         sales.Should().Contain("POS.CancelPosSale(");
         sales.Should().Contain("POS.RetryPosSaleFulfillment(");
+        saleDetail.Should().Contain("POS.GetPosSale(");
+        saleDetail.Should().Contain("POS.RetryPosSalePayment(");
         returns.Should().Contain("POS.CreatePosReturn(");
         returns.Should().Contain("NewReturnIdempotencyKey()");
         returns.Should().Contain("IdempotencyKey = _returnIdempotencyKey");
+        returnDetail.Should().Contain("POS.GetPosReturn(");
+        returnDetail.Should().Contain("POS.RetryPosReturn(");
 
         var offenders = PosPages
             .Select(page => new
@@ -183,24 +196,65 @@ public sealed class PortalContractTests
     [Test]
     public void RegisterSetup_UsesEntityPickersInsteadOfRawGuidEntry()
     {
-        var text = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Registers.razor"));
+        var pagesRoot = GetPosPagesRoot();
+        var registerList = File.ReadAllText(Path.Combine(pagesRoot, "Registers.razor"));
+        var registerDetail = File.ReadAllText(Path.Combine(pagesRoot, "RegisterDetail.razor"));
 
-        text.Should().Contain("XfEntityPicker TItem=\"IdentityCredential\"");
-        text.Should().Contain("XfEntityPicker TItem=\"Wallet\"");
-        text.Should().Contain("XfEntityPicker TItem=\"Wallets.Domain.Shared.Contracts.WalletType\"");
-        text.Should().Contain("XfEntityPicker TItem=\"Wallets.Domain.Shared.Contracts.CurrencyType\"");
-        text.Should().Contain("XfEntityPicker TItem=\"Warehouse\"");
-        text.Should().Contain("XfEntityPicker TItem=\"InventoryLocation\"");
-        text.Should().NotContain("TValue=\"Guid\"");
-        text.Should().NotContain("raw GUID");
+        foreach (var text in new[] { registerList, registerDetail })
+        {
+            text.Should().Contain("XfEntityPicker TItem=\"IdentityCredential\"");
+            text.Should().Contain("XfEntityPicker TItem=\"Wallet\"");
+            text.Should().Contain("XfEntityPicker TItem=\"Wallets.Domain.Shared.Contracts.WalletType\"");
+            text.Should().Contain("XfEntityPicker TItem=\"Wallets.Domain.Shared.Contracts.CurrencyType\"");
+            text.Should().Contain("XfEntityPicker TItem=\"Warehouse\"");
+            text.Should().Contain("XfEntityPicker TItem=\"InventoryLocation\"");
+            text.Should().NotContain("TValue=\"Guid\"");
+            text.Should().NotContain("raw GUID");
+        }
+    }
+
+    [Test]
+    public void RegisterList_OpensDedicatedDetailWorkflow()
+    {
+        var registerList = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Registers.razor"));
+
+        registerList.Should().Contain("OnRowClick=\"@((PosRegisterResponse item) => OpenRegister(item.Id))\"");
+        registerList.Should().Contain("Navigation.NavigateTo($\"/pos/registers/{id}\")");
+        registerList.Should().Contain("Title=\"Actions\"");
+        registerList.Should().Contain("Edit register {GetRegisterLabel(item)}");
+        registerList.Should().NotContain("UpdatePosRegisterRequest");
+        registerList.Should().NotContain("POS.UpdatePosRegister(");
+    }
+
+    [Test]
+    public void RegisterDetail_UsesWrapperBackedEditWithReferenceValidation()
+    {
+        var detail = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "RegisterDetail.razor"));
+
+        detail.Should().Contain("@page \"/pos/registers/{Id:guid}\"");
+        detail.Should().Contain("data-testid=\"pos-register-detail\"");
+        detail.Should().Contain("POS.GetPosRegister(new GetPosRegisterRequest");
+        detail.Should().Contain("POS.UpdatePosRegister(request)");
+        detail.Should().Contain("wallet.CredentialId != merchantCredentialId");
+        detail.Should().Contain("walletType.CurrencyTypeId is Guid walletTypeCurrencyId");
+        detail.Should().Contain("item.Id == locationId && item.WarehouseId == warehouseId");
+        detail.Should().Contain("<BbAlertTitle>Register setup incomplete</BbAlertTitle>");
+        detail.Should().Contain("<BbAlertDescription>@_validationMessage</BbAlertDescription>");
+        detail.Should().Contain("_validationMessage = validationMessage;");
+        detail.Should().Contain("Label=\"Enabled\"");
+        detail.Should().NotContain("DataContext.Update");
     }
 
     [Test]
     public void PosPages_UseWrapperReadsWherePosContractsExist()
     {
         var pagesRoot = GetPosPagesRoot();
+        var registers = File.ReadAllText(Path.Combine(pagesRoot, "Registers.razor"));
         var sales = File.ReadAllText(Path.Combine(pagesRoot, "Sales.razor"));
         var returns = File.ReadAllText(Path.Combine(pagesRoot, "Returns.razor"));
+
+        registers.Should().Contain("POS.SearchPosRegisters(new SearchPosRegistersRequest");
+        registers.Should().NotContain("DataContext.Query<PosRegister>()");
 
         sales.Should().Contain("POS.SearchPosSales(new SearchPosSalesRequest");
         sales.Should().NotContain("DataContext.Query<PosSale>()");
@@ -223,6 +277,8 @@ public sealed class PortalContractTests
         returns.Should().Contain("BuildSaleRefundAllocations");
         returns.Should().Contain("OriginalRefundAmount - PreviouslyReturnedRefundAmount");
         returns.Should().Contain("Math.Clamp(line.ReturnQuantity + delta, 0, line.RemainingQuantity)");
+        returns.Should().Contain("SaleId = saleId");
+        returns.Should().Contain("for (var page = 1; ; page++)");
     }
 
     [Test]
@@ -235,7 +291,15 @@ public sealed class PortalContractTests
 
         cashier.Should().Contain("<BbRadioGroup TValue=\"PosPaymentMethod\" @bind-Value=\"_paymentMethod\"");
         cashier.Should().Contain("<BbCurrencyInput Id=\"pos-cash-amount\" @bind-Value=\"_cashTenderedAmount\" AriaLabel=\"Cash received\"");
-        returns.Should().Contain("<BbFormFieldSelect TValue=\"string\" @bind-Value=\"RefundMethodValue\" Label=\"Refund Method\">");
+        cashier.Should().Contain("CashTenderedAmount = IsCashPayment ? _cashTenderedAmount : null");
+        cashier.Should().Contain("data-testid=\"pos-receipt-cash\"");
+        cashier.Should().Contain("IsMerchantCustomer");
+        cashier.Should().Contain("Customer wallet must be different from the register merchant wallet.");
+        cashier.Should().Contain("the sale total must be greater than zero.");
+        returns.Should().Contain("data-testid=\"pos-original-refund-method\"");
+        returns.Should().Contain("_refundMethod = response.Response.PaymentMethod;");
+        returns.Should().Contain("original captured payment method and account");
+        returns.Should().NotContain("RefundMethodValue");
         cashier.Should().NotContain("grid-cols-[");
         returns.Should().NotContain("@if (_refundMethod == PosPaymentMethod.CashDrawer)");
         cashier.Should().NotContain("@if (_paymentMethod == PosPaymentMethod.CashDrawer)");
@@ -265,11 +329,14 @@ public sealed class PortalContractTests
     {
         var pagesRoot = GetPosPagesRoot();
         var registers = File.ReadAllText(Path.Combine(pagesRoot, "Registers.razor"));
+        var registerDetail = File.ReadAllText(Path.Combine(pagesRoot, "RegisterDetail.razor"));
         var cashier = File.ReadAllText(Path.Combine(pagesRoot, "Cashier.razor"));
         var returns = File.ReadAllText(Path.Combine(pagesRoot, "Returns.razor"));
 
         Regex.Matches(registers, "AdvancedColumns=\"@").Count.Should().BeGreaterThanOrEqualTo(6);
         Regex.Matches(registers, "AdvancedSearchScope=").Count.Should().BeGreaterThanOrEqualTo(6);
+        Regex.Matches(registerDetail, "AdvancedColumns=\"@").Count.Should().BeGreaterThanOrEqualTo(6);
+        Regex.Matches(registerDetail, "AdvancedSearchScope=").Count.Should().BeGreaterThanOrEqualTo(6);
         Regex.Matches(cashier, "AdvancedColumns=\"@").Count.Should().BeGreaterThanOrEqualTo(2);
         Regex.Matches(cashier, "AdvancedSearchScope=").Count.Should().BeGreaterThanOrEqualTo(2);
         Regex.Matches(returns, "AdvancedColumns=\"@").Count.Should().BeGreaterThanOrEqualTo(1);
@@ -287,6 +354,141 @@ public sealed class PortalContractTests
         text.Should().Contain("POS.SuspendPosCart(new SuspendPosCartRequest");
         text.Should().Contain("POS.ResumePosCart(new ResumePosCartRequest");
         text.Should().Contain("POS.CancelPosCart(new CancelPosCartRequest");
+        text.Should().Contain("Search = string.IsNullOrWhiteSpace(_heldCartSearch)");
+        text.Should().Contain("Page = _heldCartPage");
+        text.Should().Contain("PageSize = HeldCartPageSize");
+        text.Should().Contain("ShowPagination=\"false\"");
+    }
+
+    [Test]
+    public void PosReferencePickers_RequestServerSearchInsteadOfRelyingOnInitialCaps()
+    {
+        var pagesRoot = GetPosPagesRoot();
+        var cashier = File.ReadAllText(Path.Combine(pagesRoot, "Cashier.razor"));
+        var registers = File.ReadAllText(Path.Combine(pagesRoot, "Registers.razor"));
+        var detail = File.ReadAllText(Path.Combine(pagesRoot, "RegisterDetail.razor"));
+        var picker = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot().FullName,
+            "src", "Presentation", "XFramework.Portal.Shared", "Components", "XfEntityPicker.razor"));
+
+        picker.Should().Contain("[Parameter] public EventCallback<string> SearchRequested");
+        picker.Should().Contain("await Task.Delay(250, _searchDebounce.Token)");
+        cashier.Should().Contain("SearchRequested=\"@SearchRegisterOptions\"");
+        cashier.Should().Contain("SearchRequested=\"@SearchCredentialOptions\"");
+        cashier.Should().Contain("POS.SearchPosRegisters(new SearchPosRegistersRequest");
+        Regex.Matches(registers, "SearchRequested=\"@").Count.Should().BeGreaterThanOrEqualTo(6);
+        Regex.Matches(detail, "SearchRequested=\"@").Count.Should().BeGreaterThanOrEqualTo(6);
+        registers.Should().Contain("Insert(0, selected)");
+        detail.Should().Contain("Insert(0, selected)");
+    }
+
+    [Test]
+    public void PosCashier_PendingPayment_FreezesPayloadAndRetriesPersistedSale()
+    {
+        var cashier = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Cashier.razor"));
+
+        cashier.Should().Contain("private bool HasPendingPayment => _lastReceipt?.Status == PosSaleStatus.PaymentPending;");
+        cashier.Should().Contain("private bool HasTerminalCheckoutFailure => _lastReceipt?.Status is");
+        cashier.Should().Contain("private bool IsInteractionLocked => IsBusy || HasPendingPayment || HasTerminalCheckoutFailure;");
+        cashier.Should().Contain("if (HasPendingPayment)");
+        cashier.Should().Contain("await RetryPendingPayment();");
+        cashier.Should().Contain("POS.RetryPosSalePayment(new RetryPosSalePaymentRequest");
+        cashier.Should().Contain("SaleId = pendingSale.Id");
+        cashier.Should().Contain("Payment result is unknown. Retry to reuse the original payment reference.");
+        cashier.Should().Contain("This sale cannot be retried. Start a new sale to use a new payment reference.");
+        cashier.Should().Contain("!HasTerminalCheckoutFailure");
+        cashier.Should().Contain("Disabled=\"@IsInteractionLocked\"");
+        Regex.Matches(cashier, @"if \(_lastReceipt\?\.Status == PosSaleStatus\.Completed\)\s*\{\s*ClearCurrentCart\(\);")
+            .Count.Should().BeGreaterThanOrEqualTo(2, "both direct and held-cart checkout must retain ambiguous payments");
+    }
+
+    [Test]
+    public void PosCashier_CompletedCheckout_RefreshesCatalogAfterInteractionUnlocks()
+    {
+        var cashier = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Cashier.razor"));
+
+        cashier.Should().Contain("var refreshCatalogAfterCheckout = false;");
+        cashier.Should().Contain("refreshCatalogAfterCheckout = true;");
+        Regex.Matches(cashier,
+                @"finally\s*\{\s*_checkingOut = false;\s*if \(refreshCatalogAfterCheckout\)\s*await SearchCatalog\(false, false\);")
+            .Count.Should().Be(2, "both checkout and pending-payment recovery must refresh displayed availability");
+    }
+
+    [Test]
+    public void PosSalesAndReturns_UseServerPagingAndDedicatedDetailRoutes()
+    {
+        var pagesRoot = GetPosPagesRoot();
+        var sales = File.ReadAllText(Path.Combine(pagesRoot, "Sales.razor"));
+        var saleDetail = File.ReadAllText(Path.Combine(pagesRoot, "SaleDetail.razor"));
+        var returns = File.ReadAllText(Path.Combine(pagesRoot, "Returns.razor"));
+        var returnDetail = File.ReadAllText(Path.Combine(pagesRoot, "ReturnDetail.razor"));
+
+        sales.Should().Contain("Page = _page");
+        sales.Should().Contain("PageSize = PageSize");
+        sales.Should().Contain("Search = string.IsNullOrWhiteSpace(_search)");
+        sales.Should().Contain("Navigation.NavigateTo($\"/pos/sales/{saleId}\")");
+        saleDetail.Should().Contain("@page \"/pos/sales/{Id:guid}\"");
+        saleDetail.Should().Contain("data-testid=\"pos-sale-detail\"");
+
+        returns.Should().Contain("Page = _returnPage");
+        returns.Should().Contain("PageSize = PageSize");
+        returns.Should().Contain("Search = string.IsNullOrWhiteSpace(_returnSearch)");
+        returns.Should().Contain("Search = string.IsNullOrWhiteSpace(_saleSearch)");
+        returns.Should().Contain("SearchRequested=\"@SearchCompletedSalesFromPicker\"");
+        returns.Should().Contain("Navigation.NavigateTo($\"/pos/returns/{returnId}\")");
+        returnDetail.Should().Contain("@page \"/pos/returns/{Id:guid}\"");
+        returnDetail.Should().Contain("data-testid=\"pos-return-detail\"");
+    }
+
+    [Test]
+    public void PosSaleAndReturnDetails_ShowAuditableLabelsCurrencyAndReceiptPrinting()
+    {
+        var pagesRoot = GetPosPagesRoot();
+        var saleDetail = File.ReadAllText(Path.Combine(pagesRoot, "SaleDetail.razor"));
+        var returnDetail = File.ReadAllText(Path.Combine(pagesRoot, "ReturnDetail.razor"));
+        var printStyles = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot().FullName,
+            "src", "Presentation", "XFramework.Portal", "wwwroot", "css", "app.css"));
+
+        saleDetail.Should().Contain("Print receipt");
+        saleDetail.Should().Contain("JSRuntime.InvokeVoidAsync(\"print\")");
+        saleDetail.Should().Contain("Refunded Amount");
+        saleDetail.Should().Contain("item.RefundedAmount");
+        saleDetail.Should().Contain("_registerLabel");
+        saleDetail.Should().Contain("_cashierLabel");
+        saleDetail.Should().Contain("_customerLabel");
+        saleDetail.Should().Contain("FormatMoney(_sale.TotalAmount)");
+        printStyles.Should().Contain(".pos-sale-receipt .overflow-auto");
+        printStyles.Should().Contain("overflow: visible !important;");
+        printStyles.Should().Contain("table-layout: fixed !important;");
+        printStyles.Should().Contain("background: #fff !important;");
+        printStyles.Should().Contain("break-inside: avoid;");
+        returnDetail.Should().Contain("_registerLabel");
+        returnDetail.Should().Contain("_cashierLabel");
+        returnDetail.Should().Contain("_customerLabel");
+        returnDetail.Should().Contain("FormatMoney(_return.TotalRefundAmount)");
+    }
+
+    [Test]
+    public void PosRegisterList_PreservesLoadFailuresInsteadOfRenderingAnEmptyResult()
+    {
+        var registers = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Registers.razor"));
+
+        registers.Should().Contain("Registers could not load");
+        registers.Should().Contain("Register data is unavailable");
+        registers.Should().Contain("if (!string.IsNullOrWhiteSpace(_loadError))");
+        registers.Should().Contain("_loadError = response.Message ?? \"The POS service did not return register data.\"");
+    }
+
+    [Test]
+    public void PosCashier_RequiresRegisterCurrencyBeforeRenderingMoneyControls()
+    {
+        var cashier = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Cashier.razor"));
+
+        cashier.Should().Contain("Title=\"Select a register\"");
+        cashier.Should().Contain("Register currency unavailable");
+        cashier.Should().Contain("RegisterCurrency is { } currency ? $\"{currency} {value:N2}\" : \"—\"");
+        cashier.Should().NotContain("RegisterCurrency ?? \"XXX\"");
     }
 
     private static IEnumerable<string> FindDirectPosMutations(string page, string text)

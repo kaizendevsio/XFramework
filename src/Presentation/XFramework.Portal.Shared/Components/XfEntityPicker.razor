@@ -1,4 +1,5 @@
 @typeparam TItem where TItem : class
+@implements IDisposable
 
 <div class="xf-form-field xf-entity-picker">
     @if (!string.IsNullOrWhiteSpace(Label))
@@ -110,7 +111,8 @@
         </BbDialogHeader>
         <div class="grid gap-3 py-4">
             <BbFormFieldInput TValue="string"
-                              @bind-Value="_advancedSearchQuery"
+                              Value="@_advancedSearchQuery"
+                              ValueChanged="@OnAdvancedSearchQueryChanged"
                               Label="Search"
                               Placeholder="@AdvancedSearchPlaceholder" />
 
@@ -192,6 +194,7 @@
     private bool _advancedOpen;
     private string _searchQuery = "";
     private string _advancedSearchQuery = "";
+    private CancellationTokenSource? _searchDebounce;
 
     [Parameter] public string? Label { get; set; }
     [Parameter] public string? Value { get; set; }
@@ -201,6 +204,7 @@
     [Parameter, EditorRequired] public Func<TItem, string> TextSelector { get; set; } = default!;
     [Parameter] public Func<TItem, string>? SearchTextSelector { get; set; }
     [Parameter] public Func<TItem, string>? AdvancedSearchTextSelector { get; set; }
+    [Parameter] public EventCallback<string> SearchRequested { get; set; }
     [Parameter] public RenderFragment<TItem>? ItemTemplate { get; set; }
     [Parameter] public IReadOnlyList<XfEntityPickerColumn<TItem>> AdvancedColumns { get; set; } = [];
     [Parameter] public IReadOnlyList<XfEntityPickerFilter<TItem>> AdvancedFilters { get; set; } = [];
@@ -335,10 +339,34 @@
         return Task.CompletedTask;
     }
 
-    private Task OnSearchQueryChanged(string value)
+    private async Task OnSearchQueryChanged(string value)
     {
         _searchQuery = value;
-        return Task.CompletedTask;
+        await RequestRemoteSearch(value);
+    }
+
+    private async Task OnAdvancedSearchQueryChanged(string value)
+    {
+        _advancedSearchQuery = value;
+        await RequestRemoteSearch(value);
+    }
+
+    private async Task RequestRemoteSearch(string value)
+    {
+        if (!SearchRequested.HasDelegate)
+            return;
+
+        _searchDebounce?.Cancel();
+        _searchDebounce?.Dispose();
+        _searchDebounce = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(250, _searchDebounce.Token);
+            await SearchRequested.InvokeAsync(value);
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private Task OnOpenChanged(bool value)
@@ -416,5 +444,11 @@
     {
         _advancedSearchQuery = "";
         _advancedFilterValues.Clear();
+    }
+
+    public void Dispose()
+    {
+        _searchDebounce?.Cancel();
+        _searchDebounce?.Dispose();
     }
 }
