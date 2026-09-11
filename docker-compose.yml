@@ -365,6 +365,7 @@ services:
       ServiceIdentity__DefaultScopes__2: notifications.send
       ServiceIdentity__DefaultScopes__3: tenant.target
       ServiceIdentity__DefaultScopes__4: storage.read
+      ServiceIdentity__DefaultScopes__5: storage.write
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
