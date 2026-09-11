@@ -187,6 +187,12 @@
   <Folder Name="/Applications/Gateway/">
     <Project Path="src/Presentation/Gateway/Gateway.csproj" />
   </Folder>
+  <Folder Name="/Presentation/">
+    <Project Path="src/Presentation/XFramework.Yap/XFramework.Yap.csproj" />
+  </Folder>
+  <Folder Name="/Presentation/Tests/">
+    <Project Path="src/Tests/Yap.Tests/Yap.Tests.csproj" />
+  </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/Infrastructure/" />
   <Folder Name="/src/Kernel/" />

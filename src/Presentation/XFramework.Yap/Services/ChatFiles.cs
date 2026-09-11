@@ -1,0 +1,100 @@
+using Communications.Integration.Clients;
+using Microsoft.AspNetCore.Components.Forms;
+using Storage.Domain.Shared.Contracts.Requests;
+using Storage.Integration.Drivers;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Integration.Security;
+
+namespace Yap.Services;
+
+public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsChatClient chat,
+    ICommunicationsChatActorProvider actors, IActorAccessTokenScope tokens, ILogger<ChatFiles> logger)
+{
+    public const long MaxFileBytes = 20 * 1024 * 1024;
+
+    public async Task<Guid> UploadAsync(IBrowserFile file, Guid threadId, IProgress<int>? progress, CancellationToken ct)
+    {
+        if (file.Size is <= 0 or > MaxFileBytes) throw new ChatOperationException("Choose a file between 1 byte and 20 MB.");
+        var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
+        using var token = tokens.Push(actor.AccessToken!);
+        var metadata = new RequestMetadata { RequestedTenantId = actor.TenantId, RequestId = Guid.NewGuid(), OperationName = "Yap attachment" };
+        var type = ChatWorkspace.Require(await storage.EnsureStorageUploadMetadata(new EnsureStorageUploadMetadataRequest
+        {
+            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+            IdentifierGroupName = "Communications", IdentifierName = "Chat attachments", Metadata = metadata
+        }, ct));
+        var upload = ChatWorkspace.Require(await storage.CreateStorageUploadSession(new CreateStorageUploadSessionRequest
+        {
+            FileName = Path.GetFileName(file.Name), ContentType = file.ContentType, TypeId = type.TypeId,
+            StorageFileIdentifierId = type.StorageFileIdentifierId, Identifier = threadId,
+            TotalSizeBytes = file.Size, ChunkSizeBytes = 256 * 1024, Metadata = metadata
+        }, ct));
+        try
+        {
+            await using var stream = file.OpenReadStream(MaxFileBytes, ct);
+            // Honor the provider's negotiated part size (S3 may require at least 5 MB).
+            if (upload.ChunkSizeBytes <= 0 || upload.ChunkSizeBytes > MaxFileBytes)
+                throw new ChatOperationException("The upload service returned an unsupported part size.");
+            var buffer = new byte[upload.ChunkSizeBytes];
+            long offset = 0;
+            var part = 1;
+            while (offset < file.Size)
+            {
+                var length = (int)Math.Min(buffer.Length, file.Size - offset);
+                await stream.ReadExactlyAsync(buffer.AsMemory(0, length), ct);
+                ChatWorkspace.Require(await storage.UploadStorageFilePart(new UploadStorageFilePartRequest
+                {
+                    UploadSessionId = upload.Id, PartNumber = part++, OffsetBytes = offset,
+                    ChunkBytes = buffer.AsSpan(0, length).ToArray(), Metadata = metadata
+                }, ct));
+                offset += length;
+                progress?.Report((int)(offset * 100 / file.Size));
+            }
+            var completed = ChatWorkspace.Require(await storage.CompleteStorageUploadSession(new CompleteStorageUploadSessionRequest
+            { UploadSessionId = upload.Id, Metadata = metadata }, ct));
+            return completed.Id;
+        }
+        catch
+        {
+            try { await storage.AbortStorageUploadSession(new AbortStorageUploadSessionRequest { UploadSessionId = upload.Id, Metadata = metadata }, CancellationToken.None); }
+            catch (Exception ex) { logger.LogWarning(ex, "Could not abort incomplete Yap upload {UploadId}.", upload.Id); }
+            throw;
+        }
+    }
+
+    public async Task AttachAsync(Guid threadId, Guid messageId, Guid storageId, CancellationToken ct)
+    {
+        var session = await chat.ForCurrentActorAsync(ct: ct);
+        var result = await session.AttachFileAsync(threadId, messageId, storageId, ct);
+        if ((int)result.HttpStatusCode == 409)
+        {
+            // A prior attempt may have committed before its response was interrupted.
+            var linked = ChatWorkspace.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
+            if (linked.Items.Any(file => file.StorageFileId == storageId)) return;
+        }
+        ChatWorkspace.Require(result);
+    }
+
+    public async Task<IReadOnlyList<ChatFileLink>> GetLinksAsync(Guid threadId, Guid messageId, CancellationToken ct)
+    {
+        var session = await chat.ForCurrentActorAsync(ct: ct);
+        var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
+        using var token = tokens.Push(actor.AccessToken!);
+        var files = ChatWorkspace.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
+        var links = new List<ChatFileLink>();
+        foreach (var file in files.Items)
+        {
+            var result = ChatWorkspace.Require(await storage.GetStorageDownloadUrl(new GetStorageDownloadUrlRequest
+            {
+                StorageFileId = file.StorageFileId, ExpirationMinutes = 5,
+                Metadata = new RequestMetadata { RequestedTenantId = actor.TenantId, RequestId = Guid.NewGuid() }
+            }, ct));
+            if (!Uri.TryCreate(result.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http"))
+                throw new ChatOperationException("This attachment cannot be opened.");
+            links.Add(new ChatFileLink(file.Id, result.Url));
+        }
+        return links;
+    }
+}
+
+public sealed record ChatFileLink(Guid Id, string Url);

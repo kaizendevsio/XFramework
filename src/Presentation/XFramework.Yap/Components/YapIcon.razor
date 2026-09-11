@@ -1,0 +1,12 @@
+@using BlazorBlueprint.Icons.Lucide.Components
+<LucideIcon Name="@IconName" Size="Size" aria-hidden="true" />
+@code {
+    [Parameter] public string Name { get; set; } = "chat";
+    [Parameter] public int Size { get; set; } = 22;
+    private string IconName => Name switch
+    {
+        "back" => "arrow-left", "arrow" => "arrow-right", "chat" => "message-circle",
+        "close" => "x", "edit" => "square-pen", "file" => "paperclip", "lock" => "lock-keyhole",
+        "refresh" => "refresh-cw", "more" => "ellipsis", "logout" => "log-out", _ => Name
+    };
+}

@@ -1,0 +1,69 @@
+:root{--glass-tint:#ffffff45;--glass-sheet:#f7f8f24d;--glass-shine:#ffffff69;--glass-edge:#ffffff65;--glass-rim:#fffffff0;--glass-shadow:0 8px 28px -12px #33402238,0 2px 5px #3340220c}
+:root[data-theme=dark]{--glass-tint:#28362755;--glass-sheet:#202c2255;--glass-shine:#d9f6c322;--glass-edge:#d9f6c326;--glass-rim:#edffdc59;--glass-shadow:0 8px 28px -12px #0009,0 2px 5px #0003}
+body{background:radial-gradient(ellipse at 15% 15%,#d5f87925,transparent 48%),radial-gradient(ellipse at 90% 75%,#bca7e625,transparent 48%),var(--page)}
+.phone{background:radial-gradient(ellipse at 5% 0%,#d5f87945,transparent 48%),radial-gradient(ellipse at 100% 80%,#bca7e626,transparent 55%),var(--surface)}
+.phone .screen,.phone .chatbody{background:transparent}
+:where(.liquid-glass){position:relative}
+/* Only GlassLayer filters the backdrop: filtering its host hides detail from the lens. */
+.liquid-glass{-webkit-backdrop-filter:none;backdrop-filter:none;background:transparent!important;box-shadow:var(--glass-shadow);border:1px solid var(--glass-edge)}
+.liquid-glass>:not(.glass-optics){position:relative;z-index:1}
+.pagebar.liquid-glass{padding:11px 15px;border-radius:26px}
+.searchbar.liquid-glass{height:46px;border-radius:18px;color:var(--dim);--glass-tint:color-mix(in srgb,var(--surface) 28%,transparent)}
+.tabs.liquid-glass{padding:5px;margin:0 16px 12px;border-radius:23px;width:fit-content}
+.tabs.liquid-glass .tab{background:transparent}
+.tabs.liquid-glass .tab[aria-selected=true]{background:color-mix(in srgb,var(--accent) 38%,transparent);backdrop-filter:blur(var(--glass-blur,2px));color:var(--text);box-shadow:inset 0 1px 0 #fff8,0 2px 7px #203c1520}
+.composer.liquid-glass{border-radius:24px 24px 0 0;padding-top:13px;--glass-tint:var(--glass-sheet)}
+.composer .inputbox{background:color-mix(in srgb,var(--surface) 40%,transparent)}
+.inp.liquid-glass{--glass-tint:color-mix(in srgb,var(--surface) 74%,transparent)}
+.inp.liquid-glass:focus-within{border-color:var(--accent-ink)}
+.vidbar.liquid-glass{--glass-tint:#182a208c;--glass-edge:#ffffff3d;--glass-rim:#ffffff8c;--glass-shine:#ffffff29;backdrop-filter:none}
+.callctl.liquid-glass{padding:14px;border-radius:30px;--glass-tint:#20342666;--glass-shine:#ffffff1f;--glass-edge:#ffffff29;--glass-rim:#ffffff65}
+.pillbtn.liquid-glass[aria-selected=true]{--glass-tint:#d5f879d9;color:#20251e}
+.phone{max-height:calc(100dvh - 178px)}
+.statebar{flex:none;padding:4px 10px 9px;gap:8px;z-index:2}
+.threadhead{background:color-mix(in srgb,var(--surface2) 78%,transparent)}
+.bub,.treply .tx{position:relative;z-index:1}
+@media(max-width:520px){
+ .pagebar.liquid-glass{left:8px;right:8px;bottom:8px;width:auto;border-radius:24px;padding:8px 12px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+ .phone{max-height:none;height:calc(100dvh - 72px - env(safe-area-inset-bottom))}
+ .phone.has-states .screen{padding-top:46px}
+ .phone .statebar{top:0;background:transparent}
+}
+@media(prefers-reduced-transparency:reduce){.liquid-glass{background:var(--surface)!important}.vidbar.liquid-glass,.callctl.liquid-glass{background:#233428!important}}
+@media(forced-colors:active){.liquid-glass{background:Canvas!important;color:CanvasText;border:1px solid CanvasText;box-shadow:none}}
+
+/* Chrome floats over a single full-height scroll viewport. Insets are measured
+   so growing reply composers and wrapped headers leave the last item reachable. */
+.scroll-surface{position:relative;flex:1;min-height:0;--scroll-top:80px;--scroll-bottom:0px}
+.scroll-content{position:absolute;inset:0;display:flex;flex-direction:column;min-height:0}
+.scroll-content>.body,.scroll-content>.chatbody{padding-top:calc(var(--scroll-top) + 12px);padding-bottom:calc(var(--scroll-bottom) + 18px);scroll-padding-top:calc(var(--scroll-top) + 12px);scroll-padding-bottom:calc(var(--scroll-bottom) + 18px)}
+.scroll-header,.scroll-footer{position:absolute;left:0;right:0;z-index:10;pointer-events:none}
+.scroll-header{top:0}.scroll-footer{bottom:0}
+.scroll-header>*,.scroll-footer>*{pointer-events:auto}
+.scroll-header .appbar{margin:0 10px 8px;border-radius:23px;padding:10px 8px}
+.scroll-footer .composer{margin:0 8px 8px;border-radius:26px;padding-bottom:13px}
+.pagebar.liquid-glass{backdrop-filter:none}
+.phone:has(.scroll-surface) .screen{position:absolute;inset:46px 0 0}
+@media(max-width:520px){
+ .phone{height:100dvh}
+ .scroll-footer{bottom:calc(64px + env(safe-area-inset-bottom))}
+ .scroll-content>.body,.scroll-content>.chatbody{padding-bottom:calc(var(--scroll-bottom) + 82px + env(safe-area-inset-bottom));scroll-padding-bottom:calc(var(--scroll-bottom) + 82px + env(safe-area-inset-bottom))}
+ .phone .fab{bottom:158px}
+ .callinner{padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+ .callscreen:has(.vidbar){padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+}
+
+.bottomnav.liquid-glass button.on{background:color-mix(in srgb,var(--accent) 28%,transparent);backdrop-filter:blur(var(--glass-blur,2px));color:var(--text);box-shadow:inset 0 1px 0 var(--glass-edge)}
+
+.fab.liquid-glass{--glass-tint:color-mix(in srgb,var(--accent) 30%,transparent);color:var(--text)}
+
+.bubble-content{display:block;position:relative;z-index:1}
+.msg .bub.liquid-glass,.treply .tx.liquid-glass{box-shadow:inset 0 1px 0 var(--glass-edge),0 3px 10px #0000000a;color:var(--text)}
+.msg.out .bub.liquid-glass,.treply .tx.own-bubble{color:var(--on-accent)}
+.msg.out .bub .glass-refraction,.treply .tx.own-bubble .glass-refraction{background:color-mix(in srgb,var(--accent) 70%,var(--glass-custom-tint,var(--glass-tint)))}
+
+.scroll-footer .composer{background:transparent;border:0;box-shadow:none;border-radius:0;margin:0 12px 10px;padding:0}
+.composer .sendbtn.liquid-glass{--glass-tint:color-mix(in srgb,var(--accent) 45%,transparent);color:var(--text)}
+.composer .alsosend.liquid-glass{width:fit-content;max-width:100%;padding:8px 12px;border-radius:18px;color:var(--text)}
+
+.treply .tx.liquid-glass{padding:10px 12px;border-radius:18px;margin-top:6px;width:fit-content;max-width:100%;overflow-wrap:anywhere}

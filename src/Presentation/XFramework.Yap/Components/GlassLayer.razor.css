@@ -1,0 +1,7 @@
+.glass-optics{position:absolute;inset:0;border-radius:inherit;pointer-events:none;overflow:hidden;z-index:0}
+.glass-refraction,.glass-highlight{position:absolute;inset:0;border-radius:inherit;pointer-events:none}
+.glass-refraction{background:var(--glass-custom-tint,var(--glass-tint));-webkit-backdrop-filter:blur(var(--glass-blur,10px)) saturate(1.35);backdrop-filter:blur(var(--glass-blur,10px)) saturate(1.35)}
+.glass-optics[data-refracted] .glass-refraction{-webkit-backdrop-filter:var(--glass-filter) saturate(1.25);backdrop-filter:var(--glass-filter) saturate(1.25)}
+.glass-highlight{background:linear-gradient(145deg,var(--glass-shine),transparent 38%,transparent 65%,var(--glass-edge));box-shadow:inset 0 1px 0 var(--glass-rim),inset 1px 0 0 var(--glass-edge),inset 0 -1px 0 var(--glass-edge);border:1px solid var(--glass-edge)}
+@media(prefers-reduced-transparency:reduce){.glass-refraction{background:var(--surface)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}.glass-highlight{background:none}}
+@media(forced-colors:active){.glass-refraction,.glass-highlight{display:none}}
