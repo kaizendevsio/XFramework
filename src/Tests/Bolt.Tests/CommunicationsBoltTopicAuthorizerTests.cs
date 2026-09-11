@@ -105,8 +105,10 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         _ = jwtService.DidNotReceive().DecodeJwtToken(Arg.Any<string>());
     }
 
-    [Test]
-    public async Task TransientSubscriberDifferentFromRegisteredClient_IsDeniedBeforeCredentialOrDatabaseWork()
+    [TestCase("different-client")]
+    [TestCase("different-client~0123456789abcdef0123456789abcdef")]
+    [TestCase("client~not-a-subscription-id")]
+    public async Task TransientSubscriberDifferentFromRegisteredClient_IsDeniedBeforeCredentialOrDatabaseWork(string subscriberId)
     {
         var tenantId = Guid.NewGuid();
         var scopeFactory = Substitute.For<IServiceScopeFactory>();
@@ -114,7 +116,7 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         var authorizer = CreateAuthorizer(scopeFactory, jwtService);
         var context = CreateContext(
             $"communications.tenant.{tenantId:N}.presence",
-            subscriberId: "different-client");
+            subscriberId: subscriberId);
 
         var allowed = await authorizer.AuthorizeAsync(context);
 
@@ -204,8 +206,9 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
         _ = jwtService.DidNotReceive().DecodeJwtToken(Arg.Any<string>());
     }
 
-    [Test]
-    public async Task PresenceSubscription_ActorCredentialWithServiceHttpPrincipal_IsAllowed()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task PresenceSubscription_ActorCredentialWithServiceHttpPrincipal_IsAllowed(bool scopedSubscriber)
     {
         var tenantId = Guid.NewGuid();
         var credentialId = Guid.NewGuid();
@@ -233,7 +236,7 @@ public sealed class CommunicationsBoltTopicAuthorizerTests
             Substitute.For<IJwtService>());
         var context = CreateContext(
             $"communications.tenant.{tenantId:N}.presence",
-            subscriberId: "client",
+            subscriberId: scopedSubscriber ? Bolt.Protocol.BoltTransientSubscriberId.Create("client") : "client",
             actorAccessToken: "actor-token",
             user: servicePrincipal);
 
