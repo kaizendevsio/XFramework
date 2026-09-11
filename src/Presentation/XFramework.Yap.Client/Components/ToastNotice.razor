@@ -1,0 +1,5 @@
+<div class="toast" role="status"><button aria-label="Dismiss notification" @onclick="OnDismiss">×</button>@Message</div>
+@code {
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public EventCallback OnDismiss { get; set; }
+}

@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ChatState State
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+<main class="app-shell">
+    @if (!State.Online || State.NeedsLogin || State.PendingCount > 0)
+    {
+        <div class="connection" role="status"><Icon Name="wifi" Size="15" />
+            <span>@(State.NeedsLogin ? "Sign in to sync" : !State.Online ? "Offline · saved on this device" : "Syncing saved messages")
+            @if (State.PendingCount > 0) { <span> · @State.PendingCount queued</span> }</span>
+            <button @onclick="State.RetryAsync">Retry</button>
+            @if (State.NeedsLogin) { <a href="/login">Sign in</a> }
+        </div>
+    }
+    <div class="screen">@Body</div>
+    @if (State.Error is not null) { <div class="toast" role="status">@State.Error<button aria-label="Dismiss notice" @onclick="State.DismissError"><Icon Name="close" Size="16" /></button></div> }
+    <div id="app-update" class="update-notice" hidden><span>A Yap update is ready.</span><button @onclick="UpdateAsync">Update app</button></div>
+</main>
+@code {
+    private IDisposable? navigation;
+    protected override void OnInitialized()
+    {
+        State.Changed += Changed;
+        navigation = Nav.RegisterLocationChangingHandler(async context => await JS.InvokeVoidAsync("yap.motion.begin", Nav.Uri, context.TargetLocation));
+    }
+    private void Changed() => _ = InvokeAsync(StateHasChanged);
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    { await JS.InvokeVoidAsync("yap.motion.complete"); await JS.InvokeVoidAsync("yap.device.checkUpdate"); }
+    private async Task UpdateAsync() { await State.SaveBeforeUpdateAsync(); await JS.InvokeVoidAsync("yap.device.update"); }
+    public void Dispose() { State.Changed -= Changed; navigation?.Dispose(); }
+}

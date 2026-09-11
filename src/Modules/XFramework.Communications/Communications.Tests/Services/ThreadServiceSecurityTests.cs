@@ -37,6 +37,48 @@ public sealed class ThreadServiceSecurityTests
     private static readonly AsyncLocal<TrustedInvocationContext?> TrustedContext = new();
 
     [Test]
+    public async Task CreateThreadMessageAsync_ClientRetry_ReturnsSameMessageAndOneOutboxEvent()
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var member = Member(Guid.NewGuid(), Guid.NewGuid(), actor, tenant);
+        var context = new InMemoryDataContext();
+        context.Seed(Thread(member.MessageThreadId, tenant), member);
+        var service = CreateService(context);
+        var request = new CreateThreadMessageRequest { ThreadId = member.MessageThreadId, ClientMessageId = Guid.NewGuid(),
+            Text = "  saved offline  ", Metadata = Metadata(actor, tenant) };
+        var first = await service.CreateThreadMessageAsync(request);
+        var retry = await service.CreateThreadMessageAsync(request);
+        Assert.That(first.IsSuccess, Is.True, first.Message);
+        Assert.That(retry.IsSuccess, Is.True, retry.Message);
+        Assert.That(retry.Data!.MessageId, Is.EqualTo(request.ClientMessageId));
+        Assert.That(context.Set<Message>(), Has.Count.EqualTo(1));
+        Assert.That(context.Set<MessageOutboxEvent>(), Has.Count.EqualTo(1));
+        request.Text = "different content";
+        var conflict = await service.CreateThreadMessageAsync(request);
+        Assert.That(conflict.StatusCode, Is.EqualTo(409));
+        member.IsEnabled = false;
+        Assert.That((await service.CreateThreadMessageAsync(request)).StatusCode, Is.EqualTo(403));
+    }
+
+    [Test]
+    public async Task CreateThreadMessageAsync_ClientIdOwnedByAnotherMember_IsRejected()
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var member = Member(Guid.NewGuid(), Guid.NewGuid(), actor, tenant);
+        var existing = Message(Guid.NewGuid(), member.MessageThreadId, Guid.NewGuid(), tenant, "same text");
+        var context = new InMemoryDataContext();
+        context.Seed(Thread(member.MessageThreadId, tenant), member, existing);
+        var service = CreateService(context);
+        var result = await service.CreateThreadMessageAsync(new CreateThreadMessageRequest { ThreadId = member.MessageThreadId,
+            ClientMessageId = existing.Id, Text = existing.Text, Metadata = Metadata(actor, tenant) });
+        Assert.That(result.StatusCode, Is.EqualTo(409));
+        Assert.That(context.Set<Message>(), Has.Count.EqualTo(1));
+        Assert.That(context.Set<MessageOutboxEvent>(), Is.Empty);
+    }
+
+    [Test]
     public async Task DeleteMessageReactionAsync_MissingThreadOrMessageId_ReturnsBadRequest()
     {
         var dataContext = new InMemoryDataContext();
@@ -904,7 +946,15 @@ public sealed class ThreadServiceSecurityTests
             new CommunicationsModerationService(dataContext, resolver),
             new TestTransientRealtimePublisher(),
             new EmptyReactionSummaryReader(),
+            new EmptyReplySummaryReader(),
             NullLogger<ThreadService>.Instance);
+    }
+
+    private sealed class EmptyReplySummaryReader : IMessageReplySummaryReader
+    {
+        public Task<Dictionary<Guid, int>> ReadAsync(Guid tenantId, Guid threadId,
+            IReadOnlyCollection<Guid> visibleMessageIds, IReadOnlyCollection<Guid> blockedMemberIds,
+            IReadOnlyCollection<Guid> hiddenMessageIds, CancellationToken ct) => Task.FromResult(new Dictionary<Guid, int>());
     }
 
     private sealed class EmptyReactionSummaryReader : IMessageReactionSummaryReader

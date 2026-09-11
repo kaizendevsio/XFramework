@@ -130,6 +130,41 @@ public sealed class ChatReferenceDataTests
         Assert.That(foreign, Is.Empty);
     }
 
+    [Test]
+    public async Task ReplySummaryReader_CountsAcrossPages_WithoutHiddenBlockedOrForeignReplies()
+    {
+        var tenant = Guid.NewGuid();
+        var thread = Guid.NewGuid();
+        var parent = Guid.NewGuid();
+        var blockedMember = Guid.NewGuid();
+        await using var db = CreateDb(tenant);
+        Message Reply() => new() { Id = Guid.NewGuid(), TenantId = tenant, MessageThreadId = thread,
+            MessageThreadMemberId = Guid.NewGuid(), ParentMessageId = parent, Text = "reply", IsEnabled = true };
+        var visible = Enumerable.Range(0, 125).Select(_ => Reply()).ToArray();
+        var hidden = Reply();
+        var blocked = Reply(); blocked.MessageThreadMemberId = blockedMember;
+        var deleted = Reply(); deleted.IsDeleted = true;
+        var disabled = Reply(); disabled.IsEnabled = false;
+        var foreign = Reply(); foreign.TenantId = Guid.NewGuid();
+        var otherThread = Reply(); otherThread.MessageThreadId = Guid.NewGuid();
+        var otherParent = Reply(); otherParent.ParentMessageId = Guid.NewGuid();
+        db.AddRange(visible);
+        db.AddRange(hidden, blocked, deleted, disabled, otherThread, otherParent);
+        await db.SaveChangesAsync();
+        await using (var foreignDb = CreateDb(foreign.TenantId))
+        {
+            foreignDb.Add(foreign);
+            await foreignDb.SaveChangesAsync();
+        }
+        var reader = new MessageReplySummaryReader(db);
+        var result = await reader.ReadAsync(tenant, thread, [parent], [blockedMember], [hidden.Id], CancellationToken.None);
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[parent], Is.EqualTo(125));
+        Assert.That(await reader.ReadAsync(Guid.NewGuid(), thread, [parent], [], [], CancellationToken.None), Is.Empty);
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => reader.ReadAsync(tenant, thread,
+            Enumerable.Range(0, 101).Select(_ => Guid.NewGuid()).ToArray(), [], [], CancellationToken.None));
+    }
+
     private ChatDb CreateDb(Guid tenant) => new(
         new DbContextOptionsBuilder<ChatDb>().UseNpgsql(_postgres.GetConnectionString())
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options, tenant);
@@ -156,6 +191,9 @@ public sealed class ChatReferenceDataTests
             // Minimal relational model for the aggregate reader: unrelated thread/Identity
             // workflows have their own integration fixtures; these queries need only scalar FKs.
             model.Entity<MessageReaction>().Ignore(x => x.Type).Ignore(x => x.Message).Ignore(x => x.MessageThreadMember);
+            model.Entity<Message>().Ignore(x => x.MessageThread).Ignore(x => x.MessageThreadMember)
+                .Ignore(x => x.MessageDeliveries).Ignore(x => x.MessageFiles).Ignore(x => x.MessageReactions)
+                .Ignore(x => x.ParentMessage).Ignore(x => x.Replies);
             model.Entity<MessageThreadMember>().Ignore(x => x.Group).Ignore(x => x.Credential)
                 .Ignore(x => x.MessageDeliveries).Ignore(x => x.MessageThread)
                 .Ignore(x => x.MessageThreadMemberRoles).Ignore(x => x.Messages);
@@ -164,7 +202,7 @@ public sealed class ChatReferenceDataTests
             model.ApplyConfiguration(new MessageReactionTypeConfiguration());
             model.ApplyConfiguration(new MessageDeliveryTypeConfiguration());
             var testedTypes = new[] { typeof(MessageType), typeof(MessageThreadType), typeof(MessageReactionType),
-                typeof(MessageDeliveryType), typeof(MessageReaction), typeof(MessageThreadMember) };
+                typeof(MessageDeliveryType), typeof(MessageReaction), typeof(MessageThreadMember), typeof(Message) };
             foreach (var unrelated in model.Model.GetEntityTypes().Select(x => x.ClrType).Where(x => !testedTypes.Contains(x)).ToArray())
                 model.Ignore(unrelated);
             base.OnModelCreating(model);

@@ -180,6 +180,7 @@ jobs:
 
       - name: Restore and build
         run: |
+          dotnet workload install wasm-tools
           dotnet restore XFramework.slnx
           dotnet build XFramework.slnx --configuration Release --no-restore
 
@@ -252,6 +253,8 @@ jobs:
       - name: Test Yap chat application
         run: |
           dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj \
+            --configuration Release --no-build --no-restore
+          dotnet test src/Tests/Yap.Client.Tests/Yap.Client.Tests.csproj \
             --configuration Release --no-build --no-restore
 
       - name: Test Storage authorization and provider contracts

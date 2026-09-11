@@ -93,6 +93,15 @@ internal static class UiFixture
                 conversations.First(c => c.Id == id).LastMessagePreview = text;
                 return ChatFixture.Ok(new CreateThreadMessageResponse { MessageId = message.Id });
             });
+        fixture.Session.Setup(s => s.SendMessageAsync(It.IsAny<CreateThreadMessageRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CreateThreadMessageRequest request, CancellationToken _) =>
+            {
+                var id = request.ClientMessageId ?? Guid.NewGuid();
+                if (messages.All(m => m.Id != id)) messages.Add(new() { Id = id, Text = request.Text ?? "", ParentMessageId = request.ParentMessageId,
+                    SenderCredentialId = fixture.Credential, CreatedAt = DateTime.UtcNow });
+                conversations.First(c => c.Id == request.ThreadId).LastMessagePreview = request.Text;
+                return ChatFixture.Ok(new CreateThreadMessageResponse { MessageId = id });
+            });
         fixture.Session.Setup(s => s.CreateDirectThreadAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid other, Guid? type, string? name, CancellationToken _) =>
             {
@@ -121,7 +130,8 @@ internal static class UiFixture
             { HttpStatusCode = HttpStatusCode.OK, Response = new()
                 { CredentialId = Guid.NewGuid(), TenantId = fixture.Tenant, RoleId = registrationRole } });
         identity.Setup(i => i.AuthenticateIdentity(It.IsAny<AuthenticateIdentityRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AuthenticateIdentityRequest request, CancellationToken _) => request.UserName == "fixture" && request.Password == "fixture"
+            .ReturnsAsync((AuthenticateIdentityRequest request, CancellationToken _) => request.UserName == "fixture"
+                && request.Password == (Environment.GetEnvironmentVariable("YAP_FIXTURE_PASSWORD") ?? "fixture")
                 ? ChatFixture.Ok(auth) : new() { HttpStatusCode = HttpStatusCode.Unauthorized });
         identity.Setup(i => i.Logout(It.IsAny<LogoutRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(Success());
         var directory = new Mock<IChatDirectory>();
@@ -131,6 +141,17 @@ internal static class UiFixture
         var storage = new Mock<IStorageServiceWrapper>();
         var fileId = Guid.NewGuid();
         var uploadId = Guid.NewGuid();
+        fixture.Session.Setup(s => s.CreateAttachmentUploadAsync(It.IsAny<Communications.Domain.Shared.Contracts.Requests.Attachments.CreateChatAttachmentUploadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new StorageUploadSessionResponse { Id = uploadId, StorageFileId = fileId, ChunkSizeBytes = 256 * 1024 }));
+        storage.Setup(s => s.UploadChatStorageFilePart(It.IsAny<UploadChatStorageFilePartRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new StorageUploadPartResponse()));
+        storage.Setup(s => s.CompleteChatStorageUploadSession(It.IsAny<CompleteChatStorageUploadSessionRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new StorageFileResponse { Id = fileId, Status = XFramework.Domain.Shared.Contracts.StorageFileStatus.Available }));
+        storage.Setup(s => s.GetStorageFile(It.IsAny<GetStorageFileRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new StorageFileResponse { Id = fileId, Name = "offline-proof.txt", ContentType = "text/plain", ContentLengthBytes = 26,
+                Status = XFramework.Domain.Shared.Contracts.StorageFileStatus.Available }));
+        fixture.Session.Setup(s => s.GetAttachmentDownloadUrlAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new StorageDownloadUrlResponse { StorageFileId = fileId, Url = $"http://127.0.0.1:{port}/test/file", ExpiresAt = DateTime.UtcNow.AddMinutes(5) }));
         storage.Setup(s => s.EnsureStorageUploadMetadata(It.IsAny<EnsureStorageUploadMetadataRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ChatFixture.Ok(new StorageUploadMetadataResponse { TypeId = Guid.NewGuid(), StorageFileIdentifierId = Guid.NewGuid() }));
         storage.Setup(s => s.CreateStorageUploadSession(It.IsAny<CreateStorageUploadSessionRequest>(), It.IsAny<CancellationToken>()))
@@ -156,6 +177,9 @@ internal static class UiFixture
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Presentation/XFramework.Yap"));
         var app = YapApplication.Build([
             "--contentRoot", root, "--applicationName", "XFramework.Yap", "--environment", "Development",
+            "--webroot", Environment.GetEnvironmentVariable("YAP_FIXTURE_WEBROOT") ?? Path.Combine(root, "wwwroot"),
+            "--staticWebAssets", Environment.GetEnvironmentVariable("YAP_FIXTURE_WEBROOT") is null
+                ? Path.Combine(AppContext.BaseDirectory, "XFramework.Yap.staticwebassets.runtime.json") : Path.Combine(root, "fixture-published-no-runtime-manifest.json"),
             "--urls", $"http://127.0.0.1:{port}", "--Yap:TenantId", fixture.Tenant.ToString(),
             "--Yap:RoleId", registrationRole.ToString(),
             "--ServiceIdentity:GenerationId", "fixture-g1", "--ServiceIdentity:ClientSecret", "fixture-only-secret-not-for-any-real-service"

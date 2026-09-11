@@ -13,4 +13,5 @@ public partial record ThreadMessageItemResponse
     public bool IsPinned { get; set; }
     public bool IsSaved { get; set; }
     public List<MessageReactionSummaryResponse> Reactions { get; set; } = [];
+    public int ReplyCount { get; set; }
 }

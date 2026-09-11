@@ -1,4 +1,3 @@
-using BlazorBlueprint.Components;
 using Bolt.Client;
 using Communications.Integration.Clients;
 using Communications.Integration.Drivers;
@@ -17,9 +16,8 @@ public static class YapApplication
     {
         var builder = WebApplication.CreateBuilder(args);
         builder.Logging.AddXFrameworkLogging(builder.Configuration);
-        builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-        builder.Services.AddCascadingAuthenticationState();
-        builder.Services.AddBlazorBlueprintComponents();
+        builder.Services.AddAntiforgery();
+        builder.Services.AddHttpClient("attachments", client => client.Timeout = TimeSpan.FromMinutes(2));
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddMemoryCache();
         builder.Services.AddAuthentication(YapAuth.Scheme).AddCookie(YapAuth.Scheme, options =>
@@ -32,6 +30,16 @@ public static class YapApplication
             options.LoginPath = "/login";
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = false;
+            options.Events.OnRedirectToLogin = context =>
+            {
+                context.Response.StatusCode = 401;
+                return Task.CompletedTask;
+            };
+            options.Events.OnRedirectToAccessDenied = context =>
+            {
+                context.Response.StatusCode = 403;
+                return Task.CompletedTask;
+            };
             options.Events.OnValidatePrincipal = context =>
             {
                 if (!context.HttpContext.RequestServices.GetRequiredService<YapSessions>().Contains(context.Principal))
@@ -49,7 +57,6 @@ public static class YapApplication
         builder.Services.AddScoped<ICommunicationsChatActorProvider, YapActorProvider>();
         builder.Services.AddScoped<IChatDirectory, ChatDirectory>();
         builder.Services.AddScoped<ChatFiles>();
-        builder.Services.AddScoped<ChatWorkspace>();
 
         configure?.Invoke(builder);
         var app = builder.Build();
@@ -63,8 +70,17 @@ public static class YapApplication
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseAntiforgery();
-        app.MapStaticAssets();
+        app.UseBlazorFrameworkFiles();
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = context =>
+            {
+                if (context.File.Name is "index.html" or "service-worker.js" or "service-worker-assets.js" or "manifest.webmanifest")
+                    context.Context.Response.Headers.CacheControl = "no-cache";
+            }
+        });
         app.MapYapAuth();
+        app.MapYapApi();
         app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
         app.MapGet("/health/ready", (BoltClient client, IConfiguration configuration) =>
         {
@@ -75,7 +91,8 @@ public static class YapApplication
                 : Results.Json(new { status = "Unhealthy", reason = configured ? "Bolt is disconnected" : "Workspace is not configured" },
                     statusCode: StatusCodes.Status503ServiceUnavailable);
         });
-        app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+        app.Map("/api/{**path}", () => Results.NotFound());
+        app.MapFallbackToFile("index.html");
         return app;
     }
 }

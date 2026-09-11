@@ -1,0 +1,20 @@
+@inject IJSRuntime JS
+<div class="glass-presets">
+    <label for="glass-preset-name">Save current look</label>
+    <div class="preset-save"><input id="glass-preset-name" @bind="name" @bind:event="oninput" maxlength="40" placeholder="Preset name" /><button type="button" class="pillbtn" @onclick="Save">Save preset</button></div>
+    @if(names.Length>0){
+        <label for="glass-preset-select">Switch preset</label>
+        <select id="glass-preset-select" value="@selected" @onchange="Switch"><option value="">Choose a saved preset</option>@foreach(var item in names){<option value="@item">@item</option>}</select>
+        @if(selected.Length>0){<button type="button" class="pillbtn" @onclick="ApplySelected">Apply preset</button><button type="button" class="pillbtn" @onclick="Delete">Delete @selected</button>}
+    }
+    <p role="status">@notice</p>
+</div>
+@code {
+    private string name="",selected="",notice="";
+    private string[] names=[];
+    protected override async Task OnAfterRenderAsync(bool firstRender){if(firstRender){names=await JS.InvokeAsync<string[]>("yap.glassPresets.names");StateHasChanged();}}
+    private async Task Save(){var clean=name.Trim();if(clean.Length==0){notice="Enter a name for this look.";return;}if(names.Contains(clean)){notice="That name is already saved. Choose a new name.";return;}var saved=await JS.InvokeAsync<bool>("yap.glassPresets.save",clean);if(!saved){notice="This browser could not save the preset.";return;}names=await JS.InvokeAsync<string[]>("yap.glassPresets.names");selected=clean;name="";notice=$"Saved {clean}.";}
+    private async Task Switch(ChangeEventArgs e){selected=e.Value?.ToString()??"";if(selected.Length>0){await JS.InvokeVoidAsync("yap.glassPresets.apply",selected);notice=$"Applied {selected}.";}}
+    private async Task ApplySelected(){await JS.InvokeVoidAsync("yap.glassPresets.apply",selected);notice=$"Applied {selected}.";}
+    private async Task Delete(){if(await JS.InvokeAsync<bool>("yap.glassPresets.remove",selected)){notice=$"Deleted {selected}.";selected="";names=await JS.InvokeAsync<string[]>("yap.glassPresets.names");}else notice="This browser could not delete the preset.";}
+}

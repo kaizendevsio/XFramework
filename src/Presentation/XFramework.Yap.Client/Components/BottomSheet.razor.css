@@ -1,0 +1,2 @@
+.sheet{--glass-tint:var(--glass-sheet);border-radius:28px;padding:8px;overflow:auto;max-height:85%}
+.overlay{-webkit-backdrop-filter:none;backdrop-filter:none;background:#0c180d38}

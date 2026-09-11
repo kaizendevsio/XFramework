@@ -1,0 +1,20 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+<div class="overlay" @onclick="OnClose" @onkeydown="KeyDown">
+    <section class="sheet liquid-glass" role="dialog" aria-modal="true" aria-label="@Title" @onclick:stopPropagation tabindex="-1" @ref="element">
+        <GlassLayer />
+        <button class="sheet-handle" data-sheet-drag aria-label="Close menu" @onclick="OnClose"><span></span></button>
+        @if(ShowHeader){<div class="close-sheet"><h2>@Title</h2><button class="iconbtn" aria-label="Close menu" @onclick="OnClose"><Icon Name="close" /></button></div>}
+        @ChildContent
+    </section>
+</div>
+@code {
+    [Parameter] public bool ShowHeader { get; set; } = true;
+    [Parameter] public string Title { get; set; } = "Actions";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private ElementReference element;
+    protected override async Task OnAfterRenderAsync(bool firstRender){if(firstRender)await JS.InvokeVoidAsync("yap.focusSheet",element);}
+    public async ValueTask DisposeAsync() => await JS.InvokeVoidAsync("yap.releaseSheet", element);
+    private Task KeyDown(KeyboardEventArgs e)=>e.Key=="Escape"?OnClose.InvokeAsync():Task.CompletedTask;
+}

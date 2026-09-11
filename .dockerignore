@@ -27,4 +27,5 @@
 **/*.suo
 **/TestResults
 docs/
+artifacts/
 *.md

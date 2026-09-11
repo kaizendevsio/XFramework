@@ -1,0 +1,22 @@
+<div class="msg @(Message.Mine ? "out" : "in")" data-message-id="@Message.Id" data-swipe-reply>
+    <button class="gesture-reply" aria-label="@($"Reply to {Message.Sender}: {Message.Text}")" @onclick="() => OnReply.InvokeAsync(Message)"><Icon Name="reply" Size="18" /></button>
+    @if (!Message.Mine) { <Avatar Initials="@Message.Initials" Color="@Message.Color" Size="a34" /> }
+    <div class="col">
+        @if (ShowSender && !Message.Mine) { <span class="who">@Message.Sender</span> }
+        <button class="bub liquid-glass" @onclick="() => OnSelect.InvokeAsync(Message)" aria-label="@($"Message from {Message.Sender}: {Message.Text}. Open actions")"><GlassLayer /><span class="bubble-content">
+            @if (Message.Quote is not null) { <span class="quote"><span class="qn">@Message.Quote.Sender</span>@Message.Quote.Text</span> }
+            @Message.Text
+        </span></button>
+        @if (Message.Reactions.Count > 0) { <div class="reacts">@foreach (var reaction in Message.Reactions) { <button class="react @(Message.MyReactionIds.ContainsKey(reaction.Key) ? "mine" : "")" aria-label="@($"React {reaction.Key}")" aria-pressed="@Message.MyReactionIds.ContainsKey(reaction.Key).ToString().ToLowerInvariant()" @onclick="() => OnReact.InvokeAsync(reaction.Key)">@reaction.Key <span>@reaction.Value</span></button> }</div> }
+        @if (Message.ReplyTotal > 0) { <button class="threadlink" @onclick="() => OnThread.InvokeAsync(Message)"><span class="fc">@foreach (var reply in Message.Replies.Take(3)) { <Avatar Initials="@reply.Initials" Color="@reply.Color" Size="a28" /> }</span>@Message.ReplyTotal replies <Icon Name="arrow" Size="13" /></button> }
+        <div class="meta">@if (Message.Pinned) { <span aria-label="Pinned">📌</span> }@Message.Time @if (Message.Mine) { <span class="rd">@(Message.Delivery == "Sent" ? "✓" : Message.Delivery)</span> }</div>
+    </div>
+</div>
+@code {
+    [Parameter, EditorRequired] public ChatMessage Message { get; set; } = default!;
+    [Parameter] public bool ShowSender { get; set; }
+    [Parameter] public EventCallback<ChatMessage> OnSelect { get; set; }
+    [Parameter] public EventCallback<ChatMessage> OnThread { get; set; }
+    [Parameter] public EventCallback<ChatMessage> OnReply { get; set; }
+    [Parameter] public EventCallback<string> OnReact { get; set; }
+}

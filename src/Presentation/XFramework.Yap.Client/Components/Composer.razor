@@ -1,0 +1,52 @@
+@inject ChatState State
+@inject IJSRuntime JS
+<form class="composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
+    @if (Reply is not null && ParentId is null) { <div class="replyto liquid-glass"><GlassLayer /><Icon Name="reply" Size="17" /><span class="mid"><span class="n">Replying to @Reply.Sender</span><span class="p">@Reply.Text</span></span><button type="button" class="iconbtn" aria-label="Cancel reply" @onclick="Cancel"><Icon Name="close" Size="16" /></button></div> }
+    @if (file is not null) { <div class="replyto liquid-glass"><GlassLayer /><Icon Name="file" Size="17" /><span class="mid">@file.Name <small>(saved on this device)</small></span><button type="button" class="iconbtn" aria-label="Remove attachment" @onclick="RemoveFileAsync"><Icon Name="close" Size="16" /></button></div> }
+    <div class="inputrow">
+        <label class="iconbtn liquid-glass attachment-pick" title="Attach file"><GlassLayer /><Icon Name="plus" /><InputFile @ref="input" OnChange="PickAsync" aria-label="Attach file" disabled="@busy" /></label>
+        <div class="inputbox liquid-glass"><GlassLayer /><input aria-label="@(ParentId.HasValue ? "Reply in thread" : "Message")" placeholder="@(ParentId.HasValue ? "Reply in thread" : "Message")" @bind="draft" @bind:event="oninput" @bind:after="SaveDraftAsync" disabled="@busy" maxlength="4000" autocomplete="off" /><button type="button" aria-label="Add smile emoji" @onclick="AddEmojiAsync">☺</button></div>
+        @if (!string.IsNullOrWhiteSpace(draft) || file is not null) { <button type="submit" class="sendbtn liquid-glass" aria-label="Send message" disabled="@busy"><GlassLayer /><Icon Name="send" Size="20" /></button> }
+    </div>
+</form>
+@code {
+    [Parameter] public Guid ThreadId { get; set; }
+    [Parameter] public Guid? ParentId { get; set; }
+    [Parameter] public ChatMessage? Reply { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+    [Parameter] public EventCallback Sent { get; set; }
+    private string Key => $"{ThreadId:N}:{ParentId?.ToString("N") ?? "main"}";
+    private string draft = "", loaded = "";
+    private bool busy;
+    private InputFile? input;
+    private ChatState.PickedFile? file;
+    protected override async Task OnParametersSetAsync()
+    { if (loaded != Key) { loaded = Key; draft = await State.DraftAsync(Key); file = null; } }
+    private async Task SaveDraftAsync() { try { await State.SaveDraftAsync(Key, draft); } catch (Exception ex) { State.Report(ex); } }
+    private async Task AddEmojiAsync() { draft += "😊"; await SaveDraftAsync(); }
+    private async Task PickAsync(InputFileChangeEventArgs e)
+    {
+        busy = true;
+        try
+        {
+            if (e.File.Size is <= 0 or > 20 * 1024 * 1024) throw new InvalidOperationException("Choose a file up to 20 MB.");
+            var picked = await JS.InvokeAsync<ChatState.PickedFile>("yap.device.pickFile", input!.Element, Guid.NewGuid().ToString("N"));
+            await RemoveFileAsync(); file = picked;
+        }
+        catch (Exception ex) { State.Report(ex); }
+        finally { busy = false; }
+    }
+    private async Task RemoveFileAsync() { if (file is not null) await JS.InvokeVoidAsync("yap.device.removeFile", file.Key); file = null; }
+    private async Task SendAsync()
+    {
+        busy = true;
+        try
+        {
+            await State.SendAsync(ThreadId, draft, ParentId ?? Reply?.Id, Key, file);
+            draft = ""; file = null;
+            await Cancel.InvokeAsync(); await Sent.InvokeAsync();
+        }
+        catch (Exception ex) { State.Report(ex); }
+        finally { busy = false; }
+    }
+}

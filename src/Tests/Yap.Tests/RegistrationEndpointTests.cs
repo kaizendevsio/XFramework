@@ -1,5 +1,5 @@
 using System.Net;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Integration.Drivers;
 using Microsoft.Extensions.Configuration;
@@ -20,9 +20,9 @@ public sealed class RegistrationEndpointTests
         await app.StartAsync();
         using var handler = new HttpClientHandler { AllowAutoRedirect = false, CookieContainer = new() };
         using var client = new HttpClient(handler) { BaseAddress = new Uri(app.Urls.Single()) };
-        Assert.That(await client.GetStringAsync("/login"), Does.Contain("/register"));
-        var page = await client.GetStringAsync("/register");
-        Assert.That(page, Does.Contain("Confirm password"));
+        Assert.That((await client.GetAsync("/api/chat/conversations")).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        var page = await client.GetStringAsync("/api/session");
+        Assert.That(page, Does.Contain("antiforgeryToken"));
         var rejected = await client.PostAsync("/auth/register", Form(null));
         Assert.That(rejected.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
         identity!.Verify(x => x.RegisterIdentity(It.IsAny<RegisterIdentityRequest>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -33,7 +33,7 @@ public sealed class RegistrationEndpointTests
             r.UserName == "new.member" && r.DisplayName == "New Member" && r.Metadata.RequestedTenantId == tenant),
             It.IsAny<CancellationToken>()), Times.Once);
         // Registration does not create an unverified authentication session.
-        Assert.That((await client.GetAsync("/settings")).StatusCode, Is.EqualTo(HttpStatusCode.Redirect));
+        Assert.That((await client.GetAsync("/api/chat/conversations")).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
         await app.StopAsync();
     }
 
@@ -47,7 +47,7 @@ public sealed class RegistrationEndpointTests
         await app.StartAsync();
         using var handler = new HttpClientHandler { AllowAutoRedirect = false, CookieContainer = new() };
         using var client = new HttpClient(handler) { BaseAddress = new Uri(app.Urls.Single()) };
-        var page = await client.GetStringAsync("/register");
+        var page = await client.GetStringAsync("/api/session");
         var response = await client.PostAsync("/auth/register", Form(Token(page), field, value));
         Assert.That(response.Headers.Location?.OriginalString, Is.EqualTo($"/register?error={error}"));
         identity!.Verify(x => x.RegisterIdentity(It.IsAny<RegisterIdentityRequest>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -67,10 +67,10 @@ public sealed class RegistrationEndpointTests
         await app.StartAsync();
         using var handler = new HttpClientHandler { AllowAutoRedirect = false, CookieContainer = new() };
         using var client = new HttpClient(handler) { BaseAddress = new Uri(app.Urls.Single()) };
-        var page = await client.GetStringAsync("/register");
+        var page = await client.GetStringAsync("/api/session");
         var response = await client.PostAsync("/auth/register", Form(Token(page)));
         Assert.That(response.Headers.Location?.OriginalString, Is.EqualTo($"/register?error={error}"));
-        Assert.That(await client.GetStringAsync(response.Headers.Location), Does.Contain("role=\"alert\""));
+
         await app.StopAsync();
     }
 
@@ -85,6 +85,5 @@ public sealed class RegistrationEndpointTests
         if (field is not null) values[field] = value!;
         return new(values);
     }
-    private static string Token(string html) => WebUtility.HtmlDecode(Regex.Match(html,
-        "name=\"__RequestVerificationToken\" value=\"([^\"]+)\"").Groups[1].Value);
+    private static string Token(string json) => JsonDocument.Parse(json).RootElement.GetProperty("antiforgeryToken").GetString()!;
 }

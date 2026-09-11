@@ -102,6 +102,25 @@ public sealed class ChatFiles(IStorageServiceWrapper storage, ICommunicationsCha
         }
         return links;
     }
+
+    public async Task<List<Yap.Contracts.ChatAttachment>> GetDetailsAsync(Guid threadId, Guid messageId, CancellationToken ct)
+    {
+        var actor = await actors.GetCurrentActorAsync(ct) ?? throw new UnauthorizedAccessException();
+        using var token = tokens.Push(actor.AccessToken!);
+        var session = await chat.ForCurrentActorAsync(ct: ct);
+        var files = YapApi.Require(await session.GetFilesAsync(threadId, messageId, pageSize: 100, ct: ct));
+        var details = new List<Yap.Contracts.ChatAttachment>();
+        foreach (var file in files.Items)
+        {
+            var data = YapApi.Require(await storage.GetStorageFile(new GetStorageFileRequest
+            {
+                StorageFileId = file.StorageFileId,
+                Metadata = new RequestMetadata { RequestedTenantId = actor.TenantId, RequestId = Guid.NewGuid(), OperationName = "Yap attachment details" }
+            }, ct));
+            details.Add(new(file.Id, data.Name, data.ContentType ?? "application/octet-stream", data.ContentLengthBytes ?? 0));
+        }
+        return details;
+    }
 }
 
 public sealed record ChatFileLink(Guid Id, string Url);

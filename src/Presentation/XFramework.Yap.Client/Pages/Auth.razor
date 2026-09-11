@@ -1,0 +1,56 @@
+@page "/login"
+@page "/register"
+@page "/signup"
+@inject ChatApi Api
+@inject ChatState State
+@inject NavigationManager Nav
+<PageTitle>@(Register ? "Create an account" : "Sign in") · Yap</PageTitle>
+<ScrollSurface><Header><div class="appbar plain"><a class="iconbtn" href="/" aria-label="Back to chats"><Icon Name="back" /></a></div></Header>
+<ChildContent><div class="body authbody"><div class="authbrand"><Brand /><span class="muted">A little closer.</span></div>
+<h1>@(Register ? "Join the conversation." : "Welcome back.")</h1><p>@(Register ? "Create your Yap account." : "Sign in to pick up where you left off.")</p>
+<form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+@if (Register) { <label class="field"><span class="lab">Display name</span><span class="inp"><Icon Name="user" /><input @bind="name" @bind:event="oninput" autocomplete="name" required maxlength="100" /></span></label> }
+<label class="field"><span class="lab">Username</span><span class="inp"><Icon Name="user" /><input @bind="username" @bind:event="oninput" autocomplete="username" autocapitalize="none" spellcheck="false" required minlength="3" maxlength="100" pattern="[a-zA-Z0-9_.\-]+" /></span></label>
+<label class="field"><span class="lab">Password</span><span class="inp"><Icon Name="lock" /><input type="password" @bind="password" @bind:event="oninput" autocomplete="@(Register ? "new-password" : "current-password")" required minlength="@(Register ? 8 : 1)" /></span></label>
+@if (Register) { <label class="field"><span class="lab">Confirm password</span><span class="inp"><Icon Name="lock" /><input type="password" @bind="confirm" @bind:event="oninput" autocomplete="new-password" required /></span></label> }
+@if (error is not null) { <p class="form-error" role="alert">@error</p> }
+@if (registered) { <p role="status">Your account is ready. Sign in below.</p> }
+<button class="btn" type="submit" disabled="@(busy || !State.Online)">@(busy ? "Please wait…" : Register ? "Create account" : "Sign in")<Icon Name="arrow" Size="18" /></button>
+</form>
+<p class="foot">@(Register ? "Already have an account?" : "New here?") <a href="@(Register ? "/login" : "/register")"><b>@(Register ? "Sign in" : "Create an account")</b></a></p>
+@if (!State.Online) { <p>Connect to sign in or create an account. <a href="/">View saved conversations</a>.</p> }
+</div></ChildContent></ScrollSurface>
+@code {
+    private bool Register => new Uri(Nav.Uri).AbsolutePath is "/register" or "/signup";
+    private string name = "", username = "", password = "", confirm = "";
+    private bool busy, registered;
+    private string? error;
+    private async Task SubmitAsync()
+    {
+        busy = true; error = null;
+        try
+        {
+            if (Register && password != confirm) { error = "The passwords do not match."; return; }
+            var path = await Api.AuthenticateAsync(Register ? "register" : "login", new()
+            { ["displayName"] = name, ["username"] = username, ["password"] = password, ["confirmPassword"] = confirm });
+            if (path.Contains("error="))
+            {
+                error = path.Split("error=").Last() switch
+                {
+                    "taken" => "That username is already taken.", "mismatch" => "The passwords do not match.",
+                    "validation" => "Check your name and username. Passwords need at least 8 characters and at most 72 UTF-8 bytes.",
+                    "credentials" => "The username or password is incorrect.", "limited" => "Too many attempts. Try again shortly.",
+                    "disabled" or "setup" => "Account creation is not available for this workspace yet.",
+                    _ => "The sign-in service is unavailable. Please try again."
+                };
+                return;
+            }
+            password = confirm = "";
+            registered = Register;
+            await State.SynchronizeAsync();
+            Nav.NavigateTo(path);
+        }
+        catch (Exception ex) { error = ex is ChatApiException ? ex.Message : "Cannot reach the sign-in service. Please try again."; }
+        finally { busy = false; }
+    }
+}
