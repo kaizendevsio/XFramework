@@ -305,10 +305,39 @@ public sealed class PosSalesService(
         if (sale is null)
             return Result<PosSaleReceiptResponse>.NotFound("POS sale was not found");
 
-        if (sale.Status is PosSaleStatus.Completed or PosSaleStatus.PaymentCaptured)
-            return Result<PosSaleReceiptResponse>.Conflict("Completed or paid sales cannot be cancelled; create a return instead");
+        if (sale.Status == PosSaleStatus.Cancelled)
+            return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), "POS sale already cancelled");
 
-        await ReleaseReservationsAsync(sale, contextResult.Data.Metadata);
+        var hasSettledOrInFlightPayment = sale.Payments.Any(payment =>
+            !payment.IsDeleted &&
+            payment.Status is PosPaymentStatus.Pending or PosPaymentStatus.Captured or PosPaymentStatus.Refunded);
+        if (hasSettledOrInFlightPayment || sale.Status is
+                PosSaleStatus.PaymentPending or
+                PosSaleStatus.PaymentCaptured or
+                PosSaleStatus.Completed or
+                PosSaleStatus.InventoryFulfillmentFailed)
+        {
+            return Result<PosSaleReceiptResponse>.Conflict(
+                "Paid or payment-in-progress sales cannot be cancelled; complete recovery or create a return instead");
+        }
+
+        if (sale.Status is not PosSaleStatus.Draft
+            and not PosSaleStatus.InventoryReserved
+            and not PosSaleStatus.PaymentFailed
+            and not PosSaleStatus.InventoryReservationFailed)
+        {
+            return Result<PosSaleReceiptResponse>.Conflict("POS sale is not in a cancellable state");
+        }
+
+        var releaseResult = await ReleaseReservationsAsync(sale, contextResult.Data.Metadata);
+        if (!releaseResult.IsSuccess)
+        {
+            sale.FailureReason = releaseResult.Message;
+            sale.RecoveryState = "Cancellation pending; retry after inventory reservations can be released.";
+            await db.SaveChangesAsync(ct);
+            return Result<PosSaleReceiptResponse>.Failure(releaseResult.Message!, releaseResult.StatusCode);
+        }
+
         sale.Status = PosSaleStatus.Cancelled;
         sale.CancelledAt = DateTime.UtcNow;
         sale.FailureReason = PosServiceHelpers.NormalizeOptional(request.Reason);
@@ -593,10 +622,11 @@ public sealed class PosSalesService(
         return Result.Success();
     }
 
-    private async Task ReleaseReservationsAsync(
+    private async Task<Result> ReleaseReservationsAsync(
         PosSale sale,
         RequestMetadata metadata)
     {
+        Result? firstFailure = null;
         foreach (var line in sale.Lines.Where(item => item.ReservationId.HasValue && item.FulfilledAt is null))
         {
             var response = await inventario.ReleaseReservation(new ReleaseReservationRequest
@@ -609,6 +639,7 @@ public sealed class PosSalesService(
             if (!response.IsSuccess)
             {
                 line.FailureReason = response.Message ?? "Inventory reservation release failed";
+                firstFailure ??= Result.Failure(line.FailureReason, (int)response.HttpStatusCode);
                 logger.LogWarning(
                     "POS sale {SaleId} line {LineId} reservation release failed: {Message}",
                     sale.Id,
@@ -618,8 +649,11 @@ public sealed class PosSalesService(
             else
             {
                 line.ReservationId = null;
+                line.FailureReason = null;
             }
         }
+
+        return firstFailure ?? Result.Success();
     }
 
     private async Task<PosRegister?> LoadRegisterAsync(
