@@ -175,6 +175,47 @@ public sealed class PosReadinessRegressionTests
         persisted.Lines.Should().OnlyContain(line => line.ReservationId == null);
     }
 
+    [Test]
+    public async Task CheckoutAsync_MerchantSelectedAsWalletCustomer_RejectsBeforeSaleOrReservationWrites()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Context(tenant);
+        var register = Sale(tenant, PosSaleStatus.Draft).Register;
+        db.Add(register);
+        await db.SaveChangesAsync();
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        var service = Service(db, tenant, inventory);
+
+        var result = await service.CheckoutAsync(new CheckoutPosSaleRequest
+        {
+            RegisterId = register.Id,
+            CashierCredentialId = Guid.NewGuid(),
+            CustomerCredentialId = register.MerchantCredentialId,
+            IdempotencyKey = $"self-transfer-{Guid.NewGuid():N}",
+            Payment = new CheckoutPosPaymentRequest
+            {
+                Method = PosPaymentMethod.WalletTransfer,
+                Amount = 10,
+                CustomerCredentialId = register.MerchantCredentialId
+            },
+            Lines =
+            [
+                new CheckoutPosSaleLineRequest
+                {
+                    ProductId = Guid.NewGuid(),
+                    Quantity = 1,
+                    ExpectedUnitPrice = 10
+                }
+            ]
+        }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(409);
+        result.Message.Should().Be("Customer wallet must be different from the register merchant wallet");
+        (await db.Set<PosSale>().CountAsync()).Should().Be(0);
+        inventory.VerifyNoOtherCalls();
+    }
+
     private AppDbContext Context(Guid tenant) => new(options, new HttpContextAccessor(),
         new ConfigurationBuilder().Build(), new TestEffectiveTenantContextAccessor(tenant));
 

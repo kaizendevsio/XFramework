@@ -57,6 +57,14 @@ public sealed class PosSalesService(
         if (register is null)
             return Result<PosSaleReceiptResponse>.NotFound("POS register was not found");
 
+        var paymentCustomerCredentialId = request.Payment.CustomerCredentialId ?? request.CustomerCredentialId;
+        if (request.Payment.Method == PosPaymentMethod.WalletTransfer &&
+            paymentCustomerCredentialId == register.MerchantCredentialId)
+        {
+            return Result<PosSaleReceiptResponse>.Conflict(
+                "Customer wallet must be different from the register merchant wallet");
+        }
+
         if (request.Lines.Count == 0)
             return Result<PosSaleReceiptResponse>.Failure("At least one sale line is required", 400);
 

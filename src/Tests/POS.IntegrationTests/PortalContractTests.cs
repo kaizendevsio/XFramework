@@ -273,6 +273,8 @@ public sealed class PortalContractTests
 
         cashier.Should().Contain("<BbRadioGroup TValue=\"PosPaymentMethod\" @bind-Value=\"_paymentMethod\"");
         cashier.Should().Contain("<BbCurrencyInput Id=\"pos-cash-amount\" @bind-Value=\"_cashTenderedAmount\" AriaLabel=\"Cash received\"");
+        cashier.Should().Contain("IsMerchantCustomer");
+        cashier.Should().Contain("Customer wallet must be different from the register merchant wallet.");
         returns.Should().Contain("data-testid=\"pos-original-refund-method\"");
         returns.Should().Contain("_refundMethod = response.Response.PaymentMethod;");
         returns.Should().Contain("original captured payment method and account");

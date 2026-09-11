@@ -489,6 +489,10 @@ else
     private decimal CartItemCount => _cart.Sum(line => line.Quantity);
     private bool IsCashPayment => _paymentMethod == PosPaymentMethod.CashDrawer;
     private bool IsWalletPayment => _paymentMethod == PosPaymentMethod.WalletTransfer;
+    private bool IsMerchantCustomer =>
+        IsWalletPayment &&
+        Guid.TryParse(_selectedCustomerCredentialId, out var customerCredentialId) &&
+        customerCredentialId == SelectedRegister?.MerchantCredentialId;
     private bool IsBusy => _checkingOut || _savingCart || _actingOnCart;
     private PosRegister? SelectedRegister => _registers.FirstOrDefault(item => item.Id.ToString() == _selectedRegisterId);
     private string? RegisterCurrency
@@ -512,7 +516,8 @@ else
         !_cart.Any() ? "Add a product to start a sale." :
         Total < 0 || _discountAmount < 0 || _taxAmount < 0 ? "Discount and tax must be valid amounts; the total cannot be negative." :
         IsCashPayment && _cashTenderedAmount < Total ? $"Enter cash received. {FormatMoney(Total - _cashTenderedAmount)} remaining." :
-        IsWalletPayment && !Guid.TryParse(_selectedCustomerCredentialId, out _) ? "Select a customer to pay from their wallet." : null;
+        IsWalletPayment && !Guid.TryParse(_selectedCustomerCredentialId, out _) ? "Select a customer to pay from their wallet." :
+        IsMerchantCustomer ? "Customer wallet must be different from the register merchant wallet." : null;
     private string CheckoutStatus => IsBusy ? "Please wait for the current sale action." : CheckoutRequirement ?? "Ready for payment";
     private bool CanCheckout => !IsBusy && CheckoutRequirement is null;
 
