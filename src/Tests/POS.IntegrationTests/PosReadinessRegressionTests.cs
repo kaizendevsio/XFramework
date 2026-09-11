@@ -10,6 +10,7 @@ using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
 using POS.Domain.Shared.Enums;
 using Testcontainers.PostgreSql;
+using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Contexts;
@@ -216,16 +217,113 @@ public sealed class PosReadinessRegressionTests
         inventory.VerifyNoOtherCalls();
     }
 
+    [Test]
+    public async Task CheckoutAsync_AmbiguousPaymentResult_ReplaysOriginalAccountAndIdempotencyWithoutReleasingStock()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Context(tenant);
+        var sale = Sale(tenant, PosSaleStatus.PaymentPending);
+        var request = CheckoutRequest(sale.Register);
+        sale.IdempotencyKey = request.IdempotencyKey!;
+        sale.RequestHash = PosServiceHelpers.BuildSaleRequestHash(request);
+        var line = Line(sale);
+        line.LineNumber = 1;
+        line.ProductId = request.Lines[0].ProductId;
+        line.Quantity = request.Lines[0].Quantity;
+        line.ExpectedUnitPrice = request.Lines[0].ExpectedUnitPrice;
+        var payment = Payment(sale, PosPaymentStatus.Pending);
+        var originalMerchantCredentialId = payment.MerchantCredentialId;
+        var originalWalletId = payment.WalletId!.Value;
+        var paymentIdempotencyKey = payment.IdempotencyKey;
+        sale.Lines.Add(line);
+        sale.Payments.Add(payment);
+        db.Add(sale);
+        await db.SaveChangesAsync();
+
+        sale.Register.MerchantCredentialId = Guid.NewGuid();
+        sale.Register.CashDrawerWalletId = Guid.NewGuid();
+        sale.Register.IsEnabled = false;
+        await db.SaveChangesAsync();
+
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        inventory.Setup(item => item.FulfillReservation(
+                It.IsAny<FulfillReservationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        wallets.SetupSequence(item => item.IncrementWallet(It.IsAny<IncrementWalletRequest>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.ServiceUnavailable, Message = "Injected lost response" })
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.OK });
+        var service = Service(db, tenant, inventory, wallets);
+
+        var uncertain = await service.CheckoutAsync(request, CancellationToken.None);
+        var recovered = await service.CheckoutAsync(request, CancellationToken.None);
+
+        uncertain.IsSuccess.Should().BeTrue(uncertain.Message);
+        uncertain.Data!.Status.Should().Be(PosSaleStatus.PaymentPending);
+        uncertain.Data.RecoveryState.Should().Contain("same idempotency key");
+        recovered.IsSuccess.Should().BeTrue(recovered.Message);
+        recovered.Data!.Status.Should().Be(PosSaleStatus.Completed);
+        wallets.Verify(item => item.IncrementWallet(It.Is<IncrementWalletRequest>(walletRequest =>
+            walletRequest.CredentialId == originalMerchantCredentialId &&
+            walletRequest.WalletId == originalWalletId &&
+            walletRequest.IdempotencyKey == paymentIdempotencyKey)), Times.Exactly(2));
+        wallets.VerifyNoOtherCalls();
+        inventory.Verify(item => item.FulfillReservation(
+            It.Is<FulfillReservationRequest>(fulfill => fulfill.ReservationId == line.ReservationId),
+            It.IsAny<CancellationToken>()), Times.Once);
+        inventory.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task CheckoutAsync_DefinitivePaymentFailureAndReleaseOutage_ReportsOutstandingReservation()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Context(tenant);
+        var sale = Sale(tenant, PosSaleStatus.PaymentPending);
+        var request = CheckoutRequest(sale.Register);
+        sale.IdempotencyKey = request.IdempotencyKey!;
+        sale.RequestHash = PosServiceHelpers.BuildSaleRequestHash(request);
+        var line = Line(sale);
+        line.LineNumber = 1;
+        line.ProductId = request.Lines[0].ProductId;
+        sale.Lines.Add(line);
+        sale.Payments.Add(Payment(sale, PosPaymentStatus.Pending));
+        db.Add(sale);
+        await db.SaveChangesAsync();
+
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        inventory.Setup(item => item.ReleaseReservation(
+                It.IsAny<ReleaseReservationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.ServiceUnavailable, Message = "Injected inventory outage" });
+        var wallets = new Mock<IWalletsServiceWrapper>(MockBehavior.Strict);
+        wallets.Setup(item => item.IncrementWallet(It.IsAny<IncrementWalletRequest>()))
+            .ReturnsAsync(new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Payment declined" });
+        var service = Service(db, tenant, inventory, wallets);
+
+        var result = await service.CheckoutAsync(request, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Data!.Status.Should().Be(PosSaleStatus.PaymentFailed);
+        result.Data.RecoveryState.Should().Contain("could not be released");
+        db.ChangeTracker.Clear();
+        var persisted = await db.Set<PosSale>().Include(item => item.Lines).SingleAsync(item => item.Id == sale.Id);
+        persisted.Lines.Should().ContainSingle().Which.ReservationId.Should().NotBeNull();
+    }
+
     private AppDbContext Context(Guid tenant) => new(options, new HttpContextAccessor(),
         new ConfigurationBuilder().Build(), new TestEffectiveTenantContextAccessor(tenant));
 
-    private static PosSalesService Service(AppDbContext db, Guid tenant, Mock<IInventarioServiceWrapper> inventory)
+    private static PosSalesService Service(
+        AppDbContext db,
+        Guid tenant,
+        Mock<IInventarioServiceWrapper> inventory,
+        Mock<IWalletsServiceWrapper>? wallets = null)
     {
         var resolver = new Mock<IPosRequestContextResolver>();
         resolver.Setup(r => r.Resolve(It.IsAny<RequestBase>(), It.IsAny<Guid?>()))
             .Returns((RequestBase request, Guid? actor) => Result<PosRequestContext>.Success(
                 new PosRequestContext(tenant, actor, request.Metadata, true, false)));
-        return new PosSalesService(db, inventory.Object, new Mock<IWalletsServiceWrapper>(MockBehavior.Strict).Object,
+        return new PosSalesService(db, inventory.Object, (wallets ?? new Mock<IWalletsServiceWrapper>(MockBehavior.Strict)).Object,
             resolver.Object, NullLogger<PosSalesService>.Instance);
     }
 
@@ -284,5 +382,26 @@ public sealed class PosReadinessRegressionTests
         CreatedAt = DateTime.UtcNow,
         ConcurrencyStamp = Guid.NewGuid(),
         IsEnabled = true
+    };
+
+    private static CheckoutPosSaleRequest CheckoutRequest(PosRegister register) => new()
+    {
+        RegisterId = register.Id,
+        CashierCredentialId = Guid.NewGuid(),
+        IdempotencyKey = $"checkout-recovery-{Guid.NewGuid():N}",
+        Payment = new CheckoutPosPaymentRequest
+        {
+            Method = PosPaymentMethod.CashDrawer,
+            Amount = 10
+        },
+        Lines =
+        [
+            new CheckoutPosSaleLineRequest
+            {
+                ProductId = Guid.NewGuid(),
+                Quantity = 1,
+                ExpectedUnitPrice = 10
+            }
+        ]
     };
 }

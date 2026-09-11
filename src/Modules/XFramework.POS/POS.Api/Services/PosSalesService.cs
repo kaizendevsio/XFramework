@@ -45,7 +45,13 @@ public sealed class PosSalesService(
             if (!string.Equals(replay.RequestHash, requestHash, StringComparison.Ordinal))
                 return Result<PosSaleReceiptResponse>.Conflict("Checkout idempotency key was reused with a different payload");
 
-            var replayRegister = await LoadRegisterAsync(tenantId, replay.RegisterId, ct);
+            if (replay.Status == PosSaleStatus.Completed)
+                return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(replay), "POS sale replayed");
+
+            if (replay.Status == PosSaleStatus.Cancelled)
+                return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(replay), "POS sale is cancelled");
+
+            var replayRegister = await LoadRegisterAsync(tenantId, replay.RegisterId, ct, requireEnabled: false);
             if (replayRegister is null)
                 return Result<PosSaleReceiptResponse>.NotFound("POS register was not found");
 
@@ -186,22 +192,38 @@ public sealed class PosSalesService(
             {
                 sale.Status = PosSaleStatus.PaymentFailed;
                 sale.FailureReason = payment.FailureReason;
-                sale.RecoveryState = "Payment failed; inventory reservations were released.";
+                sale.RecoveryState = HasOutstandingReservations(sale)
+                    ? "Payment failed; some inventory reservations still require release. Retry cancellation."
+                    : "Payment failed; inventory reservations were released.";
                 await db.SaveChangesAsync(ct);
                 return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), payment.FailureReason);
             }
 
             if (payment.Status != PosPaymentStatus.Captured)
             {
-                var paymentResult = await CapturePaymentAsync(register, sale, payment, metadata);
+                var paymentResult = await CapturePaymentAsync(sale.SaleNumber, payment, metadata);
                 if (!paymentResult.IsSuccess)
                 {
+                    if (IsAmbiguousPaymentFailure(paymentResult.StatusCode))
+                    {
+                        payment.FailureReason = paymentResult.Message;
+                        sale.Status = PosSaleStatus.PaymentPending;
+                        sale.FailureReason = paymentResult.Message;
+                        sale.RecoveryState = "Payment result is unknown; retry checkout with the same idempotency key.";
+                        await db.SaveChangesAsync(ct);
+                        return Result<PosSaleReceiptResponse>.Success(
+                            PosServiceHelpers.ToSaleReceiptResponse(sale),
+                            paymentResult.Message);
+                    }
+
                     payment.Status = PosPaymentStatus.Failed;
                     payment.FailureReason = paymentResult.Message;
                     sale.Status = PosSaleStatus.PaymentFailed;
                     sale.FailureReason = paymentResult.Message;
-                    sale.RecoveryState = "Payment failed; inventory reservations were released.";
-                    await ReleaseReservationsAsync(sale, metadata);
+                    var releaseResult = await ReleaseReservationsAsync(sale, metadata);
+                    sale.RecoveryState = releaseResult.IsSuccess
+                        ? "Payment failed; inventory reservations were released."
+                        : "Payment failed; some inventory reservations could not be released. Retry cancellation.";
                     await db.SaveChangesAsync(ct);
                     return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), paymentResult.Message);
                 }
@@ -549,21 +571,23 @@ public sealed class PosSalesService(
     }
 
     private async Task<Result> CapturePaymentAsync(
-        PosRegister register,
-        PosSale sale,
+        string saleNumber,
         PosPayment payment,
         RequestMetadata metadata)
     {
         if (payment.Method == PosPaymentMethod.CashDrawer)
         {
+            if (payment.WalletId is not { } walletId || walletId == Guid.Empty)
+                return Result.Failure("Captured payment is missing its cash drawer wallet", 409);
+
             var response = await wallets.IncrementWallet(new IncrementWalletRequest
             {
-                CredentialId = register.MerchantCredentialId,
-                WalletId = register.CashDrawerWalletId,
-                WalletTypeId = sale.WalletTypeId,
-                CurrencyId = sale.CurrencyId,
+                CredentialId = payment.MerchantCredentialId,
+                WalletId = walletId,
+                WalletTypeId = payment.WalletTypeId,
+                CurrencyId = payment.CurrencyId,
                 Amount = payment.Amount,
-                Remarks = $"POS sale {sale.SaleNumber}",
+                Remarks = $"POS sale {saleNumber}",
                 ReferenceNumber = payment.ReferenceNumber,
                 IdempotencyKey = payment.IdempotencyKey,
                 Metadata = metadata
@@ -578,14 +602,17 @@ public sealed class PosSalesService(
         if (customerCredentialId == Guid.Empty)
             return Result.Failure("Customer credential is required for wallet transfer payments", 400);
 
+        if (customerCredentialId == payment.MerchantCredentialId)
+            return Result.Failure("Customer wallet must be different from the register merchant wallet", 409);
+
         var transfer = await wallets.TransferWallet(new TransferWalletRequest
         {
             CredentialId = customerCredentialId,
-            RecipientCredentialId = register.MerchantCredentialId,
-            WalletTypeId = sale.WalletTypeId,
-            CurrencyId = sale.CurrencyId,
+            RecipientCredentialId = payment.MerchantCredentialId,
+            WalletTypeId = payment.WalletTypeId,
+            CurrencyId = payment.CurrencyId,
             Amount = payment.Amount,
-            Remarks = $"POS sale {sale.SaleNumber}",
+            Remarks = $"POS sale {saleNumber}",
             ReferenceNumber = payment.ReferenceNumber,
             IdempotencyKey = payment.IdempotencyKey,
             TransactionPurpose = TransactionPurpose.Payment,
@@ -667,15 +694,27 @@ public sealed class PosSalesService(
     private async Task<PosRegister?> LoadRegisterAsync(
         Guid tenantId,
         Guid registerId,
-        CancellationToken ct) =>
-        await db.Set<PosRegister>()
+        CancellationToken ct,
+        bool requireEnabled = true)
+    {
+        var query = db.Set<PosRegister>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(item =>
+            .Where(item =>
                 item.TenantId == tenantId &&
                 item.Id == registerId &&
-                item.IsEnabled &&
-                !item.IsDeleted,
-                ct);
+                !item.IsDeleted);
+
+        if (requireEnabled)
+            query = query.Where(item => item.IsEnabled);
+
+        return await query.FirstOrDefaultAsync(ct);
+    }
+
+    private static bool HasOutstandingReservations(PosSale sale) =>
+        sale.Lines.Any(item => item.ReservationId.HasValue && item.FulfilledAt is null);
+
+    private static bool IsAmbiguousPaymentFailure(int statusCode) =>
+        statusCode <= 0 || statusCode is 408 or 429 || statusCode >= 500;
 
     private async Task<PosSale?> LoadSaleAsync(
         Guid tenantId,
