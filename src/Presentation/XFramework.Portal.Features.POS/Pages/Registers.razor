@@ -40,9 +40,16 @@ else
             <BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Register List</BbCardTitle>
-                    <BbCardDescription>@_registers.Count register(s) loaded</BbCardDescription>
+                    <BbCardDescription>@(string.IsNullOrWhiteSpace(_loadError) ? $"{_registers.Count} register(s) loaded" : "Register data is unavailable")</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
+                    @if (!string.IsNullOrWhiteSpace(_loadError))
+                    {
+                        <BbAlert Variant="AlertVariant.Warning" class="mb-4">
+                            <BbAlertTitle>Registers could not load</BbAlertTitle>
+                            <BbAlertDescription>@_loadError Use Refresh to retry.</BbAlertDescription>
+                        </BbAlert>
+                    }
                     <div class="mb-4 flex flex-wrap items-end gap-3">
                         <BbFormFieldInput TValue="string" @bind-Value="_registerSearch" Label="Name, code, or description" />
                         <BbFormFieldSelect TValue="string" @bind-Value="_registerStatusFilter" Label="Status">
@@ -54,6 +61,8 @@ else
                             <LucideIcon Name="search" class="mr-2 h-4 w-4" />Search
                         </BbButton>
                     </div>
+                    @if (string.IsNullOrWhiteSpace(_loadError))
+                    {
                     <BbDataGrid Items="@_registers" ShowPagination="false"
                                 OnRowClick="@((PosRegisterResponse item) => OpenRegister(item.Id))"
                                 Class="cursor-pointer">
@@ -96,6 +105,7 @@ else
                             <BbButton Variant="ButtonVariant.Outline" OnClick="@NextRegisterPage" Disabled="@(!_hasNextRegisterPage || _loadingPage)">Next</BbButton>
                         </div>
                     </div>
+                    }
                 </BbCardContent>
             </BbCard>
         </div>
@@ -245,6 +255,7 @@ else
     private bool _moduleEnabled;
     private bool _dialogOpen;
     private bool _loadingPage;
+    private string? _loadError;
     private bool _hasNextRegisterPage;
     private int _registerPage = 1;
     private string _registerSearch = "";
@@ -277,10 +288,13 @@ else
             _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers");
 
             _registers = [];
+            _loadError = null;
             if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
                 return;
 
             await LoadRegisterPage();
+            if (!string.IsNullOrWhiteSpace(_loadError))
+                return;
             await SearchCredentials("");
             await SearchWallets("");
             await SearchWalletTypes("");
@@ -288,9 +302,11 @@ else
             await SearchWarehouses("");
             await SearchLocations("");
         }
-        catch
+        catch (Exception ex)
         {
-            ToastService.Show("Could not load POS registers.");
+            _loadError = ex.Message;
+            _registers = [];
+            _hasNextRegisterPage = false;
         }
         finally
         {
@@ -332,7 +348,15 @@ else
             _registers = response.Response ?? [];
             _hasNextRegisterPage = response.IsSuccess && _registers.Count == RegisterPageSize;
             if (!response.IsSuccess)
-                ToastService.Show(response.Message ?? "Could not load POS registers.");
+            {
+                _loadError = response.Message ?? "The POS service did not return register data.";
+                _registers = [];
+                _hasNextRegisterPage = false;
+            }
+            else
+            {
+                _loadError = null;
+            }
         }
         finally
         {

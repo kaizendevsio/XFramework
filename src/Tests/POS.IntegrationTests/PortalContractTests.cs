@@ -422,6 +422,28 @@ public sealed class PortalContractTests
         returnDetail.Should().Contain("data-testid=\"pos-return-detail\"");
     }
 
+    [Test]
+    public void PosRegisterList_PreservesLoadFailuresInsteadOfRenderingAnEmptyResult()
+    {
+        var registers = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Registers.razor"));
+
+        registers.Should().Contain("Registers could not load");
+        registers.Should().Contain("Register data is unavailable");
+        registers.Should().Contain("if (!string.IsNullOrWhiteSpace(_loadError))");
+        registers.Should().Contain("_loadError = response.Message ?? \"The POS service did not return register data.\"");
+    }
+
+    [Test]
+    public void PosCashier_RequiresRegisterCurrencyBeforeRenderingMoneyControls()
+    {
+        var cashier = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Cashier.razor"));
+
+        cashier.Should().Contain("Title=\"Select a register\"");
+        cashier.Should().Contain("Register currency unavailable");
+        cashier.Should().Contain("RegisterCurrency is { } currency ? $\"{currency} {value:N2}\" : \"—\"");
+        cashier.Should().NotContain("RegisterCurrency ?? \"XXX\"");
+    }
+
     private static IEnumerable<string> FindDirectPosMutations(string page, string text)
     {
         var entities = new[] { "PosRegister", "PosCart", "PosCartLine", "PosSale", "PosSaleLine", "PosPayment", "PosReturn", "PosReturnLine" };

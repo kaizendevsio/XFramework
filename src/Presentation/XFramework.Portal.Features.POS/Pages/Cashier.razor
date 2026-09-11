@@ -341,6 +341,19 @@ else
                     </div>
 
                     <div class="pos-checkout-panel">
+                        @if (SelectedRegister is null)
+                        {
+                            <BbEmpty Title="Select a register" Description="Choose an enabled register to set the sale currency and payment options." />
+                        }
+                        else if (RegisterCurrency is null)
+                        {
+                            <BbAlert Variant="AlertVariant.Warning">
+                                <BbAlertTitle>Register currency unavailable</BbAlertTitle>
+                                <BbAlertDescription>Refresh the cashier before accepting payment.</BbAlertDescription>
+                            </BbAlert>
+                        }
+                        else
+                        {
                         <BbRadioGroup TValue="PosPaymentMethod" @bind-Value="_paymentMethod" Class="pos-payment-options">
                             <label class="pos-payment-option" for="pos-payment-cash">
                                 <BbRadioGroupItem TValue="PosPaymentMethod" Value="@PosPaymentMethod.CashDrawer"
@@ -414,6 +427,7 @@ else
                                 }
                             </div>
                         }
+                        }
                     </div>
 
                     <div class="pos-total-bar">
@@ -426,8 +440,8 @@ else
                             </div>
                         }
                         <div class="pos-grand-total">
-                            <span>Total (@CurrencyCode)</span>
-                            <strong data-testid="pos-total">@Total.ToString("N2")</strong>
+                            <span>@(RegisterCurrency is { } currency ? $"Total ({currency})" : "Total")</span>
+                            <strong data-testid="pos-total">@(RegisterCurrency is null ? "—" : Total.ToString("N2"))</strong>
                         </div>
                         <p id="pos-checkout-status" class="pos-checkout-status" role="status">@CheckoutStatus</p>
                         <BbButton Size="ButtonSize.Large" OnClick="@Checkout" Disabled="@(!CanCheckout)" Class="pos-checkout-action"
@@ -440,7 +454,7 @@ else
                             {
                                 <LucideIcon Name="receipt" class="mr-2 h-5 w-5" />
                             }
-                            @(_checkingOut ? "Processing payment" : HasPendingPayment ? "Retry payment" : $"Pay {FormatMoney(Total)}")
+                            @(_checkingOut ? "Processing payment" : HasPendingPayment ? "Retry payment" : SelectedRegister is null ? "Select a register" : RegisterCurrency is null ? "Currency unavailable" : $"Pay {FormatMoney(Total)}")
                         </BbButton>
                     </div>
                 </aside>
@@ -538,8 +552,8 @@ else
             return code is { Length: 3 } && code.All(char.IsAsciiLetter) ? code : null;
         }
     }
-    private string CurrencyCode => RegisterCurrency ?? "XXX";
-    private string FormatMoney(decimal value) => $"{CurrencyCode} {value:N2}";
+    private string CurrencyCode => RegisterCurrency ?? string.Empty;
+    private string FormatMoney(decimal value) => RegisterCurrency is { } currency ? $"{currency} {value:N2}" : "—";
     private IEnumerable<decimal> SuggestedTenderAmounts => new[] { 5m, 10m, 50m }
         .Select(step => Math.Ceiling(Math.Max(Total, 0.01m) / step) * step)
         .Where(amount => amount > Total).Distinct().Take(2);

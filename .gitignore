@@ -360,3 +360,4 @@ MigrationBackup/
 # NuGet pack output
 nupkgs/
 .compound-engineering/*.local.yaml
+.local/
