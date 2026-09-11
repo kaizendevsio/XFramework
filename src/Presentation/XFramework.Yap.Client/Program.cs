@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.JSInterop;
 using SqliteWasmBlazor;
 using Yap.Client;
 using Yap.Client.Services;
@@ -20,6 +21,7 @@ builder.Services.AddSingleton(startup);
 var host = builder.Build();
 try
 {
+    await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("yap.device.acquireDatabase");
     await host.Services.InitializeSqliteWasmAsync();
     await host.Services.InitializeSqliteWasmDatabaseAsync<OfflineDatabase>();
     await using var db = await host.Services.GetRequiredService<IDbContextFactory<OfflineDatabase>>().CreateDbContextAsync();
