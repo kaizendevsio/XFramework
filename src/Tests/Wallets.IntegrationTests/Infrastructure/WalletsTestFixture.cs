@@ -220,6 +220,7 @@ public class WalletsTestFixture
         builder.Services.AddScoped<Wallets.Api.Services.IWalletOutboxPublisher, Wallets.Api.Services.WalletOutboxPublisher>();
         builder.Services.AddScoped<Wallets.Api.Services.IWalletReconciliationService, Wallets.Api.Services.WalletReconciliationService>();
         builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletOperationsService>();
+        Wallets.Api.Features.ReferenceData.ReferenceDataValidationExtensions.AddWalletsReferenceDataValidation(builder.Services);
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
         builder.Services.AddSingleton(
             TransportAuthority.CreateTokenProvider(XFrameworkServiceNames.Wallets));

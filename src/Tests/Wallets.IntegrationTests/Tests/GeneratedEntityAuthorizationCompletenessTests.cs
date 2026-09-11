@@ -86,7 +86,7 @@ public sealed class GeneratedEntityAuthorizationCompletenessTests
                     policy.AuthorizationFeature.Should().Be(expectation.Feature);
                 }
                 policy.AllowServiceOnly.Should().BeFalse();
-                policy.AllowRemoteQuery.Should().BeTrue();
+                policy.AllowRemoteQuery.Should().Be(operation == GeneratedEntityOperation.Read);
                 policy.AllowRemoteMutation.Should().Be(
                     allowsRemoteMutation && operation != GeneratedEntityOperation.Read);
             }

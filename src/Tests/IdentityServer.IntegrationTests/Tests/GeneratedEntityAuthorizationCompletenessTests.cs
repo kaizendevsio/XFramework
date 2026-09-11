@@ -11,6 +11,32 @@ namespace GeneratedAuthorizationContractTests.IdentityServer;
 [Category("Area:GeneratedAuthorization")]
 public sealed class GeneratedEntityAuthorizationCompletenessTests
 {
+    [TestCase("IdentityRoleType", "identity.roles")]
+    [TestCase("IdentityRoleTypeGroup", "identity.roles")]
+    [TestCase("IdentityContactType", "identity.contacts")]
+    [TestCase("IdentityContactGroup", "identity.contacts")]
+    [TestCase("IdentityAddressType", "identity.addresses")]
+    [TestCase("IdentityVerificationType", "identity.verifications")]
+    [TestCase("SessionType", "identity.sessions")]
+    public void ReferenceData_AllOperationsRequireCapabilitiesAndManagedTenantDelegation(string entityName, string feature)
+    {
+        var registryType = typeof(global::IdentityServer.Api.Features.Auth.ValidateSession.ValidateIdentitySessionEndpoint)
+            .Assembly.GetType("XFramework.Core.DataContext.DataContextEntityRegistrations", throwOnError: true)!;
+        var policies = (IReadOnlyCollection<GeneratedEntityAuthorizationPolicy>)registryType
+            .GetMethod("GetDataContextAuthorizationPolicies")!.Invoke(null, null)!;
+        var entityPolicies = policies.Where(policy => policy.EntityTypeName == entityName).ToArray();
+        entityPolicies.Should().HaveCount(4);
+        foreach (var policy in entityPolicies)
+        {
+            policy.AllowRemoteMutation.Should().Be(policy.Operation != GeneratedEntityOperation.Read);
+            var action = policy.Operation == GeneratedEntityOperation.Read ? "view" : policy.Operation.ToString().ToLowerInvariant();
+            policy.RequiredCapability.Should().Be($"{feature}:{action}");
+            policy.TenantAccessMode.Should().Be(XFramework.Integration.Security.TenantAccessMode.DelegatedTenant);
+            policy.RequiredCrossTenantActorCapabilities.Should().ContainSingle().Which.Should().Be("identity.tenants:manage");
+            policy.AllowServiceOnly.Should().BeFalse();
+        }
+    }
+
     [Test]
     public void GeneratedIdentityEntities_HaveCompleteServerOwnedAuthorizationPolicies()
     {

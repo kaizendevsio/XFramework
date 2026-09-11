@@ -273,6 +273,16 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                                 if ((int)status < 200 || (int)status >= 300)
                                 {
                                     var failure = DataContextResult.Failure($"DataContext change request failed with status {(int)status} ({status}).", (int)status);
+                                    try
+                                    {
+                                        var remoteFailure = MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span);
+                                        if (remoteFailure is { IsSuccess: false } && !string.IsNullOrWhiteSpace(remoteFailure.Message))
+                                            failure.Message = remoteFailure.Message;
+                                    }
+                                    catch (MemoryPack.MemoryPackSerializationException)
+                                    {
+                                        // Transport failures may not contain a DataContextResult.
+                                    }
                                     return MemoryPack.MemoryPackSerializer.Serialize(failure);
                                 }
 

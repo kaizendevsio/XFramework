@@ -121,6 +121,13 @@ not ordinary CRUD.
 
 ## Portal Rules
 
+- Reference Data catalog exception: `WalletType`, `CurrencyType`, and
+  `ExchangeRate` explicitly allow remote DataContext mutations under the
+  generated Wallets capability and delegated-tenant policies. This does not
+  permit writes to balances, ledger entries, transactions, or workflows.
+  Currency and exchange-rate writes are validated server-side; currency links
+  must be tenant-owned or global. Global reference rows remain read-only here.
+
 - Portal mutations must call Wallets service wrappers or backend workflow
   APIs. Read-only `IDataContext` queries are acceptable for grids, details,
   pickers, and display labels only.

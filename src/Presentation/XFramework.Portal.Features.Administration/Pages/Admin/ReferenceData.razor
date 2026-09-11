@@ -1,13 +1,17 @@
 @page "/admin/reference-data"
+@implements IDisposable
 @using XFramework.Domain.Shared.Contracts.Base
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Domain.Shared.BusinessObjects
+@using XFramework.Integration.DataContext
+@using Microsoft.Extensions.DependencyInjection
 
 <PageTitle>Reference Data - Portal</PageTitle>
 
 <div class="space-y-4">
     <div>
         <h2 class="text-2xl font-bold tracking-tight">Reference Data</h2>
-        <p class="text-sm text-muted-foreground">System lookup tables and reference types. These are shared across tenants.</p>
+        <p class="text-sm text-muted-foreground">System lookup tables and reference types. Changes apply to the selected tenant, or your signed-in tenant when none is selected.</p>
     </div>
 
     @if (_loading)
@@ -549,18 +553,18 @@
                                       Placeholder="Transaction fee" />
                     <BbFormFieldInput TValue="string"
                                       @bind-Value="_formEffectivity"
-                                      Label="Effectivity Date"
+                                      Label="Effectivity Date (UTC)"
                                       Placeholder="YYYY-MM-DD HH:mm" />
                     <BbFormFieldInput TValue="string"
                                       @bind-Value="_formExpiry"
-                                      Label="Expiry Date"
+                                      Label="Expiry Date (UTC)"
                                       Placeholder="YYYY-MM-DD HH:mm" />
                     break;
             }
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>
-            <BbButton OnClick="@SaveRecord">@(_isEditing ? "Update" : "Create")</BbButton>
+            <BbButton OnClick="@SaveRecord" Disabled="@_saving">@(_isEditing ? "Update" : "Create")</BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
@@ -568,10 +572,14 @@
 @* -- Delete Confirmation Dialog -- *@
 <ConfirmDeleteDialog Open="@_deleteDialogOpen"
                      OpenChanged="@(v => _deleteDialogOpen = v)"
-                     Message="@($"This will permanently delete \"{_deleteName}\". This action cannot be undone.")"
+                     Message="@($"Delete \"{_deleteName}\"?")"
                      OnConfirm="@ConfirmDelete" />
 
 @code {
+    [Inject] private IServiceProvider Services { get; set; } = default!;
+    [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
+    [Inject] private ILogger<ReferenceData> Logger { get; set; } = default!;
+    private BaseModel? _editingRecord;
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
@@ -580,6 +588,7 @@
     private bool _dialogOpen;
     private bool _deleteDialogOpen;
     private bool _isEditing;
+    private bool _saving;
     private string _activeTab = "role-types";
     private bool _activeTabLoading;
     private string _categorySearch = "";
@@ -666,17 +675,38 @@
 
     protected override async Task OnInitializedAsync()
     {
+        TenantFilter.OnChanged += OnTenantChanged;
         _loading = true;
         try
         {
             await ReloadActiveTab();
         }
-        catch { /* Non-critical - empty tabs are fine */ }
         finally
         {
             _loading = false;
         }
     }
+
+    private void OnTenantChanged() => _ = InvokeAsync(async () =>
+    {
+        _dialogOpen = false;
+        _deleteDialogOpen = false;
+        _loadedTabs.Clear();
+        _roleTypes = [];
+        _roleTypeGroups = [];
+        _contactTypes = [];
+        _contactGroups = [];
+        _addressTypes = [];
+        _verificationTypes = [];
+        _sessionTypes = [];
+        _walletTypes = [];
+        _currencyTypes = [];
+        _exchangeRates = [];
+        await ReloadActiveTab();
+        StateHasChanged();
+    });
+
+    public void Dispose() => TenantFilter.OnChanged -= OnTenantChanged;
 
     private async Task OnReferenceCategoryChanged(string? value)
     {
@@ -726,6 +756,7 @@
             {
                 case "role-types":
                     _roleTypes = await LoadList<IdentityRoleType>();
+                    _roleTypeGroups = await LoadList<IdentityRoleTypeGroup>();
                     break;
                 case "role-type-groups":
                     _roleTypeGroups = await LoadList<IdentityRoleTypeGroup>();
@@ -758,12 +789,15 @@
 
             _loadedTabs.Add(_activeTab);
         }
-        catch { /* reload failure is non-critical */ }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not load reference data category {Category}", _activeTab);
+            ToastService.Show("Could not load reference data. Check your tenant and permissions, then try again.");
+        }
     }
 
     private async Task<List<T>> LoadList<T>(int take = 100) where T : BaseModel =>
         await DataContext.Query<T>()
-            .IgnoreQueryFilters()
             .NoCache()
             .Where(x => !x.IsDeleted)
             .OrderByDescending(x => x.CreatedAt)
@@ -775,6 +809,7 @@
     private void ResetFormFields()
     {
         _editingId = Guid.Empty;
+        _editingRecord = null;
         _formName = "";
         _formDescription = "";
         _formCode = "";
@@ -810,6 +845,10 @@
         _isEditing = true;
         ResetFormFields();
         _editingId = id;
+        _editingRecord = _roleTypes.Cast<BaseModel>()
+            .Concat(_roleTypeGroups).Concat(_contactTypes).Concat(_contactGroups)
+            .Concat(_addressTypes).Concat(_verificationTypes).Concat(_sessionTypes)
+            .First(x => x.Id == id);
         _formName = name;
         _formDescription = description;
         _formCode = code;
@@ -826,6 +865,7 @@
         _isEditing = true;
         ResetFormFields();
         _editingId = item.Id;
+        _editingRecord = item;
         _formCode = item.Code;
         _formName = item.Name;
         _formDescription = item.Desc ?? "";
@@ -839,6 +879,7 @@
         _isEditing = true;
         ResetFormFields();
         _editingId = item.Id;
+        _editingRecord = item;
         _formName = item.Name ?? "";
         _formCurrencyCode = item.CurrencyIsoCode3 ?? "";
         _formDescription = item.Description ?? "";
@@ -850,6 +891,7 @@
         _isEditing = true;
         ResetFormFields();
         _editingId = item.Id;
+        _editingRecord = item;
         _formSourceCurrency = item.SourceCurrencyTypeId.ToString();
         _formTargetCurrency = item.TargetCurrencyTypeId.ToString();
         _formValue = item.Value?.ToString() ?? "";
@@ -895,13 +937,36 @@
 
     private async Task<DataContextResult> RemoveEntity<T>(T entity) where T : BaseModel
     {
-        DataContext.Remove(entity);
-        return await DataContext.SaveChangesAsync();
+        if (entity.TenantId == Guid.Empty)
+            return DataContextResult.Failure("Global reference data cannot be changed here.");
+
+        var context = CreateMutationContext(entity.TenantId);
+        context.Remove(entity);
+        return await context.SaveChangesAsync();
     }
 
     // -- Save (Create / Update) --
 
     private async Task SaveRecord()
+    {
+        if (_saving) return;
+        _saving = true;
+        try
+        {
+            await SaveActiveRecord();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not save reference data category {Category}", _activeTab);
+            ToastService.Show("Could not save reference data. Please try again.");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SaveActiveRecord()
     {
         switch (_activeTab)
         {
@@ -952,213 +1017,82 @@
             return;
         }
 
-        if (_isEditing)
+        await PersistAndClose<IdentityRoleType>(entity =>
         {
-            var entity = new IdentityRoleType
-            {
-                Id = _editingId,
-                Name = name,
-                RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : null,
-                GroupId = groupId,
-                SystemReferenceId = ParseSystemRef(),
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new IdentityRoleType
-            {
-                Id = Guid.NewGuid(),
-                Name = name,
-                RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : null,
-                GroupId = groupId,
-                SystemReferenceId = ParseSystemRef(),
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Name = name;
+            entity.RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : null;
+            entity.GroupId = groupId;
+            entity.SystemReferenceId = ParseSystemRef();
+        });
     }
 
     private async Task SaveRoleTypeGroup()
     {
         if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
 
-        if (_isEditing)
+        await PersistAndClose<IdentityRoleTypeGroup>(entity =>
         {
-            var entity = new IdentityRoleTypeGroup
-            {
-                Id = _editingId,
-                Name = _formName,
-                Description = _formDescription,
-                SystemReferenceId = ParseSystemRef(),
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new IdentityRoleTypeGroup
-            {
-                Id = Guid.NewGuid(),
-                Name = _formName,
-                Description = _formDescription,
-                SystemReferenceId = ParseSystemRef(),
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Name = _formName;
+            entity.Description = _formDescription;
+            entity.SystemReferenceId = ParseSystemRef();
+        });
     }
 
     private async Task SaveContactType()
     {
         if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
 
-        if (_isEditing)
+        await PersistAndClose<IdentityContactType>(entity =>
         {
-            var entity = new IdentityContactType
-            {
-                Id = _editingId,
-                Name = _formName,
-                SystemReferenceId = ParseSystemRef(),
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new IdentityContactType
-            {
-                Id = Guid.NewGuid(),
-                Name = _formName,
-                SystemReferenceId = ParseSystemRef(),
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Name = _formName;
+            entity.SystemReferenceId = ParseSystemRef();
+        });
     }
 
     private async Task SaveContactGroup()
     {
         if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
 
-        if (_isEditing)
+        await PersistAndClose<IdentityContactGroup>(entity =>
         {
-            var entity = new IdentityContactGroup
-            {
-                Id = _editingId,
-                Name = _formName,
-                SystemReferenceId = ParseSystemRef(),
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new IdentityContactGroup
-            {
-                Id = Guid.NewGuid(),
-                Name = _formName,
-                SystemReferenceId = ParseSystemRef(),
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Name = _formName;
+            entity.SystemReferenceId = ParseSystemRef();
+        });
     }
 
     private async Task SaveAddressType()
     {
         if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
 
-        if (_isEditing)
+        await PersistAndClose<IdentityAddressType>(entity =>
         {
-            var entity = new IdentityAddressType
-            {
-                Id = _editingId,
-                Name = _formName,
-                SystemReferenceId = ParseSystemRef(),
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new IdentityAddressType
-            {
-                Id = Guid.NewGuid(),
-                Name = _formName,
-                SystemReferenceId = ParseSystemRef(),
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Name = _formName;
+            entity.SystemReferenceId = ParseSystemRef();
+        });
     }
 
     private async Task SaveVerificationType()
     {
         if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
 
-        if (_isEditing)
+        await PersistAndClose<IdentityVerificationType>(entity =>
         {
-            var entity = new IdentityVerificationType
-            {
-                Id = _editingId,
-                Name = _formName,
-                DefaultExpiry = long.TryParse(_formDefaultExpiry, out var exp) ? exp : null,
-                Priority = short.TryParse(_formPriority, out var pri) ? pri : null,
-                SystemReferenceId = ParseSystemRef(),
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new IdentityVerificationType
-            {
-                Id = Guid.NewGuid(),
-                Name = _formName,
-                DefaultExpiry = long.TryParse(_formDefaultExpiry, out var exp) ? exp : null,
-                Priority = short.TryParse(_formPriority, out var pri) ? pri : null,
-                SystemReferenceId = ParseSystemRef(),
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Name = _formName;
+            entity.DefaultExpiry = long.TryParse(_formDefaultExpiry, out var exp) ? exp : null;
+            entity.Priority = short.TryParse(_formPriority, out var pri) ? pri : null;
+            entity.SystemReferenceId = ParseSystemRef();
+        });
     }
 
     private async Task SaveSessionType()
     {
         if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
 
-        if (_isEditing)
+        await PersistAndClose<SessionType>(entity =>
         {
-            var entity = new SessionType
-            {
-                Id = _editingId,
-                Name = _formName,
-                SystemReferenceId = ParseSystemRef(),
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new SessionType
-            {
-                Id = Guid.NewGuid(),
-                Name = _formName,
-                SystemReferenceId = ParseSystemRef(),
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Name = _formName;
+            entity.SystemReferenceId = ParseSystemRef();
+        });
     }
 
     private async Task SaveWalletType()
@@ -1191,66 +1125,26 @@
             return;
         }
 
-        if (_isEditing)
+        await PersistAndClose<global::Wallets.Domain.Shared.Contracts.WalletType>(entity =>
         {
-            var entity = new global::Wallets.Domain.Shared.Contracts.WalletType
-            {
-                Id = _editingId,
-                Code = code,
-                Name = name,
-                Desc = string.IsNullOrWhiteSpace(description) ? null : description,
-                MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null,
-                MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new global::Wallets.Domain.Shared.Contracts.WalletType
-            {
-                Id = Guid.NewGuid(),
-                Code = code,
-                Name = name,
-                Desc = string.IsNullOrWhiteSpace(description) ? null : description,
-                MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null,
-                MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Code = code;
+            entity.Name = name;
+            entity.Desc = string.IsNullOrWhiteSpace(description) ? null : description;
+            entity.MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null;
+            entity.MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null;
+        });
     }
 
     private async Task SaveCurrencyType()
     {
         if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
 
-        if (_isEditing)
+        await PersistAndClose<global::Wallets.Domain.Shared.Contracts.CurrencyType>(entity =>
         {
-            var entity = new global::Wallets.Domain.Shared.Contracts.CurrencyType
-            {
-                Id = _editingId,
-                Name = _formName,
-                CurrencyIsoCode3 = string.IsNullOrWhiteSpace(_formCurrencyCode) ? null : _formCurrencyCode,
-                Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new global::Wallets.Domain.Shared.Contracts.CurrencyType
-            {
-                Id = Guid.NewGuid(),
-                Name = _formName,
-                CurrencyIsoCode3 = string.IsNullOrWhiteSpace(_formCurrencyCode) ? null : _formCurrencyCode,
-                Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.Name = _formName;
+            entity.CurrencyIsoCode3 = string.IsNullOrWhiteSpace(_formCurrencyCode) ? null : _formCurrencyCode;
+            entity.Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription;
+        });
     }
 
     private async Task SaveExchangeRate()
@@ -1267,56 +1161,67 @@
             return;
         }
 
-        if (_isEditing)
+        await PersistAndClose<ExchangeRate>(entity =>
         {
-            var entity = new ExchangeRate
-            {
-                Id = _editingId,
-                SourceCurrencyTypeId = sourceId,
-                TargetCurrencyTypeId = targetId,
-                Value = rate,
-                Fee = decimal.TryParse(_formFee, out var fee) ? fee : null,
-                EffectivityDate = DateTime.TryParse(_formEffectivity, out var eff) ? eff : null,
-                ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? exp : null,
-                ModifiedAt = DateTime.UtcNow
-            };
-            await PersistAndClose(entity);
-        }
-        else
-        {
-            var entity = new ExchangeRate
-            {
-                Id = Guid.NewGuid(),
-                SourceCurrencyTypeId = sourceId,
-                TargetCurrencyTypeId = targetId,
-                Value = rate,
-                Fee = decimal.TryParse(_formFee, out var fee) ? fee : null,
-                EffectivityDate = DateTime.TryParse(_formEffectivity, out var eff) ? eff : null,
-                ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? exp : null,
-                CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
-            };
-            await PersistAndClose(entity);
-        }
+            entity.SourceCurrencyTypeId = sourceId;
+            entity.TargetCurrencyTypeId = targetId;
+            entity.Value = rate;
+            entity.Fee = decimal.TryParse(_formFee, out var fee) ? fee : null;
+            entity.EffectivityDate = DateTime.TryParse(_formEffectivity, out var eff) ? DateTime.SpecifyKind(eff, DateTimeKind.Utc) : null;
+            entity.ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? DateTime.SpecifyKind(exp, DateTimeKind.Utc) : null;
+        });
     }
 
-    private async Task PersistAndClose<T>(T entity) where T : class
+    // Keep each save isolated: failed remote batches remain queued in their context.
+    // Reuse this circuit's service provider so the actor token is preserved.
+    private IDataContext CreateMutationContext(Guid tenantId) =>
+        ActivatorUtilities.CreateInstance<CachingDataContext>(
+            Services, new RemoteDataContext(Services, new RequestMetadata { RequestedTenantId = tenantId }));
+
+    private async Task PersistAndClose<T>(Action<T> applyChanges) where T : BaseModel, new()
     {
-        if (!await PrepareEntityForPersistence(entity))
+        var tenantId = _isEditing ? _editingRecord?.TenantId : RequestMetadata.RequestedTenantId;
+        if (tenantId is null || tenantId == Guid.Empty)
         {
+            ToastService.Show("Select a tenant before adding reference data. Global reference data cannot be changed here.");
             return;
         }
 
+        var context = CreateMutationContext(tenantId.Value);
+        T entity;
         if (_isEditing)
         {
-            DataContext.Update(entity);
+            // Query in the mutation context so Update sends a field patch, not a full replacement.
+            var current = await context.Query<T>().NoCache().Where(x => x.Id == _editingId).FirstOrDefaultAsync();
+            if (current is null || current.ConcurrencyStamp != _editingRecord?.ConcurrencyStamp)
+            {
+                ToastService.Show("This record changed or was removed. Reload it before editing.");
+                return;
+            }
+            entity = current;
         }
         else
         {
-            DataContext.Add(entity);
+            entity = new T
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId.Value,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
         }
 
-        var result = await DataContext.SaveChangesAsync();
+        applyChanges(entity);
+        if (entity is IHasSystemReferenceId systemReference && systemReference.SystemReferenceId == Guid.Empty)
+            systemReference.SystemReferenceId = Guid.NewGuid();
+
+        if (_isEditing)
+            context.Update(entity);
+        else
+            context.Add(entity);
+
+        var result = await context.SaveChangesAsync();
         if (!result.IsSuccess)
         {
             ToastService.Show($"Error: {result.Message}");
@@ -1326,51 +1231,5 @@
         ToastService.Show(_isEditing ? $"{TabDisplayName} updated." : $"{TabDisplayName} created.");
         _dialogOpen = false;
         await ReloadActiveTab();
-    }
-
-    private async Task<bool> PrepareEntityForPersistence<T>(T entity) where T : class
-    {
-        if (entity is not BaseModel model)
-        {
-            return true;
-        }
-
-        var tenantId = await ResolveReferenceTenantId();
-        if (tenantId is null)
-        {
-            ToastService.Show("Create or select a tenant before adding reference data.");
-            return false;
-        }
-
-        model.TenantId = tenantId.Value;
-        if (model.ConcurrencyStamp == Guid.Empty)
-        {
-            model.ConcurrencyStamp = Guid.NewGuid();
-        }
-
-        if (entity is IHasSystemReferenceId systemReference && systemReference.SystemReferenceId == Guid.Empty)
-        {
-            systemReference.SystemReferenceId = ParseSystemRef();
-        }
-
-        return true;
-    }
-
-    private async Task<Guid?> ResolveReferenceTenantId()
-    {
-        if (TenantFilter.SelectedTenantId is Guid selectedTenantId)
-        {
-            return selectedTenantId;
-        }
-
-        var tenant = await DataContext.Query<Tenant>()
-            .IgnoreQueryFilters()
-            .NoCache()
-            .Where(x => !x.IsDeleted)
-            .OrderBy(x => x.Name)
-            .Take(1)
-            .FirstOrDefaultAsync();
-
-        return tenant?.Id;
     }
 }

@@ -59,6 +59,10 @@ public sealed class ServiceWrapperGeneratorTests
         generatedSource.Should().Contain("IServiceTokenProvider serviceTokenProvider");
         generatedSource.Should().Contain("IActorAccessTokenProvider actorAccessTokenProvider");
         generatedSource.Should().Contain("BoltInvocationEnvelopeFactory.CreateAsync(");
+        generatedSource.Should().Contain("MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span)");
+        generatedSource.Should().Contain("remoteFailure is { IsSuccess: false }");
+        generatedSource.Should().Contain("failure.Message = remoteFailure.Message");
+        generatedSource.Should().Contain("catch (MemoryPack.MemoryPackSerializationException)");
         generatedSource.Should().Contain("entityForLog is XFramework.Domain.Shared.Contracts.Base.IHasTenantId tenantOwned");
         generatedSource.Should().Contain("Metadata = new RequestMetadata { RequestedTenantId = requestedTenantId }");
         generatedSource.Should().Contain("public IResidentCrudService Resident { get; init; }");
