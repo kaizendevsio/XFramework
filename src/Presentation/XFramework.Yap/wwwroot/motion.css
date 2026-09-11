@@ -37,7 +37,7 @@ body,.phone,.screen,.composer,.pagebar{transition:background-color 220ms ease,co
 .sheet-handle span{display:block;width:38px;height:4px;border-radius:99px;background:var(--faint);opacity:.55}
 .sheet-handle:active{cursor:grabbing;scale:1}
 .msg{position:relative;translate:var(--reply-drag,0px) 0;transition:translate 280ms var(--ease-spring),opacity 220ms ease,transform 320ms var(--ease-out)}
-.bub,[data-swipe-tabs]{touch-action:pan-y pinch-zoom}
+.bub,[data-swipe-tabs]{touch-action:pan-y}
 [data-swipe-tabs]{translate:var(--tab-drag,0px) 0;transition:translate 240ms var(--ease-out),opacity 200ms ease,transform 260ms var(--ease-out)}
 .gesture-reply{position:absolute;left:-32px;top:8px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);opacity:0;pointer-events:none;transition:opacity 140ms ease,scale 180ms var(--ease-spring);scale:.7}
 .gesture-reply:focus-visible{left:0;top:-12px;opacity:1;pointer-events:auto;scale:1;z-index:3}
