@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Bolt.Protocol;
 using Bolt.Server;
 using Communications.Domain.Shared.Contracts;
 using Microsoft.Extensions.DependencyInjection;
@@ -239,5 +240,6 @@ public sealed class CommunicationsBoltTopicAuthorizer(
     private static bool HasValidTransientSubscriber(BoltTopicAuthorizationContext context) =>
         !string.IsNullOrWhiteSpace(context.SubscriberId) &&
         context.SubscriberId.Length <= MaxTransientSubscriberIdLength &&
-        string.Equals(context.SubscriberId, context.ClientId, StringComparison.Ordinal);
+        (string.Equals(context.SubscriberId, context.ClientId, StringComparison.Ordinal) ||
+         BoltTransientSubscriberId.IsScopedToClient(context.SubscriberId, context.ClientId));
 }

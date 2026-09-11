@@ -150,8 +150,8 @@ public sealed class BoltServer : IDisposable
     private static readonly int LargeRpcResponseStreamHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response_stream__");
 
     // Pub/sub state — transient (live fan-out only)
-    private readonly ConcurrentDictionary<int, ConcurrentDictionary<BoltHubConnection, byte>> _liveSubscribersByTopic = new();
-    private readonly ConcurrentDictionary<BoltHubConnection, ConcurrentDictionary<int, byte>> _liveSubscriptionsByConnection = new();
+    private readonly ConcurrentDictionary<int, ConcurrentDictionary<(BoltHubConnection Connection, string SubscriberId), DateTimeOffset?>> _liveSubscribersByTopic = new();
+    private readonly ConcurrentDictionary<BoltHubConnection, ConcurrentDictionary<(int TopicHash, string SubscriberId), byte>> _liveSubscriptionsByConnection = new();
 
     // Pub/sub state — durable (persistent identity)
     private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), BoltHubConnection> _liveDurableConnections = new();
@@ -2706,7 +2706,19 @@ public sealed class BoltServer : IDisposable
             return;
         }
 
-        var subscriptionAlreadyActive = IsLiveSubscriptionActive(conn, topicHash);
+        // Legacy clients have one untagged binding per topic/connection. New clients
+        // carry a connection-owned ID so each actor is authorized and delivered separately.
+        var transientId = BoltTransientSubscriberId.IsScopedToClient(subscriberId, conn.ClientId)
+            ? subscriberId : string.Empty;
+        DateTimeOffset? transientAuthorizationExpiresAtUtc = null;
+        if (transientId.Length > 0 && !string.IsNullOrWhiteSpace(actorAccessToken))
+        {
+            if (!TryReadJwtExpiration(actorAccessToken, out var expiration) || expiration <= DateTimeOffset.UtcNow)
+                return;
+            transientAuthorizationExpiresAtUtc = expiration;
+        }
+
+        var subscriptionAlreadyActive = IsLiveSubscriptionActive(conn, topicHash, transientId);
         if (!subscriptionAlreadyActive &&
             !TryReserveQuota(_subscriptionsByPrincipal, conn.QuotaKey, _maxSubscriptionsPerPrincipal))
         {
@@ -2727,7 +2739,7 @@ public sealed class BoltServer : IDisposable
 
         if (!durable)
         {
-            if (!AddLiveSubscription(conn, topicHash) && !subscriptionAlreadyActive)
+            if (!AddLiveSubscription(conn, topicHash, transientId, transientAuthorizationExpiresAtUtc) && !subscriptionAlreadyActive)
                 ReleaseQuota(_subscriptionsByPrincipal, conn.QuotaKey);
             _logger.LogDebug("Transient subscribe: topic={Topic}", topic);
             return;
@@ -2736,25 +2748,25 @@ public sealed class BoltServer : IDisposable
         if (_durableStore is null)
         {
             _logger.LogWarning("Durable subscribe requested but no IDurableQueueStore configured. Falling back to transient.");
-            if (!AddLiveSubscription(conn, topicHash) && !subscriptionAlreadyActive)
+            if (!AddLiveSubscription(conn, topicHash, transientId, transientAuthorizationExpiresAtUtc) && !subscriptionAlreadyActive)
                 ReleaseQuota(_subscriptionsByPrincipal, conn.QuotaKey);
             return;
         }
 
     }
 
-    private bool AddLiveSubscription(BoltHubConnection conn, int topicHash)
+    private bool AddLiveSubscription(BoltHubConnection conn, int topicHash, string subscriberId, DateTimeOffset? expiresAtUtc)
     {
-        var topicSet = _liveSubscribersByTopic.GetOrAdd(topicHash, _ => new ConcurrentDictionary<BoltHubConnection, byte>());
-        topicSet.TryAdd(conn, 0);
+        var topicSet = _liveSubscribersByTopic.GetOrAdd(topicHash, _ => new());
+        topicSet[(conn, subscriberId)] = expiresAtUtc;
 
-        var connSet = _liveSubscriptionsByConnection.GetOrAdd(conn, _ => new ConcurrentDictionary<int, byte>());
-        return connSet.TryAdd(topicHash, 0);
+        var connSet = _liveSubscriptionsByConnection.GetOrAdd(conn, _ => new());
+        return connSet.TryAdd((topicHash, subscriberId), 0);
     }
 
-    private bool IsLiveSubscriptionActive(BoltHubConnection connection, int topicHash) =>
+    private bool IsLiveSubscriptionActive(BoltHubConnection connection, int topicHash, string subscriberId) =>
         _liveSubscriptionsByConnection.TryGetValue(connection, out var topics) &&
-        topics.ContainsKey(topicHash);
+        topics.ContainsKey((topicHash, subscriberId));
 
     private async Task HandleDurableSubscribeAsync(
         BoltHubConnection connection,
@@ -2961,7 +2973,8 @@ public sealed class BoltServer : IDisposable
         if (!BoltCodec.TryReadUnsubscribe(buffer.AsSpan(0, length), out var topicHash, out var topic, out var subscriberId, out var permanent, out var actorAccessToken, out _))
             return;
 
-        var durable = !string.Equals(subscriberId, conn.ClientId, StringComparison.Ordinal);
+        var scopedTransient = BoltTransientSubscriberId.IsScopedToClient(subscriberId, conn.ClientId);
+        var durable = !scopedTransient && !string.Equals(subscriberId, conn.ClientId, StringComparison.Ordinal);
         if (!await AuthorizeTopicAsync(
                 conn,
                 BoltTopicOperation.Unsubscribe,
@@ -3030,10 +3043,10 @@ public sealed class BoltServer : IDisposable
         }
 
         if (_liveSubscribersByTopic.TryGetValue(topicHash, out var topicSet))
-            topicSet.TryRemove(conn, out _);
+            topicSet.TryRemove((conn, scopedTransient ? subscriberId : string.Empty), out _);
 
         if (_liveSubscriptionsByConnection.TryGetValue(conn, out var connSet) &&
-            connSet.TryRemove(topicHash, out _))
+            connSet.TryRemove((topicHash, scopedTransient ? subscriberId : string.Empty), out _))
         {
             ReleaseQuota(_subscriptionsByPrincipal, conn.QuotaKey);
         }
@@ -3161,16 +3174,19 @@ public sealed class BoltServer : IDisposable
             }
         }
 
-        // Live fan-out for transient subscribers (skip publisher and skip durable-already-delivered)
+        // Tagged transient events must reach each separately authorized subscriber,
+        // even when the same connection already received a durable event for this topic.
         if (_liveSubscribersByTopic.TryGetValue(topicHash, out var topicSetForPublish))
         {
-            foreach (var (subscriberConn, _) in topicSetForPublish)
+            foreach (var (binding, expiresAtUtc) in topicSetForPublish)
             {
+                var (subscriberConn, transientId) = binding;
                 if (subscriberConn == publisher) continue;
-                if (deliveredConnections.Contains(subscriberConn)) continue;
+                if (transientId.Length == 0 && deliveredConnections.Contains(subscriberConn)) continue;
+                if (expiresAtUtc is { } expiry && expiry <= DateTimeOffset.UtcNow) continue;
 
                 var w = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteEvent(w, topicHash, sequenceNumber: 0, isReplay: false, payload.Span);
+                BoltCodec.WriteEvent(w, topicHash, transientId, sequenceNumber: 0, isReplay: false, payload.Span);
                 try { await subscriberConn.SendAsync(w, ct); }
                 catch { }
             }
@@ -3985,10 +4001,10 @@ public sealed class BoltServer : IDisposable
         // Clean up pub/sub subscriptions for this connection
         if (_liveSubscriptionsByConnection.TryRemove(connection, out var topics))
         {
-            foreach (var (topicHash, _) in topics)
+            foreach (var (subscription, _) in topics)
             {
-                if (_liveSubscribersByTopic.TryGetValue(topicHash, out var topicSet))
-                    topicSet.TryRemove(connection, out _);
+                if (_liveSubscribersByTopic.TryGetValue(subscription.TopicHash, out var topicSet))
+                    topicSet.TryRemove((connection, subscription.SubscriberId), out _);
                 ReleaseQuota(_subscriptionsByPrincipal, connection.QuotaKey);
             }
         }

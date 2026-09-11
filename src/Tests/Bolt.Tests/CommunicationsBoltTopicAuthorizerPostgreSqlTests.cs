@@ -157,6 +157,12 @@ public sealed class CommunicationsBoltTopicAuthorizerPostgreSqlTests
         var allowed = await authorizer.AuthorizeAsync(context);
 
         allowed.Should().Be(expected);
+        var scopedContext = context with
+        {
+            SubscriberId = Bolt.Protocol.BoltTransientSubscriberId.Create("client")
+        };
+        (await authorizer.AuthorizeAsync(scopedContext)).Should().Be(expected,
+            "a scoped subscriber must pass the same tenant and active membership checks");
     }
 
     private ServiceProvider CreateProvider(ClaimsPrincipal httpPrincipal)
