@@ -218,7 +218,26 @@ public sealed class PosReadinessRegressionTests
     }
 
     [Test]
-    public async Task CheckoutAsync_AmbiguousPaymentResult_ReplaysOriginalAccountAndIdempotencyWithoutReleasingStock()
+    public async Task CheckoutAsync_ZeroTotal_RejectsBeforeRegisterOrInventoryWork()
+    {
+        var tenant = Guid.NewGuid();
+        await using var db = Context(tenant);
+        var inventory = new Mock<IInventarioServiceWrapper>(MockBehavior.Strict);
+        var service = Service(db, tenant, inventory);
+        var request = CheckoutRequest(Sale(tenant, PosSaleStatus.Draft).Register);
+        request.Payment.Amount = 0;
+
+        var result = await service.CheckoutAsync(request, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(400);
+        result.Message.Should().Be("POS sale total must be greater than zero");
+        (await db.Set<PosSale>().CountAsync()).Should().Be(0);
+        inventory.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task RetryPaymentAsync_AmbiguousPaymentResult_ReusesOriginalAccountAndIdempotencyWithoutReleasingStock()
     {
         var tenant = Guid.NewGuid();
         await using var db = Context(tenant);
@@ -256,7 +275,8 @@ public sealed class PosReadinessRegressionTests
         var service = Service(db, tenant, inventory, wallets);
 
         var uncertain = await service.CheckoutAsync(request, CancellationToken.None);
-        var recovered = await service.CheckoutAsync(request, CancellationToken.None);
+        var recovered = await service.RetryPaymentAsync(
+            new RetryPosSalePaymentRequest { SaleId = sale.Id }, CancellationToken.None);
 
         uncertain.IsSuccess.Should().BeTrue(uncertain.Message);
         uncertain.Data!.Status.Should().Be(PosSaleStatus.PaymentPending);

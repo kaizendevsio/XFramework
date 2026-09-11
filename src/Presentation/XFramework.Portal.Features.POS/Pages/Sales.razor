@@ -40,7 +40,22 @@ else
                     <BbCardDescription>@_sales.Count sale(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_sales" ShowPagination="true" InitialPageSize="20">
+                    <div class="mb-4 flex flex-wrap items-end gap-3">
+                        <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Receipt or idempotency key" />
+                        <BbFormFieldSelect TValue="string" @bind-Value="_statusFilter" Label="Status">
+                            <BbSelectItem Value="@AllStatusesValue">All statuses</BbSelectItem>
+                            @foreach (var status in Enum.GetValues<PosSaleStatus>())
+                            {
+                                <BbSelectItem Value="@status.ToString()">@status</BbSelectItem>
+                            }
+                        </BbFormFieldSelect>
+                        <BbButton OnClick="@ApplyFilters" Disabled="@_loadingPage">
+                            <LucideIcon Name="search" class="mr-2 h-4 w-4" />Search
+                        </BbButton>
+                    </div>
+                    <BbDataGrid Items="@_sales" ShowPagination="false"
+                                OnRowClick="@((PosSaleSummaryResponse item) => OpenSale(item.Id))"
+                                Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.SaleNumber)" Title="Receipt" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Register" Filterable="true" FilterBy="@(item => GetRegisterName(item.RegisterId))">
@@ -59,6 +74,9 @@ else
                             <BbDataGridTemplateColumn Title="Actions">
                                 <ChildContent Context="item">
                                     <div class="flex flex-wrap gap-1">
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost" OnClick="@(() => OpenSale(item.Id))">
+                                            View
+                                        </BbButton>
                                         @if (item.Status == PosSaleStatus.InventoryFulfillmentFailed)
                                         {
                                             <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => RetryFulfillment(item.Id))" Disabled="@_acting">
@@ -85,6 +103,13 @@ else
                             <BbEmpty Title="No POS sales" Description="Completed and recoverable checkout records will appear here." />
                         </EmptyTemplate>
                     </BbDataGrid>
+                    <div class="mt-4 flex items-center justify-between">
+                        <BbTypographyMuted>Page @_page · up to @PageSize results per page</BbTypographyMuted>
+                        <div class="flex gap-2">
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@PreviousPage" Disabled="@(_page == 1 || _loadingPage)">Previous</BbButton>
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@NextPage" Disabled="@(!_hasNextPage || _loadingPage)">Next</BbButton>
+                        </div>
+                    </div>
                 </BbCardContent>
             </BbCard>
         </div>
@@ -106,6 +131,13 @@ else
     private bool _acting;
     private bool _hasTenant;
     private bool _moduleEnabled;
+    private bool _loadingPage;
+    private bool _hasNextPage;
+    private int _page = 1;
+    private const int PageSize = 50;
+    private string _search = "";
+    private const string AllStatusesValue = "all";
+    private string _statusFilter = AllStatusesValue;
 
     protected override void OnInitialized()
     {
@@ -115,7 +147,11 @@ else
 
     protected override async Task OnInitializedAsync() => await Reload();
 
-    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+    private void OnTenantChanged()
+    {
+        _page = 1;
+        _ = InvokeAsync(Reload);
+    }
 
     private async Task Reload()
     {
@@ -128,23 +164,10 @@ else
             _sales = [];
             _registers = [];
 
-            if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
+            if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid)
                 return;
 
-            _registers = await DataContext.Query<PosRegister>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-                .Take(200)
-                .ToListAsync();
-            var salesResponse = await POS.SearchPosSales(new SearchPosSalesRequest
-            {
-                Metadata = BuildMetadata(),
-                Page = 1,
-                PageSize = 100
-            });
-
-            _sales = salesResponse.Response ?? [];
-            if (!salesResponse.IsSuccess)
-                ToastService.Show(salesResponse.Message ?? "Could not load POS sales.");
+            await LoadSalesPage();
         }
         catch
         {
@@ -156,6 +179,71 @@ else
             StateHasChanged();
         }
     }
+
+    private async Task LoadSalesPage()
+    {
+        _loadingPage = true;
+        try
+        {
+            var salesResponse = await POS.SearchPosSales(new SearchPosSalesRequest
+            {
+                Metadata = BuildMetadata(),
+                Search = string.IsNullOrWhiteSpace(_search) ? null : _search.Trim(),
+                Status = Enum.TryParse<PosSaleStatus>(_statusFilter, out var status) ? status : null,
+                Page = _page,
+                PageSize = PageSize
+            });
+            _sales = salesResponse.Response ?? [];
+            await LoadRegisterLabels();
+            _hasNextPage = salesResponse.IsSuccess && _sales.Count == PageSize;
+            if (!salesResponse.IsSuccess)
+                ToastService.Show(salesResponse.Message ?? "Could not load POS sales.");
+        }
+        finally
+        {
+            _loadingPage = false;
+        }
+    }
+
+    private async Task LoadRegisterLabels()
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId)
+            return;
+
+        var registerIds = _sales.Select(item => item.RegisterId).Distinct().ToList();
+        _registers = await DataContext.Query<PosRegister>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted && registerIds.Contains(item.Id))
+            .ToListAsync();
+    }
+
+    private async Task ApplyFilters()
+    {
+        _page = 1;
+        await LoadSalesPage();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (_page <= 1)
+            return;
+        _page--;
+        await LoadSalesPage();
+    }
+
+    private async Task NextPage()
+    {
+        if (!_hasNextPage)
+            return;
+        _page++;
+        await LoadSalesPage();
+        if (_sales.Count == 0)
+        {
+            _page--;
+            await LoadSalesPage();
+        }
+    }
+
+    private void OpenSale(Guid saleId) => Navigation.NavigateTo($"/pos/sales/{saleId}");
 
     private async Task CancelSale(Guid saleId)
     {

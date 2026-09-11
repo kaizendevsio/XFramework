@@ -23,6 +23,15 @@ public sealed class GetPosRegisterValidator : AbstractValidator<GetPosRegisterRe
         RuleFor(x => x.Id).NotEmpty();
 }
 
+public sealed class SearchPosRegistersValidator : AbstractValidator<SearchPosRegistersRequest>
+{
+    public SearchPosRegistersValidator()
+    {
+        RuleFor(x => x.Page).GreaterThan(0);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+    }
+}
+
 public sealed class CreatePosRegisterValidator : AbstractValidator<CreatePosRegisterRequest>
 {
     public CreatePosRegisterValidator() => Configure(this);
@@ -149,7 +158,8 @@ public sealed class CheckoutPosCartValidator : AbstractValidator<CheckoutPosCart
         RuleFor(x => x.CartId).NotEmpty();
         RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(160);
         RuleFor(x => x.Payment).NotNull();
-        RuleFor(x => x.Payment.Amount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.Payment.Amount).GreaterThan(0)
+            .WithMessage("POS sale total must be greater than zero");
         RuleFor(x => x.Payment.Method).IsInEnum();
         RuleFor(x => x.Payment.CustomerCredentialId)
             .NotEmpty()
@@ -173,7 +183,8 @@ public sealed class CheckoutPosSaleValidator : AbstractValidator<CheckoutPosSale
         RuleFor(x => x.Lines).Must(lines => lines is not null && lines.Count <= PosValidationLimits.MaxTransactionLines)
             .WithMessage($"A POS sale cannot contain more than {PosValidationLimits.MaxTransactionLines} lines");
         RuleFor(x => x.Payment).NotNull();
-        RuleFor(x => x.Payment.Amount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.Payment.Amount).GreaterThan(0)
+            .WithMessage("POS sale total must be greater than zero");
         RuleFor(x => x.Payment.Method).IsInEnum();
         RuleFor(x => x.Payment.CustomerCredentialId)
             .NotEmpty()
@@ -221,6 +232,12 @@ public sealed class CancelPosSaleValidator : AbstractValidator<CancelPosSaleRequ
 public sealed class RetryPosSaleFulfillmentValidator : AbstractValidator<RetryPosSaleFulfillmentRequest>
 {
     public RetryPosSaleFulfillmentValidator() =>
+        RuleFor(x => x.SaleId).NotEmpty();
+}
+
+public sealed class RetryPosSalePaymentValidator : AbstractValidator<RetryPosSalePaymentRequest>
+{
+    public RetryPosSalePaymentValidator() =>
         RuleFor(x => x.SaleId).NotEmpty();
 }
 

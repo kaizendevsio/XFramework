@@ -43,8 +43,19 @@ else
                     <BbCardDescription>@_registers.Count register(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_registers" ShowPagination="true" InitialPageSize="20"
-                                OnRowClick="@((PosRegister item) => OpenRegister(item.Id))"
+                    <div class="mb-4 flex flex-wrap items-end gap-3">
+                        <BbFormFieldInput TValue="string" @bind-Value="_registerSearch" Label="Name, code, or description" />
+                        <BbFormFieldSelect TValue="string" @bind-Value="_registerStatusFilter" Label="Status">
+                            <BbSelectItem Value="@AllStatusesValue">All statuses</BbSelectItem>
+                            <BbSelectItem Value="@("enabled")">Enabled</BbSelectItem>
+                            <BbSelectItem Value="@("disabled")">Disabled</BbSelectItem>
+                        </BbFormFieldSelect>
+                        <BbButton OnClick="@ApplyRegisterFilters" Disabled="@_loadingPage">
+                            <LucideIcon Name="search" class="mr-2 h-4 w-4" />Search
+                        </BbButton>
+                    </div>
+                    <BbDataGrid Items="@_registers" ShowPagination="false"
+                                OnRowClick="@((PosRegisterResponse item) => OpenRegister(item.Id))"
                                 Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
@@ -78,6 +89,13 @@ else
                             <BbEmpty Title="No POS registers" Description="Create a register before using cashier checkout." />
                         </EmptyTemplate>
                     </BbDataGrid>
+                    <div class="mt-4 flex items-center justify-between">
+                        <BbTypographyMuted>Page @_registerPage · up to @RegisterPageSize results per page</BbTypographyMuted>
+                        <div class="flex gap-2">
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@PreviousRegisterPage" Disabled="@(_registerPage == 1 || _loadingPage)">Previous</BbButton>
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@NextRegisterPage" Disabled="@(!_hasNextRegisterPage || _loadingPage)">Next</BbButton>
+                        </div>
+                    </div>
                 </BbCardContent>
             </BbCard>
         </div>
@@ -106,6 +124,7 @@ else
                                 ValueSelector="@GetCredentialValue"
                                 TextSelector="@GetCredentialLabel"
                                 SearchTextSelector="@GetCredentialSearchText"
+                                SearchRequested="@SearchCredentials"
                                 AdvancedColumns="@CredentialAdvancedColumns"
                                 AdvancedSearchScope="Searches credential name, username, alias, online state, last seen date, and credential id."
                                 AdvancedSearchTitle="Find Merchant Credential"
@@ -120,6 +139,7 @@ else
                                 ValueSelector="@GetWalletValue"
                                 TextSelector="@GetWalletLabel"
                                 SearchTextSelector="@GetWalletSearchText"
+                                SearchRequested="@SearchWallets"
                                 AdvancedColumns="@WalletAdvancedColumns"
                                 AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, balance, available balance, and created date."
                                 AdvancedSearchTitle="Find Cash Drawer Wallet"
@@ -136,6 +156,7 @@ else
                                 ValueSelector="@GetWalletTypeValue"
                                 TextSelector="@GetWalletTypeLabel"
                                 SearchTextSelector="@GetWalletTypeSearchText"
+                                SearchRequested="@SearchWalletTypes"
                                 AdvancedColumns="@WalletTypeAdvancedColumns"
                                 AdvancedSearchScope="Searches wallet type code, name, currency, type, transfer rules, and description."
                                 AdvancedSearchTitle="Find Wallet Type"
@@ -150,6 +171,7 @@ else
                                 ValueSelector="@GetCurrencyValue"
                                 TextSelector="@GetCurrencyLabel"
                                 SearchTextSelector="@GetCurrencySearchText"
+                                SearchRequested="@SearchCurrencies"
                                 AdvancedColumns="@CurrencyAdvancedColumns"
                                 AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
                                 AdvancedSearchTitle="Find Currency"
@@ -167,6 +189,7 @@ else
                                 ValueSelector="@GetWarehouseValue"
                                 TextSelector="@GetWarehouseLabel"
                                 SearchTextSelector="@GetWarehouseSearchText"
+                                SearchRequested="@SearchWarehouses"
                                 AdvancedColumns="@WarehouseAdvancedColumns"
                                 AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
                                 AdvancedSearchTitle="Find Warehouse"
@@ -181,6 +204,7 @@ else
                                 ValueSelector="@GetLocationValue"
                                 TextSelector="@GetLocationLabel"
                                 SearchTextSelector="@GetLocationSearchText"
+                                SearchRequested="@SearchLocations"
                                 AdvancedColumns="@LocationAdvancedColumns"
                                 AdvancedSearchScope="Searches location code, name, warehouse, type, pickable flag, and description."
                                 AdvancedSearchTitle="Find Location"
@@ -208,7 +232,7 @@ else
     [Inject] private RequestMetadata RequestMetadata { get; set; } = default!;
 
     private readonly RegisterForm _form = new();
-    private List<PosRegister> _registers = [];
+    private List<PosRegisterResponse> _registers = [];
     private List<IdentityCredential> _credentials = [];
     private List<Wallet> _wallets = [];
     private List<Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
@@ -220,6 +244,14 @@ else
     private bool _hasTenant;
     private bool _moduleEnabled;
     private bool _dialogOpen;
+    private bool _loadingPage;
+    private bool _hasNextRegisterPage;
+    private int _registerPage = 1;
+    private string _registerSearch = "";
+    private const string AllStatusesValue = "all";
+    private string _registerStatusFilter = AllStatusesValue;
+    private const int RegisterPageSize = 50;
+    private const int ReferenceSearchSize = 50;
 
     protected override void OnInitialized()
     {
@@ -229,7 +261,11 @@ else
 
     protected override async Task OnInitializedAsync() => await Reload();
 
-    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+    private void OnTenantChanged()
+    {
+        _registerPage = 1;
+        _ = InvokeAsync(Reload);
+    }
 
     private async Task Reload()
     {
@@ -244,41 +280,13 @@ else
             if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
                 return;
 
-            _registers = await DataContext.Query<PosRegister>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-                .OrderBy(item => item.Name)
-                .Take(200)
-                .ToListAsync();
-            _credentials = await DataContext.Query<IdentityCredential>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted && item.IsEnabled)
-                .OrderBy(item => item.UserName)
-                .Take(200)
-                .ToListAsync();
-            _wallets = await DataContext.Query<Wallet>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted && item.IsEnabled)
-                .OrderBy(item => item.AccountNumber)
-                .Take(200)
-                .ToListAsync();
-            _walletTypes = await DataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-                .OrderBy(item => item.Name)
-                .Take(100)
-                .ToListAsync();
-            _currencies = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>().IgnoreQueryFilters().NoCache()
-                .Where(item => !item.IsDeleted)
-                .OrderBy(item => item.CurrencyIsoCode3)
-                .Take(100)
-                .ToListAsync();
-            _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-                .OrderBy(item => item.Name)
-                .Take(100)
-                .ToListAsync();
-            _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache()
-                .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-                .OrderBy(item => item.Name)
-                .Take(200)
-                .ToListAsync();
+            await LoadRegisterPage();
+            await SearchCredentials("");
+            await SearchWallets("");
+            await SearchWalletTypes("");
+            await SearchCurrencies("");
+            await SearchWarehouses("");
+            await SearchLocations("");
         }
         catch
         {
@@ -301,6 +309,152 @@ else
         _form.DefaultWarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
         _form.DefaultLocationId = LocationsForSelectedWarehouse().FirstOrDefault()?.Id.ToString() ?? "";
         _dialogOpen = true;
+    }
+
+    private async Task LoadRegisterPage()
+    {
+        _loadingPage = true;
+        try
+        {
+            var response = await POS.SearchPosRegisters(new SearchPosRegistersRequest
+            {
+                Metadata = BuildMetadata(),
+                Search = string.IsNullOrWhiteSpace(_registerSearch) ? null : _registerSearch.Trim(),
+                IsEnabled = _registerStatusFilter switch
+                {
+                    "enabled" => true,
+                    "disabled" => false,
+                    _ => null
+                },
+                Page = _registerPage,
+                PageSize = RegisterPageSize
+            });
+            _registers = response.Response ?? [];
+            _hasNextRegisterPage = response.IsSuccess && _registers.Count == RegisterPageSize;
+            if (!response.IsSuccess)
+                ToastService.Show(response.Message ?? "Could not load POS registers.");
+        }
+        finally
+        {
+            _loadingPage = false;
+        }
+    }
+
+    private async Task ApplyRegisterFilters()
+    {
+        _registerPage = 1;
+        await LoadRegisterPage();
+    }
+
+    private async Task PreviousRegisterPage()
+    {
+        if (_registerPage <= 1) return;
+        _registerPage--;
+        await LoadRegisterPage();
+    }
+
+    private async Task NextRegisterPage()
+    {
+        if (!_hasNextRegisterPage) return;
+        _registerPage++;
+        await LoadRegisterPage();
+        if (_registers.Count == 0)
+        {
+            _registerPage--;
+            await LoadRegisterPage();
+        }
+    }
+
+    private async Task SearchCredentials(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var selected = _credentials.FirstOrDefault(item => item.Id.ToString() == _form.MerchantCredentialId);
+        var query = DataContext.Query<IdentityCredential>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted && item.IsEnabled);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.UserName.Contains(term) || (item.UserAlias != null && item.UserAlias.Contains(term)));
+        }
+        _credentials = await query.OrderBy(item => item.UserName).Take(ReferenceSearchSize).ToListAsync();
+        if (selected is not null && _credentials.All(item => item.Id != selected.Id)) _credentials.Insert(0, selected);
+    }
+
+    private async Task SearchWallets(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var selected = _wallets.FirstOrDefault(item => item.Id.ToString() == _form.CashDrawerWalletId);
+        var query = DataContext.Query<Wallet>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted && item.IsEnabled);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.AccountNumber.Contains(term));
+        }
+        _wallets = await query.OrderBy(item => item.AccountNumber).Take(ReferenceSearchSize).ToListAsync();
+        if (selected is not null && _wallets.All(item => item.Id != selected.Id)) _wallets.Insert(0, selected);
+    }
+
+    private async Task SearchWalletTypes(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var selected = _walletTypes.FirstOrDefault(item => item.Id.ToString() == _form.WalletTypeId);
+        var query = DataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.Name.Contains(term) || item.Code.Contains(term));
+        }
+        _walletTypes = await query.OrderBy(item => item.Name).Take(ReferenceSearchSize).ToListAsync();
+        if (selected is not null && _walletTypes.All(item => item.Id != selected.Id)) _walletTypes.Insert(0, selected);
+    }
+
+    private async Task SearchCurrencies(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var selected = _currencies.FirstOrDefault(item => item.Id.ToString() == _form.CurrencyId);
+        var query = DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>().IgnoreQueryFilters().NoCache()
+            .Where(item => !item.IsDeleted && (item.TenantId == tenantId || item.TenantId == Guid.Empty));
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.CurrencyIsoCode3.Contains(term) || item.Name.Contains(term));
+        }
+        _currencies = await query.OrderBy(item => item.CurrencyIsoCode3).Take(ReferenceSearchSize).ToListAsync();
+        if (selected is not null && _currencies.All(item => item.Id != selected.Id)) _currencies.Insert(0, selected);
+    }
+
+    private async Task SearchWarehouses(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var selected = _warehouses.FirstOrDefault(item => item.Id.ToString() == _form.DefaultWarehouseId);
+        var query = DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.Name.Contains(term) || item.Code.Contains(term));
+        }
+        _warehouses = await query.OrderBy(item => item.Name).Take(ReferenceSearchSize).ToListAsync();
+        if (selected is not null && _warehouses.All(item => item.Id != selected.Id)) _warehouses.Insert(0, selected);
+    }
+
+    private async Task SearchLocations(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var selected = _locations.FirstOrDefault(item => item.Id.ToString() == _form.DefaultLocationId);
+        var query = DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+        if (Guid.TryParse(_form.DefaultWarehouseId, out var warehouseId))
+            query = query.Where(item => item.WarehouseId == warehouseId);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.Name.Contains(term) || item.Code.Contains(term));
+        }
+        _locations = await query.OrderBy(item => item.Name).Take(ReferenceSearchSize).ToListAsync();
+        if (selected is not null && _locations.All(item => item.Id != selected.Id)) _locations.Insert(0, selected);
     }
 
     private async Task SaveRegister()
@@ -365,11 +519,12 @@ else
         return true;
     }
 
-    private Task OnWarehouseChanged(string? value)
+    private async Task OnWarehouseChanged(string? value)
     {
         _form.DefaultWarehouseId = value ?? "";
+        _form.DefaultLocationId = "";
+        await SearchLocations("");
         _form.DefaultLocationId = LocationsForSelectedWarehouse().FirstOrDefault()?.Id.ToString() ?? "";
-        return Task.CompletedTask;
     }
 
     private IEnumerable<InventoryLocation> LocationsForSelectedWarehouse() =>
@@ -387,7 +542,7 @@ else
     private string GetWarehouseName(Guid id) => _warehouses.FirstOrDefault(item => item.Id == id)?.Name ?? id.ToString()[..8];
     private string GetLocationName(Guid id) => _locations.FirstOrDefault(item => item.Id == id)?.Name ?? id.ToString()[..8];
     private string GetWalletName(Guid id) => _wallets.FirstOrDefault(item => item.Id == id)?.AccountNumber ?? id.ToString()[..8];
-    private static string GetRegisterLabel(PosRegister item) =>
+    private static string GetRegisterLabel(PosRegisterResponse item) =>
         string.IsNullOrWhiteSpace(item.Code) ? item.Name : $"{item.Name} ({item.Code})";
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 

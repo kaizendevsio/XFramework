@@ -1,18 +1,23 @@
 using Bolt.Client;
 using Bolt.Hub.Extensions;
+using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
+using IdentityServer.Integration.Drivers;
+using Inventario.Integration.Drivers;
 using POS.Api.Services;
 using POS.Domain.Shared.Contracts;
 using POS.Domain.Shared.Contracts.Requests;
 using POS.Integration.Drivers;
+using Wallets.Integration.Drivers;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
@@ -24,6 +29,7 @@ using XFramework.Domain.Shared.Extensions;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Extensions;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Abstractions;
 using XFramework.TestInfrastructure;
 
 namespace POS.IntegrationTests;
@@ -97,9 +103,9 @@ public sealed class PosBoltRuntimeIntegrationTests
     public async Task OneTimeTearDown()
     {
         clientScope?.Dispose();
-        if (clientApp is not null) await clientApp.StopAsync();
-        if (posApp is not null) await posApp.StopAsync();
-        if (boltApp is not null) await boltApp.StopAsync();
+        if (clientApp is not null) { await clientApp.StopAsync(); await clientApp.DisposeAsync(); }
+        if (posApp is not null) { await posApp.StopAsync(); await posApp.DisposeAsync(); }
+        if (boltApp is not null) { await boltApp.StopAsync(); await boltApp.DisposeAsync(); }
         if (postgres is not null) await postgres.DisposeAsync();
         transportAuthority?.Dispose();
     }
@@ -118,6 +124,15 @@ public sealed class PosBoltRuntimeIntegrationTests
 
         allowed.IsSuccess.Should().BeTrue(allowed.Message);
         allowed.Response!.Id.Should().Be(registerId);
+
+        var crossTenant = await wrapper.GetPosRegister(new GetPosRegisterRequest
+        {
+            Id = registerId,
+            Metadata = new RequestMetadata { RequestedTenantId = Guid.NewGuid() }
+        });
+
+        crossTenant.IsSuccess.Should().BeFalse();
+        ((int)crossTenant.HttpStatusCode).Should().Be(403);
 
         var unauthorizedToken = TestInvocationIdentityExtensions.CreateTestActorToken(
             tenantId,
@@ -171,6 +186,8 @@ public sealed class PosBoltRuntimeIntegrationTests
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = Environments.Development });
         builder.WebHost.UseUrls(BoltUrl);
         OverrideConfig(builder, "Bolt.PosRuntimeTest", BoltUrl);
+        builder.Configuration["ConnectionStrings:DefaultDatabaseConnection"] = postgres!.GetConnectionString();
+        builder.Configuration["DefaultDatabaseConnection"] = postgres.GetConnectionString();
         transportAuthority.Configure(builder);
         builder.Services.InstallServicesInAssembly<Bolt.Hub.Installers.BoltInstaller>(builder.Configuration, builder.Environment);
         builder.Services.InstallSwagger(builder.Configuration);
@@ -195,7 +212,15 @@ public sealed class PosBoltRuntimeIntegrationTests
         OverrideConfig(builder, XFrameworkServiceNames.Pos, PosUrl);
         builder.Configuration["ConnectionStrings:DefaultDatabaseConnection"] = postgres!.GetConnectionString();
         builder.Configuration["DefaultDatabaseConnection"] = postgres.GetConnectionString();
+        builder.Services.InstallServicesInAssembly<PosRegisterService>(builder.Configuration, builder.Environment);
         builder.Services.InstallStandardServices<PosRegisterService>(builder.Configuration);
+        builder.Services.AddValidatorsFromAssemblyContaining<PosRegisterService>();
+        builder.Services.RemoveAll<IJwtService>();
+        builder.Services.AddSingleton(Mock.Of<IJwtService>());
+        builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddSingleton(Mock.Of<IIdentityServerServiceWrapper>());
+        builder.Services.AddSingleton(Mock.Of<IInventarioServiceWrapper>());
+        builder.Services.AddSingleton(Mock.Of<IWalletsServiceWrapper>());
         builder.Services.AddTestInvocationServer(invocationIdentity);
         builder.Services.AddSingleton(transportAuthority.CreateTokenProvider(XFrameworkServiceNames.Pos));
 
@@ -220,6 +245,8 @@ public sealed class PosBoltRuntimeIntegrationTests
         builder.WebHost.UseUrls(ClientUrl);
         OverrideConfig(builder, XFrameworkServiceNames.Portal, ClientUrl);
         builder.Services.InstallStandardServices<PosBoltRuntimeIntegrationTests>(builder.Configuration);
+        builder.Services.RemoveAll<IJwtService>();
+        builder.Services.AddSingleton(Mock.Of<IJwtService>());
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
         builder.Services.AddSingleton(transportAuthority.CreateTokenProvider(XFrameworkServiceNames.Portal));
         builder.Services.AddTestInvocationClient(invocationIdentity);

@@ -56,6 +56,7 @@ public sealed class WrapperContractTests
                 typeof(CheckoutPosSaleRequest),
                 typeof(CancelPosSaleRequest),
                 typeof(RetryPosSaleFulfillmentRequest),
+                typeof(RetryPosSalePaymentRequest),
                 typeof(CreatePosReturnRequest),
                 typeof(RetryPosReturnRequest)
             ]);

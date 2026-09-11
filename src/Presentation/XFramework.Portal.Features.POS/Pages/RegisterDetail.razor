@@ -93,6 +93,7 @@ else
                                                 ValueSelector="@GetCredentialValue"
                                                 TextSelector="@GetCredentialLabel"
                                                 SearchTextSelector="@GetCredentialSearchText"
+                                                SearchRequested="@SearchCredentials"
                                                 AdvancedColumns="@CredentialAdvancedColumns"
                                                 AdvancedSearchScope="Searches credential name, username, alias, online state, last seen date, and credential id."
                                                 AdvancedSearchTitle="Find Merchant Credential"
@@ -107,6 +108,7 @@ else
                                                 ValueSelector="@GetWalletValue"
                                                 TextSelector="@GetWalletLabel"
                                                 SearchTextSelector="@GetWalletSearchText"
+                                                SearchRequested="@SearchWallets"
                                                 AdvancedColumns="@WalletAdvancedColumns"
                                                 AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, balance, available balance, and created date."
                                                 AdvancedSearchTitle="Find Cash Drawer Wallet"
@@ -124,6 +126,7 @@ else
                                                 ValueSelector="@GetWalletTypeValue"
                                                 TextSelector="@GetWalletTypeLabel"
                                                 SearchTextSelector="@GetWalletTypeSearchText"
+                                                SearchRequested="@SearchWalletTypes"
                                                 AdvancedColumns="@WalletTypeAdvancedColumns"
                                                 AdvancedSearchScope="Searches wallet type code, name, currency, type, transfer rules, and description."
                                                 AdvancedSearchTitle="Find Wallet Type"
@@ -138,6 +141,7 @@ else
                                                 ValueSelector="@GetCurrencyValue"
                                                 TextSelector="@GetCurrencyLabel"
                                                 SearchTextSelector="@GetCurrencySearchText"
+                                                SearchRequested="@SearchCurrencies"
                                                 AdvancedColumns="@CurrencyAdvancedColumns"
                                                 AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
                                                 AdvancedSearchTitle="Find Currency"
@@ -156,6 +160,7 @@ else
                                                 ValueSelector="@GetWarehouseValue"
                                                 TextSelector="@GetWarehouseLabel"
                                                 SearchTextSelector="@GetWarehouseSearchText"
+                                                SearchRequested="@SearchWarehouses"
                                                 AdvancedColumns="@WarehouseAdvancedColumns"
                                                 AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
                                                 AdvancedSearchTitle="Find Warehouse"
@@ -170,6 +175,7 @@ else
                                                 ValueSelector="@GetLocationValue"
                                                 TextSelector="@GetLocationLabel"
                                                 SearchTextSelector="@GetLocationSearchText"
+                                                SearchRequested="@SearchLocations"
                                                 AdvancedColumns="@LocationAdvancedColumns"
                                                 AdvancedSearchScope="Searches location code, name, warehouse, type, pickable flag, and description."
                                                 AdvancedSearchTitle="Find Location"
@@ -255,6 +261,7 @@ else
     private bool _reloading;
     private Guid? _loadedId;
     private string? _loadError;
+    private const int ReferenceSearchSize = 50;
 
     protected override void OnInitialized()
     {
@@ -306,8 +313,8 @@ else
             }
 
             _register = registerResponse.Response;
-            await LoadReferenceData(tenantId);
             LoadForm();
+            await LoadReferenceData();
         }
         catch
         {
@@ -323,38 +330,14 @@ else
         }
     }
 
-    private async Task LoadReferenceData(Guid tenantId)
+    private async Task LoadReferenceData()
     {
-        _credentials = await DataContext.Query<IdentityCredential>().IgnoreQueryFilters().NoCache()
-            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-            .OrderBy(item => item.UserName)
-            .Take(200)
-            .ToListAsync();
-        _wallets = await DataContext.Query<Wallet>().IgnoreQueryFilters().NoCache()
-            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-            .OrderBy(item => item.AccountNumber)
-            .Take(200)
-            .ToListAsync();
-        _walletTypes = await DataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>().IgnoreQueryFilters().NoCache()
-            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-            .OrderBy(item => item.Name)
-            .Take(100)
-            .ToListAsync();
-        _currencies = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>().IgnoreQueryFilters().NoCache()
-            .Where(item => !item.IsDeleted && (item.TenantId == tenantId || item.TenantId == Guid.Empty))
-            .OrderBy(item => item.CurrencyIsoCode3)
-            .Take(100)
-            .ToListAsync();
-        _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()
-            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-            .OrderBy(item => item.Name)
-            .Take(100)
-            .ToListAsync();
-        _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache()
-            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
-            .OrderBy(item => item.Name)
-            .Take(200)
-            .ToListAsync();
+        await SearchCredentials("");
+        await SearchWallets("");
+        await SearchWalletTypes("");
+        await SearchCurrencies("");
+        await SearchWarehouses("");
+        await SearchLocations("");
     }
 
     private void ClearReferenceData()
@@ -519,11 +502,128 @@ else
         return true;
     }
 
-    private Task OnWarehouseChanged(string? value)
+    private async Task SearchCredentials(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var baseQuery = DataContext.Query<IdentityCredential>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+        var query = baseQuery;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.UserName.Contains(term) || (item.UserAlias != null && item.UserAlias.Contains(term)));
+        }
+        _credentials = await query.OrderBy(item => item.UserName).Take(ReferenceSearchSize).ToListAsync();
+        if (Guid.TryParse(_form.MerchantCredentialId, out var selectedId) && _credentials.All(item => item.Id != selectedId))
+        {
+            var selected = await baseQuery.Where(item => item.Id == selectedId).FirstOrDefaultAsync();
+            if (selected is not null) _credentials.Insert(0, selected);
+        }
+    }
+
+    private async Task SearchWallets(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var baseQuery = DataContext.Query<Wallet>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+        var query = baseQuery;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.AccountNumber.Contains(term));
+        }
+        _wallets = await query.OrderBy(item => item.AccountNumber).Take(ReferenceSearchSize).ToListAsync();
+        if (Guid.TryParse(_form.CashDrawerWalletId, out var selectedId) && _wallets.All(item => item.Id != selectedId))
+        {
+            var selected = await baseQuery.Where(item => item.Id == selectedId).FirstOrDefaultAsync();
+            if (selected is not null) _wallets.Insert(0, selected);
+        }
+    }
+
+    private async Task SearchWalletTypes(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var baseQuery = DataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+        var query = baseQuery;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.Name.Contains(term) || item.Code.Contains(term));
+        }
+        _walletTypes = await query.OrderBy(item => item.Name).Take(ReferenceSearchSize).ToListAsync();
+        if (Guid.TryParse(_form.WalletTypeId, out var selectedId) && _walletTypes.All(item => item.Id != selectedId))
+        {
+            var selected = await baseQuery.Where(item => item.Id == selectedId).FirstOrDefaultAsync();
+            if (selected is not null) _walletTypes.Insert(0, selected);
+        }
+    }
+
+    private async Task SearchCurrencies(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var baseQuery = DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>().IgnoreQueryFilters().NoCache()
+            .Where(item => !item.IsDeleted && (item.TenantId == tenantId || item.TenantId == Guid.Empty));
+        var query = baseQuery;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.CurrencyIsoCode3.Contains(term) || item.Name.Contains(term));
+        }
+        _currencies = await query.OrderBy(item => item.CurrencyIsoCode3).Take(ReferenceSearchSize).ToListAsync();
+        if (Guid.TryParse(_form.CurrencyId, out var selectedId) && _currencies.All(item => item.Id != selectedId))
+        {
+            var selected = await baseQuery.Where(item => item.Id == selectedId).FirstOrDefaultAsync();
+            if (selected is not null) _currencies.Insert(0, selected);
+        }
+    }
+
+    private async Task SearchWarehouses(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var baseQuery = DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+        var query = baseQuery;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.Name.Contains(term) || item.Code.Contains(term));
+        }
+        _warehouses = await query.OrderBy(item => item.Name).Take(ReferenceSearchSize).ToListAsync();
+        if (Guid.TryParse(_form.DefaultWarehouseId, out var selectedId) && _warehouses.All(item => item.Id != selectedId))
+        {
+            var selected = await baseQuery.Where(item => item.Id == selectedId).FirstOrDefaultAsync();
+            if (selected is not null) _warehouses.Insert(0, selected);
+        }
+    }
+
+    private async Task SearchLocations(string search)
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var baseQuery = DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted);
+        if (Guid.TryParse(_form.DefaultWarehouseId, out var warehouseId))
+            baseQuery = baseQuery.Where(item => item.WarehouseId == warehouseId);
+        var query = baseQuery;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(item => item.Name.Contains(term) || item.Code.Contains(term));
+        }
+        _locations = await query.OrderBy(item => item.Name).Take(ReferenceSearchSize).ToListAsync();
+        if (Guid.TryParse(_form.DefaultLocationId, out var selectedId) && _locations.All(item => item.Id != selectedId))
+        {
+            var selected = await baseQuery.Where(item => item.Id == selectedId).FirstOrDefaultAsync();
+            if (selected is not null) _locations.Insert(0, selected);
+        }
+    }
+
+    private async Task OnWarehouseChanged(string? value)
     {
         _form.DefaultWarehouseId = value ?? "";
+        _form.DefaultLocationId = "";
+        await SearchLocations("");
         _form.DefaultLocationId = LocationsForSelectedWarehouse().FirstOrDefault()?.Id.ToString() ?? "";
-        return Task.CompletedTask;
     }
 
     private IEnumerable<InventoryLocation> LocationsForSelectedWarehouse() =>

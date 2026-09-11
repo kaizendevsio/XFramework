@@ -35,6 +35,9 @@ public sealed class PosSalesService(
         if (string.IsNullOrWhiteSpace(idempotencyKey))
             return Result<PosSaleReceiptResponse>.Failure("Checkout idempotency key is required", 400);
 
+        if (request.Payment.Amount <= 0)
+            return Result<PosSaleReceiptResponse>.Failure("POS sale total must be greater than zero", 400);
+
         var context = contextResult.Data!;
         var tenantId = context.TenantId;
         var requestHash = PosServiceHelpers.BuildSaleRequestHash(request);
@@ -138,7 +141,7 @@ public sealed class PosSalesService(
     private async Task<Result<PosSaleReceiptResponse>> ContinueCheckoutAsync(
         PosSale sale,
         PosRegister register,
-        CheckoutPosSaleRequest request,
+        CheckoutPosSaleRequest? request,
         RequestMetadata metadata,
         CancellationToken ct,
         bool replayed)
@@ -170,6 +173,9 @@ public sealed class PosSalesService(
                 .FirstOrDefault();
             if (payment is null)
             {
+                if (request is null)
+                    return Result<PosSaleReceiptResponse>.Conflict("Pending POS sale has no payment snapshot to retry");
+
                 payment = CreatePayment(sale, register, request);
                 db.Set<PosPayment>().Add(payment);
                 sale.Payments.Add(payment);
@@ -209,7 +215,7 @@ public sealed class PosSalesService(
                         payment.FailureReason = paymentResult.Message;
                         sale.Status = PosSaleStatus.PaymentPending;
                         sale.FailureReason = paymentResult.Message;
-                        sale.RecoveryState = "Payment result is unknown; retry checkout with the same idempotency key.";
+                        sale.RecoveryState = "Payment result is unknown; retry payment from this receipt to reuse the original payment reference and same idempotency key.";
                         await db.SaveChangesAsync(ct);
                         return Result<PosSaleReceiptResponse>.Success(
                             PosServiceHelpers.ToSaleReceiptResponse(sale),
@@ -408,6 +414,34 @@ public sealed class PosSalesService(
         await db.SaveChangesAsync(ct);
 
         return Result<PosSaleReceiptResponse>.Success(PosServiceHelpers.ToSaleReceiptResponse(sale), "POS sale fulfillment completed");
+    }
+
+    public async Task<Result<PosSaleReceiptResponse>> RetryPaymentAsync(
+        RetryPosSalePaymentRequest request,
+        CancellationToken ct)
+    {
+        var contextResult = contextResolver.Resolve(request);
+        if (!contextResult.IsSuccess)
+            return Result<PosSaleReceiptResponse>.Failure(contextResult.Message!, contextResult.StatusCode);
+
+        var sale = await LoadSaleAsync(contextResult.Data!.TenantId, request.SaleId, true, ct);
+        if (sale is null)
+            return Result<PosSaleReceiptResponse>.NotFound("POS sale was not found");
+
+        if (sale.Status != PosSaleStatus.PaymentPending)
+            return Result<PosSaleReceiptResponse>.Conflict("Only sales with a pending payment can retry payment");
+
+        var register = await LoadRegisterAsync(sale.TenantId, sale.RegisterId, ct, requireEnabled: false);
+        if (register is null)
+            return Result<PosSaleReceiptResponse>.NotFound("POS register was not found");
+
+        return await ContinueCheckoutAsync(
+            sale,
+            register,
+            request: null,
+            metadata: contextResult.Data.Metadata,
+            ct: ct,
+            replayed: true);
     }
 
     private async Task<Result<List<PosSaleLine>>> BuildSaleLinesAsync(
