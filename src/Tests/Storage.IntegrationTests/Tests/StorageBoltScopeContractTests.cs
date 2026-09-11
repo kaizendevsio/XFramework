@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentAssertions;
 using NUnit.Framework;
 using Storage.Api.Features.Files.Get;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.ServiceIdentity;
 using XFramework.Integration.Attributes;
 using XFramework.TestInfrastructure;
@@ -21,7 +22,9 @@ public sealed class StorageBoltScopeContractTests
         "GetStoragePublicUrlEndpoint",
         "GetStorageDownloadUrlEndpoint",
         "ValidateStorageFileReferenceEndpoint",
-        "ListStorageUploadPartsEndpoint"
+        "ListStorageUploadPartsEndpoint",
+        "ValidateChatStorageFileReferenceEndpoint",
+        "GetChatStorageDownloadUrlEndpoint"
     ];
 
     private static readonly HashSet<string> ServiceTargetWriteHandlers =
@@ -40,7 +43,7 @@ public sealed class StorageBoltScopeContractTests
             .Where(item => item.Attribute is not null)
             .ToList();
 
-        handlers.Should().HaveCount(15);
+        handlers.Should().HaveCount(21);
         foreach (var handler in handlers)
         {
             var expectedScope = ReadHandlers.Contains(handler.Type.Name)
@@ -50,6 +53,27 @@ public sealed class StorageBoltScopeContractTests
                 ? new[] { expectedScope, XFrameworkServiceScopes.TenantTarget }
                 : [expectedScope];
             handler.Attribute!.RequiredServiceScopes.Should().Equal(expectedScopes);
+        }
+    }
+
+    [Test]
+    public void ChatHandlers_KeepActorCapabilitiesAndInternalCallerBoundaries()
+    {
+        var handlers = typeof(GetStorageFileMetadataEndpoint).Assembly.GetTypes()
+            .Where(type => type.Namespace?.StartsWith("Storage.Api.Features.ChatUploads.", StringComparison.Ordinal) == true)
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Select(method => (Type: type, Attribute: method.GetCustomAttribute<BoltHandlerAttribute>())))
+            .Where(item => item.Attribute is not null).ToList();
+        handlers.Should().HaveCount(6);
+        foreach (var handler in handlers)
+        {
+            var download = handler.Type.Name == "GetChatStorageDownloadUrlEndpoint";
+            handler.Attribute!.RequiredActorCapabilities.Should().Equal(download
+                ? StorageAuthorizationCapabilities.View : StorageAuthorizationCapabilities.Create);
+            if (download || handler.Type.Name is "CreateChatStorageUploadSessionEndpoint" or "ValidateChatStorageFileReferenceEndpoint")
+                handler.Attribute.AllowedServiceCallers.Should().Equal(XFrameworkServiceNames.Communications);
+            else
+                handler.Attribute.AllowedServiceCallers.Should().BeNullOrEmpty();
         }
     }
 

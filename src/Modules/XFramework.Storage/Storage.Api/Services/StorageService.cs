@@ -118,9 +118,12 @@ public sealed partial class StorageService(
         });
     }
 
-    public async Task<Result<StorageUploadSessionResponse>> CreateUploadSessionAsync(
+    public Task<Result<StorageUploadSessionResponse>> CreateUploadSessionAsync(
         CreateStorageUploadSessionRequest request,
-        CancellationToken ct = default)
+        CancellationToken ct = default) => CreateUploadSessionCoreAsync(request, null, null, ct);
+
+    private async Task<Result<StorageUploadSessionResponse>> CreateUploadSessionCoreAsync(
+        CreateStorageUploadSessionRequest request, Guid? uploadedByCredentialId, string? uploadPurpose, CancellationToken ct)
     {
         var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
@@ -195,6 +198,8 @@ public sealed partial class StorageService(
             TypeId = request.TypeId,
             Identifier = request.Identifier == Guid.Empty ? storageFileId : request.Identifier,
             StorageFileIdentifierId = request.StorageFileIdentifierId,
+            UploadedByCredentialId = uploadedByCredentialId,
+            UploadPurpose = uploadPurpose,
             FileSize = request.TotalSizeBytes,
             ContentLengthBytes = request.TotalSizeBytes,
             Hash = NormalizeHash(request.ExpectedSha256Hash),
@@ -273,9 +278,12 @@ public sealed partial class StorageService(
             "Upload session created");
     }
 
-    public async Task<Result<StorageUploadPartResponse>> UploadPartAsync(
+    public Task<Result<StorageUploadPartResponse>> UploadPartAsync(
         UploadStorageFilePartRequest request,
-        CancellationToken ct = default)
+        CancellationToken ct = default) => UploadPartCoreAsync(request, false, ct);
+
+    private async Task<Result<StorageUploadPartResponse>> UploadPartCoreAsync(
+        UploadStorageFilePartRequest request, bool chatOnly, CancellationToken ct)
     {
         var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
@@ -320,6 +328,9 @@ public sealed partial class StorageService(
 
             if (session is null)
                 return Result<StorageUploadPartResponse>.NotFound("Upload session not found");
+
+            if (!CanMutateUpload(session.StorageFile, chatOnly))
+                return Result<StorageUploadPartResponse>.Forbidden("Upload session is not owned by the current actor");
 
             if (session.Status is StorageUploadSessionStatus.Completed or StorageUploadSessionStatus.Aborted or
                 StorageUploadSessionStatus.Completing or StorageUploadSessionStatus.Aborting)
@@ -493,9 +504,12 @@ public sealed partial class StorageService(
         });
     }
 
-    public async Task<Result<StorageFileResponse>> CompleteUploadAsync(
+    public Task<Result<StorageFileResponse>> CompleteUploadAsync(
         CompleteStorageUploadSessionRequest request,
-        CancellationToken ct = default)
+        CancellationToken ct = default) => CompleteUploadCoreAsync(request, false, ct);
+
+    private async Task<Result<StorageFileResponse>> CompleteUploadCoreAsync(
+        CompleteStorageUploadSessionRequest request, bool chatOnly, CancellationToken ct)
     {
         var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
@@ -530,6 +544,9 @@ public sealed partial class StorageService(
 
             if (session is null)
                 return Result<StorageFileResponse>.NotFound("Upload session not found");
+
+            if (!CanMutateUpload(session.StorageFile, chatOnly))
+                return Result<StorageFileResponse>.Forbidden("Upload session is not owned by the current actor");
 
             if (session.Status == StorageUploadSessionStatus.Completed)
                 return Result<StorageFileResponse>.Success(ToFileResponse(session.StorageFile), "Upload session already completed");
@@ -655,9 +672,12 @@ public sealed partial class StorageService(
             singlePartHash is null ? "Upload completed and queued for verification" : "Upload completed");
     }
 
-    public async Task<Result> AbortUploadAsync(
+    public Task<Result> AbortUploadAsync(
         AbortStorageUploadSessionRequest request,
-        CancellationToken ct = default)
+        CancellationToken ct = default) => AbortUploadCoreAsync(request, false, ct);
+
+    private async Task<Result> AbortUploadCoreAsync(
+        AbortStorageUploadSessionRequest request, bool chatOnly, CancellationToken ct)
     {
         var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
@@ -687,6 +707,8 @@ public sealed partial class StorageService(
 
             if (session is null)
                 return Result.NotFound("Upload session not found");
+            if (!CanMutateUpload(session.StorageFile, chatOnly))
+                return Result.Forbidden("Upload session is not owned by the current actor");
             if (session.Status == StorageUploadSessionStatus.Completed)
                 return Result.Conflict("Completed upload sessions cannot be aborted");
             if (session.Status == StorageUploadSessionStatus.Aborted)
@@ -872,9 +894,12 @@ public sealed partial class StorageService(
         });
     }
 
-    public async Task<Result<StorageDownloadUrlResponse>> GetDownloadUrlAsync(
+    public Task<Result<StorageDownloadUrlResponse>> GetDownloadUrlAsync(
         GetStorageDownloadUrlRequest request,
-        CancellationToken ct = default)
+        CancellationToken ct = default) => GetDownloadUrlCoreAsync(request, false, ct);
+
+    private async Task<Result<StorageDownloadUrlResponse>> GetDownloadUrlCoreAsync(
+        GetStorageDownloadUrlRequest request, bool authorizedChatDownload, CancellationToken ct)
     {
         var tenantResult = await ResolveTenantIdAsync(request.Metadata, ct);
         if (!tenantResult.IsSuccess)
@@ -889,6 +914,9 @@ public sealed partial class StorageService(
 
         if (file is null)
             return Result<StorageDownloadUrlResponse>.NotFound("Storage file not found");
+
+        if (file.UploadPurpose == StorageUploadPurposes.ChatAttachment && !authorizedChatDownload)
+            return Result<StorageDownloadUrlResponse>.Forbidden("Chat attachments must be downloaded through Communications");
 
         var availability = ValidateAvailableFile(file);
         if (!availability.IsSuccess)

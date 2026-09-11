@@ -791,9 +791,103 @@ public sealed class ThreadServiceSecurityTests
         Assert.That(result.Data.Items.Single(x => x.Id == group.Id).OtherCredentialId, Is.Null);
     }
 
+    [TestCase("member", 201)]
+    [TestCase("nonmember", 403)]
+    [TestCase("disabled", 403)]
+    [TestCase("wrongtenant", 403)]
+    public async Task CreateChatAttachmentUploadAsync_RequiresActiveMembershipAndPreservesFileDetails(string scenario, int expected)
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var thread = Thread(Guid.NewGuid(), tenant);
+        var member = Member(Guid.NewGuid(), thread.Id, actor, tenant);
+        if (scenario == "disabled") member.IsEnabled = false;
+        if (scenario == "wrongtenant") member.TenantId = Guid.NewGuid();
+        var context = new InMemoryDataContext();
+        context.Seed(thread);
+        if (scenario != "nonmember") context.Seed(member);
+        var storage = new TestStorageServiceWrapper();
+        var service = CreateService(context, storage: storage);
+        var result = await service.CreateChatAttachmentUploadAsync(new CreateChatAttachmentUploadRequest
+        {
+            Metadata = Metadata(actor, tenant), ThreadId = thread.Id,
+            FileName = "live-chat-attachment.txt", ContentType = "text/plain", TotalSizeBytes = 50, ChunkSizeBytes = 25
+        });
+        Assert.That(result.StatusCode, Is.EqualTo(expected), result.Message);
+        Assert.That(storage.ChatUploadCalls, Is.EqualTo(expected == 201 ? 1 : 0));
+        if (expected == 201)
+        {
+            Assert.That(storage.LastChatUpload!.FileName, Is.EqualTo("live-chat-attachment.txt"));
+            Assert.That(storage.LastChatUpload.ContentType, Is.EqualTo("text/plain"));
+            Assert.That(storage.LastChatUpload.ThreadId, Is.EqualTo(thread.Id));
+            Assert.That(storage.LastChatUpload.ChunkSizeBytes, Is.EqualTo(25));
+        }
+    }
+
+    [TestCase("visible", 200)]
+    [TestCase("nonmember", 403)]
+    [TestCase("deleted", 404)]
+    [TestCase("hidden", 404)]
+    [TestCase("deletedthread", 404)]
+    [TestCase("disabledthread", 404)]
+    [TestCase("unlinked", 404)]
+    [TestCase("wrongtenant", 404)]
+    public async Task GetChatAttachmentDownloadUrlAsync_RequiresVisibleLinkedMessage(string scenario, int expected)
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var thread = Thread(Guid.NewGuid(), tenant);
+        var member = Member(Guid.NewGuid(), thread.Id, actor, tenant);
+        var sender = Member(Guid.NewGuid(), thread.Id, Guid.NewGuid(), tenant);
+        var message = Message(Guid.NewGuid(), thread.Id, sender.Id, tenant, "group attachment");
+        var link = new MessageFile { Id = Guid.NewGuid(), TenantId = tenant, MessageId = message.Id,
+            StorageId = Guid.NewGuid(), IsEnabled = true };
+        if (scenario == "deleted") message.IsDeleted = true;
+        if (scenario == "deletedthread") thread.IsDeleted = true;
+        if (scenario == "disabledthread") thread.IsEnabled = false;
+        if (scenario == "wrongtenant") link.TenantId = Guid.NewGuid();
+        var context = new InMemoryDataContext();
+        context.Seed(thread, sender, message);
+        if (scenario != "nonmember") context.Seed(member);
+        if (scenario != "unlinked") context.Seed(link);
+        if (scenario == "hidden") context.Seed(new MessageHidden { Id = Guid.NewGuid(), TenantId = tenant,
+            MessageId = message.Id, MessageThreadMemberId = member.Id, IsEnabled = true });
+        var storage = new TestStorageServiceWrapper();
+        var service = CreateService(context, storage: storage);
+        var result = await service.GetChatAttachmentDownloadUrlAsync(new GetChatAttachmentDownloadUrlRequest
+        {
+            Metadata = Metadata(actor, tenant), ThreadId = thread.Id, MessageId = message.Id, FileId = link.Id
+        });
+        Assert.That(result.StatusCode, Is.EqualTo(expected), result.Message);
+        Assert.That(storage.ChatDownloadCalls, Is.EqualTo(expected == 200 ? 1 : 0));
+        if (expected == 200)
+            Assert.That(storage.LastChatDownload!.StorageFileId, Is.EqualTo(link.StorageId));
+    }
+
+    [Test]
+    public async Task CreateMessageFileAsync_StorageRejectsOwnershipOrPurpose_DoesNotLinkFile()
+    {
+        var tenant = Guid.NewGuid();
+        var actor = Guid.NewGuid();
+        var thread = Thread(Guid.NewGuid(), tenant);
+        var member = Member(Guid.NewGuid(), thread.Id, actor, tenant);
+        var message = Message(Guid.NewGuid(), thread.Id, member.Id, tenant, "attachment");
+        var context = new InMemoryDataContext();
+        context.Seed(thread, member, message);
+        var service = CreateService(context, storage: new TestStorageServiceWrapper { DenyChatAttachment = true });
+        var result = await service.CreateMessageFileAsync(new CreateMessageFileRequest
+        {
+            Metadata = Metadata(actor, tenant), ThreadId = thread.Id, MessageId = message.Id, StorageFileId = Guid.NewGuid()
+        });
+        Assert.That(result.StatusCode, Is.EqualTo(403));
+        Assert.That(context.Set<MessageFile>(), Is.Empty);
+        Assert.That(context.Set<MessageOutboxEvent>(), Is.Empty);
+    }
+
     private static ThreadService CreateService(
         InMemoryDataContext dataContext,
-        ICommunicationsTemplateService? templateService = null)
+        ICommunicationsTemplateService? templateService = null,
+        IStorageServiceWrapper? storage = null)
     {
         TrustedContext.Value = null;
         var resolver = new CommunicationsRequestContextResolver(
@@ -804,7 +898,7 @@ public sealed class ThreadServiceSecurityTests
             dataContext,
             resolver,
             templateService ?? new TestCommunicationsTemplateService(),
-            new TestStorageServiceWrapper(),
+            storage ?? new TestStorageServiceWrapper(),
             new CommunicationsPolicyService(dataContext, new MemoryCache(new MemoryCacheOptions())),
             new CommunicationsActionRateLimiter(),
             new CommunicationsModerationService(dataContext, resolver),
@@ -852,6 +946,48 @@ public sealed class ThreadServiceSecurityTests
 
     private sealed class TestStorageServiceWrapper : IStorageServiceWrapper
     {
+        public int ChatUploadCalls { get; private set; }
+        public int ChatDownloadCalls { get; private set; }
+        public bool DenyChatAttachment { get; init; }
+        public CreateChatStorageUploadSessionRequest? LastChatUpload { get; private set; }
+        public GetChatStorageDownloadUrlRequest? LastChatDownload { get; private set; }
+
+        public Task<QueryResponse<StorageUploadSessionResponse>> CreateChatStorageUploadSession(CreateChatStorageUploadSessionRequest request, CancellationToken ct = default)
+        {
+            ChatUploadCalls++;
+            LastChatUpload = request;
+            return Task.FromResult(new QueryResponse<StorageUploadSessionResponse>
+            {
+                HttpStatusCode = HttpStatusCode.Created,
+                Response = new StorageUploadSessionResponse { Id = Guid.NewGuid(), StorageFileId = Guid.NewGuid() }
+            });
+        }
+
+        public Task<QueryResponse<StorageUploadPartResponse>> UploadChatStorageFilePart(UploadChatStorageFilePartRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
+        public Task<QueryResponse<StorageFileResponse>> CompleteChatStorageUploadSession(CompleteChatStorageUploadSessionRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
+        public Task<CmdResponse> AbortChatStorageUploadSession(AbortChatStorageUploadSessionRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
+        public Task<QueryResponse<StorageFileValidationResponse>> ValidateChatStorageFileReference(ValidateChatStorageFileReferenceRequest request, CancellationToken ct = default) =>
+            DenyChatAttachment
+                ? Task.FromResult(new QueryResponse<StorageFileValidationResponse> { HttpStatusCode = HttpStatusCode.Forbidden })
+                : ValidateStorageFileReference(new ValidateStorageFileReferenceRequest { Metadata = request.Metadata, StorageFileId = request.StorageFileId, RequireAvailable = true }, ct);
+
+        public Task<QueryResponse<StorageDownloadUrlResponse>> GetChatStorageDownloadUrl(GetChatStorageDownloadUrlRequest request, CancellationToken ct = default)
+        {
+            ChatDownloadCalls++;
+            LastChatDownload = request;
+            return Task.FromResult(new QueryResponse<StorageDownloadUrlResponse>
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Response = new StorageDownloadUrlResponse { StorageFileId = request.StorageFileId, Url = "https://storage.test/attachment" }
+            });
+        }
+
         public IStorageFileCrudService StorageFile { get; init; } = null!;
         public IStorageFileTypeCrudService StorageFileType { get; init; } = null!;
 

@@ -365,6 +365,7 @@ services:
       ServiceIdentity__DefaultScopes__2: notifications.send
       ServiceIdentity__DefaultScopes__3: tenant.target
       ServiceIdentity__DefaultScopes__4: storage.read
+      ServiceIdentity__DefaultScopes__5: storage.write
       ServiceIdentity__ValidationFallback__GenerationId: ${SERVICE_CREDENTIAL_SECONDARY_GENERATION_ID:-}
       ServiceIdentity__ValidationFallback__ClientSecret: ${COMMUNICATIONS_SERVICE_IDENTITY_SECRET_SECONDARY:-}
       ServiceIdentity__ValidationFallback__ValidUntilUtc: ${SERVICE_CREDENTIAL_SECONDARY_VALID_UNTIL_UTC:-}
@@ -469,6 +470,7 @@ services:
       Storage__ProviderProfileName: ${STORAGE_PROVIDER_PROFILE_NAME:-default}
       Storage__BucketPrefix: ${STORAGE_BUCKET_PREFIX:-xframework-dev}
       Storage__S3__Endpoint: ${STORAGE_S3_ENDPOINT:-http://minio:9000}
+      Storage__S3__DownloadEndpoint: ${STORAGE_S3_DOWNLOAD_ENDPOINT:-http://xeon-dev:9000}
       Storage__S3__Region: ${STORAGE_S3_REGION:-us-east-1}
       Storage__S3__AccessKeyId: ${STORAGE_S3_ACCESS_KEY_ID:-minioadmin}
       Storage__S3__SecretAccessKey: ${STORAGE_S3_SECRET_ACCESS_KEY:-minioadmin}
