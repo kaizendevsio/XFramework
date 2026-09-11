@@ -765,6 +765,32 @@ public sealed class ThreadServiceSecurityTests
         Assert.That(result.Data.IsDirect, Is.EqualTo(direct));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task GetThreadListAsync_ReturnsCallerSpecificPeerAndNoPeerForGroups(bool secondCaller)
+    {
+        var tenant = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var actor = secondCaller ? second : first;
+        var direct = Thread(Guid.NewGuid(), tenant);
+        var group = Thread(Guid.NewGuid(), tenant);
+        var context = new InMemoryDataContext();
+        context.Seed(direct, group,
+            Member(Guid.NewGuid(), direct.Id, actor, tenant),
+            Member(Guid.NewGuid(), group.Id, actor, tenant),
+            new MessageDirectThread { Id = Guid.NewGuid(), TenantId = tenant, IsEnabled = true,
+                MessageThreadId = direct.Id, FirstCredentialId = first, SecondCredentialId = second });
+        var result = await CreateService(context).GetThreadListAsync(new GetThreadListRequest
+        {
+            Metadata = Metadata(actor, tenant)
+        });
+        Assert.That(result.IsSuccess, Is.True, result.Message);
+        Assert.That(result.Data!.Items.Single(x => x.Id == direct.Id).OtherCredentialId,
+            Is.EqualTo(secondCaller ? first : second));
+        Assert.That(result.Data.Items.Single(x => x.Id == group.Id).OtherCredentialId, Is.Null);
+    }
+
     private static ThreadService CreateService(
         InMemoryDataContext dataContext,
         ICommunicationsTemplateService? templateService = null)
