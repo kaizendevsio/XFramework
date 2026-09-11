@@ -130,7 +130,9 @@ else
                         </div>
                         <div>
                             <BbTypographyMuted>Source</BbTypographyMuted>
-                            <div>@FormatSource()</div>
+                            <div>@if (_lot.SourceReferenceType == "receiving" && _lot.SourceReferenceId is { } receiptId)
+                            { <a href="@($"/inventario/receiving/{receiptId}")">Stock receipt</a> }
+                            else { @FormatSource() }</div>
                         </div>
                         <div>
                             <BbTypographyMuted>Created</BbTypographyMuted>
@@ -324,7 +326,7 @@ else
     {
         if (_lot is null) return "N/A";
         if (string.IsNullOrWhiteSpace(_lot.SourceReferenceType) && _lot.SourceReferenceId is null) return "N/A";
-        return $"{_lot.SourceReferenceType ?? "Source"} {_lot.SourceReferenceId?.ToString()[..8] ?? ""}".Trim();
+        return InventoryDisplay.Reference(_lot.SourceReferenceType);
     }
 
     private static string FormatDate(DateTime? value) =>
@@ -363,7 +365,7 @@ else
     {
         if (_lot is null || _maintenanceSaving) return;
         _maintenanceError = null;
-        if (_editSupplierReference.Length > 200) { _maintenanceError = "SupplierReference must be at most 200 characters."; return; }
+        if (_editSupplierReference.Length > 200) { _maintenanceError = "Supplier reference must be at most 200 characters."; return; }
         _maintenanceSaving = true;
         try
         {
