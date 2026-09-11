@@ -235,7 +235,7 @@ jobs:
             --filter "FullyQualifiedName~BoltHandlerGeneratorTests|FullyQualifiedName~ServiceWrapperGeneratorTests"
           dotnet test src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj \
             --configuration Release --no-build --no-restore \
-            --filter "FullyQualifiedName~DataContext|FullyQualifiedName~TrustedInvocationFeatureGateTests"
+            --filter "FullyQualifiedName~DataContext|FullyQualifiedName~TrustedInvocationFeatureGateTests|FullyQualifiedName~RateLimiting"
 
       - name: Test focused IdentityServer and Portal contracts
         shell: bash
@@ -243,7 +243,7 @@ jobs:
           set -euo pipefail
           dotnet test src/Tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj \
             --configuration Release --no-build --no-restore \
-            --filter "FullyQualifiedName~BoltTransportTokenIssuerTests|FullyQualifiedName~LogoutAuthorizationContractTests"
+            --filter "FullyQualifiedName~BoltTransportTokenIssuerTests|FullyQualifiedName~LogoutAuthorizationContractTests|FullyQualifiedName~SessionValidation"
           dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj \
             --configuration Release --no-build --no-restore \
             --filter "FullyQualifiedName~ServiceIdentityComposeContractTests"

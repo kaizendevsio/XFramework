@@ -101,6 +101,12 @@ public partial class StorageFile : BaseModel
     [MemoryPackOrder(28)]
     public DateTime? UnclaimedUntil { get; set; }
 
+    [MemoryPackOrder(29)]
+    public Guid? UploadedByCredentialId { get; set; }
+
+    [MemoryPackOrder(30)]
+    public string? UploadPurpose { get; set; }
+
     [MemoryPackOrder(40)]
     public virtual StorageFileType Type { get; set; } = null!;
 

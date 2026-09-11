@@ -322,6 +322,24 @@ public sealed class CommunitySecurityTests
 
     private sealed class ThrowingStorageServiceWrapper : IStorageServiceWrapper
     {
+        public Task<QueryResponse<StorageUploadSessionResponse>> CreateChatStorageUploadSession(CreateChatStorageUploadSessionRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
+        public Task<QueryResponse<StorageUploadPartResponse>> UploadChatStorageFilePart(UploadChatStorageFilePartRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
+        public Task<QueryResponse<StorageFileResponse>> CompleteChatStorageUploadSession(CompleteChatStorageUploadSessionRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
+        public Task<CmdResponse> AbortChatStorageUploadSession(AbortChatStorageUploadSessionRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
+        public Task<QueryResponse<StorageFileValidationResponse>> ValidateChatStorageFileReference(ValidateChatStorageFileReferenceRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
+        public Task<QueryResponse<StorageDownloadUrlResponse>> GetChatStorageDownloadUrl(GetChatStorageDownloadUrlRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Chat Storage operation is not used by this test fixture.");
+
         public IStorageFileCrudService StorageFile { get; init; } = null!;
         public IStorageFileTypeCrudService StorageFileType { get; init; } = null!;
 
