@@ -1,0 +1,668 @@
+@page "/pos/registers/{Id:guid}"
+@implements IDisposable
+
+<PageTitle>POS Register - Portal</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="POS" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="POS Registers" />
+}
+else if (_register is null)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@BackToRegisters">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Registers
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Register Unavailable</BbAlertTitle>
+            <BbAlertDescription>@(_loadError ?? "The POS register was not found in the active tenant.")</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6" data-testid="pos-register-detail">
+            <div class="xf-detail-header">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to registers"
+                          OnClick="@BackToRegisters">
+                    <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                </BbButton>
+                <div class="xf-detail-header-main">
+                    <div class="xf-detail-header-title">
+                        <BbTypographyH3>@_register.Name</BbTypographyH3>
+                        <StatusBadge Text="@(_register.IsEnabled ? "Enabled" : "Disabled")"
+                                     Status="@(_register.IsEnabled ? "active" : "inactive")" />
+                    </div>
+                    <BbTypographyMuted>@FormatRegisterCode(_register.Code) - ID: @_register.Id</BbTypographyMuted>
+                </div>
+                <div class="xf-page-actions">
+                    @if (_editMode)
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@CancelEdit" Disabled="@_saving">Discard</BbButton>
+                        <BbButton OnClick="@SaveRegister" Disabled="@_saving">
+                            <LucideIcon Name="save" class="mr-2 h-4 w-4" />
+                            Save
+                        </BbButton>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                            <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                            Refresh
+                        </BbButton>
+                        <BbButton OnClick="@StartEdit">
+                            <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
+                            Edit
+                        </BbButton>
+                    }
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Register Settings</BbCardTitle>
+                    <BbCardDescription>Checkout identity, cash drawer, currency, and stock defaults.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_editMode)
+                    {
+                        <div class="grid gap-5">
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_form.Code" Label="Code" />
+                            </div>
+
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <XfEntityPicker TItem="IdentityCredential"
+                                                @bind-Value="_form.MerchantCredentialId"
+                                                Items="@_credentials"
+                                                Label="Merchant Credential"
+                                                Placeholder="Select merchant"
+                                                SearchPlaceholder="Search credentials..."
+                                                EmptyMessage="No credentials found."
+                                                ValueSelector="@GetCredentialValue"
+                                                TextSelector="@GetCredentialLabel"
+                                                SearchTextSelector="@GetCredentialSearchText"
+                                                AdvancedColumns="@CredentialAdvancedColumns"
+                                                AdvancedSearchScope="Searches credential name, username, alias, online state, last seen date, and credential id."
+                                                AdvancedSearchTitle="Find Merchant Credential"
+                                                AdvancedSearchDescription="Select the merchant credential used for Wallets transfers." />
+                                <XfEntityPicker TItem="Wallet"
+                                                @bind-Value="_form.CashDrawerWalletId"
+                                                Items="@_wallets"
+                                                Label="Cash Drawer Wallet"
+                                                Placeholder="Select wallet"
+                                                SearchPlaceholder="Search wallets..."
+                                                EmptyMessage="No wallets found."
+                                                ValueSelector="@GetWalletValue"
+                                                TextSelector="@GetWalletLabel"
+                                                SearchTextSelector="@GetWalletSearchText"
+                                                AdvancedColumns="@WalletAdvancedColumns"
+                                                AdvancedSearchScope="Searches wallet account number, credential, wallet type, status, balance, available balance, and created date."
+                                                AdvancedSearchTitle="Find Cash Drawer Wallet"
+                                                AdvancedSearchDescription="Select the Wallets ledger account for cash drawer movement." />
+                            </div>
+
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <XfEntityPicker TItem="Wallets.Domain.Shared.Contracts.WalletType"
+                                                @bind-Value="_form.WalletTypeId"
+                                                Items="@_walletTypes"
+                                                Label="Wallet Type"
+                                                Placeholder="Select wallet type"
+                                                SearchPlaceholder="Search wallet types..."
+                                                EmptyMessage="No wallet types found."
+                                                ValueSelector="@GetWalletTypeValue"
+                                                TextSelector="@GetWalletTypeLabel"
+                                                SearchTextSelector="@GetWalletTypeSearchText"
+                                                AdvancedColumns="@WalletTypeAdvancedColumns"
+                                                AdvancedSearchScope="Searches wallet type code, name, currency, type, transfer rules, and description."
+                                                AdvancedSearchTitle="Find Wallet Type"
+                                                AdvancedSearchDescription="Select the wallet type used for POS payments." />
+                                <XfEntityPicker TItem="Wallets.Domain.Shared.Contracts.CurrencyType"
+                                                @bind-Value="_form.CurrencyId"
+                                                Items="@_currencies"
+                                                Label="Currency"
+                                                Placeholder="Select currency"
+                                                SearchPlaceholder="Search currencies..."
+                                                EmptyMessage="No currencies found."
+                                                ValueSelector="@GetCurrencyValue"
+                                                TextSelector="@GetCurrencyLabel"
+                                                SearchTextSelector="@GetCurrencySearchText"
+                                                AdvancedColumns="@CurrencyAdvancedColumns"
+                                                AdvancedSearchScope="Searches currency ISO code, name, type, tenant scope, and description."
+                                                AdvancedSearchTitle="Find Currency"
+                                                AdvancedSearchDescription="Select the checkout currency." />
+                            </div>
+
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <XfEntityPicker TItem="Warehouse"
+                                                Value="@_form.DefaultWarehouseId"
+                                                ValueChanged="@OnWarehouseChanged"
+                                                Items="@_warehouses"
+                                                Label="Default Warehouse"
+                                                Placeholder="Select warehouse"
+                                                SearchPlaceholder="Search warehouses..."
+                                                EmptyMessage="No warehouses found."
+                                                ValueSelector="@GetWarehouseValue"
+                                                TextSelector="@GetWarehouseLabel"
+                                                SearchTextSelector="@GetWarehouseSearchText"
+                                                AdvancedColumns="@WarehouseAdvancedColumns"
+                                                AdvancedSearchScope="Searches warehouse code, name, city, region, country, default flag, and created date."
+                                                AdvancedSearchTitle="Find Warehouse"
+                                                AdvancedSearchDescription="Select the default source warehouse." />
+                                <XfEntityPicker TItem="InventoryLocation"
+                                                @bind-Value="_form.DefaultLocationId"
+                                                Items="@LocationsForSelectedWarehouse().ToList()"
+                                                Label="Default Location"
+                                                Placeholder="Select location"
+                                                SearchPlaceholder="Search locations..."
+                                                EmptyMessage="No locations found."
+                                                ValueSelector="@GetLocationValue"
+                                                TextSelector="@GetLocationLabel"
+                                                SearchTextSelector="@GetLocationSearchText"
+                                                AdvancedColumns="@LocationAdvancedColumns"
+                                                AdvancedSearchScope="Searches location code, name, warehouse, type, pickable flag, and description."
+                                                AdvancedSearchTitle="Find Location"
+                                                AdvancedSearchDescription="Select the default stock location." />
+                            </div>
+
+                            <BbFormFieldTextarea @bind-Value="_form.Description" Label="Description" />
+                            <BbFormFieldSwitch Checked="@_form.IsEnabled"
+                                               CheckedChanged="@((bool value) => _form.IsEnabled = value)"
+                                               Label="Enabled" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="xf-detail-field-grid-wide">
+                            <div>
+                                <BbTypographyMuted>Name</BbTypographyMuted>
+                                <div>@_register.Name</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Code</BbTypographyMuted>
+                                <div class="font-mono">@FormatRegisterCode(_register.Code)</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Merchant Credential</BbTypographyMuted>
+                                <div>@GetCredentialLabelById(_register.MerchantCredentialId)</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Cash Drawer Wallet</BbTypographyMuted>
+                                <div>@GetWalletName(_register.CashDrawerWalletId)</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Wallet Type</BbTypographyMuted>
+                                <div>@GetWalletTypeName(_register.WalletTypeId)</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Currency</BbTypographyMuted>
+                                <div>@GetCurrencyName(_register.CurrencyId)</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Default Warehouse</BbTypographyMuted>
+                                <div>@GetWarehouseName(_register.DefaultWarehouseId)</div>
+                            </div>
+                            <div>
+                                <BbTypographyMuted>Default Location</BbTypographyMuted>
+                                <div>@GetLocationName(_register.DefaultLocationId)</div>
+                            </div>
+                            <div class="md:col-span-2">
+                                <BbTypographyMuted>Description</BbTypographyMuted>
+                                <div>@(_register.Description ?? "No description")</div>
+                            </div>
+                        </div>
+                    }
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IPOSServiceWrapper POS { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
+    [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
+
+    private readonly RegisterForm _form = new();
+    private PosRegisterResponse? _register;
+    private List<IdentityCredential> _credentials = [];
+    private List<Wallet> _wallets = [];
+    private List<Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
+    private List<Wallets.Domain.Shared.Contracts.CurrencyType> _currencies = [];
+    private List<Warehouse> _warehouses = [];
+    private List<InventoryLocation> _locations = [];
+    private bool _loading = true;
+    private bool _saving;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private bool _editMode;
+    private bool _reloading;
+    private Guid? _loadedId;
+    private string? _loadError;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id) return;
+        _loadedId = Id;
+        await Reload();
+    }
+
+    private void OnTenantChanged()
+    {
+        if (_reloading) return;
+        _editMode = false;
+        _ = InvokeAsync(Reload);
+    }
+
+    private async Task Reload()
+    {
+        if (_reloading) return;
+
+        _reloading = true;
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Pos, "registers");
+            _register = null;
+            ClearReferenceData();
+
+            if (!_hasTenant || !_moduleEnabled || TenantFilter.SelectedTenantId is not Guid tenantId)
+                return;
+
+            var registerResponse = await POS.GetPosRegister(new GetPosRegisterRequest
+            {
+                Metadata = BuildMetadata(),
+                Id = Id
+            });
+            if (!registerResponse.IsSuccess || registerResponse.Response is null)
+            {
+                _loadError = registerResponse.Message ?? "The POS register was not found in the active tenant.";
+                return;
+            }
+
+            _register = registerResponse.Response;
+            await LoadReferenceData(tenantId);
+            LoadForm();
+        }
+        catch
+        {
+            _register = null;
+            _loadError = "Could not load the POS register.";
+            ToastService.Show(_loadError);
+        }
+        finally
+        {
+            _reloading = false;
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadReferenceData(Guid tenantId)
+    {
+        _credentials = await DataContext.Query<IdentityCredential>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
+            .OrderBy(item => item.UserName)
+            .Take(200)
+            .ToListAsync();
+        _wallets = await DataContext.Query<Wallet>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
+            .OrderBy(item => item.AccountNumber)
+            .Take(200)
+            .ToListAsync();
+        _walletTypes = await DataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
+            .OrderBy(item => item.Name)
+            .Take(100)
+            .ToListAsync();
+        _currencies = await DataContext.Query<Wallets.Domain.Shared.Contracts.CurrencyType>().IgnoreQueryFilters().NoCache()
+            .Where(item => !item.IsDeleted && (item.TenantId == tenantId || item.TenantId == Guid.Empty))
+            .OrderBy(item => item.CurrencyIsoCode3)
+            .Take(100)
+            .ToListAsync();
+        _warehouses = await DataContext.Query<Warehouse>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
+            .OrderBy(item => item.Name)
+            .Take(100)
+            .ToListAsync();
+        _locations = await DataContext.Query<InventoryLocation>().IgnoreQueryFilters().NoCache()
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
+            .OrderBy(item => item.Name)
+            .Take(200)
+            .ToListAsync();
+    }
+
+    private void ClearReferenceData()
+    {
+        _credentials = [];
+        _wallets = [];
+        _walletTypes = [];
+        _currencies = [];
+        _warehouses = [];
+        _locations = [];
+    }
+
+    private void StartEdit()
+    {
+        LoadForm();
+        _editMode = true;
+    }
+
+    private void CancelEdit()
+    {
+        LoadForm();
+        _editMode = false;
+    }
+
+    private void LoadForm()
+    {
+        if (_register is null) return;
+
+        _form.Name = _register.Name;
+        _form.Code = _register.Code ?? "";
+        _form.MerchantCredentialId = _register.MerchantCredentialId.ToString();
+        _form.CashDrawerWalletId = _register.CashDrawerWalletId.ToString();
+        _form.WalletTypeId = _register.WalletTypeId.ToString();
+        _form.CurrencyId = _register.CurrencyId.ToString();
+        _form.DefaultWarehouseId = _register.DefaultWarehouseId.ToString();
+        _form.DefaultLocationId = _register.DefaultLocationId.ToString();
+        _form.Description = _register.Description ?? "";
+        _form.IsEnabled = _register.IsEnabled;
+    }
+
+    private async Task SaveRegister()
+    {
+        if (!TryBuildUpdateRequest(out var request, out var validationMessage))
+        {
+            ToastService.Show(validationMessage);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var response = await POS.UpdatePosRegister(request);
+            if (!response.IsSuccess || response.Response is null)
+            {
+                ToastService.Show(response.Message ?? "Could not update the POS register.");
+                return;
+            }
+
+            _register = response.Response;
+            LoadForm();
+            _editMode = false;
+            ToastService.Show("POS register updated.");
+        }
+        catch
+        {
+            ToastService.Show("Could not update the POS register.");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private bool TryBuildUpdateRequest(out UpdatePosRegisterRequest request, out string validationMessage)
+    {
+        request = new UpdatePosRegisterRequest();
+        validationMessage = "Complete the register setup.";
+
+        var name = _form.Name.Trim();
+        var code = NullIfEmpty(_form.Code);
+        var description = NullIfEmpty(_form.Description);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            validationMessage = "Register name is required.";
+            return false;
+        }
+        if (name.Length > 200)
+        {
+            validationMessage = "Register name cannot exceed 200 characters.";
+            return false;
+        }
+        if (code?.Length > 64)
+        {
+            validationMessage = "Register code cannot exceed 64 characters.";
+            return false;
+        }
+        if (description?.Length > 500)
+        {
+            validationMessage = "Register description cannot exceed 500 characters.";
+            return false;
+        }
+        if (!Guid.TryParse(_form.MerchantCredentialId, out var merchantCredentialId) ||
+            !Guid.TryParse(_form.CashDrawerWalletId, out var cashDrawerWalletId) ||
+            !Guid.TryParse(_form.WalletTypeId, out var walletTypeId) ||
+            !Guid.TryParse(_form.CurrencyId, out var currencyId) ||
+            !Guid.TryParse(_form.DefaultWarehouseId, out var warehouseId) ||
+            !Guid.TryParse(_form.DefaultLocationId, out var locationId))
+        {
+            return false;
+        }
+
+        var wallet = _wallets.FirstOrDefault(item => item.Id == cashDrawerWalletId);
+        if (!_credentials.Any(item => item.Id == merchantCredentialId) || wallet is null)
+        {
+            validationMessage = "Select an available merchant credential and cash drawer wallet.";
+            return false;
+        }
+        if (wallet.CredentialId != merchantCredentialId)
+        {
+            validationMessage = "The cash drawer wallet must belong to the selected merchant credential.";
+            return false;
+        }
+        if (wallet.WalletTypeId is Guid cashDrawerWalletTypeId && cashDrawerWalletTypeId != walletTypeId)
+        {
+            validationMessage = "The cash drawer wallet type must match the selected wallet type.";
+            return false;
+        }
+
+        var walletType = _walletTypes.FirstOrDefault(item => item.Id == walletTypeId);
+        if (walletType is null || !_currencies.Any(item => item.Id == currencyId))
+        {
+            validationMessage = "Select an available wallet type and currency.";
+            return false;
+        }
+        if (walletType.CurrencyTypeId is Guid walletTypeCurrencyId && walletTypeCurrencyId != currencyId)
+        {
+            validationMessage = "The wallet type currency must match the selected register currency.";
+            return false;
+        }
+        if (!_warehouses.Any(item => item.Id == warehouseId) ||
+            !_locations.Any(item => item.Id == locationId && item.WarehouseId == warehouseId))
+        {
+            validationMessage = "Select a default location in the selected warehouse.";
+            return false;
+        }
+
+        request = new UpdatePosRegisterRequest
+        {
+            Metadata = BuildMetadata(),
+            Id = Id,
+            Name = name,
+            Code = code,
+            MerchantCredentialId = merchantCredentialId,
+            CashDrawerWalletId = cashDrawerWalletId,
+            WalletTypeId = walletTypeId,
+            CurrencyId = currencyId,
+            DefaultWarehouseId = warehouseId,
+            DefaultLocationId = locationId,
+            Description = description,
+            IsEnabled = _form.IsEnabled
+        };
+        return true;
+    }
+
+    private Task OnWarehouseChanged(string? value)
+    {
+        _form.DefaultWarehouseId = value ?? "";
+        _form.DefaultLocationId = LocationsForSelectedWarehouse().FirstOrDefault()?.Id.ToString() ?? "";
+        return Task.CompletedTask;
+    }
+
+    private IEnumerable<InventoryLocation> LocationsForSelectedWarehouse() =>
+        Guid.TryParse(_form.DefaultWarehouseId, out var warehouseId)
+            ? _locations.Where(item => item.WarehouseId == warehouseId)
+            : [];
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        RequestedTenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        OperationName = "Portal"
+    };
+
+    private void BackToRegisters() => Navigation.NavigateTo("/pos/registers");
+
+    private string GetWarehouseName(Guid id) => _warehouses.FirstOrDefault(item => item.Id == id)?.Name ?? ShortId(id);
+    private string GetLocationName(Guid id) => _locations.FirstOrDefault(item => item.Id == id)?.Name ?? ShortId(id);
+    private string GetWalletName(Guid id) => _wallets.FirstOrDefault(item => item.Id == id)?.AccountNumber ?? ShortId(id);
+    private static string FormatRegisterCode(string? code) => string.IsNullOrWhiteSpace(code) ? "No code" : code;
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string GetCredentialValue(IdentityCredential item) => item.Id.ToString();
+    private static string GetCredentialLabel(IdentityCredential item) => string.IsNullOrWhiteSpace(item.UserName) ? ShortId(item.Id) : item.UserName;
+    private static string GetCredentialSearchText(IdentityCredential item) => $"{item.UserName} {item.UserAlias}";
+    private static string GetWalletValue(Wallet item) => item.Id.ToString();
+    private static string GetWalletLabel(Wallet item) => string.IsNullOrWhiteSpace(item.AccountNumber) ? ShortId(item.Id) : item.AccountNumber;
+    private static string GetWalletSearchText(Wallet item) => $"{item.AccountNumber} {item.CredentialId}";
+    private static string GetWalletTypeValue(Wallets.Domain.Shared.Contracts.WalletType item) => item.Id.ToString();
+    private static string GetWalletTypeLabel(Wallets.Domain.Shared.Contracts.WalletType item) => $"{item.Name} ({item.Code})";
+    private static string GetWalletTypeSearchText(Wallets.Domain.Shared.Contracts.WalletType item) => $"{item.Name} {item.Code} {item.Desc}";
+    private static string GetCurrencyValue(Wallets.Domain.Shared.Contracts.CurrencyType item) => item.Id.ToString();
+    private static string GetCurrencyLabel(Wallets.Domain.Shared.Contracts.CurrencyType item) => $"{item.CurrencyIsoCode3} {item.Name}".Trim();
+    private static string GetCurrencySearchText(Wallets.Domain.Shared.Contracts.CurrencyType item) => $"{item.CurrencyIsoCode3} {item.Name}";
+    private static string GetWarehouseValue(Warehouse item) => item.Id.ToString();
+    private static string GetWarehouseLabel(Warehouse item) => string.IsNullOrWhiteSpace(item.Code) ? item.Name : $"{item.Name} ({item.Code})";
+    private static string GetWarehouseSearchText(Warehouse item) => $"{item.Name} {item.Code} {item.Description}";
+    private static string GetLocationValue(InventoryLocation item) => item.Id.ToString();
+    private static string GetLocationLabel(InventoryLocation item) => string.IsNullOrWhiteSpace(item.Code) ? item.Name : $"{item.Name} ({item.Code})";
+    private static string GetLocationSearchText(InventoryLocation item) => $"{item.Name} {item.Code} {item.Description}";
+
+    private IReadOnlyList<XfEntityPickerColumn<IdentityCredential>> CredentialAdvancedColumns =>
+    [
+        new("Name", item => item.IdentityInfo?.FullName ?? item.IdentityInfo?.IdentityName ?? item.UserName ?? item.UserAlias),
+        new("Username", item => item.UserName ?? item.UserAlias),
+        new("Online", item => FormatBoolean(item.IsOnline)),
+        new("Last Seen", item => FormatDateTime(item.LastSeen)),
+        new("Credential", item => ShortId(item.Id))
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallet>> WalletAdvancedColumns =>
+    [
+        new("Account", item => string.IsNullOrWhiteSpace(item.AccountNumber) ? ShortId(item.Id) : item.AccountNumber),
+        new("Credential", item => GetCredentialLabelById(item.CredentialId)),
+        new("Type", item => GetWalletTypeName(item.WalletTypeId)),
+        new("Status", item => item.Status.ToString()),
+        new("Balance", item => FormatDecimal(item.Balance)),
+        new("Available", item => FormatDecimal(item.AvailableBalance)),
+        new("Created", item => FormatDateTime(item.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallets.Domain.Shared.Contracts.WalletType>> WalletTypeAdvancedColumns =>
+    [
+        new("Code", item => item.Code),
+        new("Name", item => item.Name),
+        new("Currency", item => GetCurrencyName(item.CurrencyTypeId)),
+        new("Type", item => item.Type.ToString()),
+        new("Min Transfer", item => FormatDecimal(item.MinTransferRule)),
+        new("Max Transfer", item => FormatDecimal(item.MaxTransferRule)),
+        new("Description", item => item.Desc)
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Wallets.Domain.Shared.Contracts.CurrencyType>> CurrencyAdvancedColumns =>
+    [
+        new("ISO", item => item.CurrencyIsoCode3),
+        new("Name", item => item.Name),
+        new("Type", item => item.Type?.ToString()),
+        new("Scope", item => item.TenantId == Guid.Empty ? "Global" : "Tenant"),
+        new("Description", item => item.Description)
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<Warehouse>> WarehouseAdvancedColumns =>
+    [
+        new("Code", item => item.Code),
+        new("Name", item => item.Name),
+        new("City", item => item.City),
+        new("Region", item => item.Region),
+        new("Country", item => item.CountryCode),
+        new("Default", item => FormatBoolean(item.IsDefault)),
+        new("Created", item => FormatDateTime(item.CreatedAt))
+    ];
+
+    private IReadOnlyList<XfEntityPickerColumn<InventoryLocation>> LocationAdvancedColumns =>
+    [
+        new("Code", item => item.Code),
+        new("Name", item => item.Name),
+        new("Warehouse", item => GetWarehouseName(item.WarehouseId)),
+        new("Type", item => item.LocationType.ToString()),
+        new("Pickable", item => FormatBoolean(item.IsPickable)),
+        new("Description", item => item.Description)
+    ];
+
+    private string GetCredentialLabelById(Guid credentialId) =>
+        _credentials.FirstOrDefault(item => item.Id == credentialId) is { } credential
+            ? GetCredentialLabel(credential)
+            : ShortId(credentialId);
+
+    private string GetWalletTypeName(Guid? walletTypeId) =>
+        walletTypeId is Guid id
+            ? _walletTypes.FirstOrDefault(item => item.Id == id)?.Name ?? ShortId(id)
+            : "-";
+
+    private string GetCurrencyName(Guid? currencyId) =>
+        currencyId is Guid id
+            ? _currencies.FirstOrDefault(item => item.Id == id)?.CurrencyIsoCode3 ?? ShortId(id)
+            : "-";
+
+    private static string ShortId(Guid id) => id.ToString()[..8];
+    private static string FormatBoolean(bool value) => value ? "Yes" : "No";
+    private static string FormatDateTime(DateTime? value) => value?.ToString("yyyy-MM-dd") ?? "-";
+    private static string FormatDecimal(decimal? value) => value?.ToString("N2") ?? "-";
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class RegisterForm
+    {
+        public string Name { get; set; } = "";
+        public string Code { get; set; } = "";
+        public string MerchantCredentialId { get; set; } = "";
+        public string CashDrawerWalletId { get; set; } = "";
+        public string WalletTypeId { get; set; } = "";
+        public string CurrencyId { get; set; } = "";
+        public string DefaultWarehouseId { get; set; } = "";
+        public string DefaultLocationId { get; set; } = "";
+        public string Description { get; set; } = "";
+        public bool IsEnabled { get; set; } = true;
+    }
+}

@@ -13,6 +13,7 @@ public sealed class PortalContractTests
     [
         "Cashier.razor",
         "Registers.razor",
+        "RegisterDetail.razor",
         "Sales.razor",
         "Returns.razor"
     ];
@@ -106,10 +107,11 @@ public sealed class PortalContractTests
         var pagesRoot = GetPosPagesRoot();
         var cashier = File.ReadAllText(Path.Combine(pagesRoot, "Cashier.razor"));
         var registers = File.ReadAllText(Path.Combine(pagesRoot, "Registers.razor"));
+        var registerDetail = File.ReadAllText(Path.Combine(pagesRoot, "RegisterDetail.razor"));
         var sales = File.ReadAllText(Path.Combine(pagesRoot, "Sales.razor"));
         var returns = File.ReadAllText(Path.Combine(pagesRoot, "Returns.razor"));
 
-        foreach (var text in new[] { cashier, registers, sales, returns })
+        foreach (var text in new[] { cashier, registers, registerDetail, sales, returns })
             text.Should().Contain("IPOSServiceWrapper POS");
 
         cashier.Should().Contain("POS.CheckoutPosSale(");
@@ -123,6 +125,8 @@ public sealed class PortalContractTests
         cashier.Should().Contain("NewSaleIdempotencyKey()");
         cashier.Should().Contain("_cashTenderedAmount < Total");
         registers.Should().Contain("POS.CreatePosRegister(");
+        registerDetail.Should().Contain("POS.GetPosRegister(");
+        registerDetail.Should().Contain("POS.UpdatePosRegister(");
         sales.Should().Contain("POS.CancelPosSale(");
         sales.Should().Contain("POS.RetryPosSaleFulfillment(");
         returns.Should().Contain("POS.CreatePosReturn(");
@@ -183,16 +187,50 @@ public sealed class PortalContractTests
     [Test]
     public void RegisterSetup_UsesEntityPickersInsteadOfRawGuidEntry()
     {
-        var text = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Registers.razor"));
+        var pagesRoot = GetPosPagesRoot();
+        var registerList = File.ReadAllText(Path.Combine(pagesRoot, "Registers.razor"));
+        var registerDetail = File.ReadAllText(Path.Combine(pagesRoot, "RegisterDetail.razor"));
 
-        text.Should().Contain("XfEntityPicker TItem=\"IdentityCredential\"");
-        text.Should().Contain("XfEntityPicker TItem=\"Wallet\"");
-        text.Should().Contain("XfEntityPicker TItem=\"Wallets.Domain.Shared.Contracts.WalletType\"");
-        text.Should().Contain("XfEntityPicker TItem=\"Wallets.Domain.Shared.Contracts.CurrencyType\"");
-        text.Should().Contain("XfEntityPicker TItem=\"Warehouse\"");
-        text.Should().Contain("XfEntityPicker TItem=\"InventoryLocation\"");
-        text.Should().NotContain("TValue=\"Guid\"");
-        text.Should().NotContain("raw GUID");
+        foreach (var text in new[] { registerList, registerDetail })
+        {
+            text.Should().Contain("XfEntityPicker TItem=\"IdentityCredential\"");
+            text.Should().Contain("XfEntityPicker TItem=\"Wallet\"");
+            text.Should().Contain("XfEntityPicker TItem=\"Wallets.Domain.Shared.Contracts.WalletType\"");
+            text.Should().Contain("XfEntityPicker TItem=\"Wallets.Domain.Shared.Contracts.CurrencyType\"");
+            text.Should().Contain("XfEntityPicker TItem=\"Warehouse\"");
+            text.Should().Contain("XfEntityPicker TItem=\"InventoryLocation\"");
+            text.Should().NotContain("TValue=\"Guid\"");
+            text.Should().NotContain("raw GUID");
+        }
+    }
+
+    [Test]
+    public void RegisterList_OpensDedicatedDetailWorkflow()
+    {
+        var registerList = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "Registers.razor"));
+
+        registerList.Should().Contain("OnRowClick=\"@((PosRegister item) => OpenRegister(item.Id))\"");
+        registerList.Should().Contain("Navigation.NavigateTo($\"/pos/registers/{id}\")");
+        registerList.Should().Contain("Title=\"Actions\"");
+        registerList.Should().Contain("Edit register {GetRegisterLabel(item)}");
+        registerList.Should().NotContain("UpdatePosRegisterRequest");
+        registerList.Should().NotContain("POS.UpdatePosRegister(");
+    }
+
+    [Test]
+    public void RegisterDetail_UsesWrapperBackedEditWithReferenceValidation()
+    {
+        var detail = File.ReadAllText(Path.Combine(GetPosPagesRoot(), "RegisterDetail.razor"));
+
+        detail.Should().Contain("@page \"/pos/registers/{Id:guid}\"");
+        detail.Should().Contain("data-testid=\"pos-register-detail\"");
+        detail.Should().Contain("POS.GetPosRegister(new GetPosRegisterRequest");
+        detail.Should().Contain("POS.UpdatePosRegister(request)");
+        detail.Should().Contain("wallet.CredentialId != merchantCredentialId");
+        detail.Should().Contain("walletType.CurrencyTypeId is Guid walletTypeCurrencyId");
+        detail.Should().Contain("item.Id == locationId && item.WarehouseId == warehouseId");
+        detail.Should().Contain("Label=\"Enabled\"");
+        detail.Should().NotContain("DataContext.Update");
     }
 
     [Test]
@@ -265,11 +303,14 @@ public sealed class PortalContractTests
     {
         var pagesRoot = GetPosPagesRoot();
         var registers = File.ReadAllText(Path.Combine(pagesRoot, "Registers.razor"));
+        var registerDetail = File.ReadAllText(Path.Combine(pagesRoot, "RegisterDetail.razor"));
         var cashier = File.ReadAllText(Path.Combine(pagesRoot, "Cashier.razor"));
         var returns = File.ReadAllText(Path.Combine(pagesRoot, "Returns.razor"));
 
         Regex.Matches(registers, "AdvancedColumns=\"@").Count.Should().BeGreaterThanOrEqualTo(6);
         Regex.Matches(registers, "AdvancedSearchScope=").Count.Should().BeGreaterThanOrEqualTo(6);
+        Regex.Matches(registerDetail, "AdvancedColumns=\"@").Count.Should().BeGreaterThanOrEqualTo(6);
+        Regex.Matches(registerDetail, "AdvancedSearchScope=").Count.Should().BeGreaterThanOrEqualTo(6);
         Regex.Matches(cashier, "AdvancedColumns=\"@").Count.Should().BeGreaterThanOrEqualTo(2);
         Regex.Matches(cashier, "AdvancedSearchScope=").Count.Should().BeGreaterThanOrEqualTo(2);
         Regex.Matches(returns, "AdvancedColumns=\"@").Count.Should().BeGreaterThanOrEqualTo(1);

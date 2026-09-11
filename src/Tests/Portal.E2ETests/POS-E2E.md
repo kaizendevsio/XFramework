@@ -5,6 +5,15 @@
 and an externally started Portal. It does not start hosts, seed records, alter
 runtime configuration, or change database state through an API helper.
 
+`PosRegistersE2ETests` covers register-list navigation and the dedicated detail/edit workflow.
+It uses only `POS_E2E_BASE_URL`, authentication/storage state, `POS_E2E_TENANT_ID`, and
+`POS_E2E_REGISTER_NAME`. The test enters edit mode, submits an invalid local draft, discards it,
+and never sends a valid register update or changes fixture data.
+
+Its explicit save/reload case changes only the selected register description, verifies the saved
+value after a fresh wrapper read, and restores the original description in `finally`. Run it only
+against a disposable tenant with the two opt-in guards shown below.
+
 ## Prerequisites
 
 - .NET 10 SDK, the existing restored NuGet packages, and Playwright Chromium.
@@ -70,6 +79,26 @@ dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --no-build `
   --filter 'FullyQualifiedName~Portal.E2ETests.PosCashierE2ETests&TestCategory!=FinancialMutation' `
   --logger 'trx;LogFileName=pos-cashier.trx' `
   -- Playwright.BrowserName=chromium
+```
+
+Run the read-only register workflow separately:
+
+```powershell
+dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --no-build `
+  --filter 'FullyQualifiedName~Portal.E2ETests.PosRegistersE2ETests' `
+  -- Playwright.BrowserName=chromium
+```
+
+Opt in to the isolated real update regression:
+
+```powershell
+$env:POS_E2E_ALLOW_REGISTER_UPDATE = '1'
+$env:POS_E2E_ISOLATED_TENANT_ID = $env:POS_E2E_TENANT_ID
+dotnet test src/Tests/Portal.E2ETests/Portal.E2ETests.csproj --no-build `
+  --filter 'FullyQualifiedName=Portal.E2ETests.PosRegistersE2ETests.Register_IsolatedDescriptionUpdate_PersistsAfterReloadAndRestoresOriginal' `
+  -- Playwright.BrowserName=chromium
+Remove-Item Env:POS_E2E_ALLOW_REGISTER_UPDATE
+Remove-Item Env:POS_E2E_ISOLATED_TENANT_ID
 ```
 
 Append `Playwright.LaunchOptions.Headless=false` after `--` to watch the run. To use installed

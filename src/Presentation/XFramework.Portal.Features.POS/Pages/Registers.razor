@@ -43,7 +43,9 @@ else
                     <BbCardDescription>@_registers.Count register(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_registers" ShowPagination="true" InitialPageSize="20">
+                    <BbDataGrid Items="@_registers" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((PosRegister item) => OpenRegister(item.Id))"
+                                Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" Filterable="true" />
@@ -60,6 +62,15 @@ else
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsEnabled ? "Enabled" : "Disabled")"
                                                  Status="@(item.IsEnabled ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              AriaLabel="@($"Edit register {GetRegisterLabel(item)}")"
+                                              OnClick="@(() => OpenRegister(item.Id))">
+                                        <LucideIcon Name="pencil" class="h-4 w-4" />
+                                    </BbButton>
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
                         </Columns>
@@ -190,6 +201,7 @@ else
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IPOSServiceWrapper POS { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
@@ -320,6 +332,8 @@ else
         }
     }
 
+    private void OpenRegister(Guid id) => Navigation.NavigateTo($"/pos/registers/{id}");
+
     private bool TryParseForm(out CreatePosRegisterRequest request)
     {
         request = new CreatePosRegisterRequest();
@@ -373,6 +387,8 @@ else
     private string GetWarehouseName(Guid id) => _warehouses.FirstOrDefault(item => item.Id == id)?.Name ?? id.ToString()[..8];
     private string GetLocationName(Guid id) => _locations.FirstOrDefault(item => item.Id == id)?.Name ?? id.ToString()[..8];
     private string GetWalletName(Guid id) => _wallets.FirstOrDefault(item => item.Id == id)?.AccountNumber ?? id.ToString()[..8];
+    private static string GetRegisterLabel(PosRegister item) =>
+        string.IsNullOrWhiteSpace(item.Code) ? item.Name : $"{item.Name} ({item.Code})";
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string GetCredentialValue(IdentityCredential item) => item.Id.ToString();
