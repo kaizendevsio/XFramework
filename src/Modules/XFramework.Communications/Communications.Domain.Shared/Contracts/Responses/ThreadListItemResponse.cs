@@ -14,4 +14,5 @@ public partial record ThreadListItemResponse
     public int UnreadCount { get; set; }
     public bool IsMuted { get; set; }
     public bool IsArchived { get; set; }
+    public bool IsDirect { get; set; }
 }

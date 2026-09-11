@@ -6,6 +6,7 @@ using Communications.Domain.Shared.Contracts.Requests.Create;
 using Communications.Domain.Shared.Contracts.Requests.Delete;
 using Communications.Domain.Shared.Contracts.Requests.Edit;
 using Communications.Domain.Shared.Contracts.Requests.Reactions;
+using Communications.Domain.Shared.Contracts.Requests.ReferenceData;
 using Communications.Domain.Shared.Contracts.Requests.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Settings;
 using Communications.Domain.Shared.Contracts.Requests.Templates;
@@ -26,6 +27,9 @@ namespace Communications.Integration.Drivers;
 
 public interface ICommunicationsServiceWrapper : IServiceWrapper
 {
+    Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(EnsureChatDefaultsRequest request, CancellationToken ct = default);
+    Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(GetChatReferenceDataRequest request, CancellationToken ct = default);
+    Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetMessageReactionsAsync(GetMessageReactionsRequest request, CancellationToken ct = default);
     Task<CmdResponse> CreateDirectMessage(CreateDirectMessageRequest request);
     Task<CmdResponse> CreateDirectMessageAsync(
         CreateDirectMessageRequest request,
@@ -531,6 +535,15 @@ public sealed record CommunicationsServiceWrapper(
         ct.ThrowIfCancellationRequested();
         return SendVoidAsync(request, ct);
     }
+
+    public Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(EnsureChatDefaultsRequest request, CancellationToken ct = default) =>
+        SendAsync<EnsureChatDefaultsRequest, ChatReferenceDataResponse>(request, ct);
+
+    public Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(GetChatReferenceDataRequest request, CancellationToken ct = default) =>
+        SendAsync<GetChatReferenceDataRequest, ChatReferenceDataResponse>(request, ct);
+
+    public Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetMessageReactionsAsync(GetMessageReactionsRequest request, CancellationToken ct = default) =>
+        SendAsync<GetMessageReactionsRequest, PaginatedResult<MessageReactionResponse>>(request, ct);
 
     public Task<CmdResponse> DeleteMessageReactionAsync(
         DeleteMessageReactionRequest request,
