@@ -1092,7 +1092,7 @@ else
         <div class="xf-detail-header-main">
             <div class="xf-detail-header-title">
                 <BbTypographyH3>@(_product?.Name ?? "Unnamed Product")</BbTypographyH3>
-                <StatusBadge Text="@(_product?.IsAvailable == true ? "Available" : "Unavailable")"
+                <StatusBadge Text="@(_product?.IsAvailable == true ? "Catalog enabled" : "Catalog disabled")"
                              Status="@(_product?.IsAvailable == true ? "active" : "inactive")" />
             </div>
             <BbTypographyMuted>SKU: @(_product?.SKU ?? "N/A") - Category: @GetCategoryName(_product?.CategoryId ?? Guid.Empty)</BbTypographyMuted>
@@ -1172,7 +1172,7 @@ else
                         <BbFormFieldInput TValue="string" @bind-Value="_productForm.Description" Label="Description" />
                         <BbFormFieldSwitch Checked="@_productForm.IsAvailable"
                                            CheckedChanged="@((bool value) => _productForm.IsAvailable = value)"
-                                           Label="Available" />
+                                           Label="Catalog enabled" />
                     </div>
                 }
                 else

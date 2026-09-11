@@ -5,4 +5,4 @@ VSTest version 18.0.1 (x64)
 Starting test execution, please wait...
 A total of 1 test files matched the specified pattern.
 
-Passed!  - Failed:     0, Passed:    91, Skipped:     0, Total:    91, Duration: 729 ms - Portal.E2ETests.dll (net10.0)
+Passed!  - Failed:     0, Passed:    94, Skipped:     0, Total:    94, Duration: 741 ms - Portal.E2ETests.dll (net10.0)

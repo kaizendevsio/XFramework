@@ -15,6 +15,24 @@ namespace Portal.E2ETests;
 [Category("Area:PortalContract")]
 public sealed class InventarioControlRenderingTests
 {
+    [TestCase("SUP")]
+    [TestCase("Preferred supplier")]
+    [TestCase("SUP - Preferred supplier")]
+    public void PlanningDraft_ResolvesPreferredSupplierWithoutScopingOrderList(string preference)
+    {
+        var supplier = new XFramework.Inventario.Domain.Shared.Contracts.Supplier
+        {
+            Id = Guid.NewGuid(), Code = "SUP", Name = "Preferred supplier", IsActive = true
+        };
+        var page = new XFramework.Portal.Features.Inventario.Pages.PurchaseOrders { PreferredSupplier = preference };
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        typeof(XFramework.Portal.Features.Inventario.Pages.PurchaseOrders).GetField("_suppliers", flags)!
+            .SetValue(page, new List<XFramework.Inventario.Domain.Shared.Contracts.Supplier> { supplier });
+        typeof(XFramework.Portal.Features.Inventario.Pages.PurchaseOrders).GetMethod("ResolvePreferredSupplier", flags)!
+            .Invoke(page, null).Should().Be(supplier.Id.ToString());
+        page.SupplierId.Should().BeNull("draft preference must not filter the purchase-order list");
+    }
+
     [Test]
     public void TemplateColumn_ClientFilter_UsesDisplayedLookupValue()
     {

@@ -197,6 +197,7 @@ else
     [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
     [SupplyParameterFromQuery] public Guid? VariantId { get; set; }
     [SupplyParameterFromQuery] public Guid? SupplierId { get; set; }
+    [SupplyParameterFromQuery] public string? PreferredSupplier { get; set; }
     [SupplyParameterFromQuery] public decimal? Quantity { get; set; }
     [SupplyParameterFromQuery] public string? Scope { get; set; }
     private Guid? _openedProduct;
@@ -286,7 +287,7 @@ else
             _openedProduct = id;
             await OpenCreateDialog();
             _form.Status = PurchaseOrderStatus.Draft.ToString();
-            _form.SupplierId = SupplierId?.ToString() ?? "";
+            _form.SupplierId = ResolvePreferredSupplier();
             _form.Notes = Scope ?? "";
             _form.Lines[0].ProductId = id.ToString();
             _form.Lines[0].ProductVariationId = VariantId?.ToString() ?? "base";
@@ -300,6 +301,18 @@ else
         await FocusJs.InvokeVoidAsync("inventarioFocus.capture", "purchase-order");
         _form.Reset("");
         _createDialogOpen = true;
+    }
+
+    private string ResolvePreferredSupplier()
+    {
+        if (string.IsNullOrWhiteSpace(PreferredSupplier)) return SupplierId?.ToString() ?? "";
+        var preference = PreferredSupplier.Trim();
+        var matches = _suppliers.Where(x => x.IsActive &&
+            (string.Equals(x.Code, preference, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(x.Name, preference, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(GetSupplierLabel(x), preference, StringComparison.OrdinalIgnoreCase)))
+            .Take(2).ToList();
+        return matches.Count == 1 ? matches[0].Id.ToString() : "";
     }
 
     private void AddLine() => _form.Lines.Add(new PurchaseOrderLineForm { ProductId = "", Quantity = 1m });
