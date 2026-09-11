@@ -97,6 +97,33 @@ public sealed class ServiceIdentityComposeContractTests
     }
 
     [Test]
+    public void CommunicationsOutbox_UsesTrustedTenantScopes()
+    {
+        var root = FindRepositoryRoot().FullName;
+        var compose = File.ReadAllText(Path.Combine(root, "docker-compose.yml"));
+        ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.Communications).Should().Contain(
+        [
+            XFrameworkServiceScopes.CommunicationsAdmin,
+            XFrameworkServiceScopes.DataContextQueryAllTenants,
+            XFrameworkServiceScopes.TenantTarget
+        ]);
+
+        var dispatcher = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "XFramework.Communications",
+            "Communications.Api",
+            "HostedService",
+            "CommunicationsOutboxDispatcherHostedService.cs"));
+        dispatcher.Should().Contain("EstablishTenantlessAsync(");
+        dispatcher.Should().Contain("XFrameworkServiceScopes.DataContextQueryAllTenants");
+        dispatcher.Should().Contain("candidates.GroupBy(candidate => candidate.TenantId)");
+        dispatcher.Should().Contain("EstablishAsync(");
+        dispatcher.Should().Contain("XFrameworkServiceScopes.CommunicationsAdmin");
+    }
+
+    [Test]
     public void AuditStartup_UsesModuleGeneratedRoutes()
     {
         var program = File.ReadAllText(Path.Combine(FindRepositoryRoot().FullName,
