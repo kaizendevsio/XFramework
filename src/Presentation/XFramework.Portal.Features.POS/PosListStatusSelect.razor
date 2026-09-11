@@ -1,0 +1,29 @@
+<div class="xf-form-field">
+    <BbLabel For="@_controlId">Status</BbLabel>
+    <BbSelect TValue="string" Value="@Value" ValueChanged="@ValueChanged">
+        <BbSelectTrigger TValue="string" id="@_controlId" aria-label="Status">
+            <BbSelectValue>@SelectedText</BbSelectValue>
+        </BbSelectTrigger>
+        <BbSelectContent>
+            @foreach (var option in Options)
+            {
+                <BbSelectItem TValue="string" Value="@option.Value" Text="@option.Text">@option.Text</BbSelectItem>
+            }
+        </BbSelectContent>
+    </BbSelect>
+</div>
+
+@code {
+    private readonly string _controlId = $"pos-list-status-{Guid.NewGuid():N}";
+
+    [Parameter, EditorRequired]
+    public string Value { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<SelectOption<string>> Options { get; set; } = [];
+
+    private string SelectedText => Options.FirstOrDefault(option => option.Value == Value)?.Text ?? Value;
+}
