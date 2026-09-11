@@ -182,7 +182,7 @@ public sealed class InventoryLotService(
         var featureResult = await EnsureTraceabilityEnabledAsync(tenantId, ct);
         if (!featureResult.IsSuccess)
             return Result<InventoryLot>.Failure(featureResult.Message!, featureResult.StatusCode);
-        if (!Enum.IsDefined(request.Status) || request.ManufacturedAt > request.ExpiresAt)
+        if (!Enum.IsDefined(request.Status) || NormalizeUtc(request.ManufacturedAt) > NormalizeUtc(request.ExpiresAt))
             return Result<InventoryLot>.Failure("Check lot status and manufacture/expiry dates.", 400);
         if (request.Status != XFramework.Inventario.Domain.Shared.Enums.InventoryLotStatus.Available &&
             await dataContext.Query<StockBalance>().AnyAsync(x => x.TenantId == tenantId && x.LotId == request.Id && x.ReservedQuantity > 0 && !x.IsDeleted, ct))
@@ -196,8 +196,8 @@ public sealed class InventoryLotService(
             return Result<InventoryLot>.Conflict("This record changed. Refresh before saving.");
         dataContext.Update(entity);
         entity.SupplierReference = NormalizeOptional(request.SupplierReference);
-        entity.ManufacturedAt = request.ManufacturedAt;
-        entity.ExpiresAt = request.ExpiresAt;
+        entity.ManufacturedAt = NormalizeUtc(request.ManufacturedAt);
+        entity.ExpiresAt = NormalizeUtc(request.ExpiresAt);
         entity.Status = request.Status;
         entity.ModifiedAt = DateTime.UtcNow;
         entity.ConcurrencyStamp = Guid.NewGuid();

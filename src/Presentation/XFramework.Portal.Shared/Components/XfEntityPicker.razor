@@ -7,14 +7,10 @@
     }
 
     <BbPopover Open="@_open" OpenChanged="@OnOpenChanged" RestoreFocusOnClose="true">
-        <BbPopoverTrigger AsChild="false">
-            <button type="button"
-                    class="xf-entity-picker-trigger"
-                    disabled="@Disabled"
-                    aria-label="@AriaLabel">
-                <span class="xf-entity-picker-trigger-text">@SelectedText</span>
-                <LucideIcon Name="chevrons-up-down" class="xf-entity-picker-trigger-icon" />
-            </button>
+        <BbPopoverTrigger AsChild="false" class="xf-entity-picker-trigger"
+                          disabled="@Disabled" aria-label="@AriaLabel">
+            <span class="xf-entity-picker-trigger-text">@SelectedText</span>
+            <LucideIcon Name="chevrons-up-down" class="xf-entity-picker-trigger-icon" />
         </BbPopoverTrigger>
         <BbPopoverContent Class="xf-entity-picker-popover"
                           MatchTriggerWidth="true"

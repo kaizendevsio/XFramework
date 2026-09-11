@@ -41,11 +41,11 @@ else
                                 OnRowClick="@((ProductTransaction item) => Navigation.NavigateTo($"/inventario/transactions/{item.Id}"))"
                                 Class="cursor-pointer">
                         <EmptyTemplate>No Inventario sales records match this scope. Open Stock movements for inventory changes, including POS shipments and returns.</EmptyTemplate><Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Total" Filterable="true" FilterBy="@(item => item.TotalPrice)">
+                            <BbDataGridTemplateColumn Title="Total" Filterable="true" SortBy="@(item => item.TotalPrice)" FilterBy="@(item => item.TotalPrice)">
                                 <ChildContent Context="item">@item.TotalPrice.ToString("N2")</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.TransactionDate)" Title="Transaction Date" Sortable="true" Filterable="true" />

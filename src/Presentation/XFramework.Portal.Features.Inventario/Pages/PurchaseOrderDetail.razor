@@ -87,13 +87,13 @@ else
                 </BbCardHeader>
                 <BbCardContent>
                     <BbDataGrid Items="@_lines" ShowPagination="true" InitialPageSize="20">
-                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.OrderedQuantity)" Title="Ordered" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReceivedQuantity)" Title="Received" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Remaining" Filterable="true" FilterBy="@(item => Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity))">
+                            <BbDataGridTemplateColumn Title="Remaining" Filterable="true" SortBy="@(item => Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity))" FilterBy="@(item => Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity))">
                                 <ChildContent Context="item">@Math.Max(0, item.OrderedQuantity - item.ReceivedQuantity).ToString("N2")</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="@($"Unit cost ({_currency})")" Filterable="true" />

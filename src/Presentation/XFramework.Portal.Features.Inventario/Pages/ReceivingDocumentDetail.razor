@@ -91,15 +91,15 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_lines" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item"><a href="@($"/inventario/products/{item.ProductId}")">@GetProductName(item.ProductId)</a></ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId, item.LotNumber))">
+                            <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotLabel(item.LotId, item.LotNumber))" FilterBy="@(item => GetLotLabel(item.LotId, item.LotNumber))">
                                 <ChildContent Context="item">@if (item.LotId is { } lotId) { <a href="@($"/inventario/lots/{lotId}")">@GetLotLabel(item.LotId, item.LotNumber)</a> } else { <span>Untracked</span> }</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Quantity" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.UnitCost)" Title="Unit Cost" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Stock Balance" Filterable="true" FilterBy="@(item => GetStockBalanceFilterText(item))">
+                            <BbDataGridTemplateColumn Title="Stock Balance" Filterable="true" SortBy="@(item => GetStockBalanceFilterText(item))" FilterBy="@(item => GetStockBalanceFilterText(item))">
                                 <ChildContent Context="item">
                                     @if (item.StockBalanceId is { } balanceId)
                                     {

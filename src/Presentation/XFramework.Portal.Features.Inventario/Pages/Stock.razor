@@ -47,10 +47,10 @@ else
 
             <div class="xf-filter-actions">
                 <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search stock" Placeholder="Product, SKU, variant or lot" />
-                <BbFormFieldSelect TValue="string" @bind-Value="_warehouseFilter" Label="Warehouse">
+                <InventorySelect TValue="string" @bind-Value="_warehouseFilter" Label="Warehouse" DisplayTextSelector="@(value => value == "all" ? "All warehouses" : _warehouses.FirstOrDefault(x => x.Id.ToString() == value)?.Name ?? "Select warehouse")">
                     <BbSelectItem Value="@("all")">All warehouses</BbSelectItem>
                     @foreach (var warehouse in _warehouses) { <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Name</BbSelectItem> }
-                </BbFormFieldSelect>
+                </InventorySelect>
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => { _search = ""; _warehouseFilter = "all"; })">Clear filters</BbButton>
             </div>
             <BbTabs Value="@_stockView" ValueChanged="@(v => _stockView = v)" Class="inv-workspace-tabs">
@@ -69,19 +69,19 @@ else
                         <BbDataGrid Items="@_balances.Where(x => Matches(x.ProductId, x.ProductVariationId, x.LotId, x.WarehouseId)).ToList()" ShowPagination="true" InitialPageSize="20"
                                     OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                                     Class="cursor-pointer">
-                            <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
+                                <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                                     <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                                 </BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
+                                <BbDataGridTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
                                     <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                                 </BbDataGridTemplateColumn>
                                 @if (_traceabilityEnabled)
                                 {
-                                    <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId))">
+                                    <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotLabel(item.LotId))" FilterBy="@(item => GetLotLabel(item.LotId))">
                                         <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
                                     </BbDataGridTemplateColumn>
                                 }
@@ -116,18 +116,18 @@ else
                         <BbDataGrid Items="@_movements.Where(x => Matches(x.ProductId, x.ProductVariationId, x.LotId, x.WarehouseId)).ToList()" ShowPagination="true" InitialPageSize="20"
                                     OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                     Class="cursor-pointer">
-                            <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
-                                <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                                 </BbDataGridTemplateColumn>
                                 @if (_traceabilityEnabled)
                                 {
-                                    <BbDataGridTemplateColumn Title="Lot" Filterable="true" FilterBy="@(item => GetLotLabel(item.LotId))">
+                                    <BbDataGridTemplateColumn Title="Lot" Filterable="true" SortBy="@(item => GetLotLabel(item.LotId))" FilterBy="@(item => GetLotLabel(item.LotId))">
                                         <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
                                     </BbDataGridTemplateColumn>
                                 }
                                 <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
-                                <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Affects" Filterable="true" SortBy="@(item => InventoryDisplay.Effect(item.MovementType))" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
 <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="On hand before" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
@@ -172,11 +172,11 @@ else
                                 SearchTextSelector="@GetProductSearchText"
                                 AdvancedSearchTitle="Find Product"
                                 AdvancedSearchDescription="Search products in the active tenant." />
-                <BbFormFieldSelect TValue="string" Value="@_movementForm.ProductVariationId" ValueChanged="@((string value) => { _movementForm.ProductVariationId = value; _movementForm.LotId = ""; })" Label="Variant">
+                <InventorySelect TValue="string" Value="@_movementForm.ProductVariationId" ValueChanged="@((string value) => { _movementForm.ProductVariationId = value; _movementForm.LotId = ""; })" Label="Variant" DisplayTextSelector="@(value => InventoryDisplay.Variant(_variants, Guid.TryParse(value, out var id) ? id : null))">
                     <BbSelectItem Value="@("base")">Base product</BbSelectItem>
                     @foreach (var variant in _variants.Where(x => x.ProductId.ToString() == _movementForm.ProductId))
                     { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }
-                </BbFormFieldSelect>
+                </InventorySelect>
                 @if (_traceabilityEnabled)
                 {
                     <XfEntityPicker TItem="InventoryLot"
@@ -219,12 +219,12 @@ else
                                 SearchTextSelector="@GetLocationSearchText"
                                 AdvancedSearchTitle="Find Location"
                                 AdvancedSearchDescription="Search locations for the selected warehouse." />
-                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
+                <InventorySelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
                     @foreach (var type in Enum.GetValues<InventoryMovementType>())
                     {
                         <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
                     }
-                </BbFormFieldSelect>
+                </InventorySelect>
             </div>
             <div class="grid gap-3 md:grid-cols-3">
                 <BbFormFieldNumericInput TValue="decimal"
@@ -254,6 +254,8 @@ else
 </BbDialog>
 
 @code {
+    [Inject] private Microsoft.JSInterop.IJSRuntime FocusJs { get; set; } = default!;
+    private bool _wasDialogOpen;
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -273,8 +275,9 @@ else
         $"{GetProductName(product)} {_products.FirstOrDefault(x => x.Id == product)?.SKU} {InventoryDisplay.Variant(_variants, variant)} {GetLotLabel(lot)}".Contains(_search, StringComparison.OrdinalIgnoreCase);
     private decimal SelectedAvailable => _balances.Where(x => x.ProductId.ToString() == _movementForm.ProductId && x.ProductVariationId == ParseVariant(_movementForm.ProductVariationId) && x.WarehouseId.ToString() == _movementForm.WarehouseId && x.LocationId.ToString() == _movementForm.LocationId && x.LotId == ParseVariant(_movementForm.LotId)).Sum(x => x.AvailableQuantity);
     private static Guid? ParseVariant(string value) => Guid.TryParse(value, out var id) ? id : null;
-    private void OpenForBalance(StockBalance balance)
+    private async Task OpenForBalance(StockBalance balance)
     {
+        await FocusJs.InvokeVoidAsync("inventarioFocus.capture", "stock-movement");
         _movementForm = new();
         _movementForm.ProductId = balance.ProductId.ToString();
         _movementForm.ProductVariationId = balance.ProductVariationId?.ToString() ?? "base";
@@ -302,6 +305,12 @@ else
     private bool _postingMovement;
     private bool _movementDialogOpen;
     private bool IsPostMovementDisabled => _postingMovement || string.IsNullOrEmpty(_movementForm.ProductId) || _movementForm.Quantity == 0 || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_wasDialogOpen && !_movementDialogOpen) await FocusJs.InvokeVoidAsync("inventarioFocus.restore", "stock-movement");
+        _wasDialogOpen = _movementDialogOpen;
+    }
+
     protected override void OnInitialized()
     {
         TenantFilter.OnChanged += OnTenantChanged;
@@ -451,8 +460,9 @@ else
         }
     }
 
-    private void OpenMovementDialog()
+    private async Task OpenMovementDialog()
     {
+        await FocusJs.InvokeVoidAsync("inventarioFocus.capture", "stock-movement");
         _movementForm = new();
         ApplyDefaultMovementSelections();
         _movementDialogOpen = true;

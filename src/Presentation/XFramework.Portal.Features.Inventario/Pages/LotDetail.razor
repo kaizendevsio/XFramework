@@ -94,7 +94,7 @@ else
                         <div class="xf-detail-field-grid"><BbFormFieldInput TValue="string" @bind-Value="_editSupplierReference" Label="Supplier Reference" />
 <BbFormFieldDatePicker @bind-Value="_editManufacturedAt" Label="Manufactured At" />
 <BbFormFieldDatePicker @bind-Value="_editExpiresAt" Label="Expires At" />
-<BbFormFieldSelect TValue="InventoryLotStatus" @bind-Value="_editStatus" Label="Status">@foreach (var value in Enum.GetValues<InventoryLotStatus>()) { <BbSelectItem Value="@value">@value</BbSelectItem> }</BbFormFieldSelect>
+<InventorySelect TValue="InventoryLotStatus" @bind-Value="_editStatus" Label="Status">@foreach (var value in Enum.GetValues<InventoryLotStatus>()) { <BbSelectItem Value="@value">@value</BbSelectItem> }</InventorySelect>
 </div>
                         <p class="text-sm text-muted-foreground">Identity and existing stock quantities remain unchanged. Eligibility and pickability changes require active reservations to be released first.</p>
                         <div class="xf-page-actions"><BbButton OnClick="@SaveMaintenance" Disabled="@_maintenanceSaving">Save changes</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _maintenanceEditing = false)" Disabled="@_maintenanceSaving">Discard</BbButton></div>
@@ -153,11 +153,11 @@ else
                     <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="10"
                                 OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                                 <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
+                            <BbDataGridTemplateColumn Title="Location" Filterable="true" SortBy="@(item => GetLocationName(item.LocationId))" FilterBy="@(item => GetLocationName(item.LocationId))">
                                 <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
@@ -177,12 +177,12 @@ else
                     <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="10"
                                 OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                 Class="cursor-pointer">
-                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
+                        <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" SortBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Affects" Filterable="true" SortBy="@(item => InventoryDisplay.Effect(item.MovementType))" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
 <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Reference" Filterable="true" FilterBy="@(item => InventoryDisplay.Reference(item.ReferenceType))"><ChildContent Context="item">@InventoryDisplay.Reference(item.ReferenceType)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Reference" Filterable="true" SortBy="@(item => InventoryDisplay.Reference(item.ReferenceType))" FilterBy="@(item => InventoryDisplay.Reference(item.ReferenceType))"><ChildContent Context="item">@InventoryDisplay.Reference(item.ReferenceType)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
@@ -375,8 +375,8 @@ else
                 Id = _lot.Id,
                 ConcurrencyStamp = _editStamp,
                 SupplierReference = _editSupplierReference,
-                ManufacturedAt = _editManufacturedAt,
-                ExpiresAt = _editExpiresAt,
+                ManufacturedAt = InventoryDisplay.CalendarDateUtc(_editManufacturedAt),
+                ExpiresAt = InventoryDisplay.CalendarDateUtc(_editExpiresAt),
                 Status = _editStatus,
             });
             if (result.IsSuccess)

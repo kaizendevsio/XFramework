@@ -67,7 +67,7 @@ else
                         @if (_maintenanceError is not null) { <BbAlert><BbAlertDescription>@_maintenanceError</BbAlertDescription></BbAlert> }
                         <div class="xf-detail-field-grid"><BbFormFieldInput TValue="string" @bind-Value="_editName" Label="Name" />
 <BbFormFieldInput TValue="string" @bind-Value="_editDescription" Label="Description" />
-<BbFormFieldSelect TValue="InventoryLocationType" @bind-Value="_editLocationType" Label="Location Type">@foreach (var value in Enum.GetValues<InventoryLocationType>()) { <BbSelectItem Value="@value">@value</BbSelectItem> }</BbFormFieldSelect>
+<InventorySelect TValue="InventoryLocationType" @bind-Value="_editLocationType" Label="Location Type">@foreach (var value in Enum.GetValues<InventoryLocationType>()) { <BbSelectItem Value="@value">@value</BbSelectItem> }</InventorySelect>
 <BbFormFieldSwitch @bind-Checked="_editIsPickable" Label="Is Pickable" />
 </div>
                         <p class="text-sm text-muted-foreground">Identity and existing stock quantities remain unchanged. Eligibility and pickability changes require active reservations to be released first.</p>
@@ -149,7 +149,7 @@ else
                                 OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
@@ -170,11 +170,11 @@ else
                                 OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Affects" Filterable="true" SortBy="@(item => InventoryDisplay.Effect(item.MovementType))" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
 <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
@@ -193,11 +193,11 @@ else
                                 OnRowClick="@((Reservation item) => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Format="0.####" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.Status.ToString())" FilterBy="@(item => item.Status.ToString())">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@(item.Status == ReservationStatus.Active ? "active" : "inactive")" />
                                 </ChildContent>

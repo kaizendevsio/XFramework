@@ -45,7 +45,7 @@ else
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Products" Filterable="true" FilterBy="@(item => GetProductCount(item.Id))">
+                            <BbDataGridTemplateColumn Title="Products" Filterable="true" SortBy="@(item => GetProductCount(item.Id))" FilterBy="@(item => GetProductCount(item.Id))">
                                 <ChildContent Context="item">@GetProductCount(item.Id)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" Filterable="true" />

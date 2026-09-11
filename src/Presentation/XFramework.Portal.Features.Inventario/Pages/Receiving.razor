@@ -50,18 +50,18 @@ else
                                 Class="cursor-pointer">
                         <Columns>
                             <BbDataGridPropertyColumn Property="@(x => x.ReceiptNumber)" Title="Receipt" Sortable="true" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Purchase Order" Filterable="true" FilterBy="@(item => GetPurchaseOrderNumber(item.PurchaseOrderId))">
+                            <BbDataGridTemplateColumn Title="Purchase Order" Filterable="true" SortBy="@(item => GetPurchaseOrderNumber(item.PurchaseOrderId))" FilterBy="@(item => GetPurchaseOrderNumber(item.PurchaseOrderId))">
                                 <ChildContent Context="item">@GetPurchaseOrderNumber(item.PurchaseOrderId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Supplier" Filterable="true" FilterBy="@(item => GetSupplierName(item.SupplierId))">
+                            <BbDataGridTemplateColumn Title="Supplier" Filterable="true" SortBy="@(item => GetSupplierName(item.SupplierId))" FilterBy="@(item => GetSupplierName(item.SupplierId))">
                                 <ChildContent Context="item">@GetSupplierName(item.SupplierId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
+                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" SortBy="@(item => GetWarehouseName(item.WarehouseId))" FilterBy="@(item => GetWarehouseName(item.WarehouseId))">
                                 <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.ReceivedAt)" Title="Received" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Lines" Filterable="true" FilterBy="@(item => _lines.Count(x => x.ReceivingDocumentId == item.Id))">
+                            <BbDataGridTemplateColumn Title="Lines" Filterable="true" SortBy="@(item => _lines.Count(x => x.ReceivingDocumentId == item.Id))" FilterBy="@(item => _lines.Count(x => x.ReceivingDocumentId == item.Id))">
                                 <ChildContent Context="item">@_lines.Count(x => x.ReceivingDocumentId == item.Id)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Actions">
@@ -192,11 +192,11 @@ else
                                                 SearchTextSelector="@GetProductSearchText"
                                                 AdvancedSearchTitle="Find Product"
                                                 AdvancedSearchDescription="Search products in the active tenant." />
-                                <BbFormFieldSelect TValue="string" Value="@line.ProductVariationId" ValueChanged="@((string value) => { line.ProductVariationId = value; line.LotId = ""; line.LotNumber = ""; line.ManufacturedAt = null; line.ExpiresAt = null; })" Label="Variant" Disabled="@(!string.IsNullOrEmpty(_form.PurchaseOrderId))">
+                                <InventorySelect TValue="string" Value="@line.ProductVariationId" ValueChanged="@((string value) => { line.ProductVariationId = value; line.LotId = ""; line.LotNumber = ""; line.ManufacturedAt = null; line.ExpiresAt = null; })" Label="Variant" DisplayTextSelector="@(value => InventoryDisplay.Variant(_variants, Guid.TryParse(value, out var id) ? id : null))" Disabled="@(!string.IsNullOrEmpty(_form.PurchaseOrderId))">
                                     <BbSelectItem Value="@("base")">Base product</BbSelectItem>
                                     @foreach (var variant in _variants.Where(x => x.ProductId.ToString() == line.ProductId))
                                     { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }
-                                </BbFormFieldSelect>
+                                </InventorySelect>
                                 <BbFormFieldNumericInput TValue="decimal"
                                                          @bind-Value="line.Quantity"
                                                          Label="Quantity"
@@ -249,6 +249,8 @@ else
 </BbDialog>
 
 @code {
+    [Inject] private Microsoft.JSInterop.IJSRuntime FocusJs { get; set; } = default!;
+    private bool _wasDialogOpen;
     private string _currency = "PHP";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
@@ -345,12 +347,14 @@ else
         }
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_wasDialogOpen && !_receiveDialogOpen) await FocusJs.InvokeVoidAsync("inventarioFocus.restore", "receiving");
+        _wasDialogOpen = _receiveDialogOpen;
         if (!_loading && _hasTenant && _purchasingEnabled && PurchaseOrderId is { } id && _openedPurchaseOrderId != id)
         {
             _openedPurchaseOrderId = id;
-            OpenReceiveDialog();
+            await OpenReceiveDialog();
             OnPurchaseOrderChanged(id.ToString());
             StateHasChanged();
         }
@@ -393,8 +397,9 @@ else
         return $"{remaining} Adds {line.Quantity:0.####} {line.UnitOfMeasure} on hand. Line total: {_currency} {line.Quantity * line.UnitCost:N2}. Select an existing lot, enter a new lot number, or leave both empty for untracked stock.";
     }
 
-    private void OpenReceiveDialog()
+    private async Task OpenReceiveDialog()
     {
+        await FocusJs.InvokeVoidAsync("inventarioFocus.capture", "receiving");
         _receiveError = null;
         var warehouseId = _warehouses.FirstOrDefault()?.Id;
         _form.Reset(warehouseId?.ToString() ?? "", _locations.FirstOrDefault(x => x.WarehouseId == warehouseId)?.Id.ToString() ?? "", "");
@@ -454,8 +459,8 @@ else
                         UnitCost = x.UnitCost > 0 ? x.UnitCost : null,
                         LotId = Guid.TryParse(x.LotId, out var lotId) ? lotId : null,
                         LotNumber = NullIfEmpty(x.LotNumber),
-                        ManufacturedAt = x.ManufacturedAt,
-                        ExpiresAt = x.ExpiresAt
+                        ManufacturedAt = InventoryDisplay.CalendarDateUtc(x.ManufacturedAt),
+                        ExpiresAt = InventoryDisplay.CalendarDateUtc(x.ExpiresAt)
                     })
                     .ToList()
             });
@@ -476,6 +481,7 @@ else
                     "Lot does not belong to the receiving product." or
                     "Lot does not belong to the receiving variant." => "Choose a lot for this product and variant, or clear the lot selection.",
                     _ when result.HttpStatusCode == System.Net.HttpStatusCode.Conflict => "The order or stock changed, or this receipt was already submitted with different details. Refresh and check receiving history before trying again.",
+                    "The database update could not be completed." or "Receiving save failed." => "The receipt could not be saved. Check receiving history before retrying; if it is absent, keep this form open and ask support to investigate.",
                     _ when result.HttpStatusCode == System.Net.HttpStatusCode.BadRequest => "Check the order line, product, variant, quantity, lot dates and unit. Each order receipt line must match an outstanding order line.",
                     _ when result.HttpStatusCode == System.Net.HttpStatusCode.Forbidden => "Your tenant or role cannot receive into this stock position.",
                     _ => "Could not confirm the receipt. Check receiving history, then retry the same form to preserve duplicate protection."

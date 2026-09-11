@@ -102,7 +102,7 @@ public sealed class ReservationService(
             ReferenceType = NormalizeOptional(request.ReferenceType),
             ReferenceId = request.ReferenceId,
             ReservedAt = now,
-            ExpiresAt = request.ExpiresAt,
+            ExpiresAt = InventoryLotService.NormalizeUtc(request.ExpiresAt),
             IdempotencyKey = idempotencyKey,
             IsEnabled = true,
             CreatedAt = now,

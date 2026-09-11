@@ -7,6 +7,7 @@ else if (_supplier is null) { <BbEmpty Title="Record not found" Description="Cho
 else
 {
     <div class="space-y-6 inv-page">
+        <a href="/inventario/suppliers">Back to suppliers</a>
         <div class="xf-page-header"><BbTypographyH3>@_supplier.Name</BbTypographyH3><BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">Refresh</BbButton></div>
         <a href="@($"/inventario/purchase-orders?supplierId={Id}")">View supplier purchase orders</a>
         <BbCard><BbCardHeader><BbCardTitle>Supplier Summary</BbCardTitle></BbCardHeader><BbCardContent>@if (_maintenanceEditing)

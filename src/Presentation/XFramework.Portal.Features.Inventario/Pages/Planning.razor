@@ -93,10 +93,10 @@ else
                 <BbCardContent>
                     <BbDataGrid Items="@_rules" OnRowClick="@((InventoryReorderRule item) => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))" ShowPagination="true" InitialPageSize="20">
                         <Columns>
-                            <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
+                            <BbDataGridTemplateColumn Title="Product" Filterable="true" SortBy="@(item => GetProductName(item.ProductId))" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridTemplateColumn Title="Scope" Filterable="true" FilterBy="@(item => GetScopeLabel(item))">
+                            <BbDataGridTemplateColumn Title="Scope" Filterable="true" SortBy="@(item => GetScopeLabel(item))" FilterBy="@(item => GetScopeLabel(item))">
                                 <ChildContent Context="item">@GetScopeLabel(item)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MinimumQuantity)" Title="Min" Sortable="true" Filterable="true" />
@@ -104,7 +104,7 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Point" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReorderQuantity)" Title="Qty" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Supplier" Filterable="true" />
-                            <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.IsActive)">
+                            <BbDataGridTemplateColumn Title="Status" Filterable="true" SortBy="@(item => item.IsActive)" FilterBy="@(item => item.IsActive)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>

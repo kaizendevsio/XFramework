@@ -14,6 +14,10 @@ internal static class InventoryDisplay
             ? $"{variant.VariationType}: {variant.Name}".Trim(' ', ':')
             : $"Variant {id.ToString()![..8]}";
 
+    // Date pickers represent a calendar date, not a local instant. Preserve that date at UTC midnight.
+    public static DateTime? CalendarDateUtc(DateTime? value) => value is { } date
+        ? DateTime.SpecifyKind(date.Date, DateTimeKind.Utc) : null;
+
     public static string Effect(InventoryMovementType type) => type is InventoryMovementType.Reservation or InventoryMovementType.Release
         ? "Reserved" : "On hand";
 
