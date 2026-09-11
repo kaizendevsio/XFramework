@@ -16,7 +16,54 @@ public static class YapAuth
     public static void MapYapAuth(this WebApplication app)
     {
         app.MapPost("/auth/login", LoginAsync).AllowAnonymous();
+        app.MapPost("/auth/register", RegisterAsync).AllowAnonymous();
         app.MapPost("/auth/logout", LogoutAsync).RequireAuthorization();
+    }
+
+    private static async Task<IResult> RegisterAsync(HttpContext context, IAntiforgery antiforgery,
+        IConfiguration configuration, IIdentityServerServiceWrapper identity, ILogger<YapSessions> logger,
+        CancellationToken ct)
+    {
+        try { await antiforgery.ValidateRequestAsync(context); }
+        catch (AntiforgeryValidationException) { return Results.BadRequest("Refresh the page and try again."); }
+        var form = await context.Request.ReadFormAsync(ct);
+        var name = form["displayName"].ToString().Trim();
+        var username = form["username"].ToString().Trim();
+        var password = form["password"].ToString();
+        if (name.Length is 0 or > 100 || username.Length is < 3 or > 100 ||
+            !System.Text.RegularExpressions.Regex.IsMatch(username, @"\A[a-zA-Z0-9_.-]+\z") ||
+            password.Length < 8 || System.Text.Encoding.UTF8.GetByteCount(password) > 72)
+            return Results.Redirect("/register?error=validation");
+        if (password != form["confirmPassword"].ToString())
+            return Results.Redirect("/register?error=mismatch");
+        if (!Guid.TryParse(configuration["Yap:TenantId"], out var tenant) || tenant == Guid.Empty ||
+            !Guid.TryParse(configuration["Yap:RoleId"], out var role) || role == Guid.Empty)
+            return Results.Redirect("/register?error=disabled");
+        try
+        {
+            var response = await identity.RegisterIdentity(new RegisterIdentityRequest
+            {
+                DisplayName = name, UserName = username, Password = password,
+                Metadata = new RequestMetadata { RequestedTenantId = tenant, RequestId = Guid.NewGuid(), OperationName = "Yap registration" }
+            }, ct);
+            if (response.IsSuccess && response.Response?.TenantId == tenant && response.Response.RoleId == role)
+                return Results.Redirect("/login?registered=true");
+            var error = response.HttpStatusCode switch
+            {
+                System.Net.HttpStatusCode.Conflict => "taken",
+                System.Net.HttpStatusCode.BadRequest => "validation",
+                System.Net.HttpStatusCode.Forbidden => "disabled",
+                System.Net.HttpStatusCode.TooManyRequests => "limited",
+                _ => "unavailable"
+            };
+            return Results.Redirect($"/register?error={error}");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Yap registration could not complete ({ErrorType}).", ex.GetType().Name);
+            return Results.Redirect("/register?error=unavailable");
+        }
     }
 
     private static async Task<IResult> LoginAsync(HttpContext context, IAntiforgery antiforgery,

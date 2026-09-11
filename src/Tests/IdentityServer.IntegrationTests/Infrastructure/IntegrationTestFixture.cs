@@ -102,6 +102,22 @@ public class IntegrationTestFixture
             LimitedScopeClientSecret,
             XFrameworkServiceScopes.DataContextQuery);
 
+    public static readonly Guid RegistrationRoleId = Guid.NewGuid();
+
+    private static WebApplication? _registrationClientApp;
+    private static IServiceScope? _registrationClientScope;
+
+    public static async Task<IIdentityServerServiceWrapper> CreateRegistrationServiceWrapper()
+    {
+        if (_registrationClientApp is null)
+        {
+            _registrationClientApp = StartTestClient(registration: true);
+            await ConnectBoltClient(_registrationClientApp.Services.GetRequiredService<BoltClient>(), "Yap registration test client");
+            _registrationClientScope = _registrationClientApp.Services.CreateScope();
+        }
+        return _registrationClientScope!.ServiceProvider.GetRequiredService<IIdentityServerServiceWrapper>();
+    }
+
     public static async Task<IIdentityServerServiceWrapper> CreatePortalWrapperWithoutTenantTargetScope()
         => await CreateServiceWrapper(
             TestServiceClientId,
@@ -251,6 +267,8 @@ public class IntegrationTestFixture
     [OneTimeTearDown]
     public async Task GlobalTeardown()
     {
+        try { _registrationClientScope?.Dispose(); } catch { }
+        try { if (_registrationClientApp != null) await _registrationClientApp.StopAsync(); } catch { }
         try { _testClientScope?.Dispose(); } catch { }
         try { if (_testClientApp != null) await _testClientApp.StopAsync(); } catch { }
         try { if (_identityServerApp != null) await _identityServerApp.StopAsync(); } catch { }
@@ -342,6 +360,7 @@ public class IntegrationTestFixture
         builder.Services.AddHostedService<StorageCleanupOutboxDispatcher>();
         builder.Services.AddHostedService<StorageClaimOutboxDispatcher>();
         builder.Services.AddScoped<AuthService>();
+        builder.Services.AddScoped<IdentityServer.Api.Features.Auth.Register.RegistrationService>();
         builder.Services.AddScoped<IAuthService>(serviceProvider => serviceProvider.GetRequiredService<AuthService>());
         builder.Services.AddScoped<IPasswordResetProcessor>(serviceProvider =>
             new FailureInjectingPasswordResetProcessor(serviceProvider.GetRequiredService<AuthService>()));
@@ -401,34 +420,36 @@ public class IntegrationTestFixture
     /// Minimal app that acts as a Bolt client with IIdentityServerServiceWrapper.
     /// This is how any real service (Blazor, Wallets, etc.) would call IdentityServer via Bolt.
     /// </summary>
-    private static WebApplication StartTestClient()
+    private static WebApplication StartTestClient(bool registration = false)
     {
+        var clientId = registration ? "XFramework.Yap" : TestServiceClientId;
+        var generation = registration ? "yap-registration-test-g1" : TestServiceGenerationId;
+        var secret = registration ? "YapRegistrationIntegrationSecret-2026" : TestServiceClientSecret;
+        var clientUrl = registration ? GetAvailableLoopbackUrl() : TestClientUrl;
+        string[] scopes = registration
+            ? [XFrameworkServiceScopes.BoltService, XFrameworkServiceScopes.IdentityRegister, XFrameworkServiceScopes.TenantTarget]
+            : [XFrameworkServiceScopes.BoltService, XFrameworkServiceScopes.IdentityAdmin, XFrameworkServiceScopes.DataContextQuery,
+                XFrameworkServiceScopes.DataContextMutate, XFrameworkServiceScopes.IdentitySessionValidate, XFrameworkServiceScopes.TenantTarget];
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
             EnvironmentName = Environments.Development
         });
-        builder.WebHost.UseUrls(TestClientUrl);
+        builder.WebHost.UseUrls(clientUrl);
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["BoltConfiguration:ClientName"] = XFrameworkServiceNames.Portal,
+            ["BoltConfiguration:ClientName"] = clientId,
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["BoltConfiguration:GenerateServiceAccessToken"] = "false",
-            ["ServiceIdentity:ClientId"] = TestServiceClientId,
+            ["ServiceIdentity:ClientId"] = clientId,
             ["ServiceIdentity:Authority"] = IdentityServerUrl,
             ["ServiceIdentity:AllowInsecureHttp"] = "true",
-            ["ServiceIdentity:GenerationId"] = TestServiceGenerationId,
-            ["ServiceIdentity:ClientSecret"] = TestServiceClientSecret,
-            ["ServiceIdentity:DefaultScopes:0"] = XFrameworkServiceScopes.BoltService,
-            ["ServiceIdentity:DefaultScopes:1"] = XFrameworkServiceScopes.IdentityAdmin,
-            ["ServiceIdentity:DefaultScopes:2"] = XFrameworkServiceScopes.DataContextQuery,
-            ["ServiceIdentity:DefaultScopes:3"] = XFrameworkServiceScopes.DataContextMutate,
-            ["ServiceIdentity:DefaultScopes:4"] = XFrameworkServiceScopes.IdentitySessionValidate,
-            ["ServiceIdentity:DefaultScopes:5"] = XFrameworkServiceScopes.TenantTarget,
+            ["ServiceIdentity:GenerationId"] = generation,
+            ["ServiceIdentity:ClientSecret"] = secret,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
-            ["Kestrel:Endpoints:Http:Url"] = TestClientUrl,
-            ["urls"] = TestClientUrl,
+            ["Kestrel:Endpoints:Http:Url"] = clientUrl,
+            ["urls"] = clientUrl,
             ["JwtOptions:ValidAudience"] = "http://localhost:18261",
             ["JwtOptions:ValidIssuer"] = "http://localhost:18261",
             ["JwtOptions:GenerationId"] = "test-jwt-g1",
@@ -438,6 +459,9 @@ public class IntegrationTestFixture
             ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",
             ["Logging:LogLevel:Default"] = "Warning",
         });
+
+        builder.Configuration.AddInMemoryCollection(scopes.Select((scope, index) =>
+            new KeyValuePair<string, string?>($"ServiceIdentity:DefaultScopes:{index}", scope)));
 
         // Core services needed by service wrappers.
         // NOTE(Task13): Test client uses thin-protocol BoltDriver. IdentityServer still uses
@@ -449,8 +473,8 @@ public class IntegrationTestFixture
         builder.Services.AddSingleton<IBoltTransportTokenProvider>(_ =>
             new IntegrationBoltTransportTokenProvider(
                 _identityServerApp.Services.GetRequiredService<IBoltTransportTokenSigner>(),
-                TestServiceClientId,
-                TestServiceGenerationId));
+                clientId,
+                generation));
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
         builder.Services.AddSingleton<IActorAccessTokenProvider, IdentityServerTestActorAccessTokenProvider>();
 
@@ -471,7 +495,7 @@ public class IntegrationTestFixture
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
         StartApplication(app);
-        _testClientTask = app.WaitForShutdownAsync();
+        if (!registration) _testClientTask = app.WaitForShutdownAsync();
         return app;
     }
 
@@ -594,6 +618,14 @@ public class IntegrationTestFixture
             ["ServiceIdentity:BoltTransportTokenIssuer:Enabled"] = "true",
             ["ServiceIdentity:BoltTransportTokenIssuer:SigningKeyPath"] = TransportSigningKeyPath,
             ["ServiceIdentity:Clients:0:ClientId"] = TestServiceClientId,
+            ["ServiceIdentity:Clients:3:ClientId"] = "XFramework.Yap",
+            ["ServiceIdentity:Clients:3:GenerationId"] = "yap-registration-test-g1",
+            ["ServiceIdentity:Clients:3:ClientSecret"] = "YapRegistrationIntegrationSecret-2026",
+            ["ServiceIdentity:Clients:3:AllowedAudiences"] = XFrameworkServiceNames.IdentityServer,
+            ["ServiceIdentity:Clients:3:AllowedScopes"] = "bolt.service,identity.register,tenant.target",
+            ["SelfRegistration:Clients:0:ClientId"] = "XFramework.Yap",
+            ["SelfRegistration:Clients:0:TenantId"] = TestTenantId.ToString(),
+            ["SelfRegistration:Clients:0:RoleId"] = RegistrationRoleId.ToString(),
             ["ServiceIdentity:Clients:0:GenerationId"] = TestServiceGenerationId,
             ["ServiceIdentity:Clients:0:ClientSecret"] = TestServiceClientSecret,
             ["ServiceIdentity:Clients:0:AllowedAudiences"] = XFrameworkServiceNames.IdentityServer,

@@ -23,9 +23,10 @@ namespace Yap.Tests;
 // Browser fixture only. The production project has no demo flag, fake login, or seeded chats.
 internal static class UiFixture
 {
-    public static WebApplication Create(int port = 5189)
+    public static WebApplication Create(int port = 5189, Action<Mock<IIdentityServerServiceWrapper>>? configureIdentity = null)
     {
         var fixture = new ChatFixture();
+        var registrationRole = Guid.NewGuid();
         var auth = YapSessionsTests.Session();
         auth.Credential!.Id = fixture.Credential;
         auth.Credential.TenantId = fixture.Tenant;
@@ -115,6 +116,10 @@ internal static class UiFixture
         fixture.Session.Setup(s => s.SubscribeTypingAsync(It.IsAny<Guid>(), It.IsAny<Func<CommunicationsTypingState, Task>>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var identity = new Mock<IIdentityServerServiceWrapper>();
+        identity.Setup(i => i.RegisterIdentity(It.IsAny<RegisterIdentityRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CmdResponse<IdentityServer.Domain.Shared.Contracts.Responses.RegisterIdentityResponse>
+            { HttpStatusCode = HttpStatusCode.OK, Response = new()
+                { CredentialId = Guid.NewGuid(), TenantId = fixture.Tenant, RoleId = registrationRole } });
         identity.Setup(i => i.AuthenticateIdentity(It.IsAny<AuthenticateIdentityRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((AuthenticateIdentityRequest request, CancellationToken _) => request.UserName == "fixture" && request.Password == "fixture"
                 ? ChatFixture.Ok(auth) : new() { HttpStatusCode = HttpStatusCode.Unauthorized });
@@ -147,11 +152,12 @@ internal static class UiFixture
         storage.Setup(s => s.GetStorageDownloadUrl(It.IsAny<GetStorageDownloadUrlRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ChatFixture.Ok(new StorageDownloadUrlResponse { StorageFileId = fileId, Url = $"http://127.0.0.1:{port}/test/file", ExpiresAt = DateTime.UtcNow.AddMinutes(5) }));
 
+        configureIdentity?.Invoke(identity);
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Presentation/XFramework.Yap"));
         var app = YapApplication.Build([
             "--contentRoot", root, "--applicationName", "XFramework.Yap", "--environment", "Development",
             "--urls", $"http://127.0.0.1:{port}", "--Yap:TenantId", fixture.Tenant.ToString(),
-            "--Yap:RoleId", Guid.NewGuid().ToString(),
+            "--Yap:RoleId", registrationRole.ToString(),
             "--ServiceIdentity:GenerationId", "fixture-g1", "--ServiceIdentity:ClientSecret", "fixture-only-secret-not-for-any-real-service"
         ], builder =>
         {
