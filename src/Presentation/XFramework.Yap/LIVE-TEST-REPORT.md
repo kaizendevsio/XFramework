@@ -13,6 +13,14 @@ Deployment `34584776953` completed successfully for develop `7836437a`. The new 
 
 Attachment contracts are concrete in the fix task but have not been imported into Yap yet: creation and download are Communications membership-checked SDK operations; upload part/complete/abort use dedicated Storage chat operations. The fix task reported ordinary-user multipart and ownership tests passing; no live attachment success is claimed here.
 
+### Attachment adapter integration (deployment pending)
+
+Imported the fix task's `4aeb2980` as `2b35cb21` and adapted Yap to the actual committed SDK contracts. Creation now calls the actor-bound Communications session's `CreateAttachmentUploadAsync`; parts, completion, and abort use dedicated Storage chat requests. Generic metadata provisioning is removed. Downloads use Communications `GetAttachmentDownloadUrlAsync` with the MessageFile link ID, preserving membership/message visibility checks.
+
+The adapter honors negotiated part sizes and retains the actual filename, MIME type, and bytes. After multipart completion it polls tenant-scoped Storage metadata for up to 60 seconds if the file is still Verifying/VerificationInProgress, and only returns an Available file for message linking. It aborts an incomplete session on upload failure, but does not abort an already completed upload when later verification fails or is cancelled.
+
+All **30 Yap tests pass**, including exact multipart bytes/offsets/numbers, Available and Verifying completion, abort after a rejected part, and link-scoped downloads. PR #443 owns the normal server deployment. These are adapter tests, not live upload/download evidence; the app remains stopped pending server deployment and authorization recovery.
+
 ## Live checks after PR #441 deployment
 
 Deployment `34583099498` completed successfully. These checks ran against that deployed server with the scope-corrected client, before importing PR #442's new transient subscription protocol. Local Yap was stopped once PR #442 deployment `34584776953` reached service rollout.
