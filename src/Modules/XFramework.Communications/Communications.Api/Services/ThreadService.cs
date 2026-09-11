@@ -328,6 +328,10 @@ public sealed partial class ThreadService(
                 .Where(x => x.TenantId == caller.TenantId && threadIds.Contains(x.MessageThreadId))
                 .Where(x => !x.IsDeleted && x.IsEnabled).ToListAsync(ct);
             var directThreadIds = directThreads.Select(x => x.MessageThreadId).ToHashSet();
+            var directPeers = directThreads
+                .Where(x => x.FirstCredentialId == caller.CredentialId || x.SecondCredentialId == caller.CredentialId)
+                .ToDictionary(x => x.MessageThreadId, x => x.FirstCredentialId == caller.CredentialId
+                    ? x.SecondCredentialId : x.FirstCredentialId);
             var blockedCredentialIds = await GetBlockedCredentialIdsForAsync(caller.TenantId, caller.CredentialId, ct);
             var blockedSenderMemberIds = await GetBlockedThreadMemberIdsAsync(
                 caller.TenantId,
@@ -401,7 +405,8 @@ public sealed partial class ThreadService(
                     UnreadCount = unreadCount,
                     IsMuted = membership?.IsMuted == true,
                     IsArchived = membership?.IsArchived == true,
-                    IsDirect = directThreadIds.Contains(t.Id)
+                    IsDirect = directThreadIds.Contains(t.Id),
+                    OtherCredentialId = directPeers.TryGetValue(t.Id, out var peer) ? peer : null
                 };
             }).ToList();
 

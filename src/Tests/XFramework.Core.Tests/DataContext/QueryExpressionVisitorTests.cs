@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using FluentAssertions;
 using NUnit.Framework;
 using XFramework.Domain.Shared.Enums;
@@ -101,9 +103,10 @@ public class QueryExpressionVisitorTests
     {
         var filters = QueryExpressionVisitor.Parse<Product>(x => x.Price > 10 && x.Stock > 0);
 
-        filters.Should().HaveCount(2);
+        filters.Should().HaveCount(3);
         filters[0].PropertyName.Should().Be("Price");
         filters[1].PropertyName.Should().Be("Stock");
+        filters[2].Operation.Should().Be(QueryFilterOperation.And);
     }
 
     [Test]
@@ -183,8 +186,9 @@ public class QueryExpressionVisitorTests
             x => x.Status == ProductStatus.Active || x.Status == ProductStatus.Pending || x.Status == ProductStatus.Archived);
 
         // Should be optimized to In filters
-        filters.Should().AllSatisfy(f => f.Operation.Should().Be(QueryFilterOperation.In));
-        filters.Should().AllSatisfy(f => f.PropertyName.Should().Be("Status"));
+        filters.Take(3).Should().AllSatisfy(f => f.Operation.Should().Be(QueryFilterOperation.In));
+        filters.Take(3).Should().AllSatisfy(f => f.PropertyName.Should().Be("Status"));
+        filters[3].Operation.Should().Be(QueryFilterOperation.And);
     }
 
     [Test]
@@ -193,7 +197,7 @@ public class QueryExpressionVisitorTests
         // x.Price is >= 10 and <= 50 compiles to x.Price >= 10 && x.Price <= 50
         var filters = QueryExpressionVisitor.Parse<Product>(x => x.Price >= 10 && x.Price <= 50);
 
-        filters.Should().HaveCount(2);
+        filters.Should().HaveCount(3);
         filters[0].Operation.Should().Be(QueryFilterOperation.GreaterThanOrEqual);
         filters[1].Operation.Should().Be(QueryFilterOperation.LessThanOrEqual);
     }
@@ -218,5 +222,39 @@ public class QueryExpressionVisitorTests
         filters.Should().HaveCount(1);
         filters[0].PropertyName.Should().Be("CreatedAt");
         filters[0].Operation.Should().Be(QueryFilterOperation.GreaterThan);
+    }
+
+    [Test]
+    public void Parse_ArrayAndListContains_ProducesBoundedInGroups()
+    {
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        var array = QueryExpressionVisitor.Parse<Product>(x => ids.Contains(x.Id));
+        var list = ids.ToList();
+        var instance = QueryExpressionVisitor.Parse<Product>(x => list.Contains(x.Id));
+        array.Take(2).Select(x => x.Value).Should().Equal(ids.Cast<object>());
+        array.Take(2).Should().OnlyContain(x => x.Operation == QueryFilterOperation.In && x.PropertyName == "Id");
+        instance.Should().BeEquivalentTo(array);
+        array.Last().Operation.Should().Be(QueryFilterOperation.And);
+    }
+
+    [Test]
+    public void Parse_UnsupportedOrOversizedContains_FailsExplicitly()
+    {
+        var ids = Enumerable.Range(0, 65).Select(_ => Guid.NewGuid()).ToArray();
+        Action oversized = () => QueryExpressionVisitor.Parse<Product>(x => ids.Contains(x.Id));
+        oversized.Should().Throw<NotSupportedException>().WithMessage("*64*");
+        Action comparer = () => QueryExpressionVisitor.Parse<Product>(x => new[] { "a" }.Contains(x.Name, StringComparer.OrdinalIgnoreCase));
+        comparer.Should().Throw<NotSupportedException>();
+        Action rowCollection = () => QueryExpressionVisitor.Parse<Product>(x => x.Name.ToCharArray().Contains('a'));
+        rowCollection.Should().Throw<NotSupportedException>();
+    }
+
+    [Test]
+    public void Parse_ExplicitIgnoreCaseContains_PreservesComparisonChoice()
+    {
+        var filters = QueryExpressionVisitor.Parse<Product>(x => x.Name.Contains("alice", StringComparison.OrdinalIgnoreCase));
+        filters.Single().Operation.Should().Be(QueryFilterOperation.ContainsIgnoreCase);
+        Action unsupported = () => QueryExpressionVisitor.Parse<Product>(x => x.Name.Contains("alice", StringComparison.CurrentCulture));
+        unsupported.Should().Throw<NotSupportedException>();
     }
 }

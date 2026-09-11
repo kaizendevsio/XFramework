@@ -266,7 +266,7 @@ public static class QueryDescriptorExecutor
     private static IQueryable<T> ApplyFilters<T>(IQueryable<T> queryable, List<QueryFilter> filters) where T : class
     {
         var parameter = Expression.Parameter(typeof(T), "e");
-        Expression? combined = null;
+        var operands = new List<(int Start, int End, Expression Predicate)>();
 
         // Track Or groups
         var i = 0;
@@ -274,9 +274,21 @@ public static class QueryDescriptorExecutor
         {
             var filter = filters[i];
 
-            if (filter.Operation == QueryFilterOperation.Or)
+            if (filter.Operation is QueryFilterOperation.Or or QueryFilterOperation.And)
             {
-                // This is an Or group marker — the previous N filters form the group
+                if (filter.Value is not int count || count < 1 || count > i)
+                    throw new InvalidOperationException("Invalid remote query boolean group.");
+                var start = i - count;
+                var first = operands.FindIndex(operand => operand.Start == start);
+                if (first < 0 || operands[^1].End != i - 1)
+                    throw new InvalidOperationException("Remote query boolean group crosses an operand boundary.");
+                var grouped = operands[first].Predicate;
+                for (var j = first + 1; j < operands.Count; j++)
+                    grouped = filter.Operation == QueryFilterOperation.Or
+                        ? Expression.OrElse(grouped, operands[j].Predicate)
+                        : Expression.AndAlso(grouped, operands[j].Predicate);
+                operands.RemoveRange(first, operands.Count - first);
+                operands.Add((start, i, grouped));
                 i++;
                 continue;
             }
@@ -286,6 +298,7 @@ public static class QueryDescriptorExecutor
                 // Collect all In values for this property
                 var inValues = new List<object?>();
                 var propertyName = filter.PropertyName;
+                var start = i;
                 while (i < filters.Count
                        && filters[i].Operation == QueryFilterOperation.In
                        && filters[i].PropertyName == propertyName)
@@ -295,21 +308,22 @@ public static class QueryDescriptorExecutor
                 }
 
                 var inExpression = BuildInExpression(parameter, propertyName!, inValues);
-                combined = combined is null ? inExpression : Expression.AndAlso(combined, inExpression);
+                operands.Add((start, i - 1, inExpression));
                 continue;
             }
 
             var filterExpression = BuildFilterExpression(parameter, filter);
             if (filterExpression is not null)
             {
-                combined = combined is null ? filterExpression : Expression.AndAlso(combined, filterExpression);
+                operands.Add((i, i, filterExpression));
             }
 
             i++;
         }
 
-        if (combined is not null)
+        if (operands.Count > 0)
         {
+            var combined = operands.Select(operand => operand.Predicate).Aggregate(Expression.AndAlso);
             var lambda = Expression.Lambda<Func<T, bool>>(combined, parameter);
             queryable = queryable.Where(lambda);
         }
@@ -334,6 +348,7 @@ public static class QueryDescriptorExecutor
             QueryFilterOperation.GreaterThanOrEqual => Expression.GreaterThanOrEqual(property, ConvertValue(filter.Value, property.Type)),
             QueryFilterOperation.LessThanOrEqual => Expression.LessThanOrEqual(property, ConvertValue(filter.Value, property.Type)),
             QueryFilterOperation.Contains => BuildStringMethodCall(property, "Contains", filter.Value),
+            QueryFilterOperation.ContainsIgnoreCase => BuildCaseInsensitiveContains(property, filter.Value),
             QueryFilterOperation.StartsWith => BuildStringMethodCall(property, "StartsWith", filter.Value),
             QueryFilterOperation.EndsWith => BuildStringMethodCall(property, "EndsWith", filter.Value),
             QueryFilterOperation.IsType => BuildTypeCheck(parameter, filter.Value?.ToString()),
@@ -366,6 +381,17 @@ public static class QueryDescriptorExecutor
     {
         var method = typeof(string).GetMethod(methodName, [typeof(string)])!;
         return Expression.Call(property, method, Expression.Constant(value?.ToString() ?? string.Empty));
+    }
+
+    private static Expression BuildCaseInsensitiveContains(Expression property, object? value)
+    {
+        // Escape LIKE metacharacters so Contains keeps literal substring semantics.
+        var literal = (value?.ToString() ?? string.Empty)
+            .Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var method = typeof(NpgsqlDbFunctionsExtensions).GetMethod(nameof(NpgsqlDbFunctionsExtensions.ILike),
+            [typeof(DbFunctions), typeof(string), typeof(string), typeof(string)])!;
+        return Expression.Call(method, Expression.Constant(EF.Functions), property,
+            Expression.Constant($"%{literal}%"), Expression.Constant("\\"));
     }
 
     private static Expression BuildTypeCheck(ParameterExpression parameter, string? typeName)

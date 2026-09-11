@@ -16,4 +16,5 @@ public enum QueryFilterOperation
     IsType,
     IsNotType,
     In,
+    ContainsIgnoreCase,
 }

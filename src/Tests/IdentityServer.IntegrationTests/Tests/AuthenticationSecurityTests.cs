@@ -489,8 +489,9 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
         persisted.Status.Should().Be(CurrentSessionState.Inactive);
     }
 
-    [Test]
-    public async Task Logout_ActorPlusServiceCannotTerminateAnotherCredentialsSession()
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task Logout_YapActorCanTerminateOnlyOwnCredentialsSession(bool ownsSession)
     {
         var seeded = await SeedAuthenticationGraph();
         var auth = await AuthenticateDirect(CreateAuthRequest(
@@ -503,7 +504,7 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
 
         await using var scope = IntegrationTestFixture.Services.CreateAsyncScope();
         var actor = new TrustedActorIdentity(
-            Guid.NewGuid(),
+            ownsSession ? seeded.CredentialId : Guid.NewGuid(),
             Guid.NewGuid(),
             seeded.TenantId,
             Guid.NewGuid(),
@@ -512,9 +513,9 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
             "identityserver-integration-tests-g1",
             DateTimeOffset.UtcNow.AddHours(1));
         var service = new TrustedServiceIdentity(
-            "TestClient",
+            XFrameworkServiceNames.Yap,
             XFrameworkServiceNames.IdentityServer,
-            new HashSet<string>(XFrameworkServiceScopes.AdminDefaults, StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal),
             "test-client-g1");
         scope.ServiceProvider.GetRequiredService<ITrustedInvocationContextStore>().Set(
             new TrustedInvocationContext(actor, service, seeded.TenantId, null, Guid.NewGuid()));
@@ -527,13 +528,14 @@ public sealed class AuthenticationSecurityTests : IntegrationTestBase
                 Metadata = new RequestMetadata()
             });
 
-        result.IsSuccess.Should().BeFalse();
-        result.StatusCode.Should().Be(403);
+        result.IsSuccess.Should().Be(ownsSession);
+        if (!ownsSession)
+            result.StatusCode.Should().Be(403);
         await using var db = CreateDbContext();
         var persisted = await db.Set<Session>()
             .IgnoreQueryFilters()
             .SingleAsync(session => session.Id == sessionId);
-        persisted.Status.Should().Be(CurrentSessionState.Active);
+        persisted.Status.Should().Be(ownsSession ? CurrentSessionState.Inactive : CurrentSessionState.Active);
     }
 
     [Test]

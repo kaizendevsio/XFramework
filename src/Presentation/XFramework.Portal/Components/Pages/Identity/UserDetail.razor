@@ -1338,18 +1338,20 @@ else
                 .Where(credential => credential.TenantId == tenantId)
                 .Select(credential => credential.Id)
                 .ToArray();
-            _roles = credentialIds.Length == 0
-                ? []
-                : (await DataContext.Query<IdentityRole>()
+            _roles = [];
+            foreach (var credentialBatch in credentialIds.Chunk(50))
+            {
+                _roles.AddRange(await DataContext.Query<IdentityRole>()
                     .IgnoreQueryFilters()
                     .NoCache()
                     .Where(role => role.TenantId == tenantId)
-                    .Where(role => credentialIds.Contains(role.CredentialId))
+                    .Where(role => credentialBatch.Contains(role.CredentialId))
                     .Include(x => x.Type)
                     .OrderByDescending(x => x.CreatedAt)
                     .Take(1_000)
-                    .ToListAsync())
-                .ToList();
+                    .ToListAsync());
+            }
+            _roles = _roles.OrderByDescending(role => role.CreatedAt).Take(1_000).ToList();
         }
         catch (Exception ex)
         {

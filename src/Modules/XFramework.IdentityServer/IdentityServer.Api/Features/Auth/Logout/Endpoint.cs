@@ -1,12 +1,15 @@
 using FluentValidation;
 using IdentityServer.Api.Features.Authorization.Shared;
 using XFramework.Integration.Attributes;
+using XFramework.Integration.Security;
 
 namespace IdentityServer.Api.Features.Auth.Logout;
 
 public static class LogoutEndpoint
 {
-    [BoltHandler(RequiredServiceScopes = [XFrameworkServiceScopes.IdentityAdmin])]
+    // Signing out is an actor-owned operation, not an administrative operation.
+    // AuthService checks the trusted actor credential and tenant against the session.
+    [BoltHandler(RequiredServiceScopes = [], ActorRequirement = ActorRequirement.Required)]
     public static Task<Result> Handle(
         LogoutRequest request,
         IAuthService authService,

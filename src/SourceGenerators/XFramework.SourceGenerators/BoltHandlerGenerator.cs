@@ -291,7 +291,15 @@ public class BoltHandlerGenerator : ISourceGenerator
         }
 
         var featureGateRoute = route;
-        var featureGateHttpMethod = httpMethod;
+        var featureGateHttpMethod = httpMethod switch
+        {
+            "MapGet" => "GET",
+            "MapPost" => "POST",
+            "MapPut" => "PUT",
+            "MapPatch" => "PATCH",
+            "MapDelete" => "DELETE",
+            _ => httpMethod
+        };
         var featureGateCapability = capability;
         if (featureGateRoute is null)
         {
