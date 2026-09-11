@@ -131,6 +131,11 @@ public sealed class StorageMinioProviderTests
                 $"{endpoint.TrimEnd('/')}/{privateBucket.BucketName}/{privateFile.ObjectKey}");
             privateResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
+            // Keep upload/management on the internal endpoint but sign against
+            // the externally reachable authority. Host rewriting after signing fails.
+            options.S3.DownloadEndpoint = endpoint;
+            options.S3.Endpoint = "http://docker-only-minio.invalid:9000";
+            profile.Endpoint = options.S3.Endpoint;
             var signed = await provider.CreateDownloadUrlAsync(
                 profile,
                 privateBucket,
@@ -139,6 +144,7 @@ public sealed class StorageMinioProviderTests
                 CancellationToken.None);
             using var signedResponse = await anonymous.GetAsync(signed.Url);
             signedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await signedResponse.Content.ReadAsByteArrayAsync()).Should().Equal(1, 2, 3, 4);
         }
         finally
         {

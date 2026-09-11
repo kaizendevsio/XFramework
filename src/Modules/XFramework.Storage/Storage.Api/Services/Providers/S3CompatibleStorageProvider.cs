@@ -242,14 +242,22 @@ public sealed class S3CompatibleStorageProvider(
         DateTime expiresAt,
         CancellationToken ct)
     {
-        using var client = CreateClient(profile);
+        var endpoint = profile.Endpoint ?? storageOptions.S3.Endpoint;
+        // Sign for the browser-visible authority, not a Docker-only hostname.
+        // The configured alias belongs only to the configured store; other
+        // provider profiles must retain their own endpoint and credentials.
+        if (!string.IsNullOrWhiteSpace(storageOptions.S3.DownloadEndpoint) &&
+            !string.IsNullOrWhiteSpace(storageOptions.S3.Endpoint) &&
+            string.Equals(endpoint?.TrimEnd('/'), storageOptions.S3.Endpoint.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+            endpoint = storageOptions.S3.DownloadEndpoint;
+        using var client = CreateClient(profile, endpoint);
         var url = client.GetPreSignedURL(new GetPreSignedUrlRequest
         {
             BucketName = bucket.BucketName,
             Key = RequireObjectKey(file),
             Expires = expiresAt,
             Verb = HttpVerb.GET,
-            Protocol = (profile.Endpoint ?? storageOptions.S3.Endpoint)?.StartsWith(
+            Protocol = endpoint?.StartsWith(
                 "http://",
                 StringComparison.OrdinalIgnoreCase) == true
                 ? Protocol.HTTP
@@ -265,14 +273,14 @@ public sealed class S3CompatibleStorageProvider(
         });
     }
 
-    private AmazonS3Client CreateClient(StorageProviderProfile profile)
+    private AmazonS3Client CreateClient(StorageProviderProfile profile, string? endpointOverride = null)
     {
         var config = new AmazonS3Config
         {
             ForcePathStyle = profile.UsePathStyle
         };
 
-        var endpoint = profile.Endpoint ?? storageOptions.S3.Endpoint;
+        var endpoint = endpointOverride ?? profile.Endpoint ?? storageOptions.S3.Endpoint;
         var region = profile.Region ?? storageOptions.S3.Region;
 
         if (!string.IsNullOrWhiteSpace(endpoint))

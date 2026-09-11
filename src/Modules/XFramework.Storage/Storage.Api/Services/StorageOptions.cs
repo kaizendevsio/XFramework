@@ -36,6 +36,7 @@ public sealed class StorageOptions
 public sealed class S3StorageOptions
 {
     public string? Endpoint { get; set; }
+    public string? DownloadEndpoint { get; set; }
     public string Region { get; set; } = "us-east-1";
     public string? AccessKeyId { get; set; }
     public string? SecretAccessKey { get; set; }

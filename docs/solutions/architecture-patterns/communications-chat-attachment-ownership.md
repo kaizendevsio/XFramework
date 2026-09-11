@@ -24,10 +24,12 @@ operations; Communications owns membership, message visibility, and attachment l
 2. Call the session's `CreateAttachmentUploadAsync(CreateChatAttachmentUploadRequest)`
    with the thread ID, original filename, MIME type, total byte length, and optional
    chunk size/SHA-256. Communications checks active membership and attachment policy.
-3. Send negotiated chunks through `IStorageServiceWrapper.UploadChatStorageFilePart`
+3. Omit the requested chunk size to use the provider default (S3 multipart requires
+   at least 5 MiB per non-final part). Send returned-size chunks through `IStorageServiceWrapper.UploadChatStorageFilePart`
    using `UploadChatStorageFilePartRequest`, then complete with
    `CompleteChatStorageUploadSessionRequest`. Forward the same actor token for each
-   call. Use `AbortChatStorageUploadSessionRequest` on cancellation.
+   call and set each part's `PartSha256Hash` to the SHA-256 of its exact bytes.
+   Use `AbortChatStorageUploadSessionRequest` on cancellation.
 4. Multipart completion can return `Verifying`; wait for Storage status `Available`
    before linking via the existing `CreateMessageFile` operation. Storage verifies
    the uploader, tenant, thread, purpose, and availability before Communications links.
@@ -56,6 +58,12 @@ operations; Communications owns membership, message visibility, and attachment l
 - Generic download URLs cannot bypass Communications visibility checks for chat files.
   Generic upload mutations also enforce ownership on chat-purpose files. Existing
   generic metadata-management authorization is unchanged.
+- For a Docker-internal S3 endpoint, set `Storage:S3:DownloadEndpoint` to the
+  browser-reachable address of the **same** store. The normal dev Compose path uses
+  `STORAGE_S3_DOWNLOAD_ENDPOINT` (default `http://xeon-dev:9000`). This address is used
+  before signing, never by rewriting a signed URL. It applies only to profiles
+  matching `Storage:S3:Endpoint`; independent provider profiles keep their endpoint.
+  Private buckets remain private and upload/management traffic stays internal.
 - Existing legacy attachment links need an explicit ownership/provenance migration
   before using this new download path; do not infer ownership or grant admin access.
 
