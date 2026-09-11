@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.JSInterop;
 using Yap.Contracts;
@@ -8,11 +9,28 @@ namespace Yap.Client.Services;
 public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : IAsyncDisposable
 {
     private readonly SemaphoreSlim sync = new(1, 1);
+    private readonly SemaphoreSlim typingPublish = new(1, 1);
     private readonly CancellationTokenSource lifetime = new();
     private DotNetObjectReference<ChatState>? reference;
     private Task? polling;
     private int pages = 1;
     private int inboxPages = 1;
+    private bool refreshPending;
+    private Task? refreshing;
+    private readonly ConcurrentDictionary<Guid, DateTime> typing = new();
+    private readonly HashSet<Guid> acknowledged = [];
+    private DateTime lastTyping;
+    private Guid? publishingThread;
+    public string? TypingText
+    {
+        get
+        {
+            var people = typing.Where(x => x.Value > DateTime.UtcNow).Select(x => x.Key).ToArray();
+            return people.Length == 0 ? null : string.Join(", ", people
+                .Select(id => Selected?.People.FirstOrDefault(x => x.Id == id)?.Name ?? "Someone"))
+                + (people.Length == 1 ? " is typing…" : " are typing…");
+        }
+    }
     public int ConversationTotal { get; private set; }
     public UserSession? User { get; private set; }
     public bool Ready { get; private set; }
@@ -57,13 +75,81 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
     }
 
     [JSInvokable] public async Task ConnectivityChanged(bool online)
-    { Online = online; Notify(); if (online) await SynchronizeAsync(); }
-    [JSInvokable] public Task RefreshHint() => SynchronizeAsync();
+    { Online = online; if (!online) typing.Clear(); Notify(); if (online) await SynchronizeAsync(); }
+    [JSInvokable] public Task RefreshHint()
+    {
+        refreshPending = true;
+        return refreshing is { IsCompleted: false } ? refreshing : refreshing = RefreshEventsAsync();
+    }
+
+    private async Task RefreshEventsAsync()
+    {
+        try
+        {
+            await sync.WaitAsync(lifetime.Token);
+            try
+            {
+                while (refreshPending && Online && !NeedsLogin && User is not null)
+                {
+                    refreshPending = false;
+                    // Show the open conversation before fetching inbox summaries.
+                    if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
+                    for (var page = 0; page < inboxPages; page++)
+                    {
+                        var list = await api.GetAsync<ChatPage<Conversation>>($"api/chat/conversations?page={page}", lifetime.Token);
+                        ConversationTotal = list.TotalCount;
+                        await store.SaveConversationsAsync(Scope, list.Items);
+                        if ((page + 1) * 30 >= list.TotalCount) break;
+                    }
+                    Conversations = await store.ConversationsAsync(Scope);
+                    Notify();
+                }
+            }
+            finally { sync.Release(); }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ChatApiException ex) { NeedsLogin = ex.Status == 401; Report(ex); }
+        catch (Exception ex) { Report(ex); }
+    }
+
+    [JSInvokable] public void TypingChanged(Guid thread, Guid credential, bool active)
+    {
+        if (!Online || NeedsLogin || Selected?.Id != thread || User?.CredentialId == credential) return;
+        if (active) { typing[credential] = DateTime.UtcNow.AddSeconds(6); _ = ExpireTypingAsync(thread, credential); }
+        else typing.TryRemove(credential, out _);
+        Notify();
+    }
+
+    private async Task ExpireTypingAsync(Guid thread, Guid credential)
+    {
+        try { await Task.Delay(6000, lifetime.Token); }
+        catch (OperationCanceledException) { return; }
+        if (Selected?.Id == thread && typing.TryGetValue(credential, out var until) && until <= DateTime.UtcNow)
+        { ((ICollection<KeyValuePair<Guid, DateTime>>)typing).Remove(new(credential, until)); Notify(); }
+    }
+
+    public async Task PublishTypingAsync(Guid thread, bool active)
+    {
+        await typingPublish.WaitAsync();
+        try
+        {
+            if (!Online || NeedsLogin || User is null) return;
+            if (active && publishingThread == thread && DateTime.UtcNow - lastTyping < TimeSpan.FromSeconds(3)) return;
+            if (!active && publishingThread != thread) return;
+            publishingThread = active ? thread : null;
+            lastTyping = DateTime.UtcNow;
+            try { await api.PostAsync("api/chat/thread-actions", new ThreadAction(thread, "typing", active)); }
+            catch (Exception) { /* Typing is transient; message delivery remains independent. */ }
+        }
+        finally { typingPublish.Release(); }
+    }
+
+    private ValueTask WatchEventsAsync() => js.InvokeVoidAsync("yap.device.events", Scope, Selected?.Id);
 
     public async Task SynchronizeAsync()
     {
         if (!await js.InvokeAsync<bool>("yap.device.online")) { Online = false; Notify(); return; }
-        if (!await sync.WaitAsync(0)) return;
+        await sync.WaitAsync(lifetime.Token);
         Busy = true;
         try
         {
@@ -101,7 +187,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             }
             Conversations = await store.ConversationsAsync(Scope);
             if (Selected is not null) await RefreshSelectedAsync(Selected.Id);
-            await js.InvokeVoidAsync("yap.device.events", Scope);
+            await WatchEventsAsync();
         }
         catch (ChatApiException ex) { NeedsLogin = ex.Status == 401; if (ex.Status >= 500) Online = false; Error = ex.Message; }
         catch (HttpRequestException) { Online = false; Error = "Cannot reach chat. Your messages are saved and will retry."; }
@@ -121,11 +207,14 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         try
         {
             pages = 1;
+            typing.Clear();
+            acknowledged.Clear();
             Selected = Conversations.FirstOrDefault(x => x.Id == id) ?? new Conversation { Id = id };
             Selected.Messages = await store.MessagesAsync(Scope, id);
             ComposeReplies(Selected.Messages);
             Notify();
             if (Online && !NeedsLogin) await RefreshSelectedAsync(id);
+            if (Online && !NeedsLogin) await WatchEventsAsync();
         }
         catch (Exception ex) { Report(ex); }
         finally { sync.Release(); Notify(); }
@@ -152,7 +241,13 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
         Selected = conversation;
         var index = Conversations.FindIndex(x => x.Id == id);
         if (index >= 0) Conversations[index] = conversation;
-        if (fetched.Count > 0) await api.PostAsync("api/chat/read", new ReadMessages(id, fetched.Where(x => !x.Mine).Select(x => x.Id).Take(100).ToList()));
+        Notify(); // Read receipts must not delay rendering a received message.
+        var unread = fetched.Where(x => !x.Mine && !acknowledged.Contains(x.Id)).Select(x => x.Id).Take(100).ToList();
+        if (unread.Count > 0)
+        {
+            await api.PostAsync("api/chat/read", new ReadMessages(id, unread));
+            acknowledged.UnionWith(unread);
+        }
     }
 
     public async Task LoadEarlierAsync()
@@ -325,6 +420,7 @@ public sealed class ChatState(OfflineStore store, ChatApi api, IJSRuntime js) : 
             await store.SetSettingAsync("pendingLogout", "true");
             await store.ClearPrivateAsync();
             User = null; Selected = null; Conversations = []; Defaults = null; PendingCount = 0; NeedsLogin = false;
+            typing.Clear(); publishingThread = null;
             api.Account = "";
             await js.InvokeVoidAsync("yap.device.events", "");
             await js.InvokeVoidAsync("yap.device.clearFiles");

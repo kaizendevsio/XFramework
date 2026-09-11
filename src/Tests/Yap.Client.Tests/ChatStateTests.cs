@@ -12,6 +12,68 @@ namespace Yap.Client.Tests;
 public sealed class ChatStateTests
 {
     [Test]
+    public async Task RefreshHint_RendersBeforeReadReceiptAndKeepsEventsArrivingDuringRefresh()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var user = new UserSession(Guid.NewGuid(), Guid.NewGuid(), "Recipient");
+        var friend = Guid.NewGuid(); var thread = Guid.NewGuid();
+        var chat = new Conversation { Id = thread, People = [new(friend, "Sarah", "sarah")] };
+        var messages = new List<ChatMessage>();
+        var reading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sessionRequests = 0; var readRequests = 0;
+        var typingRequests = new List<bool>();
+        var js = new Mock<IJSRuntime>();
+        js.Setup(x => x.InvokeAsync<bool>("yap.device.online", It.IsAny<object?[]?>())).ReturnsAsync(true);
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/session") { sessionRequests++; return Json(new SessionResponse(user, "token")); }
+            if (path.EndsWith("initialize")) return Json(new ChatDefaults(Guid.NewGuid(), []));
+            if (path.EndsWith("thread-actions")) { typingRequests.Add((await request.Content!.ReadFromJsonAsync<ThreadAction>())!.Value); return new(HttpStatusCode.NoContent); }
+            if (path.EndsWith("/read")) { readRequests++; reading.TrySetResult(); await release.Task; return new(HttpStatusCode.NoContent); }
+            if (path.EndsWith("/messages")) return Json(new ChatPage<ChatMessage>(messages.ToList(), messages.Count));
+            if (path.EndsWith(thread.ToString())) return Json(chat);
+            return Json(new ChatPage<Conversation>([chat], 1));
+        })) { BaseAddress = new("https://yap.test/") };
+        await using var state = new ChatState(fixture.Store, new ChatApi(http), js.Object);
+        await state.InitializeAsync(); await state.SelectAsync(thread);
+        messages.Add(new() { Id = Guid.NewGuid(), ThreadId = thread, SenderId = friend, Text = "First" });
+        var refresh = state.RefreshHint();
+        try
+        {
+            await reading.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.That(state.Selected!.Messages.Select(x => x.Text), Does.Contain("First"));
+            messages.Add(new() { Id = Guid.NewGuid(), ThreadId = thread, SenderId = friend, Text = "Second" });
+            _ = state.RefreshHint();
+        }
+        finally { release.TrySetResult(); }
+        await refresh.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.That(state.Selected!.Messages.Select(x => x.Text), Does.Contain("Second"));
+        await state.RefreshHint();
+        Assert.That(readRequests, Is.EqualTo(2));
+        Assert.That(sessionRequests, Is.EqualTo(1));
+        state.TypingChanged(thread, user.CredentialId, true);
+        state.TypingChanged(Guid.NewGuid(), friend, true);
+        Assert.That(state.TypingText, Is.Null);
+        state.TypingChanged(thread, friend, true);
+        Assert.That(state.TypingText, Is.EqualTo("Sarah is typing…"));
+        state.TypingChanged(thread, friend, false);
+        Assert.That(state.TypingText, Is.Null);
+        state.TypingChanged(thread, friend, true);
+        await Task.Delay(6200);
+        Assert.That(state.TypingText, Is.Null);
+        await state.PublishTypingAsync(thread, true);
+        await state.PublishTypingAsync(thread, true);
+        await state.PublishTypingAsync(thread, false);
+        await state.PublishTypingAsync(thread, true);
+        Assert.That(typingRequests, Is.EqualTo(new[] { true, false, true }));
+        await state.ConnectivityChanged(false);
+        await state.PublishTypingAsync(thread, true);
+        Assert.That(typingRequests, Has.Count.EqualTo(3));
+    }
+
+    [Test]
     public async Task SynchronizeAsync_ResponseLostAfterCommit_RetriesSameIdAndClearsQueueAfterReceipt()
     {
         await using var fixture = await StoreFixture.CreateAsync();

@@ -44,10 +44,12 @@ public sealed class ThreadServiceSecurityTests
         var member = Member(Guid.NewGuid(), Guid.NewGuid(), actor, tenant);
         var context = new InMemoryDataContext();
         context.Seed(Thread(member.MessageThreadId, tenant), member);
-        var service = CreateService(context);
+        var signal = new CommunicationsOutboxSignal();
+        var service = CreateService(context, signal: signal);
         var request = new CreateThreadMessageRequest { ThreadId = member.MessageThreadId, ClientMessageId = Guid.NewGuid(),
             Text = "  saved offline  ", Metadata = Metadata(actor, tenant) };
         var first = await service.CreateThreadMessageAsync(request);
+        await signal.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(1));
         var retry = await service.CreateThreadMessageAsync(request);
         Assert.That(first.IsSuccess, Is.True, first.Message);
         Assert.That(retry.IsSuccess, Is.True, retry.Message);
@@ -152,7 +154,8 @@ public sealed class ThreadServiceSecurityTests
         dataContext.Seed(
             ThreadType(typeId, tenantId),
             Credential(callerCredentialId, tenantId));
-        var service = CreateService(dataContext);
+        var signal = new CommunicationsOutboxSignal();
+        var service = CreateService(dataContext, signal: signal);
 
         var result = await service.CreateThreadAsync(new CreateThreadRequest
         {
@@ -168,6 +171,8 @@ public sealed class ThreadServiceSecurityTests
             Assert.That(result.Message, Is.EqualTo("Error creating thread"));
             Assert.That(result.Message, Does.Not.Contain("provider detail"));
         });
+        using var deadline = new CancellationTokenSource(100);
+        Assert.ThrowsAsync<OperationCanceledException>(() => signal.WaitAsync(TimeSpan.FromSeconds(5), deadline.Token));
     }
 
     [Test]
@@ -929,7 +934,8 @@ public sealed class ThreadServiceSecurityTests
     private static ThreadService CreateService(
         InMemoryDataContext dataContext,
         ICommunicationsTemplateService? templateService = null,
-        IStorageServiceWrapper? storage = null)
+        IStorageServiceWrapper? storage = null,
+        CommunicationsOutboxSignal? signal = null)
     {
         TrustedContext.Value = null;
         var resolver = new CommunicationsRequestContextResolver(
@@ -947,7 +953,8 @@ public sealed class ThreadServiceSecurityTests
             new TestTransientRealtimePublisher(),
             new EmptyReactionSummaryReader(),
             new EmptyReplySummaryReader(),
-            NullLogger<ThreadService>.Instance);
+            NullLogger<ThreadService>.Instance,
+            signal ?? new CommunicationsOutboxSignal());
     }
 
     private sealed class EmptyReplySummaryReader : IMessageReplySummaryReader

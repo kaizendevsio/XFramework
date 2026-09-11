@@ -6,6 +6,7 @@ namespace Communications.Api.HostedService;
 
 public sealed class CommunicationsOutboxDispatcherHostedService(
     IServiceScopeFactory scopeFactory,
+    CommunicationsOutboxSignal signal,
     ILogger<CommunicationsOutboxDispatcherHostedService> logger) : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
@@ -15,7 +16,6 @@ public sealed class CommunicationsOutboxDispatcherHostedService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(Interval);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -31,7 +31,7 @@ public sealed class CommunicationsOutboxDispatcherHostedService(
                 logger.LogError(ex, "Communications outbox dispatcher failed");
             }
 
-            await timer.WaitForNextTickAsync(stoppingToken);
+            await signal.WaitAsync(Interval, stoppingToken);
         }
     }
 
@@ -78,6 +78,7 @@ public sealed class CommunicationsOutboxDispatcherHostedService(
                 now,
                 ct);
         }
+        if (candidates.Count == BatchSize) signal.Notify();
     }
 
     private async Task DispatchTenantBatchAsync(

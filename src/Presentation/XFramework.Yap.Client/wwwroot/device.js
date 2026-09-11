@@ -1,6 +1,6 @@
 // Files stay in OPFS. SQLite owns conversations, drafts and upload receipts.
 (() => {
-    let listener, events, account, installPrompt, registration, databaseLock;
+    let listener, events, account, activeThread, installPrompt, registration, databaseLock;
     const urls = new Set();
     const directory = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('yap-files', { create: true });
     const write = async (key, blob) => {
@@ -30,12 +30,18 @@
         },
         online: () => navigator.onLine,
         watch: dotnet => { listener = dotnet; },
-        events(scope) {
-            if (account === scope && events) return;
-            events?.close(); events = null; account = scope;
+        events(scope, thread) {
+            if (account === scope && activeThread === thread && events) return;
+            events?.close(); events = null; account = scope; activeThread = thread;
             if (!scope) return;
-            events = new EventSource(`/api/chat/events?account=${encodeURIComponent(scope)}`);
+            events = new EventSource(`/api/chat/events?account=${encodeURIComponent(scope)}${thread ? `&thread=${thread}` : ''}`);
             events.onmessage = () => listener?.invokeMethodAsync('RefreshHint').catch(() => {});
+            events.onopen = events.onmessage;
+            events.addEventListener('typing', event => {
+                if (account !== scope || activeThread !== thread) return;
+                const state = JSON.parse(event.data);
+                listener?.invokeMethodAsync('TypingChanged', state.ThreadId, state.CredentialId, state.IsTyping).catch(() => {});
+            });
         },
         async pickFile(input, key) {
             const file = input.files[0];

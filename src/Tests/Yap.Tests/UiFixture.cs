@@ -122,7 +122,11 @@ internal static class UiFixture
             .ReturnsAsync((Guid thread, Guid id, CancellationToken _) => { messages.First(m => m.Id == id).IsPinned = true; return Success(); });
         fixture.Session.Setup(s => s.SaveMessageAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(Success());
         fixture.Session.Setup(s => s.PublishTypingAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        fixture.Session.Setup(s => s.SubscribeTypingAsync(It.IsAny<Guid>(), It.IsAny<Func<CommunicationsTypingState, Task>>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        Func<CommunicationsTypingState, Task>? onTyping = null;
+        Guid typingThread = fixture.Thread;
+        fixture.Session.Setup(s => s.SubscribeTypingAsync(It.IsAny<Guid>(), It.IsAny<Func<CommunicationsTypingState, Task>>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, Func<CommunicationsTypingState, Task>, CancellationToken>((thread, handler, _) => { typingThread = thread; onTyping = handler; })
+            .Returns(Task.CompletedTask);
 
         var identity = new Mock<IIdentityServerServiceWrapper>();
         identity.Setup(i => i.RegisterIdentity(It.IsAny<RegisterIdentityRequest>(), It.IsAny<CancellationToken>()))
@@ -200,6 +204,12 @@ internal static class UiFixture
             return Results.Ok();
         });
         app.MapGet("/test/file", () => Results.Text("Fixture attachment download", "text/plain"));
+        app.MapPost("/test/typing/{active:bool}", async (bool active) =>
+        {
+            if (onTyping is not null) await onTyping(new() { TenantId = fixture.Tenant, ThreadId = typingThread,
+                CredentialId = friend, IsTyping = active, OccurredAt = DateTime.UtcNow });
+            return Results.Ok();
+        });
         return app;
     }
 

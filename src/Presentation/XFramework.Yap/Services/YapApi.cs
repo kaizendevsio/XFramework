@@ -1,6 +1,8 @@
 using System.Net;
 using System.Security.Claims;
 using System.Threading.Channels;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http.Features;
 using Communications.Integration.Clients;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Microsoft.AspNetCore.Antiforgery;
@@ -178,32 +180,46 @@ public static class YapApi
             file.Length <= maxAllowedSize ? file.OpenReadStream() : throw new YapApiException(413, "The attachment exceeds 20 MB.");
     }
 
-    private static async Task StreamEventsAsync(HttpContext context, ICommunicationsChatClient client, CancellationToken ct)
+    private static async Task StreamEventsAsync(HttpContext context, ICommunicationsChatClient client, Guid? thread, CancellationToken ct)
     {
         var session = await client.ForCurrentActorAsync(ct: ct);
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
         lifetime.CancelAfter(TimeSpan.FromMinutes(5)); // Reconnect revalidates the cookie and actor session.
-        var hints = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
-        await session.SubscribeUserEventsAsync(_ => { hints.Writer.TryWrite(true); return Task.CompletedTask; }, lifetime.Token);
-        context.Response.ContentType = "text/event-stream";
-        context.Response.Headers.CacheControl = "no-store";
-        context.Response.Headers["X-Accel-Buffering"] = "no";
-        await context.Response.WriteAsync(": connected\n\n", ct);
-        await context.Response.Body.FlushAsync(ct);
         try
         {
-            while (!lifetime.IsCancellationRequested)
+            var hints = Channel.CreateBounded<string>(new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.DropOldest });
+            if (thread.HasValue)
             {
-                using var heartbeat = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
-                heartbeat.CancelAfter(TimeSpan.FromSeconds(15));
-                var changed = false;
-                try { changed = await hints.Reader.ReadAsync(heartbeat.Token); }
-                catch (OperationCanceledException) when (!lifetime.IsCancellationRequested) { }
-                await context.Response.WriteAsync(changed ? "data: refresh\n\n" : ": heartbeat\n\n", lifetime.Token);
-                await context.Response.Body.FlushAsync(lifetime.Token);
+                Require(await session.GetThreadAsync(thread.Value, lifetime.Token));
+                await session.SubscribeTypingAsync(thread.Value, state =>
+                {
+                    hints.Writer.TryWrite($"event: typing\ndata: {JsonSerializer.Serialize(new TypingUpdate(state.ThreadId, state.CredentialId, state.IsTyping))}\n\n");
+                    return Task.CompletedTask;
+                }, lifetime.Token);
             }
+            await session.SubscribeUserEventsAsync(_ => { hints.Writer.TryWrite("data: refresh\n\n"); return Task.CompletedTask; }, lifetime.Token);
+            context.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+            context.Response.ContentType = "text/event-stream";
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers["X-Accel-Buffering"] = "no";
+            await context.Response.WriteAsync(": connected\n\n", ct);
+            await context.Response.Body.FlushAsync(ct);
+            try
+            {
+                while (!lifetime.IsCancellationRequested)
+                {
+                    using var heartbeat = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+                    heartbeat.CancelAfter(TimeSpan.FromSeconds(15));
+                    var frame = ": heartbeat\n\n";
+                    try { frame = await hints.Reader.ReadAsync(heartbeat.Token); }
+                    catch (OperationCanceledException) when (!lifetime.IsCancellationRequested) { }
+                    await context.Response.WriteAsync(frame, lifetime.Token);
+                    await context.Response.Body.FlushAsync(lifetime.Token);
+                }
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        finally { await lifetime.CancelAsync(); }
     }
 
     private static int Page(int? page) => Math.Clamp(page ?? 0, 0, 10000);
