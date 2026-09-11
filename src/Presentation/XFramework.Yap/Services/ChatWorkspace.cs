@@ -187,7 +187,9 @@ public sealed class ChatWorkspace(ICommunicationsChatClient client, IChatDirecto
         var items = new List<ThreadMessageItemResponse>();
         for (var page = 0; page < replyPages; page++)
         {
-            var result = Require(await Session.GetRepliesAsync(Selected!.Id, ReplyParent!.Id, page, 30, lifetime.Token));
+            var response = await Session.GetRepliesAsync(Selected!.Id, ReplyParent!.Id, page, 30, lifetime.Token);
+            if (response.HttpStatusCode == System.Net.HttpStatusCode.NotFound) { ClearReplies(); return; }
+            var result = Require(response);
             items.AddRange(result.Items);
             ReplyTotal = result.TotalCount;
             if (items.Count >= ReplyTotal) break;

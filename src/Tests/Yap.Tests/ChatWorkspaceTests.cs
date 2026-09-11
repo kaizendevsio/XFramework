@@ -239,6 +239,29 @@ public sealed class ChatWorkspaceTests
         await workspace.CloseRepliesAsync();
         Assert.That(workspace.Replies, Is.Empty);
     }
+
+    [Test]
+    public async Task ReplyParentDeleted_ClosesThreadAndAllowsFurtherRealtimeUpdates()
+    {
+        var fixture = new ChatFixture();
+        var parent = new Yap.Models.ChatMessage(Guid.NewGuid(), fixture.Credential, "You", "Topic", DateTime.UtcNow, true, null, false, false);
+        fixture.Session.SetupSequence(s => s.GetRepliesAsync(fixture.Thread, parent.Id, 0, 30, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ChatFixture.Ok(new GetThreadMessagesResponse { Items = [new() { Id = Guid.NewGuid(), Text = "Reply" }], TotalCount = 1 }))
+            .ReturnsAsync(new QueryResponse<GetThreadMessagesResponse> { HttpStatusCode = HttpStatusCode.NotFound });
+        await using var workspace = fixture.Workspace();
+        await workspace.StartAsync("device");
+        await workspace.SelectAsync(fixture.Thread);
+        await workspace.OpenRepliesAsync(parent);
+
+        await fixture.OnEvent!(new() { TenantId = fixture.Tenant, ThreadId = fixture.Thread });
+        await fixture.OnEvent!(new() { TenantId = fixture.Tenant, ThreadId = fixture.Thread });
+
+        Assert.That(workspace.ReplyParent, Is.Null);
+        Assert.That(workspace.Replies, Is.Empty);
+        Assert.That(workspace.ReplyTotal, Is.Zero);
+        Assert.That(workspace.LiveError, Is.Null);
+        fixture.Session.Verify(s => s.GetRepliesAsync(fixture.Thread, parent.Id, 0, 30, It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
 }
 
 internal sealed class ChatFixture
