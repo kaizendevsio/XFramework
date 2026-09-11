@@ -23,7 +23,8 @@ Use an existing XFramework environment with IdentityServer, Communications, Stor
 2. Allow the audiences `XFramework.Bolt.Hub`, `XFramework.IdentityServer`, `XFramework.Communications`, and `XFramework.Storage`, and the explicit scopes from this app's `ServiceIdentity:DefaultScopes`: `bolt.service`, `communications.chat`, `identity.session.validate`, `datacontext.query`, `storage.read`, `storage.write`. The Hub must admit this registered service identity.
 3. Choose an existing tenant, enabled account, and permitted role. People search and member names use IdentityServer's authorized, tenant-scoped credential read endpoint; the account also needs the corresponding `identity.credentials` read permission/feature. Communications membership and policy checks still apply to every chat operation.
 4. Enable Communications Chat View/Create/Update/Delete for the member role. On connection, Yap calls the Communications-owned `EnsureChatDefaultsAsync` workflow to provision or discover fixed tenant chat, reaction, and delivery defaults. The returned thread type is used for groups; no type IDs need to be hardcoded in the app. This requires the chat-default SDK/API deployment.
-5. Configure a working Storage provider and the desired Communications attachment policy. Uploads use Storage's metadata/session/part/completion APIs, followed by Communications attachment linking.
+5. Deploy the actor-owned chat attachment APIs and configure a working Storage provider and Communications attachment policy. Upload creation and download authorization go through the Communications chat session; dedicated Storage chat operations handle parts, completion, and abort. Ordinary members need Storage View/Create, not Manage. For S3, configure a browser-reachable signing endpoint before generating private download URLs. See the [attachment workflow](../../../docs/solutions/architecture-patterns/communications-chat-attachment-ownership.md).
+6. Deploy the matching Bolt Hub before using this client's actor-isolated transient subscriptions. See [shared-client subscription compatibility](../../../docs/solutions/architecture-patterns/bolt-transient-actor-subscriptions.md).
 
 From the repository root, replace the placeholders below with your environment values:
 
@@ -55,7 +56,7 @@ dotnet build src/Presentation/XFramework.Yap/XFramework.Yap.csproj -m:1 /nr:fals
 dotnet test src/Tests/Yap.Tests/Yap.Tests.csproj -m:1 /nr:false
 ```
 
-The tests cover authentication/antiforgery through the actual HTTP host, token isolation and refresh, chat event/cancellation behavior, uncertain sends, message order/read acknowledgements, search scope and older-history navigation, reply-thread refresh, group typing, reaction ownership, and attachment chunks/retries.
+The tests cover authentication/antiforgery through the actual HTTP host, token isolation and refresh, chat event/cancellation behavior, uncertain sends, message order/read acknowledgements, search scope and older-history navigation, reply-thread refresh, group typing and rapid restart, reaction ownership, and attachment part hashes, negotiated chunks, verification status, failed-upload cleanup, and authorized download-link IDs.
 
 For UI review without a live backend, the **test project only** provides an isolated in-memory fixture:
 
