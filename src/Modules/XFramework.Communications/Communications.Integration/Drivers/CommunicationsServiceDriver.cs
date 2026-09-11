@@ -14,6 +14,7 @@ using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Requests.Update;
 using Communications.Domain.Shared.Contracts.Responses;
 using Communications.Integration.Clients;
+using Storage.Domain.Shared.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -27,6 +28,8 @@ namespace Communications.Integration.Drivers;
 
 public interface ICommunicationsServiceWrapper : IServiceWrapper
 {
+    Task<QueryResponse<StorageUploadSessionResponse>> CreateChatAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default);
+    Task<QueryResponse<StorageDownloadUrlResponse>> GetChatAttachmentDownloadUrlAsync(GetChatAttachmentDownloadUrlRequest request, CancellationToken ct = default);
     Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(EnsureChatDefaultsRequest request, CancellationToken ct = default);
     Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(GetChatReferenceDataRequest request, CancellationToken ct = default);
     Task<QueryResponse<PaginatedResult<MessageReactionResponse>>> GetMessageReactionsAsync(GetMessageReactionsRequest request, CancellationToken ct = default);
@@ -538,6 +541,12 @@ public sealed record CommunicationsServiceWrapper(
 
     public Task<QueryResponse<ChatReferenceDataResponse>> EnsureChatDefaultsAsync(EnsureChatDefaultsRequest request, CancellationToken ct = default) =>
         SendAsync<EnsureChatDefaultsRequest, ChatReferenceDataResponse>(request, ct);
+
+    public Task<QueryResponse<StorageUploadSessionResponse>> CreateChatAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default) =>
+        SendAsync<CreateChatAttachmentUploadRequest, StorageUploadSessionResponse>(request, ct);
+
+    public Task<QueryResponse<StorageDownloadUrlResponse>> GetChatAttachmentDownloadUrlAsync(GetChatAttachmentDownloadUrlRequest request, CancellationToken ct = default) =>
+        SendAsync<GetChatAttachmentDownloadUrlRequest, StorageDownloadUrlResponse>(request, ct);
 
     public Task<QueryResponse<ChatReferenceDataResponse>> GetChatReferenceDataAsync(GetChatReferenceDataRequest request, CancellationToken ct = default) =>
         SendAsync<GetChatReferenceDataRequest, ChatReferenceDataResponse>(request, ct);

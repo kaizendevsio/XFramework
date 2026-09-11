@@ -12,6 +12,8 @@ namespace Communications.Api.Services;
 
 public interface IThreadService
 {
+    Task<Result<Storage.Domain.Shared.Contracts.Responses.StorageUploadSessionResponse>> CreateChatAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default);
+    Task<Result<Storage.Domain.Shared.Contracts.Responses.StorageDownloadUrlResponse>> GetChatAttachmentDownloadUrlAsync(GetChatAttachmentDownloadUrlRequest request, CancellationToken ct = default);
     // Round 1: Thread CRUD + Members + Messages
     Task<Result<CreateThreadResponse>> CreateThreadAsync(CreateThreadRequest request, CancellationToken ct = default);
     Task<Result<CreateThreadResponse>> CreateDirectThreadAsync(CreateDirectThreadRequest request, CancellationToken ct = default);

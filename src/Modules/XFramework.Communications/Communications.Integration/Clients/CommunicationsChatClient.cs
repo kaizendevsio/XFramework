@@ -10,6 +10,7 @@ using Communications.Domain.Shared.Contracts.Requests.Realtime;
 using Communications.Domain.Shared.Contracts.Requests.Threads;
 using Communications.Domain.Shared.Contracts.Responses;
 using Communications.Integration.Drivers;
+using Storage.Domain.Shared.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -43,6 +44,8 @@ public interface ICommunicationsChatClient
 
 public interface ICommunicationsChatSession
 {
+    Task<QueryResponse<StorageUploadSessionResponse>> CreateAttachmentUploadAsync(CreateChatAttachmentUploadRequest request, CancellationToken ct = default);
+    Task<QueryResponse<StorageDownloadUrlResponse>> GetAttachmentDownloadUrlAsync(Guid threadId, Guid messageId, Guid fileId, CancellationToken ct = default);
     Guid TenantId { get; }
     Guid CredentialId { get; }
     string DeviceId { get; }
@@ -413,6 +416,17 @@ internal sealed class CommunicationsChatSession(
             ThreadId = threadId,
             MessageId = messageId,
             StorageFileId = storageFileId
+        }), callCt), ct);
+
+    public Task<QueryResponse<StorageUploadSessionResponse>> CreateAttachmentUploadAsync(
+        CreateChatAttachmentUploadRequest request, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.CreateChatAttachmentUploadAsync(Prepare(request), callCt), ct);
+
+    public Task<QueryResponse<StorageDownloadUrlResponse>> GetAttachmentDownloadUrlAsync(
+        Guid threadId, Guid messageId, Guid fileId, CancellationToken ct = default) =>
+        InvokeAsync(callCt => wrapper.GetChatAttachmentDownloadUrlAsync(Prepare(new GetChatAttachmentDownloadUrlRequest
+        {
+            ThreadId = threadId, MessageId = messageId, FileId = fileId
         }), callCt), ct);
 
     public Task<QueryResponse<PaginatedResult<MessageFileResponse>>> GetFilesAsync(

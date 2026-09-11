@@ -2355,15 +2355,15 @@ public sealed partial class ThreadService(
             if (!canAttach)
                 return Result<CmdResponse>.Forbidden("Only the message sender or a thread admin can attach files to this message");
 
-            var storageFileResult = await storageServiceWrapper.ValidateStorageFileReference(new ValidateStorageFileReferenceRequest
+            var storageFileResult = await storageServiceWrapper.ValidateChatStorageFileReference(new ValidateChatStorageFileReferenceRequest
             {
                 Metadata = request.Metadata,
                 StorageFileId = request.StorageFileId,
-                RequireAvailable = true
-            });
+                ThreadId = request.ThreadId
+            }, ct);
 
             if (!storageFileResult.IsSuccess || storageFileResult.Response is null)
-                return Result<CmdResponse>.NotFound("Storage file not found");
+                return Result<CmdResponse>.Failure("Storage file is not available for this attachment", (int)storageFileResult.HttpStatusCode);
 
             var storageFile = storageFileResult.Response;
             if (!storageFile.IsValid)

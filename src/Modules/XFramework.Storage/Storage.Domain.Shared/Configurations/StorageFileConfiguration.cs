@@ -35,6 +35,7 @@ public sealed class StorageFileConfiguration : IEntityTypeConfiguration<StorageF
         entity.Property(e => e.CdnBaseUrl).HasColumnType("text");
         entity.Property(e => e.ObjectDeletedAt);
         entity.Property(e => e.UnclaimedUntil);
+        entity.Property(e => e.UploadPurpose).HasMaxLength(64);
 
         entity.HasOne(d => d.Type).WithMany(p => p.StorageFiles)
             .HasForeignKey(d => d.TypeId)
