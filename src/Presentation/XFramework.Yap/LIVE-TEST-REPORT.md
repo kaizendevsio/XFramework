@@ -1,6 +1,25 @@
 # Yap live setup and test report — 2026-09-11
 
-**Status: role provisioning, dedicated service authentication, live login/logout, chat defaults, conversation loading, and empty message search pass. Member search is blocked by a generated SDK token-scope mismatch. No live direct-chat, group-chat, reaction, attachment, or realtime message test has passed yet.** Fixture browser tests are not evidence about deployed APIs.
+**Status: direct and three-person group messaging, replies, direct-chat reactions, message search, editing, pinning, saved messages, and non-member rejection now have live passing evidence. Shared typing subscriptions and regular-user attachment upload remain blocked. Further recovery, delete, mute, and persistence checks are pending.** Fixture tests remain separate from the live evidence below.
+
+## Live chat checks with query-scope fix `7f2ba968`
+
+Local Yap imported the tested SDK scope fix as `41f8fff9`; all 26 local tests passed. It used deployed server revision `94cc21b0` while PR #441 proceeded through normal deployment. The local app was stopped when core rollout began at approximately `09:22Z`, avoiding the known synthetic routing interference.
+
+- **Member search:** Bob searched `cArOl` and received Carol, proving case-insensitive authorized lookup. Searching `yap` listed Alice, Carol, and Dave while excluding Bob.
+- **Direct chat:** created `ad1e82d5-6521-40b7-bb74-608929607586` for Bob and Carol. The conversation appeared in both open sessions; Bob saw Carol's name and Carol saw Bob's. Each sent a message and the other received it without manual refresh.
+- **Reactions:** Bob added Love to message `7dfe8f4f-f3eb-465e-9af2-27e2524c2ced`; Carol saw count 1. Carol added hers; both saw count 2 and their own pressed state. Bob removed his; count returned to 1, Bob's pressed state became false, and Carol's remained true.
+- **Replies and threads:** Carol replied to Bob's first message. Bob opened its thread and saw the parent plus one reply. Bob sent from the thread composer; the panel showed two replies and Carol received the linked response in the main history.
+- **Private access:** Dave opened the direct conversation URL. `GetThreadRequest` returned 403 at `09:12:21Z`; no private messages were rendered.
+- **Group chat:** created `ded22f72-8d4c-42df-8816-96d1110b5758`, named `Yap E2E Group 0911`, with Bob, Carol, and Dave. It appeared for all three. Each sent a message; all three sessions showed all three messages without manual refresh.
+- **Message search:** Bob's `Yap E2E` search returned all seven then-existing direct/group messages. Selecting Only this conversation returned exactly the three group messages. Selecting Dave's result focused DOM message `8183ee12-c0dd-4af1-ace0-9eb29bd16410` in the correct group.
+- **Edit, pin, save:** Dave edited his group message; Bob and Carol saw the edit. Bob pinned it and Carol saw the pin. Bob saved it, reloaded the page, and still saw the edited text, pin, and Unsave action. Carol still saw Save message, confirming per-user saved state. Bob unsaved it and the action returned to Save message. Unpin was submitted; cross-user removal verification is pending.
+- **Post-reload delivery:** Dave's additional group message ultimately reached Bob and Carol after Bob's reload, but a 2.5-second DOM observation did not see it arrive. No duplicate durable-subscription error appeared in the app log. Prompt delivery after reload must be retested outside deployment; subsequent connection/reconcile errors coincided with core rollout.
+
+### Outstanding live blockers
+
+1. **Typing is one-way with concurrent users.** Carol-to-Bob typing appeared and cleared; Bob-to-Carol did not. Logs at `09:06:05Z` show the second transient subscription rejected with `Already subscribed to topic`. `BoltClient` permits only one local subscriber per topic hash. The same error occurred twice when all three members opened the group. The fix task owns multi-subscriber support with separate actor authorization, independent cancellation, and reconnect tests. This was not a transport-token expiry failure.
+2. **Attachments call an admin-only workflow.** Selecting `live-chat-attachment.txt` through Chrome succeeded, but `EnsureStorageUploadMetadataRequest` returned 403 at `09:16:22Z`, before creating an upload session or message. Generic Storage metadata management intentionally requires Manage. The fix task is implementing an appropriate chat upload path without granting admin permissions; it also found upload-session operations require an ownership/authorization review. The failed file was removed from the composer. No upload/download has passed live yet.
 
 ## Retest after PR #440 deployment
 
