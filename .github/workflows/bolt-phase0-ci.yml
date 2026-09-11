@@ -232,7 +232,7 @@ jobs:
         run: |
           dotnet test src/Tests/XFramework.SourceGenerators.Tests/XFramework.SourceGenerators.Tests.csproj \
             --configuration Release --no-build --no-restore \
-            --filter "FullyQualifiedName~BoltHandlerGeneratorTests"
+            --filter "FullyQualifiedName~BoltHandlerGeneratorTests|FullyQualifiedName~ServiceWrapperGeneratorTests"
           dotnet test src/Tests/XFramework.Core.Tests/XFramework.Core.Tests.csproj \
             --configuration Release --no-build --no-restore \
             --filter "FullyQualifiedName~DataContext|FullyQualifiedName~TrustedInvocationFeatureGateTests"

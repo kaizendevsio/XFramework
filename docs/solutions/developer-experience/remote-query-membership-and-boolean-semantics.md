@@ -4,6 +4,14 @@ Remote LINQ is parsed in `QueryExpressionVisitor`, serialized as a MemoryPack
 `QueryDescriptor`, and executed by `QueryDescriptorExecutor`. Test that entire path;
 an in-memory `IDataContext` fake does not exercise query serialization.
 
+Generated query and query-stream wrappers use `CreateDataContextQueryAsync` to
+request only `datacontext.query` for ordinary actor-bound reads. Actorless reads
+still require `tenant.target`; filter bypass still requests both `datacontext.query.all-tenants`
+and `tenant.target`. Actor tokens are resolved once and propagated unchanged, and
+the owning service continues to enforce tenant/actor authorization. Mutation scope
+selection is unchanged. `GeneratedQueryTokenScopeTests` captures token acquisition
+from the actual compiled IdentityServer wrapper for each query/stream combination.
+
 - Local arrays and `List<T>.Contains(entity.Property)` emit bounded `In` filters.
   C# 14's array-to-`ReadOnlySpan<T>` binding is supported without evaluating or
   boxing the span. Keep each lookup at 64 values or fewer; 50-item batches leave

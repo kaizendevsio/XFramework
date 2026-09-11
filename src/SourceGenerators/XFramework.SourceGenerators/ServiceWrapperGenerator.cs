@@ -242,11 +242,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                                     ?? throw new System.InvalidOperationException("Query descriptor could not be deserialized.");
                                 descriptor.Metadata ??= new RequestMetadata();
                                 descriptor.Metadata.RequestId ??= System.Guid.NewGuid();
-                                System.Collections.Generic.IReadOnlyCollection<string> scopes = descriptor.IgnoreQueryFilters
-                                    ? new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQueryAllTenants, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget }
-                                    : new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget };
-                                var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateAsync(
-                                    descriptor, targetClient, scopes, serviceTokenProvider, actorAccessTokenProvider, ct);
+                                var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateDataContextQueryAsync(
+                                    descriptor, targetClient, serviceTokenProvider, actorAccessTokenProvider, ct);
                                 var (status, data) = await boltClient.InvokeAsync(targetClient, "__db_query__", payload, ct);
                                 if ((int)status < 200 || (int)status >= 300)
                                     throw new System.InvalidOperationException($"DataContext query request failed with status {(int)status} ({status}).");
@@ -299,11 +296,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                                     ?? throw new System.InvalidOperationException("Query descriptor could not be deserialized.");
                                 descriptor.Metadata ??= new RequestMetadata();
                                 descriptor.Metadata.RequestId ??= System.Guid.NewGuid();
-                                System.Collections.Generic.IReadOnlyCollection<string> scopes = descriptor.IgnoreQueryFilters
-                                    ? new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQueryAllTenants, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget }
-                                    : new[] { XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.DataContextQuery, XFramework.Domain.Shared.ServiceIdentity.XFrameworkServiceScopes.TenantTarget };
-                                var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateAsync(
-                                    descriptor, targetClient, scopes, serviceTokenProvider, actorAccessTokenProvider, ct);
+                                var payload = await XFramework.Integration.Security.BoltInvocationEnvelopeFactory.CreateDataContextQueryAsync(
+                                    descriptor, targetClient, serviceTokenProvider, actorAccessTokenProvider, ct);
                                 var stream = await boltClient.OpenStreamAsync(targetClient, "__db_query_stream__", ct);
                                 try
                                 {
