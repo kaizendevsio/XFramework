@@ -97,6 +97,33 @@ public sealed class ServiceIdentityComposeContractTests
     }
 
     [Test]
+    public void CommunicationsOutbox_UsesTrustedTenantScopes()
+    {
+        var root = FindRepositoryRoot().FullName;
+        var compose = File.ReadAllText(Path.Combine(root, "docker-compose.yml"));
+        ExtractAllowedScopesForClient(compose, XFrameworkServiceNames.Communications).Should().Contain(
+        [
+            XFrameworkServiceScopes.CommunicationsAdmin,
+            XFrameworkServiceScopes.DataContextQueryAllTenants,
+            XFrameworkServiceScopes.TenantTarget
+        ]);
+
+        var dispatcher = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "XFramework.Communications",
+            "Communications.Api",
+            "HostedService",
+            "CommunicationsOutboxDispatcherHostedService.cs"));
+        dispatcher.Should().Contain("EstablishTenantlessAsync(");
+        dispatcher.Should().Contain("XFrameworkServiceScopes.DataContextQueryAllTenants");
+        dispatcher.Should().Contain("candidates.GroupBy(candidate => candidate.TenantId)");
+        dispatcher.Should().Contain("EstablishAsync(");
+        dispatcher.Should().Contain("XFrameworkServiceScopes.CommunicationsAdmin");
+    }
+
+    [Test]
     public void AuditStartup_UsesModuleGeneratedRoutes()
     {
         var program = File.ReadAllText(Path.Combine(FindRepositoryRoot().FullName,
@@ -110,7 +137,7 @@ public sealed class ServiceIdentityComposeContractTests
         var root = FindRepositoryRoot().FullName;
         var compose = File.ReadAllText(Path.Combine(root, "docker-compose.yml"));
         ExtractAllowedScopesForClient(compose, "XFramework.Yap").Should().BeEquivalentTo(
-            new[] { "bolt.service", "communications.chat", "identity.session.validate", "datacontext.query", "storage.read", "storage.write" });
+            new[] { "bolt.service", "communications.chat", "identity.session.validate", "datacontext.query", "storage.read", "storage.write", "identity.register", "tenant.target" });
         compose.Should().Contain("ServiceIdentity__Clients__13__ClientSecret: ${YAP_SERVICE_IDENTITY_SECRET:");
         compose.Should().Contain("ServiceIdentity__Clients__13__GenerationId: ${YAP_SERVICE_CREDENTIAL_GENERATION_ID:");
         compose.Should().Contain("ServiceIdentity__Clients__13__AllowedAudiences: XFramework.Bolt.Hub,XFramework.IdentityServer,XFramework.Communications,XFramework.Storage");
@@ -121,6 +148,16 @@ public sealed class ServiceIdentityComposeContractTests
         provision.Should().Contain("umask 077");
         provision.Should().Contain("openssl rand -hex 48");
         provision.Should().Contain("os.chmod(path, 0o600)");
+        var yap = ExtractService(compose, "yap");
+        yap.Should().Contain("127.0.0.1:5188:8080");
+        yap.Should().Contain("ServiceIdentity__ClientSecret: ${YAP_SERVICE_IDENTITY_SECRET:");
+        yap.Should().Contain("/health/ready");
+        yap.Should().NotContain("DefaultDatabaseConnection");
+        yap.Should().NotContain("<<: *common-env");
+        workflow.Should().Contain("portal operations-dashboard yap bolt-phase0-synthetics");
+        workflow.Should().Contain("yap=http://127.0.0.1:5188/health/ready");
+        workflow.Should().Contain("services+=(yap)");
+        workflow.Should().Contain("Configure and verify Yap HTTPS ingress");
     }
 
     [Test]

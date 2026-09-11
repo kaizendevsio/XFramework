@@ -21,7 +21,7 @@ else if (!_purchasingEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Purchase Orders</BbTypographyH3>
@@ -39,13 +39,13 @@ else
                 </div>
             </div>
 
-            <BbCard>
+            <BbFormFieldSelect TValue="string" @bind-Value="_view" Label="Order view"><BbSelectItem Value="@("all")">All orders</BbSelectItem><BbSelectItem Value="@("outstanding")">Outstanding</BbSelectItem><BbSelectItem Value="@("overdue")">Overdue</BbSelectItem></BbFormFieldSelect><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Purchase Order List</BbCardTitle>
                     <BbCardDescription>@_orders.Count purchase order(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_orders" ShowPagination="true" InitialPageSize="20"
+                    <BbDataGrid Items="@_orders.Where(MatchesOrder).ToList()" ShowPagination="true" InitialPageSize="20"
                                 OnRowClick="@((PurchaseOrder item) => Navigation.NavigateTo($"/inventario/purchase-orders/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
@@ -80,12 +80,12 @@ else
 }
 
 <BbDialog Open="@_createDialogOpen" OpenChanged="@(v => _createDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Create Purchase Order</BbDialogTitle>
             <BbDialogDescription>Add one or more product lines. Receiving will update line quantities later.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <div class="grid gap-3 md:grid-cols-3">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.OrderNumber" Label="Order Number" />
                 <XfEntityPicker TItem="Supplier"
@@ -127,7 +127,7 @@ else
                         var line = _form.Lines[index];
                         <div class="grid gap-3 rounded-md border p-3 md:grid-cols-[2fr_1fr_1fr_auto]">
                             <XfEntityPicker TItem="Product"
-                                            @bind-Value="line.ProductId"
+                                            Value="@line.ProductId" ValueChanged="@((string? value) => { line.ProductId = value ?? ""; line.ProductVariationId = "base"; })"
                                             Items="@_products"
                                             Label="Product"
                                             Placeholder="Select product"
@@ -138,13 +138,14 @@ else
                                             SearchTextSelector="@GetProductSearchText"
                                             AdvancedSearchTitle="Find Product"
                                             AdvancedSearchDescription="Search products in the active tenant." />
+                            <BbFormFieldSelect TValue="string" @bind-Value="line.ProductVariationId" Label="Variant"><BbSelectItem Value="@("base")">Base product</BbSelectItem>@foreach (var variant in _variants.Where(x => x.ProductId.ToString() == line.ProductId)) { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }</BbFormFieldSelect>
                             <BbFormFieldNumericInput TValue="decimal"
                                                      @bind-Value="line.Quantity"
                                                      Label="Quantity"
                                                      Min="0"
-                                                     DecimalPlaces="2"
+                                                     DecimalPlaces="4"
                                                      Step="1" />
-                            <BbFormFieldCurrencyInput @bind-Value="line.UnitCost"
+                            <BbFormFieldCurrencyInput CurrencyCode="@_currency" @bind-Value="line.UnitCost"
                                                       Label="Unit Cost"
                                                       Min="0"
                                                       ShowSymbol="false" />
@@ -160,6 +161,7 @@ else
                 </div>
             </div>
         </div>
+        <p>Total: @_currency @_form.Lines.Sum(x => x.Quantity * x.UnitCost).ToString("N2"). Review product, variant, quantity and cost before creating the order.</p>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _createDialogOpen = false)">Cancel</BbButton>
             <BbButton OnClick="@CreatePurchaseOrder" Disabled="@IsCreateDisabled">Create</BbButton>
@@ -168,6 +170,7 @@ else
 </BbDialog>
 
 @code {
+    private string _currency = "PHP";
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -180,6 +183,16 @@ else
     private List<PurchaseOrderLine> _lines = [];
     private List<Supplier> _suppliers = [];
     private List<Product> _products = [];
+    private List<ProductVariation> _variants = [];
+    [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
+    [SupplyParameterFromQuery] public Guid? VariantId { get; set; }
+    [SupplyParameterFromQuery] public Guid? SupplierId { get; set; }
+    [SupplyParameterFromQuery] public decimal? Quantity { get; set; }
+    [SupplyParameterFromQuery] public string? Scope { get; set; }
+    private Guid? _openedProduct;
+    private string _view = "all";
+    private bool MatchesOrder(PurchaseOrder order) => (SupplierId is null || order.SupplierId == SupplierId) && (_view == "all" || (order.Status is PurchaseOrderStatus.Open or PurchaseOrderStatus.PartiallyReceived && (_view == "outstanding" || order.ExpectedDate < DateTime.UtcNow)));
+
     private bool _loading = true;
     private bool _hasTenant;
     private bool _purchasingEnabled;
@@ -213,6 +226,8 @@ else
             if (!_hasTenant || !_purchasingEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _currency = await InventoryDisplay.CurrencyAsync(DataContext, tenantId);
             _suppliers = await DataContext.Query<Supplier>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -252,13 +267,29 @@ else
         }
     }
 
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!_loading && _hasTenant && _purchasingEnabled && ProductId is { } id && _openedProduct != id)
+        {
+            _openedProduct = id;
+            OpenCreateDialog();
+            _form.Status = PurchaseOrderStatus.Draft.ToString();
+            _form.SupplierId = SupplierId?.ToString() ?? "";
+            _form.Notes = Scope ?? "";
+            _form.Lines[0].ProductId = id.ToString();
+            _form.Lines[0].ProductVariationId = VariantId?.ToString() ?? "base";
+            _form.Lines[0].Quantity = Quantity is > 0 ? Quantity.Value : 1;
+            StateHasChanged();
+        }
+    }
+
     private void OpenCreateDialog()
     {
-        _form.Reset(_products.FirstOrDefault()?.Id.ToString() ?? "");
+        _form.Reset("");
         _createDialogOpen = true;
     }
 
-    private void AddLine() => _form.Lines.Add(new PurchaseOrderLineForm { ProductId = _products.FirstOrDefault()?.Id.ToString() ?? "", Quantity = 1m });
+    private void AddLine() => _form.Lines.Add(new PurchaseOrderLineForm { ProductId = "", Quantity = 1m });
 
     private void RemoveLine(int index)
     {
@@ -284,6 +315,7 @@ else
                     .Select(x => new PurchaseOrderLineRequest
                     {
                         ProductId = Guid.Parse(x.ProductId),
+                        ProductVariationId = Guid.TryParse(x.ProductVariationId, out var variantId) ? variantId : null,
                         OrderedQuantity = x.Quantity,
                         UnitCost = x.UnitCost > 0 ? x.UnitCost : null,
                         UnitOfMeasure = NullIfEmpty(x.UnitOfMeasure)
@@ -364,6 +396,7 @@ else
     private sealed class PurchaseOrderLineForm
     {
         public string ProductId { get; set; } = "";
+        public string ProductVariationId { get; set; } = "base";
         public decimal Quantity { get; set; } = 1m;
         public decimal UnitCost { get; set; }
         public string UnitOfMeasure { get; set; } = "";

@@ -37,7 +37,7 @@ else if (_location is null)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="Back to warehouses"
                           OnClick="@(() => Navigation.NavigateTo("/inventario/warehouses"))">
@@ -62,7 +62,21 @@ else
                     <BbCardTitle>Location Summary</BbCardTitle>
                     <BbCardDescription>Internal storage position details.</BbCardDescription>
                 </BbCardHeader>
-                <BbCardContent>
+                <BbCardContent>@if (_maintenanceEditing)
+                    {
+                        @if (_maintenanceError is not null) { <BbAlert><BbAlertDescription>@_maintenanceError</BbAlertDescription></BbAlert> }
+                        <div class="xf-detail-field-grid"><BbFormFieldInput TValue="string" @bind-Value="_editName" Label="Name" />
+<BbFormFieldInput TValue="string" @bind-Value="_editDescription" Label="Description" />
+<BbFormFieldSelect TValue="InventoryLocationType" @bind-Value="_editLocationType" Label="Location Type">@foreach (var value in Enum.GetValues<InventoryLocationType>()) { <BbSelectItem Value="@value">@value</BbSelectItem> }</BbFormFieldSelect>
+<BbFormFieldSwitch @bind-Checked="_editIsPickable" Label="Is Pickable" />
+</div>
+                        <p class="text-sm text-muted-foreground">Identity and existing stock quantities remain unchanged. Eligibility and pickability changes require active reservations to be released first.</p>
+                        <div class="xf-page-actions"><BbButton OnClick="@SaveMaintenance" Disabled="@_maintenanceSaving">Save changes</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _maintenanceEditing = false)" Disabled="@_maintenanceSaving">Discard</BbButton></div>
+                    }
+                    else
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@BeginMaintenance">Edit details</BbButton>
+
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <BbTypographyMuted>Code</BbTypographyMuted>
@@ -93,7 +107,9 @@ else
                             <div>@(_location.Description ?? "No description")</div>
                         </div>
                     </div>
-                </BbCardContent>
+
+                    }
+</BbCardContent>
             </BbCard>
 
             <div class="xf-summary-grid xf-summary-grid-3">
@@ -136,9 +152,9 @@ else
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
@@ -158,8 +174,9 @@ else
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+<BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                         </Columns>
                     </BbDataGrid>
@@ -179,7 +196,7 @@ else
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status.ToString())">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@(item.Status == ReservationStatus.Active ? "active" : "inactive")" />
@@ -351,4 +368,57 @@ else
         TenantFilter.OnChanged -= OnTenantChanged;
         ModuleNavigation.OnChanged -= OnTenantChanged;
     }
+
+    private string? _maintenanceError;
+    private bool _maintenanceEditing;
+    private bool _maintenanceSaving;
+    private Guid _editStamp;
+    private string _editName = "";
+    private string _editDescription = "";
+    private InventoryLocationType _editLocationType;
+    private bool _editIsPickable;
+
+    private void BeginMaintenance()
+    {
+        if (_location is null) return;
+        _editStamp = _location.ConcurrencyStamp;
+        _editName = _location.Name ?? "";
+        _editDescription = _location.Description ?? "";
+        _editLocationType = _location.LocationType;
+        _editIsPickable = _location.IsPickable;
+        _maintenanceError = null;
+        _maintenanceEditing = true;
+    }
+    private async Task SaveMaintenance()
+    {
+        if (_location is null || _maintenanceSaving) return;
+        _maintenanceError = null;
+        if (_editName.Length > 200) { _maintenanceError = "Name must be at most 200 characters."; return; }
+        if (_editDescription.Length > 1000) { _maintenanceError = "Description must be at most 1000 characters."; return; }
+        if (string.IsNullOrWhiteSpace(_editName)) { _maintenanceError = "Name is required."; return; }
+        _maintenanceSaving = true;
+        try
+        {
+            var result = await Inventario.UpdateInventoryLocation(new UpdateInventoryLocationRequest
+            {
+                Metadata = new() { RequestedTenantId = TenantFilter.SelectedTenantId },
+                Id = _location.Id,
+                ConcurrencyStamp = _editStamp,
+                Name = _editName,
+                Description = _editDescription,
+                LocationType = _editLocationType,
+                IsPickable = _editIsPickable,
+            });
+            if (result.IsSuccess)
+            {
+                _maintenanceEditing = false;
+                ToastService.Success("Changes saved.");
+                await Reload();
+            }
+            else ToastService.Error("Could not save. Check fields, release active reservations if changing eligibility, or refresh if another user edited this record.");
+        }
+        catch { ToastService.Error("Could not save changes. Refresh and try again."); }
+        finally { _maintenanceSaving = false; }
+    }
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
 }

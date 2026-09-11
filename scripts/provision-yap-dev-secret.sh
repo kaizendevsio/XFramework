@@ -15,7 +15,14 @@ fi
 if ! grep -q '^YAP_SERVICE_CREDENTIAL_GENERATION_ID=' "$target"; then
     printf '\nYAP_SERVICE_CREDENTIAL_GENERATION_ID=yap-dev-%s\n' "$(openssl rand -hex 8)" >> "$target"
 fi
-# Protected configuration handoff for the separately hosted Yap development app.
+# Preserve configured workspaces; initialize this dev host with the provisioned Yap workspace.
+if ! grep -q '^YAP_TENANT_ID=' "$target"; then
+    printf '\nYAP_TENANT_ID=c4af50e9-325c-4b17-a4e9-ada54c9475b9\n' >> "$target"
+fi
+if ! grep -q '^YAP_ROLE_ID=' "$target"; then
+    printf '\nYAP_ROLE_ID=633a467c-53a8-4c51-8f19-f655d5391f22\n' >> "$target"
+fi
+# Protected configuration handoff for local Yap development.
 install -d -m 700 /opt/xframework/client-config
 python3 - "$target" /opt/xframework/client-config/yap.service-identity.json <<'PY'
 import json

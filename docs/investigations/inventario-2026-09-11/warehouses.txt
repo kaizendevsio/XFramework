@@ -1,0 +1,246 @@
+- complementary "Portal navigation":
+  - generic: X
+  - text: Portal
+  - paragraph: Modules & operations
+  - navigation:
+    - link "Dashboard":
+      - /url: /
+      - generic: Dashboard
+    - button "Audit" [expanded]:
+      - generic: Audit
+    - link "Database changes":
+      - /url: /audit/logs
+      - generic: Database changes
+    - button "Identity" [expanded]:
+      - generic: Identity
+    - link "Users":
+      - /url: /identity/users
+      - generic: Users
+    - link "Sessions":
+      - /url: /identity/sessions
+      - generic: Sessions
+    - link "Auth Logs":
+      - /url: /identity/auth-logs
+      - generic: Auth Logs
+    - button "Inventario" [expanded]:
+      - generic: Inventario
+    - link "Products":
+      - /url: /inventario/products
+      - generic: Products
+    - link "Categories":
+      - /url: /inventario/categories
+      - generic: Categories
+    - link "Warehouses" [active]:
+      - /url: /inventario/warehouses
+      - generic: Warehouses
+    - link "Lots":
+      - /url: /inventario/lots
+      - generic: Lots
+    - link "Stock":
+      - /url: /inventario/stock
+      - generic: Stock
+    - link "Reservations":
+      - /url: /inventario/reservations
+      - generic: Reservations
+    - link "Planning":
+      - /url: /inventario/planning
+      - generic: Planning
+    - link "Suppliers":
+      - /url: /inventario/suppliers
+      - generic: Suppliers
+    - link "Purchase Orders":
+      - /url: /inventario/purchase-orders
+      - generic: Purchase Orders
+    - link "Receiving":
+      - /url: /inventario/receiving
+      - generic: Receiving
+    - link "Reports":
+      - /url: /inventario/reports
+      - generic: Reports
+    - link "Sales Transactions":
+      - /url: /inventario/transactions
+      - generic: Sales Transactions
+    - link "Settings":
+      - /url: /inventario/settings
+      - generic: Settings
+    - button "POS" [expanded]:
+      - generic: POS
+    - link "Cashier":
+      - /url: /pos/cashier
+      - generic: Cashier
+    - link "Registers":
+      - /url: /pos/registers
+      - generic: Registers
+    - link "Sales":
+      - /url: /pos/sales
+      - generic: Sales
+    - link "Returns":
+      - /url: /pos/returns
+      - generic: Returns
+    - button "Communications":
+      - generic: Communications
+    - link:
+      - /url: /communications/users
+      - generic: Users
+    - link:
+      - /url: /communications/threads
+      - generic: Threads
+    - link:
+      - /url: /communications/operations
+      - generic: Operations
+    - link:
+      - /url: /communications/moderation
+      - generic: Moderation
+    - link:
+      - /url: /communications/settings
+      - generic: Settings
+    - button "Community":
+      - generic: Community
+    - link:
+      - /url: /community/identities
+      - generic: Identities
+    - link:
+      - /url: /community/content
+      - generic: Content
+    - link:
+      - /url: /community/connections
+      - generic: Connections
+    - link:
+      - /url: /community/notifications
+      - generic: Notifications
+    - link:
+      - /url: /community/settings
+      - generic: Settings
+    - button "Attendance":
+      - generic: Attendance
+    - link:
+      - /url: /attendance/contexts
+      - generic: Contexts
+    - link:
+      - /url: /attendance/sessions
+      - generic: Sessions
+    - link:
+      - /url: /attendance/reports
+      - generic: Reports
+    - button "Storage":
+      - generic: Storage
+    - link:
+      - /url: /storage/files
+      - generic: Files
+    - button "Finance" [expanded]:
+      - generic: Finance
+    - link "Wallets":
+      - /url: /finance/wallets
+      - generic: Wallets
+    - link "Deposits":
+      - /url: /finance/deposit-requests
+      - generic: Deposits
+    - link "Withdrawals":
+      - /url: /finance/withdrawal-requests
+      - generic: Withdrawals
+    - link "Transfers":
+      - /url: /finance/transfers
+      - generic: Transfers
+    - link "Batch":
+      - /url: /finance/batch
+      - generic: Batch
+    - link "Operations":
+      - /url: /finance/wallet-operations
+      - generic: Operations
+    - link "Statements":
+      - /url: /finance/statements
+      - generic: Statements
+    - link "Audit":
+      - /url: /finance/wallet-audit
+      - generic: Audit
+    - link "Reconciliation":
+      - /url: /finance/reconciliation
+      - generic: Reconciliation
+    - link "Outbox":
+      - /url: /finance/outbox-webhooks
+      - generic: Outbox
+    - link "Approvals":
+      - /url: /finance/wallet-approvals
+      - generic: Approvals
+    - link "Policy":
+      - /url: /finance/policy-decisions
+      - generic: Policy
+    - link "Refunds":
+      - /url: /finance/refunds-disputes
+      - generic: Refunds
+    - button "System" [expanded]:
+      - generic: System
+    - link "Reference Data":
+      - /url: /admin/reference-data
+      - generic: Reference Data
+  - generic: v1.0 - XFramework
+  - button "Collapse sidebar":
+- banner:
+  - navigation "breadcrumb":
+    - list:
+      - link "Dashboard":
+        - /url: /
+      - link "Inventario" [disabled]
+      - link "Warehouses" [disabled]
+  - button "Switch to light mode":
+  - button "Customize theme":
+  - button "SA Super Admin E2E Inventory POS 20260906":
+    - generic: SA
+    - generic: Super Admin
+    - generic: E2E Inventory POS 20260906
+- main:
+  - heading "Warehouses" [level=3]
+  - paragraph: Set up stock storage warehouses and open a warehouse to manage its locations.
+  - button "Create Warehouse":
+    - text: Create Warehouse
+  - button "Refresh":
+    - text: Refresh
+  - heading "Warehouse List" [level=3]
+  - paragraph: 2 warehouse(s), 2 location(s)
+  - grid:
+    - rowgroup:
+      - row "Code Filter Code Name Filter Name City Filter City Default Filter Default Locations Filter Locations Actions":
+        - columnheader "Code Filter Code":
+          - generic: Code
+          - button "Filter Code":
+        - columnheader "Name Filter Name":
+          - generic: Name
+          - button "Filter Name":
+        - columnheader "City Filter City":
+          - generic: City
+          - button "Filter City":
+        - columnheader "Default Filter Default":
+          - generic: Default
+          - button "Filter Default":
+        - columnheader "Locations Filter Locations":
+          - generic: Locations
+          - button "Filter Locations":
+        - columnheader "Actions":
+          - generic: Actions
+    - rowgroup:
+      - row "WH-E2E-MAIN Main E2E Warehouse Singapore Default 1 View warehouse":
+        - gridcell "WH-E2E-MAIN"
+        - gridcell "Main E2E Warehouse"
+        - gridcell "Singapore"
+        - gridcell "Default":
+          - generic: Default
+        - gridcell "1"
+        - gridcell "View warehouse":
+          - button "View warehouse":
+      - row "WH-E2E-OVER Overflow E2E Warehouse Singapore Standard 1 View warehouse":
+        - gridcell "WH-E2E-OVER"
+        - gridcell "Overflow E2E Warehouse"
+        - gridcell "Singapore"
+        - gridcell "Standard":
+          - generic: Standard
+        - gridcell "1"
+        - gridcell "View warehouse":
+          - button "View warehouse":
+  - navigation "Pagination":
+    - generic: Showing 1-2 of 2
+    - list:
+      - button "Previous" [disabled]:
+        - generic: Previous
+      - button "Next" [disabled]:
+        - generic: Next
+- document

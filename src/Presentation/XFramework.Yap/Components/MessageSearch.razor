@@ -1,0 +1,68 @@
+@using Communications.Domain.Shared.Contracts.Responses
+@inject ChatWorkspace Chat
+@inject ILogger<MessageSearch> Logger
+
+<BbDialog Open="Open" OpenChanged="OpenChanged"><BbDialogContent Class="yap-dialog">
+    <BbDialogHeader><BbDialogTitle>Search messages</BbDialogTitle><BbDialogDescription>Find a message and open it in its conversation.</BbDialogDescription></BbDialogHeader>
+    <form class="people-search" @onsubmit="Search" @onsubmit:preventDefault>
+        <label class="field"><span class="lab">Message text</span><BbInput UpdateTiming="UpdateTiming.Immediate" @bind-Value="query" Placeholder="Search messages" maxlength="200" /></label>
+        <BbButton Type="ButtonType.Submit" Disabled="busy || string.IsNullOrWhiteSpace(query)">Search</BbButton>
+    </form>
+    @if (Chat.Selected is not null) { <label class="check"><input type="checkbox" @bind="currentOnly" />Only this conversation</label> }
+    @if (busy) { <BbSpinner /> }
+    @if (searched)
+    {
+        <p class="search-count">@total result@(total == 1 ? "" : "s")</p>
+        <div class="message-search-results">
+            @foreach (var result in results)
+            {
+                <BbButton Class="message-search-result" Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="() => OpenResult.InvokeAsync(result)">
+                    <span class="t2">@(Chat.Conversations.FirstOrDefault(c => c.Id == result.ThreadId)?.Name ?? "Conversation") · @result.CreatedAt.ToLocalTime().ToString("g")</span>
+                    <span>@result.Text</span>
+                </BbButton>
+            }
+        </div>
+        @if (results.Count < total) { <BbButton Variant="ButtonVariant.Ghost" Disabled="busy" OnClick="More">More results</BbButton> }
+    }
+    @if (error is not null) { <p class="form-error" role="alert">@error</p> }
+</BbDialogContent></BbDialog>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public EventCallback<SearchMessageItemResponse> OpenResult { get; set; }
+    private string query = "", submittedQuery = "";
+    private Guid? submittedThread;
+    private bool currentOnly, busy, searched;
+    private int page, total;
+    private string? error;
+    private List<SearchMessageItemResponse> results = [];
+
+    private async Task Search()
+    {
+        if (busy) return;
+        submittedQuery = query;
+        submittedThread = currentOnly ? Chat.Selected?.Id : null;
+        page = 0; results = []; searched = false;
+        await Fetch(0);
+    }
+    private Task More() => Fetch(page + 1);
+    private async Task Fetch(int nextPage)
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try
+        {
+            var response = await Chat.SearchAsync(submittedQuery, submittedThread, nextPage);
+            results = results.Concat(response.Items).DistinctBy(m => m.MessageId).ToList();
+            page = nextPage; total = response.TotalCount; searched = true;
+        }
+        catch (OperationCanceledException) when (Chat.Cancellation.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Yap could not search messages.");
+            error = ex is ChatOperationException ? ex.Message : "Search is unavailable. Please try again.";
+        }
+        finally { busy = false; }
+    }
+}

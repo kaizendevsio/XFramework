@@ -1,0 +1,35 @@
+@page "/register"
+@attribute [AllowAnonymous]
+<PageTitle>Create an account · Yap</PageTitle>
+<ScrollSurface>
+    <Header><div class="appbar plain liquid-glass"><GlassLayer /><Brand /><span class="sp"></span><ThemeToggle /></div></Header>
+    <ChildContent><div class="body authbody">
+        <div class="authbrand"><Brand /><span class="tagline">A little closer.</span></div>
+        <h1>Join the conversation</h1><p>Create your account and find your people.</p>
+        @if (Error is not null) { <p class="form-error" role="alert">@ErrorMessage</p> }
+        <form method="post" action="/auth/register" data-enhance="false">
+            <AntiforgeryToken />
+            <label class="field"><span class="lab">Display name</span><span class="inp liquid-glass"><GlassLayer /><YapIcon Name="user" Size="19" /><input name="displayName" placeholder="What should we call you?" required maxlength="100" autocomplete="nickname" /></span></label>
+            <label class="field"><span class="lab">Username</span><span class="inp liquid-glass"><GlassLayer /><YapIcon Name="user" Size="19" /><input name="username" placeholder="Choose a username" required minlength="3" maxlength="100" pattern="[a-zA-Z0-9_.\-]+" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="username-help" /></span></label>
+            <p id="username-help" class="field-help">3–100 characters: letters, numbers, dots, underscores, or hyphens.</p>
+            <label class="field"><span class="lab">Password</span><span class="inp liquid-glass"><GlassLayer /><YapIcon Name="lock" Size="19" /><input name="password" type="password" placeholder="Create a password" required minlength="8" maxlength="72" autocomplete="new-password" aria-describedby="password-help" /></span></label>
+            <p id="password-help" class="field-help">Use at least 8 characters.</p>
+            <label class="field"><span class="lab">Confirm password</span><span class="inp liquid-glass"><GlassLayer /><YapIcon Name="lock" Size="19" /><input name="confirmPassword" type="password" placeholder="Repeat your password" required minlength="8" maxlength="72" autocomplete="new-password" /></span></label>
+            <button class="btn" type="submit">Create account <YapIcon Name="arrow" Size="18" /></button>
+        </form>
+        <p class="foot">Already have an account? <a href="/login">Sign in</a></p>
+        <InstallHelp />
+    </div></ChildContent>
+</ScrollSurface>
+@code {
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+    private string ErrorMessage => Error switch
+    {
+        "validation" => "Check your display name, username, and password requirements, then try again.",
+        "mismatch" => "Your passwords don't match. Please enter them again.",
+        "taken" => "That username is already taken. Choose another or sign in to your existing account.",
+        "disabled" => "Registration is not available for this workspace. Please contact your administrator.",
+        "limited" => "Too many registration attempts. Please wait a minute and try again.",
+        _ => "We couldn't confirm registration. Try signing in if you already submitted this form, or try again shortly."
+    };
+}

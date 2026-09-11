@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" data-base-color="stone" data-primary-color="lime">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f8f2" />
+    <meta name="description" content="Yap. A little closer. Your conversations, together." />
+    <base href="/" />
+    <link rel="icon" href="icon-192.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Yap" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="stylesheet" href="_content/BlazorBlueprint.Components/css/themes.css" />
+    <link rel="stylesheet" href="_content/BlazorBlueprint.Components/blazorblueprint.css" />
+    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="brand.css" />
+    <link rel="stylesheet" href="motion.css" />
+    <link rel="stylesheet" href="glass.css" />
+    <link rel="stylesheet" href="XFramework.Yap.styles.css" />
+    <link rel="stylesheet" href="live.css" />
+    <script src="app.js"></script>
+    <script src="mobile.js"></script>
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+<body>
+    <div id="app"><Routes @rendermode="InteractiveServer" /></div>
+    <div id="blazor-error-ui" role="alert">The connection was interrupted. <a href="/">Reload Yap</a>.</div>
+    <script src="glass-settings.js"></script>
+    <script src="glass.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>

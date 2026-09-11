@@ -24,7 +24,7 @@ else if (!_reservationsEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Reservations</BbTypographyH3>
@@ -46,29 +46,38 @@ else
                 </div>
             </div>
 
-            <BbCard>
+            <div class="xf-filter-actions">
+                <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search reservations" />
+                <BbFormFieldSelect TValue="string" @bind-Value="_view" Label="Status">
+                    <BbSelectItem Value="@("active")">Active</BbSelectItem><BbSelectItem Value="@("expiring")">Due within 24 hours</BbSelectItem><BbSelectItem Value="@("all")">All history</BbSelectItem>
+                    @foreach (var status in Enum.GetValues<ReservationStatus>()) { <BbSelectItem Value="@status.ToString()">@status</BbSelectItem> }
+                </BbFormFieldSelect>
+            </div><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Reservation List</BbCardTitle>
                     <BbCardDescription>@_reservations.Count reservation(s) loaded</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_reservations" ShowPagination="true" InitialPageSize="20"
+                    <BbDataGrid Items="@_reservations.Where(MatchesReservation).ToList()" ShowPagination="true" InitialPageSize="20"
                                 OnRowClick="@((Reservation item) => Navigation.NavigateTo($"/inventario/reservations/{item.Id}"))"
                                 Class="cursor-pointer">
                         <Columns>
+                            <BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Warehouse" Filterable="true" FilterBy="@(item => GetWarehouseName(item.WarehouseId))"><ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent></BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Allocated lots" Filterable="true" FilterBy="@(item => AllocationLabel(item))"><ChildContent Context="item">@AllocationLabel(item)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                             </BbDataGridTemplateColumn>
                             <BbDataGridTemplateColumn Title="Location" Filterable="true" FilterBy="@(item => GetLocationName(item.LocationId))">
                                 <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Status" Filterable="true" FilterBy="@(item => item.Status)">
                                 <ChildContent Context="item">
                                     <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceType)" Title="Reference" Filterable="true" />
+                            <BbDataGridTemplateColumn Title="Reference" Filterable="true" FilterBy="@(item => InventoryDisplay.Reference(item.ReferenceType))"><ChildContent Context="item">@InventoryDisplay.Reference(item.ReferenceType)</ChildContent></BbDataGridTemplateColumn>
                             <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" Filterable="true" />
                             <BbDataGridTemplateColumn Title="Actions">
@@ -101,12 +110,12 @@ else
 }
 
 <BbDialog Open="@_reservationDialogOpen" OpenChanged="@(v => _reservationDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Reserve Inventory</BbDialogTitle>
             <BbDialogDescription>Reservations reduce available quantity without changing on-hand stock.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <div class="grid gap-3 xl:grid-cols-3">
                 <XfEntityPicker TItem="Product"
                                 Value="@_form.ProductId"
@@ -147,6 +156,12 @@ else
                                 AdvancedSearchTitle="Find Location"
                                 AdvancedSearchDescription="Search locations for the selected warehouse." />
             </div>
+            <BbFormFieldSelect TValue="string" Value="@_form.ProductVariationId" ValueChanged="@((string value) => { _form.ProductVariationId = value; _form.LotId = ""; })" Label="Variant">
+                <BbSelectItem Value="@("base")">Base product</BbSelectItem>
+                @foreach (var variant in _variants.Where(x => x.ProductId.ToString() == _form.ProductId))
+                { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }
+            </BbFormFieldSelect>
+            <p>Available stock: @AvailableStock.ToString("0.####"). Leaving the lot empty allocates eligible stock with the earliest expiry first.</p>
             @if (_traceabilityEnabled)
             {
                 <div class="grid gap-3 md:grid-cols-2">
@@ -154,14 +169,14 @@ else
                                     @bind-Value="_form.LotId"
                                     Items="@LotsForSelectedProduct().ToList()"
                                     Label="Lot / Batch"
-                                    Placeholder="Auto FEFO allocation"
+                                    Placeholder="Earliest expiry first"
                                     SearchPlaceholder="Search lots..."
                                     EmptyMessage="No lots found."
                                     ValueSelector="@GetLotPickerValue"
                                     TextSelector="@GetLotLabel"
                                     SearchTextSelector="@GetLotSearchText"
                                     AllowClear="true"
-                                    ClearText="Auto FEFO allocation"
+                                    ClearText="Earliest expiry first"
                                     AdvancedSearchTitle="Find Lot / Batch"
                                     AdvancedSearchDescription="Search lots for the selected product." />
                     <BbFormFieldSwitch Checked="@_form.AllowExpiredLotOverride"
@@ -178,7 +193,7 @@ else
                                          @bind-Value="_form.Quantity"
                                          Label="Quantity"
                                          Min="0"
-                                         DecimalPlaces="2"
+                                         DecimalPlaces="4"
                                          Step="1" />
                 <BbFormFieldDatePicker @bind-Value="_form.ExpiresAt" Label="Expires At" />
                 <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceType" Label="Reference Type" />
@@ -205,8 +220,20 @@ else
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
-    private readonly ReservationForm _form = new();
+    private ReservationForm _form = new();
     private List<Product> _products = [];
+    private List<ProductVariation> _variants = [];
+    private List<StockBalance> _balances = [];
+    private List<ReservationAllocation> _allocations = [];
+    private string _search = "";
+    private string _view = "active";
+    private static Guid? OptionalId(string value) => Guid.TryParse(value, out var id) ? id : null;
+    private string AllocationLabel(Reservation reservation) => string.Join(", ", _allocations.Where(x => x.ReservationId == reservation.Id).Select(x => x.LotId is { } id ? _lots.FirstOrDefault(l => l.Id == id)?.LotNumber ?? id.ToString()[..8] : "Untracked").Distinct());
+    private decimal AvailableStock => _balances.Where(x => x.ProductId.ToString() == _form.ProductId && x.ProductVariationId == OptionalId(_form.ProductVariationId) && x.WarehouseId.ToString() == _form.WarehouseId && x.LocationId.ToString() == _form.LocationId && (string.IsNullOrEmpty(_form.LotId) || x.LotId.ToString() == _form.LotId) && (x.LotId == null || _lots.Any(l => l.Id == x.LotId && l.Status == InventoryLotStatus.Available && (l.ExpiresAt == null || l.ExpiresAt > DateTime.UtcNow || _form.AllowExpiredLotOverride)))).Sum(x => x.AvailableQuantity);
+    private bool MatchesReservation(Reservation item) =>
+        (_view == "all" || (_view == "active" && item.Status == ReservationStatus.Active) || (_view == "expiring" && item.Status == ReservationStatus.Active && item.ExpiresAt <= DateTime.UtcNow.AddDays(1)) || item.Status.ToString() == _view) &&
+        $"{GetProductName(item.ProductId)} {InventoryDisplay.Variant(_variants, item.ProductVariationId)} {item.ReferenceType} {AllocationLabel(item)}".Contains(_search, StringComparison.OrdinalIgnoreCase);
+
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
     private List<InventoryLot> _lots = [];
@@ -218,7 +245,7 @@ else
     private bool _reserving;
     private bool _expiring;
     private bool _reservationDialogOpen;
-    private bool IsReserveDisabled => _reserving || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
+    private bool IsReserveDisabled => _reserving || string.IsNullOrEmpty(_form.ProductId) || _form.Quantity <= 0 || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
 
     protected override void OnInitialized()
     {
@@ -248,6 +275,9 @@ else
             if (!_hasTenant || !_reservationsEnabled) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _balances = await DataContext.Query<StockBalance>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            _allocations = await DataContext.Query<ReservationAllocation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(2000).ToListAsync();
             _products = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -328,6 +358,7 @@ else
             {
                 Metadata = BuildMetadata(),
                 ProductId = productId,
+                ProductVariationId = OptionalId(_form.ProductVariationId),
                 WarehouseId = warehouseId,
                 LocationId = locationId,
                 Quantity = _form.Quantity,
@@ -361,6 +392,7 @@ else
 
     private void OpenReservationDialog()
     {
+        _form = new();
         ApplyDefaultSelections();
         _reservationDialogOpen = true;
     }
@@ -430,14 +462,15 @@ else
     private IEnumerable<InventoryLot> LotsForSelectedProduct()
     {
         if (!Guid.TryParse(_form.ProductId, out var productId))
-            return _lots;
+            return [];
 
-        return _lots.Where(x => x.ProductId == productId);
+        return _lots.Where(x => x.ProductId == productId && x.ProductVariationId == OptionalId(_form.ProductVariationId));
     }
 
     private void OnReservationProductChanged(string? value)
     {
         _form.ProductId = value ?? "";
+        _form.ProductVariationId = "base";
         _form.LotId = "";
     }
 
@@ -450,7 +483,7 @@ else
 
     private void ApplyDefaultSelections()
     {
-        _form.ProductId = _form.ProductId.Length > 0 ? _form.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
+
         _form.WarehouseId = _form.WarehouseId.Length > 0 ? _form.WarehouseId : _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
         var location = LocationsForSelectedWarehouse().FirstOrDefault() ?? _locations.FirstOrDefault();
         _form.LocationId = _form.LocationId.Length > 0 ? _form.LocationId : location?.Id.ToString() ?? "";
@@ -485,7 +518,7 @@ else
     private static string GetWarehouseLabel(Warehouse warehouse) => $"{warehouse.Code} - {warehouse.Name}";
     private static string GetWarehousePickerValue(Warehouse warehouse) => warehouse.Id.ToString();
     private static string GetWarehouseSearchText(Warehouse warehouse) => $"{warehouse.Code} {warehouse.Name} {warehouse.City} {warehouse.Region} {warehouse.CountryCode}";
-    private string GetWarehouseName(Guid warehouseId) => _warehouses.FirstOrDefault(x => x.Id == warehouseId) is { } warehouse ? GetWarehouseLabel(warehouse) : warehouseId.ToString()[..8];
+    private string GetWarehouseName(Guid? warehouseId) => _warehouses.FirstOrDefault(x => x.Id == warehouseId) is { } warehouse ? GetWarehouseLabel(warehouse) : warehouseId?.ToString()[..8] ?? "Any warehouse";
 
     private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
     private static string GetLocationPickerValue(InventoryLocation location) => location.Id.ToString();
@@ -517,10 +550,11 @@ else
     private sealed class ReservationForm
     {
         public string ProductId { get; set; } = "";
+        public string ProductVariationId { get; set; } = "base";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
         public string LotId { get; set; } = "";
-        public decimal Quantity { get; set; }
+        public decimal Quantity { get; set; } = 1m;
         public DateTime? ExpiresAt { get; set; }
         public string ReferenceType { get; set; } = "";
         public string ReferenceId { get; set; } = "";

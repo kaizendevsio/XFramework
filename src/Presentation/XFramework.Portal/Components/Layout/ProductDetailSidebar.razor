@@ -8,6 +8,8 @@
                 Match="NavLinkMatch.All"
                 Strong="true" />
 
+<SidebarNavItem Href="/inventario/stock" Label="Inventario workspace" Icon="boxes" />
+
 <SidebarSection GroupId="product-detail" Title="Product Detail" Icon="package">
     <SidebarAnchorItem Href="@SectionHref("summary")" Label="Summary" Icon="file-text" Active="@(CurrentSection == "summary")" />
     @if (ShowStock)

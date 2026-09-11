@@ -2225,3 +2225,28 @@
         break-inside: avoid;
     }
 }
+
+/* Inventario workspace: preserve table state while hiding inactive mounted panels. */
+.inv-workspace-tabs [role="tabpanel"][data-state="inactive"] { display: none; }
+.inventario-mobile-menu { display: none; }
+.inventario-shell .xf-page-header, .inventario-shell .xf-page-actions { flex-wrap: wrap; }
+.inventario-shell [role="grid"] { min-width: 38rem; }
+.inventario-shell [role="grid"] [role="columnheader"]:last-child,
+.inventario-shell [role="grid"] [role="gridcell"]:last-child { position: sticky; right: 0; background: var(--background); }
+.inventario-shell .inv-page { min-width: 0; }
+.inventario-shell .inv-page div:has(> [role="grid"])::after { content: "Scroll table horizontally for more columns"; display: block; position: sticky; left: 0; font-size: .75rem; color: var(--muted-foreground); padding-top: .4rem; }
+.inventario-navigation-sheet { width: min(90vw, 22rem); overflow-y: auto; }
+.inv-dialog { max-height: calc(100dvh - 2rem); display: flex; flex-direction: column; overflow: hidden; }
+.inv-dialog > .inv-dialog-body { overflow-y: auto; min-height: 0; flex: 1; }
+.inv-dialog > :not(.inv-dialog-body) { flex-shrink: 0; }
+@media (max-width: 767px) {
+    .inventario-shell > .app-sidebar { display: none; }
+    .inventario-shell .inventario-mobile-menu { display: inline-flex; }
+    .inventario-shell .app-header { padding-inline: .5rem; gap: .25rem; }
+    .inventario-shell .app-header-breadcrumb { overflow: hidden; max-width: 45vw; }
+    .inventario-shell .app-header-breadcrumb ol { flex-wrap: nowrap; white-space: nowrap; }
+    .inventario-shell main { padding: .75rem; }
+    .inventario-shell .xf-filter-actions { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; }
+    .inventario-shell .inv-workspace-tabs [role="tablist"] { max-width: 100%; overflow-x: auto; }
+    .inv-dialog { max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }
+}

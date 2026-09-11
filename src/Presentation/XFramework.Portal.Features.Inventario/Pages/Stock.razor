@@ -24,7 +24,7 @@ else if (!_stockEnabled && !_movementsEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Stock Control</BbTypographyH3>
@@ -45,18 +45,31 @@ else
                 </div>
             </div>
 
+            <div class="xf-filter-actions">
+                <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search stock" Placeholder="Product, SKU, variant or lot" />
+                <BbFormFieldSelect TValue="string" @bind-Value="_warehouseFilter" Label="Warehouse">
+                    <BbSelectItem Value="@("all")">All warehouses</BbSelectItem>
+                    @foreach (var warehouse in _warehouses) { <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Name</BbSelectItem> }
+                </BbFormFieldSelect>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => { _search = ""; _warehouseFilter = "all"; })">Clear filters</BbButton>
+            </div>
+            <BbTabs Value="@_stockView" ValueChanged="@(v => _stockView = v)" Class="inv-workspace-tabs">
+                <BbTabsList>
+                    @if (_stockEnabled) { <BbTabsTrigger Value="balances">Balances (@_balances.Count)</BbTabsTrigger> }
+                    @if (_movementsEnabled) { <BbTabsTrigger Value="movements">Movements (@_movements.Count)</BbTabsTrigger> }
+                </BbTabsList>
             @if (_stockEnabled)
             {
-                <BbCard>
+                <BbTabsContent Value="balances" ForceMount="true"><BbCard>
                     <BbCardHeader>
                         <BbCardTitle>Stock Balances</BbCardTitle>
                         <BbCardDescription>@_balances.Count balance row(s) loaded</BbCardDescription>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="20"
+                        <BbDataGrid Items="@_balances.Where(x => Matches(x.ProductId, x.ProductVariationId, x.LotId, x.WarehouseId)).ToList()" ShowPagination="true" InitialPageSize="20"
                                     OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
                                     Class="cursor-pointer">
-                            <Columns>
+                            <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
                                 <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                                 </BbDataGridTemplateColumn>
@@ -72,36 +85,38 @@ else
                                         <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
                                     </BbDataGridTemplateColumn>
                                 }
-                                <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.LastMovementAt)" Title="Last Movement" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Format="0.####" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Format="0.####" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
+
+                                <BbDataGridPropertyColumn Property="@(x => x.LastMovementAt)" Title="Last movement" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
                                     <ChildContent Context="item">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" AriaLabel="View stock balance"
                                                   OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))">
                                             <LucideIcon Name="eye" class="h-4 w-4" />
                                         </BbButton>
+                                        <div @onclick:stopPropagation="true"><BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => OpenForBalance(item))">Adjust</BbButton></div>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
                             </Columns>
                         </BbDataGrid>
                     </BbCardContent>
-                </BbCard>
+                </BbCard></BbTabsContent>
             }
 
             @if (_movementsEnabled)
             {
-                <BbCard>
+                <BbTabsContent Value="movements" ForceMount="true"><BbCard>
                     <BbCardHeader>
                         <BbCardTitle>Movement Ledger</BbCardTitle>
                         <BbCardDescription>@_movements.Count movement(s) loaded</BbCardDescription>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20"
+                        <BbDataGrid Items="@_movements.Where(x => Matches(x.ProductId, x.ProductVariationId, x.LotId, x.WarehouseId)).ToList()" ShowPagination="true" InitialPageSize="20"
                                     OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
                                     Class="cursor-pointer">
-                            <Columns>
+                            <Columns><BbDataGridTemplateColumn Title="Variant" Filterable="true" FilterBy="@(item => InventoryDisplay.Variant(_variants, item.ProductVariationId))"><ChildContent Context="item">@InventoryDisplay.Variant(_variants, item.ProductVariationId)</ChildContent></BbDataGridTemplateColumn>
                                 <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                                 </BbDataGridTemplateColumn>
@@ -112,9 +127,10 @@ else
                                     </BbDataGridTemplateColumn>
                                 }
                                 <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="Before" Sortable="true" Filterable="true" />
-                                <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" Filterable="true" />
+                                <BbDataGridTemplateColumn Title="Affects" Filterable="true" FilterBy="@(item => InventoryDisplay.Effect(item.MovementType))"><ChildContent Context="item">@InventoryDisplay.Effect(item.MovementType)</ChildContent></BbDataGridTemplateColumn>
+<BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Format="0.####" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="On hand before" Format="0.####" Sortable="true" Filterable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="On hand after" Format="0.####" Sortable="true" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" Filterable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" Filterable="true" />
                                 <BbDataGridTemplateColumn Title="Actions">
@@ -128,19 +144,20 @@ else
                             </Columns>
                         </BbDataGrid>
                     </BbCardContent>
-                </BbCard>
+                </BbCard></BbTabsContent>
             }
+</BbTabs>
         </div>
     </FadeInContent>
 }
 
 <BbDialog Open="@_movementDialogOpen" OpenChanged="@(v => _movementDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Post Movement</BbDialogTitle>
-            <BbDialogDescription>Movements are append-only and update stock balances through Inventario services.</BbDialogDescription>
+            <BbDialogDescription>Choose the stock position and record the quantity change. Adjustments use a signed change: +5 adds five; -5 removes five. This does not set an absolute balance.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <div class="grid gap-3 xl:grid-cols-2">
                 <XfEntityPicker TItem="Product"
                                 Value="@_movementForm.ProductId"
@@ -155,6 +172,11 @@ else
                                 SearchTextSelector="@GetProductSearchText"
                                 AdvancedSearchTitle="Find Product"
                                 AdvancedSearchDescription="Search products in the active tenant." />
+                <BbFormFieldSelect TValue="string" Value="@_movementForm.ProductVariationId" ValueChanged="@((string value) => { _movementForm.ProductVariationId = value; _movementForm.LotId = ""; })" Label="Variant">
+                    <BbSelectItem Value="@("base")">Base product</BbSelectItem>
+                    @foreach (var variant in _variants.Where(x => x.ProductId.ToString() == _movementForm.ProductId))
+                    { <BbSelectItem Value="@variant.Id.ToString()">@InventoryDisplay.Variant(_variants, variant.Id)</BbSelectItem> }
+                </BbFormFieldSelect>
                 @if (_traceabilityEnabled)
                 {
                     <XfEntityPicker TItem="InventoryLot"
@@ -208,11 +230,12 @@ else
                 <BbFormFieldNumericInput TValue="decimal"
                                          @bind-Value="_movementForm.Quantity"
                                          Label="Quantity"
-                                         DecimalPlaces="2"
+                                         DecimalPlaces="4"
                                          Step="1" />
                 <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
                 <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
             </div>
+            <p class="text-sm text-muted-foreground">Available in selected position: @SelectedAvailable.ToString("0.####"). Reservation/release changes reserved stock; other types change on-hand. A negative-stock override permits an available balance below zero for this posting only.</p>
             <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Reason" Label="Reason" />
             @if (_negativeStockEnabled)
             {
@@ -238,8 +261,33 @@ else
     [Inject] private IPortalModuleAvailability ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
-    private readonly MovementForm _movementForm = new();
+    private MovementForm _movementForm = new();
     private List<Product> _products = [];
+    private List<ProductVariation> _variants = [];
+    private string _search = "";
+    private string _warehouseFilter = "all";
+    private string _stockView = "balances";
+    [SupplyParameterFromQuery] public Guid? ProductId { get; set; }
+    private bool Matches(Guid product, Guid? variant, Guid? lot, Guid? warehouse) =>
+        (ProductId is null || product == ProductId) && (_warehouseFilter == "all" || warehouse.ToString() == _warehouseFilter) &&
+        $"{GetProductName(product)} {_products.FirstOrDefault(x => x.Id == product)?.SKU} {InventoryDisplay.Variant(_variants, variant)} {GetLotLabel(lot)}".Contains(_search, StringComparison.OrdinalIgnoreCase);
+    private decimal SelectedAvailable => _balances.Where(x => x.ProductId.ToString() == _movementForm.ProductId && x.ProductVariationId == ParseVariant(_movementForm.ProductVariationId) && x.WarehouseId.ToString() == _movementForm.WarehouseId && x.LocationId.ToString() == _movementForm.LocationId && x.LotId == ParseVariant(_movementForm.LotId)).Sum(x => x.AvailableQuantity);
+    private static Guid? ParseVariant(string value) => Guid.TryParse(value, out var id) ? id : null;
+    private void OpenForBalance(StockBalance balance)
+    {
+        _movementForm = new();
+        _movementForm.ProductId = balance.ProductId.ToString();
+        _movementForm.ProductVariationId = balance.ProductVariationId?.ToString() ?? "base";
+        _movementForm.WarehouseId = balance.WarehouseId.ToString();
+        _movementForm.LocationId = balance.LocationId.ToString();
+        _movementForm.LotId = balance.LotId?.ToString() ?? "";
+        _movementForm.Quantity = 0;
+        _movementForm.MovementType = InventoryMovementType.Adjustment.ToString();
+        _movementForm.AllowNegativeStock = false;
+        _movementForm.ReferenceType = "";
+        _movementForm.Reason = "";
+        _movementDialogOpen = true;
+    }
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
     private List<InventoryLot> _lots = [];
@@ -253,7 +301,7 @@ else
     private bool _negativeStockEnabled;
     private bool _postingMovement;
     private bool _movementDialogOpen;
-    private bool IsPostMovementDisabled => _postingMovement || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
+    private bool IsPostMovementDisabled => _postingMovement || string.IsNullOrEmpty(_movementForm.ProductId) || _movementForm.Quantity == 0 || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
     protected override void OnInitialized()
     {
         TenantFilter.OnChanged += OnTenantChanged;
@@ -287,6 +335,8 @@ else
             if (!_hasTenant || (!_stockEnabled && !_movementsEnabled)) return;
 
             var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _variants = await DataContext.Query<ProductVariation>().NoCache().Where(x => x.TenantId == tenantId && !x.IsDeleted).Take(1000).ToListAsync();
+            if (!_stockEnabled) _stockView = "movements";
             _products = await DataContext.Query<Product>()
                 .IgnoreQueryFilters()
                 .NoCache()
@@ -374,6 +424,7 @@ else
             {
                 Metadata = BuildMetadata(),
                 ProductId = productId,
+                ProductVariationId = ParseVariant(_movementForm.ProductVariationId),
                 WarehouseId = warehouseId,
                 LocationId = locationId,
                 LotId = Guid.TryParse(_movementForm.LotId, out var lotId) ? lotId : null,
@@ -402,6 +453,7 @@ else
 
     private void OpenMovementDialog()
     {
+        _movementForm = new();
         ApplyDefaultMovementSelections();
         _movementDialogOpen = true;
     }
@@ -424,12 +476,13 @@ else
     private void OnMovementProductChanged(string? value)
     {
         _movementForm.ProductId = value ?? "";
+        _movementForm.ProductVariationId = "base";
         _movementForm.LotId = "";
     }
 
     private void ApplyDefaultMovementSelections()
     {
-        _movementForm.ProductId = _movementForm.ProductId.Length > 0 ? _movementForm.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
+
         _movementForm.WarehouseId = _movementForm.WarehouseId.Length > 0 ? _movementForm.WarehouseId : _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
         var location = LocationsForSelectedWarehouse().FirstOrDefault() ?? _locations.FirstOrDefault();
         _movementForm.LocationId = _movementForm.LocationId.Length > 0 ? _movementForm.LocationId : location?.Id.ToString() ?? "";
@@ -438,9 +491,9 @@ else
     private IEnumerable<InventoryLot> LotsForSelectedProduct()
     {
         if (!Guid.TryParse(_movementForm.ProductId, out var productId))
-            return _lots;
+            return [];
 
-        return _lots.Where(x => x.ProductId == productId);
+        return _lots.Where(x => x.ProductId == productId && x.ProductVariationId == ParseVariant(_movementForm.ProductVariationId));
     }
 
     private RequestMetadata BuildMetadata() => new()
@@ -506,6 +559,7 @@ else
     private sealed class MovementForm
     {
         public string ProductId { get; set; } = "";
+        public string ProductVariationId { get; set; } = "base";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
         public string LotId { get; set; } = "";

@@ -195,4 +195,74 @@ public sealed class WarehouseService(
             TenantModuleFeatureKeys.Inventario,
             TenantModuleFeatureKeys.WarehousingSubFeature,
             ct);
+
+    public async Task<Result<Warehouse>> UpdateWarehouseAsync(UpdateWarehouseRequest request, CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<Warehouse>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+        var tenantId = tenantResult.Data;
+        var featureResult = await EnsureWarehousingEnabledAsync(tenantId, ct);
+        if (!featureResult.IsSuccess)
+            return Result<Warehouse>.Failure(featureResult.Message!, featureResult.StatusCode);
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 200)
+            return Result<Warehouse>.Failure("Name is required and must be at most 200 characters.", 400);
+
+        if (request.Description?.Length > 1000) return Result<Warehouse>.Failure("Description must be at most 1000 characters.", 400);
+        if (request.AddressLine?.Length > 500) return Result<Warehouse>.Failure("AddressLine must be at most 500 characters.", 400);
+        if (request.City?.Length > 100) return Result<Warehouse>.Failure("City must be at most 100 characters.", 400);
+        if (request.Region?.Length > 100) return Result<Warehouse>.Failure("Region must be at most 100 characters.", 400);
+        if (request.PostalCode?.Length > 25) return Result<Warehouse>.Failure("PostalCode must be at most 25 characters.", 400);
+        if (request.CountryCode?.Length > 3) return Result<Warehouse>.Failure("CountryCode must be at most 3 characters.", 400);
+        var entity = await dataContext.Query<Warehouse>()
+            .Where(x => x.TenantId == tenantId && x.Id == request.Id && !x.IsDeleted).FirstOrDefaultAsync(ct);
+        if (entity is null) return Result<Warehouse>.NotFound("Record not found.");
+        if (entity.ConcurrencyStamp != request.ConcurrencyStamp)
+            return Result<Warehouse>.Conflict("This record changed. Refresh before saving.");
+        dataContext.Update(entity);
+        entity.Name = NormalizeOptional(request.Name);
+        entity.Description = NormalizeOptional(request.Description);
+        entity.AddressLine = NormalizeOptional(request.AddressLine);
+        entity.City = NormalizeOptional(request.City);
+        entity.Region = NormalizeOptional(request.Region);
+        entity.PostalCode = NormalizeOptional(request.PostalCode);
+        entity.CountryCode = NormalizeOptional(request.CountryCode);
+        entity.ModifiedAt = DateTime.UtcNow;
+        entity.ConcurrencyStamp = Guid.NewGuid();
+        var saved = await dataContext.SaveChangesAsync(ct);
+        return saved.IsSuccess ? Result<Warehouse>.Success(entity) : Result<Warehouse>.Failure("Could not save changes.", saved.StatusCode);
+    }
+
+    public async Task<Result<InventoryLocation>> UpdateInventoryLocationAsync(UpdateInventoryLocationRequest request, CancellationToken ct = default)
+    {
+        var tenantResult = GetCurrentTenantId(request);
+        if (!tenantResult.IsSuccess)
+            return Result<InventoryLocation>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+        var tenantId = tenantResult.Data;
+        var featureResult = await EnsureWarehousingEnabledAsync(tenantId, ct);
+        if (!featureResult.IsSuccess)
+            return Result<InventoryLocation>.Failure(featureResult.Message!, featureResult.StatusCode);
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 200)
+            return Result<InventoryLocation>.Failure("Name is required and must be at most 200 characters.", 400);
+        if (!Enum.IsDefined(request.LocationType))
+            return Result<InventoryLocation>.Failure("Choose a valid location type.", 400);
+        if (!request.IsPickable && await dataContext.Query<StockBalance>().AnyAsync(x => x.TenantId == tenantId && x.LocationId == request.Id && x.ReservedQuantity > 0 && !x.IsDeleted, ct))
+            return Result<InventoryLocation>.Conflict("Release active reservations before disabling picking.");
+
+        if (request.Description?.Length > 1000) return Result<InventoryLocation>.Failure("Description must be at most 1000 characters.", 400);
+        var entity = await dataContext.Query<InventoryLocation>()
+            .Where(x => x.TenantId == tenantId && x.Id == request.Id && !x.IsDeleted).FirstOrDefaultAsync(ct);
+        if (entity is null) return Result<InventoryLocation>.NotFound("Record not found.");
+        if (entity.ConcurrencyStamp != request.ConcurrencyStamp)
+            return Result<InventoryLocation>.Conflict("This record changed. Refresh before saving.");
+        dataContext.Update(entity);
+        entity.Name = NormalizeOptional(request.Name);
+        entity.Description = NormalizeOptional(request.Description);
+        entity.LocationType = request.LocationType;
+        entity.IsPickable = request.IsPickable;
+        entity.ModifiedAt = DateTime.UtcNow;
+        entity.ConcurrencyStamp = Guid.NewGuid();
+        var saved = await dataContext.SaveChangesAsync(ct);
+        return saved.IsSuccess ? Result<InventoryLocation>.Success(entity) : Result<InventoryLocation>.Failure("Could not save changes.", saved.StatusCode);
+    }
 }

@@ -20,7 +20,7 @@ else if (!_planningEnabled)
 else
 {
     <FadeInContent>
-        <div class="space-y-6">
+        <div class="space-y-6 inv-page">
             <div class="xf-page-header">
                 <div>
                     <BbTypographyH3>Replenishment Planning</BbTypographyH3>
@@ -65,10 +65,10 @@ else
                 </BbCard>
             </div>
 
-            <BbCard>
+            <BbTabs DefaultValue="view0" Class="inv-workspace-tabs"><BbTabsList><BbTabsTrigger Value="view0">Suggestions</BbTabsTrigger><BbTabsTrigger Value="view1">Rules</BbTabsTrigger></BbTabsList><BbTabsContent Value="view0" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Reorder Suggestions</BbCardTitle>
-                    <BbCardDescription>@_suggestions.Count suggestion(s) generated from active rules</BbCardDescription>
+                    <BbCardDescription>@_suggestions.Count suggestion(s). When available stock reaches the reorder point, order the greater of configured reorder quantity or the gap to maximum stock (or point + reorder quantity when no maximum is set). Review supplier and quantities in a draft PO.</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
                     <BbDataGrid Items="@_suggestions" ShowPagination="true" InitialPageSize="20">
@@ -76,22 +76,22 @@ else
                             <BbDataGridPropertyColumn Property="@(x => x.ProductName)" Title="Product" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.WarehouseName)" Title="Warehouse" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.LocationName)" Title="Location" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Format="0.####" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.ReorderPoint)" Title="Reorder Point" Sortable="true" Filterable="true" />
                             <BbDataGridPropertyColumn Property="@(x => x.SuggestedQuantity)" Title="Suggested Qty" Sortable="true" Filterable="true" />
-                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" Filterable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.PreferredSupplier)" Title="Preferred Supplier" Filterable="true" /><BbDataGridTemplateColumn Title="Next step"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Navigation.NavigateTo($"/inventario/purchase-orders?productId={item.ProductId}&variantId={item.ProductVariationId}&quantity={item.SuggestedQuantity.ToString(CultureInfo.InvariantCulture)}&scope={Uri.EscapeDataString($"Replenish {item.WarehouseName} / {item.LocationName}. Preferred supplier: {item.PreferredSupplier}")}"))">Prepare draft PO</BbButton></ChildContent></BbDataGridTemplateColumn>
                         </Columns>
                     </BbDataGrid>
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent>
 
-            <BbCard>
+            <BbTabsContent Value="view1" ForceMount="true"><BbCard>
                 <BbCardHeader>
                     <BbCardTitle>Reorder Rules</BbCardTitle>
                     <BbCardDescription>@_rules.Count rule(s) configured</BbCardDescription>
                 </BbCardHeader>
                 <BbCardContent>
-                    <BbDataGrid Items="@_rules" ShowPagination="true" InitialPageSize="20">
+                    <BbDataGrid Items="@_rules" OnRowClick="@((InventoryReorderRule item) => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))" ShowPagination="true" InitialPageSize="20">
                         <Columns>
                             <BbDataGridTemplateColumn Title="Product" Filterable="true" FilterBy="@(item => GetProductName(item.ProductId))">
                                 <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
@@ -109,21 +109,21 @@ else
                                     <StatusBadge Text="@(item.IsActive ? "Active" : "Inactive")" Status="@(item.IsActive ? "active" : "inactive")" />
                                 </ChildContent>
                             </BbDataGridTemplateColumn>
-                        </Columns>
+                        <BbDataGridTemplateColumn Title="Actions"><ChildContent Context="item"><BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/inventario/planning/rules/{item.Id}"))">View / edit</BbButton></ChildContent></BbDataGridTemplateColumn></Columns>
                     </BbDataGrid>
                 </BbCardContent>
-            </BbCard>
+            </BbCard></BbTabsContent></BbTabs>
         </div>
     </FadeInContent>
 }
 
 <BbDialog Open="@_ruleDialogOpen" OpenChanged="@(v => _ruleDialogOpen = v)">
-    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide">
+    <BbDialogContent TrapFocus="false" Class="xf-dialog-wide inv-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Add Reorder Rule</BbDialogTitle>
             <BbDialogDescription>Rules can apply tenant-wide for a product or be scoped to a warehouse/location.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="grid gap-4 py-4">
+        <div class="grid gap-4 py-4 inv-dialog-body">
             <div class="grid gap-3 md:grid-cols-2">
                 <XfEntityPicker TItem="Product"
                                 @bind-Value="_form.ProductId"
@@ -173,25 +173,25 @@ else
                                          @bind-Value="_form.MinimumQuantity"
                                          Label="Minimum"
                                          Min="0"
-                                         DecimalPlaces="2"
+                                         DecimalPlaces="4"
                                          Step="1" />
                 <BbFormFieldNumericInput TValue="decimal"
                                          @bind-Value="_form.MaximumQuantity"
                                          Label="Maximum"
                                          Min="0"
-                                         DecimalPlaces="2"
+                                         DecimalPlaces="4"
                                          Step="1" />
                 <BbFormFieldNumericInput TValue="decimal"
                                          @bind-Value="_form.ReorderPoint"
                                          Label="Reorder Point"
                                          Min="0"
-                                         DecimalPlaces="2"
+                                         DecimalPlaces="4"
                                          Step="1" />
                 <BbFormFieldNumericInput TValue="decimal"
                                          @bind-Value="_form.ReorderQuantity"
                                          Label="Reorder Qty"
                                          Min="0"
-                                         DecimalPlaces="2"
+                                         DecimalPlaces="4"
                                          Step="1" />
             </div>
             <BbFormFieldSwitch Checked="@_form.IsActive"
@@ -206,6 +206,7 @@ else
 </BbDialog>
 
 @code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private IPortalTenantContext TenantFilter { get; set; } = default!;
@@ -288,7 +289,7 @@ else
         {
             var available = _balances
                 .Where(x =>
-                    x.ProductId == rule.ProductId &&
+                    x.ProductId == rule.ProductId && x.ProductVariationId == rule.ProductVariationId &&
                     (rule.WarehouseId is null || x.WarehouseId == rule.WarehouseId) &&
                     (rule.LocationId is null || x.LocationId == rule.LocationId))
                 .Sum(x => x.AvailableQuantity);
@@ -296,6 +297,7 @@ else
             if (available > reorderPoint) continue;
 
             var row = new PlanningRow(
+                rule.ProductId, rule.ProductVariationId,
                 GetProductName(rule.ProductId),
                 GetWarehouseName(rule.WarehouseId),
                 GetLocationName(rule.LocationId),
@@ -435,6 +437,7 @@ else
     }
 
     private sealed record PlanningRow(
+        Guid ProductId, Guid? ProductVariationId,
         string ProductName,
         string WarehouseName,
         string LocationName,
