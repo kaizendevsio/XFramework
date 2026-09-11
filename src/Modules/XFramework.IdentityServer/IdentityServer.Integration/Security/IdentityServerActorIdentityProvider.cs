@@ -1,7 +1,9 @@
 using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -17,6 +19,7 @@ public sealed class IdentityServerActorIdentityProvider(
     : IActorIdentityProvider
 {
     private static readonly object RequestCacheKey = new();
+    private static readonly TimeSpan TransientRetryDelay = TimeSpan.FromMilliseconds(250);
 
     public async Task<ActorIdentityValidationResult> ValidateAsync(
         string token,
@@ -34,17 +37,7 @@ public sealed class IdentityServerActorIdentityProvider(
         try
         {
             using var actorScope = actorAccessTokenScope.Push(token);
-            var response = await identityServer.ValidateIdentitySession(
-                new ValidateIdentitySessionRequest
-                {
-                    Metadata = new RequestMetadata
-                    {
-                        RequestId = Guid.NewGuid(),
-                        OperationName = "Validate actor identity",
-                        DeviceName = Environment.MachineName
-                    }
-                },
-                ct);
+            var response = await ValidateWithTransientRetryAsync(ct);
 
             if (!response.IsSuccess || response.Response is not { IsValid: true } snapshot)
             {
@@ -90,6 +83,41 @@ public sealed class IdentityServerActorIdentityProvider(
                 503);
         }
     }
+
+    private async Task<QueryResponse<ValidateIdentitySessionResponse>> ValidateWithTransientRetryAsync(
+        CancellationToken ct)
+    {
+        try
+        {
+            var response = await identityServer.ValidateIdentitySession(CreateRequest(), ct);
+            if (response.HttpStatusCode != HttpStatusCode.ServiceUnavailable)
+                return response;
+
+            logger.LogDebug("Retrying actor validation after a transient IdentityServer service-unavailable response.");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException)
+        {
+            logger.LogDebug(exception, "Retrying actor validation after a transient Bolt transport failure.");
+        }
+
+        await Task.Delay(TransientRetryDelay, ct);
+        return await identityServer.ValidateIdentitySession(CreateRequest(), ct);
+    }
+
+    private static ValidateIdentitySessionRequest CreateRequest() =>
+        new()
+        {
+            Metadata = new RequestMetadata
+            {
+                RequestId = Guid.NewGuid(),
+                OperationName = "Validate actor identity",
+                DeviceName = Environment.MachineName
+            }
+        };
 
     private sealed record CachedValidation(string TokenDigest, ActorIdentityValidationResult Result);
 }

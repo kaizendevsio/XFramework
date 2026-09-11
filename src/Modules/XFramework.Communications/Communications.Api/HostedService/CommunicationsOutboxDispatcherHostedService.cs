@@ -1,4 +1,6 @@
 using Communications.Api.Services;
+using XFramework.Domain.Shared.ServiceIdentity;
+using XFramework.Integration.Security;
 
 namespace Communications.Api.HostedService;
 
@@ -35,32 +37,83 @@ public sealed class CommunicationsOutboxDispatcherHostedService(
 
     private async Task DispatchBatchAsync(CancellationToken ct)
     {
+        var now = DateTime.UtcNow;
+        List<OutboxCandidate> candidates;
+        await using (var discoveryScope = scopeFactory.CreateAsyncScope())
+        {
+            var discoveryAuthorization = await discoveryScope.ServiceProvider
+                .GetRequiredService<ITrustedServiceTargetContextInitializer>()
+                .EstablishTenantlessAsync(
+                    XFrameworkServiceNames.Communications,
+                    [XFrameworkServiceScopes.DataContextQueryAllTenants],
+                    XFrameworkServiceNames.Communications,
+                    ct: ct);
+            if (!discoveryAuthorization.IsSuccess)
+            {
+                logger.LogWarning(
+                    "Communications outbox tenant discovery authorization failed: {Error}",
+                    discoveryAuthorization.Error);
+                return;
+            }
+
+            var discoveryDb = discoveryScope.ServiceProvider.GetRequiredService<DbContext>();
+            candidates = await discoveryDb.Set<MessageOutboxEvent>()
+                .IgnoreQueryFilters()
+                .Where(e => !e.IsDeleted && e.IsEnabled)
+                .Where(e => e.ProcessedAt == null)
+                .Where(e => e.DeadLetteredAt == null)
+                .Where(e => e.NextAttemptAt == null || e.NextAttemptAt <= now)
+                .Where(e => e.LeaseExpiresAt == null || e.LeaseExpiresAt <= now)
+                .OrderBy(e => e.OccurredAt)
+                .Take(BatchSize)
+                .Select(e => new OutboxCandidate(e.Id, e.TenantId))
+                .ToListAsync(ct);
+        }
+
+        foreach (var tenantCandidates in candidates.GroupBy(candidate => candidate.TenantId))
+        {
+            await DispatchTenantBatchAsync(
+                tenantCandidates.Key,
+                tenantCandidates.Select(candidate => candidate.Id).ToArray(),
+                now,
+                ct);
+        }
+    }
+
+    private async Task DispatchTenantBatchAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> candidateIds,
+        DateTime now,
+        CancellationToken ct)
+    {
         await using var scope = scopeFactory.CreateAsyncScope();
+        var authorization = await scope.ServiceProvider
+            .GetRequiredService<ITrustedServiceTargetContextInitializer>()
+            .EstablishAsync(
+                tenantId,
+                XFrameworkServiceNames.Communications,
+                [XFrameworkServiceScopes.CommunicationsAdmin],
+                XFrameworkServiceNames.Communications,
+                ct: ct);
+        if (!authorization.IsSuccess)
+        {
+            logger.LogWarning(
+                "Communications outbox tenant {TenantId} authorization failed: {Error}",
+                tenantId,
+                authorization.Error);
+            return;
+        }
+
         var db = scope.ServiceProvider.GetRequiredService<DbContext>();
         var publisher = scope.ServiceProvider.GetRequiredService<ICommunicationsRealtimePublisher>();
         var notificationFanout = scope.ServiceProvider.GetRequiredService<ICommunicationsNotificationFanout>();
-        var now = DateTime.UtcNow;
         var leaseOwner = $"{Environment.MachineName}:{Guid.NewGuid():N}";
-
-        var candidateIds = await db.Set<MessageOutboxEvent>()
-            .IgnoreQueryFilters()
-            .Where(e => !e.IsDeleted && e.IsEnabled)
-            .Where(e => e.ProcessedAt == null)
-            .Where(e => e.DeadLetteredAt == null)
-            .Where(e => e.NextAttemptAt == null || e.NextAttemptAt <= now)
-            .Where(e => e.LeaseExpiresAt == null || e.LeaseExpiresAt <= now)
-            .OrderBy(e => e.OccurredAt)
-            .Take(BatchSize)
-            .Select(e => e.Id)
-            .ToListAsync(ct);
-
-        if (candidateIds.Count == 0)
-            return;
 
         var leaseExpiresAt = now.Add(LeaseDuration);
         await db.Set<MessageOutboxEvent>()
             .IgnoreQueryFilters()
             .Where(e => candidateIds.Contains(e.Id))
+            .Where(e => e.TenantId == tenantId)
             .Where(e => e.ProcessedAt == null)
             .Where(e => e.DeadLetteredAt == null)
             .Where(e => e.LeaseExpiresAt == null || e.LeaseExpiresAt <= now)
@@ -73,6 +126,7 @@ public sealed class CommunicationsOutboxDispatcherHostedService(
             .IgnoreQueryFilters()
             .AsTracking()
             .Where(e => candidateIds.Contains(e.Id))
+            .Where(e => e.TenantId == tenantId)
             .Where(e => e.LeaseOwner == leaseOwner)
             .OrderBy(e => e.OccurredAt)
             .ToListAsync(ct);
@@ -127,6 +181,8 @@ public sealed class CommunicationsOutboxDispatcherHostedService(
 
         await db.SaveChangesAsync(ct);
     }
+
+    private sealed record OutboxCandidate(Guid Id, Guid TenantId);
 
     private static TimeSpan CalculateBackoff(int attempts)
     {
