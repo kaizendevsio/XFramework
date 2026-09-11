@@ -37,12 +37,9 @@ else
                 </div>
             </div>
 
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Register List</BbCardTitle>
-                    <BbCardDescription>@(string.IsNullOrWhiteSpace(_loadError) ? $"{_registers.Count} register(s) loaded" : "Register data is unavailable")</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
+            <section class="pos-list-surface" data-testid="pos-list-surface">
+                <BbTypographyMuted data-testid="pos-list-result-count">@(string.IsNullOrWhiteSpace(_loadError) ? $"{_registers.Count} register(s) loaded" : "Register data is unavailable")</BbTypographyMuted>
+                <div class="pos-list-content">
                     @if (!string.IsNullOrWhiteSpace(_loadError))
                     {
                         <BbAlert Variant="AlertVariant.Warning" class="mb-4">
@@ -50,14 +47,14 @@ else
                             <BbAlertDescription>@_loadError Use Refresh to retry.</BbAlertDescription>
                         </BbAlert>
                     }
-                    <div class="mb-4 flex flex-wrap items-end gap-3">
-                        <BbFormFieldInput TValue="string" @bind-Value="_registerSearch" Label="Name, code, or description" />
-                        <BbFormFieldSelect TValue="string" @bind-Value="_registerStatusFilter" Label="Status">
-                            <BbSelectItem Value="@AllStatusesValue">All statuses</BbSelectItem>
-                            <BbSelectItem Value="@("enabled")">Enabled</BbSelectItem>
-                            <BbSelectItem Value="@("disabled")">Disabled</BbSelectItem>
-                        </BbFormFieldSelect>
-                        <BbButton OnClick="@ApplyRegisterFilters" Disabled="@_loadingPage">
+                    <div class="xf-filter-actions pos-list-toolbar" data-testid="pos-list-toolbar">
+                        <div class="pos-list-search" data-testid="pos-list-search">
+                            <BbFormFieldInput TValue="string" @bind-Value="_registerSearch" Label="Name, code, or description" Placeholder="Search registers" />
+                        </div>
+                        <div class="pos-list-status" data-testid="pos-list-status">
+                            <PosListStatusSelect @bind-Value="_registerStatusFilter" Options="@RegisterStatusOptions" />
+                        </div>
+                        <BbButton class="pos-list-search-action" OnClick="@ApplyRegisterFilters" Disabled="@_loadingPage">
                             <LucideIcon Name="search" class="mr-2 h-4 w-4" />Search
                         </BbButton>
                     </div>
@@ -95,19 +92,19 @@ else
                             </BbDataGridTemplateColumn>
                         </Columns>
                         <EmptyTemplate>
-                            <BbEmpty Title="No POS registers" Description="Create a register before using cashier checkout." />
+                            <BbEmpty Title="No registers found" Description="Try adjusting the search or status filter, or create a register to get started." />
                         </EmptyTemplate>
                     </BbDataGrid>
-                    <div class="mt-4 flex items-center justify-between">
+                    <div class="pos-list-pager" data-testid="pos-list-pager">
                         <BbTypographyMuted>Page @_registerPage · up to @RegisterPageSize results per page</BbTypographyMuted>
-                        <div class="flex gap-2">
+                        <div class="pos-list-pager-actions">
                             <BbButton Variant="ButtonVariant.Outline" OnClick="@PreviousRegisterPage" Disabled="@(_registerPage == 1 || _loadingPage)">Previous</BbButton>
                             <BbButton Variant="ButtonVariant.Outline" OnClick="@NextRegisterPage" Disabled="@(!_hasNextRegisterPage || _loadingPage)">Next</BbButton>
                         </div>
                     </div>
                     }
-                </BbCardContent>
-            </BbCard>
+                </div>
+            </section>
         </div>
     </FadeInContent>
 }
@@ -261,6 +258,12 @@ else
     private string _registerSearch = "";
     private const string AllStatusesValue = "all";
     private string _registerStatusFilter = AllStatusesValue;
+    private static readonly IReadOnlyList<SelectOption<string>> RegisterStatusOptions =
+    [
+        new(AllStatusesValue, "All statuses"),
+        new("enabled", "Enabled"),
+        new("disabled", "Disabled")
+    ];
     private const int RegisterPageSize = 50;
     private const int ReferenceSearchSize = 50;
 

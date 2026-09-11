@@ -34,22 +34,17 @@ else
                 </div>
             </div>
 
-            <BbCard>
-                <BbCardHeader>
-                    <BbCardTitle>Sale List</BbCardTitle>
-                    <BbCardDescription>@_sales.Count sale(s) loaded</BbCardDescription>
-                </BbCardHeader>
-                <BbCardContent>
-                    <div class="mb-4 flex flex-wrap items-end gap-3">
-                        <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Receipt or idempotency key" />
-                        <BbFormFieldSelect TValue="string" @bind-Value="_statusFilter" Label="Status">
-                            <BbSelectItem Value="@AllStatusesValue">All statuses</BbSelectItem>
-                            @foreach (var status in Enum.GetValues<PosSaleStatus>())
-                            {
-                                <BbSelectItem Value="@status.ToString()">@status</BbSelectItem>
-                            }
-                        </BbFormFieldSelect>
-                        <BbButton OnClick="@ApplyFilters" Disabled="@_loadingPage">
+            <section class="pos-list-surface" data-testid="pos-list-surface">
+                <BbTypographyMuted data-testid="pos-list-result-count">@_sales.Count sale(s) loaded</BbTypographyMuted>
+                <div class="pos-list-content">
+                    <div class="xf-filter-actions pos-list-toolbar" data-testid="pos-list-toolbar">
+                        <div class="pos-list-search" data-testid="pos-list-search">
+                            <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Receipt or idempotency key" Placeholder="Search sales" />
+                        </div>
+                        <div class="pos-list-status" data-testid="pos-list-status">
+                            <PosListStatusSelect @bind-Value="_statusFilter" Options="@SaleStatusOptions" />
+                        </div>
+                        <BbButton class="pos-list-search-action" OnClick="@ApplyFilters" Disabled="@_loadingPage">
                             <LucideIcon Name="search" class="mr-2 h-4 w-4" />Search
                         </BbButton>
                     </div>
@@ -100,18 +95,18 @@ else
                             </BbDataGridTemplateColumn>
                         </Columns>
                         <EmptyTemplate>
-                            <BbEmpty Title="No POS sales" Description="Completed and recoverable checkout records will appear here." />
+                            <BbEmpty Title="No sales found" Description="Try adjusting the search or status filter." />
                         </EmptyTemplate>
                     </BbDataGrid>
-                    <div class="mt-4 flex items-center justify-between">
+                    <div class="pos-list-pager" data-testid="pos-list-pager">
                         <BbTypographyMuted>Page @_page · up to @PageSize results per page</BbTypographyMuted>
-                        <div class="flex gap-2">
+                        <div class="pos-list-pager-actions">
                             <BbButton Variant="ButtonVariant.Outline" OnClick="@PreviousPage" Disabled="@(_page == 1 || _loadingPage)">Previous</BbButton>
                             <BbButton Variant="ButtonVariant.Outline" OnClick="@NextPage" Disabled="@(!_hasNextPage || _loadingPage)">Next</BbButton>
                         </div>
                     </div>
-                </BbCardContent>
-            </BbCard>
+                </div>
+            </section>
         </div>
     </FadeInContent>
 }
@@ -139,6 +134,11 @@ else
     private string _search = "";
     private const string AllStatusesValue = "all";
     private string _statusFilter = AllStatusesValue;
+    private static readonly IReadOnlyList<SelectOption<string>> SaleStatusOptions =
+    [
+        new(AllStatusesValue, "All statuses"),
+        .. Enum.GetValues<PosSaleStatus>().Select(status => new SelectOption<string>(status.ToString(), status.ToString()))
+    ];
 
     protected override void OnInitialized()
     {
