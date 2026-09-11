@@ -21,7 +21,9 @@ public static class RateLimitingExtensions
     /// <remarks>
     /// Configures the following:
     /// <list type="bullet">
-    ///   <item><description>Global limiter: 100 requests per minute per IP</description></item>
+    ///   <item><description>General traffic: 100 requests per minute per IP</description></item>
+    ///   <item><description>Identity session validation: 600/minute per IP in an independent bounded partition</description></item>
+    ///   <item><description>Public signing-key queries: 60/minute per IP in an independent bounded partition</description></item>
     ///   <item><description>"auth" policy: 10 requests per minute per IP (login, token refresh)</description></item>
     ///   <item><description>"password-reset" policy: 3 requests per 15 minutes per IP</description></item>
     ///   <item><description>"api" policy: 60 requests per minute per IP (general API endpoints)</description></item>
@@ -35,15 +37,20 @@ public static class RateLimitingExtensions
     {
         services.AddRateLimiter(options =>
         {
-            // Global rate limit: 100 requests per minute per IP
+            // One hub multiplexes many users. Session checks and key refreshes must
+            // not exhaust each other's quota (or the login/general request budget).
+            // These are fixed route classes, never client-supplied partition IDs.
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            {
+                var (category, limit) = ResolveGlobalBudget(context.Request);
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: $"{category}:{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}",
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 100,
+                        PermitLimit = limit,
                         Window = TimeSpan.FromMinutes(1)
-                    }));
+                    });
+            });
 
             // Strict policy for auth endpoints: 10 requests per minute per IP
             AddIpPolicy(options, "auth", 10, TimeSpan.FromMinutes(1));
@@ -60,6 +67,18 @@ public static class RateLimitingExtensions
         });
 
         return services;
+    }
+
+    private static (string Category, int Limit) ResolveGlobalBudget(HttpRequest request)
+    {
+        if (HttpMethods.IsPost(request.Method))
+        {
+            if (request.Path.Equals("/api/auth/validate-session", StringComparison.OrdinalIgnoreCase))
+                return ("session-validation", 600);
+            if (request.Path.Equals("/api/service-identity/signing-keys/query", StringComparison.OrdinalIgnoreCase))
+                return ("signing-keys", 60);
+        }
+        return ("general", 100);
     }
 
     /// <summary>
