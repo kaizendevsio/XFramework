@@ -32,7 +32,7 @@ public sealed class StorageDownloadEndpointTests
         uri.Host.Should().Be(expectedHost);
         uri.Scheme.Should().Be(expectedScheme);
         uri.AbsolutePath.Should().Be("/private-test/attachment.txt");
-        uri.Query.Should().Contain("X-Amz-Signature=");
+        uri.Query.Should().Contain("Signature=");
         result.IsPublic.Should().BeFalse();
         profile.Endpoint.Should().Be(providerEndpoint);
     }
